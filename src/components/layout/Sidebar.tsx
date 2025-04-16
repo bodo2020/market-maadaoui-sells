@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   FileText,
+  Receipt,
   Home
 } from "lucide-react";
 
@@ -75,6 +76,12 @@ export default function Sidebar() {
           label="المنتجات"
           href="/products"
           active={currentPath === "/products"}
+        />
+        <SidebarItem
+          icon={<Receipt size={20} />}
+          label="الفواتير"
+          href="/invoices"
+          active={currentPath === "/invoices"}
         />
         <SidebarItem
           icon={<BarChart4 size={20} />}

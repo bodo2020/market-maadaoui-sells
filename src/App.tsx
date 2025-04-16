@@ -16,6 +16,7 @@ import InventoryManagement from "./pages/InventoryManagement";
 import Reports from "./pages/Reports";
 import EmployeeManagement from "./pages/EmployeeManagement";
 import ExpenseManagement from "./pages/ExpenseManagement";
+import Invoices from "./pages/Invoices";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -58,6 +59,12 @@ const App = () => (
             <Route path="/reports" element={
               <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                 <Reports />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/invoices" element={
+              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.CASHIER]}>
+                <Invoices />
               </ProtectedRoute>
             } />
             
