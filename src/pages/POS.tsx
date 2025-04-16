@@ -17,13 +17,13 @@ const demoProducts: Product[] = [
     id: "1",
     name: "سكر 1 كيلو",
     barcode: "6221031954818",
-    imageUrls: ["/placeholder.svg"],
+    image_urls: ["/placeholder.svg"],
     quantity: 100,
     price: 45,
-    purchasePrice: 40,
-    isOffer: false,
-    categoryId: "1",
-    isBulk: false,
+    purchase_price: 40,
+    is_offer: false,
+    category_id: "1",
+    is_bulk: false,
     barcode_type: "normal",
     bulk_enabled: false,
     created_at: new Date(),
@@ -33,14 +33,14 @@ const demoProducts: Product[] = [
     id: "2",
     name: "زيت عباد الشمس 1 لتر",
     barcode: "6221031951255",
-    imageUrls: ["/placeholder.svg"],
+    image_urls: ["/placeholder.svg"],
     quantity: 50,
     price: 60,
-    purchasePrice: 52,
-    isOffer: true,
-    offerPrice: 55,
-    categoryId: "1",
-    isBulk: false,
+    purchase_price: 52,
+    is_offer: true,
+    offer_price: 55,
+    category_id: "1",
+    is_bulk: false,
     barcode_type: "normal",
     bulk_enabled: false,
     created_at: new Date(),
@@ -50,13 +50,13 @@ const demoProducts: Product[] = [
     id: "3",
     name: "أرز مصري 5 كيلو",
     barcode: "6221031953392",
-    imageUrls: ["/placeholder.svg"],
+    image_urls: ["/placeholder.svg"],
     quantity: 30,
     price: 180,
-    purchasePrice: 160,
-    isOffer: false,
-    categoryId: "1",
-    isBulk: true,
+    purchase_price: 160,
+    is_offer: false,
+    category_id: "1",
+    is_bulk: true,
     barcode_type: "normal",
     bulk_enabled: true,
     bulk_quantity: 5,
@@ -69,14 +69,14 @@ const demoProducts: Product[] = [
     id: "4",
     name: "شاي ليبتون 100 كيس",
     barcode: "6221031958762",
-    imageUrls: ["/placeholder.svg"],
+    image_urls: ["/placeholder.svg"],
     quantity: 45,
     price: 120,
-    purchasePrice: 110,
-    isOffer: true,
-    offerPrice: 115,
-    categoryId: "2",
-    isBulk: false,
+    purchase_price: 110,
+    is_offer: true,
+    offer_price: 115,
+    category_id: "2",
+    is_bulk: false,
     barcode_type: "normal",
     bulk_enabled: false,
     created_at: new Date(),
@@ -86,13 +86,13 @@ const demoProducts: Product[] = [
     id: "5",
     name: "تفاح أحمر",
     barcode: "2000123456789",
-    imageUrls: ["/placeholder.svg"],
+    image_urls: ["/placeholder.svg"],
     quantity: 80,
     price: 35,
-    purchasePrice: 30,
-    isOffer: false,
-    categoryId: "1",
-    isBulk: false,
+    purchase_price: 30,
+    is_offer: false,
+    category_id: "1",
+    is_bulk: false,
     barcode_type: "scale",
     bulk_enabled: false,
     created_at: new Date(),
@@ -174,20 +174,20 @@ export default function POS() {
           ? { 
               ...item, 
               quantity: item.quantity + 1,
-              total: (item.quantity + 1) * (product.isOffer && product.offerPrice ? product.offerPrice : product.price) 
+              total: (item.quantity + 1) * (product.is_offer && product.offer_price ? product.offer_price : product.price) 
             } 
           : item
       ));
     } else {
       // Add new item
-      const price = product.isOffer && product.offerPrice ? product.offerPrice : product.price;
+      const price = product.is_offer && product.offer_price ? product.offer_price : product.price;
       setCartItems([
         ...cartItems, 
         { 
           product, 
           quantity: 1, 
           price,
-          discount: product.isOffer && product.offerPrice ? product.price - product.offerPrice : 0,
+          discount: product.is_offer && product.offer_price ? product.price - product.offer_price : 0,
           total: price,
           weight: null
         }
@@ -200,7 +200,7 @@ export default function POS() {
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
     // Calculate price based on weight (kg) and per kg price
     const itemPrice = product.price * weight;
-    const discountPerKg = product.isOffer && product.offerPrice ? product.price - product.offerPrice : 0;
+    const discountPerKg = product.is_offer && product.offer_price ? product.price - product.offer_price : 0;
     
     // Add as new item always (since weight might be different)
     setCartItems([
@@ -406,7 +406,7 @@ export default function POS() {
                         <CardContent className="p-3">
                           <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
                             <img 
-                              src={product.imageUrls[0]} 
+                              src={product.image_urls[0]} 
                               alt={product.name}
                               className="h-16 w-16 object-contain"
                             />
@@ -433,9 +433,9 @@ export default function POS() {
                             <p className="text-sm font-bold">
                               {product.barcode_type === "scale" ? (
                                 <span>{product.price} / كجم</span>
-                              ) : product.isOffer && product.offerPrice ? (
+                              ) : product.is_offer && product.offer_price ? (
                                 <>
-                                  <span className="text-primary">{product.offerPrice}</span>
+                                  <span className="text-primary">{product.offer_price}</span>
                                   <span className="mr-1 text-xs text-muted-foreground line-through">{product.price}</span>
                                 </>
                               ) : (
@@ -443,7 +443,7 @@ export default function POS() {
                               )}
                               <span className="mr-1 text-xs">{siteConfig.currency}</span>
                             </p>
-                            {product.isOffer && (
+                            {product.is_offer && (
                               <Tag className="h-4 w-4 text-primary" />
                             )}
                           </div>
@@ -476,7 +476,7 @@ export default function POS() {
                       <CardContent className="p-3">
                         <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
                           <img 
-                            src={product.imageUrls[0]} 
+                            src={product.image_urls[0]} 
                             alt={product.name}
                             className="h-16 w-16 object-contain"
                           />
@@ -503,9 +503,9 @@ export default function POS() {
                           <p className="text-sm font-bold">
                             {product.barcode_type === "scale" ? (
                               <span>{product.price} / كجم</span>
-                            ) : product.isOffer && product.offerPrice ? (
+                            ) : product.is_offer && product.offer_price ? (
                               <>
-                                <span className="text-primary">{product.offerPrice}</span>
+                                <span className="text-primary">{product.offer_price}</span>
                                 <span className="mr-1 text-xs text-muted-foreground line-through">{product.price}</span>
                               </>
                             ) : (
@@ -513,7 +513,7 @@ export default function POS() {
                             )}
                             <span className="mr-1 text-xs">{siteConfig.currency}</span>
                           </p>
-                          {product.isOffer && (
+                          {product.is_offer && (
                             <Tag className="h-4 w-4 text-primary" />
                           )}
                         </div>
@@ -560,8 +560,8 @@ export default function POS() {
                                 </span>
                               ) : (
                                 <span className="ml-1">
-                                  {item.product.isOffer && item.product.offerPrice ? item.product.offerPrice : item.product.price} {siteConfig.currency}
-                                  {item.product.isOffer && item.product.offerPrice && (
+                                  {item.product.is_offer && item.product.offer_price ? item.product.offer_price : item.product.price} {siteConfig.currency}
+                                  {item.product.is_offer && item.product.offer_price && (
                                     <span className="line-through mr-1">{item.product.price} {siteConfig.currency}</span>
                                   )}
                                 </span>

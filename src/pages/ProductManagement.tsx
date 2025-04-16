@@ -61,13 +61,13 @@ const demoProducts: Product[] = [
     id: "1",
     name: "سكر 1 كيلو",
     barcode: "6221031954818",
-    imageUrls: ["/placeholder.svg"],
+    image_urls: ["/placeholder.svg"],
     quantity: 100,
     price: 45,
-    purchasePrice: 40,
-    isOffer: false,
-    categoryId: "1",
-    isBulk: false,
+    purchase_price: 40,
+    is_offer: false,
+    category_id: "1",
+    is_bulk: false,
     barcode_type: "normal",
     bulk_enabled: false,
     created_at: new Date(),
@@ -77,14 +77,14 @@ const demoProducts: Product[] = [
     id: "2",
     name: "زيت عباد الشمس 1 لتر",
     barcode: "6221031951255",
-    imageUrls: ["/placeholder.svg"],
+    image_urls: ["/placeholder.svg"],
     quantity: 50,
     price: 60,
-    purchasePrice: 52,
-    isOffer: true,
-    offerPrice: 55,
-    categoryId: "1",
-    isBulk: false,
+    purchase_price: 52,
+    is_offer: true,
+    offer_price: 55,
+    category_id: "1",
+    is_bulk: false,
     barcode_type: "normal",
     bulk_enabled: false,
     created_at: new Date(),
@@ -94,13 +94,13 @@ const demoProducts: Product[] = [
     id: "3",
     name: "أرز مصري 5 كيلو",
     barcode: "6221031953392",
-    imageUrls: ["/placeholder.svg"],
+    image_urls: ["/placeholder.svg"],
     quantity: 30,
     price: 180,
-    purchasePrice: 160,
-    isOffer: false,
-    categoryId: "1",
-    isBulk: true,
+    purchase_price: 160,
+    is_offer: false,
+    category_id: "1",
+    is_bulk: true,
     barcode_type: "normal",
     bulk_enabled: true,
     bulk_quantity: 5,
@@ -113,14 +113,14 @@ const demoProducts: Product[] = [
     id: "4",
     name: "شاي ليبتون 100 كيس",
     barcode: "6221031958762",
-    imageUrls: ["/placeholder.svg"],
+    image_urls: ["/placeholder.svg"],
     quantity: 45,
     price: 120,
-    purchasePrice: 110,
-    isOffer: true,
-    offerPrice: 115,
-    categoryId: "2",
-    isBulk: false,
+    purchase_price: 110,
+    is_offer: true,
+    offer_price: 115,
+    category_id: "2",
+    is_bulk: false,
     barcode_type: "normal",
     bulk_enabled: false,
     created_at: new Date(),
@@ -130,13 +130,13 @@ const demoProducts: Product[] = [
     id: "5",
     name: "تفاح أحمر",
     barcode: "2000123456789",
-    imageUrls: ["/placeholder.svg"],
+    image_urls: ["/placeholder.svg"],
     quantity: 80,
     price: 35,
-    purchasePrice: 30,
-    isOffer: false,
-    categoryId: "1",
-    isBulk: false,
+    purchase_price: 30,
+    is_offer: false,
+    category_id: "1",
+    is_bulk: false,
     barcode_type: "scale",
     bulk_enabled: false,
     created_at: new Date(),
@@ -182,7 +182,7 @@ export default function ProductManagement() {
   };
 
   const handleSaveProduct = () => {
-    if (!newProduct.name || !newProduct.barcode || !newProduct.price || !newProduct.purchasePrice) {
+    if (!newProduct.name || !newProduct.barcode || !newProduct.price || !newProduct.purchase_price) {
       toast({
         title: "خطأ",
         description: "يرجى ملء جميع الحقول المطلوبة",
@@ -206,13 +206,13 @@ export default function ProductManagement() {
       id: Math.random().toString().slice(2, 10),
       name: newProduct.name || "",
       barcode: newProduct.barcode || "",
-      imageUrls: ["/placeholder.svg"],
+      image_urls: ["/placeholder.svg"],
       quantity: newProduct.quantity || 0,
       price: newProduct.price || 0,
-      purchasePrice: newProduct.purchasePrice || 0,
-      isOffer: false,
-      categoryId: newProduct.categoryId || "1",
-      isBulk: newProduct.bulk_enabled || false,
+      purchase_price: newProduct.purchase_price || 0,
+      is_offer: false,
+      category_id: newProduct.category_id || "1",
+      is_bulk: newProduct.bulk_enabled || false,
       barcode_type: newProduct.barcode_type || "normal",
       bulk_enabled: newProduct.bulk_enabled || false,
       bulk_quantity: newProduct.bulk_quantity,
@@ -295,7 +295,7 @@ export default function ProductManagement() {
                     <TableCell>
                       <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
                         <img 
-                          src={product.imageUrls[0]} 
+                          src={product.image_urls[0]} 
                           alt={product.name}
                           className="h-8 w-8 object-contain"
                         />
@@ -311,9 +311,9 @@ export default function ProductManagement() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {product.isOffer && product.offerPrice ? (
+                      {product.is_offer && product.offer_price ? (
                         <div>
-                          <span className="text-primary font-medium">{product.offerPrice} {siteConfig.currency}</span>
+                          <span className="text-primary font-medium">{product.offer_price} {siteConfig.currency}</span>
                           <span className="mr-2 text-xs text-muted-foreground line-through">{product.price} {siteConfig.currency}</span>
                         </div>
                       ) : (
@@ -360,7 +360,7 @@ export default function ProductManagement() {
                             <Trash2 className="ml-2 h-4 w-4" />
                             حذف
                           </DropdownMenuItem>
-                          {!product.isOffer && (
+                          {!product.is_offer && (
                             <DropdownMenuItem>
                               <Tag className="ml-2 h-4 w-4" />
                               إضافة عرض
@@ -451,12 +451,12 @@ export default function ProductManagement() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="purchasePrice">سعر الشراء</Label>
+                <Label htmlFor="purchase_price">سعر الشراء</Label>
                 <Input 
-                  id="purchasePrice" 
+                  id="purchase_price" 
                   type="number" 
                   placeholder="0.00" 
-                  value={newProduct.purchasePrice || ""}
+                  value={newProduct.purchase_price || ""}
                   onChange={handleInputChange}
                 />
               </div>
@@ -510,9 +510,9 @@ export default function ProductManagement() {
             <div className="space-y-2">
               <Label htmlFor="category">الفئة</Label>
               <Input 
-                id="categoryId" 
+                id="category_id" 
                 placeholder="الفئة" 
-                value={newProduct.categoryId || ""}
+                value={newProduct.category_id || ""}
                 onChange={handleInputChange}
               />
             </div>

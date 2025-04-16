@@ -230,9 +230,9 @@ export default function Reports() {
                   <TableBody>
                     {sales.map(sale => (
                       <TableRow key={sale.id}>
-                        <TableCell className="font-medium">{sale.invoiceNumber}</TableCell>
-                        <TableCell>{sale.date.toLocaleDateString('ar-EG')}</TableCell>
-                        <TableCell>{users.find(user => user.id === sale.cashierId)?.name || 'غير معروف'}</TableCell>
+                        <TableCell className="font-medium">{sale.invoice_number}</TableCell>
+                        <TableCell>{typeof sale.date === 'string' ? sale.date : sale.date.toLocaleDateString('ar-EG')}</TableCell>
+                        <TableCell>{users.find(user => user.id === sale.cashier_id)?.name || 'غير معروف'}</TableCell>
                         <TableCell>
                           {sale.items.reduce((sum, item) => sum + item.quantity, 0)} عنصر
                         </TableCell>
@@ -241,9 +241,9 @@ export default function Reports() {
                           {formatCurrency(sale.profit)}
                         </TableCell>
                         <TableCell>
-                          {sale.paymentMethod === 'cash' && 'نقداً'}
-                          {sale.paymentMethod === 'card' && 'بطاقة'}
-                          {sale.paymentMethod === 'mixed' && 'مختلط'}
+                          {sale.payment_method === 'cash' && 'نقداً'}
+                          {sale.payment_method === 'card' && 'بطاقة'}
+                          {sale.payment_method === 'mixed' && 'مختلط'}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -311,7 +311,7 @@ export default function Reports() {
                             <div className="text-right">
                               <div className="font-bold">{formatCurrency(item.revenue)}</div>
                               <div className="text-sm text-green-600">
-                                ربح: {formatCurrency(item.revenue - (item.product.purchasePrice * item.quantitySold))}
+                                ربح: {formatCurrency(item.revenue - (item.product.purchase_price * item.quantitySold))}
                               </div>
                             </div>
                           </div>
@@ -345,8 +345,8 @@ export default function Reports() {
                             <TableCell className="font-medium">{item.product.name}</TableCell>
                             <TableCell>{item.quantitySold} وحدة</TableCell>
                             <TableCell>
-                              {formatCurrency(item.product.isOffer && item.product.offerPrice
-                                ? item.product.offerPrice
+                              {formatCurrency(item.product.is_offer && item.product.offer_price
+                                ? item.product.offer_price
                                 : item.product.price
                               )}
                             </TableCell>
@@ -355,7 +355,7 @@ export default function Reports() {
                               {((item.revenue / totalSales) * 100).toFixed(1)}%
                             </TableCell>
                             <TableCell className="text-green-600">
-                              {formatCurrency(item.revenue - (item.product.purchasePrice * item.quantitySold))}
+                              {formatCurrency(item.revenue - (item.product.purchase_price * item.quantitySold))}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -397,7 +397,7 @@ export default function Reports() {
                     {users
                       .filter(user => user.role === "cashier")
                       .map(cashier => {
-                        const cashierSales = sales.filter(sale => sale.cashierId === cashier.id);
+                        const cashierSales = sales.filter(sale => sale.cashier_id === cashier.id);
                         const totalSales = cashierSales.reduce((sum, sale) => sum + sale.total, 0);
                         const totalItems = cashierSales.reduce(
                           (sum, sale) => sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 
@@ -459,15 +459,15 @@ export default function Reports() {
                   <CardContent>
                     <div className="text-3xl font-bold text-green-600">
                       {Math.max(...Array.from(productsSoldMap.values()).map(item => {
-                        const profit = item.revenue - (item.product.purchasePrice * item.quantitySold);
+                        const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
                         return Math.round((profit / item.revenue) * 100);
                       }))}%
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
                       لمنتج {Array.from(productsSoldMap.values())
                         .sort((a, b) => {
-                          const profitA = a.revenue - (a.product.purchasePrice * a.quantitySold);
-                          const profitB = b.revenue - (b.product.purchasePrice * b.quantitySold);
+                          const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
+                          const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
                           const marginA = profitA / a.revenue;
                           const marginB = profitB / b.revenue;
                           return marginB - marginA;
@@ -486,7 +486,7 @@ export default function Reports() {
                       {Math.min(...Array.from(productsSoldMap.values())
                         .filter(item => item.revenue > 0)
                         .map(item => {
-                          const profit = item.revenue - (item.product.purchasePrice * item.quantitySold);
+                          const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
                           return Math.round((profit / item.revenue) * 100);
                         })
                       )}%
@@ -494,8 +494,8 @@ export default function Reports() {
                     <div className="text-sm text-muted-foreground mt-1">
                       لمنتج {Array.from(productsSoldMap.values())
                         .sort((a, b) => {
-                          const profitA = a.revenue - (a.product.purchasePrice * a.quantitySold);
-                          const profitB = b.revenue - (b.product.purchasePrice * b.quantitySold);
+                          const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
+                          const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
                           const marginA = profitA / a.revenue;
                           const marginB = profitB / b.revenue;
                           return marginA - marginB;
@@ -523,24 +523,24 @@ export default function Reports() {
                   <TableBody>
                     {Array.from(productsSoldMap.values())
                       .sort((a, b) => {
-                        const profitA = a.revenue - (a.product.purchasePrice * a.quantitySold);
-                        const profitB = b.revenue - (b.product.purchasePrice * b.quantitySold);
+                        const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
+                        const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
                         return profitB - profitA;
                       })
                       .map(item => {
-                        const profit = item.revenue - (item.product.purchasePrice * item.quantitySold);
+                        const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
                         const margin = (profit / item.revenue) * 100;
                         
                         return (
                           <TableRow key={item.product.id}>
                             <TableCell className="font-medium">{item.product.name}</TableCell>
                             <TableCell>
-                              {formatCurrency(item.product.isOffer && item.product.offerPrice
-                                ? item.product.offerPrice
+                              {formatCurrency(item.product.is_offer && item.product.offer_price
+                                ? item.product.offer_price
                                 : item.product.price
                               )}
                             </TableCell>
-                            <TableCell>{formatCurrency(item.product.purchasePrice)}</TableCell>
+                            <TableCell>{formatCurrency(item.product.purchase_price)}</TableCell>
                             <TableCell>
                               <div className="flex items-center">
                                 <div 
