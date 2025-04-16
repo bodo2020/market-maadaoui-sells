@@ -1,4 +1,3 @@
-
 import { User, UserRole, Product, Category, Sale, Expense, Shift } from "@/types";
 import { siteConfig } from "@/config/site";
 
@@ -76,8 +75,10 @@ export const products: Product[] = [
     isOffer: false,
     categoryId: "102",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "2",
@@ -91,8 +92,10 @@ export const products: Product[] = [
     offerPrice: 55,
     categoryId: "101",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "3",
@@ -105,8 +108,12 @@ export const products: Product[] = [
     isOffer: false,
     categoryId: "102",
     isBulk: true,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: true,
+    bulk_quantity: 5,
+    bulk_price: 150,
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "4",
@@ -120,8 +127,10 @@ export const products: Product[] = [
     offerPrice: 115,
     categoryId: "201",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "5",
@@ -134,8 +143,10 @@ export const products: Product[] = [
     isOffer: false,
     categoryId: "102",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   }
 ];
 

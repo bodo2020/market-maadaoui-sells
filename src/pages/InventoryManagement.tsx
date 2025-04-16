@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -279,7 +278,7 @@ export default function InventoryManagement() {
                       {(product.purchasePrice * product.quantity).toFixed(2)} {siteConfig.currency}
                     </TableCell>
                     <TableCell>
-                      {product.updatedAt.toLocaleDateString('ar-EG')}
+                      {product.updated_at.toLocaleDateString('ar-EG')}
                     </TableCell>
                     <TableCell>
                       <Button 
