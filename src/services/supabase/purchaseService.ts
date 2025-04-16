@@ -7,7 +7,7 @@ export async function fetchPurchases() {
   try {
     const { data, error } = await supabase
       .from("purchases")
-      .select("*")
+      .select("*, suppliers(name)")
       .order("date", { ascending: false });
 
     if (error) {
@@ -16,7 +16,7 @@ export async function fetchPurchases() {
       return [];
     }
 
-    return data as Purchase[];
+    return data as (Purchase & { suppliers: { name: string } })[];
   } catch (error) {
     console.error("Unexpected error fetching purchases:", error);
     toast.error("حدث خطأ غير متوقع");
@@ -26,6 +26,16 @@ export async function fetchPurchases() {
 
 export async function createPurchase(purchaseData: any) {
   try {
+    // Generate invoice number if not provided
+    if (!purchaseData.invoice_number) {
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const randomPart = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      purchaseData.invoice_number = `P-${year}${month}${day}-${randomPart}`;
+    }
+
     // First, create the purchase record
     const { data: purchase, error: purchaseError } = await supabase
       .from("purchases")
@@ -93,6 +103,36 @@ export async function createPurchase(purchaseData: any) {
       }
     }
 
+    // Update supplier balance
+    if (purchase) {
+      const remainingAmount = purchaseData.total - purchaseData.paid;
+      if (remainingAmount !== 0) {
+        // Get current supplier balance
+        const { data: supplier, error: supplierError } = await supabase
+          .from("suppliers")
+          .select("balance")
+          .eq("id", purchaseData.supplier_id)
+          .single();
+
+        if (!supplierError) {
+          // Update supplier balance
+          // Negative balance means the supplier owes the business money
+          // Positive balance means the business owes money to the supplier
+          const currentBalance = supplier.balance || 0;
+          const newBalance = currentBalance + remainingAmount;
+          
+          const { error: updateError } = await supabase
+            .from("suppliers")
+            .update({ balance: newBalance })
+            .eq("id", purchaseData.supplier_id);
+
+          if (updateError) {
+            console.error("Error updating supplier balance:", updateError);
+          }
+        }
+      }
+    }
+
     toast.success("تم إنشاء فاتورة الشراء بنجاح");
     return purchase as Purchase;
   } catch (error) {
@@ -104,6 +144,46 @@ export async function createPurchase(purchaseData: any) {
 
 export async function deletePurchase(id: string) {
   try {
+    // Get purchase details to update supplier balance
+    const { data: purchase, error: purchaseError } = await supabase
+      .from("purchases")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (purchaseError) {
+      console.error("Error fetching purchase for deletion:", purchaseError);
+      toast.error("فشل في حذف فاتورة الشراء");
+      return false;
+    }
+
+    // Update supplier balance
+    const remainingAmount = purchase.total - purchase.paid;
+    if (remainingAmount !== 0) {
+      // Get current supplier balance
+      const { data: supplier, error: supplierError } = await supabase
+        .from("suppliers")
+        .select("balance")
+        .eq("id", purchase.supplier_id)
+        .single();
+
+      if (!supplierError && supplier) {
+        // Update supplier balance
+        // We're reversing the effect of the purchase
+        const currentBalance = supplier.balance || 0;
+        const newBalance = currentBalance - remainingAmount;
+        
+        const { error: updateError } = await supabase
+          .from("suppliers")
+          .update({ balance: newBalance })
+          .eq("id", purchase.supplier_id);
+
+        if (updateError) {
+          console.error("Error updating supplier balance during deletion:", updateError);
+        }
+      }
+    }
+
     // Note: We don't need to manually delete purchase items because of the ON DELETE CASCADE constraint
     const { error } = await supabase.from("purchases").delete().eq("id", id);
 

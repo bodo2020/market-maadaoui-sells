@@ -6,7 +6,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Plus, Trash2, Save, ShoppingCart, FileText } from "lucide-react";
+import { Search, Plus, Trash2, Save, ShoppingCart, FileText, BadgeDollarSign } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -15,12 +15,13 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { fetchSuppliers } from "@/services/supabase/supplierService";
 import { fetchProducts } from "@/services/supabase/productService";
 import { createPurchase } from "@/services/supabase/purchaseService";
 import { Product, Supplier, CartItem } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
 export default function SupplierPurchases() {
@@ -29,6 +30,7 @@ export default function SupplierPurchases() {
   // Supplier selection state
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
   const [selectedSupplierName, setSelectedSupplierName] = useState<string>("");
+  const [selectedSupplierBalance, setSelectedSupplierBalance] = useState<number | null>(null);
   
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -64,6 +66,7 @@ export default function SupplierPurchases() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchases"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("تم إضافة فاتورة الشراء بنجاح");
       resetPurchase();
     },
@@ -100,6 +103,7 @@ export default function SupplierPurchases() {
     setSelectedSupplierId(supplierId);
     const supplier = suppliers.find(s => s.id === supplierId);
     setSelectedSupplierName(supplier?.name || "");
+    setSelectedSupplierBalance(supplier?.balance || null);
   };
   
   // Add product to cart
@@ -170,11 +174,6 @@ export default function SupplierPurchases() {
       return;
     }
     
-    if (!invoiceNumber) {
-      toast.error("الرجاء إدخال رقم الفاتورة");
-      return;
-    }
-    
     setIsConfirmDialogOpen(true);
   };
   
@@ -182,7 +181,7 @@ export default function SupplierPurchases() {
   const confirmPurchase = () => {
     const purchaseData = {
       supplier_id: selectedSupplierId,
-      invoice_number: invoiceNumber,
+      invoice_number: invoiceNumber, // This will be auto-generated if empty
       date: invoiceDate,
       total: subtotal,
       paid: paid,
@@ -206,9 +205,24 @@ export default function SupplierPurchases() {
     setPaid(0);
     setSelectedSupplierId("");
     setSelectedSupplierName("");
+    setSelectedSupplierBalance(null);
     setInvoiceNumber("");
     setInvoiceDate(new Date().toISOString().split('T')[0]);
     setDescription("");
+  };
+
+  // Helper function to format balance
+  const formatBalance = (balance: number | null) => {
+    if (balance === null) return "0.00";
+    return balance.toFixed(2);
+  };
+
+  // Helper function to determine balance status
+  const getBalanceStatus = (balance: number | null) => {
+    if (!balance) return "neutral";
+    if (balance > 0) return "negative"; // Business owes money to supplier
+    if (balance < 0) return "positive"; // Supplier owes money to business
+    return "neutral";
   };
   
   return (
@@ -226,21 +240,48 @@ export default function SupplierPurchases() {
                 <CardTitle>اختيار المورد</CardTitle>
               </CardHeader>
               <CardContent>
-                <Select 
-                  value={selectedSupplierId} 
-                  onValueChange={handleSupplierSelect}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر المورد" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-4">
+                  <Select 
+                    value={selectedSupplierId} 
+                    onValueChange={handleSupplierSelect}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر المورد" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {selectedSupplierId && selectedSupplierBalance !== null && (
+                    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                      <BadgeDollarSign className="h-5 w-5 text-primary" />
+                      <span className="font-semibold">الرصيد:</span>
+                      
+                      {getBalanceStatus(selectedSupplierBalance) === "negative" && (
+                        <Badge variant="destructive" className="mr-auto">
+                          مدين بـ {formatBalance(selectedSupplierBalance)}
+                        </Badge>
+                      )}
+                      
+                      {getBalanceStatus(selectedSupplierBalance) === "positive" && (
+                        <Badge variant="success" className="mr-auto bg-green-600">
+                          دائن بـ {formatBalance(Math.abs(selectedSupplierBalance || 0))}
+                        </Badge>
+                      )}
+                      
+                      {getBalanceStatus(selectedSupplierBalance) === "neutral" && (
+                        <Badge variant="outline" className="mr-auto">
+                          متعادل {formatBalance(selectedSupplierBalance)}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
             
@@ -309,8 +350,11 @@ export default function SupplierPurchases() {
                       id="invoice-number"
                       value={invoiceNumber}
                       onChange={(e) => setInvoiceNumber(e.target.value)}
-                      placeholder="أدخل رقم الفاتورة"
+                      placeholder="ترك فارغًا للتوليد التلقائي"
                     />
+                    <div className="text-xs text-muted-foreground">
+                      اترك هذا الحقل فارغًا لتوليد رقم فاتورة تلقائيًا
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
@@ -459,19 +503,22 @@ export default function SupplierPurchases() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>تأكيد الشراء</DialogTitle>
+            <DialogDescription>
+              سيتم إنشاء فاتورة شراء وتحديث رصيد المورد ومخزون المنتجات
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p>هل أنت متأكد من رغبتك في حفظ فاتورة الشراء هذه؟</p>
-            
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span>المورد:</span>
                 <span>{selectedSupplierName}</span>
               </div>
-              <div className="flex justify-between">
-                <span>رقم الفاتورة:</span>
-                <span>{invoiceNumber}</span>
-              </div>
+              {invoiceNumber && (
+                <div className="flex justify-between">
+                  <span>رقم الفاتورة:</span>
+                  <span>{invoiceNumber}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>المجموع:</span>
                 <span>{subtotal.toFixed(2)}</span>
@@ -485,6 +532,19 @@ export default function SupplierPurchases() {
                 <span>{(subtotal - paid).toFixed(2)}</span>
               </div>
             </div>
+            
+            {selectedSupplierBalance !== null && (subtotal - paid) !== 0 && (
+              <div className="p-3 bg-gray-50 rounded-md">
+                <div className="flex justify-between">
+                  <span>الرصيد الحالي:</span>
+                  <span>{formatBalance(selectedSupplierBalance)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>الرصيد بعد الشراء:</span>
+                  <span>{formatBalance((selectedSupplierBalance || 0) + (subtotal - paid))}</span>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>
