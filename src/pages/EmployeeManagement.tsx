@@ -1,356 +1,71 @@
 
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import React from 'react';
 import MainLayout from "@/components/layout/MainLayout";
-import { siteConfig } from "@/config/site";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  UserPlus,
-  Users,
-  Search,
-  Loader2,
-  Clock,
-  AlarmClockCheck,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  Download,
-  Filter,
-} from "lucide-react";
-import { 
-  fetchUsers, 
-  createUser, 
-  updateUser, 
-  deleteUser, 
-  startShift, 
-  endShift,
-  exportEmployeesToExcel 
-} from "@/services/supabase/userService";
-import { User, UserRole } from "@/types";
+import { useEmployeeManagement } from '@/hooks/employees/useEmployeeManagement';
+
+// Import the refactored components
+import { EmployeeActions } from '@/components/employees/EmployeeActions';
+import { EmployeeStats } from '@/components/employees/EmployeeStats';
+import { EmployeeTableContainer } from '@/components/employees/EmployeeTableContainer';
+import { EmployeeFilters } from '@/components/employees/EmployeeFilters';
+import { EmployeeFormDialog } from '@/components/employees/EmployeeFormDialog';
+import { DeleteEmployeeDialog } from '@/components/employees/DeleteEmployeeDialog';
+import { ShiftHistoryDialog } from '@/components/employees/ShiftHistoryDialog';
 
 export default function EmployeeManagement() {
-  const [search, setSearch] = useState("");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false);
-  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
-  const [filterRole, setFilterRole] = useState<string | null>(null);
-  const [filterActive, setFilterActive] = useState<boolean | null>(null);
-  const [filterShift, setFilterShift] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    role: "",
-    phone: "",
-    password: "",
-    email: "",
-    username: "",
-    active: true,
-    salary: 0,
-    salary_type: "monthly"
-  });
-  
-  const queryClient = useQueryClient();
-  
-  const { data: employees, isLoading, error } = useQuery({
-    queryKey: ['employees'],
-    queryFn: fetchUsers
-  });
-  
-  const createUserMutation = useMutation({
-    mutationFn: createUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
-      toast.success("تم إضافة الموظف بنجاح");
-      setIsAddDialogOpen(false);
-      resetForm();
-    },
-    onError: (error) => {
-      toast.error("حدث خطأ أثناء إضافة الموظف");
-      console.error("Error creating employee:", error);
-    }
-  });
-  
-  const updateUserMutation = useMutation({
-    mutationFn: ({ id, user }: { id: string; user: Partial<User> }) => 
-      updateUser(id, user),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
-      toast.success("تم تحديث بيانات الموظف بنجاح");
-      setIsEditDialogOpen(false);
-      setSelectedEmployee(null);
-    },
-    onError: (error) => {
-      toast.error("حدث خطأ أثناء تحديث بيانات الموظف");
-      console.error("Error updating employee:", error);
-    }
-  });
-  
-  const deleteUserMutation = useMutation({
-    mutationFn: (id: string) => deleteUser(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
-      toast.success("تم حذف الموظف بنجاح");
-      setIsDeleteDialogOpen(false);
-      setSelectedEmployee(null);
-    },
-    onError: (error) => {
-      toast.error("حدث خطأ أثناء حذف الموظف");
-      console.error("Error deleting employee:", error);
-    }
-  });
-  
-  const startShiftMutation = useMutation({
-    mutationFn: startShift,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
-      toast.success("تم بدء الوردية بنجاح");
-    },
-    onError: (error) => {
-      toast.error("حدث خطأ أثناء بدء الوردية");
-      console.error("Error starting shift:", error);
-    }
-  });
-  
-  const endShiftMutation = useMutation({
-    mutationFn: endShift,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
-      toast.success("تم إنهاء الوردية بنجاح");
-    },
-    onError: (error) => {
-      toast.error("حدث خطأ أثناء إنهاء الوردية");
-      console.error("Error ending shift:", error);
-    }
-  });
-  
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      role: "",
-      phone: "",
-      password: "",
-      email: "",
-      username: "",
-      active: true,
-      salary: 0,
-      salary_type: "monthly"
-    });
-  };
-  
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { id, value } = e.target;
-    setFormData({
-      ...formData,
-      [id]: value
-    });
-  };
-  
-  const handleSelectChange = (value: string, field: string) => {
-    setFormData({
-      ...formData,
-      [field]: value
-    });
-  };
-  
-  const handleAddEmployee = () => {
-    if (!formData.name || !formData.role || !formData.phone || !formData.password) {
-      toast.error("يرجى ملء جميع الحقول المطلوبة");
-      return;
-    }
-    
-    const username = formData.username || formData.phone;
-    
-    createUserMutation.mutate({
-      name: formData.name,
-      role: formData.role as UserRole,
-      phone: formData.phone,
-      password: formData.password,
-      email: formData.email,
-      username: username,
-      active: formData.active,
-      salary: formData.salary,
-      salary_type: formData.salary_type
-    });
-  };
-  
-  const handleEditEmployee = () => {
-    if (!selectedEmployee) return;
-    
-    updateUserMutation.mutate({
-      id: selectedEmployee.id,
-      user: {
-        name: formData.name,
-        role: formData.role as UserRole,
-        phone: formData.phone,
-        email: formData.email,
-        username: formData.username,
-        active: formData.active,
-        salary: formData.salary,
-        salary_type: formData.salary_type,
-        ...(formData.password ? { password: formData.password } : {})
-      }
-    });
-  };
-  
-  const handleDeleteEmployee = () => {
-    if (!selectedEmployee) return;
-    deleteUserMutation.mutate(selectedEmployee.id);
-  };
-  
-  const handleEditClick = (employee: User) => {
-    setSelectedEmployee(employee);
-    setFormData({
-      name: employee.name,
-      role: employee.role,
-      phone: employee.phone || "",
-      password: "",
-      email: employee.email || "",
-      username: employee.username,
-      active: employee.active !== false,
-      salary: employee.salary || 0,
-      salary_type: employee.salary_type || "monthly"
-    });
-    setIsEditDialogOpen(true);
-  };
-  
-  const handleDeleteClick = (employee: User) => {
-    setSelectedEmployee(employee);
-    setIsDeleteDialogOpen(true);
-  };
-  
-  const handleShiftClick = (employee: User) => {
-    setSelectedEmployee(employee);
-    setIsShiftDialogOpen(true);
-  };
-  
-  const handleStartShift = (employeeId: string) => {
-    startShiftMutation.mutate(employeeId);
-  };
-  
-  const handleEndShift = (shiftId: string) => {
-    endShiftMutation.mutate(shiftId);
-  };
-  
-  const hasActiveShift = (employee: User) => {
-    if (!employee.shifts) return false;
-    return employee.shifts.some(shift => !shift.end_time);
-  };
-  
-  const getActiveShiftId = (employee: User) => {
-    if (!employee.shifts) return null;
-    const activeShift = employee.shifts.find(shift => !shift.end_time);
-    return activeShift ? activeShift.id : null;
-  };
-  
-  const getTotalHoursWorked = (employee: User) => {
-    if (!employee.shifts) return 0;
-    
-    return employee.shifts.reduce((total, shift) => {
-      if (shift.total_hours) {
-        return total + shift.total_hours;
-      }
-      return total;
-    }, 0);
-  };
-  
-  const getEmployeesOnShift = () => {
-    if (!employees) return 0;
-    return employees.filter(employee => hasActiveShift(employee)).length;
-  };
-  
-  const getTotalHours = () => {
-    if (!employees) return 0;
-    return employees.reduce((total, employee) => total + getTotalHoursWorked(employee), 0);
-  };
-  
-  const getAverageHours = () => {
-    if (!employees || employees.length === 0) return 0;
-    return getTotalHours() / employees.length;
-  };
-  
-  const handleExportEmployees = async () => {
-    try {
-      await exportEmployeesToExcel();
-      toast.success("تم تصدير بيانات الموظفين بنجاح");
-    } catch (error) {
-      console.error("Error exporting employees:", error);
-      toast.error("حدث خطأ أثناء تصدير بيانات الموظفين");
-    }
-  };
-  
-  const handleFilterEmployees = () => {
-    setIsFilterDialogOpen(true);
-  };
-  
-  const applyFilters = () => {
-    setIsFilterDialogOpen(false);
-  };
-  
-  const resetFilters = () => {
-    setFilterRole(null);
-    setFilterActive(null);
-    setFilterShift(null);
-  };
-  
-  const filteredEmployees = employees ? employees.filter(employee => {
-    const textMatch = employee.name.toLowerCase().includes(search.toLowerCase()) || 
-      (employee.phone && employee.phone.includes(search));
-    
-    const roleMatch = !filterRole || employee.role === filterRole;
-    
-    const activeMatch = filterActive === null || employee.active === filterActive;
-    
-    const shiftMatch = filterShift === null || 
-      (filterShift === 'active' && hasActiveShift(employee)) ||
-      (filterShift === 'inactive' && !hasActiveShift(employee));
-    
-    return textMatch && roleMatch && activeMatch && shiftMatch;
-  }) : [];
-  
+  const {
+    search,
+    setSearch,
+    isAddDialogOpen,
+    setIsAddDialogOpen,
+    isEditDialogOpen,
+    setIsEditDialogOpen,
+    isDeleteDialogOpen,
+    setIsDeleteDialogOpen,
+    isShiftDialogOpen,
+    setIsShiftDialogOpen,
+    isFilterDialogOpen,
+    setIsFilterDialogOpen,
+    selectedEmployee,
+    filterRole,
+    setFilterRole,
+    filterActive,
+    setFilterActive,
+    filterShift,
+    setFilterShift,
+    formData,
+    employees,
+    isLoading,
+    error,
+    createUserMutation,
+    updateUserMutation,
+    deleteUserMutation,
+    startShiftMutation,
+    endShiftMutation,
+    handleInputChange,
+    handleSelectChange,
+    handleAddEmployee,
+    handleEditEmployee,
+    handleDeleteEmployee,
+    handleEditClick,
+    handleDeleteClick,
+    handleShiftClick,
+    handleStartShift,
+    handleEndShift,
+    hasActiveShift,
+    getActiveShiftId,
+    getTotalHoursWorked,
+    getEmployeesOnShift,
+    getTotalHours,
+    getAverageHours,
+    handleExportEmployees,
+    applyFilters,
+    resetFilters,
+    filteredEmployees,
+    queryClient
+  } = useEmployeeManagement();
+
   if (error) {
     return (
       <MainLayout>
@@ -370,657 +85,84 @@ export default function EmployeeManagement() {
   
   return (
     <MainLayout>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">إدارة الموظفين</h1>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
-          <UserPlus className="ml-2 h-4 w-4" />
-          إضافة موظف جديد
-        </Button>
-      </div>
+      <EmployeeActions 
+        onAddClick={() => setIsAddDialogOpen(true)}
+        onFilterClick={() => setIsFilterDialogOpen(true)}
+        onExportClick={handleExportEmployees}
+      />
       
-      <div className="flex gap-2 mb-6">
-        <Button variant="outline" onClick={handleFilterEmployees}>
-          <Filter className="ml-2 h-4 w-4" />
-          تصفية
-        </Button>
-        <Button variant="outline" onClick={handleExportEmployees}>
-          <Download className="ml-2 h-4 w-4" />
-          تصدير
-        </Button>
-      </div>
+      <EmployeeStats 
+        employees={employees}
+        isLoading={isLoading}
+        getEmployeesOnShift={getEmployeesOnShift}
+        getTotalHours={getTotalHours}
+        getAverageHours={getAverageHours}
+      />
       
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي الموظفين</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="h-6 w-12 bg-muted animate-pulse rounded"></div>
-            ) : (
-              <div className="text-2xl font-bold">{employees?.length || 0}</div>
-            )}
-            <p className="text-xs text-muted-foreground">موظف مسجل</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">موظفون في وردية</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="h-6 w-12 bg-muted animate-pulse rounded"></div>
-            ) : (
-              <div className="text-2xl font-bold">{getEmployeesOnShift()}</div>
-            )}
-            <p className="text-xs text-muted-foreground">موظف حالياً في وردية</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي ساعات العمل</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="h-6 w-16 bg-muted animate-pulse rounded"></div>
-            ) : (
-              <div className="text-2xl font-bold">{getTotalHours().toFixed(1)}</div>
-            )}
-            <p className="text-xs text-muted-foreground">ساعة عمل هذا الشهر</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">متوسط ساعات العمل</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="h-6 w-16 bg-muted animate-pulse rounded"></div>
-            ) : (
-              <div className="text-2xl font-bold">{getAverageHours().toFixed(1)}</div>
-            )}
-            <p className="text-xs text-muted-foreground">ساعة لكل موظف</p>
-          </CardContent>
-        </Card>
-      </div>
+      <EmployeeTableContainer
+        employees={filteredEmployees}
+        isLoading={isLoading}
+        search={search}
+        setSearch={setSearch}
+        startShiftMutation={startShiftMutation}
+        endShiftMutation={endShiftMutation}
+        onEditClick={handleEditClick}
+        onDeleteClick={handleDeleteClick}
+        onShiftClick={handleShiftClick}
+        hasActiveShift={hasActiveShift}
+        getActiveShiftId={getActiveShiftId}
+        getTotalHoursWorked={getTotalHoursWorked}
+        handleStartShift={handleStartShift}
+        handleEndShift={handleEndShift}
+      />
       
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>قائمة الموظفين</CardTitle>
-              <CardDescription>إدارة الموظفين والورديات</CardDescription>
-            </div>
-            <Users className="h-5 w-5 text-muted-foreground" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2 mb-6">
-            <Input 
-              placeholder="ابحث بالاسم أو رقم الهاتف" 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="max-w-sm"
-            />
-            <Button variant="outline">
-              <Search className="ml-2 h-4 w-4" />
-              بحث
-            </Button>
-          </div>
-          
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>الاسم</TableHead>
-                  <TableHead>الدور</TableHead>
-                  <TableHead>رقم الهاتف</TableHead>
-                  <TableHead>الحالة</TableHead>
-                  <TableHead>ساعات العمل</TableHead>
-                  <TableHead>الوردية</TableHead>
-                  <TableHead className="text-left">خيارات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array(5).fill(0).map((_, index) => (
-                    <TableRow key={index}>
-                      <TableCell><div className="h-4 w-32 bg-muted animate-pulse rounded"></div></TableCell>
-                      <TableCell><div className="h-4 w-16 bg-muted animate-pulse rounded"></div></TableCell>
-                      <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded"></div></TableCell>
-                      <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded"></div></TableCell>
-                      <TableCell><div className="h-4 w-16 bg-muted animate-pulse rounded"></div></TableCell>
-                      <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded"></div></TableCell>
-                      <TableCell><div className="h-4 w-8 bg-muted animate-pulse rounded"></div></TableCell>
-                    </TableRow>
-                  ))
-                ) : filteredEmployees.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      لم يتم العثور على موظفين مطابقين
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredEmployees.map(employee => (
-                    <TableRow key={employee.id}>
-                      <TableCell className="font-medium">{employee.name}</TableCell>
-                      <TableCell>
-                        {employee.role === UserRole.ADMIN && "مدير"}
-                        {employee.role === UserRole.CASHIER && "كاشير"}
-                        {employee.role === UserRole.EMPLOYEE && "موظف"}
-                        {employee.role === UserRole.DELIVERY && "مندوب توصيل"}
-                      </TableCell>
-                      <TableCell>{employee.phone || "-"}</TableCell>
-                      <TableCell>
-                        {hasActiveShift(employee) ? (
-                          <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">في وردية</span>
-                        ) : (
-                          <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">خارج الوردية</span>
-                        )}
-                      </TableCell>
-                      <TableCell>{getTotalHoursWorked(employee).toFixed(1)} ساعة</TableCell>
-                      <TableCell>
-                        {startShiftMutation.isPending || endShiftMutation.isPending ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            disabled
-                          >
-                            <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                            جارِ المعالجة...
-                          </Button>
-                        ) : hasActiveShift(employee) ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-red-500 border-red-200 hover:bg-red-50"
-                            onClick={() => {
-                              const shiftId = getActiveShiftId(employee);
-                              if (shiftId) handleEndShift(shiftId);
-                            }}
-                          >
-                            <Clock className="ml-2 h-4 w-4" />
-                            إنهاء الوردية
-                          </Button>
-                        ) : (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-green-500 border-green-200 hover:bg-green-50"
-                            onClick={() => handleStartShift(employee.id)}
-                          >
-                            <AlarmClockCheck className="ml-2 h-4 w-4" />
-                            بدء وردية
-                          </Button>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>خيارات</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleEditClick(employee)}>
-                              <Pencil className="ml-2 h-4 w-4" />
-                              تعديل
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleShiftClick(employee)}
-                            >
-                              <Clock className="ml-2 h-4 w-4" />
-                              سجل الورديات
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => handleDeleteClick(employee)}
-                            >
-                              <Trash2 className="ml-2 h-4 w-4" />
-                              حذف
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      <EmployeeFormDialog 
+        isOpen={isAddDialogOpen}
+        setIsOpen={setIsAddDialogOpen}
+        formData={formData}
+        handleInputChange={handleInputChange}
+        handleSelectChange={handleSelectChange}
+        handleSubmit={handleAddEmployee}
+        isEdit={false}
+        isMutating={createUserMutation.isPending}
+      />
       
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]">
-          <DialogHeader>
-            <DialogTitle>إضافة موظف جديد</DialogTitle>
-            <DialogDescription>
-              أدخل بيانات الموظف الجديد. اضغط حفظ عند الانتهاء.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">اسم الموظف</Label>
-                <Input 
-                  id="name" 
-                  placeholder="الاسم الكامل" 
-                  value={formData.name}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">رقم الهاتف</Label>
-                <Input 
-                  id="phone" 
-                  placeholder="01xxxxxxxxx" 
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="role">الدور الوظيفي</Label>
-                <Select onValueChange={(value) => handleSelectChange(value, "role")}>
-                  <SelectTrigger id="role">
-                    <SelectValue placeholder="اختر الدور" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
-                    <SelectItem value={UserRole.CASHIER}>كاشير</SelectItem>
-                    <SelectItem value={UserRole.EMPLOYEE}>موظف</SelectItem>
-                    <SelectItem value={UserRole.DELIVERY}>مندوب توصيل</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">كلمة المرور</Label>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  placeholder="كلمة المرور" 
-                  value={formData.password}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">اسم المستخدم (اختياري)</Label>
-                <Input 
-                  id="username" 
-                  placeholder="اسم المستخدم" 
-                  value={formData.username}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">البريد الإلكتروني (اختياري)</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="البريد الإلكتروني" 
-                  value={formData.email}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="salary">الراتب</Label>
-                <Input 
-                  id="salary" 
-                  type="number" 
-                  placeholder="الراتب" 
-                  value={formData.salary}
-                  onChange={(e) => setFormData({...formData, salary: Number(e.target.value)})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="salary_type">نوع الراتب</Label>
-                <Select onValueChange={(value) => handleSelectChange(value, "salary_type")} defaultValue={formData.salary_type}>
-                  <SelectTrigger id="salary_type">
-                    <SelectValue placeholder="اختر نوع الراتب" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="monthly">شهري</SelectItem>
-                    <SelectItem value="daily">يومي</SelectItem>
-                    <SelectItem value="hourly">بالساعة</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              type="submit" 
-              onClick={handleAddEmployee}
-              disabled={createUserMutation.isPending}
-            >
-              {createUserMutation.isPending ? (
-                <>
-                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                  جارِ الحفظ...
-                </>
-              ) : "حفظ الموظف"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EmployeeFormDialog 
+        isOpen={isEditDialogOpen}
+        setIsOpen={setIsEditDialogOpen}
+        formData={formData}
+        handleInputChange={handleInputChange}
+        handleSelectChange={handleSelectChange}
+        handleSubmit={handleEditEmployee}
+        isEdit={true}
+        isMutating={updateUserMutation.isPending}
+      />
       
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]">
-          <DialogHeader>
-            <DialogTitle>تعديل بيانات الموظف</DialogTitle>
-            <DialogDescription>
-              قم بتعديل بيانات الموظف. اضغط حفظ عند الانتهاء.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">اسم الموظف</Label>
-                <Input 
-                  id="name" 
-                  placeholder="الاسم الكامل" 
-                  value={formData.name}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">رقم الهاتف</Label>
-                <Input 
-                  id="phone" 
-                  placeholder="01xxxxxxxxx" 
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="role">الدور الوظيفي</Label>
-                <Select 
-                  defaultValue={formData.role}
-                  onValueChange={(value) => handleSelectChange(value, "role")}
-                >
-                  <SelectTrigger id="role">
-                    <SelectValue placeholder="اختر الدور" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
-                    <SelectItem value={UserRole.CASHIER}>كاشير</SelectItem>
-                    <SelectItem value={UserRole.EMPLOYEE}>موظف</SelectItem>
-                    <SelectItem value={UserRole.DELIVERY}>مندوب توصيل</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">كلمة المرور (اترك فارغاً للإبقاء على القديمة)</Label>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  placeholder="كلمة المرور" 
-                  value={formData.password}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="username">اسم المستخدم</Label>
-                <Input 
-                  id="username" 
-                  placeholder="اسم المستخدم" 
-                  value={formData.username}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">البريد الإلكتروني (اختياري)</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="البريد الإلكتروني" 
-                  value={formData.email}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="salary">الراتب</Label>
-                <Input 
-                  id="salary" 
-                  type="number" 
-                  placeholder="الراتب" 
-                  value={formData.salary}
-                  onChange={(e) => setFormData({...formData, salary: Number(e.target.value)})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="salary_type">نوع الراتب</Label>
-                <Select 
-                  defaultValue={formData.salary_type}
-                  onValueChange={(value) => handleSelectChange(value, "salary_type")}
-                >
-                  <SelectTrigger id="salary_type">
-                    <SelectValue placeholder="اختر نوع الراتب" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="monthly">شهري</SelectItem>
-                    <SelectItem value="daily">يومي</SelectItem>
-                    <SelectItem value="hourly">بالساعة</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              type="submit" 
-              onClick={handleEditEmployee}
-              disabled={updateUserMutation.isPending}
-            >
-              {updateUserMutation.isPending ? (
-                <>
-                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                  جارِ التحديث...
-                </>
-              ) : "حفظ التغييرات"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteEmployeeDialog 
+        isOpen={isDeleteDialogOpen}
+        setIsOpen={setIsDeleteDialogOpen}
+        handleDelete={handleDeleteEmployee}
+        isDeleting={deleteUserMutation.isPending}
+      />
       
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>حذف الموظف</DialogTitle>
-            <DialogDescription>
-              هل أنت متأكد من رغبتك في حذف هذا الموظف؟ سيتم حذف جميع بيانات الورديات المرتبطة به. هذا الإجراء لا يمكن التراجع عنه.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsDeleteDialogOpen(false)}
-            >
-              إلغاء
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDeleteEmployee}
-              disabled={deleteUserMutation.isPending}
-            >
-              {deleteUserMutation.isPending ? (
-                <>
-                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                  جارِ الحذف...
-                </>
-              ) : "حذف"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ShiftHistoryDialog 
+        isOpen={isShiftDialogOpen}
+        setIsOpen={setIsShiftDialogOpen}
+        employee={selectedEmployee}
+      />
       
-      <Dialog open={isShiftDialogOpen} onOpenChange={setIsShiftDialogOpen}>
-        <DialogContent className="sm:max-w-[625px]">
-          <DialogHeader>
-            <DialogTitle>سجل الورديات - {selectedEmployee?.name}</DialogTitle>
-            <DialogDescription>
-              عرض سجل الورديات للموظف
-            </DialogDescription>
-          </DialogHeader>
-          {selectedEmployee && (
-            <div className="py-4">
-              {!selectedEmployee.shifts || selectedEmployee.shifts.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  لا يوجد ورديات مسجلة لهذا الموظف
-                </p>
-              ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>رقم الوردية</TableHead>
-                        <TableHead>وقت البدء</TableHead>
-                        <TableHead>وقت الانتهاء</TableHead>
-                        <TableHead>عدد الساعات</TableHead>
-                        <TableHead>الحالة</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedEmployee.shifts
-                        .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
-                        .map((shift, index) => (
-                        <TableRow key={shift.id}>
-                          <TableCell>#{index + 1}</TableCell>
-                          <TableCell>
-                            {new Date(shift.start_time).toLocaleTimeString('ar-EG', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              day: '2-digit',
-                              month: '2-digit'
-                            })}
-                          </TableCell>
-                          <TableCell>
-                            {shift.end_time ? new Date(shift.end_time).toLocaleTimeString('ar-EG', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              day: '2-digit',
-                              month: '2-digit'
-                            }) : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {shift.total_hours ? shift.total_hours.toFixed(1) : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {shift.end_time ? (
-                              <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                                مكتملة
-                              </span>
-                            ) : (
-                              <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                                جارية
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>تصفية الموظفين</DialogTitle>
-            <DialogDescription>
-              تصفية قائمة الموظفين حسب المعايير المختارة
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="filter-role">الدور الوظيفي</Label>
-              <Select 
-                value={filterRole || "all"}
-                onValueChange={(value) => setFilterRole(value === "all" ? null : value)}
-              >
-                <SelectTrigger id="filter-role">
-                  <SelectValue placeholder="جميع الأدوار" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">جميع الأدوار</SelectItem>
-                  <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
-                  <SelectItem value={UserRole.CASHIER}>كاشير</SelectItem>
-                  <SelectItem value={UserRole.EMPLOYEE}>موظف</SelectItem>
-                  <SelectItem value={UserRole.DELIVERY}>مندوب توصيل</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="filter-active">الحالة</Label>
-              <Select 
-                value={filterActive === null ? "all" : filterActive ? "active" : "inactive"}
-                onValueChange={(value) => {
-                  if (value === "all") setFilterActive(null);
-                  else setFilterActive(value === "active");
-                }}
-              >
-                <SelectTrigger id="filter-active">
-                  <SelectValue placeholder="جميع الحالات" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">جميع الحالات</SelectItem>
-                  <SelectItem value="active">نشط</SelectItem>
-                  <SelectItem value="inactive">غير نشط</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="filter-shift">الوردية</Label>
-              <Select 
-                value={filterShift || "all"}
-                onValueChange={(value) => setFilterShift(value === "all" ? null : value)}
-              >
-                <SelectTrigger id="filter-shift">
-                  <SelectValue placeholder="جميع الورديات" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">جميع الورديات</SelectItem>
-                  <SelectItem value="active">في وردية</SelectItem>
-                  <SelectItem value="inactive">خارج الوردية</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={resetFilters}>إعادة ضبط</Button>
-            <Button onClick={applyFilters}>تطبيق</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EmployeeFilters 
+        isOpen={isFilterDialogOpen}
+        setIsOpen={setIsFilterDialogOpen}
+        filterRole={filterRole}
+        setFilterRole={setFilterRole}
+        filterActive={filterActive}
+        setFilterActive={setFilterActive}
+        filterShift={filterShift}
+        setFilterShift={setFilterShift}
+        applyFilters={applyFilters}
+        resetFilters={resetFilters}
+      />
     </MainLayout>
   );
 }
