@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -385,7 +384,7 @@ export default function ProductManagement() {
       
       {/* Add Product Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[625px]">
+        <DialogContent className="sm:max-w-[480px] max-w-[95%] w-full">
           <DialogHeader>
             <DialogTitle>إضافة منتج جديد</DialogTitle>
             <DialogDescription>
