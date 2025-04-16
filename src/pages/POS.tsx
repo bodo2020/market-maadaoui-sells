@@ -15,6 +15,7 @@ import { createSale, generateInvoiceNumber } from "@/services/supabase/saleServi
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import BarcodeScanner from "@/components/POS/BarcodeScanner";
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -34,6 +35,7 @@ export default function POS() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [currentInvoiceNumber, setCurrentInvoiceNumber] = useState<string>("");
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -403,6 +405,42 @@ export default function POS() {
     setCurrentInvoiceNumber("");
   };
   
+  const handleBarcodeScan = async (barcode: string) => {
+    setSearch(barcode);
+    
+    // Automatically search for the scanned barcode
+    try {
+      // Try to fetch directly from backend first
+      const product = await fetchProductByBarcode(barcode);
+      if (product) {
+        if (product.calculated_weight) {
+          handleAddScaleProductToCart(product, product.calculated_weight);
+        } else if (product.bulk_enabled && product.bulk_barcode === barcode) {
+          handleAddBulkToCart(product);
+        } else {
+          handleAddToCart(product);
+        }
+        toast({
+          title: "تم المسح بنجاح",
+          description: `${barcode} - ${product.name}`,
+        });
+      } else {
+        toast({
+          title: "لم يتم العثور على المنتج",
+          description: `لم يتم العثور على منتج بالباركود ${barcode}`,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error scanning barcode:", error);
+      toast({
+        title: "خطأ في قراءة الباركود",
+        description: "حدث خطأ أثناء البحث عن الباركود",
+        variant: "destructive"
+      });
+    }
+  };
+  
   const subtotal = cartItems.reduce((sum, item) => sum + item.total, 0);
   const discount = cartItems.reduce((sum, item) => sum + (item.discount * item.quantity), 0);
   const total = subtotal;
@@ -443,7 +481,10 @@ export default function POS() {
                   <Search className="ml-2 h-4 w-4" />
                   بحث
                 </Button>
-                <Button variant="outline">
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowBarcodeScanner(true)}
+                >
                   <Barcode className="ml-2 h-4 w-4" />
                   مسح
                 </Button>
@@ -938,6 +979,13 @@ export default function POS() {
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* Barcode Scanner Component */}
+      <BarcodeScanner 
+        isOpen={showBarcodeScanner}
+        onClose={() => setShowBarcodeScanner(false)}
+        onScan={handleBarcodeScan}
+      />
     </MainLayout>
   );
 }
