@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, 
-  CreditCard as CardIcon, Banknote, Check, X
+  CreditCard as CardIcon, Banknote, Check, X, ScanLine
 } from "lucide-react";
 import { CartItem, Product, Sale } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -36,7 +37,133 @@ export default function POS() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [currentInvoiceNumber, setCurrentInvoiceNumber] = useState<string>("");
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [barcodeBuffer, setBarcodeBuffer] = useState<string>("");
+  const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  
+  // Set up the barcode scanner input listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if the target is an input field that's not the search input
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      const isSearchInput = target === searchInputRef.current;
+      
+      // If we're typing in an input that's not our search box, don't process barcode
+      if (isInput && !isSearchInput) return;
+
+      // If Enter key is pressed and we have a barcode buffer, process it
+      if (e.key === 'Enter' && barcodeBuffer) {
+        e.preventDefault(); // Prevent form submission if in a form
+        
+        // Process the scanned barcode
+        console.log("External barcode scanned:", barcodeBuffer);
+        processBarcode(barcodeBuffer);
+        setBarcodeBuffer("");
+        return;
+      }
+
+      // Only accept alphanumeric characters, which is what we expect from barcode scanners
+      if (/^[a-zA-Z0-9]$/.test(e.key)) {
+        // Clear the timeout if it exists
+        if (barcodeTimeoutRef.current) {
+          clearTimeout(barcodeTimeoutRef.current);
+        }
+
+        // Append the character to the buffer
+        setBarcodeBuffer(prev => prev + e.key);
+
+        // Set a timeout to clear the buffer if no new input is received within a short time
+        // This distinguishes between manual typing and barcode scanner input, which is very fast
+        barcodeTimeoutRef.current = setTimeout(() => {
+          // If the buffer is too short, it's probably manual typing, not a barcode scan
+          if (barcodeBuffer.length < 5) {
+            // For manual typing, we don't clear the buffer, as the user might still be typing
+            // into an input field, like the search box
+            if (!isInput) {
+              setBarcodeBuffer("");
+            }
+          }
+        }, 100); // 100ms is typically fast enough to catch all barcode scanner input but slow enough to distinguish from normal typing
+      }
+    };
+
+    // Add the event listener
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Clean up
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (barcodeTimeoutRef.current) {
+        clearTimeout(barcodeTimeoutRef.current);
+      }
+    };
+  }, [barcodeBuffer]); // Only re-run when barcodeBuffer changes
+
+  // Process a scanned barcode
+  const processBarcode = async (barcode: string) => {
+    // If barcode is too short, ignore it
+    if (barcode.length < 5) return;
+    
+    try {
+      // Set the search field to the barcode for visual feedback
+      setSearch(barcode);
+      
+      // Try to fetch the product from the database
+      const product = await fetchProductByBarcode(barcode);
+      
+      if (product) {
+        // Handle different product types
+        if (product.calculated_weight) {
+          handleAddScaleProductToCart(product, product.calculated_weight);
+        } else if (product.bulk_enabled && product.bulk_barcode === barcode) {
+          handleAddBulkToCart(product);
+        } else {
+          handleAddToCart(product);
+        }
+        
+        toast({
+          title: "تم المسح بنجاح",
+          description: `${barcode} - ${product.name}`,
+        });
+      } else {
+        // Check local products array for scale barcodes that start with 2
+        if (barcode.startsWith("2") && barcode.length === 13) {
+          // Extract the product code (digits 2-7)
+          const productCode = barcode.substring(1, 7);
+          
+          // Find the product with this code
+          const scaleProduct = products.find(p => 
+            p.barcode_type === "scale" && 
+            p.barcode === productCode
+          );
+          
+          if (scaleProduct) {
+            // Extract weight from barcode (digits 8-12)
+            const weightInGrams = parseInt(barcode.substring(7, 12));
+            const weightInKg = weightInGrams / 1000;
+            
+            handleAddScaleProductToCart(scaleProduct, weightInKg);
+            return;
+          }
+        }
+        
+        toast({
+          title: "لم يتم العثور على المنتج",
+          description: `لم يتم العثور على منتج بالباركود ${barcode}`,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error processing barcode:", error);
+      toast({
+        title: "خطأ في معالجة الباركود",
+        description: "حدث خطأ أثناء معالجة الباركود. يرجى المحاولة مرة أخرى.",
+        variant: "destructive"
+      });
+    }
+  };
   
   useEffect(() => {
     const loadProducts = async () => {
@@ -406,39 +533,7 @@ export default function POS() {
   };
   
   const handleBarcodeScan = async (barcode: string) => {
-    setSearch(barcode);
-    
-    // Automatically search for the scanned barcode
-    try {
-      // Try to fetch directly from backend first
-      const product = await fetchProductByBarcode(barcode);
-      if (product) {
-        if (product.calculated_weight) {
-          handleAddScaleProductToCart(product, product.calculated_weight);
-        } else if (product.bulk_enabled && product.bulk_barcode === barcode) {
-          handleAddBulkToCart(product);
-        } else {
-          handleAddToCart(product);
-        }
-        toast({
-          title: "تم المسح بنجاح",
-          description: `${barcode} - ${product.name}`,
-        });
-      } else {
-        toast({
-          title: "لم يتم العثور على المنتج",
-          description: `لم يتم العثور على منتج بالباركود ${barcode}`,
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error("Error scanning barcode:", error);
-      toast({
-        title: "خطأ في قراءة الباركود",
-        description: "حدث خطأ أثناء البحث عن الباركود",
-        variant: "destructive"
-      });
-    }
+    processBarcode(barcode);
   };
   
   const subtotal = cartItems.reduce((sum, item) => sum + item.total, 0);
@@ -459,6 +554,16 @@ export default function POS() {
         </p>
       </div>
       
+      <div className="relative mb-4 bg-muted/30 p-3 rounded-lg border border-muted flex items-center">
+        <ScanLine className="h-5 w-5 text-primary ml-3" />
+        <div>
+          <h3 className="font-medium">وضع مسح الباركود نشط</h3>
+          <p className="text-sm text-muted-foreground">
+            قم بتوصيل قارئ الباركود واستخدامه لمسح المنتجات مباشرة، أو اضغط على زر "مسح" لاستخدام الكاميرا
+          </p>
+        </div>
+      </div>
+      
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Products Search Section */}
         <div className="lg:col-span-2">
@@ -476,6 +581,7 @@ export default function POS() {
                     if (e.key === 'Enter') handleSearch();
                   }}
                   className="flex-1"
+                  ref={searchInputRef}
                 />
                 <Button onClick={handleSearch}>
                   <Search className="ml-2 h-4 w-4" />

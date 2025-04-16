@@ -1,8 +1,8 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Camera, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Camera, X, Smartphone, Barcode as BarcodeIcon } from "lucide-react";
 
 interface BarcodeScannerProps {
   isOpen: boolean;
@@ -183,6 +183,9 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>مسح الباركود</DialogTitle>
+          <DialogDescription>
+            يمكنك استخدام ماسح الباركود الخارجي مباشرة أو استخدام كاميرا الهاتف
+          </DialogDescription>
         </DialogHeader>
         
         <div className="py-4">
@@ -213,15 +216,22 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
             </div>
           )}
           
-          <p className="text-sm text-muted-foreground mt-4 text-center">
-            قم بتوجيه الكاميرا نحو الباركود ليتم مسحه تلقائياً
-          </p>
-          
-          {!isBarcodeDetectorSupported && (
-            <p className="text-xs text-amber-600 mt-2 text-center">
-              متصفحك لا يدعم قراءة الباركود تلقائياً. استخدم زر "اختبار المسح" أدناه.
+          <div className="space-y-2 mt-4">
+            <p className="text-sm text-muted-foreground text-center">
+              قم بتوجيه الكاميرا نحو الباركود ليتم مسحه تلقائياً
             </p>
-          )}
+            
+            <div className="bg-muted/30 p-3 rounded-md flex items-center gap-2 text-sm border border-muted">
+              <Smartphone className="h-4 w-4 text-primary" />
+              <p>الماسح الضوئي الخارجي: قم بتوصيل الماسح وسيتم التقاط الباركود تلقائياً</p>
+            </div>
+            
+            {!isBarcodeDetectorSupported && (
+              <p className="text-xs text-amber-600 text-center">
+                متصفحك لا يدعم قراءة الباركود تلقائياً. استخدم زر "اختبار المسح" أدناه.
+              </p>
+            )}
+          </div>
         </div>
         
         <DialogFooter className="sm:justify-start flex space-x-2 space-x-reverse">
