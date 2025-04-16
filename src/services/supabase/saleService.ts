@@ -4,11 +4,13 @@ import { Sale, CartItem } from "@/types";
 
 export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
   // Ensure the date is a string when sending to Supabase
+  // and properly stringify the items array to make it compatible with Supabase Json type
   const saleData = {
     ...sale,
     date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date,
-    // Items needs to be stringified JSON for insertion
-    items: sale.items
+    // Convert CartItem[] to Json by stringifying it first then parsing it
+    // This removes the complex object references and creates a plain object
+    items: JSON.parse(JSON.stringify(sale.items))
   };
 
   const { data, error } = await supabase
