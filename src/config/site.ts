@@ -4,5 +4,10 @@ export const siteConfig = {
   currency: "ج.م",
   description: "نظام نقاط البيع لماركت المعداوي",
   primaryColor: "#005931",
-  rtl: true
+  rtl: true,
+  // Add the missing properties
+  address: "",
+  phone: "",
+  email: "",
+  logoUrl: null
 }

@@ -1,6 +1,43 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Sale } from "@/types";
+import { Sale, CartItem } from "@/types";
+
+// Helper function to convert database JSON to CartItem[]
+function parseItems(jsonItems: any): CartItem[] {
+  if (!jsonItems) return [];
+  
+  try {
+    if (typeof jsonItems === 'string') {
+      return JSON.parse(jsonItems);
+    }
+    return jsonItems as CartItem[];
+  } catch (error) {
+    console.error("Error parsing items:", error);
+    return [];
+  }
+}
+
+// Helper function to convert database record to Sale type
+function mapDbSaleToSale(dbSale: any): Sale {
+  return {
+    id: dbSale.id,
+    date: dbSale.date,
+    items: parseItems(dbSale.items),
+    cashier_id: dbSale.cashier_id,
+    subtotal: dbSale.subtotal,
+    discount: dbSale.discount,
+    total: dbSale.total,
+    profit: dbSale.profit,
+    payment_method: dbSale.payment_method as 'cash' | 'card' | 'mixed',
+    card_amount: dbSale.card_amount,
+    cash_amount: dbSale.cash_amount,
+    customer_name: dbSale.customer_name,
+    customer_phone: dbSale.customer_phone,
+    invoice_number: dbSale.invoice_number,
+    created_at: dbSale.created_at,
+    updated_at: dbSale.updated_at
+  };
+}
 
 export async function fetchSales() {
   const { data, error } = await supabase
@@ -13,7 +50,8 @@ export async function fetchSales() {
     throw error;
   }
 
-  return data as Sale[];
+  // Map each database record to our Sale type
+  return data.map(mapDbSaleToSale) as Sale[];
 }
 
 export async function fetchSaleById(id: string) {
@@ -28,7 +66,7 @@ export async function fetchSaleById(id: string) {
     throw error;
   }
 
-  return data as Sale;
+  return mapDbSaleToSale(data) as Sale;
 }
 
 export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
@@ -39,10 +77,13 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
     sale.invoice_number = `INV-${dateStr}-${timeStr}`;
   }
 
+  // Convert date to string if it's a Date object
+  const dateStr = typeof sale.date === 'string' ? sale.date : sale.date.toISOString();
+
   const { data, error } = await supabase
     .from("sales")
-    .insert([{
-      date: sale.date,
+    .insert({
+      date: dateStr,
       items: sale.items,
       cashier_id: sale.cashier_id,
       subtotal: sale.subtotal,
@@ -55,7 +96,7 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
       customer_name: sale.customer_name,
       customer_phone: sale.customer_phone,
       invoice_number: sale.invoice_number
-    }])
+    })
     .select();
 
   if (error) {
@@ -63,7 +104,7 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
     throw error;
   }
 
-  return data[0] as Sale;
+  return mapDbSaleToSale(data[0]) as Sale;
 }
 
 export async function updateSale(id: string, sale: Partial<Sale>) {
@@ -72,7 +113,11 @@ export async function updateSale(id: string, sale: Partial<Sale>) {
   // Only include fields that are present in the sale object
   Object.keys(sale).forEach(key => {
     if (sale[key as keyof Sale] !== undefined) {
-      updateData[key] = sale[key as keyof Sale];
+      if (key === 'date' && sale.date instanceof Date) {
+        updateData[key] = sale.date.toISOString();
+      } else {
+        updateData[key] = sale[key as keyof Sale];
+      }
     }
   });
 
@@ -87,7 +132,7 @@ export async function updateSale(id: string, sale: Partial<Sale>) {
     throw error;
   }
 
-  return data[0] as Sale;
+  return mapDbSaleToSale(data[0]) as Sale;
 }
 
 export async function deleteSale(id: string) {
