@@ -513,7 +513,7 @@ export default function ProductManagement() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="normal">عادي</SelectItem>
-                      <SelectItem value="scale">ميزان (يبدأ برقم 2)</SelectItem>
+                      <SelectItem value="scale">ميزان</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
