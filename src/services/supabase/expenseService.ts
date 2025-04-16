@@ -32,13 +32,18 @@ export async function fetchExpenseById(id: string) {
 }
 
 export async function createExpense(expense: Omit<Expense, "id" | "created_at" | "updated_at">) {
+  // Ensure date is always a string format for Supabase
+  const formattedDate = typeof expense.date === 'string' 
+    ? expense.date 
+    : (expense.date as Date).toISOString();
+
   const { data, error } = await supabase
     .from("expenses")
     .insert([{
       type: expense.type,
       amount: expense.amount,
       description: expense.description,
-      date: expense.date,
+      date: formattedDate,
       receipt_url: expense.receipt_url || null,
     }])
     .select();
@@ -57,7 +62,14 @@ export async function updateExpense(id: string, expense: Partial<Expense>) {
   // Only include fields that are present in the expense object
   Object.keys(expense).forEach(key => {
     if (expense[key as keyof Expense] !== undefined) {
-      updateData[key] = expense[key as keyof Expense];
+      // Ensure date is always a string format for Supabase
+      if (key === 'date' && expense.date) {
+        updateData[key] = typeof expense.date === 'string' 
+          ? expense.date 
+          : (expense.date as Date).toISOString();
+      } else {
+        updateData[key] = expense[key as keyof Expense];
+      }
     }
   });
 

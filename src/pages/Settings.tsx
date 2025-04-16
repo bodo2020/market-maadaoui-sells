@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Store, Users, PackageOpen, CreditCard, Truck, Receipt } from "lucide-react";
 import StoreSettings from "@/components/settings/StoreSettings";
 import UsersManagement from "@/components/settings/UsersManagement";
+import ExpenseSettings from "@/components/settings/ExpenseSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/types";
 
@@ -40,9 +41,9 @@ export default function Settings() {
               <Truck className="ml-2 h-4 w-4" />
               الشحن
             </TabsTrigger>
-            <TabsTrigger value="invoices" className="flex items-center">
+            <TabsTrigger value="expenses" className="flex items-center">
               <Receipt className="ml-2 h-4 w-4" />
-              الفواتير
+              المصاريف
             </TabsTrigger>
           </TabsList>
           
@@ -74,10 +75,8 @@ export default function Settings() {
             </div>
           </TabsContent>
           
-          <TabsContent value="invoices">
-            <div className="text-center py-12 text-muted-foreground">
-              إعدادات الفواتير ستكون متاحة قريباً
-            </div>
+          <TabsContent value="expenses">
+            <ExpenseSettings />
           </TabsContent>
         </Tabs>
       </div>
