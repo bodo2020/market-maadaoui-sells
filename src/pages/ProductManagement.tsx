@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -55,7 +56,7 @@ import { Product } from "@/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { fetchProducts, createProduct, updateProduct, deleteProduct } from "@/services/supabase/productService";
+import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchProductById } from "@/services/supabase/productService";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { Dialog as ShadcnDialog } from "@/components/ui/dialog";
@@ -77,6 +78,10 @@ export default function ProductManagement() {
   const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState("");
   const [scannedWeight, setScannedWeight] = useState("");
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false);
+  const [productToAddOffer, setProductToAddOffer] = useState<Product | null>(null);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -122,6 +127,23 @@ export default function ProductManagement() {
     }
   };
 
+  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value, type } = e.target;
+    
+    if (id === "barcode" && productToEdit?.barcode_type === "scale") {
+      const cleanValue = value.replace(/\D/g, '').substring(0, 5);
+      setProductToEdit({
+        ...productToEdit,
+        [id]: cleanValue
+      } as Product);
+    } else {
+      setProductToEdit({
+        ...productToEdit,
+        [id]: type === "number" ? Number(value) : value
+      } as Product);
+    }
+  };
+
   const handleSelectChange = (value: string, field: string) => {
     setNewProduct({
       ...newProduct,
@@ -129,11 +151,25 @@ export default function ProductManagement() {
     });
   };
 
+  const handleEditSelectChange = (value: string, field: string) => {
+    setProductToEdit({
+      ...productToEdit,
+      [field]: value
+    } as Product);
+  };
+
   const handleCheckboxChange = (checked: boolean, field: string) => {
     setNewProduct({
       ...newProduct,
       [field]: checked
     });
+  };
+
+  const handleEditCheckboxChange = (checked: boolean, field: string) => {
+    setProductToEdit({
+      ...productToEdit,
+      [field]: checked
+    } as Product);
   };
 
   const handleSaveProduct = async () => {
@@ -200,6 +236,40 @@ export default function ProductManagement() {
     }
   };
 
+  const handleEditProduct = async () => {
+    if (!productToEdit || !productToEdit.name || !productToEdit.price || !productToEdit.purchase_price) {
+      toast({
+        title: "خطأ",
+        description: "يرجى ملء جميع الحقول المطلوبة",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const updatedProduct = await updateProduct(productToEdit.id, productToEdit);
+      
+      setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+      setIsEditDialogOpen(false);
+      setProductToEdit(null);
+      
+      toast({
+        title: "تم بنجاح",
+        description: "تم تحديث المنتج بنجاح",
+      });
+    } catch (error) {
+      console.error("Error updating product:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء تحديث المنتج",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
     
@@ -219,6 +289,43 @@ export default function ProductManagement() {
       toast({
         title: "خطأ",
         description: "حدث خطأ أثناء حذف المنتج",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddOffer = async () => {
+    if (!productToAddOffer || !productToAddOffer.offer_price) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال سعر العرض",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const updatedProduct = await updateProduct(productToAddOffer.id, {
+        is_offer: true,
+        offer_price: productToAddOffer.offer_price
+      });
+      
+      setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+      setIsOfferDialogOpen(false);
+      setProductToAddOffer(null);
+      
+      toast({
+        title: "تم بنجاح",
+        description: "تم إضافة العرض بنجاح",
+      });
+    } catch (error) {
+      console.error("Error adding offer:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء إضافة العرض",
         variant: "destructive"
       });
     } finally {
@@ -299,6 +406,31 @@ export default function ProductManagement() {
         variant: "destructive"
       });
     }
+  };
+
+  const handleEditClick = async (product: Product) => {
+    try {
+      // Fetch the latest product data to ensure we have the most up-to-date information
+      const freshProduct = await fetchProductById(product.id);
+      setProductToEdit(freshProduct);
+      setIsEditDialogOpen(true);
+    } catch (error) {
+      console.error("Error fetching product for edit:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء تحميل بيانات المنتج",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddOfferClick = (product: Product) => {
+    setProductToAddOffer({
+      ...product,
+      is_offer: true,
+      offer_price: product.offer_price || Math.round(product.price * 0.9) // Default to 10% off
+    });
+    setIsOfferDialogOpen(true);
   };
 
   return (
@@ -430,7 +562,7 @@ export default function ProductManagement() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>خيارات</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditClick(product)}>
                                 <Pencil className="ml-2 h-4 w-4" />
                                 تعديل
                               </DropdownMenuItem>
@@ -445,7 +577,7 @@ export default function ProductManagement() {
                                 حذف
                               </DropdownMenuItem>
                               {!product.is_offer && (
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleAddOfferClick(product)}>
                                   <Tag className="ml-2 h-4 w-4" />
                                   إضافة عرض
                                 </DropdownMenuItem>
@@ -752,6 +884,285 @@ export default function ProductManagement() {
             >
               {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
               حذف
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[480px] max-w-[95%] w-full">
+          <DialogHeader>
+            <DialogTitle>تعديل المنتج</DialogTitle>
+            <DialogDescription>
+              قم بتعديل تفاصيل المنتج. اضغط حفظ عند الانتهاء.
+            </DialogDescription>
+          </DialogHeader>
+          {productToEdit && (
+            <ScrollArea className="max-h-[70vh]">
+              <div className="grid gap-4 py-4 px-1">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">اسم المنتج</Label>
+                    <Input 
+                      id="name" 
+                      placeholder="اسم المنتج" 
+                      value={productToEdit.name || ""}
+                      onChange={handleEditInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="barcode_type">نوع الباركود</Label>
+                    <Select 
+                      onValueChange={(value) => handleEditSelectChange(value, "barcode_type")}
+                      value={productToEdit.barcode_type || "normal"}
+                      disabled
+                    >
+                      <SelectTrigger id="barcode_type">
+                        <SelectValue placeholder="اختر نوع الباركود" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="normal">عادي</SelectItem>
+                        <SelectItem value="scale">ميزان</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="barcode">
+                      {productToEdit.barcode_type === "scale" ? "رمز المنتج (6 أرقام)" : "الباركود"}
+                    </Label>
+                    <Input 
+                      id="barcode" 
+                      placeholder={productToEdit.barcode_type === "scale" ? "أدخل 1-6 أرقام" : "الباركود"} 
+                      value={productToEdit.barcode || ""}
+                      onChange={handleEditInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">الكمية</Label>
+                    <Input 
+                      id="quantity" 
+                      type="number" 
+                      placeholder="0" 
+                      value={productToEdit.quantity || ""}
+                      onChange={handleEditInputChange}
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="price">سعر البيع</Label>
+                    <Input 
+                      id="price" 
+                      type="number" 
+                      placeholder="0.00" 
+                      value={productToEdit.price || ""}
+                      onChange={handleEditInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="purchase_price">سعر الشراء</Label>
+                    <Input 
+                      id="purchase_price" 
+                      type="number" 
+                      placeholder="0.00" 
+                      value={productToEdit.purchase_price || ""}
+                      onChange={handleEditInputChange}
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="is_offer" 
+                      checked={productToEdit.is_offer}
+                      onCheckedChange={(checked) => handleEditCheckboxChange(!!checked, "is_offer")} 
+                    />
+                    <Label htmlFor="is_offer" className="mr-2">هذا المنتج مخفض</Label>
+                  </div>
+                </div>
+                
+                {productToEdit.is_offer && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label htmlFor="offer_price">سعر العرض</Label>
+                    <Input 
+                      id="offer_price" 
+                      type="number" 
+                      placeholder="0.00" 
+                      value={productToEdit.offer_price || ""}
+                      onChange={handleEditInputChange}
+                    />
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="bulk_enabled" 
+                      checked={productToEdit.bulk_enabled}
+                      onCheckedChange={(checked) => handleEditCheckboxChange(!!checked, "bulk_enabled")} 
+                    />
+                    <Label htmlFor="bulk_enabled" className="mr-2">تمكين البيع بالجملة</Label>
+                  </div>
+                </div>
+                
+                {productToEdit.bulk_enabled && (
+                  <div className="grid grid-cols-3 gap-4 pt-2 border-t">
+                    <div className="space-y-2">
+                      <Label htmlFor="bulk_quantity">كمية العبوة</Label>
+                      <Input 
+                        id="bulk_quantity" 
+                        type="number" 
+                        placeholder="عدد الوحدات" 
+                        value={productToEdit.bulk_quantity || ""}
+                        onChange={handleEditInputChange}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bulk_price">سعر الجملة</Label>
+                      <Input 
+                        id="bulk_price" 
+                        type="number" 
+                        placeholder="0.00" 
+                        value={productToEdit.bulk_price || ""}
+                        onChange={handleEditInputChange}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bulk_barcode">باركود الجملة</Label>
+                      <Input 
+                        id="bulk_barcode" 
+                        placeholder="باركود عبوة الجملة" 
+                        value={productToEdit.bulk_barcode || ""}
+                        onChange={handleEditInputChange}
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="category_id">الفئة</Label>
+                  <Input 
+                    id="category_id" 
+                    placeholder="الفئة" 
+                    value={productToEdit.category_id || ""}
+                    onChange={handleEditInputChange}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="description">وصف المنتج</Label>
+                  <Input 
+                    id="description" 
+                    placeholder="وصف المنتج" 
+                    value={productToEdit.description || ""}
+                    onChange={handleEditInputChange}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="manufacturer_name">الشركة المصنعة</Label>
+                  <Input 
+                    id="manufacturer_name" 
+                    placeholder="الشركة المصنعة" 
+                    value={productToEdit.manufacturer_name || ""}
+                    onChange={handleEditInputChange}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="unit_of_measure">وحدة القياس</Label>
+                  <Input 
+                    id="unit_of_measure" 
+                    placeholder="وحدة القياس (قطعة، كجم، لتر)" 
+                    value={productToEdit.unit_of_measure || ""}
+                    onChange={handleEditInputChange}
+                  />
+                </div>
+              </div>
+            </ScrollArea>
+          )}
+          <DialogFooter>
+            <Button 
+              type="button" 
+              onClick={handleEditProduct}
+              disabled={loading}
+            >
+              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+              حفظ التغييرات
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isOfferDialogOpen} onOpenChange={setIsOfferDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>إضافة عرض</DialogTitle>
+            <DialogDescription>
+              أدخل سعر العرض للمنتج.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {productToAddOffer && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 border rounded-md">
+                  <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
+                    <img 
+                      src={productToAddOffer.image_urls ? productToAddOffer.image_urls[0] : "/placeholder.svg"} 
+                      alt={productToAddOffer.name}
+                      className="h-8 w-8 object-contain"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">{productToAddOffer.name}</h4>
+                    <p className="text-sm">
+                      السعر الأصلي: <span className="font-medium">{productToAddOffer.price} {siteConfig.currency}</span>
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="offer_price">سعر العرض</Label>
+                  <Input 
+                    id="offer_price" 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={productToAddOffer.offer_price || ""}
+                    onChange={(e) => setProductToAddOffer({
+                      ...productToAddOffer,
+                      offer_price: Number(e.target.value)
+                    })}
+                  />
+                </div>
+                
+                {productToAddOffer.offer_price && productToAddOffer.price && (
+                  <div className="text-sm p-2 bg-muted rounded-md">
+                    نسبة الخصم: <span className="font-medium text-primary">
+                      {Math.round((1 - (productToAddOffer.offer_price / productToAddOffer.price)) * 100)}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsOfferDialogOpen(false)}
+            >
+              إلغاء
+            </Button>
+            <Button 
+              onClick={handleAddOffer}
+              disabled={loading}
+            >
+              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+              إضافة العرض
             </Button>
           </DialogFooter>
         </DialogContent>
