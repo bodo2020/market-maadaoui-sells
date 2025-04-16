@@ -10,7 +10,6 @@ import {
   ShoppingCart,
   PackageOpen,
   Users,
-  CalendarRange,
   Settings,
   LogOut,
   FileText,
@@ -120,12 +119,6 @@ export default function Sidebar() {
           label="الموظفين"
           href="/employees"
           active={currentPath === "/employees"}
-        />
-        <SidebarItem
-          icon={<CalendarRange size={20} />}
-          label="الورديات"
-          href="/shifts"
-          active={currentPath === "/shifts"}
         />
         <SidebarItem
           icon={<Settings size={20} />}
