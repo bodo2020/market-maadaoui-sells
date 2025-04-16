@@ -1,4 +1,7 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
@@ -51,10 +54,20 @@ import {
   Building2,
   Zap,
   Truck,
-  Users
+  Users,
+  Loader2
 } from "lucide-react";
-import { expenses, formatCurrency } from "@/data/mockData";
+import { 
+  fetchExpenses, 
+  createExpense, 
+  updateExpense, 
+  deleteExpense 
+} from "@/services/supabase/expenseService";
 import { Expense } from "@/types";
+
+function formatCurrency(amount: number): string {
+  return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}`;
+}
 
 const expenseCategories = [
   { id: "rent", name: "إيجار", icon: <Building2 className="h-4 w-4" /> },
@@ -66,17 +79,150 @@ const expenseCategories = [
 ];
 
 export default function ExpenseManagement() {
-  const [allExpenses, setAllExpenses] = useState<Expense[]>(expenses);
   const [search, setSearch] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [formData, setFormData] = useState({
+    type: "",
+    amount: 0,
+    description: "",
+    date: new Date().toISOString().split('T')[0],
+    receipt_url: ""
+  });
   
-  const filteredExpenses = allExpenses.filter(expense => {
-    const matchesSearch = expense.description.includes(search) || 
-                          expense.type.includes(search);
+  const queryClient = useQueryClient();
+  
+  // Fetch expenses
+  const { data: expenses, isLoading, error } = useQuery({
+    queryKey: ['expenses'],
+    queryFn: fetchExpenses
+  });
+  
+  // Create expense mutation
+  const createExpenseMutation = useMutation({
+    mutationFn: createExpense,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast.success("تم إضافة المصروف بنجاح");
+      setIsAddDialogOpen(false);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error("حدث خطأ أثناء إضافة المصروف");
+      console.error("Error creating expense:", error);
+    }
+  });
+  
+  // Update expense mutation
+  const updateExpenseMutation = useMutation({
+    mutationFn: ({ id, expense }: { id: string; expense: Partial<Expense> }) => 
+      updateExpense(id, expense),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast.success("تم تحديث المصروف بنجاح");
+      setIsEditDialogOpen(false);
+      setSelectedExpense(null);
+    },
+    onError: (error) => {
+      toast.error("حدث خطأ أثناء تحديث المصروف");
+      console.error("Error updating expense:", error);
+    }
+  });
+  
+  // Delete expense mutation
+  const deleteExpenseMutation = useMutation({
+    mutationFn: (id: string) => deleteExpense(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast.success("تم حذف المصروف بنجاح");
+      setIsDeleteDialogOpen(false);
+      setSelectedExpense(null);
+    },
+    onError: (error) => {
+      toast.error("حدث خطأ أثناء حذف المصروف");
+      console.error("Error deleting expense:", error);
+    }
+  });
+  
+  const resetForm = () => {
+    setFormData({
+      type: "",
+      amount: 0,
+      description: "",
+      date: new Date().toISOString().split('T')[0],
+      receipt_url: ""
+    });
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { id, value } = e.target;
+    setFormData({
+      ...formData,
+      [id]: id === "amount" ? parseFloat(value) || 0 : value
+    });
+  };
+  
+  const handleAddExpense = () => {
+    if (!formData.type || formData.amount <= 0 || !formData.description) {
+      toast.error("يرجى ملء جميع الحقول المطلوبة");
+      return;
+    }
+    
+    createExpenseMutation.mutate({
+      type: formData.type,
+      amount: formData.amount,
+      description: formData.description,
+      date: formData.date,
+      receipt_url: formData.receipt_url || null
+    });
+  };
+  
+  const handleEditExpense = () => {
+    if (!selectedExpense) return;
+    
+    updateExpenseMutation.mutate({
+      id: selectedExpense.id,
+      expense: {
+        type: formData.type,
+        amount: formData.amount,
+        description: formData.description,
+        date: formData.date,
+        receipt_url: formData.receipt_url || null
+      }
+    });
+  };
+  
+  const handleDeleteExpense = () => {
+    if (!selectedExpense) return;
+    deleteExpenseMutation.mutate(selectedExpense.id);
+  };
+  
+  const handleEditClick = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setFormData({
+      type: expense.type,
+      amount: expense.amount,
+      description: expense.description,
+      date: new Date(expense.date).toISOString().split('T')[0],
+      receipt_url: expense.receipt_url || ""
+    });
+    setIsEditDialogOpen(true);
+  };
+  
+  const handleDeleteClick = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const filteredExpenses = expenses ? expenses.filter(expense => {
+    const matchesSearch = expense.description.toLowerCase().includes(search.toLowerCase()) || 
+                          expense.type.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = selectedCategory ? expense.type === selectedCategory : true;
     return matchesSearch && matchesCategory;
-  });
+  }) : [];
   
   const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   
@@ -93,9 +239,44 @@ export default function ExpenseManagement() {
     return (expensesByCategory[category] || []).reduce((sum, expense) => sum + expense.amount, 0);
   };
   
-  const handleAddExpense = () => {
-    setIsAddDialogOpen(false);
+  const getCurrentMonthExpenses = () => {
+    const now = new Date();
+    return filteredExpenses.filter(expense => {
+      const expenseDate = new Date(expense.date);
+      return expenseDate.getMonth() === now.getMonth() && 
+             expenseDate.getFullYear() === now.getFullYear();
+    }).reduce((sum, expense) => sum + expense.amount, 0);
   };
+  
+  const getLargestExpenseCategory = () => {
+    if (Object.keys(expensesByCategory).length === 0) return null;
+    
+    const categories = Object.keys(expensesByCategory);
+    if (categories.length === 0) return null;
+    
+    return categories.sort((a, b) => 
+      getTotalByCategory(b) - getTotalByCategory(a)
+    )[0];
+  };
+  
+  const largestCategory = getLargestExpenseCategory();
+  
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="flex flex-col items-center justify-center h-64">
+          <p className="text-destructive text-lg">حدث خطأ أثناء تحميل البيانات</p>
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['expenses'] })}
+          >
+            إعادة المحاولة
+          </Button>
+        </div>
+      </MainLayout>
+    );
+  }
   
   return (
     <MainLayout>
@@ -113,9 +294,17 @@ export default function ExpenseManagement() {
             <CardTitle className="text-sm font-medium">إجمالي المصروفات</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
+            {isLoading ? (
+              <div className="h-6 w-24 bg-muted animate-pulse rounded"></div>
+            ) : (
+              <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
+            )}
             <p className="text-xs text-muted-foreground">
-              {filteredExpenses.length} مصروف مسجل
+              {isLoading ? (
+                <div className="h-4 w-16 bg-muted animate-pulse rounded mt-1"></div>
+              ) : (
+                `${filteredExpenses.length} مصروف مسجل`
+              )}
             </p>
           </CardContent>
         </Card>
@@ -125,16 +314,11 @@ export default function ExpenseManagement() {
             <CardTitle className="text-sm font-medium">مصروفات هذا الشهر</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(
-                filteredExpenses.filter(expense => {
-                  const now = new Date();
-                  const expenseDate = new Date(expense.date);
-                  return expenseDate.getMonth() === now.getMonth() && 
-                         expenseDate.getFullYear() === now.getFullYear();
-                }).reduce((sum, expense) => sum + expense.amount, 0)
-              )}
-            </div>
+            {isLoading ? (
+              <div className="h-6 w-24 bg-muted animate-pulse rounded"></div>
+            ) : (
+              <div className="text-2xl font-bold">{formatCurrency(getCurrentMonthExpenses())}</div>
+            )}
             <p className="text-xs text-muted-foreground">
               في شهر {new Date().toLocaleDateString('ar-EG', { month: 'long' })}
             </p>
@@ -146,20 +330,16 @@ export default function ExpenseManagement() {
             <CardTitle className="text-sm font-medium">أكبر فئة مصروفات</CardTitle>
           </CardHeader>
           <CardContent>
-            {Object.keys(expensesByCategory).length > 0 ? (
+            {isLoading ? (
               <>
-                <div className="text-2xl font-bold">
-                  {Object.entries(expensesByCategory)
-                    .sort((a, b) => 
-                      getTotalByCategory(b[0]) - getTotalByCategory(a[0])
-                    )[0][0]}
-                </div>
+                <div className="h-6 w-20 bg-muted animate-pulse rounded"></div>
+                <div className="h-4 w-16 bg-muted animate-pulse rounded mt-1"></div>
+              </>
+            ) : largestCategory ? (
+              <>
+                <div className="text-2xl font-bold">{largestCategory}</div>
                 <p className="text-xs text-muted-foreground">
-                  {formatCurrency(
-                    Math.max(...Object.keys(expensesByCategory).map(category => 
-                      getTotalByCategory(category)
-                    ))
-                  )}
+                  {formatCurrency(getTotalByCategory(largestCategory))}
                 </p>
               </>
             ) : (
@@ -195,11 +375,6 @@ export default function ExpenseManagement() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" className="flex gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span className="hidden sm:inline">تاريخ</span>
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
                   <Button 
                     variant={selectedCategory ? "default" : "outline"} 
                     className="flex gap-2"
@@ -216,10 +391,10 @@ export default function ExpenseManagement() {
                 {expenseCategories.map(category => (
                   <Button 
                     key={category.id}
-                    variant={selectedCategory === category.id ? "default" : "outline"}
+                    variant={selectedCategory === category.name ? "default" : "outline"}
                     className="text-xs"
                     onClick={() => setSelectedCategory(
-                      selectedCategory === category.id ? null : category.id
+                      selectedCategory === category.name ? null : category.name
                     )}
                   >
                     {category.icon}
@@ -240,7 +415,27 @@ export default function ExpenseManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredExpenses.length === 0 ? (
+                    {isLoading ? (
+                      Array(5).fill(0).map((_, index) => (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <div className="h-4 w-20 bg-muted animate-pulse rounded"></div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 w-32 bg-muted animate-pulse rounded"></div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 w-16 bg-muted animate-pulse rounded"></div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 w-24 bg-muted animate-pulse rounded"></div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 w-8 bg-muted animate-pulse rounded"></div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : filteredExpenses.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                           لم يتم العثور على مصروفات مطابقة
@@ -276,7 +471,7 @@ export default function ExpenseManagement() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>خيارات</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditClick(expense)}>
                                   <Pencil className="ml-2 h-4 w-4" />
                                   تعديل
                                 </DropdownMenuItem>
@@ -286,7 +481,10 @@ export default function ExpenseManagement() {
                                     عرض الإيصال
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem className="text-destructive">
+                                <DropdownMenuItem 
+                                  className="text-destructive"
+                                  onClick={() => handleDeleteClick(expense)}
+                                >
                                   <Trash2 className="ml-2 h-4 w-4" />
                                   حذف
                                 </DropdownMenuItem>
@@ -312,7 +510,24 @@ export default function ExpenseManagement() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {Object.keys(expensesByCategory).length === 0 ? (
+              {isLoading ? (
+                <div className="space-y-4">
+                  {Array(4).fill(0).map((_, index) => (
+                    <div key={index}>
+                      <div className="flex justify-between items-center mb-1">
+                        <div className="h-4 w-24 bg-muted animate-pulse rounded"></div>
+                        <div className="h-4 w-16 bg-muted animate-pulse rounded"></div>
+                      </div>
+                      <div className="w-full h-2 bg-gray-100 rounded-full">
+                        <div 
+                          className="h-2 bg-primary rounded-full animate-pulse" 
+                          style={{ width: `${Math.random() * 100}%` }} 
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : Object.keys(expensesByCategory).length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">
                   <ReceiptText className="h-10 w-10 mx-auto mb-2 opacity-20" />
                   <p>لا توجد مصاريف لعرضها</p>
@@ -369,6 +584,7 @@ export default function ExpenseManagement() {
         </div>
       </div>
       
+      {/* Add Expense Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
@@ -380,10 +596,12 @@ export default function ExpenseManagement() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="expenseType">نوع المصروف</Label>
+                <Label htmlFor="type">نوع المصروف</Label>
                 <select 
-                  id="expenseType"
+                  id="type"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
+                  value={formData.type}
+                  onChange={handleInputChange}
                 >
                   <option value="">-- اختر النوع --</option>
                   {expenseCategories.map(category => (
@@ -399,8 +617,12 @@ export default function ExpenseManagement() {
                   <Input 
                     id="amount" 
                     type="number" 
+                    min="0"
+                    step="0.01"
                     placeholder="0.00" 
                     className="pl-8"
+                    value={formData.amount}
+                    onChange={handleInputChange}
                   />
                   <span className="absolute left-3 top-2.5 text-muted-foreground">
                     {siteConfig.currency}
@@ -411,7 +633,12 @@ export default function ExpenseManagement() {
             
             <div className="space-y-2">
               <Label htmlFor="date">التاريخ</Label>
-              <Input id="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+              <Input 
+                id="date" 
+                type="date" 
+                value={formData.date}
+                onChange={handleInputChange}
+              />
             </div>
             
             <div className="space-y-2">
@@ -420,16 +647,161 @@ export default function ExpenseManagement() {
                 id="description" 
                 placeholder="أدخل وصفاً للمصروف" 
                 rows={3}
+                value={formData.description}
+                onChange={handleInputChange}
               />
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="receipt">إرفاق إيصال (اختياري)</Label>
-              <Input id="receipt" type="file" />
+              <Label htmlFor="receipt_url">رابط الإيصال (اختياري)</Label>
+              <Input 
+                id="receipt_url" 
+                placeholder="أدخل رابط الإيصال"
+                value={formData.receipt_url}
+                onChange={handleInputChange}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" onClick={handleAddExpense}>حفظ المصروف</Button>
+            <Button 
+              type="submit" 
+              onClick={handleAddExpense}
+              disabled={createExpenseMutation.isPending}
+            >
+              {createExpenseMutation.isPending ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جارِ الحفظ...
+                </>
+              ) : "حفظ المصروف"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Expense Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>تعديل المصروف</DialogTitle>
+            <DialogDescription>
+              قم بتعديل تفاصيل المصروف. اضغط حفظ عند الانتهاء.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="type">نوع المصروف</Label>
+                <select 
+                  id="type"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
+                  value={formData.type}
+                  onChange={handleInputChange}
+                >
+                  <option value="">-- اختر النوع --</option>
+                  {expenseCategories.map(category => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">المبلغ</Label>
+                <div className="relative">
+                  <Input 
+                    id="amount" 
+                    type="number" 
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00" 
+                    className="pl-8"
+                    value={formData.amount}
+                    onChange={handleInputChange}
+                  />
+                  <span className="absolute left-3 top-2.5 text-muted-foreground">
+                    {siteConfig.currency}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="date">التاريخ</Label>
+              <Input 
+                id="date" 
+                type="date" 
+                value={formData.date}
+                onChange={handleInputChange}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="description">الوصف</Label>
+              <Textarea 
+                id="description" 
+                placeholder="أدخل وصفاً للمصروف" 
+                rows={3}
+                value={formData.description}
+                onChange={handleInputChange}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="receipt_url">رابط الإيصال (اختياري)</Label>
+              <Input 
+                id="receipt_url" 
+                placeholder="أدخل رابط الإيصال"
+                value={formData.receipt_url}
+                onChange={handleInputChange}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              type="submit" 
+              onClick={handleEditExpense}
+              disabled={updateExpenseMutation.isPending}
+            >
+              {updateExpenseMutation.isPending ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جارِ التحديث...
+                </>
+              ) : "حفظ التغييرات"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Expense Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>حذف المصروف</DialogTitle>
+            <DialogDescription>
+              هل أنت متأكد من رغبتك في حذف هذا المصروف؟ هذا الإجراء لا يمكن التراجع عنه.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              إلغاء
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteExpense}
+              disabled={deleteExpenseMutation.isPending}
+            >
+              {deleteExpenseMutation.isPending ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جارِ الحذف...
+                </>
+              ) : "حذف"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

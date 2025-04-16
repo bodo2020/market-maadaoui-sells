@@ -16,18 +16,30 @@ export async function fetchExpenses() {
   return data as Expense[];
 }
 
+export async function fetchExpenseById(id: string) {
+  const { data, error } = await supabase
+    .from("expenses")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) {
+    console.error("Error fetching expense:", error);
+    throw error;
+  }
+
+  return data as Expense;
+}
+
 export async function createExpense(expense: Omit<Expense, "id" | "created_at" | "updated_at">) {
-  // Convert Date to ISO string if needed
-  const dateValue = expense.date instanceof Date ? expense.date.toISOString() : expense.date;
-  
   const { data, error } = await supabase
     .from("expenses")
     .insert([{
       type: expense.type,
       amount: expense.amount,
       description: expense.description,
-      date: dateValue,
-      receipt_url: expense.receipt_url
+      date: expense.date,
+      receipt_url: expense.receipt_url || null,
     }])
     .select();
 
@@ -45,13 +57,7 @@ export async function updateExpense(id: string, expense: Partial<Expense>) {
   // Only include fields that are present in the expense object
   Object.keys(expense).forEach(key => {
     if (expense[key as keyof Expense] !== undefined) {
-      // Convert Date objects to ISO strings
-      if (key === 'date' || key === 'created_at' || key === 'updated_at') {
-        const value = expense[key as keyof Expense];
-        updateData[key] = value instanceof Date ? value.toISOString() : value;
-      } else {
-        updateData[key] = expense[key as keyof Expense];
-      }
+      updateData[key] = expense[key as keyof Expense];
     }
   });
 

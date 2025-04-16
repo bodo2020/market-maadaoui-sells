@@ -1,4 +1,7 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
@@ -52,84 +55,241 @@ import {
   Users,
   UserPlus,
   Clock,
-  AlarmClockCheck
+  AlarmClockCheck,
+  Loader2
 } from "lucide-react";
-import { users } from "@/data/mockData";
+import { 
+  fetchUsers, 
+  createUser, 
+  updateUser, 
+  deleteUser, 
+  startShift, 
+  endShift, 
+  getActiveShift 
+} from "@/services/supabase/userService";
 import { User, UserRole, Shift } from "@/types";
 
 export default function EmployeeManagement() {
-  const [employees, setEmployees] = useState<User[]>(users);
   const [search, setSearch] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    role: "",
+    phone: "",
+    password: "",
+    email: "",
+    username: "",
+    active: true
+  });
+  
+  const queryClient = useQueryClient();
+  
+  // Fetch users/employees
+  const { data: employees, isLoading, error } = useQuery({
+    queryKey: ['employees'],
+    queryFn: fetchUsers
+  });
+  
+  // Create user mutation
+  const createUserMutation = useMutation({
+    mutationFn: createUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success("تم إضافة الموظف بنجاح");
+      setIsAddDialogOpen(false);
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error("حدث خطأ أثناء إضافة الموظف");
+      console.error("Error creating employee:", error);
+    }
+  });
+  
+  // Update user mutation
+  const updateUserMutation = useMutation({
+    mutationFn: ({ id, user }: { id: string; user: Partial<User> }) => 
+      updateUser(id, user),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success("تم تحديث بيانات الموظف بنجاح");
+      setIsEditDialogOpen(false);
+      setSelectedEmployee(null);
+    },
+    onError: (error) => {
+      toast.error("حدث خطأ أثناء تحديث بيانات الموظف");
+      console.error("Error updating employee:", error);
+    }
+  });
+  
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: (id: string) => deleteUser(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success("تم حذف الموظف بنجاح");
+      setIsDeleteDialogOpen(false);
+      setSelectedEmployee(null);
+    },
+    onError: (error) => {
+      toast.error("حدث خطأ أثناء حذف الموظف");
+      console.error("Error deleting employee:", error);
+    }
+  });
+  
+  // Start shift mutation
+  const startShiftMutation = useMutation({
+    mutationFn: startShift,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success("تم بدء الوردية بنجاح");
+    },
+    onError: (error) => {
+      toast.error("حدث خطأ أثناء بدء الوردية");
+      console.error("Error starting shift:", error);
+    }
+  });
+  
+  // End shift mutation
+  const endShiftMutation = useMutation({
+    mutationFn: endShift,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success("تم إنهاء الوردية بنجاح");
+    },
+    onError: (error) => {
+      toast.error("حدث خطأ أثناء إنهاء الوردية");
+      console.error("Error ending shift:", error);
+    }
+  });
+  
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      role: "",
+      phone: "",
+      password: "",
+      email: "",
+      username: "",
+      active: true
+    });
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { id, value } = e.target;
+    setFormData({
+      ...formData,
+      [id]: value
+    });
+  };
+  
+  const handleSelectChange = (value: string, field: string) => {
+    setFormData({
+      ...formData,
+      [field]: value
+    });
+  };
+  
+  const handleAddEmployee = () => {
+    if (!formData.name || !formData.role || !formData.phone || !formData.password) {
+      toast.error("يرجى ملء جميع الحقول المطلوبة");
+      return;
+    }
+    
+    // Use phone as username if not provided
+    const username = formData.username || formData.phone;
+    
+    createUserMutation.mutate({
+      name: formData.name,
+      role: formData.role as UserRole,
+      phone: formData.phone,
+      password: formData.password,
+      email: formData.email,
+      username: username,
+      active: formData.active
+    });
+  };
+  
+  const handleEditEmployee = () => {
+    if (!selectedEmployee) return;
+    
+    updateUserMutation.mutate({
+      id: selectedEmployee.id,
+      user: {
+        name: formData.name,
+        role: formData.role as UserRole,
+        phone: formData.phone,
+        email: formData.email,
+        username: formData.username,
+        active: formData.active,
+        // Only update password if a new one is provided
+        ...(formData.password ? { password: formData.password } : {})
+      }
+    });
+  };
+  
+  const handleDeleteEmployee = () => {
+    if (!selectedEmployee) return;
+    deleteUserMutation.mutate(selectedEmployee.id);
+  };
+  
+  const handleEditClick = (employee: User) => {
+    setSelectedEmployee(employee);
+    setFormData({
+      name: employee.name,
+      role: employee.role,
+      phone: employee.phone || "",
+      password: "", // Don't show the password
+      email: employee.email || "",
+      username: employee.username,
+      active: employee.active !== false // Default to true if not specified
+    });
+    setIsEditDialogOpen(true);
+  };
+  
+  const handleDeleteClick = (employee: User) => {
+    setSelectedEmployee(employee);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const handleShiftClick = (employee: User) => {
+    setSelectedEmployee(employee);
+    setIsShiftDialogOpen(true);
+  };
+  
+  const handleStartShift = (employeeId: string) => {
+    startShiftMutation.mutate(employeeId);
+  };
+  
+  const handleEndShift = (shiftId: string) => {
+    endShiftMutation.mutate(shiftId);
+  };
   
   // Filtering employees based on search
-  const filteredEmployees = employees.filter(employee => 
-    employee.name.includes(search) || 
-    employee.phone.includes(search)
-  );
-  
-  // Start shift for an employee
-  const startShift = (employeeId: string) => {
-    setEmployees(employees.map(employee => {
-      if (employee.id === employeeId) {
-        const newShift: Shift = {
-          id: Date.now().toString(),
-          employee_id: employeeId,
-          start_time: new Date(),
-          created_at: new Date(),
-          updated_at: new Date()
-        };
-        return {
-          ...employee,
-          shifts: [...employee.shifts, newShift]
-        };
-      }
-      return employee;
-    }));
-  };
-  
-  // End shift for an employee
-  const endShift = (employeeId: string) => {
-    setEmployees(employees.map(employee => {
-      if (employee.id === employeeId) {
-        const shifts = [...employee.shifts];
-        const activeShiftIndex = shifts.findIndex(shift => !shift.end_time);
-        
-        if (activeShiftIndex !== -1) {
-          const now = new Date();
-          const startTime = shifts[activeShiftIndex].start_time;
-          const hoursWorked = (now.getTime() - new Date(startTime).getTime()) / (1000 * 60 * 60);
-          
-          shifts[activeShiftIndex] = {
-            ...shifts[activeShiftIndex],
-            end_time: now,
-            total_hours: hoursWorked,
-            updated_at: now
-          };
-        }
-        
-        return {
-          ...employee,
-          shifts
-        };
-      }
-      return employee;
-    }));
-  };
+  const filteredEmployees = employees ? employees.filter(employee => 
+    employee.name.toLowerCase().includes(search.toLowerCase()) || 
+    (employee.phone && employee.phone.includes(search))
+  ) : [];
   
   // Check if employee has active shift
-  const hasActiveShift = (employeeId: string) => {
-    const employee = employees.find(e => e.id === employeeId);
-    if (!employee) return false;
+  const hasActiveShift = (employee: User) => {
+    if (!employee.shifts) return false;
     return employee.shifts.some(shift => !shift.end_time);
   };
   
+  // Get active shift ID
+  const getActiveShiftId = (employee: User) => {
+    if (!employee.shifts) return null;
+    const activeShift = employee.shifts.find(shift => !shift.end_time);
+    return activeShift ? activeShift.id : null;
+  };
+  
   // Get total hours worked
-  const getTotalHoursWorked = (employeeId: string) => {
-    const employee = employees.find(e => e.id === employeeId);
-    if (!employee) return 0;
+  const getTotalHoursWorked = (employee: User) => {
+    if (!employee.shifts) return 0;
     
     return employee.shifts.reduce((total, shift) => {
       if (shift.total_hours) {
@@ -139,11 +299,40 @@ export default function EmployeeManagement() {
     }, 0);
   };
   
-  // Functions to handle adding a new employee
-  const handleAddEmployee = () => {
-    // In a real app, this would validate and add the employee to the database
-    setIsAddDialogOpen(false);
+  // Get employees currently on shift
+  const getEmployeesOnShift = () => {
+    if (!employees) return 0;
+    return employees.filter(employee => hasActiveShift(employee)).length;
   };
+  
+  // Get total hours for all employees
+  const getTotalHours = () => {
+    if (!employees) return 0;
+    return employees.reduce((total, employee) => total + getTotalHoursWorked(employee), 0);
+  };
+  
+  // Get average hours per employee
+  const getAverageHours = () => {
+    if (!employees || employees.length === 0) return 0;
+    return getTotalHours() / employees.length;
+  };
+  
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="flex flex-col items-center justify-center h-64">
+          <p className="text-destructive text-lg">حدث خطأ أثناء تحميل البيانات</p>
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['employees'] })}
+          >
+            إعادة المحاولة
+          </Button>
+        </div>
+      </MainLayout>
+    );
+  }
   
   return (
     <MainLayout>
@@ -161,7 +350,11 @@ export default function EmployeeManagement() {
             <CardTitle className="text-sm font-medium">إجمالي الموظفين</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{employees.length}</div>
+            {isLoading ? (
+              <div className="h-6 w-12 bg-muted animate-pulse rounded"></div>
+            ) : (
+              <div className="text-2xl font-bold">{employees?.length || 0}</div>
+            )}
             <p className="text-xs text-muted-foreground">موظف مسجل</p>
           </CardContent>
         </Card>
@@ -171,9 +364,11 @@ export default function EmployeeManagement() {
             <CardTitle className="text-sm font-medium">موظفون في وردية</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {employees.filter(employee => hasActiveShift(employee.id)).length}
-            </div>
+            {isLoading ? (
+              <div className="h-6 w-12 bg-muted animate-pulse rounded"></div>
+            ) : (
+              <div className="text-2xl font-bold">{getEmployeesOnShift()}</div>
+            )}
             <p className="text-xs text-muted-foreground">موظف حالياً في وردية</p>
           </CardContent>
         </Card>
@@ -183,9 +378,11 @@ export default function EmployeeManagement() {
             <CardTitle className="text-sm font-medium">إجمالي ساعات العمل</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {employees.reduce((total, employee) => total + getTotalHoursWorked(employee.id), 0).toFixed(1)}
-            </div>
+            {isLoading ? (
+              <div className="h-6 w-16 bg-muted animate-pulse rounded"></div>
+            ) : (
+              <div className="text-2xl font-bold">{getTotalHours().toFixed(1)}</div>
+            )}
             <p className="text-xs text-muted-foreground">ساعة عمل هذا الشهر</p>
           </CardContent>
         </Card>
@@ -195,9 +392,11 @@ export default function EmployeeManagement() {
             <CardTitle className="text-sm font-medium">متوسط ساعات العمل</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(employees.reduce((total, employee) => total + getTotalHoursWorked(employee.id), 0) / Math.max(1, employees.length)).toFixed(1)}
-            </div>
+            {isLoading ? (
+              <div className="h-6 w-16 bg-muted animate-pulse rounded"></div>
+            ) : (
+              <div className="text-2xl font-bold">{getAverageHours().toFixed(1)}</div>
+            )}
             <p className="text-xs text-muted-foreground">ساعة لكل موظف</p>
           </CardContent>
         </Card>
@@ -241,79 +440,111 @@ export default function EmployeeManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEmployees.map(employee => (
-                  <TableRow key={employee.id}>
-                    <TableCell className="font-medium">{employee.name}</TableCell>
-                    <TableCell>
-                      {employee.role === UserRole.ADMIN && "مدير"}
-                      {employee.role === UserRole.CASHIER && "كاشير"}
-                      {employee.role === UserRole.EMPLOYEE && "موظف"}
-                      {employee.role === UserRole.DELIVERY && "مندوب توصيل"}
+                {isLoading ? (
+                  Array(5).fill(0).map((_, index) => (
+                    <TableRow key={index}>
+                      <TableCell><div className="h-4 w-32 bg-muted animate-pulse rounded"></div></TableCell>
+                      <TableCell><div className="h-4 w-16 bg-muted animate-pulse rounded"></div></TableCell>
+                      <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded"></div></TableCell>
+                      <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded"></div></TableCell>
+                      <TableCell><div className="h-4 w-16 bg-muted animate-pulse rounded"></div></TableCell>
+                      <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded"></div></TableCell>
+                      <TableCell><div className="h-4 w-8 bg-muted animate-pulse rounded"></div></TableCell>
+                    </TableRow>
+                  ))
+                ) : filteredEmployees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      لم يتم العثور على موظفين مطابقين
                     </TableCell>
-                    <TableCell>{employee.phone}</TableCell>
-                    <TableCell>
-                      {hasActiveShift(employee.id) ? (
-                        <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">في وردية</span>
-                      ) : (
-                        <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">خارج الوردية</span>
-                      )}
-                    </TableCell>
-                    <TableCell>{getTotalHoursWorked(employee.id).toFixed(1)} ساعة</TableCell>
-                    <TableCell>
-                      {hasActiveShift(employee.id) ? (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-red-500 border-red-200 hover:bg-red-50"
-                          onClick={() => endShift(employee.id)}
-                        >
-                          <Clock className="ml-2 h-4 w-4" />
-                          إنهاء الوردية
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-green-500 border-green-200 hover:bg-green-50"
-                          onClick={() => startShift(employee.id)}
-                        >
-                          <AlarmClockCheck className="ml-2 h-4 w-4" />
-                          بدء وردية
-                        </Button>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
+                  </TableRow>
+                ) : (
+                  filteredEmployees.map(employee => (
+                    <TableRow key={employee.id}>
+                      <TableCell className="font-medium">{employee.name}</TableCell>
+                      <TableCell>
+                        {employee.role === UserRole.ADMIN && "مدير"}
+                        {employee.role === UserRole.CASHIER && "كاشير"}
+                        {employee.role === UserRole.EMPLOYEE && "موظف"}
+                        {employee.role === UserRole.DELIVERY && "مندوب توصيل"}
+                      </TableCell>
+                      <TableCell>{employee.phone || "-"}</TableCell>
+                      <TableCell>
+                        {hasActiveShift(employee) ? (
+                          <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">في وردية</span>
+                        ) : (
+                          <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">خارج الوردية</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{getTotalHoursWorked(employee).toFixed(1)} ساعة</TableCell>
+                      <TableCell>
+                        {startShiftMutation.isPending || endShiftMutation.isPending ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            disabled
+                          >
+                            <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                            جارِ المعالجة...
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>خيارات</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem>
-                            <Pencil className="ml-2 h-4 w-4" />
-                            تعديل
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
+                        ) : hasActiveShift(employee) ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-500 border-red-200 hover:bg-red-50"
                             onClick={() => {
-                              setSelectedEmployee(employee);
-                              setIsShiftDialogOpen(true);
+                              const shiftId = getActiveShiftId(employee);
+                              if (shiftId) handleEndShift(shiftId);
                             }}
                           >
                             <Clock className="ml-2 h-4 w-4" />
-                            سجل الورديات
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="ml-2 h-4 w-4" />
-                            حذف
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                            إنهاء الوردية
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-green-500 border-green-200 hover:bg-green-50"
+                            onClick={() => handleStartShift(employee.id)}
+                          >
+                            <AlarmClockCheck className="ml-2 h-4 w-4" />
+                            بدء وردية
+                          </Button>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>خيارات</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleEditClick(employee)}>
+                              <Pencil className="ml-2 h-4 w-4" />
+                              تعديل
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleShiftClick(employee)}
+                            >
+                              <Clock className="ml-2 h-4 w-4" />
+                              سجل الورديات
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => handleDeleteClick(employee)}
+                            >
+                              <Trash2 className="ml-2 h-4 w-4" />
+                              حذف
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -333,19 +564,29 @@ export default function EmployeeManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">اسم الموظف</Label>
-                <Input id="name" placeholder="الاسم الكامل" />
+                <Input 
+                  id="name" 
+                  placeholder="الاسم الكامل" 
+                  value={formData.name}
+                  onChange={handleInputChange}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">رقم الهاتف</Label>
-                <Input id="phone" placeholder="01xxxxxxxxx" />
+                <Input 
+                  id="phone" 
+                  placeholder="01xxxxxxxxx" 
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                />
               </div>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="role">الدور الوظيفي</Label>
-                <Select>
-                  <SelectTrigger>
+                <Select onValueChange={(value) => handleSelectChange(value, "role")}>
+                  <SelectTrigger id="role">
                     <SelectValue placeholder="اختر الدور" />
                   </SelectTrigger>
                   <SelectContent>
@@ -358,17 +599,183 @@ export default function EmployeeManagement() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">كلمة المرور</Label>
-                <Input id="password" type="password" placeholder="كلمة الم��ور" />
+                <Input 
+                  id="password" 
+                  type="password" 
+                  placeholder="كلمة المرور" 
+                  value={formData.password}
+                  onChange={handleInputChange}
+                />
               </div>
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="address">العنوان</Label>
-              <Input id="address" placeholder="العنوان" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">اسم المستخدم (اختياري)</Label>
+                <Input 
+                  id="username" 
+                  placeholder="اسم المستخدم" 
+                  value={formData.username}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">البريد الإلكتروني (اختياري)</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="البريد الإلكتروني" 
+                  value={formData.email}
+                  onChange={handleInputChange}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" onClick={handleAddEmployee}>حفظ الموظف</Button>
+            <Button 
+              type="submit" 
+              onClick={handleAddEmployee}
+              disabled={createUserMutation.isPending}
+            >
+              {createUserMutation.isPending ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جارِ الحفظ...
+                </>
+              ) : "حفظ الموظف"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Edit Employee Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle>تعديل بيانات الموظف</DialogTitle>
+            <DialogDescription>
+              قم بتعديل بيانات الموظف. اضغط حفظ عند الانتهاء.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">اسم الموظف</Label>
+                <Input 
+                  id="name" 
+                  placeholder="الاسم الكامل" 
+                  value={formData.name}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">رقم الهاتف</Label>
+                <Input 
+                  id="phone" 
+                  placeholder="01xxxxxxxxx" 
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="role">الدور الوظيفي</Label>
+                <Select 
+                  defaultValue={formData.role}
+                  onValueChange={(value) => handleSelectChange(value, "role")}
+                >
+                  <SelectTrigger id="role">
+                    <SelectValue placeholder="اختر الدور" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
+                    <SelectItem value={UserRole.CASHIER}>كاشير</SelectItem>
+                    <SelectItem value={UserRole.EMPLOYEE}>موظف</SelectItem>
+                    <SelectItem value={UserRole.DELIVERY}>مندوب توصيل</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">كلمة المرور (اترك فارغاً للإبقاء على القديمة)</Label>
+                <Input 
+                  id="password" 
+                  type="password" 
+                  placeholder="كلمة المرور" 
+                  value={formData.password}
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="username">اسم المستخدم</Label>
+                <Input 
+                  id="username" 
+                  placeholder="اسم المستخدم" 
+                  value={formData.username}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">البريد الإلكتروني (اختياري)</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="البريد الإلكتروني" 
+                  value={formData.email}
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              type="submit" 
+              onClick={handleEditEmployee}
+              disabled={updateUserMutation.isPending}
+            >
+              {updateUserMutation.isPending ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جارِ التحديث...
+                </>
+              ) : "حفظ التغييرات"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Employee Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>حذف الموظف</DialogTitle>
+            <DialogDescription>
+              هل أنت متأكد من رغبتك في حذف هذا الموظف؟ سيتم حذف جميع بيانات الورديات المرتبطة به. هذا الإجراء لا يمكن التراجع عنه.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              إلغاء
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteEmployee}
+              disabled={deleteUserMutation.isPending}
+            >
+              {deleteUserMutation.isPending ? (
+                <>
+                  <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  جارِ الحذف...
+                </>
+              ) : "حذف"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -384,7 +791,7 @@ export default function EmployeeManagement() {
           </DialogHeader>
           {selectedEmployee && (
             <div className="py-4">
-              {selectedEmployee.shifts.length === 0 ? (
+              {!selectedEmployee.shifts || selectedEmployee.shifts.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
                   لا يوجد ورديات مسجلة لهذا الموظف
                 </p>
@@ -401,7 +808,9 @@ export default function EmployeeManagement() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedEmployee.shifts.map((shift, index) => (
+                      {selectedEmployee.shifts
+                        .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
+                        .map((shift, index) => (
                         <TableRow key={shift.id}>
                           <TableCell>#{index + 1}</TableCell>
                           <TableCell>
