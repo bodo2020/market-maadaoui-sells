@@ -243,7 +243,7 @@ export default function ProductManagement() {
     if (!/^\d{1,6}$/.test(barcode)) {
       toast({
         title: "خطأ",
-        description: "رم�� منتج الميزان يجب أن يكون من 1 إلى 6 أرقام فقط.",
+        description: "رمز منتج الميزان يجب أن يكون من 1 إلى 6 أرقام فقط.",
         variant: "destructive"
       });
       return false;
@@ -522,22 +522,22 @@ export default function ProductManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="barcode">
-                    {newProduct.barcode_type === "scale" ? "رمز المنتج (5 أرقام)" : "الباركود"}
+                    {newProduct.barcode_type === "scale" ? "رمز المنتج (6 أرقام)" : "الباركود"}
                   </Label>
                   <Input 
                     id="barcode" 
-                    placeholder={newProduct.barcode_type === "scale" ? "أدخل 1-5 أرقام" : "الباركود"} 
+                    placeholder={newProduct.barcode_type === "scale" ? "أدخل 1-6 أرقام" : "الباركود"} 
                     value={newProduct.barcode || ""}
                     onChange={handleInputChange}
                   />
                   {newProduct.barcode_type === "scale" && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      أدخل رمز المنتج فقط (1-5 أرقام). سيتم تخزينه كرمز من 5 أرقام.
+                      أدخل رمز المنتج فقط (1-6 أرقام). سيتم تخزينه كرمز من 6 أرقام.
                     </p>
                   )}
                   {newProduct.barcode_type === "scale" && newProduct.barcode && newProduct.barcode.length > 0 && (
                     <p className="text-xs text-primary mt-1">
-                      رمز المنتج المخزن: {newProduct.barcode.padStart(5, '0')}
+                      رمز المنتج المخزن: {newProduct.barcode.padStart(6, '0')}
                     </p>
                   )}
                 </div>
