@@ -20,6 +20,8 @@ import Finance from "./pages/Finance";
 import Invoices from "./pages/Invoices";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import Purchases from "./pages/Purchases";
+import SupplierPurchases from "./pages/SupplierPurchases";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +62,18 @@ function App() {
               <Route path="/suppliers-customers" element={
                 <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.EMPLOYEE]}>
                   <SuppliersCustomers />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/purchases" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <Purchases />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/supplier-purchases" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <SupplierPurchases />
                 </ProtectedRoute>
               } />
               
