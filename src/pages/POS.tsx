@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -632,8 +631,6 @@ export default function POS() {
                           if (product.barcode_type === "scale") {
                             setCurrentScaleProduct(product);
                             setShowWeightDialog(true);
-                          } else if (product.bulk_enabled && product.bulk_barcode) {
-                            handleAddBulkToCart(product);
                           } else {
                             handleAddToCart(product);
                           }
@@ -710,8 +707,6 @@ export default function POS() {
                           if (product.barcode_type === "scale") {
                             setCurrentScaleProduct(product);
                             setShowWeightDialog(true);
-                          } else if (product.bulk_enabled && product.bulk_barcode) {
-                            handleAddBulkToCart(product);
                           } else {
                             handleAddToCart(product);
                           }
