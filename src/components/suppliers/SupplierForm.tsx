@@ -1,7 +1,8 @@
 
 import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Supplier, addSupplier, updateSupplier } from "@/services/supabase/supplierService";
+import { Supplier } from "@/types";
+import { addSupplier, updateSupplier } from "@/services/supabase/supplierService";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
