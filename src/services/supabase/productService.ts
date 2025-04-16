@@ -31,30 +31,32 @@ export async function fetchProductById(id: string) {
 }
 
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
+  // Only include fields that exist in the database schema
+  const productData = {
+    name: product.name,
+    barcode: product.barcode,
+    description: product.description,
+    image_urls: product.image_urls,
+    quantity: product.quantity,
+    price: product.price,
+    purchase_price: product.purchase_price,
+    offer_price: product.offer_price,
+    is_offer: product.is_offer,
+    category_id: product.category_id,
+    subcategory_id: product.subcategory_id,
+    subsubcategory_id: product.subsubcategory_id,
+    barcode_type: product.barcode_type,
+    bulk_enabled: product.bulk_enabled,
+    bulk_quantity: product.bulk_quantity,
+    bulk_price: product.bulk_price,
+    bulk_barcode: product.bulk_barcode,
+    manufacturer_name: product.manufacturer_name,
+    unit_of_measure: product.unit_of_measure
+  };
+
   const { data, error } = await supabase
     .from("products")
-    .insert([{
-      name: product.name,
-      barcode: product.barcode,
-      description: product.description,
-      image_urls: product.image_urls,
-      quantity: product.quantity,
-      price: product.price,
-      purchase_price: product.purchase_price,
-      offer_price: product.offer_price,
-      is_offer: product.is_offer,
-      category_id: product.category_id,
-      subcategory_id: product.subcategory_id,
-      subsubcategory_id: product.subsubcategory_id,
-      barcode_type: product.barcode_type,
-      bulk_enabled: product.bulk_enabled,
-      bulk_quantity: product.bulk_quantity,
-      bulk_price: product.bulk_price,
-      bulk_barcode: product.bulk_barcode,
-      manufacturer_name: product.manufacturer_name,
-      is_bulk: product.is_bulk,
-      unit_of_measure: product.unit_of_measure
-    }])
+    .insert([productData])
     .select();
 
   if (error) {
@@ -68,9 +70,18 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 export async function updateProduct(id: string, product: Partial<Product>) {
   const updateData: any = {};
   
-  // Only include fields that are present in the product object
+  // Only include fields that are present in the product object and exist in the database
+  const validFields = [
+    'name', 'barcode', 'description', 'image_urls', 'quantity', 
+    'price', 'purchase_price', 'offer_price', 'is_offer',
+    'category_id', 'subcategory_id', 'subsubcategory_id',
+    'barcode_type', 'bulk_enabled', 'bulk_quantity', 'bulk_price', 
+    'bulk_barcode', 'manufacturer_name', 'unit_of_measure',
+    'created_at', 'updated_at'
+  ];
+  
   Object.keys(product).forEach(key => {
-    if (product[key as keyof Product] !== undefined) {
+    if (product[key as keyof Product] !== undefined && validFields.includes(key)) {
       // Convert Date objects to ISO strings if needed
       if (key === 'created_at' || key === 'updated_at') {
         const value = product[key as keyof Product];

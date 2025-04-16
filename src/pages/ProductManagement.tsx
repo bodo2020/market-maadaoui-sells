@@ -40,7 +40,8 @@ import {
   Barcode,
   Box,
   Loader2,
-  ScanLine
+  ScanLine,
+  Image as ImageIcon
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -137,10 +138,10 @@ export default function ProductManagement() {
     }
 
     // Validate scale barcode
-    if (newProduct.barcode_type === "scale" && !newProduct.barcode?.startsWith("2")) {
+    if (newProduct.barcode_type === "scale" && (!newProduct.barcode?.startsWith("2") || newProduct.barcode.length !== 13)) {
       toast({
         title: "خطأ",
-        description: "باركود الميزان يجب أن يبدأ بالرقم 2",
+        description: "باركود الميزان يجب أن يبدأ بالرقم 2 ويتكون من 13 رقم",
         variant: "destructive"
       });
       return;
@@ -168,7 +169,6 @@ export default function ProductManagement() {
         bulk_price: newProduct.bulk_enabled ? newProduct.bulk_price : null,
         bulk_barcode: newProduct.bulk_enabled ? newProduct.bulk_barcode : null,
         manufacturer_name: newProduct.manufacturer_name || null,
-        is_bulk: false,
         unit_of_measure: newProduct.unit_of_measure || null
       };
 
@@ -231,12 +231,8 @@ export default function ProductManagement() {
   };
 
   const validateWeightBarcode = (barcode: string) => {
-    // Check if barcode starts with 2 and has the correct length
-    if (
-      !barcode.startsWith('2') || 
-      barcode.length !== 13 || 
-      !/^\d+$/.test(barcode)
-    ) {
+    // Check if barcode starts with 2 and has the correct length of 13 digits
+    if (!barcode.startsWith('2') || barcode.length !== 13 || !/^\d+$/.test(barcode)) {
       toast({
         title: "خطأ",
         description: "باركود الميزان غير صالح. يجب أن يبدأ برقم 2 ويتكون من 13 رقم.",
@@ -246,18 +242,22 @@ export default function ProductManagement() {
     }
 
     // Parse product code and weight
-    const productCode = barcode.slice(1, 5);
-    const weight = parseInt(barcode.slice(5, 11)) / 1000; // convert to kg
-    const checkDigit = barcode.slice(-1);
-
-    // Additional validations can be added here
+    const productCode = barcode.substring(1, 5);
+    const weight = parseInt(barcode.substring(5, 11)) / 1000; // convert to kg
+    
     setNewProduct(prev => ({
       ...prev,
       barcode_type: 'scale',
       barcode: barcode,
       name: `منتج وزني ${productCode}`,
       quantity: 1,
+      unit_of_measure: 'كجم'
     }));
+
+    toast({
+      title: "تم قراءة الباركود",
+      description: `رمز المنتج: ${productCode}، الوزن: ${weight} كجم`,
+    });
 
     return true;
   };
@@ -277,8 +277,19 @@ export default function ProductManagement() {
           barcode: scannedBarcode,
         }));
         setIsBarcodeDialogOpen(false);
+        
+        toast({
+          title: "تم قراءة الباركود",
+          description: `الباركود: ${scannedBarcode}`,
+        });
       }
       setScannedBarcode("");
+    } else {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال الباركود أولاً",
+        variant: "destructive"
+      });
     }
   };
 
@@ -444,7 +455,6 @@ export default function ProductManagement() {
         </CardContent>
       </Card>
       
-      {/* Add Product Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[480px] max-w-[95%] w-full">
           <DialogHeader>
@@ -452,14 +462,16 @@ export default function ProductManagement() {
             <DialogDescription>
               أدخل تفاصيل المنتج. اضغط حفظ عند الانتهاء.
             </DialogDescription>
-            <Button 
-              variant="outline" 
-              onClick={handleBarcodeScanning}
-              className="self-start"
-            >
-              <ScanLine className="ml-2 h-4 w-4" />
-              مسح الباركود
-            </Button>
+            <div className="flex space-x-2 self-start">
+              <Button 
+                variant="outline" 
+                onClick={handleBarcodeScanning}
+                className="ml-2"
+              >
+                <ScanLine className="ml-2 h-4 w-4" />
+                مسح الباركود
+              </Button>
+            </div>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh]">
             <div className="grid gap-4 py-4 px-1">
@@ -499,8 +511,8 @@ export default function ProductManagement() {
                     value={newProduct.barcode || ""}
                     onChange={handleInputChange}
                   />
-                  {newProduct.barcode_type === "scale" && newProduct.barcode && !newProduct.barcode.startsWith("2") && (
-                    <p className="text-xs text-destructive mt-1">باركود الميزان يجب أن يبدأ بالرقم 2</p>
+                  {newProduct.barcode_type === "scale" && newProduct.barcode && (!newProduct.barcode.startsWith("2") || newProduct.barcode.length !== 13) && (
+                    <p className="text-xs text-destructive mt-1">باركود الميزان يجب أن يبدأ بالرقم 2 وأن يتكون من 13 رقم</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -649,7 +661,23 @@ export default function ProductManagement() {
               
               <div className="space-y-2">
                 <Label htmlFor="image">صورة المنتج</Label>
-                <Input id="image" type="file" />
+                <div className="flex items-center gap-2">
+                  <div className="h-20 w-20 border rounded overflow-hidden flex items-center justify-center bg-gray-50">
+                    {newProduct.image_urls && newProduct.image_urls[0] ? (
+                      <img 
+                        src={newProduct.image_urls[0]} 
+                        alt="صورة المنتج" 
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    ) : (
+                      <ImageIcon className="h-10 w-10 text-gray-300" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Input id="image" type="file" />
+                    <p className="text-xs text-muted-foreground mt-1">يمكنك تحميل صورة أو استخدام الصورة الافتراضية</p>
+                  </div>
+                </div>
               </div>
             </div>
           </ScrollArea>
@@ -666,7 +694,6 @@ export default function ProductManagement() {
         </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -713,14 +740,22 @@ export default function ProductManagement() {
         </DialogContent>
       </Dialog>
       
-      {/* Add Barcode Scanning Dialog */}
       <ShadcnDialog open={isBarcodeDialogOpen} onOpenChange={setIsBarcodeDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>مسح الباركود</DialogTitle>
             <DialogDescription>
-              للمنتجات العادية: قم بمسح الباركود الخاص بالمنتج
+              للمنتجات العادية: قم بمسح الباركود الخاص بالمتج
+              <br />
               للمنتجات الموزونة: قم بوزن المنتج ومسح الباركود الصادر من الميزان
+              <br />
+              صيغة باركود الوزن: 2XXXXYYYYYYZ حيث:
+              <br />
+              XXXX = رمز المنتج
+              <br />
+              YYYYYY = الوزن بالجرام
+              <br />
+              Z = رقم التحقق
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -734,6 +769,7 @@ export default function ProductManagement() {
                 onChange={(e) => setScannedBarcode(e.target.value)}
                 className="col-span-3"
                 placeholder="أدخل الباركود أو امسحه"
+                autoFocus
               />
             </div>
           </div>
