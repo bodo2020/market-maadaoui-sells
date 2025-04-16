@@ -55,6 +55,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, createProduct, updateProduct, deleteProduct } from "@/services/supabase/productService";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function ProductManagement() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -391,196 +392,198 @@ export default function ProductManagement() {
               أدخل تفاصيل المنتج. اضغط حفظ عند الانتهاء.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">اسم المنتج</Label>
-                <Input 
-                  id="name" 
-                  placeholder="اسم المنتج" 
-                  value={newProduct.name || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="barcode_type">نوع الباركود</Label>
-                <Select 
-                  onValueChange={(value) => handleSelectChange(value, "barcode_type")}
-                  value={newProduct.barcode_type}
-                >
-                  <SelectTrigger id="barcode_type">
-                    <SelectValue placeholder="اختر نوع الباركود" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="normal">عادي</SelectItem>
-                    <SelectItem value="scale">ميزان (يبدأ برقم 2)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="barcode">الباركود</Label>
-                <Input 
-                  id="barcode" 
-                  placeholder={newProduct.barcode_type === "scale" ? "يجب أن يبدأ برقم 2" : "الباركود"} 
-                  value={newProduct.barcode || ""}
-                  onChange={handleInputChange}
-                />
-                {newProduct.barcode_type === "scale" && newProduct.barcode && !newProduct.barcode.startsWith("2") && (
-                  <p className="text-xs text-destructive mt-1">باركود الميزان يجب أن يبدأ بالرقم 2</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantity">الكمية</Label>
-                <Input 
-                  id="quantity" 
-                  type="number" 
-                  placeholder="0" 
-                  value={newProduct.quantity || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="price">سعر البيع</Label>
-                <Input 
-                  id="price" 
-                  type="number" 
-                  placeholder="0.00" 
-                  value={newProduct.price || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="purchase_price">سعر الشراء</Label>
-                <Input 
-                  id="purchase_price" 
-                  type="number" 
-                  placeholder="0.00" 
-                  value={newProduct.purchase_price || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="is_offer" 
-                  checked={newProduct.is_offer}
-                  onCheckedChange={(checked) => handleCheckboxChange(!!checked, "is_offer")} 
-                />
-                <Label htmlFor="is_offer" className="mr-2">هذا المنتج مخفض</Label>
-              </div>
-            </div>
-            
-            {newProduct.is_offer && (
-              <div className="space-y-2 pt-2 border-t">
-                <Label htmlFor="offer_price">سعر العرض</Label>
-                <Input 
-                  id="offer_price" 
-                  type="number" 
-                  placeholder="0.00" 
-                  value={newProduct.offer_price || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="bulk_enabled" 
-                  checked={newProduct.bulk_enabled}
-                  onCheckedChange={(checked) => handleCheckboxChange(!!checked, "bulk_enabled")} 
-                />
-                <Label htmlFor="bulk_enabled" className="mr-2">تمكين البيع بالجملة</Label>
-              </div>
-            </div>
-            
-            {newProduct.bulk_enabled && (
-              <div className="grid grid-cols-3 gap-4 pt-2 border-t">
+          <ScrollArea className="max-h-[70vh]">
+            <div className="grid gap-4 py-4 px-1">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="bulk_quantity">كمية العبوة</Label>
+                  <Label htmlFor="name">اسم المنتج</Label>
                   <Input 
-                    id="bulk_quantity" 
-                    type="number" 
-                    placeholder="عدد الوحدات" 
-                    value={newProduct.bulk_quantity || ""}
+                    id="name" 
+                    placeholder="اسم المنتج" 
+                    value={newProduct.name || ""}
                     onChange={handleInputChange}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bulk_price">سعر الجملة</Label>
+                  <Label htmlFor="barcode_type">نوع الباركود</Label>
+                  <Select 
+                    onValueChange={(value) => handleSelectChange(value, "barcode_type")}
+                    value={newProduct.barcode_type}
+                  >
+                    <SelectTrigger id="barcode_type">
+                      <SelectValue placeholder="اختر نوع الباركود" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="normal">عادي</SelectItem>
+                      <SelectItem value="scale">ميزان (يبدأ برقم 2)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="barcode">الباركود</Label>
                   <Input 
-                    id="bulk_price" 
+                    id="barcode" 
+                    placeholder={newProduct.barcode_type === "scale" ? "يجب أن يبدأ برقم 2" : "الباركود"} 
+                    value={newProduct.barcode || ""}
+                    onChange={handleInputChange}
+                  />
+                  {newProduct.barcode_type === "scale" && newProduct.barcode && !newProduct.barcode.startsWith("2") && (
+                    <p className="text-xs text-destructive mt-1">باركود الميزان يجب أن يبدأ بالرقم 2</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">الكمية</Label>
+                  <Input 
+                    id="quantity" 
+                    type="number" 
+                    placeholder="0" 
+                    value={newProduct.quantity || ""}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="price">سعر البيع</Label>
+                  <Input 
+                    id="price" 
                     type="number" 
                     placeholder="0.00" 
-                    value={newProduct.bulk_price || ""}
+                    value={newProduct.price || ""}
                     onChange={handleInputChange}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="bulk_barcode">باركود الجملة</Label>
+                  <Label htmlFor="purchase_price">سعر الشراء</Label>
                   <Input 
-                    id="bulk_barcode" 
-                    placeholder="باركود عبوة الجملة" 
-                    value={newProduct.bulk_barcode || ""}
+                    id="purchase_price" 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={newProduct.purchase_price || ""}
                     onChange={handleInputChange}
                   />
                 </div>
               </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="category_id">الفئة</Label>
-              <Input 
-                id="category_id" 
-                placeholder="الفئة" 
-                value={newProduct.category_id || ""}
-                onChange={handleInputChange}
-              />
+              
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="is_offer" 
+                    checked={newProduct.is_offer}
+                    onCheckedChange={(checked) => handleCheckboxChange(!!checked, "is_offer")} 
+                  />
+                  <Label htmlFor="is_offer" className="mr-2">هذا المنتج مخفض</Label>
+                </div>
+              </div>
+              
+              {newProduct.is_offer && (
+                <div className="space-y-2 pt-2 border-t">
+                  <Label htmlFor="offer_price">سعر العرض</Label>
+                  <Input 
+                    id="offer_price" 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={newProduct.offer_price || ""}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="bulk_enabled" 
+                    checked={newProduct.bulk_enabled}
+                    onCheckedChange={(checked) => handleCheckboxChange(!!checked, "bulk_enabled")} 
+                  />
+                  <Label htmlFor="bulk_enabled" className="mr-2">تمكين البيع بالجملة</Label>
+                </div>
+              </div>
+              
+              {newProduct.bulk_enabled && (
+                <div className="grid grid-cols-3 gap-4 pt-2 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="bulk_quantity">كمية العبوة</Label>
+                    <Input 
+                      id="bulk_quantity" 
+                      type="number" 
+                      placeholder="عدد الوحدات" 
+                      value={newProduct.bulk_quantity || ""}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bulk_price">سعر الجملة</Label>
+                    <Input 
+                      id="bulk_price" 
+                      type="number" 
+                      placeholder="0.00" 
+                      value={newProduct.bulk_price || ""}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bulk_barcode">باركود الجملة</Label>
+                    <Input 
+                      id="bulk_barcode" 
+                      placeholder="باركود عبوة الجملة" 
+                      value={newProduct.bulk_barcode || ""}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="category_id">الفئة</Label>
+                <Input 
+                  id="category_id" 
+                  placeholder="الفئة" 
+                  value={newProduct.category_id || ""}
+                  onChange={handleInputChange}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="description">وصف المنتج</Label>
+                <Input 
+                  id="description" 
+                  placeholder="وصف المنتج" 
+                  value={newProduct.description || ""}
+                  onChange={handleInputChange}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="manufacturer_name">الشركة المصنعة</Label>
+                <Input 
+                  id="manufacturer_name" 
+                  placeholder="الشركة المصنعة" 
+                  value={newProduct.manufacturer_name || ""}
+                  onChange={handleInputChange}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="unit_of_measure">وحدة القياس</Label>
+                <Input 
+                  id="unit_of_measure" 
+                  placeholder="وحدة القياس (قطعة، كجم، لتر)" 
+                  value={newProduct.unit_of_measure || ""}
+                  onChange={handleInputChange}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="image">صورة المنتج</Label>
+                <Input id="image" type="file" />
+              </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">وصف المنتج</Label>
-              <Input 
-                id="description" 
-                placeholder="وصف المنتج" 
-                value={newProduct.description || ""}
-                onChange={handleInputChange}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="manufacturer_name">الشركة المصنعة</Label>
-              <Input 
-                id="manufacturer_name" 
-                placeholder="الشركة المصنعة" 
-                value={newProduct.manufacturer_name || ""}
-                onChange={handleInputChange}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="unit_of_measure">وحدة القياس</Label>
-              <Input 
-                id="unit_of_measure" 
-                placeholder="وحدة القياس (قطعة، كجم، لتر)" 
-                value={newProduct.unit_of_measure || ""}
-                onChange={handleInputChange}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="image">صورة المنتج</Label>
-              <Input id="image" type="file" />
-            </div>
-          </div>
+          </ScrollArea>
           <DialogFooter>
             <Button 
               type="button" 

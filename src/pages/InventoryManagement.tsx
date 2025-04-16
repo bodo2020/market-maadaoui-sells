@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { products } from "@/data/mockData";
 import { Product } from "@/types";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function InventoryManagement() {
   const [inventory, setInventory] = useState<Product[]>(products);
@@ -314,77 +315,79 @@ export default function InventoryManagement() {
               أدخل كمية المخزون المراد إضافتها
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {!selectedProduct ? (
-              <div className="space-y-2">
-                <Label htmlFor="productSelect">اختر المنتج</Label>
-                <select 
-                  id="productSelect"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
-                  onChange={(e) => {
-                    const product = inventory.find(p => p.id === e.target.value);
-                    setSelectedProduct(product || null);
-                  }}
-                >
-                  <option value="">-- اختر المنتج --</option>
-                  {inventory.map(product => (
-                    <option key={product.id} value={product.id}>
-                      {product.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 p-3 border rounded-md">
-                <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
-                  <img 
-                    src={selectedProduct.image_urls[0]} 
-                    alt={selectedProduct.name}
-                    className="h-8 w-8 object-contain"
-                  />
+          <ScrollArea className="max-h-[70vh]">
+            <div className="grid gap-4 py-4 px-1">
+              {!selectedProduct ? (
+                <div className="space-y-2">
+                  <Label htmlFor="productSelect">اختر المنتج</Label>
+                  <select 
+                    id="productSelect"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
+                    onChange={(e) => {
+                      const product = inventory.find(p => p.id === e.target.value);
+                      setSelectedProduct(product || null);
+                    }}
+                  >
+                    <option value="">-- اختر المنتج --</option>
+                    {inventory.map(product => (
+                      <option key={product.id} value={product.id}>
+                        {product.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div>
-                  <h4 className="font-medium">{selectedProduct.name}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    المخزون الحالي: {selectedProduct.quantity} وحدة
+              ) : (
+                <div className="flex items-center gap-3 p-3 border rounded-md">
+                  <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
+                    <img 
+                      src={selectedProduct.image_urls[0]} 
+                      alt={selectedProduct.name}
+                      className="h-8 w-8 object-contain"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">{selectedProduct.name}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      المخزون الحالي: {selectedProduct.quantity} وحدة
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="stockAmount">الكمية المراد إضافتها</Label>
+                <Input 
+                  id="stockAmount" 
+                  type="number" 
+                  min="1"
+                  value={stockToAdd}
+                  onChange={(e) => setStockToAdd(parseInt(e.target.value) || 0)}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="purchasePrice">سعر الشراء للوحدة</Label>
+                <Input 
+                  id="purchasePrice" 
+                  type="number" 
+                  min="0"
+                  defaultValue={selectedProduct?.purchase_price}
+                  disabled
+                />
+              </div>
+              
+              {selectedProduct && stockToAdd > 0 && (
+                <div className="p-3 bg-primary/10 rounded-md">
+                  <p className="text-sm">
+                    إجمالي التكلفة: {(selectedProduct.purchase_price * stockToAdd).toFixed(2)} {siteConfig.currency}
+                  </p>
+                  <p className="text-sm">
+                    المخزون بعد الإضافة: {selectedProduct.quantity + stockToAdd} وحدة
                   </p>
                 </div>
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="stockAmount">الكمية المراد إضافتها</Label>
-              <Input 
-                id="stockAmount" 
-                type="number" 
-                min="1"
-                value={stockToAdd}
-                onChange={(e) => setStockToAdd(parseInt(e.target.value) || 0)}
-              />
+              )}
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="purchasePrice">سعر الشراء للوحدة</Label>
-              <Input 
-                id="purchasePrice" 
-                type="number" 
-                min="0"
-                defaultValue={selectedProduct?.purchase_price}
-                disabled
-              />
-            </div>
-            
-            {selectedProduct && stockToAdd > 0 && (
-              <div className="p-3 bg-primary/10 rounded-md">
-                <p className="text-sm">
-                  إجمالي التكلفة: {(selectedProduct.purchase_price * stockToAdd).toFixed(2)} {siteConfig.currency}
-                </p>
-                <p className="text-sm">
-                  المخزون بعد الإضافة: {selectedProduct.quantity + stockToAdd} وحدة
-                </p>
-              </div>
-            )}
-          </div>
+          </ScrollArea>
           <DialogFooter>
             <Button 
               type="submit" 
