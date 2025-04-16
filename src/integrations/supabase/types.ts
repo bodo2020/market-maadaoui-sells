@@ -87,6 +87,7 @@ export type Database = {
           description: string | null
           id: string
           image_urls: string[] | null
+          is_bulk: boolean | null
           is_offer: boolean | null
           manufacturer_name: string | null
           name: string
@@ -110,6 +111,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_urls?: string[] | null
+          is_bulk?: boolean | null
           is_offer?: boolean | null
           manufacturer_name?: string | null
           name: string
@@ -133,6 +135,7 @@ export type Database = {
           description?: string | null
           id?: string
           image_urls?: string[] | null
+          is_bulk?: boolean | null
           is_offer?: boolean | null
           manufacturer_name?: string | null
           name?: string

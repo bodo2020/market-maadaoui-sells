@@ -52,7 +52,7 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
     bulk_barcode: product.bulk_barcode,
     manufacturer_name: product.manufacturer_name,
     unit_of_measure: product.unit_of_measure,
-    is_bulk: product.is_bulk
+    is_bulk: product.is_bulk || false
   };
 
   const { data, error } = await supabase
