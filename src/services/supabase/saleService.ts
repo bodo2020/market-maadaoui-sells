@@ -1,11 +1,19 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Sale } from "@/types";
+import { Sale, CartItem } from "@/types";
 
 export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
+  // Ensure the date is a string when sending to Supabase
+  const saleData = {
+    ...sale,
+    date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date,
+    // Items needs to be stringified JSON for insertion
+    items: sale.items
+  };
+
   const { data, error } = await supabase
     .from("sales")
-    .insert([sale])
+    .insert(saleData)
     .select("*")
     .single();
 
@@ -14,7 +22,11 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
     throw error;
   }
 
-  return data as Sale;
+  // Convert the returned data to match our Sale type
+  return {
+    ...data,
+    items: data.items as unknown as CartItem[]
+  } as Sale;
 }
 
 export async function fetchSales() {
@@ -28,7 +40,11 @@ export async function fetchSales() {
     throw error;
   }
 
-  return data as Sale[];
+  // Convert all items in the array to match our Sale type
+  return data.map(sale => ({
+    ...sale,
+    items: sale.items as unknown as CartItem[]
+  })) as Sale[];
 }
 
 export async function fetchSaleById(id: string) {
@@ -43,7 +59,11 @@ export async function fetchSaleById(id: string) {
     throw error;
   }
 
-  return data as Sale;
+  // Convert the returned data to match our Sale type
+  return {
+    ...data,
+    items: data.items as unknown as CartItem[]
+  } as Sale;
 }
 
 export async function generateInvoiceNumber() {
