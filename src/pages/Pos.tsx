@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -868,4 +869,77 @@ export default function Pos() {
                           id="cashAmount"
                           type="number"
                           step="0.01"
-                          min
+                          min="0"
+                          value={cashAmount}
+                          onChange={(e) => setCashAmount(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    
+                    {(paymentMethod === 'card' || paymentMethod === 'mixed') && (
+                      <div className="space-y-1">
+                        <Label htmlFor="cardAmount" className="flex items-center">
+                          <CardIcon className="ml-2 h-4 w-4" />
+                          المبلغ بالبطاقة
+                        </Label>
+                        <Input 
+                          id="cardAmount"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={cardAmount}
+                          onChange={(e) => setCardAmount(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {paymentMethod === 'cash' && parseFloat(cashAmount || "0") > total && (
+                    <div className="flex justify-between items-center p-2 bg-primary/10 rounded">
+                      <span>المبلغ المتبقي:</span>
+                      <span className="font-bold">{calculateChange().toFixed(2)} {siteConfig.currency}</span>
+                    </div>
+                  )}
+                  
+                  {paymentMethod === 'mixed' && (
+                    <div className="flex justify-between items-center p-2 bg-primary/10 rounded">
+                      <span>إجمالي المدفوع:</span>
+                      <span className="font-bold">
+                        {(parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0")).toFixed(2)} {siteConfig.currency}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button
+                  onClick={completeSale}
+                  disabled={
+                    isProcessing || 
+                    !validatePayment() ||
+                    (paymentMethod === 'mixed' && (
+                      parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0") !== total
+                    ))
+                  }
+                  className="w-full"
+                >
+                  {isProcessing ? (
+                    <span className="flex items-center">
+                      جاري المعالجة...
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      <Check className="ml-2 h-4 w-4" />
+                      إتمام البيع
+                    </span>
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </MainLayout>
+  );
+}
