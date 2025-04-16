@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -65,7 +64,8 @@ import {
   updateUser, 
   deleteUser, 
   startShift, 
-  endShift, 
+  endShift,
+  exportEmployeesToExcel 
 } from "@/services/supabase/userService";
 import { User, UserRole } from "@/types";
 
@@ -75,7 +75,11 @@ export default function EmployeeManagement() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isShiftDialogOpen, setIsShiftDialogOpen] = useState(false);
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
+  const [filterRole, setFilterRole] = useState<string | null>(null);
+  const [filterActive, setFilterActive] = useState<boolean | null>(null);
+  const [filterShift, setFilterShift] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     role: "",
@@ -83,7 +87,9 @@ export default function EmployeeManagement() {
     password: "",
     email: "",
     username: "",
-    active: true
+    active: true,
+    salary: 0,
+    salary_type: "monthly"
   });
   
   const queryClient = useQueryClient();
@@ -168,7 +174,9 @@ export default function EmployeeManagement() {
       password: "",
       email: "",
       username: "",
-      active: true
+      active: true,
+      salary: 0,
+      salary_type: "monthly"
     });
   };
   
@@ -202,7 +210,9 @@ export default function EmployeeManagement() {
       password: formData.password,
       email: formData.email,
       username: username,
-      active: formData.active
+      active: formData.active,
+      salary: formData.salary,
+      salary_type: formData.salary_type
     });
   };
   
@@ -218,6 +228,8 @@ export default function EmployeeManagement() {
         email: formData.email,
         username: formData.username,
         active: formData.active,
+        salary: formData.salary,
+        salary_type: formData.salary_type,
         ...(formData.password ? { password: formData.password } : {})
       }
     });
@@ -237,7 +249,9 @@ export default function EmployeeManagement() {
       password: "",
       email: employee.email || "",
       username: employee.username,
-      active: employee.active !== false
+      active: employee.active !== false,
+      salary: employee.salary || 0,
+      salary_type: employee.salary_type || "monthly"
     });
     setIsEditDialogOpen(true);
   };
@@ -259,11 +273,6 @@ export default function EmployeeManagement() {
   const handleEndShift = (shiftId: string) => {
     endShiftMutation.mutate(shiftId);
   };
-  
-  const filteredEmployees = employees ? employees.filter(employee => 
-    employee.name.toLowerCase().includes(search.toLowerCase()) || 
-    (employee.phone && employee.phone.includes(search))
-  ) : [];
   
   const hasActiveShift = (employee: User) => {
     if (!employee.shifts) return false;
@@ -302,13 +311,44 @@ export default function EmployeeManagement() {
     return getTotalHours() / employees.length;
   };
   
-  const handleExportEmployees = () => {
-    toast.info("سيتم إضافة ميزة التصدير قريباً");
+  const handleExportEmployees = async () => {
+    try {
+      await exportEmployeesToExcel();
+      toast.success("تم تصدير بيانات الموظفين بنجاح");
+    } catch (error) {
+      console.error("Error exporting employees:", error);
+      toast.error("حدث خطأ أثناء تصدير بيانات الموظفين");
+    }
   };
   
   const handleFilterEmployees = () => {
-    toast.info("سيتم إضافة ميزة التصفية قريباً");
+    setIsFilterDialogOpen(true);
   };
+  
+  const applyFilters = () => {
+    setIsFilterDialogOpen(false);
+  };
+  
+  const resetFilters = () => {
+    setFilterRole(null);
+    setFilterActive(null);
+    setFilterShift(null);
+  };
+  
+  const filteredEmployees = employees ? employees.filter(employee => {
+    const textMatch = employee.name.toLowerCase().includes(search.toLowerCase()) || 
+      (employee.phone && employee.phone.includes(search));
+    
+    const roleMatch = !filterRole || employee.role === filterRole;
+    
+    const activeMatch = filterActive === null || employee.active === filterActive;
+    
+    const shiftMatch = filterShift === null || 
+      (filterShift === 'active' && hasActiveShift(employee)) ||
+      (filterShift === 'inactive' && !hasActiveShift(employee));
+    
+    return textMatch && roleMatch && activeMatch && shiftMatch;
+  }) : [];
   
   if (error) {
     return (
@@ -633,6 +673,32 @@ export default function EmployeeManagement() {
                 />
               </div>
             </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="salary">الراتب</Label>
+                <Input 
+                  id="salary" 
+                  type="number" 
+                  placeholder="الراتب" 
+                  value={formData.salary}
+                  onChange={(e) => setFormData({...formData, salary: Number(e.target.value)})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="salary_type">نوع الراتب</Label>
+                <Select onValueChange={(value) => handleSelectChange(value, "salary_type")}>
+                  <SelectTrigger id="salary_type">
+                    <SelectValue placeholder="اختر نوع الراتب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">شهري</SelectItem>
+                    <SelectItem value="daily">يومي</SelectItem>
+                    <SelectItem value="hourly">بالساعة</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button 
@@ -730,6 +796,35 @@ export default function EmployeeManagement() {
                   value={formData.email}
                   onChange={handleInputChange}
                 />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="salary">الراتب</Label>
+                <Input 
+                  id="salary" 
+                  type="number" 
+                  placeholder="الراتب" 
+                  value={formData.salary}
+                  onChange={(e) => setFormData({...formData, salary: Number(e.target.value)})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="salary_type">نوع الراتب</Label>
+                <Select 
+                  defaultValue={formData.salary_type}
+                  onValueChange={(value) => handleSelectChange(value, "salary_type")}
+                >
+                  <SelectTrigger id="salary_type">
+                    <SelectValue placeholder="اختر نوع الراتب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">شهري</SelectItem>
+                    <SelectItem value="daily">يومي</SelectItem>
+                    <SelectItem value="hourly">بالساعة</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
@@ -851,6 +946,77 @@ export default function EmployeeManagement() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>تصفية الموظفين</DialogTitle>
+            <DialogDescription>
+              حدد معايير التصفية المطلوبة
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>الدور الوظيفي</Label>
+              <Select value={filterRole || ""} onValueChange={(value) => setFilterRole(value || null)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="جميع الأدوار" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">جميع الأدوار</SelectItem>
+                  <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
+                  <SelectItem value={UserRole.CASHIER}>كاشير</SelectItem>
+                  <SelectItem value={UserRole.EMPLOYEE}>موظف</SelectItem>
+                  <SelectItem value={UserRole.DELIVERY}>مندوب توصيل</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>حالة النشاط</Label>
+              <Select 
+                value={filterActive === null ? "" : filterActive ? "active" : "inactive"} 
+                onValueChange={(value) => {
+                  if (value === "") setFilterActive(null);
+                  else setFilterActive(value === "active");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="جميع الحالات" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">جميع الحالات</SelectItem>
+                  <SelectItem value="active">نشط</SelectItem>
+                  <SelectItem value="inactive">غير نشط</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>حالة الوردية</Label>
+              <Select 
+                value={filterShift || ""} 
+                onValueChange={(value) => setFilterShift(value || null)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="جميع الحالات" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">جميع الحالات</SelectItem>
+                  <SelectItem value="active">في وردية</SelectItem>
+                  <SelectItem value="inactive">خارج الوردية</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={resetFilters}>
+              إعادة ضبط
+            </Button>
+            <Button onClick={applyFilters}>
+              تطبيق
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </MainLayout>

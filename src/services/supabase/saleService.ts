@@ -2,70 +2,54 @@ import { supabase } from "@/integrations/supabase/client";
 import { Sale, CartItem } from "@/types";
 
 export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
-  // Ensure the date is a string when sending to Supabase
-  // and properly stringify the items array to make it compatible with Supabase Json type
-  const saleData = {
-    ...sale,
-    date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date,
-    // Convert CartItem[] to Json by stringifying it first then parsing it
-    // This removes the complex object references and creates a plain object
-    items: JSON.parse(JSON.stringify(sale.items))
-  };
-
-  // Start a transaction to create the sale and update product quantities
-  // We'll do this in sequential steps rather than a true transaction since Supabase doesn't support complex transactions
   try {
-    // 1. Create the sale record
+    // Create the sale record
     const { data, error } = await supabase
       .from("sales")
-      .insert(saleData)
-      .select("*")
-      .single();
+      .insert([sale])
+      .select();
 
     if (error) {
       console.error("Error creating sale:", error);
       throw error;
     }
 
-    // 2. Update product quantities for each item in the sale
-    for (const item of sale.items) {
-      const productId = item.product.id;
-      const quantitySold = item.quantity;
-      
-      // Get current product quantity
-      const { data: productData, error: productError } = await supabase
-        .from("products")
-        .select("quantity")
-        .eq("id", productId)
-        .single();
+    // Update product quantities for each sold item
+    if (sale.items && sale.items.length > 0) {
+      for (const item of sale.items) {
+        if (!item.product || !item.product.id) continue;
         
-      if (productError) {
-        console.error(`Error fetching product ${productId}:`, productError);
-        continue; // Skip this product but continue with others
-      }
-      
-      // Calculate new quantity
-      const currentQuantity = productData.quantity || 0;
-      const newQuantity = Math.max(0, currentQuantity - quantitySold); // Prevent negative quantities
-      
-      // Update product quantity
-      const { error: updateError } = await supabase
-        .from("products")
-        .update({ quantity: newQuantity })
-        .eq("id", productId);
-        
-      if (updateError) {
-        console.error(`Error updating quantity for product ${productId}:`, updateError);
+        // Get current quantity
+        const { data: product, error: fetchError } = await supabase
+          .from("products")
+          .select("quantity")
+          .eq("id", item.product.id)
+          .single();
+
+        if (fetchError) {
+          console.error(`Error fetching product ${item.product.id}:`, fetchError);
+          continue;
+        }
+
+        // Calculate new quantity (ensure it doesn't go below 0)
+        const currentQuantity = product.quantity || 0;
+        const newQuantity = Math.max(0, currentQuantity - item.quantity);
+
+        // Update the product quantity
+        const { error: updateError } = await supabase
+          .from("products")
+          .update({ quantity: newQuantity })
+          .eq("id", item.product.id);
+
+        if (updateError) {
+          console.error(`Error updating product ${item.product.id} quantity:`, updateError);
+        }
       }
     }
 
-    // Convert the returned data to match our Sale type
-    return {
-      ...data,
-      items: data.items as unknown as CartItem[]
-    } as Sale;
+    return data[0] as Sale;
   } catch (error) {
-    console.error("Error in sale creation process:", error);
+    console.error("Error in createSale:", error);
     throw error;
   }
 }

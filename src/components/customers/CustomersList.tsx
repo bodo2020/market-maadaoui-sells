@@ -6,10 +6,12 @@ import { fetchCustomers, deleteCustomer } from "@/services/supabase/customerServ
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Plus, Edit, Trash2, Phone, Mail, Building } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Phone, Mail, Building, CreditCard, Download } from "lucide-react";
 import CustomerForm from "./CustomerForm";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function CustomersList() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,6 +48,11 @@ export default function CustomersList() {
     }
   };
   
+  const handleExportClick = () => {
+    // TODO: Implement export functionality
+    console.log("Export customers");
+  };
+  
   const filteredCustomers = customers.filter(customer => {
     const searchTermLower = searchTerm.toLowerCase();
     return (
@@ -55,14 +62,33 @@ export default function CustomersList() {
     );
   });
   
+  // Mock data for customer transactions (to be implemented with a real backend)
+  const getCustomerTransactions = (customerId: string) => {
+    return [
+      { id: 1, date: "2023-04-20", amount: -100, type: "debt", description: "فاتورة شراء منتجات" },
+      { id: 2, date: "2023-04-21", amount: 41, type: "credit", description: "دفعة جزئية" },
+      { id: 3, date: "2023-04-25", amount: 59, type: "credit", description: "دفعة نهائية" }
+    ];
+  };
+  
+  const calculateCustomerBalance = (customerId: string) => {
+    const transactions = getCustomerTransactions(customerId);
+    return transactions.reduce((balance, transaction) => balance + transaction.amount, 0);
+  };
+  
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-xl flex items-center justify-between">
           <span>العملاء</span>
-          <Button onClick={handleAddClick} className="mr-2">
-            <Plus className="mr-2 h-4 w-4" /> إضافة عميل
-          </Button>
+          <div className="flex space-x-2">
+            <Button onClick={handleExportClick} variant="outline" className="mr-2">
+              <Download className="mr-2 h-4 w-4" /> تصدير
+            </Button>
+            <Button onClick={handleAddClick} className="mr-2">
+              <Plus className="mr-2 h-4 w-4" /> إضافة عميل
+            </Button>
+          </div>
         </CardTitle>
         <div className="flex w-full max-w-sm items-center space-x-2 mt-2">
           <Input
@@ -93,59 +119,119 @@ export default function CustomersList() {
                   <TableHead>الهاتف</TableHead>
                   <TableHead>البريد الإلكتروني</TableHead>
                   <TableHead>العنوان</TableHead>
+                  <TableHead>الرصيد</TableHead>
                   <TableHead className="text-left">الإجراءات</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell>
-                      {customer.phone ? (
-                        <div className="flex items-center">
-                          <Phone className="h-4 w-4 mr-1" />
-                          {customer.phone}
-                        </div>
-                      ) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {customer.email ? (
-                        <div className="flex items-center">
-                          <Mail className="h-4 w-4 mr-1" />
-                          {customer.email}
-                        </div>
-                      ) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {customer.address ? (
-                        <div className="flex items-center">
-                          <Building className="h-4 w-4 mr-1" />
-                          {customer.address}
-                        </div>
-                      ) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditClick(customer)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive"
-                          onClick={() => handleDeleteClick(customer.id)}
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filteredCustomers.map((customer) => {
+                  const balance = calculateCustomerBalance(customer.id);
+                  
+                  return (
+                    <React.Fragment key={customer.id}>
+                      <TableRow>
+                        <TableCell className="font-medium">{customer.name}</TableCell>
+                        <TableCell>
+                          {customer.phone ? (
+                            <div className="flex items-center">
+                              <Phone className="h-4 w-4 mr-1" />
+                              {customer.phone}
+                            </div>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {customer.email ? (
+                            <div className="flex items-center">
+                              <Mail className="h-4 w-4 mr-1" />
+                              {customer.email}
+                            </div>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {customer.address ? (
+                            <div className="flex items-center">
+                              <Building className="h-4 w-4 mr-1" />
+                              {customer.address}
+                            </div>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {balance > 0 ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
+                              <CreditCard className="h-3 w-3 mr-1" /> لنا: {balance}
+                            </Badge>
+                          ) : balance < 0 ? (
+                            <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">
+                              <CreditCard className="h-3 w-3 mr-1" /> علينا: {Math.abs(balance)}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">متوازن</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditClick(customer)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              onClick={() => handleDeleteClick(customer.id)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell colSpan={6} className="p-0">
+                          <Accordion type="single" collapsible className="w-full">
+                            <AccordionItem value={customer.id}>
+                              <AccordionTrigger className="py-2 px-4 text-sm">
+                                عرض تفاصيل المعاملات المالية
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="p-4">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>التاريخ</TableHead>
+                                        <TableHead>الوصف</TableHead>
+                                        <TableHead>المبلغ</TableHead>
+                                        <TableHead>النوع</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {getCustomerTransactions(customer.id).map(transaction => (
+                                        <TableRow key={transaction.id}>
+                                          <TableCell>{transaction.date}</TableCell>
+                                          <TableCell>{transaction.description}</TableCell>
+                                          <TableCell>{Math.abs(transaction.amount)}</TableCell>
+                                          <TableCell>
+                                            {transaction.type === 'debt' ? 
+                                              <Badge variant="outline" className="bg-red-50 text-red-700">علينا</Badge> : 
+                                              <Badge variant="outline" className="bg-green-50 text-green-700">لنا</Badge>
+                                            }
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        </TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

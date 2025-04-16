@@ -1,6 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { User, UserRole, Shift } from "@/types";
+import * as ExcelJS from 'exceljs';
+import * as FileSaver from 'file-saver';
 
 export async function fetchUsers() {
   try {
@@ -13,7 +14,6 @@ export async function fetchUsers() {
       throw error;
     }
 
-    // Fetch shifts for each user
     const usersWithShifts = await Promise.all(
       data.map(async (user) => {
         const { data: shifts, error: shiftsError } = await supabase
@@ -50,7 +50,6 @@ export async function fetchUserById(id: string) {
       throw error;
     }
 
-    // Fetch shifts for the user
     const { data: shifts, error: shiftsError } = await supabase
       .from("shifts")
       .select("*")
@@ -70,7 +69,6 @@ export async function fetchUserById(id: string) {
 
 export async function authenticateUser(username: string, password: string) {
   try {
-    // Hardcoded admin user for testing
     if (username === 'admin' && password === 'admin') {
       return {
         id: '1',
@@ -85,7 +83,6 @@ export async function authenticateUser(username: string, password: string) {
       } as User;
     }
 
-    // If not admin, try the database - use maybeSingle() instead of single() to handle cases where no user is found
     const { data, error } = await supabase
       .from("users")
       .select("*")
@@ -97,19 +94,16 @@ export async function authenticateUser(username: string, password: string) {
       throw new Error("Invalid username or password");
     }
 
-    // If no user is found
     if (!data) {
       console.error("User not found");
       throw new Error("Invalid username or password");
     }
 
-    // For demo purposes only - in a real app, you'd use proper password verification
     if (data.password !== password) {
       console.error("Password mismatch");
       throw new Error("Invalid username or password");
     }
 
-    // Fetch shifts for the user
     const { data: shifts, error: shiftsError } = await supabase
       .from("shifts")
       .select("*")
@@ -136,9 +130,9 @@ export async function createUser(user: Omit<User, "id" | "created_at" | "updated
         role: user.role,
         phone: user.phone,
         password: user.password,
-        username: user.username || user.phone, // Using phone as username if none provided
+        username: user.username || user.phone,
         email: user.email,
-        active: user.active !== false // Default to true if not specified
+        active: user.active !== false
       }])
       .select();
 
@@ -158,7 +152,6 @@ export async function updateUser(id: string, user: Partial<User>) {
   try {
     const updateData: any = {};
     
-    // Only include fields that are present in the user object
     Object.keys(user).forEach(key => {
       if (user[key as keyof User] !== undefined && key !== 'shifts') {
         updateData[key] = user[key as keyof User];
@@ -176,7 +169,6 @@ export async function updateUser(id: string, user: Partial<User>) {
       throw error;
     }
 
-    // Fetch shifts for the updated user
     const { data: shifts, error: shiftsError } = await supabase
       .from("shifts")
       .select("*")
@@ -196,7 +188,6 @@ export async function updateUser(id: string, user: Partial<User>) {
 
 export async function deleteUser(id: string) {
   try {
-    // First delete related shifts
     const { error: shiftsError } = await supabase
       .from("shifts")
       .delete()
@@ -207,7 +198,6 @@ export async function deleteUser(id: string) {
       throw shiftsError;
     }
 
-    // Then delete the user
     const { error } = await supabase
       .from("users")
       .delete()
@@ -225,7 +215,6 @@ export async function deleteUser(id: string) {
   }
 }
 
-// Shift-related functions
 export async function startShift(employeeId: string) {
   try {
     const { data, error } = await supabase
@@ -252,7 +241,6 @@ export async function endShift(shiftId: string) {
   try {
     const now = new Date();
     
-    // First get the shift to calculate total hours
     const { data: shiftData, error: fetchError } = await supabase
       .from("shifts")
       .select("*")
@@ -264,11 +252,9 @@ export async function endShift(shiftId: string) {
       throw fetchError;
     }
     
-    // Calculate total hours
     const startTime = new Date(shiftData.start_time);
     const hoursWorked = (now.getTime() - startTime.getTime()) / (1000 * 60 * 60);
     
-    // Update the shift
     const { data, error } = await supabase
       .from("shifts")
       .update({
@@ -299,7 +285,7 @@ export async function getActiveShift(employeeId: string) {
       .is("end_time", null)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows returned
+    if (error && error.code !== 'PGRST116') {
       console.error("Error fetching active shift:", error);
       throw error;
     }
@@ -327,6 +313,97 @@ export async function getShifts(employeeId: string) {
     return data as Shift[];
   } catch (error) {
     console.error("Error in getShifts:", error);
+    throw error;
+  }
+}
+
+export async function exportEmployeesToExcel(): Promise<void> {
+  try {
+    const users = await fetchUsers();
+    
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('الموظفين');
+    
+    worksheet.views = [{ rightToLeft: true }];
+    
+    const headerRow = [
+      'الاسم',
+      'الدور الوظيفي',
+      'اسم المستخدم',
+      'رقم الهاتف',
+      'البريد الإلكتروني',
+      'الراتب',
+      'نوع الراتب',
+      'الحالة',
+      'إجمالي ساعات العمل',
+      'تاريخ التسجيل'
+    ];
+    
+    worksheet.addRow(headerRow);
+    
+    worksheet.getRow(1).font = { bold: true, size: 14 };
+    worksheet.getRow(1).alignment = { horizontal: 'center' };
+    
+    const getRoleInArabic = (role: UserRole): string => {
+      switch (role) {
+        case UserRole.ADMIN: return 'مدير';
+        case UserRole.CASHIER: return 'كاشير';
+        case UserRole.EMPLOYEE: return 'موظف';
+        case UserRole.DELIVERY: return 'مندوب توصيل';
+        default: return role;
+      }
+    };
+    
+    const getSalaryTypeInArabic = (type: string): string => {
+      switch (type) {
+        case 'monthly': return 'شهري';
+        case 'daily': return 'يومي';
+        case 'hourly': return 'بالساعة';
+        default: return type || 'شهري';
+      }
+    };
+    
+    users.forEach(user => {
+      const totalHours = user.shifts ? user.shifts.reduce((total, shift) => {
+        if (shift.total_hours) {
+          return total + shift.total_hours;
+        }
+        return total;
+      }, 0) : 0;
+      
+      worksheet.addRow([
+        user.name,
+        getRoleInArabic(user.role),
+        user.username,
+        user.phone || '',
+        user.email || '',
+        user.salary || 0,
+        getSalaryTypeInArabic(user.salary_type),
+        user.active !== false ? 'نشط' : 'غير نشط',
+        totalHours.toFixed(1),
+        new Date(user.created_at).toLocaleDateString('ar-EG')
+      ]);
+    });
+    
+    worksheet.columns.forEach(column => {
+      let maxLength = 0;
+      column.eachCell({ includeEmpty: true }, cell => {
+        const columnLength = cell.value ? cell.value.toString().length : 10;
+        if (columnLength > maxLength) {
+          maxLength = columnLength;
+        }
+      });
+      column.width = maxLength < 10 ? 10 : maxLength;
+    });
+    
+    const buffer = await workbook.xlsx.writeBuffer();
+    
+    const date = new Date().toISOString().split('T')[0];
+    const fileName = `قائمة_الموظفين_${date}.xlsx`;
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    FileSaver.saveAs(blob, fileName);
+  } catch (error) {
+    console.error("Error exporting employees to Excel:", error);
     throw error;
   }
 }

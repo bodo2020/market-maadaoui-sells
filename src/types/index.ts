@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -9,15 +8,16 @@ export enum UserRole {
 export interface User {
   id: string;
   name: string;
-  role: UserRole;
-  phone: string;
-  password: string;
-  shifts?: Shift[];
-  created_at: Date | string;
-  updated_at?: Date | string;
-  email?: string;
   username: string;
+  role: UserRole;
+  phone?: string;
+  email?: string;
+  password?: string;
+  created_at: string;
   active?: boolean;
+  shifts?: Shift[];
+  salary?: number;
+  salary_type?: string;
 }
 
 export interface Category {
