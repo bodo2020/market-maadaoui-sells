@@ -1,8 +1,9 @@
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   BarChart4,
   Store,
@@ -41,8 +42,14 @@ function SidebarItem({ icon, label, href, active }: SidebarItemProps) {
 }
 
 export default function Sidebar() {
-  // In a real app, you'd get the current path from router
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const currentPath = window.location.pathname;
+  
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
   
   return (
     <div className="w-64 border-l bg-white h-screen overflow-y-auto p-4 flex flex-col">
@@ -107,7 +114,11 @@ export default function Sidebar() {
         />
       </div>
       
-      <Button variant="outline" className="mt-4 gap-2 w-full justify-start">
+      <Button 
+        variant="outline" 
+        className="mt-4 gap-2 w-full justify-start"
+        onClick={handleLogout}
+      >
         <LogOut size={20} />
         <span>تسجيل الخروج</span>
       </Button>

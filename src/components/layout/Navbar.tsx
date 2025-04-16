@@ -1,5 +1,5 @@
 
-import { Bell, User } from "lucide-react";
+import { Bell, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,8 +10,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 export default function Navbar() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <header className="border-b bg-white py-3 px-6 flex items-center justify-between">
       <div className="flex items-center">
@@ -28,11 +38,13 @@ export default function Navbar() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground">أ م</AvatarFallback>
+                <AvatarFallback className="bg-primary text-primary-foreground">
+                  {user?.name ? user.name.charAt(0) : 'أ'}
+                </AvatarFallback>
               </Avatar>
               <div className="text-right">
-                <p className="text-sm font-medium">أحمد المعداوي</p>
-                <p className="text-xs text-muted-foreground">مدير</p>
+                <p className="text-sm font-medium">{user?.name || 'المستخدم'}</p>
+                <p className="text-xs text-muted-foreground">{user?.role || 'مستخدم'}</p>
               </div>
             </Button>
           </DropdownMenuTrigger>
@@ -45,7 +57,10 @@ export default function Navbar() {
             </DropdownMenuItem>
             <DropdownMenuItem>الإعدادات</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>تسجيل الخروج</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
+              <LogOut className="ml-2 h-4 w-4" />
+              <span>تسجيل الخروج</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
