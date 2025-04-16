@@ -107,10 +107,19 @@ export default function ProductManagement() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target;
-    setNewProduct({
-      ...newProduct,
-      [id]: type === "number" ? Number(value) : value
-    });
+    
+    if (id === "barcode" && newProduct.barcode_type === "scale") {
+      const cleanValue = value.replace(/\D/g, '').substring(0, 5);
+      setNewProduct({
+        ...newProduct,
+        [id]: cleanValue
+      });
+    } else {
+      setNewProduct({
+        ...newProduct,
+        [id]: type === "number" ? Number(value) : value
+      });
+    }
   };
 
   const handleSelectChange = (value: string, field: string) => {
@@ -137,7 +146,6 @@ export default function ProductManagement() {
       return;
     }
 
-    // Validate scale barcode
     if (newProduct.barcode_type === "scale" && (!newProduct.barcode?.startsWith("2") || newProduct.barcode.length !== 13)) {
       toast({
         title: "خطأ",
@@ -149,7 +157,6 @@ export default function ProductManagement() {
 
     setLoading(true);
     try {
-      // Add the new product to Supabase
       const productToAdd: Omit<Product, "id" | "created_at" | "updated_at"> = {
         name: newProduct.name || "",
         barcode: newProduct.barcode || null,
@@ -233,32 +240,30 @@ export default function ProductManagement() {
   };
 
   const validateWeightBarcode = (barcode: string) => {
-    // Check if barcode starts with 2 and has the correct length of 13 digits
-    if (!barcode.startsWith('2') || barcode.length !== 13 || !/^\d+$/.test(barcode)) {
+    if (!/^\d{1,5}$/.test(barcode)) {
       toast({
         title: "خطأ",
-        description: "باركود الميزان غير صالح. يجب أن يبدأ برقم 2 ويتكون من 13 رقم.",
+        description: "رمز منتج الميزان يجب أن يكون من 1 إلى 5 أرقام فقط.",
         variant: "destructive"
       });
       return false;
     }
 
-    // Parse product code and weight
-    const productCode = barcode.substring(1, 5);
-    const weight = parseInt(barcode.substring(5, 11)) / 1000; // convert to kg
+    let formattedBarcode = barcode;
+    while (formattedBarcode.length < 5) {
+      formattedBarcode = '0' + formattedBarcode;
+    }
     
     setNewProduct(prev => ({
       ...prev,
       barcode_type: 'scale',
-      barcode: barcode,
-      name: `منتج وزني ${productCode}`,
-      quantity: 1,
+      barcode: formattedBarcode,
       unit_of_measure: 'كجم'
     }));
 
     toast({
-      title: "تم قراءة الباركود",
-      description: `رمز المنتج: ${productCode}، الوزن: ${weight} كجم`,
+      title: "تم تعيين رمز المنتج",
+      description: `رمز المنتج: ${formattedBarcode}`,
     });
 
     return true;
@@ -266,13 +271,23 @@ export default function ProductManagement() {
 
   const handleBarcodeSubmit = () => {
     if (scannedBarcode) {
-      if (scannedBarcode.startsWith('2')) {
-        // Weight-based barcode
-        if (validateWeightBarcode(scannedBarcode)) {
-          setIsBarcodeDialogOpen(false);
-        }
+      if (scannedBarcode.startsWith('2') && scannedBarcode.length === 13) {
+        const productCode = scannedBarcode.substring(1, 6);
+        
+        setNewProduct(prev => ({
+          ...prev,
+          barcode_type: 'scale',
+          barcode: productCode,
+          unit_of_measure: 'كجم'
+        }));
+        
+        setIsBarcodeDialogOpen(false);
+        
+        toast({
+          title: "تم قراءة باركود الميزان",
+          description: `رمز المنتج: ${productCode}`,
+        });
       } else {
-        // Normal barcode
         setNewProduct(prev => ({
           ...prev,
           barcode_type: 'normal',
@@ -479,7 +494,7 @@ export default function ProductManagement() {
             <div className="grid gap-4 py-4 px-1">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">اسم المنتج</Label>
+                  <Label htmlFor="name">اسم الم��تج</Label>
                   <Input 
                     id="name" 
                     placeholder="اسم المنتج" 
@@ -506,15 +521,24 @@ export default function ProductManagement() {
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="barcode">الباركود</Label>
+                  <Label htmlFor="barcode">
+                    {newProduct.barcode_type === "scale" ? "رمز المنتج (5 أرقام)" : "الباركود"}
+                  </Label>
                   <Input 
                     id="barcode" 
-                    placeholder={newProduct.barcode_type === "scale" ? "يجب أن يبدأ برقم 2" : "الباركود"} 
+                    placeholder={newProduct.barcode_type === "scale" ? "أدخل 1-5 أرقام" : "الباركود"} 
                     value={newProduct.barcode || ""}
                     onChange={handleInputChange}
                   />
-                  {newProduct.barcode_type === "scale" && newProduct.barcode && (!newProduct.barcode.startsWith("2") || newProduct.barcode.length !== 13) && (
-                    <p className="text-xs text-destructive mt-1">باركود الميزان يجب أن يبدأ بالرقم 2 وأن يتكون من 13 رقم</p>
+                  {newProduct.barcode_type === "scale" && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      أدخل رمز المنتج فقط (1-5 أرقام). سيتم تخزينه كرمز من 5 أرقام.
+                    </p>
+                  )}
+                  {newProduct.barcode_type === "scale" && newProduct.barcode && newProduct.barcode.length > 0 && (
+                    <p className="text-xs text-primary mt-1">
+                      رمز المنتج المخزن: {newProduct.barcode.padStart(5, '0')}
+                    </p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -753,9 +777,9 @@ export default function ProductManagement() {
               <br />
               صيغة باركود الوزن: 2XXXXYYYYYYZ حيث:
               <br />
-              XXXX = رمز المنتج
+              XXXX = رمز المنتج (5 أرقام)
               <br />
-              YYYYYY = الوزن بالجرام
+              YYYYYY = الوزن بالجرام (5 أرقام)
               <br />
               Z = رقم التحقق
             </DialogDescription>

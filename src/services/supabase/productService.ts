@@ -30,34 +30,108 @@ export async function fetchProductById(id: string) {
   return data as Product;
 }
 
+export async function fetchProductByBarcode(barcode: string) {
+  // Handle scale barcodes (starting with 2 and 13 digits)
+  if (barcode.startsWith('2') && barcode.length === 13) {
+    // Extract the product code (5 digits after the '2')
+    const productCode = barcode.substring(1, 6);
+    
+    // Get product with matching scale product code
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("barcode_type", "scale")
+      .eq("barcode", productCode)
+      .single();
+    
+    if (error) {
+      console.error("Error fetching scale product:", error);
+      throw error;
+    }
+    
+    if (data) {
+      // Extract weight from barcode: positions 7-11 (5 digits)
+      // Format is 2PPPPPWWWWWC where:
+      // P = product code (5 digits)
+      // W = weight in grams (5 digits)
+      // C = check digit
+      const weightInGrams = parseInt(barcode.substring(6, 11));
+      const weightInKg = weightInGrams / 1000;
+      
+      // Return a modified product with the calculated quantity
+      return {
+        ...data,
+        is_weight_based: true,
+        calculated_weight: weightInKg,
+        calculated_price: Number(data.price) * weightInKg
+      } as Product;
+    }
+    
+    return null;
+  }
+  
+  // Handle regular barcodes
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("barcode", barcode)
+    .single();
+
+  if (error) {
+    console.error("Error fetching product by barcode:", error);
+    if (error.code === 'PGRST116') {
+      // No data found
+      return null;
+    }
+    throw error;
+  }
+
+  return data as Product;
+}
+
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
+  // Format barcode for scale products (store only the 5-digit product code)
+  let productData = { ...product };
+  
+  if (productData.barcode_type === "scale" && productData.barcode) {
+    // If user entered more than 5 digits, extract just the product code part
+    if (productData.barcode.length > 5) {
+      productData.barcode = productData.barcode.substring(0, 5);
+    }
+    
+    // Ensure it's exactly 5 digits by padding with zeros if needed
+    while (productData.barcode.length < 5) {
+      productData.barcode = '0' + productData.barcode;
+    }
+  }
+  
   // Only include fields that exist in the database schema
-  const productData = {
-    name: product.name,
-    barcode: product.barcode,
-    description: product.description,
-    image_urls: product.image_urls,
-    quantity: product.quantity,
-    price: product.price,
-    purchase_price: product.purchase_price,
-    offer_price: product.offer_price,
-    is_offer: product.is_offer,
-    category_id: product.category_id,
-    subcategory_id: product.subcategory_id,
-    subsubcategory_id: product.subsubcategory_id,
-    barcode_type: product.barcode_type,
-    bulk_enabled: product.bulk_enabled,
-    bulk_quantity: product.bulk_quantity,
-    bulk_price: product.bulk_price,
-    bulk_barcode: product.bulk_barcode,
-    manufacturer_name: product.manufacturer_name,
-    unit_of_measure: product.unit_of_measure,
-    is_bulk: product.is_bulk || false
+  const finalProductData = {
+    name: productData.name,
+    barcode: productData.barcode,
+    description: productData.description,
+    image_urls: productData.image_urls,
+    quantity: productData.quantity,
+    price: productData.price,
+    purchase_price: productData.purchase_price,
+    offer_price: productData.offer_price,
+    is_offer: productData.is_offer,
+    category_id: productData.category_id,
+    subcategory_id: productData.subcategory_id,
+    subsubcategory_id: productData.subsubcategory_id,
+    barcode_type: productData.barcode_type,
+    bulk_enabled: productData.bulk_enabled,
+    bulk_quantity: productData.bulk_quantity,
+    bulk_price: productData.bulk_price,
+    bulk_barcode: productData.bulk_barcode,
+    manufacturer_name: productData.manufacturer_name,
+    unit_of_measure: productData.unit_of_measure,
+    is_bulk: productData.is_bulk || false
   };
 
   const { data, error } = await supabase
     .from("products")
-    .insert([productData])
+    .insert([finalProductData])
     .select();
 
   if (error) {
@@ -69,6 +143,19 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 }
 
 export async function updateProduct(id: string, product: Partial<Product>) {
+  // Format barcode for scale products if it's being updated
+  if (product.barcode_type === "scale" && product.barcode) {
+    // If user entered more than 5 digits, extract just the product code part
+    if (product.barcode.length > 5) {
+      product.barcode = product.barcode.substring(0, 5);
+    }
+    
+    // Ensure it's exactly 5 digits by padding with zeros if needed
+    while (product.barcode.length < 5) {
+      product.barcode = '0' + product.barcode;
+    }
+  }
+
   const updateData: any = {};
   
   // Only include fields that are present in the product object and exist in the database
