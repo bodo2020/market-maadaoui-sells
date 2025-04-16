@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -9,7 +10,7 @@ import {
 } from "lucide-react";
 import { CartItem, Product } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-import { fetchProducts } from "@/services/supabase/productService";
+import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -43,7 +44,7 @@ export default function POS() {
     loadProducts();
   }, [toast]);
   
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!search) return;
     
     // Check if it's a bulk barcode
@@ -54,24 +55,61 @@ export default function POS() {
       return;
     }
     
-    // Check if it's a scale barcode (starts with 2)
-    if (search.startsWith("2")) {
+    // Check if it's a scale barcode (starts with 2 and has 13 digits)
+    if (search.startsWith("2") && search.length === 13) {
+      // First try direct lookup through API
+      try {
+        const product = await fetchProductByBarcode(search);
+        if (product) {
+          // If the product has calculated_weight property, it was processed by the backend
+          if (product.calculated_weight) {
+            handleAddScaleProductToCart(product, product.calculated_weight);
+            setSearch("");
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching product by scale barcode:", error);
+      }
+      
+      // As a fallback, process locally if API didn't handle it
+      // Extract the product code (digits 2-7)
+      const productCode = search.substring(1, 7);
+      
+      // Find the product with this code
       const scaleProduct = products.find(p => 
         p.barcode_type === "scale" && 
-        search.substring(0, 7) === p.barcode?.substring(0, 7)
+        p.barcode === productCode
       );
       
       if (scaleProduct) {
-        // Extract weight from barcode (assume format 2PPPPPWWWWWC)
-        // where P is product code, W is weight in grams, C is check digit
-        const weightInGrams = parseFloat(search.substring(7, 12)) / 1000;
-        handleAddScaleProductToCart(scaleProduct, weightInGrams);
+        // Extract weight from barcode (digits 8-12)
+        // Format is 2PPPPPWWWWWC where:
+        // P is product code (6 digits)
+        // W is weight in grams (5 digits)
+        // C is check digit
+        const weightInGrams = parseInt(search.substring(7, 12));
+        const weightInKg = weightInGrams / 1000;
+        
+        handleAddScaleProductToCart(scaleProduct, weightInKg);
         setSearch("");
         return;
       }
     }
     
-    // Regular search
+    // Try to fetch directly from backend first
+    try {
+      const product = await fetchProductByBarcode(search);
+      if (product) {
+        handleAddToCart(product);
+        setSearch("");
+        return;
+      }
+    } catch (error) {
+      console.error("Error fetching product by barcode:", error);
+    }
+    
+    // Regular search if direct lookup failed
     const results = products.filter(
       product => 
         product.barcode === search || 

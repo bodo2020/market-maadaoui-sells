@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -45,6 +46,10 @@ export async function fetchProductByBarcode(barcode: string) {
     
     if (error) {
       console.error("Error fetching scale product:", error);
+      if (error.code === 'PGRST116') {
+        // No data found
+        return null;
+      }
       throw error;
     }
     
