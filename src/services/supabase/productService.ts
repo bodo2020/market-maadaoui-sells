@@ -51,7 +51,8 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
     bulk_price: product.bulk_price,
     bulk_barcode: product.bulk_barcode,
     manufacturer_name: product.manufacturer_name,
-    unit_of_measure: product.unit_of_measure
+    unit_of_measure: product.unit_of_measure,
+    is_bulk: product.is_bulk
   };
 
   const { data, error } = await supabase
@@ -77,7 +78,7 @@ export async function updateProduct(id: string, product: Partial<Product>) {
     'category_id', 'subcategory_id', 'subsubcategory_id',
     'barcode_type', 'bulk_enabled', 'bulk_quantity', 'bulk_price', 
     'bulk_barcode', 'manufacturer_name', 'unit_of_measure',
-    'created_at', 'updated_at'
+    'created_at', 'updated_at', 'is_bulk'
   ];
   
   Object.keys(product).forEach(key => {

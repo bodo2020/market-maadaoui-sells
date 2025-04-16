@@ -169,7 +169,8 @@ export default function ProductManagement() {
         bulk_price: newProduct.bulk_enabled ? newProduct.bulk_price : null,
         bulk_barcode: newProduct.bulk_enabled ? newProduct.bulk_barcode : null,
         manufacturer_name: newProduct.manufacturer_name || null,
-        unit_of_measure: newProduct.unit_of_measure || null
+        unit_of_measure: newProduct.unit_of_measure || null,
+        is_bulk: false
       };
 
       const addedProduct = await createProduct(productToAdd);
@@ -181,6 +182,7 @@ export default function ProductManagement() {
         is_offer: false,
         image_urls: ["/placeholder.svg"],
         quantity: 0,
+        is_bulk: false
       });
       setIsAddDialogOpen(false);
       
@@ -405,7 +407,7 @@ export default function ProductManagement() {
                         </TableCell>
                         <TableCell>
                           {(product.quantity || 0) > 10 ? (
-                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">متوفر</span>
+                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">متو��ر</span>
                           ) : (product.quantity || 0) > 0 ? (
                             <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">مخزون منخفض</span>
                           ) : (
