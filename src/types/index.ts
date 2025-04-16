@@ -56,6 +56,8 @@ export interface Product {
   is_weight_based?: boolean;
   calculated_weight?: number;
   calculated_price?: number;
+  // Property to indicate if the product was scanned with its bulk barcode
+  is_bulk_scan?: boolean;
 }
 
 export interface CartItem {
