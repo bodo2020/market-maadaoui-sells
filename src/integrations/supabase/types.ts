@@ -97,6 +97,7 @@ export type Database = {
           quantity: number | null
           subcategory_id: string | null
           subsubcategory_id: string | null
+          unit_of_measure: string | null
           updated_at: string | null
         }
         Insert: {
@@ -121,6 +122,7 @@ export type Database = {
           quantity?: number | null
           subcategory_id?: string | null
           subsubcategory_id?: string | null
+          unit_of_measure?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -145,6 +147,7 @@ export type Database = {
           quantity?: number | null
           subcategory_id?: string | null
           subsubcategory_id?: string | null
+          unit_of_measure?: string | null
           updated_at?: string | null
         }
         Relationships: []
