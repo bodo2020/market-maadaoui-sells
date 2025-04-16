@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -74,7 +73,22 @@ export async function fetchProductByBarcode(barcode: string) {
     return null;
   }
   
-  // Handle regular barcodes
+  // First check if this is a bulk barcode
+  const bulkProduct = await supabase
+    .from("products")
+    .select("*")
+    .eq("bulk_barcode", barcode)
+    .maybeSingle();
+    
+  if (!bulkProduct.error && bulkProduct.data) {
+    // Mark this as a bulk product scan
+    return {
+      ...bulkProduct.data,
+      is_bulk_scan: true
+    } as Product;
+  }
+  
+  // If not a bulk barcode, look for regular barcode
   const { data, error } = await supabase
     .from("products")
     .select("*")
@@ -90,7 +104,11 @@ export async function fetchProductByBarcode(barcode: string) {
     throw error;
   }
 
-  return data as Product;
+  // Return the product with a flag indicating this is not a bulk scan
+  return {
+    ...data,
+    is_bulk_scan: false
+  } as Product;
 }
 
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {

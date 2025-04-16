@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -96,9 +97,11 @@ export default function POS() {
       if (product) {
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
-        } else if (product.bulk_enabled && product.bulk_barcode === barcode) {
+        } else if (product.is_bulk_scan) {
+          // Product was scanned with its bulk barcode
           handleAddBulkToCart(product);
         } else {
+          // Product was scanned with its regular barcode
           handleAddToCart(product);
         }
         
@@ -163,13 +166,31 @@ export default function POS() {
   const handleSearch = async () => {
     if (!search) return;
     
-    const bulkProduct = products.find(p => p.bulk_enabled && p.bulk_barcode === search);
-    if (bulkProduct) {
-      handleAddBulkToCart(bulkProduct);
-      setSearch("");
-      return;
+    // Check if this is a bulk barcode first
+    try {
+      const product = await fetchProductByBarcode(search);
+      if (product) {
+        if (product.calculated_weight) {
+          handleAddScaleProductToCart(product, product.calculated_weight);
+          setSearch("");
+          return;
+        } else if (product.is_bulk_scan) {
+          // Product was found with its bulk barcode
+          handleAddBulkToCart(product);
+          setSearch("");
+          return;
+        } else {
+          // Product was found with its regular barcode
+          handleAddToCart(product);
+          setSearch("");
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching product by barcode:", error);
     }
     
+    // If we get here, handle scale barcode as before
     if (search.startsWith("2") && search.length === 13) {
       try {
         const product = await fetchProductByBarcode(search);
@@ -200,17 +221,7 @@ export default function POS() {
       }
     }
     
-    try {
-      const product = await fetchProductByBarcode(search);
-      if (product) {
-        handleAddToCart(product);
-        setSearch("");
-        return;
-      }
-    } catch (error) {
-      console.error("Error fetching product by barcode:", error);
-    }
-    
+    // If nothing found by barcode, search by name as before
     const results = products.filter(
       product => 
         product.barcode === search || 
@@ -219,6 +230,7 @@ export default function POS() {
     
     setSearchResults(results);
     
+    // Handle exact match cases
     const exactMatch = products.find(p => 
       p.barcode === search && 
       p.barcode_type === "normal" && 
