@@ -11,19 +11,48 @@ interface InvoiceDialogProps {
   isOpen: boolean;
   onClose: () => void;
   sale: Sale | null;
+  previewMode?: boolean;
+  settings?: {
+    footer?: string;
+    website?: string;
+    fontSize?: string;
+    showVat?: boolean;
+    template?: string;
+    notes?: string;
+    paymentInstructions?: string;
+  };
 }
 
-const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale }) => {
+const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ 
+  isOpen, 
+  onClose, 
+  sale, 
+  previewMode = false,
+  settings 
+}) => {
   if (!sale) return null;
 
+  // Combine current site config with any preview settings
+  const invoiceSettings = {
+    ...siteConfig.invoice,
+    ...(settings || {})
+  };
+
   const handlePrint = () => {
-    // Get store info from site config
+    // Get store info from site config, overriding with preview settings if any
     const storeInfo = {
       name: siteConfig.name,
       address: siteConfig.address || "العنوان غير متوفر",
       phone: siteConfig.phone || "الهاتف غير متوفر",
       vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
-      logo: siteConfig.logo || siteConfig.logoUrl // Use logoUrl as fallback
+      logo: siteConfig.logo || siteConfig.logoUrl, // Use logoUrl as fallback
+      website: invoiceSettings.website || "",
+      footer: invoiceSettings.footer || "شكراً لزيارتكم!",
+      fontSize: invoiceSettings.fontSize || "normal",
+      showVat: invoiceSettings.showVat ?? true,
+      template: invoiceSettings.template || "default",
+      notes: invoiceSettings.notes || "",
+      paymentInstructions: invoiceSettings.paymentInstructions || "",
     };
     
     // Print the invoice
@@ -40,11 +69,18 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale }) 
     minute: '2-digit'
   });
 
+  // Apply font size based on settings
+  const fontSizeClass = {
+    small: "text-xs",
+    normal: "",
+    large: "text-lg"
+  }[invoiceSettings.fontSize || "normal"];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className={`sm:max-w-xl max-h-[90vh] overflow-y-auto ${fontSizeClass}`}>
         <DialogHeader>
-          <DialogTitle>فاتورة المبيعات</DialogTitle>
+          <DialogTitle>{previewMode ? "معاينة الفاتورة" : "فاتورة المبيعات"}</DialogTitle>
         </DialogHeader>
         
         <div className="invoice-preview p-4 border rounded-md bg-gray-50">
@@ -52,6 +88,10 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale }) 
             <h2 className="text-xl font-bold">{siteConfig.name}</h2>
             {siteConfig.address && <p className="text-sm text-muted-foreground">{siteConfig.address}</p>}
             {siteConfig.phone && <p className="text-sm text-muted-foreground">هاتف: {siteConfig.phone}</p>}
+            {invoiceSettings.website && <p className="text-sm text-muted-foreground">{invoiceSettings.website}</p>}
+            {invoiceSettings.showVat && siteConfig.vatNumber && (
+              <p className="text-sm text-muted-foreground">الرقم الضريبي: {siteConfig.vatNumber}</p>
+            )}
           </div>
           
           <div className="flex justify-between items-start mb-6">
@@ -124,8 +164,22 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale }) 
             </div>
           </div>
           
+          {invoiceSettings.notes && (
+            <div className="text-sm mt-4 pt-2 border-t">
+              <p className="font-medium">ملاحظات:</p>
+              <p>{invoiceSettings.notes}</p>
+            </div>
+          )}
+          
+          {invoiceSettings.paymentInstructions && (
+            <div className="text-sm mt-2">
+              <p className="font-medium">تعليمات الدفع:</p>
+              <p>{invoiceSettings.paymentInstructions}</p>
+            </div>
+          )}
+          
           <div className="text-center text-sm text-muted-foreground mt-8 pt-4 border-t">
-            <p>شكراً لزيارتكم!</p>
+            <p>{invoiceSettings.footer || "شكراً لزيارتكم!"}</p>
           </div>
         </div>
         

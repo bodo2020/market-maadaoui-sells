@@ -5,11 +5,20 @@ export const siteConfig = {
   description: "نظام نقاط البيع لماركت المعداوي",
   primaryColor: "#005931",
   rtl: true,
-  // Add the missing properties
   address: "",
   phone: "",
   email: "",
   logoUrl: null,
-  vatNumber: "", // Added this property
-  logo: null     // Added this property
+  vatNumber: "", 
+  logo: null,
+  // Invoice template settings
+  invoice: {
+    footer: "شكراً لزيارتكم!",
+    website: "",
+    fontSize: "normal", // small, normal, large
+    showVat: true,
+    template: "default", // default, compact, detailed
+    notes: "",
+    paymentInstructions: "",
+  }
 }

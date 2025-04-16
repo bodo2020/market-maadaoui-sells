@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, CartItem } from "@/types";
 
@@ -106,6 +105,13 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
   phone: string;
   vatNumber?: string;
   logo?: string;
+  website?: string;
+  footer?: string;
+  fontSize?: string;
+  showVat?: boolean;
+  template?: string;
+  notes?: string;
+  paymentInstructions?: string;
 }) {
   // Get formatted date
   const saleDate = new Date(sale.date);
@@ -116,6 +122,24 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
     hour: '2-digit',
     minute: '2-digit'
   });
+  
+  // Set font size based on settings
+  let fontSizeBase = "9pt";
+  let fontSizeHeader = "16pt";
+  let fontSizeTitle = "10pt";
+  let fontSizeTotal = "12pt";
+  
+  if (storeInfo.fontSize === "small") {
+    fontSizeBase = "8pt";
+    fontSizeHeader = "14pt";
+    fontSizeTitle = "9pt";
+    fontSizeTotal = "10pt";
+  } else if (storeInfo.fontSize === "large") {
+    fontSizeBase = "11pt";
+    fontSizeHeader = "18pt";
+    fontSizeTitle = "12pt";
+    fontSizeTotal = "14pt";
+  }
   
   // Generate HTML
   const html = `
@@ -131,6 +155,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
           margin: 0;
           padding: 0;
           direction: rtl;
+          font-size: ${fontSizeBase};
         }
         .invoice-container {
           width: 80mm;
@@ -148,12 +173,12 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
           margin-bottom: 3mm;
         }
         .store-name {
-          font-size: 16pt;
+          font-size: ${fontSizeHeader};
           font-weight: bold;
           margin: 2mm 0;
         }
         .store-info {
-          font-size: 9pt;
+          font-size: ${fontSizeBase};
           margin-bottom: 3mm;
         }
         .invoice-details {
@@ -161,7 +186,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
           padding: 2mm 0;
           border-top: 1px dashed #000;
           border-bottom: 1px dashed #000;
-          font-size: 10pt;
+          font-size: ${fontSizeTitle};
         }
         .invoice-number {
           font-weight: bold;
@@ -170,7 +195,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
           width: 100%;
           border-collapse: collapse;
           margin: 5mm 0;
-          font-size: 9pt;
+          font-size: ${fontSizeBase};
         }
         .items-table th {
           text-align: right;
@@ -186,20 +211,25 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
         }
         .totals {
           margin-top: 5mm;
-          font-size: 10pt;
+          font-size: ${fontSizeTitle};
           text-align: left;
         }
         .grand-total {
-          font-size: 12pt;
+          font-size: ${fontSizeTotal};
           font-weight: bold;
           margin-top: 2mm;
           border-top: 1px solid #000;
           padding-top: 2mm;
         }
+        .notes {
+          margin-top: 4mm;
+          padding-top: 2mm;
+          border-top: 1px dashed #000;
+        }
         .footer {
           margin-top: 8mm;
           text-align: center;
-          font-size: 9pt;
+          font-size: ${fontSizeBase};
           border-top: 1px dashed #000;
           padding-top: 3mm;
         }
@@ -223,7 +253,8 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
           <div class="store-info">
             ${storeInfo.address}<br>
             هاتف: ${storeInfo.phone}
-            ${storeInfo.vatNumber ? `<br>الرقم الضريبي: ${storeInfo.vatNumber}` : ''}
+            ${storeInfo.website ? `<br>${storeInfo.website}` : ''}
+            ${(storeInfo.showVat && storeInfo.vatNumber) ? `<br>الرقم الضريبي: ${storeInfo.vatNumber}` : ''}
           </div>
         </div>
         
@@ -231,6 +262,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
           <div>رقم الفاتورة: <span class="invoice-number">${sale.invoice_number}</span></div>
           <div>التاريخ: ${formattedDate}</div>
           ${sale.customer_name ? `<div>العميل: ${sale.customer_name}</div>` : ''}
+          ${sale.customer_phone ? `<div>هاتف: ${sale.customer_phone}</div>` : ''}
         </div>
         
         <table class="items-table">
@@ -259,7 +291,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
           ${sale.discount > 0 ? `<div>الخصم: ${sale.discount.toFixed(2)}</div>` : ''}
           <div class="grand-total">الإجمالي: ${sale.total.toFixed(2)}</div>
           
-          <div style="margin-top: 3mm; font-size: 9pt;">
+          <div style="margin-top: 3mm; font-size: ${fontSizeBase};">
             طريقة الدفع: 
             ${sale.payment_method === 'cash' ? 'نقدي' : 
               sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'}
@@ -268,8 +300,22 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
           </div>
         </div>
         
+        ${storeInfo.notes ? `
+        <div class="notes">
+          <div style="font-weight: bold;">ملاحظات:</div>
+          <div>${storeInfo.notes}</div>
+        </div>
+        ` : ''}
+        
+        ${storeInfo.paymentInstructions ? `
+        <div class="notes" style="border-top: none; padding-top: 0;">
+          <div style="font-weight: bold;">تعليمات الدفع:</div>
+          <div>${storeInfo.paymentInstructions}</div>
+        </div>
+        ` : ''}
+        
         <div class="footer">
-          شكراً لزيارتكم!
+          ${storeInfo.footer || "شكراً لزيارتكم!"}
         </div>
       </div>
       
@@ -293,6 +339,13 @@ export function printInvoice(sale: Sale, storeInfo: {
   phone: string;
   vatNumber?: string;
   logo?: string;
+  website?: string;
+  footer?: string;
+  fontSize?: string;
+  showVat?: boolean;
+  template?: string;
+  notes?: string;
+  paymentInstructions?: string;
 }) {
   const invoiceHTML = generateInvoiceHTML(sale, storeInfo);
   
