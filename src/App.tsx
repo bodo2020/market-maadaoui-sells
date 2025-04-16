@@ -16,6 +16,7 @@ import SuppliersCustomers from "./pages/SuppliersCustomers";
 import Reports from "./pages/Reports";
 import EmployeeManagement from "./pages/EmployeeManagement";
 import ExpenseManagement from "./pages/ExpenseManagement";
+import Finance from "./pages/Finance";
 import Invoices from "./pages/Invoices";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -59,6 +60,12 @@ function App() {
               <Route path="/suppliers-customers" element={
                 <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.EMPLOYEE]}>
                   <SuppliersCustomers />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/finance" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <Finance />
                 </ProtectedRoute>
               } />
               
