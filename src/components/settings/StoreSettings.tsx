@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Image as ImageIcon } from "lucide-react";
-import { siteConfig } from "@/config/site";
+import { siteConfig, updateSiteConfig } from "@/config/site";
 import { supabase } from "@/integrations/supabase/client";
 
 interface SettingsData {
@@ -26,7 +26,19 @@ export default function StoreSettings() {
     logoUrl: siteConfig.logoUrl || null,
   });
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    setSettingsData({
+      storeName: siteConfig.name,
+      storeAddress: siteConfig.address || "",
+      storePhone: siteConfig.phone || "",
+      storeEmail: siteConfig.email || "",
+      logoUrl: siteConfig.logoUrl || null,
+    });
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -84,8 +96,18 @@ export default function StoreSettings() {
 
   const handleSaveSettings = async () => {
     try {
-      // In a real app, we would save to the database
-      // For now, just show a success message
+      setSaving(true);
+      
+      // Update the site config
+      updateSiteConfig({
+        name: settingsData.storeName,
+        address: settingsData.storeAddress,
+        phone: settingsData.storePhone,
+        email: settingsData.storeEmail,
+        logoUrl: settingsData.logoUrl,
+        logo: settingsData.logoUrl, // Update logo as well for invoice compatibility
+      });
+      
       toast({
         title: "تم",
         description: "تم حفظ الإعدادات بنجاح",
@@ -97,6 +119,8 @@ export default function StoreSettings() {
         description: "حدث خطأ أثناء حفظ الإعدادات",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -149,8 +173,12 @@ export default function StoreSettings() {
                 />
               </div>
               
-              <Button onClick={handleSaveSettings} className="w-full">
-                حفظ الإعدادات
+              <Button 
+                onClick={handleSaveSettings} 
+                className="w-full"
+                disabled={saving}
+              >
+                {saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
               </Button>
             </div>
           </CardContent>
