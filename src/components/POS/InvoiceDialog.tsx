@@ -20,6 +20,9 @@ interface InvoiceDialogProps {
     template?: string;
     notes?: string;
     paymentInstructions?: string;
+    logoChoice?: string;
+    customLogoUrl?: string | null;
+    logo?: string | null; // Added logo property
   };
 }
 
@@ -45,7 +48,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       address: siteConfig.address || "العنوان غير متوفر",
       phone: siteConfig.phone || "الهاتف غير متوفر",
       vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
-      logo: siteConfig.logo || siteConfig.logoUrl, // Use logoUrl as fallback
+      logo: invoiceSettings.logo || siteConfig.logo || siteConfig.logoUrl, // Use logo from settings if available
       website: invoiceSettings.website || "",
       footer: invoiceSettings.footer || "شكراً لزيارتكم!",
       fontSize: invoiceSettings.fontSize || "normal",
@@ -53,6 +56,8 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       template: invoiceSettings.template || "default",
       notes: invoiceSettings.notes || "",
       paymentInstructions: invoiceSettings.paymentInstructions || "",
+      logoChoice: invoiceSettings.logoChoice || "store",
+      customLogoUrl: invoiceSettings.customLogoUrl || null,
     };
     
     // Print the invoice

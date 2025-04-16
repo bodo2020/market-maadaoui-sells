@@ -117,7 +117,7 @@ export default function InvoiceSettings() {
           image_urls: [],
           is_offer: false,
           bulk_enabled: false,
-          is_bulk: false, // Added the missing property
+          is_bulk: false,
           created_at: new Date().toISOString(),
         },
         quantity: 2,
@@ -135,7 +135,7 @@ export default function InvoiceSettings() {
           image_urls: [],
           is_offer: false,
           bulk_enabled: false,
-          is_bulk: false, // Added the missing property
+          is_bulk: false,
           created_at: new Date().toISOString(),
         },
         quantity: 1,
@@ -420,6 +420,8 @@ export default function InvoiceSettings() {
         settings={{
           ...settings,
           // Determine which logo URL to use based on the logo choice
+          logoChoice: settings.logoChoice,
+          customLogoUrl: settings.customLogoUrl,
           logo: settings.logoChoice === 'store' 
             ? siteConfig.logoUrl 
             : settings.logoChoice === 'custom' 
