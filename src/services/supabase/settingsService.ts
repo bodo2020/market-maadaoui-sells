@@ -10,18 +10,37 @@ export interface StoreSettings {
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
-  const { data, error } = await supabase
-    .from("store_settings")
-    .select("*")
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from("store_settings")
+      .select("*")
+      .maybeSingle();
 
-  if (error) {
-    console.error("Error fetching store settings:", error);
-    throw error;
-  }
+    if (error) {
+      console.error("Error fetching store settings:", error);
+      throw error;
+    }
 
-  // Return default settings if no settings found
-  if (!data) {
+    // Return default settings if no settings found
+    if (!data) {
+      return {
+        storeName: "My Store",
+        storeAddress: "",
+        storePhone: "",
+        storeEmail: "",
+        logoUrl: null
+      };
+    }
+
+    return {
+      storeName: data.storeName || "My Store",
+      storeAddress: data.storeAddress || "",
+      storePhone: data.storePhone || "",
+      storeEmail: data.storeEmail || "",
+      logoUrl: data.logoUrl || null
+    } as StoreSettings;
+  } catch (error) {
+    console.error("Error in getStoreSettings:", error);
     return {
       storeName: "My Store",
       storeAddress: "",
@@ -30,54 +49,63 @@ export async function getStoreSettings(): Promise<StoreSettings> {
       logoUrl: null
     };
   }
-
-  return data as StoreSettings;
 }
 
 export async function updateStoreSettings(settings: Partial<StoreSettings>): Promise<StoreSettings> {
-  // First check if settings record exists
-  const { data: existingSettings } = await supabase
-    .from("store_settings")
-    .select("*")
-    .maybeSingle();
+  try {
+    // Check if settings record exists
+    const { data: existingSettings } = await supabase
+      .from("store_settings")
+      .select("*")
+      .maybeSingle();
 
-  let result;
-  
-  if (!existingSettings) {
-    // If no record exists, create a new one
-    const { data, error } = await supabase
-      .from("store_settings")
-      .insert({
-        id: 1, // Using a constant ID since we only need one store settings record
-        ...settings
-      })
-      .select()
-      .single();
+    let result;
+    
+    if (!existingSettings) {
+      // If no record exists, create a new one
+      const { data, error } = await supabase
+        .from("store_settings")
+        .insert({
+          id: 1, // Using a constant ID since we only need one store settings record
+          ...settings
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Error creating store settings:", error);
+        throw error;
+      }
       
-    if (error) {
-      console.error("Error creating store settings:", error);
-      throw error;
+      result = data;
+    } else {
+      // If record exists, update it
+      const { data, error } = await supabase
+        .from("store_settings")
+        .update(settings)
+        .eq("id", existingSettings.id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Error updating store settings:", error);
+        throw error;
+      }
+      
+      result = data;
     }
     
-    result = data;
-  } else {
-    // If record exists, update it
-    const { data, error } = await supabase
-      .from("store_settings")
-      .update(settings)
-      .eq("id", existingSettings.id)
-      .select()
-      .single();
-      
-    if (error) {
-      console.error("Error updating store settings:", error);
-      throw error;
-    }
-    
-    result = data;
+    return {
+      storeName: result.storeName || "My Store",
+      storeAddress: result.storeAddress || "",
+      storePhone: result.storePhone || "",
+      storeEmail: result.storeEmail || "",
+      logoUrl: result.logoUrl || null
+    } as StoreSettings;
+  } catch (error) {
+    console.error("Error in updateStoreSettings:", error);
+    throw error;
   }
-  
-  return result as StoreSettings;
 }
 
 export async function uploadLogo(file: File): Promise<string> {

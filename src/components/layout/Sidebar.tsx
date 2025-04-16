@@ -1,3 +1,4 @@
+
 import {
   LayoutDashboard,
   ListChecks,
@@ -7,16 +8,20 @@ import {
   BarChart,
   ReceiptText
 } from "lucide-react"
-
 import { UserRole } from "@/types"
 
-import { MainNavItem } from "@/types"
-
-interface SidebarProps {
-  items: MainNavItem[]
+interface MainNavItem {
+  title: string;
+  href?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  role?: UserRole[];
 }
 
-export function Sidebar({ items }: SidebarProps) {
+interface SidebarProps {
+  items?: MainNavItem[];
+}
+
+export function Sidebar({ items = defaultItems }: SidebarProps) {
   return (
     <div className="w-60 border-r flex-col space-y-4 bg-white p-4">
       <div className="px-3 py-2">
