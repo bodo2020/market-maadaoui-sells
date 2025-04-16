@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Shift, User } from "@/types";
-import { Clock, Calendar, ClockCheck, UserPlus, Loader2, Search, Download } from "lucide-react";
+import { Clock, Calendar, Check, ClockIcon, UserPlus, Loader2, Search, Download } from "lucide-react";
 import { startShift, endShift, getShifts, exportEmployeesToExcel } from "@/services/supabase/userService";
 import { fetchUsers } from "@/services/supabase/userService";
 import { format, parseISO, differenceInHours, differenceInMinutes } from "date-fns";
@@ -308,7 +307,7 @@ export default function Shifts() {
                               {endShiftMutation.isPending && (
                                 <Loader2 className="h-3 w-3 animate-spin" />
                               )}
-                              <ClockCheck size={16} />
+                              <Check size={16} />
                               <span>إنهاء</span>
                             </Button>
                           )}
