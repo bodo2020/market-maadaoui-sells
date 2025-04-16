@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Purchase } from "@/types";
@@ -219,6 +218,44 @@ export async function getPurchaseById(id: string) {
     return data as Purchase;
   } catch (error) {
     console.error("Unexpected error fetching purchase:", error);
+    toast.error("حدث خطأ غير متوقع");
+    return null;
+  }
+}
+
+export async function getPurchaseWithItems(id: string) {
+  try {
+    // First get the purchase
+    const { data: purchase, error: purchaseError } = await supabase
+      .from("purchases")
+      .select("*, suppliers(name)")
+      .eq("id", id)
+      .single();
+
+    if (purchaseError) {
+      console.error("Error fetching purchase:", purchaseError);
+      toast.error("فشل في جلب بيانات فاتورة الشراء");
+      return null;
+    }
+
+    // Then get the purchase items
+    const { data: items, error: itemsError } = await supabase
+      .from("purchase_items")
+      .select("*, products(name)")
+      .eq("purchase_id", id);
+
+    if (itemsError) {
+      console.error("Error fetching purchase items:", itemsError);
+      toast.error("فشل في جلب عناصر فاتورة الشراء");
+      return null;
+    }
+
+    return {
+      ...purchase,
+      items: items
+    };
+  } catch (error) {
+    console.error("Unexpected error fetching purchase with items:", error);
     toast.error("حدث خطأ غير متوقع");
     return null;
   }
