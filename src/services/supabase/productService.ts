@@ -33,8 +33,8 @@ export async function fetchProductById(id: string) {
 export async function fetchProductByBarcode(barcode: string) {
   // Handle scale barcodes (starting with 2 and 13 digits)
   if (barcode.startsWith('2') && barcode.length === 13) {
-    // Extract the product code (5 digits after the '2')
-    const productCode = barcode.substring(1, 6);
+    // Extract the product code (6 digits after the '2')
+    const productCode = barcode.substring(1, 7);
     
     // Get product with matching scale product code
     const { data, error } = await supabase
@@ -51,11 +51,11 @@ export async function fetchProductByBarcode(barcode: string) {
     
     if (data) {
       // Extract weight from barcode: positions 7-11 (5 digits)
-      // Format is 2PPPPPWWWWWC where:
-      // P = product code (5 digits)
+      // Format is 2PPPPPPWWWWWC where:
+      // P = product code (6 digits)
       // W = weight in grams (5 digits)
       // C = check digit
-      const weightInGrams = parseInt(barcode.substring(6, 11));
+      const weightInGrams = parseInt(barcode.substring(7, 12));
       const weightInKg = weightInGrams / 1000;
       
       // Return a modified product with the calculated quantity
@@ -90,17 +90,17 @@ export async function fetchProductByBarcode(barcode: string) {
 }
 
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
-  // Format barcode for scale products (store only the 5-digit product code)
+  // Format barcode for scale products (store only the 6-digit product code)
   let productData = { ...product };
   
   if (productData.barcode_type === "scale" && productData.barcode) {
-    // If user entered more than 5 digits, extract just the product code part
-    if (productData.barcode.length > 5) {
-      productData.barcode = productData.barcode.substring(0, 5);
+    // If user entered more than 6 digits, extract just the product code part
+    if (productData.barcode.length > 6) {
+      productData.barcode = productData.barcode.substring(0, 6);
     }
     
-    // Ensure it's exactly 5 digits by padding with zeros if needed
-    while (productData.barcode.length < 5) {
+    // Ensure it's exactly 6 digits by padding with zeros if needed
+    while (productData.barcode.length < 6) {
       productData.barcode = '0' + productData.barcode;
     }
   }
@@ -145,13 +145,13 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 export async function updateProduct(id: string, product: Partial<Product>) {
   // Format barcode for scale products if it's being updated
   if (product.barcode_type === "scale" && product.barcode) {
-    // If user entered more than 5 digits, extract just the product code part
-    if (product.barcode.length > 5) {
-      product.barcode = product.barcode.substring(0, 5);
+    // If user entered more than 6 digits, extract just the product code part
+    if (product.barcode.length > 6) {
+      product.barcode = product.barcode.substring(0, 6);
     }
     
-    // Ensure it's exactly 5 digits by padding with zeros if needed
-    while (product.barcode.length < 5) {
+    // Ensure it's exactly 6 digits by padding with zeros if needed
+    while (product.barcode.length < 6) {
       product.barcode = '0' + product.barcode;
     }
   }

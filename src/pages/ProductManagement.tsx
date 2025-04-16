@@ -240,17 +240,17 @@ export default function ProductManagement() {
   };
 
   const validateWeightBarcode = (barcode: string) => {
-    if (!/^\d{1,5}$/.test(barcode)) {
+    if (!/^\d{1,6}$/.test(barcode)) {
       toast({
         title: "خطأ",
-        description: "رمز منتج الميزان يجب أن يكون من 1 إلى 5 أرقام فقط.",
+        description: "رم�� منتج الميزان يجب أن يكون من 1 إلى 6 أرقام فقط.",
         variant: "destructive"
       });
       return false;
     }
 
     let formattedBarcode = barcode;
-    while (formattedBarcode.length < 5) {
+    while (formattedBarcode.length < 6) {
       formattedBarcode = '0' + formattedBarcode;
     }
     
@@ -272,7 +272,7 @@ export default function ProductManagement() {
   const handleBarcodeSubmit = () => {
     if (scannedBarcode) {
       if (scannedBarcode.startsWith('2') && scannedBarcode.length === 13) {
-        const productCode = scannedBarcode.substring(1, 6);
+        const productCode = scannedBarcode.substring(1, 7);
         
         setNewProduct(prev => ({
           ...prev,
