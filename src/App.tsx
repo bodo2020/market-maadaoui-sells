@@ -1,90 +1,182 @@
+import React, { useEffect, useState } from "react";
+import {
+  BrowserRouter as Router,
+  Route,
+  Routes,
+  Navigate,
+} from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { Toast } from "@/components/ui/toast";
+import { useAuth } from "@/hooks/use-auth";
+import { UserRole } from "./types";
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
-import ProtectedRoute from "@/components/Auth/ProtectedRoute";
-import { UserRole } from "@/types";
-
-import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
-import POS from "./pages/POS";
-import ProductManagement from "./pages/ProductManagement";
-import InventoryManagement from "./pages/InventoryManagement";
-import Reports from "./pages/Reports";
-import EmployeeManagement from "./pages/EmployeeManagement";
-import ExpenseManagement from "./pages/ExpenseManagement";
+import Dashboard from "./pages/Dashboard";
+import Products from "./pages/Products";
+import Categories from "./pages/Categories";
+import Expenses from "./pages/Expenses";
+import Users from "./pages/Users";
+import Pos from "./pages/Pos";
 import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
+import InvoiceList from "./pages/InvoiceList";
+import InvoiceDetail from "./pages/InvoiceDetail";
 
-const queryClient = new QueryClient();
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            
-            <Route path="/" element={
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const MainLayout = ({ children }: { children: React.ReactNode }) => {
+  return <div className="h-screen flex">{children}</div>;
+};
+
+function App() {
+  const { toast } = useToast();
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOnline) {
+      toast({
+        title: "لا يوجد اتصال بالإنترنت",
+        description:
+          "الرجاء التحقق من اتصالك بالإنترنت. قد لا تتوفر بعض الميزات.",
+        variant: "destructive",
+      });
+    }
+  }, [isOnline, toast]);
+
+  return (
+    <>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/"
+            element={
               <ProtectedRoute>
-                <Dashboard />
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
               </ProtectedRoute>
-            } />
-            
-            <Route path="/pos" element={
-              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.CASHIER]}>
-                <POS />
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Dashboard />
+                </MainLayout>
               </ProtectedRoute>
-            } />
-            
-            <Route path="/products" element={
-              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                <ProductManagement />
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Products />
+                </MainLayout>
               </ProtectedRoute>
-            } />
-            
-            <Route path="/inventory" element={
-              <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.EMPLOYEE]}>
-                <InventoryManagement />
+            }
+          />
+          <Route
+            path="/categories"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Categories />
+                </MainLayout>
               </ProtectedRoute>
-            } />
-            
-            <Route path="/reports" element={
-              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                <Reports />
+            }
+          />
+          <Route
+            path="/expenses"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Expenses />
+                </MainLayout>
               </ProtectedRoute>
-            } />
-            
-            <Route path="/employees" element={
-              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                <EmployeeManagement />
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Users />
+                </MainLayout>
               </ProtectedRoute>
-            } />
-            
-            <Route path="/expenses" element={
-              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                <ExpenseManagement />
+            }
+          />
+          <Route
+            path="/pos"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Pos />
+                </MainLayout>
               </ProtectedRoute>
-            } />
-            
-            <Route path="/settings" element={
-              <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                <Settings />
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Settings />
+                </MainLayout>
               </ProtectedRoute>
-            } />
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+            }
+          />
+          <Route
+            path="/invoices"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <InvoiceList />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/invoices/:id"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <InvoiceDetail />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+      <Toast />
+    </>
+  );
+}
 
 export default App;
