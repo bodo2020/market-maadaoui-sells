@@ -20,6 +20,7 @@ import Finance from "./pages/Finance";
 import Invoices from "./pages/Invoices";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import Shifts from "./pages/Shifts";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,12 @@ function App() {
               <Route path="/employees" element={
                 <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                   <EmployeeManagement />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/shifts" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <Shifts />
                 </ProtectedRoute>
               } />
               
