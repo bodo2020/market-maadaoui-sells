@@ -53,6 +53,10 @@ export interface Product {
   manufacturer_name?: string;
   is_bulk: boolean;
   unit_of_measure?: string;
+  // Properties for scale products calculation
+  is_weight_based?: boolean;
+  calculated_weight?: number;
+  calculated_price?: number;
 }
 
 export interface CartItem {
