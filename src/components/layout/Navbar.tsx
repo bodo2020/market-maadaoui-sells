@@ -1,5 +1,6 @@
 
-import { Bell, User, LogOut } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Bell, BellDot, User, LogOut, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,15 +13,74 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { 
+  getNotifications, 
+  markNotificationAsRead, 
+  markAllNotificationsAsRead, 
+  checkLowStockProducts,
+  StockNotification
+} from "@/services/notificationService";
+import { toast } from "@/components/ui/sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [notifications, setNotifications] = useState<StockNotification[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  // Load notifications on mount and periodically check for low stock
+  useEffect(() => {
+    // Load existing notifications
+    setNotifications(getNotifications());
+    
+    // Check for low stock products initially
+    const checkStock = async () => {
+      const newNotifications = await checkLowStockProducts();
+      setNotifications(getNotifications());
+      
+      // Show toast for new notifications
+      newNotifications.forEach(notification => {
+        if (!notification.read) {
+          toast({
+            title: "تنبيه المخزون المنخفض",
+            description: `المنتج "${notification.product.name}" منخفض المخزون (${notification.product.quantity} وحدة متبقية)`,
+          });
+        }
+      });
+    };
+    
+    checkStock();
+    
+    // Periodically check for low stock (every 5 minutes)
+    const interval = setInterval(checkStock, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  const handleNotificationClick = (notification: StockNotification) => {
+    // Mark the notification as read
+    markNotificationAsRead(notification.id);
+    setNotifications(getNotifications());
+    
+    // Navigate to inventory management page
+    navigate('/inventory');
+    
+    // Close the dropdown
+    setNotificationsOpen(false);
+  };
+
+  const handleMarkAllAsRead = () => {
+    markAllNotificationsAsRead();
+    setNotifications(getNotifications());
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <header className="border-b bg-white py-3 px-6 flex items-center justify-between">
@@ -29,10 +89,69 @@ export default function Navbar() {
       </div>
       
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell size={20} />
-          <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-        </Button>
+        <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative">
+              {unreadCount > 0 ? (
+                <>
+                  <BellDot size={20} className="text-yellow-500" />
+                  <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                </>
+              ) : (
+                <Bell size={20} />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuLabel className="flex items-center justify-between">
+              <span>الإشعارات</span>
+              {unreadCount > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 text-xs"
+                  onClick={handleMarkAllAsRead}
+                >
+                  <Check className="ml-1 h-3 w-3" /> تعيين الكل كمقروء
+                </Button>
+              )}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            
+            <ScrollArea className="h-[300px]">
+              {notifications.length === 0 ? (
+                <div className="py-4 px-2 text-center text-muted-foreground">
+                  لا توجد إشعارات
+                </div>
+              ) : (
+                notifications.map(notification => (
+                  <DropdownMenuItem 
+                    key={notification.id}
+                    className={`p-3 cursor-pointer ${!notification.read ? 'bg-yellow-50' : ''}`}
+                    onClick={() => handleNotificationClick(notification)}
+                  >
+                    <div className="flex gap-3 items-start w-full">
+                      <div className={`h-2 w-2 mt-2 rounded-full ${!notification.read ? 'bg-yellow-500' : 'bg-gray-200'}`} />
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <p className="font-medium text-sm">تنبيه المخزون المنخفض</p>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(notification.createdAt).toLocaleDateString('ar-EG')}
+                          </span>
+                        </div>
+                        <p className="text-sm mt-1">
+                          المنتج "{notification.product.name}" منخفض المخزون ({notification.product.quantity} وحدة متبقية)
+                        </p>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                ))
+              )}
+            </ScrollArea>
+          </DropdownMenuContent>
+        </DropdownMenu>
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
