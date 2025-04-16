@@ -22,8 +22,8 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale }) 
       name: siteConfig.name,
       address: siteConfig.address || "العنوان غير متوفر",
       phone: siteConfig.phone || "الهاتف غير متوفر",
-      vatNumber: siteConfig.vatNumber,
-      logo: siteConfig.logo
+      vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
+      logo: siteConfig.logo || siteConfig.logoUrl // Use logoUrl as fallback
     };
     
     // Print the invoice

@@ -9,5 +9,7 @@ export const siteConfig = {
   address: "",
   phone: "",
   email: "",
-  logoUrl: null
+  logoUrl: null,
+  vatNumber: "", // Added this property
+  logo: null     // Added this property
 }
