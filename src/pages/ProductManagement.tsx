@@ -413,7 +413,7 @@ export default function ProductManagement() {
                         </TableCell>
                         <TableCell>
                           {(product.quantity || 0) > 10 ? (
-                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">متو��ر</span>
+                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">متوفر</span>
                           ) : (product.quantity || 0) > 0 ? (
                             <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">مخزون منخفض</span>
                           ) : (
