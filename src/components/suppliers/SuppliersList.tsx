@@ -6,10 +6,11 @@ import { fetchSuppliers, deleteSupplier } from "@/services/supabase/supplierServ
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Plus, Edit, Trash2, Phone, Mail, Building, User } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Phone, Mail, Building, User, CreditCard } from "lucide-react";
 import SupplierForm from "./SupplierForm";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export default function SuppliersList() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -95,6 +96,7 @@ export default function SuppliersList() {
                   <TableHead>الهاتف</TableHead>
                   <TableHead>البريد الإلكتروني</TableHead>
                   <TableHead>العنوان</TableHead>
+                  <TableHead>الرصيد</TableHead>
                   <TableHead className="text-left">الإجراءات</TableHead>
                 </TableRow>
               </TableHeader>
@@ -126,6 +128,26 @@ export default function SuppliersList() {
                           {supplier.address}
                         </div>
                       ) : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {supplier.balance !== undefined ? (
+                        <div className="flex items-center">
+                          <CreditCard className="h-4 w-4 mr-1" />
+                          {supplier.balance > 0 ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
+                              لنا: {supplier.balance}
+                            </Badge>
+                          ) : supplier.balance < 0 ? (
+                            <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">
+                              علينا: {Math.abs(supplier.balance)}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">متوازن</Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <Badge variant="outline">0</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
