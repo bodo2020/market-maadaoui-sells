@@ -38,7 +38,9 @@ import {
   Package, 
   ArrowUpDown,
   MoreHorizontal,
-  Tag
+  Tag,
+  Barcode,
+  Box
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -49,6 +51,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Product } from "@/types";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 // Demo products
 const demoProducts: Product[] = [
@@ -63,8 +68,10 @@ const demoProducts: Product[] = [
     isOffer: false,
     categoryId: "1",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "2",
@@ -78,8 +85,10 @@ const demoProducts: Product[] = [
     offerPrice: 55,
     categoryId: "1",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "3",
@@ -92,8 +101,13 @@ const demoProducts: Product[] = [
     isOffer: false,
     categoryId: "1",
     isBulk: true,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: true,
+    bulk_quantity: 5,
+    bulk_price: 850,
+    bulk_barcode: "6221031953393",
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "4",
@@ -107,13 +121,15 @@ const demoProducts: Product[] = [
     offerPrice: 115,
     categoryId: "2",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "5",
-    name: "دقيق فاخر 1 كيلو",
-    barcode: "6221031959124",
+    name: "تفاح أحمر",
+    barcode: "2000123456789",
     imageUrls: ["/placeholder.svg"],
     quantity: 80,
     price: 35,
@@ -121,8 +137,10 @@ const demoProducts: Product[] = [
     isOffer: false,
     categoryId: "1",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "scale",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   }
 ];
 
@@ -130,11 +148,92 @@ export default function ProductManagement() {
   const [products, setProducts] = useState<Product[]>(demoProducts);
   const [search, setSearch] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newProduct, setNewProduct] = useState<Partial<Product>>({
+    barcode_type: "normal",
+    bulk_enabled: false,
+  });
+  const { toast } = useToast();
   
   const filteredProducts = products.filter(product => 
     product.name.includes(search) || 
     product.barcode.includes(search)
   );
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value, type } = e.target;
+    setNewProduct({
+      ...newProduct,
+      [id]: type === "number" ? Number(value) : value
+    });
+  };
+
+  const handleSelectChange = (value: string, field: string) => {
+    setNewProduct({
+      ...newProduct,
+      [field]: value
+    });
+  };
+
+  const handleCheckboxChange = (checked: boolean, field: string) => {
+    setNewProduct({
+      ...newProduct,
+      [field]: checked
+    });
+  };
+
+  const handleSaveProduct = () => {
+    if (!newProduct.name || !newProduct.barcode || !newProduct.price || !newProduct.purchasePrice) {
+      toast({
+        title: "خطأ",
+        description: "يرجى ملء جميع الحقول المطلوبة",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate scale barcode
+    if (newProduct.barcode_type === "scale" && !newProduct.barcode?.startsWith("2")) {
+      toast({
+        title: "خطأ",
+        description: "باركود الميزان يجب أن يبدأ بالرقم 2",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Add the new product
+    const productToAdd: Product = {
+      id: Math.random().toString().slice(2, 10),
+      name: newProduct.name || "",
+      barcode: newProduct.barcode || "",
+      imageUrls: ["/placeholder.svg"],
+      quantity: newProduct.quantity || 0,
+      price: newProduct.price || 0,
+      purchasePrice: newProduct.purchasePrice || 0,
+      isOffer: false,
+      categoryId: newProduct.categoryId || "1",
+      isBulk: newProduct.bulk_enabled || false,
+      barcode_type: newProduct.barcode_type || "normal",
+      bulk_enabled: newProduct.bulk_enabled || false,
+      bulk_quantity: newProduct.bulk_quantity,
+      bulk_price: newProduct.bulk_price,
+      bulk_barcode: newProduct.bulk_barcode,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    setProducts([...products, productToAdd]);
+    setNewProduct({
+      barcode_type: "normal",
+      bulk_enabled: false,
+    });
+    setIsAddDialogOpen(false);
+    
+    toast({
+      title: "تم بنجاح",
+      description: "تم إضافة المنتج بنجاح",
+    });
+  };
   
   return (
     <MainLayout>
@@ -182,8 +281,10 @@ export default function ProductManagement() {
                     </div>
                   </TableHead>
                   <TableHead>الباركود</TableHead>
+                  <TableHead>نوع الباركود</TableHead>
                   <TableHead className="text-left">السعر</TableHead>
                   <TableHead>المخزون</TableHead>
+                  <TableHead>بيع بالجملة</TableHead>
                   <TableHead className="text-left">الحالة</TableHead>
                   <TableHead className="text-left">خيارات</TableHead>
                 </TableRow>
@@ -203,6 +304,13 @@ export default function ProductManagement() {
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.barcode}</TableCell>
                     <TableCell>
+                      {product.barcode_type === "scale" ? (
+                        <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">ميزان</span>
+                      ) : (
+                        <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">عادي</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       {product.isOffer && product.offerPrice ? (
                         <div>
                           <span className="text-primary font-medium">{product.offerPrice} {siteConfig.currency}</span>
@@ -213,6 +321,18 @@ export default function ProductManagement() {
                       )}
                     </TableCell>
                     <TableCell className="text-center">{product.quantity}</TableCell>
+                    <TableCell>
+                      {product.bulk_enabled ? (
+                        <div className="flex items-center">
+                          <Box className="h-4 w-4 text-green-600 mr-1" />
+                          <span className="text-xs">
+                            {product.bulk_quantity} وحدة - {product.bulk_price} {siteConfig.currency}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">غير متاح</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {product.quantity > 10 ? (
                         <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">متوفر</span>
@@ -270,34 +390,131 @@ export default function ProductManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">اسم المنتج</Label>
-                <Input id="name" placeholder="اسم المنتج" />
+                <Input 
+                  id="name" 
+                  placeholder="اسم المنتج" 
+                  value={newProduct.name || ""}
+                  onChange={handleInputChange}
+                />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="barcode_type">نوع الباركود</Label>
+                <Select 
+                  onValueChange={(value) => handleSelectChange(value, "barcode_type")}
+                  value={newProduct.barcode_type}
+                >
+                  <SelectTrigger id="barcode_type">
+                    <SelectValue placeholder="اختر نوع الباركود" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="normal">عادي</SelectItem>
+                    <SelectItem value="scale">ميزان (يبدأ برقم 2)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="barcode">الباركود</Label>
-                <Input id="barcode" placeholder="الباركود" />
+                <Input 
+                  id="barcode" 
+                  placeholder={newProduct.barcode_type === "scale" ? "يجب أن يبدأ برقم 2" : "الباركود"} 
+                  value={newProduct.barcode || ""}
+                  onChange={handleInputChange}
+                />
+                {newProduct.barcode_type === "scale" && newProduct.barcode && !newProduct.barcode.startsWith("2") && (
+                  <p className="text-xs text-destructive mt-1">باركود الميزان يجب أن يبدأ بالرقم 2</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quantity">الكمية</Label>
+                <Input 
+                  id="quantity" 
+                  type="number" 
+                  placeholder="0" 
+                  value={newProduct.quantity || ""}
+                  onChange={handleInputChange}
+                />
               </div>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="price">سعر البيع</Label>
-                <Input id="price" type="number" placeholder="0.00" />
+                <Input 
+                  id="price" 
+                  type="number" 
+                  placeholder="0.00" 
+                  value={newProduct.price || ""}
+                  onChange={handleInputChange}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="purchasePrice">سعر الشراء</Label>
-                <Input id="purchasePrice" type="number" placeholder="0.00" />
+                <Input 
+                  id="purchasePrice" 
+                  type="number" 
+                  placeholder="0.00" 
+                  value={newProduct.purchasePrice || ""}
+                  onChange={handleInputChange}
+                />
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="quantity">الكمية</Label>
-                <Input id="quantity" type="number" placeholder="0" />
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="bulk_enabled" 
+                  checked={newProduct.bulk_enabled}
+                  onCheckedChange={(checked) => handleCheckboxChange(!!checked, "bulk_enabled")} 
+                />
+                <Label htmlFor="bulk_enabled" className="mr-2">تمكين البيع بالجملة</Label>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="category">الفئة</Label>
-                <Input id="category" placeholder="الفئة" />
+            </div>
+            
+            {newProduct.bulk_enabled && (
+              <div className="grid grid-cols-3 gap-4 pt-2 border-t">
+                <div className="space-y-2">
+                  <Label htmlFor="bulk_quantity">كمية العبوة</Label>
+                  <Input 
+                    id="bulk_quantity" 
+                    type="number" 
+                    placeholder="عدد الوحدات" 
+                    value={newProduct.bulk_quantity || ""}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bulk_price">سعر الجملة</Label>
+                  <Input 
+                    id="bulk_price" 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={newProduct.bulk_price || ""}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bulk_barcode">باركود الجملة</Label>
+                  <Input 
+                    id="bulk_barcode" 
+                    placeholder="باركود عبوة الجملة" 
+                    value={newProduct.bulk_barcode || ""}
+                    onChange={handleInputChange}
+                  />
+                </div>
               </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="category">الفئة</Label>
+              <Input 
+                id="categoryId" 
+                placeholder="الفئة" 
+                value={newProduct.categoryId || ""}
+                onChange={handleInputChange}
+              />
             </div>
             
             <div className="space-y-2">
@@ -306,7 +523,7 @@ export default function ProductManagement() {
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">حفظ المنتج</Button>
+            <Button type="button" onClick={handleSaveProduct}>حفظ المنتج</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

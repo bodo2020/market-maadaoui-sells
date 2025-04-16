@@ -9,6 +9,78 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      products: {
+        Row: {
+          barcode: string | null
+          barcode_type: string | null
+          bulk_barcode: string | null
+          bulk_enabled: boolean | null
+          bulk_price: number | null
+          bulk_quantity: number | null
+          category_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          image_urls: string[] | null
+          is_offer: boolean | null
+          manufacturer_name: string | null
+          name: string
+          offer_price: number | null
+          price: number
+          purchase_price: number
+          quantity: number | null
+          subcategory_id: string | null
+          subsubcategory_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          barcode?: string | null
+          barcode_type?: string | null
+          bulk_barcode?: string | null
+          bulk_enabled?: boolean | null
+          bulk_price?: number | null
+          bulk_quantity?: number | null
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_urls?: string[] | null
+          is_offer?: boolean | null
+          manufacturer_name?: string | null
+          name: string
+          offer_price?: number | null
+          price: number
+          purchase_price: number
+          quantity?: number | null
+          subcategory_id?: string | null
+          subsubcategory_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          barcode?: string | null
+          barcode_type?: string | null
+          bulk_barcode?: string | null
+          bulk_enabled?: boolean | null
+          bulk_price?: number | null
+          bulk_quantity?: number | null
+          category_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_urls?: string[] | null
+          is_offer?: boolean | null
+          manufacturer_name?: string | null
+          name?: string
+          offer_price?: number | null
+          price?: number
+          purchase_price?: number
+          quantity?: number | null
+          subcategory_id?: string | null
+          subsubcategory_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           active: boolean | null

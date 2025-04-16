@@ -1,14 +1,15 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt
+  Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box
 } from "lucide-react";
 import { CartItem, Product } from "@/types";
+import { useToast } from "@/hooks/use-toast";
 
 // Demo products
 const demoProducts: Product[] = [
@@ -23,8 +24,10 @@ const demoProducts: Product[] = [
     isOffer: false,
     categoryId: "1",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "2",
@@ -38,8 +41,10 @@ const demoProducts: Product[] = [
     offerPrice: 55,
     categoryId: "1",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "3",
@@ -52,8 +57,13 @@ const demoProducts: Product[] = [
     isOffer: false,
     categoryId: "1",
     isBulk: true,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: true,
+    bulk_quantity: 5,
+    bulk_price: 850,
+    bulk_barcode: "6221031953393",
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "4",
@@ -67,13 +77,15 @@ const demoProducts: Product[] = [
     offerPrice: 115,
     categoryId: "2",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "normal",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   },
   {
     id: "5",
-    name: "دقيق فاخر 1 كيلو",
-    barcode: "6221031959124",
+    name: "تفاح أحمر",
+    barcode: "2000123456789",
     imageUrls: ["/placeholder.svg"],
     quantity: 80,
     price: 35,
@@ -81,8 +93,10 @@ const demoProducts: Product[] = [
     isOffer: false,
     categoryId: "1",
     isBulk: false,
-    createdAt: new Date(),
-    updatedAt: new Date()
+    barcode_type: "scale",
+    bulk_enabled: false,
+    created_at: new Date(),
+    updated_at: new Date()
   }
 ];
 
@@ -90,10 +104,40 @@ export default function POS() {
   const [search, setSearch] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [weightInput, setWeightInput] = useState<string>("");
+  const [showWeightDialog, setShowWeightDialog] = useState(false);
+  const [currentScaleProduct, setCurrentScaleProduct] = useState<Product | null>(null);
+  const { toast } = useToast();
   
   const handleSearch = () => {
     if (!search) return;
     
+    // Check if it's a bulk barcode
+    const bulkProduct = demoProducts.find(p => p.bulk_enabled && p.bulk_barcode === search);
+    if (bulkProduct) {
+      handleAddBulkToCart(bulkProduct);
+      setSearch("");
+      return;
+    }
+    
+    // Check if it's a scale barcode (starts with 2)
+    if (search.startsWith("2")) {
+      const scaleProduct = demoProducts.find(p => 
+        p.barcode_type === "scale" && 
+        search.substring(0, 7) === p.barcode.substring(0, 7)
+      );
+      
+      if (scaleProduct) {
+        // Extract weight from barcode (assume format 2PPPPPWWWWWC)
+        // where P is product code, W is weight in grams, C is check digit
+        const weightInGrams = parseFloat(search.substring(7, 12)) / 1000;
+        handleAddScaleProductToCart(scaleProduct, weightInGrams);
+        setSearch("");
+        return;
+      }
+    }
+    
+    // Regular search
     const results = demoProducts.filter(
       product => 
         product.barcode === search || 
@@ -102,10 +146,20 @@ export default function POS() {
     
     setSearchResults(results);
     
-    // If we found exact barcode match, add to cart
-    const exactMatch = demoProducts.find(p => p.barcode === search);
+    // If we found exact barcode match for a regular product, add to cart
+    const exactMatch = demoProducts.find(p => 
+      p.barcode === search && 
+      p.barcode_type === "normal" && 
+      !p.bulk_enabled
+    );
+    
     if (exactMatch) {
       handleAddToCart(exactMatch);
+      setSearch("");
+    } else if (results.length === 1 && results[0].barcode_type === "scale") {
+      // If we found a single scale product, prompt for weight
+      setCurrentScaleProduct(results[0]);
+      setShowWeightDialog(true);
       setSearch("");
     }
   };
@@ -134,7 +188,8 @@ export default function POS() {
           quantity: 1, 
           price,
           discount: product.isOffer && product.offerPrice ? product.price - product.offerPrice : 0,
-          total: price 
+          total: price,
+          weight: null
         }
       ]);
     }
@@ -142,22 +197,104 @@ export default function POS() {
     setSearchResults([]);
   };
   
-  const handleRemoveFromCart = (productId: string) => {
-    setCartItems(cartItems.filter(item => item.product.id !== productId));
+  const handleAddScaleProductToCart = (product: Product, weight: number) => {
+    // Calculate price based on weight (kg) and per kg price
+    const itemPrice = product.price * weight;
+    const discountPerKg = product.isOffer && product.offerPrice ? product.price - product.offerPrice : 0;
+    
+    // Add as new item always (since weight might be different)
+    setCartItems([
+      ...cartItems, 
+      { 
+        product, 
+        quantity: 1, 
+        price: itemPrice,
+        discount: discountPerKg * weight,
+        total: itemPrice,
+        weight: weight
+      }
+    ]);
+    
+    toast({
+      title: "تم إضافة منتج بالوزن",
+      description: `${product.name} - ${weight} كجم`,
+    });
+    
+    setSearchResults([]);
+    setShowWeightDialog(false);
+    setCurrentScaleProduct(null);
+    setWeightInput("");
   };
   
-  const handleQuantityChange = (productId: string, change: number) => {
-    setCartItems(cartItems.map(item => {
-      if (item.product.id === productId) {
+  const handleAddBulkToCart = (product: Product) => {
+    if (!product.bulk_enabled || !product.bulk_quantity || !product.bulk_price) {
+      toast({
+        title: "خطأ",
+        description: "تفاصيل الجملة غير كاملة لهذا المنتج",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // For bulk items, add the bulk quantity to cart
+    setCartItems([
+      ...cartItems, 
+      { 
+        product, 
+        quantity: product.bulk_quantity,
+        price: product.bulk_price / product.bulk_quantity,
+        discount: 0,
+        total: product.bulk_price,
+        isBulk: true
+      }
+    ]);
+    
+    toast({
+      title: "تم إضافة عبوة جملة",
+      description: `${product.name} - ${product.bulk_quantity} وحدة`,
+    });
+    
+    setSearchResults([]);
+  };
+  
+  const handleWeightSubmit = () => {
+    if (!currentScaleProduct || !weightInput) return;
+    
+    const weight = parseFloat(weightInput);
+    if (isNaN(weight) || weight <= 0) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال وزن صحيح",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    handleAddScaleProductToCart(currentScaleProduct, weight);
+  };
+  
+  const handleRemoveFromCart = (index: number) => {
+    setCartItems(cartItems.filter((_, i) => i !== index));
+  };
+  
+  const handleQuantityChange = (index: number, change: number) => {
+    setCartItems(cartItems.map((item, i) => {
+      if (i === index) {
+        // Don't allow changing quantity for scale products
+        if (item.weight !== null && change > 0) return item;
+        
         const newQuantity = Math.max(1, item.quantity + change);
-        const price = item.product.isOffer && item.product.offerPrice 
-          ? item.product.offerPrice 
-          : item.product.price;
+        let price = item.price;
+        
+        // Recalculate total
+        let total = item.weight !== null 
+          ? item.price // For scale items, price is already calculated based on weight
+          : newQuantity * price;
         
         return {
           ...item,
           quantity: newQuantity,
-          total: newQuantity * price
+          total
         };
       }
       return item;
@@ -210,6 +347,42 @@ export default function POS() {
                 </Button>
               </div>
               
+              {/* Weight Input Dialog */}
+              {showWeightDialog && currentScaleProduct && (
+                <div className="border rounded-lg p-4 mb-4 bg-muted/10">
+                  <div className="flex items-center mb-3">
+                    <Scale className="h-5 w-5 ml-2 text-primary" />
+                    <h3 className="font-semibold">إدخال الوزن - {currentScaleProduct.name}</h3>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="أدخل الوزن بالكيلوجرام" 
+                      type="number" 
+                      step="0.001"
+                      value={weightInput}
+                      onChange={(e) => setWeightInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleWeightSubmit();
+                      }}
+                      className="flex-1"
+                    />
+                    <span className="flex items-center ml-2 text-sm text-muted-foreground">كجم</span>
+                    <Button onClick={handleWeightSubmit}>إضافة</Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setShowWeightDialog(false);
+                        setCurrentScaleProduct(null);
+                        setWeightInput("");
+                      }}
+                    >
+                      إلغاء
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
               {searchResults.length > 0 && (
                 <div className="border rounded-lg p-4 space-y-4">
                   <h3 className="font-semibold">نتائج البحث</h3>
@@ -219,7 +392,16 @@ export default function POS() {
                       <Card 
                         key={product.id} 
                         className="cursor-pointer hover:bg-gray-50 transition-colors"
-                        onClick={() => handleAddToCart(product)}
+                        onClick={() => {
+                          if (product.barcode_type === "scale") {
+                            setCurrentScaleProduct(product);
+                            setShowWeightDialog(true);
+                          } else if (product.bulk_enabled && product.bulk_barcode) {
+                            handleAddBulkToCart(product);
+                          } else {
+                            handleAddToCart(product);
+                          }
+                        }}
                       >
                         <CardContent className="p-3">
                           <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
@@ -230,9 +412,28 @@ export default function POS() {
                             />
                           </div>
                           <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
+                          
+                          {/* Product icons/badges */}
+                          <div className="flex gap-1 my-1">
+                            {product.barcode_type === "scale" && (
+                              <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
+                                <Scale className="h-3 w-3 ml-1" />
+                                بالوزن
+                              </span>
+                            )}
+                            {product.bulk_enabled && (
+                              <span className="bg-amber-100 text-amber-800 text-xs rounded px-1.5 py-0.5 flex items-center">
+                                <Box className="h-3 w-3 ml-1" />
+                                جملة
+                              </span>
+                            )}
+                          </div>
+                          
                           <div className="flex justify-between items-center mt-2">
                             <p className="text-sm font-bold">
-                              {product.isOffer && product.offerPrice ? (
+                              {product.barcode_type === "scale" ? (
+                                <span>{product.price} / كجم</span>
+                              ) : product.isOffer && product.offerPrice ? (
                                 <>
                                   <span className="text-primary">{product.offerPrice}</span>
                                   <span className="mr-1 text-xs text-muted-foreground line-through">{product.price}</span>
@@ -261,7 +462,16 @@ export default function POS() {
                     <Card 
                       key={product.id} 
                       className="cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={() => handleAddToCart(product)}
+                      onClick={() => {
+                        if (product.barcode_type === "scale") {
+                          setCurrentScaleProduct(product);
+                          setShowWeightDialog(true);
+                        } else if (product.bulk_enabled && product.bulk_barcode) {
+                          handleAddBulkToCart(product);
+                        } else {
+                          handleAddToCart(product);
+                        }
+                      }}
                     >
                       <CardContent className="p-3">
                         <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
@@ -272,9 +482,28 @@ export default function POS() {
                           />
                         </div>
                         <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
+                        
+                        {/* Product icons/badges */}
+                        <div className="flex gap-1 my-1">
+                          {product.barcode_type === "scale" && (
+                            <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
+                              <Scale className="h-3 w-3 ml-1" />
+                              بالوزن
+                            </span>
+                          )}
+                          {product.bulk_enabled && (
+                            <span className="bg-amber-100 text-amber-800 text-xs rounded px-1.5 py-0.5 flex items-center">
+                              <Box className="h-3 w-3 ml-1" />
+                              جملة
+                            </span>
+                          )}
+                        </div>
+                        
                         <div className="flex justify-between items-center mt-2">
                           <p className="text-sm font-bold">
-                            {product.isOffer && product.offerPrice ? (
+                            {product.barcode_type === "scale" ? (
+                              <span>{product.price} / كجم</span>
+                            ) : product.isOffer && product.offerPrice ? (
                               <>
                                 <span className="text-primary">{product.offerPrice}</span>
                                 <span className="mr-1 text-xs text-muted-foreground line-through">{product.price}</span>
@@ -315,17 +544,27 @@ export default function POS() {
               ) : (
                 <>
                   <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                    {cartItems.map(item => (
-                      <div key={item.product.id} className="flex flex-col pb-3 border-b">
+                    {cartItems.map((item, index) => (
+                      <div key={index} className="flex flex-col pb-3 border-b">
                         <div className="flex justify-between">
                           <div className="flex-1">
                             <h4 className="font-medium">{item.product.name}</h4>
                             <div className="flex text-sm space-x-1 text-muted-foreground">
-                              <span className="ml-1">
-                                {item.product.isOffer && item.product.offerPrice ? item.product.offerPrice : item.product.price} {siteConfig.currency}
-                              </span>
-                              {item.product.isOffer && item.product.offerPrice && (
-                                <span className="line-through">{item.product.price} {siteConfig.currency}</span>
+                              {item.weight ? (
+                                <span className="ml-1">
+                                  {item.product.price} {siteConfig.currency}/كجم × {item.weight} كجم
+                                </span>
+                              ) : item.isBulk ? (
+                                <span className="ml-1">
+                                  عبوة جملة {item.quantity} وحدة
+                                </span>
+                              ) : (
+                                <span className="ml-1">
+                                  {item.product.isOffer && item.product.offerPrice ? item.product.offerPrice : item.product.price} {siteConfig.currency}
+                                  {item.product.isOffer && item.product.offerPrice && (
+                                    <span className="line-through mr-1">{item.product.price} {siteConfig.currency}</span>
+                                  )}
+                                </span>
                               )}
                             </div>
                           </div>
@@ -336,33 +575,45 @@ export default function POS() {
                         </div>
                         
                         <div className="flex justify-between items-center mt-2">
-                          <div className="flex items-center space-x-2">
-                            <Button 
-                              variant="outline" 
-                              size="icon" 
-                              className="h-7 w-7"
-                              onClick={() => handleQuantityChange(item.product.id, -1)}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            
-                            <span className="w-8 text-center">{item.quantity}</span>
-                            
-                            <Button 
-                              variant="outline" 
-                              size="icon" 
-                              className="h-7 w-7"
-                              onClick={() => handleQuantityChange(item.product.id, 1)}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
+                          {item.weight === null && !item.isBulk ? (
+                            <div className="flex items-center space-x-2">
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-7 w-7"
+                                onClick={() => handleQuantityChange(index, -1)}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              
+                              <span className="w-8 text-center">{item.quantity}</span>
+                              
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-7 w-7"
+                                onClick={() => handleQuantityChange(index, 1)}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : item.weight ? (
+                            <div className="flex items-center">
+                              <Scale className="h-4 w-4 text-blue-500 ml-1" />
+                              <span className="text-sm">{item.weight} كجم</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center">
+                              <Box className="h-4 w-4 text-amber-500 ml-1" />
+                              <span className="text-sm">{item.quantity} وحدة</span>
+                            </div>
+                          )}
                           
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             className="h-7 w-7 text-destructive"
-                            onClick={() => handleRemoveFromCart(item.product.id)}
+                            onClick={() => handleRemoveFromCart(index)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

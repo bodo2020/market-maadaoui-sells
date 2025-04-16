@@ -43,8 +43,14 @@ export interface Product {
   isBulk: boolean;
   unitOfMeasure?: string;
   manufacturerName?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  // New fields
+  barcode_type: "normal" | "scale";
+  bulk_enabled: boolean;
+  bulk_quantity?: number;
+  bulk_price?: number;
+  bulk_barcode?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface CartItem {
@@ -53,6 +59,8 @@ export interface CartItem {
   price: number;
   discount: number;
   total: number;
+  weight?: number | null;
+  isBulk?: boolean;
 }
 
 export interface Sale {
