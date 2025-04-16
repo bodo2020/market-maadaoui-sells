@@ -1,4 +1,3 @@
-
 import { Link, useNavigate } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -16,7 +15,8 @@ import {
   Receipt,
   Home,
   UserPlus,
-  Banknote
+  Banknote,
+  Truck
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -125,6 +125,12 @@ export default function Sidebar() {
           label="الإعدادات"
           href="/settings"
           active={currentPath === "/settings"}
+        />
+        <SidebarItem
+          icon={<Truck size={20} />}
+          label="مشتريات الموردين"
+          href="/supplier-purchases"
+          active={currentPath === "/supplier-purchases"}
         />
       </div>
       
