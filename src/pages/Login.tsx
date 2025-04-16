@@ -1,77 +1,107 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { siteConfig } from "@/config/site";
-import { Button } from "@/components/ui/button";
+import { useNavigate, Navigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserRole } from "@/types";
+import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
+import { LogIn } from "lucide-react";
 
 export default function Login() {
-  const [phone, setPhone] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { login, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // For demo purposes, just navigate to dashboard
-    setIsLoading(true);
-    
-    // In a real app, you would validate credentials and get user role
-    setTimeout(() => {
-      setIsLoading(false);
+    if (!username || !password) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال اسم المستخدم وكلمة المرور",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await login(username, password);
       navigate("/");
-    }, 1500);
+    } catch (error) {
+      // Error is handled in the auth context
+      console.error("Login failed:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="w-full max-w-md p-4">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary mb-2">{siteConfig.name}</h1>
-          <p className="text-gray-600">نظام نقاط البيع</p>
-        </div>
+  // If user is already authenticated, redirect to dashboard
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="w-full max-w-md">
         <Card>
-          <CardHeader>
-            <CardTitle>تسجيل الدخول</CardTitle>
-            <CardDescription>
-              أدخل بيانات الحساب الخاص بك للوصول إلى النظام
+          <CardHeader className="space-y-1">
+            <CardTitle className="text-2xl text-center">تسجيل الدخول</CardTitle>
+            <CardDescription className="text-center">
+              أدخل بيانات الدخول للوصول إلى لوحة التحكم
             </CardDescription>
           </CardHeader>
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">رقم الهاتف</Label>
-                <Input
-                  id="phone"
-                  type="text"
-                  placeholder="01xxxxxxxxx"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                />
+          <CardContent className="space-y-4">
+            <form onSubmit={handleLogin}>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">اسم المستخدم</Label>
+                  <Input
+                    id="username"
+                    placeholder="اسم المستخدم"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">كلمة المرور</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="كلمة المرور"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center">
+                      <span className="animate-spin mr-2">◌</span>
+                      جاري التحميل...
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      <LogIn className="mr-2 h-4 w-4" />
+                      تسجيل الدخول
+                    </span>
+                  )}
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">كلمة المرور</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "جاري تسجيل الدخول..." : "تسجيل الدخول"}
-              </Button>
-            </CardFooter>
-          </form>
+            </form>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+            <p className="text-sm text-muted-foreground">
+              * استخدم اسم المستخدم: admin وكلمة المرور: admin للدخول
+            </p>
+          </CardFooter>
         </Card>
       </div>
     </div>

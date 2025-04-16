@@ -9,6 +9,71 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          parent_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          parent_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          parent_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          created_at: string | null
+          date: string
+          description: string
+          id: string
+          receipt_url: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          date: string
+          description: string
+          id?: string
+          receipt_url?: string | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          date?: string
+          description?: string
+          id?: string
+          receipt_url?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           barcode: string | null
@@ -80,6 +145,109 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      sales: {
+        Row: {
+          card_amount: number | null
+          cash_amount: number | null
+          cashier_id: string | null
+          created_at: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          date: string
+          discount: number
+          id: string
+          invoice_number: string
+          items: Json
+          payment_method: string
+          profit: number
+          subtotal: number
+          total: number
+          updated_at: string | null
+        }
+        Insert: {
+          card_amount?: number | null
+          cash_amount?: number | null
+          cashier_id?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          date?: string
+          discount?: number
+          id?: string
+          invoice_number: string
+          items: Json
+          payment_method: string
+          profit: number
+          subtotal: number
+          total: number
+          updated_at?: string | null
+        }
+        Update: {
+          card_amount?: number | null
+          cash_amount?: number | null
+          cashier_id?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          date?: string
+          discount?: number
+          id?: string
+          invoice_number?: string
+          items?: Json
+          payment_method?: string
+          profit?: number
+          subtotal?: number
+          total?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_cashier_id_fkey"
+            columns: ["cashier_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shifts: {
+        Row: {
+          created_at: string | null
+          employee_id: string | null
+          end_time: string | null
+          id: string
+          start_time: string
+          total_hours: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          employee_id?: string | null
+          end_time?: string | null
+          id?: string
+          start_time: string
+          total_hours?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          employee_id?: string | null
+          end_time?: string | null
+          id?: string
+          start_time?: string
+          total_hours?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {
