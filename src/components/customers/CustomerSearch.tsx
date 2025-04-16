@@ -1,18 +1,18 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-type EmployeeSearchProps = {
+type CustomerSearchProps = {
   search: string;
   setSearch: (value: string) => void;
   placeholder?: string;
 };
 
-export function EmployeeSearch({ search, setSearch, placeholder = "ابحث بالاسم أو رقم الهاتف" }: EmployeeSearchProps) {
+export function CustomerSearch({ search, setSearch, placeholder = "ابحث باسم العميل أو رقم الهاتف" }: CustomerSearchProps) {
   return (
-    <div className="flex gap-2 mb-6">
+    <div className="flex gap-2">
       <Input 
         placeholder={placeholder} 
         value={search}

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Customer } from "@/types";
@@ -25,6 +26,19 @@ export async function fetchCustomers() {
 
 export async function addCustomer(customer: Omit<Customer, "id" | "created_at" | "updated_at">) {
   try {
+    // Check if customer with same name or phone already exists
+    if (customer.phone) {
+      const { data: existingCustomer } = await supabase
+        .from("customers")
+        .select("*")
+        .eq("phone", customer.phone)
+        .single();
+      
+      if (existingCustomer) {
+        return existingCustomer as Customer;
+      }
+    }
+    
     const { data, error } = await supabase.from("customers").insert(customer).select().single();
 
     if (error) {
@@ -103,6 +117,59 @@ export async function getCustomerById(id: string) {
   } catch (error) {
     console.error("Unexpected error fetching customer:", error);
     toast.error("حدث خطأ غير متوقع");
+    return null;
+  }
+}
+
+export async function findCustomerByPhone(phone: string) {
+  try {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("phone", phone)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // Not found error
+      console.error("Error finding customer by phone:", error);
+      return null;
+    }
+
+    return data as Customer || null;
+  } catch (error) {
+    console.error("Unexpected error finding customer by phone:", error);
+    return null;
+  }
+}
+
+export async function findOrCreateCustomer(customerInfo: { name: string; phone?: string }) {
+  if (!customerInfo.name && !customerInfo.phone) {
+    return null;
+  }
+  
+  try {
+    // First check if customer exists by phone
+    if (customerInfo.phone) {
+      const existingCustomer = await findCustomerByPhone(customerInfo.phone);
+      if (existingCustomer) {
+        // If customer exists but name is different, update it
+        if (existingCustomer.name !== customerInfo.name && customerInfo.name) {
+          return updateCustomer(existingCustomer.id, { name: customerInfo.name });
+        }
+        return existingCustomer;
+      }
+    }
+    
+    // If no match by phone, create a new customer
+    return addCustomer({
+      name: customerInfo.name,
+      phone: customerInfo.phone || null,
+      email: null,
+      address: null,
+      notes: null
+    });
+    
+  } catch (error) {
+    console.error("Error in findOrCreateCustomer:", error);
     return null;
   }
 }
