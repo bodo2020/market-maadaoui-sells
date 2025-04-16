@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,11 @@ export default function InvoiceSettings() {
     customLogoUrl: siteConfig.invoice?.customLogoUrl || null,
   });
 
+  // Load settings from siteConfig when component mounts
   useEffect(() => {
+    console.log("Loading invoice settings from siteConfig:", siteConfig.invoice);
+    console.log("Store logo URL:", siteConfig.logoUrl);
+    
     setSettings({
       footer: siteConfig.invoice?.footer || "شكراً لزيارتكم!",
       website: siteConfig.invoice?.website || "",

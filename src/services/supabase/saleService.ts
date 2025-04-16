@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, CartItem } from "@/types";
 
@@ -104,7 +105,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
   address: string;
   phone: string;
   vatNumber?: string;
-  logo?: string;
+  logo?: string | null;
   website?: string;
   footer?: string;
   fontSize?: string;
@@ -143,13 +144,12 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
     fontSizeTotal = "14pt";
   }
 
-  // Determine which logo to use
-  let logoUrl = null;
-  if (storeInfo.logoChoice === 'store') {
-    logoUrl = storeInfo.logo;
-  } else if (storeInfo.logoChoice === 'custom') {
-    logoUrl = storeInfo.customLogoUrl;
-  }
+  // Determine logo URL based on settings
+  const logoUrl = storeInfo.logoChoice === 'store' 
+    ? storeInfo.logo 
+    : storeInfo.logoChoice === 'custom' 
+      ? storeInfo.customLogoUrl 
+      : null;
   
   // Generate HTML
   const html = `
@@ -180,6 +180,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
         .logo {
           max-width: 60mm;
           height: auto;
+          max-height: 20mm;
           margin-bottom: 3mm;
         }
         .store-name {
@@ -348,7 +349,7 @@ export function printInvoice(sale: Sale, storeInfo: {
   address: string;
   phone: string;
   vatNumber?: string;
-  logo?: string;
+  logo?: string | null;
   website?: string;
   footer?: string;
   fontSize?: string;

@@ -22,7 +22,7 @@ interface InvoiceDialogProps {
     paymentInstructions?: string;
     logoChoice?: string;
     customLogoUrl?: string | null;
-    logo?: string | null; // Added logo property
+    logo?: string | null;
   };
 }
 
@@ -48,7 +48,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       address: siteConfig.address || "العنوان غير متوفر",
       phone: siteConfig.phone || "الهاتف غير متوفر",
       vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
-      logo: invoiceSettings.logo || siteConfig.logo || siteConfig.logoUrl, // Use logo from settings if available
+      logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
       website: invoiceSettings.website || "",
       footer: invoiceSettings.footer || "شكراً لزيارتكم!",
       fontSize: invoiceSettings.fontSize || "normal",
@@ -81,6 +81,13 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
     large: "text-lg"
   }[invoiceSettings.fontSize || "normal"];
 
+  // Determine which logo to display in the preview
+  const logoUrl = invoiceSettings.logoChoice === 'store' 
+    ? siteConfig.logoUrl 
+    : invoiceSettings.logoChoice === 'custom' 
+      ? invoiceSettings.customLogoUrl 
+      : null;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className={`sm:max-w-xl max-h-[90vh] overflow-y-auto ${fontSizeClass}`}>
@@ -90,6 +97,11 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
         
         <div className="invoice-preview p-4 border rounded-md bg-gray-50">
           <div className="text-center mb-6">
+            {logoUrl && (
+              <div className="flex justify-center mb-3">
+                <img src={logoUrl} alt="شعار المتجر" className="h-16 object-contain" />
+              </div>
+            )}
             <h2 className="text-xl font-bold">{siteConfig.name}</h2>
             {siteConfig.address && <p className="text-sm text-muted-foreground">{siteConfig.address}</p>}
             {siteConfig.phone && <p className="text-sm text-muted-foreground">هاتف: {siteConfig.phone}</p>}
