@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
@@ -23,40 +22,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
-  Search, 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  MoreHorizontal,
-  Users,
-  UserPlus,
-  Clock,
-  AlarmClockCheck,
-  Loader2
+  Download,
+  Filter,
 } from "lucide-react";
 import { 
   fetchUsers, 
@@ -65,9 +32,8 @@ import {
   deleteUser, 
   startShift, 
   endShift, 
-  getActiveShift 
 } from "@/services/supabase/userService";
-import { User, UserRole, Shift } from "@/types";
+import { User, UserRole } from "@/types";
 
 export default function EmployeeManagement() {
   const [search, setSearch] = useState("");
@@ -88,13 +54,11 @@ export default function EmployeeManagement() {
   
   const queryClient = useQueryClient();
   
-  // Fetch users/employees
   const { data: employees, isLoading, error } = useQuery({
     queryKey: ['employees'],
     queryFn: fetchUsers
   });
   
-  // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: createUser,
     onSuccess: () => {
@@ -109,7 +73,6 @@ export default function EmployeeManagement() {
     }
   });
   
-  // Update user mutation
   const updateUserMutation = useMutation({
     mutationFn: ({ id, user }: { id: string; user: Partial<User> }) => 
       updateUser(id, user),
@@ -125,7 +88,6 @@ export default function EmployeeManagement() {
     }
   });
   
-  // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: (id: string) => deleteUser(id),
     onSuccess: () => {
@@ -140,7 +102,6 @@ export default function EmployeeManagement() {
     }
   });
   
-  // Start shift mutation
   const startShiftMutation = useMutation({
     mutationFn: startShift,
     onSuccess: () => {
@@ -153,7 +114,6 @@ export default function EmployeeManagement() {
     }
   });
   
-  // End shift mutation
   const endShiftMutation = useMutation({
     mutationFn: endShift,
     onSuccess: () => {
@@ -199,7 +159,6 @@ export default function EmployeeManagement() {
       return;
     }
     
-    // Use phone as username if not provided
     const username = formData.username || formData.phone;
     
     createUserMutation.mutate({
@@ -225,7 +184,6 @@ export default function EmployeeManagement() {
         email: formData.email,
         username: formData.username,
         active: formData.active,
-        // Only update password if a new one is provided
         ...(formData.password ? { password: formData.password } : {})
       }
     });
@@ -242,10 +200,10 @@ export default function EmployeeManagement() {
       name: employee.name,
       role: employee.role,
       phone: employee.phone || "",
-      password: "", // Don't show the password
+      password: "",
       email: employee.email || "",
       username: employee.username,
-      active: employee.active !== false // Default to true if not specified
+      active: employee.active !== false
     });
     setIsEditDialogOpen(true);
   };
@@ -268,26 +226,22 @@ export default function EmployeeManagement() {
     endShiftMutation.mutate(shiftId);
   };
   
-  // Filtering employees based on search
   const filteredEmployees = employees ? employees.filter(employee => 
     employee.name.toLowerCase().includes(search.toLowerCase()) || 
     (employee.phone && employee.phone.includes(search))
   ) : [];
   
-  // Check if employee has active shift
   const hasActiveShift = (employee: User) => {
     if (!employee.shifts) return false;
     return employee.shifts.some(shift => !shift.end_time);
   };
   
-  // Get active shift ID
   const getActiveShiftId = (employee: User) => {
     if (!employee.shifts) return null;
     const activeShift = employee.shifts.find(shift => !shift.end_time);
     return activeShift ? activeShift.id : null;
   };
   
-  // Get total hours worked
   const getTotalHoursWorked = (employee: User) => {
     if (!employee.shifts) return 0;
     
@@ -299,22 +253,27 @@ export default function EmployeeManagement() {
     }, 0);
   };
   
-  // Get employees currently on shift
   const getEmployeesOnShift = () => {
     if (!employees) return 0;
     return employees.filter(employee => hasActiveShift(employee)).length;
   };
   
-  // Get total hours for all employees
   const getTotalHours = () => {
     if (!employees) return 0;
     return employees.reduce((total, employee) => total + getTotalHoursWorked(employee), 0);
   };
   
-  // Get average hours per employee
   const getAverageHours = () => {
     if (!employees || employees.length === 0) return 0;
     return getTotalHours() / employees.length;
+  };
+  
+  const handleExportEmployees = () => {
+    toast.info("سيتم إضافة ميزة التصدير قريباً");
+  };
+  
+  const handleFilterEmployees = () => {
+    toast.info("سيتم إضافة ميزة التصفية قريباً");
   };
   
   if (error) {
@@ -341,6 +300,17 @@ export default function EmployeeManagement() {
         <Button onClick={() => setIsAddDialogOpen(true)}>
           <UserPlus className="ml-2 h-4 w-4" />
           إضافة موظف جديد
+        </Button>
+      </div>
+      
+      <div className="flex gap-2 mb-6">
+        <Button variant="outline" onClick={handleFilterEmployees}>
+          <Filter className="ml-2 h-4 w-4" />
+          تصفية
+        </Button>
+        <Button variant="outline" onClick={handleExportEmployees}>
+          <Download className="ml-2 h-4 w-4" />
+          تصدير
         </Button>
       </div>
       
@@ -551,7 +521,6 @@ export default function EmployeeManagement() {
         </CardContent>
       </Card>
       
-      {/* Add Employee Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
@@ -648,7 +617,6 @@ export default function EmployeeManagement() {
         </DialogContent>
       </Dialog>
       
-      {/* Edit Employee Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>
@@ -748,7 +716,6 @@ export default function EmployeeManagement() {
         </DialogContent>
       </Dialog>
       
-      {/* Delete Employee Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -780,7 +747,6 @@ export default function EmployeeManagement() {
         </DialogContent>
       </Dialog>
       
-      {/* Employee Shifts Dialog */}
       <Dialog open={isShiftDialogOpen} onOpenChange={setIsShiftDialogOpen}>
         <DialogContent className="sm:max-w-[625px]">
           <DialogHeader>
