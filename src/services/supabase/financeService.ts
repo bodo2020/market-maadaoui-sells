@@ -44,9 +44,10 @@ export async function fetchFinancialSummary(): Promise<FinancialSummary> {
   
   // Calculate financial summary
   const totalRevenue = salesData.reduce((sum, sale) => sum + Number(sale.total), 0);
+  const totalProfit = salesData.reduce((sum, sale) => sum + Number(sale.profit), 0);
   const totalExpenses = expensesData.reduce((sum, expense) => sum + Number(expense.amount), 0);
-  const netProfit = totalRevenue - totalExpenses;
-  const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+  const netProfit = totalProfit - totalExpenses;
+  const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
   
   // For cash balance, we use a simplified approach
   // In a real system, you would need to track all cash movements

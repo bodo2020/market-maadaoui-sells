@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -108,6 +107,9 @@ export default function Reports() {
   const totalItems = filteredSales.reduce((sum, sale) => 
     sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
   
+  // Calculate profit margin correctly
+  const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
+  
   // Get top selling products
   const productsSoldMap = new Map<string, { product: Product; quantitySold: number; revenue: number }>();
   
@@ -214,9 +216,8 @@ export default function Reports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {summaryLoading ? "..." : summaryData?.profitMargin 
-                ? `${Math.round(summaryData.profitMargin)}%` 
-                : (totalSales > 0 ? `${Math.round((totalProfit / totalSales) * 100)}%` : "0%")}
+              {summaryLoading ? "..." : 
+                `${Math.round(summaryData?.profitMargin || profitMargin)}%`}
             </div>
             <div className="flex items-center mt-1">
               <TrendingUp className="h-4 w-4 text-green-500 ml-1" />
@@ -504,9 +505,7 @@ export default function Reports() {
                       <CardContent>
                         <div className="text-3xl font-bold flex items-center">
                           <Percent className="h-6 w-6 mr-1 text-primary" />
-                          {summaryData?.profitMargin 
-                            ? Math.round(summaryData.profitMargin) 
-                            : (totalSales > 0 ? Math.round((totalProfit / totalSales) * 100) : 0)}%
+                          {Math.round(profitMargin)}%
                         </div>
                       </CardContent>
                     </Card>
