@@ -2,7 +2,7 @@
 import { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import Navbar from "./Navbar";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { Navigate } from "react-router-dom";
 
 interface MainLayoutProps {

@@ -17,15 +17,15 @@ import Products from "./pages/Products";
 import Categories from "./pages/Categories";
 import Expenses from "./pages/Expenses";
 import Users from "./pages/Users";
-import POS from "./pages/POS"; // Fixed casing to match the file name
+import Pos from "./pages/Pos"; // Fixed casing to match the file name
 import Settings from "./pages/Settings";
 import InvoiceList from "./pages/InvoiceList";
 import InvoiceDetail from "./pages/InvoiceDetail";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth(); // Fixed property name from loading to isLoading
 
-  if (loading) {
+  if (isLoading) {
     return <div>Loading...</div>;
   }
 
@@ -138,7 +138,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <MainLayout>
-                  <POS />
+                  <Pos />
                 </MainLayout>
               </ProtectedRoute>
             }
