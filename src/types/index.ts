@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -73,7 +74,7 @@ export interface CartItem {
 
 export interface Sale {
   id: string;
-  date: Date | string;
+  date: string;
   items: CartItem[];
   cashier_id?: string;
   subtotal: number;
@@ -86,8 +87,8 @@ export interface Sale {
   customer_name?: string;
   customer_phone?: string;
   invoice_number: string;
-  created_at: Date | string;
-  updated_at?: Date | string;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface Expense {
@@ -95,20 +96,20 @@ export interface Expense {
   type: string;
   amount: number;
   description: string;
-  date: Date | string;
+  date: string;
   receipt_url?: string;
-  created_at: Date | string;
-  updated_at?: Date | string;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface Shift {
   id: string;
   employee_id?: string;
-  start_time: Date | string;
-  end_time?: Date | string;
+  start_time: string;
+  end_time?: string;
   total_hours?: number;
-  created_at: Date | string;
-  updated_at?: Date | string;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface Supplier {
@@ -119,8 +120,9 @@ export interface Supplier {
   email?: string;
   address?: string;
   notes?: string;
-  created_at: Date | string;
-  updated_at?: Date | string;
+  created_at: string;
+  updated_at?: string;
+  balance?: number;
 }
 
 export interface Customer {
@@ -130,19 +132,20 @@ export interface Customer {
   email?: string;
   address?: string;
   notes?: string;
-  created_at: Date | string;
-  updated_at?: Date | string;
+  created_at: string;
+  updated_at?: string;
+  balance?: number;
 }
 
 export interface Purchase {
   id: string;
   supplier_id: string;
   invoice_number: string;
-  date: Date | string;
+  date: string;
   total: number;
   paid: number;
   description?: string;
   invoice_file_url?: string;
-  created_at: Date | string;
-  updated_at?: Date | string;
+  created_at: string;
+  updated_at?: string;
 }

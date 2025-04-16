@@ -3,10 +3,16 @@ import { Sale, CartItem } from "@/types";
 
 export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
   try {
+    // Ensure date is a string
+    const saleData = {
+      ...sale,
+      date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date
+    };
+    
     // Create the sale record
     const { data, error } = await supabase
       .from("sales")
-      .insert([sale])
+      .insert([saleData])
       .select();
 
     if (error) {
@@ -47,7 +53,13 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
       }
     }
 
-    return data[0] as Sale;
+    // Convert JSON data to proper Sale type
+    const saleResult = {
+      ...data[0],
+      items: data[0].items as unknown as CartItem[]
+    } as Sale;
+
+    return saleResult;
   } catch (error) {
     console.error("Error in createSale:", error);
     throw error;

@@ -1,4 +1,5 @@
-import { User, UserRole, Product, Category, Sale, Expense, Shift } from "@/types";
+
+import { User, UserRole, Product, Category, Sale, Expense, Shift, Purchase } from "@/types";
 import { siteConfig } from "@/config/site";
 
 // Categories
