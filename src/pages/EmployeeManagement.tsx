@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -961,8 +962,8 @@ export default function EmployeeManagement() {
             <div className="space-y-2">
               <Label htmlFor="filter-role">الدور الوظيفي</Label>
               <Select 
-                value={filterRole || ""}
-                onValueChange={(value) => setFilterRole(value === "" ? null : value)}
+                value={filterRole || "all"}
+                onValueChange={(value) => setFilterRole(value === "all" ? null : value)}
               >
                 <SelectTrigger id="filter-role">
                   <SelectValue placeholder="جميع الأدوار" />
@@ -980,9 +981,9 @@ export default function EmployeeManagement() {
             <div className="space-y-2">
               <Label htmlFor="filter-active">الحالة</Label>
               <Select 
-                value={filterActive === null ? "" : filterActive ? "active" : "inactive"}
+                value={filterActive === null ? "all" : filterActive ? "active" : "inactive"}
                 onValueChange={(value) => {
-                  if (value === "") setFilterActive(null);
+                  if (value === "all") setFilterActive(null);
                   else setFilterActive(value === "active");
                 }}
               >
@@ -990,7 +991,7 @@ export default function EmployeeManagement() {
                   <SelectValue placeholder="جميع الحالات" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">جميع الحالات</SelectItem>
+                  <SelectItem value="all">جميع الحالات</SelectItem>
                   <SelectItem value="active">نشط</SelectItem>
                   <SelectItem value="inactive">غير نشط</SelectItem>
                 </SelectContent>
@@ -1000,14 +1001,14 @@ export default function EmployeeManagement() {
             <div className="space-y-2">
               <Label htmlFor="filter-shift">الوردية</Label>
               <Select 
-                value={filterShift || ""}
-                onValueChange={(value) => setFilterShift(value === "" ? null : value)}
+                value={filterShift || "all"}
+                onValueChange={(value) => setFilterShift(value === "all" ? null : value)}
               >
                 <SelectTrigger id="filter-shift">
                   <SelectValue placeholder="جميع الورديات" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">جميع الورديات</SelectItem>
+                  <SelectItem value="all">جميع الورديات</SelectItem>
                   <SelectItem value="active">في وردية</SelectItem>
                   <SelectItem value="inactive">خارج الوردية</SelectItem>
                 </SelectContent>
