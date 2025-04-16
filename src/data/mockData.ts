@@ -7,59 +7,59 @@ export const categories: Category[] = [
   {
     id: "1",
     name: "بقالة",
-    created_at: new Date(),
-    updated_at: new Date(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     children: [
       {
         id: "101",
         name: "زيوت وسمن",
         parent_id: "1",
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       },
       {
         id: "102",
         name: "أرز وسكر",
         parent_id: "1",
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       },
       {
         id: "103",
         name: "معلبات",
         parent_id: "1",
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }
     ]
   },
   {
     id: "2",
     name: "مشروبات",
-    created_at: new Date(),
-    updated_at: new Date(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     children: [
       {
         id: "201",
         name: "شاي وقهوة",
         parent_id: "2",
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       },
       {
         id: "202",
         name: "عصائر",
         parent_id: "2",
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }
     ]
   },
   {
     id: "3",
     name: "منظفات",
-    created_at: new Date(),
-    updated_at: new Date()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
 
@@ -78,8 +78,8 @@ export const products: Product[] = [
     is_bulk: false,
     barcode_type: "normal",
     bulk_enabled: false,
-    created_at: new Date(),
-    updated_at: new Date()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     id: "2",
@@ -95,8 +95,8 @@ export const products: Product[] = [
     is_bulk: false,
     barcode_type: "normal",
     bulk_enabled: false,
-    created_at: new Date(),
-    updated_at: new Date()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     id: "3",
@@ -113,8 +113,8 @@ export const products: Product[] = [
     bulk_enabled: true,
     bulk_quantity: 5,
     bulk_price: 150,
-    created_at: new Date(),
-    updated_at: new Date()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     id: "4",
@@ -130,8 +130,8 @@ export const products: Product[] = [
     is_bulk: false,
     barcode_type: "normal",
     bulk_enabled: false,
-    created_at: new Date(),
-    updated_at: new Date()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     id: "5",
@@ -146,8 +146,8 @@ export const products: Product[] = [
     is_bulk: false,
     barcode_type: "normal",
     bulk_enabled: false,
-    created_at: new Date(),
-    updated_at: new Date()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
 
@@ -160,8 +160,7 @@ export const users: User[] = [
     phone: "01012345678",
     password: "admin123",
     shifts: [],
-    created_at: new Date(),
-    updated_at: new Date(),
+    created_at: new Date().toISOString(),
     username: "admin"
   },
   {
@@ -171,8 +170,7 @@ export const users: User[] = [
     phone: "01023456789",
     password: "cashier123",
     shifts: [],
-    created_at: new Date(),
-    updated_at: new Date(),
+    created_at: new Date().toISOString(),
     username: "cashier"
   },
   {
@@ -182,8 +180,7 @@ export const users: User[] = [
     phone: "01034567890",
     password: "employee123",
     shifts: [],
-    created_at: new Date(),
-    updated_at: new Date(),
+    created_at: new Date().toISOString(),
     username: "employee"
   },
   {
@@ -193,8 +190,7 @@ export const users: User[] = [
     phone: "01045678901",
     password: "delivery123",
     shifts: [],
-    created_at: new Date(),
-    updated_at: new Date(),
+    created_at: new Date().toISOString(),
     username: "delivery"
   }
 ];

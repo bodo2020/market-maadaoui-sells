@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, CartItem } from "@/types";
 
@@ -6,7 +7,9 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
     // Ensure date is a string
     const saleData = {
       ...sale,
-      date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date
+      date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date,
+      // Convert CartItem[] to Json for Supabase
+      items: JSON.parse(JSON.stringify(sale.items))
     };
     
     // Create the sale record
