@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -7,16 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, 
-  CreditCard as CardIcon, Banknote, Check, X, ScanLine
+  CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer
 } from "lucide-react";
 import { CartItem, Product, Sale } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 import { createSale, generateInvoiceNumber } from "@/services/supabase/saleService";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
+import InvoiceDialog from "@/components/POS/InvoiceDialog";
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -38,83 +38,62 @@ export default function POS() {
   const [currentInvoiceNumber, setCurrentInvoiceNumber] = useState<string>("");
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [barcodeBuffer, setBarcodeBuffer] = useState<string>("");
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [currentSale, setCurrentSale] = useState<Sale | null>(null);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
-  // Set up the barcode scanner input listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if the target is an input field that's not the search input
       const target = e.target as HTMLElement;
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
       const isSearchInput = target === searchInputRef.current;
       
-      // If we're typing in an input that's not our search box, don't process barcode
       if (isInput && !isSearchInput) return;
 
-      // If Enter key is pressed and we have a barcode buffer, process it
       if (e.key === 'Enter' && barcodeBuffer) {
-        e.preventDefault(); // Prevent form submission if in a form
-        
-        // Process the scanned barcode
+        e.preventDefault();
         console.log("External barcode scanned:", barcodeBuffer);
         processBarcode(barcodeBuffer);
         setBarcodeBuffer("");
         return;
       }
 
-      // Only accept alphanumeric characters, which is what we expect from barcode scanners
       if (/^[a-zA-Z0-9]$/.test(e.key)) {
-        // Clear the timeout if it exists
         if (barcodeTimeoutRef.current) {
           clearTimeout(barcodeTimeoutRef.current);
         }
-
-        // Append the character to the buffer
         setBarcodeBuffer(prev => prev + e.key);
-
-        // Set a timeout to clear the buffer if no new input is received within a short time
-        // This distinguishes between manual typing and barcode scanner input, which is very fast
         barcodeTimeoutRef.current = setTimeout(() => {
-          // If the buffer is too short, it's probably manual typing, not a barcode scan
           if (barcodeBuffer.length < 5) {
-            // For manual typing, we don't clear the buffer, as the user might still be typing
-            // into an input field, like the search box
             if (!isInput) {
               setBarcodeBuffer("");
             }
           }
-        }, 100); // 100ms is typically fast enough to catch all barcode scanner input but slow enough to distinguish from normal typing
+        }, 100);
       }
     };
 
-    // Add the event listener
     document.addEventListener('keydown', handleKeyDown);
 
-    // Clean up
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       if (barcodeTimeoutRef.current) {
         clearTimeout(barcodeTimeoutRef.current);
       }
     };
-  }, [barcodeBuffer]); // Only re-run when barcodeBuffer changes
+  }, [barcodeBuffer]);
 
-  // Process a scanned barcode
   const processBarcode = async (barcode: string) => {
-    // If barcode is too short, ignore it
     if (barcode.length < 5) return;
     
     try {
-      // Set the search field to the barcode for visual feedback
       setSearch(barcode);
       
-      // Try to fetch the product from the database
       const product = await fetchProductByBarcode(barcode);
       
       if (product) {
-        // Handle different product types
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
         } else if (product.bulk_enabled && product.bulk_barcode === barcode) {
@@ -128,19 +107,14 @@ export default function POS() {
           description: `${barcode} - ${product.name}`,
         });
       } else {
-        // Check local products array for scale barcodes that start with 2
         if (barcode.startsWith("2") && barcode.length === 13) {
-          // Extract the product code (digits 2-7)
           const productCode = barcode.substring(1, 7);
-          
-          // Find the product with this code
           const scaleProduct = products.find(p => 
             p.barcode_type === "scale" && 
             p.barcode === productCode
           );
           
           if (scaleProduct) {
-            // Extract weight from barcode (digits 8-12)
             const weightInGrams = parseInt(barcode.substring(7, 12));
             const weightInKg = weightInGrams / 1000;
             
@@ -164,7 +138,7 @@ export default function POS() {
       });
     }
   };
-  
+
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -185,11 +159,10 @@ export default function POS() {
     
     loadProducts();
   }, [toast]);
-  
+
   const handleSearch = async () => {
     if (!search) return;
     
-    // Check if it's a bulk barcode
     const bulkProduct = products.find(p => p.bulk_enabled && p.bulk_barcode === search);
     if (bulkProduct) {
       handleAddBulkToCart(bulkProduct);
@@ -197,13 +170,10 @@ export default function POS() {
       return;
     }
     
-    // Check if it's a scale barcode (starts with 2 and has 13 digits)
     if (search.startsWith("2") && search.length === 13) {
-      // First try direct lookup through API
       try {
         const product = await fetchProductByBarcode(search);
         if (product) {
-          // If the product has calculated_weight property, it was processed by the backend
           if (product.calculated_weight) {
             handleAddScaleProductToCart(product, product.calculated_weight);
             setSearch("");
@@ -214,22 +184,13 @@ export default function POS() {
         console.error("Error fetching product by scale barcode:", error);
       }
       
-      // As a fallback, process locally if API didn't handle it
-      // Extract the product code (digits 2-7)
       const productCode = search.substring(1, 7);
-      
-      // Find the product with this code
       const scaleProduct = products.find(p => 
         p.barcode_type === "scale" && 
         p.barcode === productCode
       );
       
       if (scaleProduct) {
-        // Extract weight from barcode (digits 8-12)
-        // Format is 2PPPPPWWWWWC where:
-        // P is product code (6 digits)
-        // W is weight in grams (5 digits)
-        // C is check digit
         const weightInGrams = parseInt(search.substring(7, 12));
         const weightInKg = weightInGrams / 1000;
         
@@ -239,7 +200,6 @@ export default function POS() {
       }
     }
     
-    // Try to fetch directly from backend first
     try {
       const product = await fetchProductByBarcode(search);
       if (product) {
@@ -251,7 +211,6 @@ export default function POS() {
       console.error("Error fetching product by barcode:", error);
     }
     
-    // Regular search if direct lookup failed
     const results = products.filter(
       product => 
         product.barcode === search || 
@@ -260,7 +219,6 @@ export default function POS() {
     
     setSearchResults(results);
     
-    // If we found exact barcode match for a regular product, add to cart
     const exactMatch = products.find(p => 
       p.barcode === search && 
       p.barcode_type === "normal" && 
@@ -271,18 +229,16 @@ export default function POS() {
       handleAddToCart(exactMatch);
       setSearch("");
     } else if (results.length === 1 && results[0].barcode_type === "scale") {
-      // If we found a single scale product, prompt for weight
       setCurrentScaleProduct(results[0]);
       setShowWeightDialog(true);
       setSearch("");
     }
   };
-  
+
   const handleAddToCart = (product: Product) => {
     const existingItem = cartItems.find(item => item.product.id === product.id);
     
     if (existingItem) {
-      // Update existing item quantity
       setCartItems(cartItems.map(item => 
         item.product.id === product.id 
           ? { 
@@ -293,7 +249,6 @@ export default function POS() {
           : item
       ));
     } else {
-      // Add new item
       const price = product.is_offer && product.offer_price ? product.offer_price : product.price;
       setCartItems([
         ...cartItems, 
@@ -310,13 +265,11 @@ export default function POS() {
     
     setSearchResults([]);
   };
-  
+
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
-    // Calculate price based on weight (kg) and per kg price
     const itemPrice = product.price * weight;
     const discountPerKg = product.is_offer && product.offer_price ? product.price - product.offer_price : 0;
     
-    // Add as new item always (since weight might be different)
     setCartItems([
       ...cartItems, 
       { 
@@ -339,7 +292,7 @@ export default function POS() {
     setCurrentScaleProduct(null);
     setWeightInput("");
   };
-  
+
   const handleAddBulkToCart = (product: Product) => {
     if (!product.bulk_enabled || !product.bulk_quantity || !product.bulk_price) {
       toast({
@@ -350,7 +303,6 @@ export default function POS() {
       return;
     }
     
-    // For bulk items, add the bulk quantity to cart
     setCartItems([
       ...cartItems, 
       { 
@@ -370,7 +322,7 @@ export default function POS() {
     
     setSearchResults([]);
   };
-  
+
   const handleWeightSubmit = () => {
     if (!currentScaleProduct || !weightInput) return;
     
@@ -386,23 +338,21 @@ export default function POS() {
     
     handleAddScaleProductToCart(currentScaleProduct, weight);
   };
-  
+
   const handleRemoveFromCart = (index: number) => {
     setCartItems(cartItems.filter((_, i) => i !== index));
   };
-  
+
   const handleQuantityChange = (index: number, change: number) => {
     setCartItems(cartItems.map((item, i) => {
       if (i === index) {
-        // Don't allow changing quantity for scale products
         if (item.weight !== null && change > 0) return item;
         
         const newQuantity = Math.max(1, item.quantity + change);
         let price = item.price;
         
-        // Recalculate total
         let total = item.weight !== null 
-          ? item.price // For scale items, price is already calculated based on weight
+          ? item.price
           : newQuantity * price;
         
         return {
@@ -414,16 +364,15 @@ export default function POS() {
       return item;
     }));
   };
-  
+
   const openCheckout = () => {
     if (cartItems.length === 0) return;
     setIsCheckoutOpen(true);
     
-    // Set default cash amount to total
     setCashAmount(total.toFixed(2));
     setCardAmount("");
   };
-  
+
   const handlePaymentMethodChange = (value: 'cash' | 'card' | 'mixed') => {
     setPaymentMethod(value);
     
@@ -434,19 +383,18 @@ export default function POS() {
       setCashAmount("");
       setCardAmount(total.toFixed(2));
     } else {
-      // For mixed, we'll leave both fields available
       setCashAmount("");
       setCardAmount("");
     }
   };
-  
+
   const calculateChange = () => {
     if (paymentMethod === 'card') return 0;
     
     const cashAmountNum = parseFloat(cashAmount || "0");
     return Math.max(0, cashAmountNum - total);
   };
-  
+
   const validatePayment = () => {
     if (paymentMethod === 'cash') {
       const cashAmountNum = parseFloat(cashAmount || "0");
@@ -455,13 +403,12 @@ export default function POS() {
       const cardAmountNum = parseFloat(cardAmount || "0");
       return cardAmountNum === total;
     } else {
-      // For mixed payment
       const cashAmountNum = parseFloat(cashAmount || "0");
       const cardAmountNum = parseFloat(cardAmount || "0");
       return (cashAmountNum + cardAmountNum) === total;
     }
   };
-  
+
   const completeSale = async () => {
     if (!validatePayment()) {
       toast({
@@ -478,7 +425,6 @@ export default function POS() {
       const invoiceNumber = await generateInvoiceNumber();
       setCurrentInvoiceNumber(invoiceNumber);
       
-      // Calculate total profit
       const profit = cartItems.reduce((sum, item) => {
         const itemCost = item.product.purchase_price * (item.weight || item.quantity);
         return sum + (item.total - itemCost);
@@ -500,6 +446,7 @@ export default function POS() {
       };
       
       const sale = await createSale(saleData);
+      setCurrentSale(sale);
       
       toast({
         title: "تم إتمام البيع بنجاح",
@@ -518,7 +465,7 @@ export default function POS() {
       setIsProcessing(false);
     }
   };
-  
+
   const resetSale = () => {
     setCartItems([]);
     setIsCheckoutOpen(false);
@@ -530,16 +477,46 @@ export default function POS() {
     setCustomerName("");
     setCustomerPhone("");
     setCurrentInvoiceNumber("");
+    setCurrentSale(null);
   };
-  
+
+  const handleViewInvoice = () => {
+    if (currentSale) {
+      setShowInvoice(true);
+    }
+  };
+
+  const handlePreviewInvoice = () => {
+    if (cartItems.length === 0) return;
+    
+    const tempSale: Sale = {
+      id: 'temp',
+      date: new Date().toISOString(),
+      items: cartItems,
+      subtotal: subtotal,
+      discount: discount,
+      total: total,
+      profit: 0,
+      payment_method: 'cash',
+      invoice_number: 'PREVIEW',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      customer_name: customerName || undefined,
+      customer_phone: customerPhone || undefined,
+    };
+    
+    setCurrentSale(tempSale);
+    setShowInvoice(true);
+  };
+
   const handleBarcodeScan = async (barcode: string) => {
     processBarcode(barcode);
   };
-  
+
   const subtotal = cartItems.reduce((sum, item) => sum + item.total, 0);
   const discount = cartItems.reduce((sum, item) => sum + (item.discount * item.quantity), 0);
   const total = subtotal;
-  
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -565,7 +542,6 @@ export default function POS() {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Products Search Section */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader className="pb-3">
@@ -596,7 +572,6 @@ export default function POS() {
                 </Button>
               </div>
               
-              {/* Weight Input Dialog */}
               {showWeightDialog && currentScaleProduct && (
                 <div className="border rounded-lg p-4 mb-4 bg-muted/10">
                   <div className="flex items-center mb-3">
@@ -662,7 +637,6 @@ export default function POS() {
                           </div>
                           <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
                           
-                          {/* Product icons/badges */}
                           <div className="flex gap-1 my-1">
                             {product.barcode_type === "scale" && (
                               <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
@@ -741,7 +715,6 @@ export default function POS() {
                           </div>
                           <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
                           
-                          {/* Product icons/badges */}
                           <div className="flex gap-1 my-1">
                             {product.barcode_type === "scale" && (
                               <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
@@ -785,7 +758,6 @@ export default function POS() {
           </Card>
         </div>
         
-        {/* Cart Section */}
         <div>
           <Card className="sticky top-6">
             <CardHeader className="pb-3">
@@ -924,7 +896,6 @@ export default function POS() {
         </div>
       </div>
       
-      {/* Checkout Dialog */}
       <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -942,9 +913,15 @@ export default function POS() {
                 <p className="font-bold text-lg">{currentInvoiceNumber}</p>
               </div>
               
-              <Button onClick={resetSale} className="w-full">
-                عملية بيع جديدة
-              </Button>
+              <div className="flex flex-col space-y-2">
+                <Button onClick={handleViewInvoice} className="w-full">
+                  <Printer className="ml-2 h-4 w-4" />
+                  عرض وطباعة الفاتورة
+                </Button>
+                <Button onClick={resetSale} className="w-full">
+                  عملية بيع جديدة
+                </Button>
+              </div>
             </div>
           ) : (
             <>
@@ -1086,7 +1063,12 @@ export default function POS() {
         </DialogContent>
       </Dialog>
       
-      {/* Barcode Scanner Component */}
+      <InvoiceDialog 
+        isOpen={showInvoice}
+        onClose={() => setShowInvoice(false)}
+        sale={currentSale}
+      />
+      
       <BarcodeScanner 
         isOpen={showBarcodeScanner}
         onClose={() => setShowBarcodeScanner(false)}
