@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -12,6 +13,7 @@ import { CartItem, Product, Sale } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 import { createSale, generateInvoiceNumber } from "@/services/supabase/saleService";
+import { findOrCreateCustomer } from "@/services/supabase/customerService";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -433,6 +435,19 @@ export default function POS() {
     setIsProcessing(true);
     
     try {
+      // First, if customer information is provided, find or create the customer
+      let customerData = null;
+      if (customerName || customerPhone) {
+        customerData = await findOrCreateCustomer({
+          name: customerName,
+          phone: customerPhone
+        });
+        
+        if (customerData) {
+          console.log("Customer data saved:", customerData);
+        }
+      }
+      
       const invoiceNumber = await generateInvoiceNumber();
       setCurrentInvoiceNumber(invoiceNumber);
       

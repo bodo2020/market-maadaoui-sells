@@ -4,14 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Customer } from "@/types";
 import { fetchCustomers, deleteCustomer } from "@/services/supabase/customerService";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Plus, Edit, Trash2, Phone, Mail, Building, CreditCard, Download } from "lucide-react";
+import { Plus, Edit, Trash2, Phone, Mail, Building, CreditCard, Download } from "lucide-react";
 import CustomerForm from "./CustomerForm";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { CustomerSearch } from "./CustomerSearch";
 
 export default function CustomersList() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -53,10 +53,17 @@ export default function CustomersList() {
     console.log("Export customers");
   };
   
+  const handleSearch = () => {
+    console.log("Searching for:", searchTerm);
+    // The filtering is already handled in the component with filteredCustomers
+  };
+  
   const filteredCustomers = customers.filter(customer => {
+    if (!searchTerm) return true;
+    
     const searchTermLower = searchTerm.toLowerCase();
     return (
-      customer.name.toLowerCase().includes(searchTermLower) ||
+      (customer.name || "").toLowerCase().includes(searchTermLower) ||
       (customer.phone || "").includes(searchTerm) ||
       (customer.email || "").toLowerCase().includes(searchTermLower)
     );
@@ -90,17 +97,12 @@ export default function CustomersList() {
             </Button>
           </div>
         </CardTitle>
-        <div className="flex w-full max-w-sm items-center space-x-2 mt-2">
-          <Input
-            type="search"
-            placeholder="بحث..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
+        <div className="w-full max-w-sm mt-2">
+          <CustomerSearch 
+            search={searchTerm} 
+            setSearch={setSearchTerm} 
+            onSearch={handleSearch}
           />
-          <Button variant="ghost">
-            <Search />
-          </Button>
         </div>
       </CardHeader>
       <CardContent>
