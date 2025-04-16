@@ -2,6 +2,7 @@
 import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
+import { useQuery } from "@tanstack/react-query";
 import { 
   Card, 
   CardContent, 
@@ -37,8 +38,9 @@ import {
   DollarSign,
   Percent
 } from "lucide-react";
-import { sales, products, users, formatCurrency } from "@/data/mockData";
-import { Sale, Product } from "@/types";
+import { fetchSales } from "@/services/supabase/saleService";
+import { fetchProducts } from "@/services/supabase/productService";
+import { CartItem, Product, Sale } from "@/types";
 
 // Demo chart data
 const BarChart = () => (
@@ -58,20 +60,36 @@ const BarChart = () => (
   </div>
 );
 
+function formatCurrency(amount: number): string {
+  return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}`;
+}
+
 export default function Reports() {
   const [dateRange, setDateRange] = useState("week");
   const [reportType, setReportType] = useState("sales");
   
-  // Calculate total sales
-  const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
-  const totalProfit = sales.reduce((sum, sale) => sum + sale.profit, 0);
-  const totalItems = sales.reduce((sum, sale) => sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
+  const { data: sales, isLoading: salesLoading } = useQuery({
+    queryKey: ['sales'],
+    queryFn: fetchSales
+  });
+
+  const { data: products, isLoading: productsLoading } = useQuery({
+    queryKey: ['products'],
+    queryFn: fetchProducts
+  });
+  
+  // Calculate total sales and profits
+  const filteredSales = sales || [];
+  const totalSales = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalProfit = filteredSales.reduce((sum, sale) => sum + sale.profit, 0);
+  const totalItems = filteredSales.reduce((sum, sale) => 
+    sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
   
   // Get top selling products
   const productsSoldMap = new Map<string, { product: Product; quantitySold: number; revenue: number }>();
   
-  sales.forEach(sale => {
-    sale.items.forEach(item => {
+  filteredSales.forEach(sale => {
+    sale.items.forEach((item: CartItem) => {
       const productId = item.product.id;
       if (productsSoldMap.has(productId)) {
         const existing = productsSoldMap.get(productId)!;
@@ -91,12 +109,17 @@ export default function Reports() {
     .sort((a, b) => b.quantitySold - a.quantitySold)
     .slice(0, 5);
   
+  const handleExportReport = () => {
+    alert('سيتم تنفيذ تصدير التقرير قريبًا');
+    // TODO: Implement report export functionality
+  };
+  
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">التقارير والإحصائيات</h1>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportReport}>
             <Download className="ml-2 h-4 w-4" />
             تصدير التقرير
           </Button>
@@ -121,7 +144,7 @@ export default function Reports() {
             <CardTitle className="text-sm font-medium text-muted-foreground">المبيعات</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalSales)}</div>
+            <div className="text-2xl font-bold">{salesLoading ? "..." : formatCurrency(totalSales)}</div>
             <div className="flex items-center mt-1">
               <TrendingUp className="h-4 w-4 text-green-500 ml-1" />
               <span className="text-xs text-green-500">%12+</span>
@@ -135,7 +158,7 @@ export default function Reports() {
             <CardTitle className="text-sm font-medium text-muted-foreground">الأرباح</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalProfit)}</div>
+            <div className="text-2xl font-bold">{salesLoading ? "..." : formatCurrency(totalProfit)}</div>
             <div className="flex items-center mt-1">
               <TrendingUp className="h-4 w-4 text-green-500 ml-1" />
               <span className="text-xs text-green-500">%8+</span>
@@ -149,7 +172,7 @@ export default function Reports() {
             <CardTitle className="text-sm font-medium text-muted-foreground">المنتجات المباعة</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalItems} وحدة</div>
+            <div className="text-2xl font-bold">{salesLoading ? "..." : `${totalItems} وحدة`}</div>
             <div className="flex items-center mt-1">
               <TrendingUp className="h-4 w-4 text-green-500 ml-1" />
               <span className="text-xs text-green-500">%15+</span>
@@ -163,7 +186,9 @@ export default function Reports() {
             <CardTitle className="text-sm font-medium text-muted-foreground">معدل الربح</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{Math.round((totalProfit / totalSales) * 100)}%</div>
+            <div className="text-2xl font-bold">
+              {salesLoading ? "..." : totalSales > 0 ? `${Math.round((totalProfit / totalSales) * 100)}%` : "0%"}
+            </div>
             <div className="flex items-center mt-1">
               <TrendingUp className="h-4 w-4 text-green-500 ml-1" />
               <span className="text-xs text-green-500">%2+</span>
@@ -214,42 +239,46 @@ export default function Reports() {
                 <BarChart />
               </div>
               
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>رقم الفاتورة</TableHead>
-                      <TableHead>التاريخ</TableHead>
-                      <TableHead>الكاشير</TableHead>
-                      <TableHead>العناصر</TableHead>
-                      <TableHead>المجموع</TableHead>
-                      <TableHead>الربح</TableHead>
-                      <TableHead>طريقة الدفع</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sales.map(sale => (
-                      <TableRow key={sale.id}>
-                        <TableCell className="font-medium">{sale.invoice_number}</TableCell>
-                        <TableCell>{typeof sale.date === 'string' ? sale.date : sale.date.toLocaleDateString('ar-EG')}</TableCell>
-                        <TableCell>{users.find(user => user.id === sale.cashier_id)?.name || 'غير معروف'}</TableCell>
-                        <TableCell>
-                          {sale.items.reduce((sum, item) => sum + item.quantity, 0)} عنصر
-                        </TableCell>
-                        <TableCell>{formatCurrency(sale.total)}</TableCell>
-                        <TableCell className="text-green-600">
-                          {formatCurrency(sale.profit)}
-                        </TableCell>
-                        <TableCell>
-                          {sale.payment_method === 'cash' && 'نقداً'}
-                          {sale.payment_method === 'card' && 'بطاقة'}
-                          {sale.payment_method === 'mixed' && 'مختلط'}
-                        </TableCell>
+              {salesLoading ? (
+                <p className="text-center py-4 text-muted-foreground">جاري تحميل البيانات...</p>
+              ) : filteredSales.length === 0 ? (
+                <p className="text-center py-4 text-muted-foreground">لا توجد بيانات مبيعات للعرض</p>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>رقم الفاتورة</TableHead>
+                        <TableHead>التاريخ</TableHead>
+                        <TableHead>العناصر</TableHead>
+                        <TableHead>المجموع</TableHead>
+                        <TableHead>الربح</TableHead>
+                        <TableHead>طريقة الدفع</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSales.map(sale => (
+                        <TableRow key={sale.id}>
+                          <TableCell className="font-medium">{sale.invoice_number}</TableCell>
+                          <TableCell>{new Date(sale.date).toLocaleDateString('ar-EG')}</TableCell>
+                          <TableCell>
+                            {sale.items.reduce((sum, item) => sum + item.quantity, 0)} عنصر
+                          </TableCell>
+                          <TableCell>{formatCurrency(sale.total)}</TableCell>
+                          <TableCell className="text-green-600">
+                            {formatCurrency(sale.profit)}
+                          </TableCell>
+                          <TableCell>
+                            {sale.payment_method === 'cash' && 'نقداً'}
+                            {sale.payment_method === 'card' && 'بطاقة'}
+                            {sale.payment_method === 'mixed' && 'مختلط'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -263,107 +292,125 @@ export default function Reports() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">حسب الكمية</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {topSellingProducts.map((item, index) => (
-                        <div key={item.product.id} className="flex items-center">
-                          <div className="w-8 text-muted-foreground">{index + 1}.</div>
-                          <div className="flex-1">
-                            <div className="font-medium">{item.product.name}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {formatCurrency(item.product.price)} / وحدة
+              {salesLoading || productsLoading ? (
+                <p className="text-center py-4 text-muted-foreground">جاري تحميل البيانات...</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">حسب الكمية</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {topSellingProducts.length === 0 ? (
+                        <p className="text-center py-4 text-muted-foreground">لا توجد بيانات للعرض</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {topSellingProducts.map((item, index) => (
+                            <div key={item.product.id} className="flex items-center">
+                              <div className="w-8 text-muted-foreground">{index + 1}.</div>
+                              <div className="flex-1">
+                                <div className="font-medium">{item.product.name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {formatCurrency(item.product.price)} / وحدة
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold">{item.quantitySold} وحدة</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {formatCurrency(item.revenue)}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold">{item.quantitySold} وحدة</div>
-                            <div className="text-sm text-muted-foreground">
-                              {formatCurrency(item.revenue)}
-                            </div>
-                          </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-                
+                      )}
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">حسب الإيرادات</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {topSellingProducts.length === 0 ? (
+                        <p className="text-center py-4 text-muted-foreground">لا توجد بيانات للعرض</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {[...topSellingProducts]
+                            .sort((a, b) => b.revenue - a.revenue)
+                            .map((item, index) => (
+                              <div key={item.product.id} className="flex items-center">
+                                <div className="w-8 text-muted-foreground">{index + 1}.</div>
+                                <div className="flex-1">
+                                  <div className="font-medium">{item.product.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {item.quantitySold} وحدة
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="font-bold">{formatCurrency(item.revenue)}</div>
+                                  <div className="text-sm text-green-600">
+                                    ربح: {formatCurrency(item.revenue - (item.product.purchase_price * item.quantitySold))}
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          }
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+              
+              {salesLoading || productsLoading ? (
+                <p className="text-center py-4 text-muted-foreground">جاري تحميل البيانات...</p>
+              ) : productsSoldMap.size === 0 ? (
+                <p className="text-center py-4 text-muted-foreground">لا توجد بيانات للعرض</p>
+              ) : (
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">حسب الإيرادات</CardTitle>
+                    <CardTitle className="text-base">جميع المنتجات المباعة</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {[...topSellingProducts]
-                        .sort((a, b) => b.revenue - a.revenue)
-                        .map((item, index) => (
-                          <div key={item.product.id} className="flex items-center">
-                            <div className="w-8 text-muted-foreground">{index + 1}.</div>
-                            <div className="flex-1">
-                              <div className="font-medium">{item.product.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {item.quantitySold} وحدة
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-bold">{formatCurrency(item.revenue)}</div>
-                              <div className="text-sm text-green-600">
-                                ربح: {formatCurrency(item.revenue - (item.product.purchase_price * item.quantitySold))}
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      }
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>المنتج</TableHead>
+                            <TableHead>الكمية المباعة</TableHead>
+                            <TableHead>سعر الوحدة</TableHead>
+                            <TableHead>إجمالي المبيعات</TableHead>
+                            <TableHead>نسبة المبيعات</TableHead>
+                            <TableHead>الربح</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {Array.from(productsSoldMap.values()).map(item => (
+                            <TableRow key={item.product.id}>
+                              <TableCell className="font-medium">{item.product.name}</TableCell>
+                              <TableCell>{item.quantitySold} وحدة</TableCell>
+                              <TableCell>
+                                {formatCurrency(item.product.is_offer && item.product.offer_price
+                                  ? item.product.offer_price
+                                  : item.product.price
+                                )}
+                              </TableCell>
+                              <TableCell>{formatCurrency(item.revenue)}</TableCell>
+                              <TableCell>
+                                {totalSales > 0 ? ((item.revenue / totalSales) * 100).toFixed(1) : 0}%
+                              </TableCell>
+                              <TableCell className="text-green-600">
+                                {formatCurrency(item.revenue - (item.product.purchase_price * item.quantitySold))}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
                   </CardContent>
                 </Card>
-              </div>
-              
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">جميع المنتجات المباعة</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>المنتج</TableHead>
-                          <TableHead>الكمية المباعة</TableHead>
-                          <TableHead>سعر الوحدة</TableHead>
-                          <TableHead>إجمالي المبيعات</TableHead>
-                          <TableHead>نسبة المبيعات</TableHead>
-                          <TableHead>الربح</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {Array.from(productsSoldMap.values()).map(item => (
-                          <TableRow key={item.product.id}>
-                            <TableCell className="font-medium">{item.product.name}</TableCell>
-                            <TableCell>{item.quantitySold} وحدة</TableCell>
-                            <TableCell>
-                              {formatCurrency(item.product.is_offer && item.product.offer_price
-                                ? item.product.offer_price
-                                : item.product.price
-                              )}
-                            </TableCell>
-                            <TableCell>{formatCurrency(item.revenue)}</TableCell>
-                            <TableCell>
-                              {((item.revenue / totalSales) * 100).toFixed(1)}%
-                            </TableCell>
-                            <TableCell className="text-green-600">
-                              {formatCurrency(item.revenue - (item.product.purchase_price * item.quantitySold))}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -381,50 +428,8 @@ export default function Reports() {
                 <BarChart />
               </div>
               
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>الكاشير</TableHead>
-                      <TableHead>عدد المعاملات</TableHead>
-                      <TableHead>المنتجات المباعة</TableHead>
-                      <TableHead>إجمالي المبيعات</TableHead>
-                      <TableHead>متوسط قيمة المعاملة</TableHead>
-                      <TableHead>إجمالي الربح</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users
-                      .filter(user => user.role === "cashier")
-                      .map(cashier => {
-                        const cashierSales = sales.filter(sale => sale.cashier_id === cashier.id);
-                        const totalSales = cashierSales.reduce((sum, sale) => sum + sale.total, 0);
-                        const totalItems = cashierSales.reduce(
-                          (sum, sale) => sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 
-                          0
-                        );
-                        const totalProfit = cashierSales.reduce((sum, sale) => sum + sale.profit, 0);
-                        
-                        return (
-                          <TableRow key={cashier.id}>
-                            <TableCell className="font-medium">{cashier.name}</TableCell>
-                            <TableCell>{cashierSales.length}</TableCell>
-                            <TableCell>{totalItems} وحدة</TableCell>
-                            <TableCell>{formatCurrency(totalSales)}</TableCell>
-                            <TableCell>
-                              {cashierSales.length > 0 
-                                ? formatCurrency(totalSales / cashierSales.length) 
-                                : formatCurrency(0)
-                              }
-                            </TableCell>
-                            <TableCell className="text-green-600">
-                              {formatCurrency(totalProfit)}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                  </TableBody>
-                </Table>
+              <div className="text-center py-8 text-muted-foreground">
+                سيتم قريبًا توفير تقارير مفصلة عن أداء الكاشير
               </div>
             </CardContent>
           </Card>
@@ -439,132 +444,152 @@ export default function Reports() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">متوسط هامش الربح</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold flex items-center">
-                      <Percent className="h-6 w-6 mr-1 text-primary" />
-                      {Math.round((totalProfit / totalSales) * 100)}%
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">أعلى هامش ربح</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-green-600">
-                      {Math.max(...Array.from(productsSoldMap.values()).map(item => {
-                        const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
-                        return Math.round((profit / item.revenue) * 100);
-                      }))}%
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      لمنتج {Array.from(productsSoldMap.values())
-                        .sort((a, b) => {
-                          const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
-                          const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
-                          const marginA = profitA / a.revenue;
-                          const marginB = profitB / b.revenue;
-                          return marginB - marginA;
-                        })[0]?.product.name
-                      }
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">أقل هامش ربح</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-yellow-600">
-                      {Math.min(...Array.from(productsSoldMap.values())
-                        .filter(item => item.revenue > 0)
-                        .map(item => {
-                          const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
-                          return Math.round((profit / item.revenue) * 100);
-                        })
-                      )}%
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      لمنتج {Array.from(productsSoldMap.values())
-                        .sort((a, b) => {
-                          const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
-                          const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
-                          const marginA = profitA / a.revenue;
-                          const marginB = profitB / b.revenue;
-                          return marginA - marginB;
-                        })
-                        .filter(item => item.revenue > 0)[0]?.product.name
-                      }
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-              
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>المنتج</TableHead>
-                      <TableHead>سعر البيع</TableHead>
-                      <TableHead>سعر الشراء</TableHead>
-                      <TableHead>هامش الربح</TableHead>
-                      <TableHead>الكمية المباعة</TableHead>
-                      <TableHead>إجمالي الربح</TableHead>
-                      <TableHead>نسبة من إجمالي الربح</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Array.from(productsSoldMap.values())
-                      .sort((a, b) => {
-                        const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
-                        const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
-                        return profitB - profitA;
-                      })
-                      .map(item => {
-                        const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
-                        const margin = (profit / item.revenue) * 100;
-                        
-                        return (
-                          <TableRow key={item.product.id}>
-                            <TableCell className="font-medium">{item.product.name}</TableCell>
-                            <TableCell>
-                              {formatCurrency(item.product.is_offer && item.product.offer_price
-                                ? item.product.offer_price
-                                : item.product.price
-                              )}
-                            </TableCell>
-                            <TableCell>{formatCurrency(item.product.purchase_price)}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center">
-                                <div 
-                                  className={`h-2 rounded-full mr-2 ${
-                                    margin >= 30 ? 'bg-green-500' : 
-                                    margin >= 20 ? 'bg-yellow-500' : 
-                                    'bg-red-500'
-                                  }`}
-                                  style={{ width: `${Math.min(margin, 50)}%` }}
-                                ></div>
-                                <span>{margin.toFixed(1)}%</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{item.quantitySold} وحدة</TableCell>
-                            <TableCell className="text-green-600">{formatCurrency(profit)}</TableCell>
-                            <TableCell>
-                              {(profit / totalProfit * 100).toFixed(1)}%
-                            </TableCell>
+              {salesLoading || productsLoading ? (
+                <p className="text-center py-4 text-muted-foreground">جاري تحميل البيانات...</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">متوسط هامش الربح</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold flex items-center">
+                          <Percent className="h-6 w-6 mr-1 text-primary" />
+                          {totalSales > 0 ? Math.round((totalProfit / totalSales) * 100) : 0}%
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">أعلى هامش ربح</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {Array.from(productsSoldMap.values()).length === 0 ? (
+                          <div className="text-3xl font-bold text-green-600">0%</div>
+                        ) : (
+                          <>
+                            <div className="text-3xl font-bold text-green-600">
+                              {Math.max(...Array.from(productsSoldMap.values()).map(item => {
+                                const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
+                                return Math.round((profit / item.revenue) * 100);
+                              }), 0)}%
+                            </div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              لمنتج {Array.from(productsSoldMap.values())
+                                .sort((a, b) => {
+                                  const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
+                                  const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
+                                  const marginA = profitA / a.revenue;
+                                  const marginB = profitB / b.revenue;
+                                  return marginB - marginA;
+                                })[0]?.product.name || ''}
+                            </div>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">أقل هامش ربح</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {Array.from(productsSoldMap.values())
+                          .filter(item => item.revenue > 0).length === 0 ? (
+                          <div className="text-3xl font-bold text-yellow-600">0%</div>
+                        ) : (
+                          <>
+                            <div className="text-3xl font-bold text-yellow-600">
+                              {Math.min(...Array.from(productsSoldMap.values())
+                                .filter(item => item.revenue > 0)
+                                .map(item => {
+                                  const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
+                                  return Math.round((profit / item.revenue) * 100);
+                                }), 0)}%
+                            </div>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              لمنتج {Array.from(productsSoldMap.values())
+                                .sort((a, b) => {
+                                  const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
+                                  const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
+                                  const marginA = profitA / a.revenue;
+                                  const marginB = profitB / b.revenue;
+                                  return marginA - marginB;
+                                })
+                                .filter(item => item.revenue > 0)[0]?.product.name || ''}
+                            </div>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  {productsSoldMap.size === 0 ? (
+                    <p className="text-center py-4 text-muted-foreground">لا توجد بيانات للعرض</p>
+                  ) : (
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>المنتج</TableHead>
+                            <TableHead>سعر البيع</TableHead>
+                            <TableHead>سعر الشراء</TableHead>
+                            <TableHead>هامش الربح</TableHead>
+                            <TableHead>الكمية المباعة</TableHead>
+                            <TableHead>إجمالي الربح</TableHead>
+                            <TableHead>نسبة من إجمالي الربح</TableHead>
                           </TableRow>
-                        );
-                      })}
-                  </TableBody>
-                </Table>
-              </div>
+                        </TableHeader>
+                        <TableBody>
+                          {Array.from(productsSoldMap.values())
+                            .sort((a, b) => {
+                              const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
+                              const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
+                              return profitB - profitA;
+                            })
+                            .map(item => {
+                              const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
+                              const margin = item.revenue > 0 ? (profit / item.revenue) * 100 : 0;
+                              
+                              return (
+                                <TableRow key={item.product.id}>
+                                  <TableCell className="font-medium">{item.product.name}</TableCell>
+                                  <TableCell>
+                                    {formatCurrency(item.product.is_offer && item.product.offer_price
+                                      ? item.product.offer_price
+                                      : item.product.price
+                                    )}
+                                  </TableCell>
+                                  <TableCell>{formatCurrency(item.product.purchase_price)}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center">
+                                      <div 
+                                        className={`h-2 rounded-full mr-2 ${
+                                          margin >= 30 ? 'bg-green-500' : 
+                                          margin >= 20 ? 'bg-yellow-500' : 
+                                          'bg-red-500'
+                                        }`}
+                                        style={{ width: `${Math.min(margin, 50)}%` }}
+                                      ></div>
+                                      <span>{margin.toFixed(1)}%</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>{item.quantitySold} وحدة</TableCell>
+                                  <TableCell className="text-green-600">{formatCurrency(profit)}</TableCell>
+                                  <TableCell>
+                                    {totalProfit > 0 ? (profit / totalProfit * 100).toFixed(1) : 0}%
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

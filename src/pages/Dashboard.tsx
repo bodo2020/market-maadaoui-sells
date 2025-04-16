@@ -1,7 +1,9 @@
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
+import { useQuery } from "@tanstack/react-query";
 import { 
   BarChart4, 
   ShoppingCart, 
@@ -10,6 +12,9 @@ import {
   ArrowUpRight, 
   ArrowDownRight 
 } from "lucide-react";
+import { fetchSales } from "@/services/supabase/saleService";
+import { fetchProducts } from "@/services/supabase/productService";
+import { CartItem, Product, Sale } from "@/types";
 
 interface StatCardProps {
   title: string;
@@ -49,20 +54,91 @@ function StatCard({ title, value, description, icon, trend, trendValue }: StatCa
   );
 }
 
+function formatCurrency(amount: number): string {
+  return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}`;
+}
+
 export default function Dashboard() {
-  // Demo data for the dashboard
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const { data: sales, isLoading: salesLoading } = useQuery({
+    queryKey: ['sales'],
+    queryFn: fetchSales
+  });
+
+  const { data: products, isLoading: productsLoading } = useQuery({
+    queryKey: ['products'],
+    queryFn: fetchProducts
+  });
+
+  // Calculate dashboard stats
+  const todaySales = sales?.filter(sale => {
+    const saleDate = new Date(sale.date);
+    saleDate.setHours(0, 0, 0, 0);
+    return saleDate.getTime() === today.getTime();
+  }) || [];
+  
+  const totalSalesToday = todaySales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalProfitToday = todaySales.reduce((sum, sale) => sum + sale.profit, 0);
+  
+  // Calculate low stock products
+  const lowStockProducts = products?.filter(product => product.quantity <= 5) || [];
+  
+  // Calculate monthly sales
+  const thisMonth = today.getMonth();
+  const thisYear = today.getFullYear();
+  
+  const monthlySales = sales?.filter(sale => {
+    const saleDate = new Date(sale.date);
+    return saleDate.getMonth() === thisMonth && saleDate.getFullYear() === thisYear;
+  }) || [];
+  
+  const totalMonthlySales = monthlySales.reduce((sum, sale) => sum + sale.total, 0);
+  const totalMonthlyTransactions = monthlySales.length;
+  
+  // Get the most recent sales
+  const recentSales = [...(sales || [])]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+  
+  // Calculate top selling products
+  const productsSoldMap = new Map<string, { product: Product; quantitySold: number; revenue: number }>();
+  
+  sales?.forEach(sale => {
+    sale.items.forEach((item: CartItem) => {
+      const productId = item.product.id;
+      if (productsSoldMap.has(productId)) {
+        const existing = productsSoldMap.get(productId)!;
+        existing.quantitySold += item.quantity;
+        existing.revenue += item.total;
+      } else {
+        productsSoldMap.set(productId, {
+          product: item.product,
+          quantitySold: item.quantity,
+          revenue: item.total
+        });
+      }
+    });
+  });
+  
+  const topSellingProducts = Array.from(productsSoldMap.values())
+    .sort((a, b) => b.quantitySold - a.quantitySold)
+    .slice(0, 5);
+
+  // Demo data for the dashboard when no real data is available
   const stats = [
     {
       title: "إجمالي المبيعات اليوم",
-      value: `${siteConfig.currency} 12,500`,
-      description: "20 معاملة اليوم",
+      value: salesLoading ? `${siteConfig.currency} ...` : formatCurrency(totalSalesToday),
+      description: `${todaySales.length} معاملة اليوم`,
       icon: <ShoppingCart size={16} />,
       trend: "up" as const,
       trendValue: "15% من الأمس"
     },
     {
       title: "الربح اليوم",
-      value: `${siteConfig.currency} 3,200`,
+      value: salesLoading ? `${siteConfig.currency} ...` : formatCurrency(totalProfitToday),
       description: "إجمالي الأرباح من المبيعات",
       icon: <TrendingUp size={16} />,
       trend: "up" as const,
@@ -70,7 +146,7 @@ export default function Dashboard() {
     },
     {
       title: "منتجات منخفضة المخزون",
-      value: "8",
+      value: productsLoading ? "..." : `${lowStockProducts.length}`,
       description: "منتجات تحتاج إلى تجديد المخزون",
       icon: <Package size={16} />,
       trend: "down" as const,
@@ -78,8 +154,8 @@ export default function Dashboard() {
     },
     {
       title: "مبيعات هذا الشهر",
-      value: `${siteConfig.currency} 120,000`,
-      description: "إجمالي 450 معاملة",
+      value: salesLoading ? `${siteConfig.currency} ...` : formatCurrency(totalMonthlySales),
+      description: `إجمالي ${totalMonthlyTransactions} معاملة`,
       icon: <BarChart4 size={16} />,
       trend: "up" as const,
       trendValue: "8% من الشهر الماضي"
@@ -116,16 +192,23 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* For demo, we'll add static data */}
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex justify-between items-center pb-2 border-b">
-                  <div>
-                    <p className="font-medium">فاتورة #{1000 + i}</p>
-                    <p className="text-sm text-muted-foreground">منذ {30 - i * 5} دقيقة</p>
+              {salesLoading ? (
+                <p className="text-center py-4 text-muted-foreground">جاري تحميل البيانات...</p>
+              ) : recentSales.length === 0 ? (
+                <p className="text-center py-4 text-muted-foreground">لا توجد مبيعات حتى الآن</p>
+              ) : (
+                recentSales.map((sale) => (
+                  <div key={sale.id} className="flex justify-between items-center pb-2 border-b">
+                    <div>
+                      <p className="font-medium">{sale.invoice_number}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(sale.date).toLocaleDateString('ar-EG')}
+                      </p>
+                    </div>
+                    <p className="font-medium">{formatCurrency(sale.total)}</p>
                   </div>
-                  <p className="font-medium">{siteConfig.currency} {Math.floor(Math.random() * 500) + 100}</p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -134,24 +217,23 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle>المنتجات الأكثر مبيعاً</CardTitle>
             <CardDescription>
-              أعلى 5 منتجات مبيعاً هذا الأسبوع
+              أعلى 5 منتجات مبيعاً
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Static data for demo */}
-              {[
-                "سكر 1 كيلو",
-                "زيت عباد الشمس 1 لتر",
-                "أرز مصري 5 كيلو",
-                "شاي ليبتون 100 كيس",
-                "دقيق فاخر 1 كيلو"
-              ].map((product, i) => (
-                <div key={i} className="flex justify-between items-center pb-2 border-b">
-                  <p className="font-medium">{product}</p>
-                  <p className="text-sm font-medium">{Math.floor(Math.random() * 50) + 10} وحدة</p>
-                </div>
-              ))}
+              {salesLoading || productsLoading ? (
+                <p className="text-center py-4 text-muted-foreground">جاري تحميل البيانات...</p>
+              ) : topSellingProducts.length === 0 ? (
+                <p className="text-center py-4 text-muted-foreground">لا توجد بيانات حتى الآن</p>
+              ) : (
+                topSellingProducts.map((item) => (
+                  <div key={item.product.id} className="flex justify-between items-center pb-2 border-b">
+                    <p className="font-medium">{item.product.name}</p>
+                    <p className="text-sm font-medium">{item.quantitySold} وحدة</p>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
