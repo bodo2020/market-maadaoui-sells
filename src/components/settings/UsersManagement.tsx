@@ -57,7 +57,6 @@ export default function UsersManagement() {
     try {
       setLoading(true);
       
-      // Check if the current user is authenticated and is an admin
       if (!currentUser || currentUser.role !== UserRole.ADMIN) {
         toast({
           title: "خطأ في الصلاحيات",
@@ -117,7 +116,6 @@ export default function UsersManagement() {
 
   const handleAddUser = async () => {
     try {
-      // Validate form
       if (!formData.name || !formData.username || !formData.password) {
         toast({
           title: "خطأ",
@@ -165,7 +163,6 @@ export default function UsersManagement() {
         active: formData.active
       };
 
-      // Only include password if it was changed
       if (formData.password) {
         updateData.password = formData.password;
       }
@@ -386,7 +383,6 @@ export default function UsersManagement() {
         </div>
       )}
 
-      {/* Edit User Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>

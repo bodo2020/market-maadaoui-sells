@@ -687,7 +687,7 @@ export default function EmployeeManagement() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="salary_type">نوع الراتب</Label>
-                <Select onValueChange={(value) => handleSelectChange(value, "salary_type")}>
+                <Select onValueChange={(value) => handleSelectChange(value, "salary_type")} defaultValue={formData.salary_type}>
                   <SelectTrigger id="salary_type">
                     <SelectValue placeholder="اختر نوع الراتب" />
                   </SelectTrigger>
@@ -954,18 +954,21 @@ export default function EmployeeManagement() {
           <DialogHeader>
             <DialogTitle>تصفية الموظفين</DialogTitle>
             <DialogDescription>
-              حدد معايير التصفية المطلوبة
+              تصفية قائمة الموظفين حسب المعايير المختارة
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label>الدور الوظيفي</Label>
-              <Select value={filterRole || ""} onValueChange={(value) => setFilterRole(value || null)}>
-                <SelectTrigger>
+              <Label htmlFor="filter-role">الدور الوظيفي</Label>
+              <Select 
+                value={filterRole || ""}
+                onValueChange={(value) => setFilterRole(value === "" ? null : value)}
+              >
+                <SelectTrigger id="filter-role">
                   <SelectValue placeholder="جميع الأدوار" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">جميع الأدوار</SelectItem>
+                  <SelectItem value="all">جميع الأدوار</SelectItem>
                   <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
                   <SelectItem value={UserRole.CASHIER}>كاشير</SelectItem>
                   <SelectItem value={UserRole.EMPLOYEE}>موظف</SelectItem>
@@ -973,16 +976,17 @@ export default function EmployeeManagement() {
                 </SelectContent>
               </Select>
             </div>
+            
             <div className="space-y-2">
-              <Label>حالة النشاط</Label>
+              <Label htmlFor="filter-active">الحالة</Label>
               <Select 
-                value={filterActive === null ? "" : filterActive ? "active" : "inactive"} 
+                value={filterActive === null ? "" : filterActive ? "active" : "inactive"}
                 onValueChange={(value) => {
                   if (value === "") setFilterActive(null);
                   else setFilterActive(value === "active");
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger id="filter-active">
                   <SelectValue placeholder="جميع الحالات" />
                 </SelectTrigger>
                 <SelectContent>
@@ -992,17 +996,18 @@ export default function EmployeeManagement() {
                 </SelectContent>
               </Select>
             </div>
+            
             <div className="space-y-2">
-              <Label>حالة الوردية</Label>
+              <Label htmlFor="filter-shift">الوردية</Label>
               <Select 
-                value={filterShift || ""} 
-                onValueChange={(value) => setFilterShift(value || null)}
+                value={filterShift || ""}
+                onValueChange={(value) => setFilterShift(value === "" ? null : value)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="جميع الحالات" />
+                <SelectTrigger id="filter-shift">
+                  <SelectValue placeholder="جميع الورديات" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">جميع الحالات</SelectItem>
+                  <SelectItem value="">جميع الورديات</SelectItem>
                   <SelectItem value="active">في وردية</SelectItem>
                   <SelectItem value="inactive">خارج الوردية</SelectItem>
                 </SelectContent>
@@ -1010,12 +1015,8 @@ export default function EmployeeManagement() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={resetFilters}>
-              إعادة ضبط
-            </Button>
-            <Button onClick={applyFilters}>
-              تطبيق
-            </Button>
+            <Button variant="ghost" onClick={resetFilters}>إعادة ضبط</Button>
+            <Button onClick={applyFilters}>تطبيق</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
