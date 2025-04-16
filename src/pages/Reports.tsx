@@ -38,34 +38,39 @@ import {
   DollarSign,
   Percent
 } from "lucide-react";
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend
+} from "recharts";
 import { fetchSales } from "@/services/supabase/saleService";
 import { fetchProducts } from "@/services/supabase/productService";
 import { CartItem, Product, Sale } from "@/types";
-
-// Demo chart data
-const BarChart = () => (
-  <div className="w-full h-64 bg-gray-50 rounded-md p-6 flex items-end space-x-2 rtl:space-x-reverse">
-    {Array.from({ length: 10 }).map((_, i) => {
-      const height = 20 + Math.random() * 150;
-      return (
-        <div key={i} className="flex flex-col items-center flex-1">
-          <div 
-            className="w-full bg-primary rounded-t-sm" 
-            style={{ height: `${height}px` }}
-          ></div>
-          <span className="text-xs mt-2">{i + 1}</span>
-        </div>
-      );
-    })}
-  </div>
-);
+import { 
+  fetchMonthlyRevenue, 
+  fetchExpensesByCategory, 
+  fetchFinancialSummary 
+} from "@/services/supabase/financeService";
+import { 
+  ChartContainer, 
+  ChartTooltip, 
+  ChartTooltipContent 
+} from "@/components/ui/chart";
 
 function formatCurrency(amount: number): string {
   return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}`;
 }
 
 export default function Reports() {
-  const [dateRange, setDateRange] = useState("week");
+  const [dateRange, setDateRange] = useState("month");
   const [reportType, setReportType] = useState("sales");
   
   const { data: sales, isLoading: salesLoading } = useQuery({
@@ -76,6 +81,24 @@ export default function Reports() {
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ['products'],
     queryFn: fetchProducts
+  });
+  
+  // Fetch revenue data from Supabase
+  const { data: revenueData, isLoading: revenueLoading } = useQuery({
+    queryKey: ['monthlyRevenue'],
+    queryFn: fetchMonthlyRevenue
+  });
+  
+  // Fetch expense data from Supabase
+  const { data: expenseData, isLoading: expensesLoading } = useQuery({
+    queryKey: ['expensesByCategory'],
+    queryFn: fetchExpensesByCategory
+  });
+  
+  // Fetch financial summary data
+  const { data: summaryData, isLoading: summaryLoading } = useQuery({
+    queryKey: ['financialSummary'],
+    queryFn: fetchFinancialSummary
   });
   
   // Calculate total sales and profits
@@ -144,7 +167,9 @@ export default function Reports() {
             <CardTitle className="text-sm font-medium text-muted-foreground">المبيعات</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{salesLoading ? "..." : formatCurrency(totalSales)}</div>
+            <div className="text-2xl font-bold">
+              {summaryLoading ? "..." : formatCurrency(summaryData?.totalRevenue || totalSales)}
+            </div>
             <div className="flex items-center mt-1">
               <TrendingUp className="h-4 w-4 text-green-500 ml-1" />
               <span className="text-xs text-green-500">%12+</span>
@@ -158,7 +183,9 @@ export default function Reports() {
             <CardTitle className="text-sm font-medium text-muted-foreground">الأرباح</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{salesLoading ? "..." : formatCurrency(totalProfit)}</div>
+            <div className="text-2xl font-bold">
+              {summaryLoading ? "..." : formatCurrency(summaryData?.netProfit || totalProfit)}
+            </div>
             <div className="flex items-center mt-1">
               <TrendingUp className="h-4 w-4 text-green-500 ml-1" />
               <span className="text-xs text-green-500">%8+</span>
@@ -187,7 +214,9 @@ export default function Reports() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {salesLoading ? "..." : totalSales > 0 ? `${Math.round((totalProfit / totalSales) * 100)}%` : "0%"}
+              {summaryLoading ? "..." : summaryData?.profitMargin 
+                ? `${Math.round(summaryData.profitMargin)}%` 
+                : (totalSales > 0 ? `${Math.round((totalProfit / totalSales) * 100)}%` : "0%")}
             </div>
             <div className="flex items-center mt-1">
               <TrendingUp className="h-4 w-4 text-green-500 ml-1" />
@@ -236,7 +265,30 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="mb-6">
-                <BarChart />
+                {revenueLoading ? (
+                  <div className="h-64 flex items-center justify-center bg-gray-50 rounded-md">
+                    <p className="text-muted-foreground">جاري تحميل البيانات...</p>
+                  </div>
+                ) : revenueData && revenueData.length > 0 ? (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={revenueData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <RechartsTooltip 
+                          formatter={(value: number) => formatCurrency(value)} 
+                          labelFormatter={(label) => `شهر ${label}`}
+                        />
+                        <Bar dataKey="amount" name="المبيعات" fill="#4338ca" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center bg-gray-50 rounded-md">
+                    <p className="text-muted-foreground">لا توجد بيانات للعرض</p>
+                  </div>
+                )}
               </div>
               
               {salesLoading ? (
@@ -424,10 +476,6 @@ export default function Reports() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="mb-6">
-                <BarChart />
-              </div>
-              
               <div className="text-center py-8 text-muted-foreground">
                 سيتم قريبًا توفير تقارير مفصلة عن أداء الكاشير
               </div>
@@ -456,7 +504,9 @@ export default function Reports() {
                       <CardContent>
                         <div className="text-3xl font-bold flex items-center">
                           <Percent className="h-6 w-6 mr-1 text-primary" />
-                          {totalSales > 0 ? Math.round((totalProfit / totalSales) * 100) : 0}%
+                          {summaryData?.profitMargin 
+                            ? Math.round(summaryData.profitMargin) 
+                            : (totalSales > 0 ? Math.round((totalProfit / totalSales) * 100) : 0)}%
                         </div>
                       </CardContent>
                     </Card>
@@ -605,18 +655,70 @@ export default function Reports() {
             <CardContent>
               <div className="space-y-8">
                 <div>
-                  <h3 className="text-lg font-medium mb-4">المبيعات اليومية</h3>
-                  <BarChart />
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium mb-4">المبيعات الأسبوعية</h3>
-                  <BarChart />
-                </div>
-                
-                <div>
                   <h3 className="text-lg font-medium mb-4">المبيعات الشهرية</h3>
-                  <BarChart />
+                  {revenueLoading ? (
+                    <div className="h-64 flex items-center justify-center bg-gray-50 rounded-md">
+                      <p className="text-muted-foreground">جاري تحميل البيانات...</p>
+                    </div>
+                  ) : revenueData && revenueData.length > 0 ? (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={revenueData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <RechartsTooltip 
+                            formatter={(value: number) => formatCurrency(value)} 
+                            labelFormatter={(label) => `شهر ${label}`}
+                          />
+                          <Bar dataKey="amount" name="المبيعات" fill="#8b5cf6" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-64 flex items-center justify-center bg-gray-50 rounded-md">
+                      <p className="text-muted-foreground">لا توجد بيانات للعرض</p>
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-medium mb-4">توزيع المصروفات</h3>
+                  {expensesLoading ? (
+                    <div className="h-64 flex items-center justify-center bg-gray-50 rounded-md">
+                      <p className="text-muted-foreground">جاري تحميل البيانات...</p>
+                    </div>
+                  ) : expenseData && expenseData.length > 0 ? (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={expenseData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                            nameKey="name"
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          >
+                            {expenseData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip 
+                            formatter={(value: number) => formatCurrency(value)} 
+                          />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-64 flex items-center justify-center bg-gray-50 rounded-md">
+                      <p className="text-muted-foreground">لا توجد مصروفات لعرضها</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
