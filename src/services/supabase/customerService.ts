@@ -1,17 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
-export interface Customer {
-  id: string;
-  name: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  notes?: string;
-  created_at: string | Date;
-  updated_at: string | Date;
-}
+import { Customer } from "@/types";
 
 export async function fetchCustomers() {
   try {
@@ -53,7 +42,7 @@ export async function addCustomer(customer: Omit<Customer, "id" | "created_at" |
   }
 }
 
-export async function updateCustomer(id: string, updates: Partial<Customer>) {
+export async function updateCustomer(id: string, updates: Partial<Omit<Customer, "created_at" | "updated_at">>) {
   try {
     const { data, error } = await supabase
       .from("customers")
