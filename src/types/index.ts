@@ -12,45 +12,47 @@ export interface User {
   role: UserRole;
   phone: string;
   password: string;
-  shifts: Shift[];
-  createdAt: Date;
-  updatedAt: Date;
+  shifts?: Shift[];
+  created_at: Date | string;
+  updated_at?: Date | string;
+  email?: string;
+  username: string;
+  active?: boolean;
 }
 
 export interface Category {
   id: string;
   name: string;
-  parentId?: string;
+  parent_id?: string;
   children?: Category[];
-  createdAt: Date;
-  updatedAt: Date;
+  created_at: Date | string;
+  updated_at?: Date | string;
 }
 
 export interface Product {
   id: string;
   name: string;
-  barcode: string;
+  barcode?: string;
   description?: string;
-  imageUrls: string[];
+  image_urls: string[];
   quantity: number;
   price: number;
-  purchasePrice: number;
-  offerPrice?: number;
-  isOffer: boolean;
-  categoryId: string;
-  subcategoryId?: string;
-  subsubcategoryId?: string;
-  // Add new fields for barcode and bulk selling
-  barcode_type: "normal" | "scale";
+  purchase_price: number; 
+  offer_price?: number;
+  is_offer: boolean;
+  category_id?: string;
+  subcategory_id?: string;
+  subsubcategory_id?: string;
+  barcode_type?: string;
   bulk_enabled: boolean;
   bulk_quantity?: number;
   bulk_price?: number;
   bulk_barcode?: string;
-  created_at: Date;
-  updated_at: Date;
-  manufacturerName?: string;
-  isBulk: boolean;
-  unitOfMeasure?: string;
+  created_at: Date | string;
+  updated_at?: Date | string;
+  manufacturer_name?: string;
+  is_bulk: boolean;
+  unit_of_measure?: string;
 }
 
 export interface CartItem {
@@ -65,21 +67,21 @@ export interface CartItem {
 
 export interface Sale {
   id: string;
-  date: Date;
+  date: Date | string;
   items: CartItem[];
-  cashierId: string;
+  cashier_id?: string;
   subtotal: number;
   discount: number;
   total: number;
   profit: number;
-  paymentMethod: 'cash' | 'card' | 'mixed';
-  cardAmount?: number;
-  cashAmount?: number;
-  customerName?: string;
-  customerPhone?: string;
-  invoiceNumber: string;
-  createdAt: Date;
-  updatedAt: Date;
+  payment_method: 'cash' | 'card' | 'mixed';
+  card_amount?: number;
+  cash_amount?: number;
+  customer_name?: string;
+  customer_phone?: string;
+  invoice_number: string;
+  created_at: Date | string;
+  updated_at?: Date | string;
 }
 
 export interface Expense {
@@ -87,18 +89,18 @@ export interface Expense {
   type: string;
   amount: number;
   description: string;
-  date: Date;
-  receiptUrl?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  date: Date | string;
+  receipt_url?: string;
+  created_at: Date | string;
+  updated_at?: Date | string;
 }
 
 export interface Shift {
   id: string;
-  employeeId: string;
-  startTime: Date;
-  endTime?: Date;
-  totalHours?: number;
-  createdAt: Date;
-  updatedAt: Date;
+  employee_id?: string;
+  start_time: Date | string;
+  end_time?: Date | string;
+  total_hours?: number;
+  created_at: Date | string;
+  updated_at?: Date | string;
 }

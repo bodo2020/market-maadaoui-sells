@@ -54,7 +54,7 @@ export async function authenticateUser(username: string, password: string) {
   return data as User;
 }
 
-export async function createUser(user: Omit<User, "id" | "createdAt" | "updatedAt" | "shifts">) {
+export async function createUser(user: Omit<User, "id" | "created_at" | "updated_at" | "shifts">) {
   const { data, error } = await supabase
     .from("users")
     .insert([{
@@ -75,9 +75,18 @@ export async function createUser(user: Omit<User, "id" | "createdAt" | "updatedA
 }
 
 export async function updateUser(id: string, user: Partial<User>) {
+  const updateData: any = {};
+  
+  // Only include fields that are present in the user object
+  Object.keys(user).forEach(key => {
+    if (user[key as keyof User] !== undefined) {
+      updateData[key] = user[key as keyof User];
+    }
+  });
+
   const { data, error } = await supabase
     .from("users")
-    .update(user)
+    .update(updateData)
     .eq("id", id)
     .select();
 

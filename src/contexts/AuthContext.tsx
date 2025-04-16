@@ -57,9 +57,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         role: user.role as UserRole,
         phone: user.phone || "",
         password: "", // Don't store the actual password in state
-        shifts: [],
-        createdAt: new Date(user.created_at),
-        updatedAt: new Date()
+        created_at: user.created_at,
+        username: user.username
       };
 
       setUser(loggedInUser);
