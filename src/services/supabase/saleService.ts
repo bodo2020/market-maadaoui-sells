@@ -31,39 +31,6 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
   } as Sale;
 }
 
-export async function updateSale(id: string, saleData: Partial<Sale>) {
-  // Process the data before sending to Supabase
-  const updateData: any = { ...saleData };
-  
-  // Handle date conversion if date is provided
-  if (updateData.date && typeof updateData.date === 'object') {
-    updateData.date = (updateData.date as Date).toISOString();
-  }
-  
-  // Handle items array conversion if provided
-  if (updateData.items) {
-    updateData.items = JSON.parse(JSON.stringify(updateData.items));
-  }
-  
-  const { data, error } = await supabase
-    .from("sales")
-    .update(updateData)
-    .eq("id", id)
-    .select("*")
-    .single();
-
-  if (error) {
-    console.error("Error updating sale:", error);
-    throw error;
-  }
-
-  // Convert the returned data to match our Sale type
-  return {
-    ...data,
-    items: data.items as unknown as CartItem[]
-  } as Sale;
-}
-
 export async function fetchSales() {
   const { data, error } = await supabase
     .from("sales")
@@ -99,20 +66,6 @@ export async function fetchSaleById(id: string) {
     ...data,
     items: data.items as unknown as CartItem[]
   } as Sale;
-}
-
-export async function deleteSale(id: string) {
-  const { error } = await supabase
-    .from("sales")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting sale:", error);
-    throw error;
-  }
-
-  return true;
 }
 
 export async function generateInvoiceNumber() {
