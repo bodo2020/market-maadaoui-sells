@@ -14,12 +14,13 @@ import { Search, Plus, Eye, Trash2, FileText, Upload, Download, Filter } from "l
 import { fetchPurchases, createPurchase, deletePurchase } from "@/services/supabase/purchaseService";
 import { fetchSuppliers } from "@/services/supabase/supplierService";
 import { Textarea } from "@/components/ui/textarea";
+import { Purchase } from "@/types";
 
 export default function Purchases() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
+  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
   const [formData, setFormData] = useState({
     supplier_id: "",
     invoice_number: "",
@@ -121,7 +122,7 @@ export default function Purchases() {
     }
   };
   
-  const handleViewPurchase = (purchase: any) => {
+  const handleViewPurchase = (purchase: Purchase) => {
     setSelectedPurchase(purchase);
     setIsViewDialogOpen(true);
   };
@@ -151,7 +152,7 @@ export default function Purchases() {
     return suppliers.find(s => s.id === supplierId)?.name || "غير معروف";
   };
   
-  const getRemainingAmount = (purchase: any) => {
+  const getRemainingAmount = (purchase: Purchase) => {
     return purchase.total - purchase.paid;
   };
   

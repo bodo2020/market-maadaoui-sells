@@ -133,3 +133,16 @@ export interface Customer {
   created_at: Date | string;
   updated_at?: Date | string;
 }
+
+export interface Purchase {
+  id: string;
+  supplier_id: string;
+  invoice_number: string;
+  date: Date | string;
+  total: number;
+  paid: number;
+  description?: string;
+  invoice_file_url?: string;
+  created_at: Date | string;
+  updated_at?: Date | string;
+}

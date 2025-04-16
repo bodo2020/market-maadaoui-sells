@@ -1,4 +1,3 @@
-
 import { User, UserRole, Product, Category, Sale, Expense, Shift } from "@/types";
 import { siteConfig } from "@/config/site";
 
@@ -203,7 +202,7 @@ export const users: User[] = [
 export const sales: Sale[] = [
   {
     id: "1",
-    date: new Date(),
+    date: new Date().toISOString(),
     items: [
       {
         product: products[0],
@@ -227,12 +226,12 @@ export const sales: Sale[] = [
     profit: (products[0].price - products[0].purchase_price) * 2 + (products[2].price - products[2].purchase_price),
     payment_method: 'cash',
     invoice_number: "INV-001",
-    created_at: new Date(),
-    updated_at: new Date()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     id: "2",
-    date: new Date(),
+    date: new Date().toISOString(),
     items: [
       {
         product: products[1],
@@ -249,8 +248,8 @@ export const sales: Sale[] = [
     profit: ((products[1].offer_price || products[1].price) - products[1].purchase_price) * 3,
     payment_method: 'card',
     invoice_number: "INV-002",
-    created_at: new Date(),
-    updated_at: new Date()
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
 
@@ -261,27 +260,27 @@ export const expenses: Expense[] = [
     type: "إيجار",
     amount: 3000,
     description: "إيجار المحل لشهر ابريل",
-    date: new Date(),
-    created_at: new Date(),
-    updated_at: new Date()
+    date: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     id: "2",
     type: "كهرباء",
     amount: 750,
     description: "فاتورة كهرباء شهر ابريل",
-    date: new Date(),
-    created_at: new Date(),
-    updated_at: new Date()
+    date: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   {
     id: "3",
     type: "مرتبات",
     amount: 5000,
     description: "مرتبات الموظفين لشهر ابريل",
-    date: new Date(),
-    created_at: new Date(),
-    updated_at: new Date()
+    date: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   }
 ];
 
