@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import {
   BrowserRouter as Router,
@@ -7,7 +6,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Toaster } from "@/components/ui/toaster";
+import { Toast } from "@/components/ui/toast";
 import { useAuth } from "@/hooks/use-auth";
 import { UserRole } from "./types";
 
@@ -17,15 +16,15 @@ import Products from "./pages/Products";
 import Categories from "./pages/Categories";
 import Expenses from "./pages/Expenses";
 import Users from "./pages/Users";
-import Pos from "./pages/Pos"; 
+import Pos from "./pages/Pos";
 import Settings from "./pages/Settings";
 import InvoiceList from "./pages/InvoiceList";
 import InvoiceDetail from "./pages/InvoiceDetail";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
+  const { user, loading } = useAuth();
 
-  if (isLoading) {
+  if (loading) {
     return <div>Loading...</div>;
   }
 
@@ -175,7 +174,7 @@ function App() {
           />
         </Routes>
       </Router>
-      <Toaster />
+      <Toast />
     </>
   );
 }

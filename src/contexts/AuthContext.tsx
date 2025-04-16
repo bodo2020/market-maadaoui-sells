@@ -1,5 +1,5 @@
 
-import { createContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { User, UserRole } from "@/types";
 import { authenticateUser } from "@/services/supabase/userService";
 import { useToast } from "@/hooks/use-toast";
@@ -12,13 +12,15 @@ interface AuthContextType {
   logout: () => void;
 }
 
-export const AuthContext = createContext<AuthContextType>({
+const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
   isLoading: true,
   login: async () => {},
   logout: () => {},
 });
+
+export const useAuth = () => useContext(AuthContext);
 
 interface AuthProviderProps {
   children: ReactNode;

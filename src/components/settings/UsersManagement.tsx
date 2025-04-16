@@ -30,7 +30,7 @@ import {
 import { UserRole, User } from "@/types";
 import { fetchUsers, createUser, updateUser, deleteUser } from "@/services/supabase/userService";
 import { Loader2, UserPlus, Pencil, Trash2 } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);

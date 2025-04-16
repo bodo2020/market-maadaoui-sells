@@ -5,7 +5,7 @@ import { Store, Users, PackageOpen, CreditCard, Truck, Receipt } from "lucide-re
 import StoreSettings from "@/components/settings/StoreSettings";
 import UsersManagement from "@/components/settings/UsersManagement";
 import ExpenseSettings from "@/components/settings/ExpenseSettings";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/types";
 
 export default function Settings() {

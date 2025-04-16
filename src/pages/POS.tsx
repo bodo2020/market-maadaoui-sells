@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, 
-  CreditCard as CardIcon, Banknote, Check, X 
+  CreditCard as CardIcon, Banknote, Check, X
 } from "lucide-react";
 import { CartItem, Product, Sale } from "@/types";
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 
-export default function Pos() {
+export default function POS() {
   const [search, setSearch] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -36,7 +35,7 @@ export default function Pos() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [currentInvoiceNumber, setCurrentInvoiceNumber] = useState<string>("");
   const { toast } = useToast();
-
+  
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -880,7 +879,7 @@ export default function Pos() {
                       <div className="space-y-1">
                         <Label htmlFor="cardAmount" className="flex items-center">
                           <CardIcon className="ml-2 h-4 w-4" />
-                          المبلغ بالبطاقة
+                          مبلغ البطاقة
                         </Label>
                         <Input 
                           id="cardAmount"
@@ -894,46 +893,45 @@ export default function Pos() {
                     )}
                   </div>
                   
-                  {paymentMethod === 'cash' && parseFloat(cashAmount || "0") > total && (
-                    <div className="flex justify-between items-center p-2 bg-primary/10 rounded">
-                      <span>المبلغ المتبقي:</span>
-                      <span className="font-bold">{calculateChange().toFixed(2)} {siteConfig.currency}</span>
-                    </div>
-                  )}
-                  
                   {paymentMethod === 'mixed' && (
-                    <div className="flex justify-between items-center p-2 bg-primary/10 rounded">
-                      <span>إجمالي المدفوع:</span>
-                      <span className="font-bold">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">مجموع الدفع: </span>
+                      <span className={`font-bold ${parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0") !== total ? "text-red-500" : "text-green-500"}`}>
                         {(parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0")).toFixed(2)} {siteConfig.currency}
                       </span>
                     </div>
                   )}
+                  
+                  {paymentMethod === 'cash' && parseFloat(cashAmount || "0") > total && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">المبلغ المتبقي: </span>
+                      <span className="font-bold">{calculateChange().toFixed(2)} {siteConfig.currency}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="rounded-lg bg-muted p-3">
+                  <div className="flex justify-between font-bold">
+                    <span>الإجمالي:</span>
+                    <span>{total.toFixed(2)} {siteConfig.currency}</span>
+                  </div>
                 </div>
               </div>
               
-              <DialogFooter>
+              <DialogFooter className="sm:justify-start">
                 <Button
+                  type="submit"
+                  disabled={isProcessing || !validatePayment()}
                   onClick={completeSale}
-                  disabled={
-                    isProcessing || 
-                    !validatePayment() ||
-                    (paymentMethod === 'mixed' && (
-                      parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0") !== total
-                    ))
-                  }
-                  className="w-full"
                 >
-                  {isProcessing ? (
-                    <span className="flex items-center">
-                      جاري المعالجة...
-                    </span>
-                  ) : (
-                    <span className="flex items-center">
-                      <Check className="ml-2 h-4 w-4" />
-                      إتمام البيع
-                    </span>
-                  )}
+                  {isProcessing ? "جاري المعالجة..." : "تأكيد البيع"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCheckoutOpen(false)}
+                >
+                  إلغاء
                 </Button>
               </DialogFooter>
             </>
