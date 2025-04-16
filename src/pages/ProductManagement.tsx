@@ -494,7 +494,7 @@ export default function ProductManagement() {
             <div className="grid gap-4 py-4 px-1">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">اسم الم��تج</Label>
+                  <Label htmlFor="name">اسم المنتج</Label>
                   <Input 
                     id="name" 
                     placeholder="اسم المنتج" 
