@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, CartItem } from "@/types";
+import { Json } from "@/integrations/supabase/types";
 
 // Helper function to convert database JSON to CartItem[]
 function parseItems(jsonItems: any): CartItem[] {
@@ -79,12 +80,15 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
 
   // Convert date to string if it's a Date object
   const dateStr = typeof sale.date === 'string' ? sale.date : sale.date.toISOString();
+  
+  // Convert CartItem[] to JSON-serializable object
+  const serializedItems = JSON.parse(JSON.stringify(sale.items));
 
   const { data, error } = await supabase
     .from("sales")
     .insert({
       date: dateStr,
-      items: sale.items,
+      items: serializedItems,
       cashier_id: sale.cashier_id,
       subtotal: sale.subtotal,
       discount: sale.discount,
@@ -115,6 +119,9 @@ export async function updateSale(id: string, sale: Partial<Sale>) {
     if (sale[key as keyof Sale] !== undefined) {
       if (key === 'date' && sale.date instanceof Date) {
         updateData[key] = sale.date.toISOString();
+      } else if (key === 'items' && sale.items) {
+        // Convert CartItem[] to JSON-serializable object
+        updateData[key] = JSON.parse(JSON.stringify(sale.items));
       } else {
         updateData[key] = sale[key as keyof Sale];
       }
