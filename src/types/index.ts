@@ -1,4 +1,31 @@
 
+export enum UserRole {
+  ADMIN = "admin",
+  CASHIER = "cashier",
+  EMPLOYEE = "employee",
+  DELIVERY = "delivery"
+}
+
+export interface User {
+  id: string;
+  name: string;
+  role: UserRole;
+  phone: string;
+  password: string;
+  shifts: Shift[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  parentId?: string;
+  children?: Category[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -24,4 +51,54 @@ export interface Product {
   manufacturerName?: string;
   isBulk: boolean;
   unitOfMeasure?: string;
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+  price: number;
+  discount: number;
+  total: number;
+  weight?: number | null;
+  isBulk?: boolean;
+}
+
+export interface Sale {
+  id: string;
+  date: Date;
+  items: CartItem[];
+  cashierId: string;
+  subtotal: number;
+  discount: number;
+  total: number;
+  profit: number;
+  paymentMethod: 'cash' | 'card' | 'mixed';
+  cardAmount?: number;
+  cashAmount?: number;
+  customerName?: string;
+  customerPhone?: string;
+  invoiceNumber: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Expense {
+  id: string;
+  type: string;
+  amount: number;
+  description: string;
+  date: Date;
+  receiptUrl?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Shift {
+  id: string;
+  employeeId: string;
+  startTime: Date;
+  endTime?: Date;
+  totalHours?: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
