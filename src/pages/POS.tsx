@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -6,11 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box
+  Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, 
+  CreditCard as CardIcon, Banknote, Check, X
 } from "lucide-react";
-import { CartItem, Product } from "@/types";
+import { CartItem, Product, Sale } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
+import { createSale, generateInvoiceNumber } from "@/services/supabase/saleService";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -21,6 +25,15 @@ export default function POS() {
   const [currentScaleProduct, setCurrentScaleProduct] = useState<Product | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mixed'>('cash');
+  const [cashAmount, setCashAmount] = useState<string>("");
+  const [cardAmount, setCardAmount] = useState<string>("");
+  const [customerName, setCustomerName] = useState<string>("");
+  const [customerPhone, setCustomerPhone] = useState<string>("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [currentInvoiceNumber, setCurrentInvoiceNumber] = useState<string>("");
   const { toast } = useToast();
   
   useEffect(() => {
@@ -271,6 +284,123 @@ export default function POS() {
       }
       return item;
     }));
+  };
+  
+  const openCheckout = () => {
+    if (cartItems.length === 0) return;
+    setIsCheckoutOpen(true);
+    
+    // Set default cash amount to total
+    setCashAmount(total.toFixed(2));
+    setCardAmount("");
+  };
+  
+  const handlePaymentMethodChange = (value: 'cash' | 'card' | 'mixed') => {
+    setPaymentMethod(value);
+    
+    if (value === 'cash') {
+      setCashAmount(total.toFixed(2));
+      setCardAmount("");
+    } else if (value === 'card') {
+      setCashAmount("");
+      setCardAmount(total.toFixed(2));
+    } else {
+      // For mixed, we'll leave both fields available
+      setCashAmount("");
+      setCardAmount("");
+    }
+  };
+  
+  const calculateChange = () => {
+    if (paymentMethod === 'card') return 0;
+    
+    const cashAmountNum = parseFloat(cashAmount || "0");
+    return Math.max(0, cashAmountNum - total);
+  };
+  
+  const validatePayment = () => {
+    if (paymentMethod === 'cash') {
+      const cashAmountNum = parseFloat(cashAmount || "0");
+      return cashAmountNum >= total;
+    } else if (paymentMethod === 'card') {
+      const cardAmountNum = parseFloat(cardAmount || "0");
+      return cardAmountNum === total;
+    } else {
+      // For mixed payment
+      const cashAmountNum = parseFloat(cashAmount || "0");
+      const cardAmountNum = parseFloat(cardAmount || "0");
+      return (cashAmountNum + cardAmountNum) === total;
+    }
+  };
+  
+  const completeSale = async () => {
+    if (!validatePayment()) {
+      toast({
+        title: "خطأ في إتمام البيع",
+        description: "يرجى التأكد من صحة المبالغ المدخلة.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsProcessing(true);
+    
+    try {
+      const invoiceNumber = await generateInvoiceNumber();
+      setCurrentInvoiceNumber(invoiceNumber);
+      
+      // Calculate total profit
+      const profit = cartItems.reduce((sum, item) => {
+        const itemCost = item.product.purchase_price * (item.weight || item.quantity);
+        return sum + (item.total - itemCost);
+      }, 0);
+      
+      const saleData: Omit<Sale, "id" | "created_at" | "updated_at"> = {
+        date: new Date().toISOString(),
+        items: cartItems,
+        subtotal: subtotal,
+        discount: discount,
+        total: total,
+        profit: profit,
+        payment_method: paymentMethod,
+        cash_amount: paymentMethod === 'card' ? undefined : parseFloat(cashAmount || "0"),
+        card_amount: paymentMethod === 'cash' ? undefined : parseFloat(cardAmount || "0"),
+        customer_name: customerName || undefined,
+        customer_phone: customerPhone || undefined,
+        invoice_number: invoiceNumber
+      };
+      
+      const sale = await createSale(saleData);
+      
+      toast({
+        title: "تم إتمام البيع بنجاح",
+        description: `رقم الفاتورة: ${sale.invoice_number}`,
+      });
+      
+      setShowSuccess(true);
+      
+    } catch (error) {
+      console.error("Error completing sale:", error);
+      toast({
+        title: "خطأ في إتمام البيع",
+        description: "حدث خطأ أثناء حفظ بيانات البيع، يرجى المحاولة مرة أخرى.",
+        variant: "destructive"
+      });
+      setIsProcessing(false);
+    }
+  };
+  
+  const resetSale = () => {
+    setCartItems([]);
+    setIsCheckoutOpen(false);
+    setShowSuccess(false);
+    setIsProcessing(false);
+    setPaymentMethod('cash');
+    setCashAmount("");
+    setCardAmount("");
+    setCustomerName("");
+    setCustomerPhone("");
+    setCurrentInvoiceNumber("");
   };
   
   const subtotal = cartItems.reduce((sum, item) => sum + item.total, 0);
@@ -628,6 +758,7 @@ export default function POS() {
                 className="w-full" 
                 size="lg"
                 disabled={cartItems.length === 0}
+                onClick={openCheckout}
               >
                 <CreditCard className="ml-2 h-4 w-4" />
                 إتمام الشراء
@@ -645,6 +776,168 @@ export default function POS() {
           </Card>
         </div>
       </div>
+      
+      {/* Checkout Dialog */}
+      <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>إتمام عملية البيع</DialogTitle>
+          </DialogHeader>
+          
+          {showSuccess ? (
+            <div className="space-y-4 py-4">
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <div className="rounded-full bg-green-100 p-3">
+                  <Check className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="font-semibold text-lg">تمت عملية البيع بنجاح</h3>
+                <p className="text-muted-foreground text-center">تم تسجيل عملية البيع بنجاح برقم فاتورة:</p>
+                <p className="font-bold text-lg">{currentInvoiceNumber}</p>
+              </div>
+              
+              <Button onClick={resetSale} className="w-full">
+                عملية بيع جديدة
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <h3 className="font-semibold">معلومات العميل (اختياري)</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="customerName">اسم العميل</Label>
+                      <Input 
+                        id="customerName" 
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="customerPhone">رقم الهاتف</Label>
+                      <Input 
+                        id="customerPhone" 
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="font-semibold">طريقة الدفع</h3>
+                  <RadioGroup 
+                    value={paymentMethod} 
+                    onValueChange={(value) => handlePaymentMethodChange(value as 'cash' | 'card' | 'mixed')}
+                    className="flex space-x-2 space-x-reverse"
+                  >
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <RadioGroupItem value="cash" id="cash" />
+                      <Label htmlFor="cash" className="flex items-center">
+                        <Banknote className="ml-2 h-4 w-4" />
+                        نقدي
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <RadioGroupItem value="card" id="card" />
+                      <Label htmlFor="card" className="flex items-center">
+                        <CardIcon className="ml-2 h-4 w-4" />
+                        بطاقة
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <RadioGroupItem value="mixed" id="mixed" />
+                      <Label htmlFor="mixed" className="flex items-center">
+                        <CardIcon className="ml-2 h-4 w-4" />
+                        مختلط
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                
+                <div className="space-y-3">
+                  <h3 className="font-semibold">تفاصيل الدفع</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(paymentMethod === 'cash' || paymentMethod === 'mixed') && (
+                      <div className="space-y-1">
+                        <Label htmlFor="cashAmount" className="flex items-center">
+                          <Banknote className="ml-2 h-4 w-4" />
+                          المبلغ النقدي
+                        </Label>
+                        <Input 
+                          id="cashAmount"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={cashAmount}
+                          onChange={(e) => setCashAmount(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    
+                    {(paymentMethod === 'card' || paymentMethod === 'mixed') && (
+                      <div className="space-y-1">
+                        <Label htmlFor="cardAmount" className="flex items-center">
+                          <CardIcon className="ml-2 h-4 w-4" />
+                          مبلغ البطاقة
+                        </Label>
+                        <Input 
+                          id="cardAmount"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={cardAmount}
+                          onChange={(e) => setCardAmount(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  
+                  {paymentMethod === 'mixed' && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">مجموع الدفع: </span>
+                      <span className={`font-bold ${parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0") !== total ? "text-red-500" : "text-green-500"}`}>
+                        {(parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0")).toFixed(2)} {siteConfig.currency}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {paymentMethod === 'cash' && parseFloat(cashAmount || "0") > total && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">المبلغ المتبقي: </span>
+                      <span className="font-bold">{calculateChange().toFixed(2)} {siteConfig.currency}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="rounded-lg bg-muted p-3">
+                  <div className="flex justify-between font-bold">
+                    <span>الإجمالي:</span>
+                    <span>{total.toFixed(2)} {siteConfig.currency}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <DialogFooter className="sm:justify-start">
+                <Button
+                  type="submit"
+                  disabled={isProcessing || !validatePayment()}
+                  onClick={completeSale}
+                >
+                  {isProcessing ? "جاري المعالجة..." : "تأكيد البيع"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCheckoutOpen(false)}
+                >
+                  إلغاء
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

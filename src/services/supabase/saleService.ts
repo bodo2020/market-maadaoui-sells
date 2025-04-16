@@ -1,43 +1,20 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Sale, CartItem } from "@/types";
-import { Json } from "@/integrations/supabase/types";
+import { Sale } from "@/types";
 
-// Helper function to convert database JSON to CartItem[]
-function parseItems(jsonItems: any): CartItem[] {
-  if (!jsonItems) return [];
-  
-  try {
-    if (typeof jsonItems === 'string') {
-      return JSON.parse(jsonItems);
-    }
-    return jsonItems as CartItem[];
-  } catch (error) {
-    console.error("Error parsing items:", error);
-    return [];
+export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
+  const { data, error } = await supabase
+    .from("sales")
+    .insert([sale])
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("Error creating sale:", error);
+    throw error;
   }
-}
 
-// Helper function to convert database record to Sale type
-function mapDbSaleToSale(dbSale: any): Sale {
-  return {
-    id: dbSale.id,
-    date: dbSale.date,
-    items: parseItems(dbSale.items),
-    cashier_id: dbSale.cashier_id,
-    subtotal: dbSale.subtotal,
-    discount: dbSale.discount,
-    total: dbSale.total,
-    profit: dbSale.profit,
-    payment_method: dbSale.payment_method as 'cash' | 'card' | 'mixed',
-    card_amount: dbSale.card_amount,
-    cash_amount: dbSale.cash_amount,
-    customer_name: dbSale.customer_name,
-    customer_phone: dbSale.customer_phone,
-    invoice_number: dbSale.invoice_number,
-    created_at: dbSale.created_at,
-    updated_at: dbSale.updated_at
-  };
+  return data as Sale;
 }
 
 export async function fetchSales() {
@@ -51,8 +28,7 @@ export async function fetchSales() {
     throw error;
   }
 
-  // Map each database record to our Sale type
-  return data.map(mapDbSaleToSale) as Sale[];
+  return data as Sale[];
 }
 
 export async function fetchSaleById(id: string) {
@@ -67,91 +43,32 @@ export async function fetchSaleById(id: string) {
     throw error;
   }
 
-  return mapDbSaleToSale(data) as Sale;
+  return data as Sale;
 }
 
-export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
-  // Generate a unique invoice number based on date and time if not provided
-  if (!sale.invoice_number) {
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const timeStr = new Date().toISOString().slice(11, 19).replace(/:/g, "");
-    sale.invoice_number = `INV-${dateStr}-${timeStr}`;
-  }
-
-  // Convert date to string if it's a Date object
-  const dateStr = typeof sale.date === 'string' ? sale.date : sale.date.toISOString();
+export async function generateInvoiceNumber() {
+  // Get current date
+  const now = new Date();
+  const year = now.getFullYear().toString().slice(-2);
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const day = now.getDate().toString().padStart(2, '0');
   
-  // Convert CartItem[] to JSON-serializable object
-  const serializedItems = JSON.parse(JSON.stringify(sale.items));
-
-  const { data, error } = await supabase
-    .from("sales")
-    .insert({
-      date: dateStr,
-      items: serializedItems,
-      cashier_id: sale.cashier_id,
-      subtotal: sale.subtotal,
-      discount: sale.discount,
-      total: sale.total,
-      profit: sale.profit,
-      payment_method: sale.payment_method,
-      card_amount: sale.card_amount,
-      cash_amount: sale.cash_amount,
-      customer_name: sale.customer_name,
-      customer_phone: sale.customer_phone,
-      invoice_number: sale.invoice_number
-    })
-    .select();
-
-  if (error) {
-    console.error("Error creating sale:", error);
-    throw error;
-  }
-
-  return mapDbSaleToSale(data[0]) as Sale;
-}
-
-export async function updateSale(id: string, sale: Partial<Sale>) {
-  const updateData: any = {};
+  // Get count of today's invoices to increment
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
   
-  // Only include fields that are present in the sale object
-  Object.keys(sale).forEach(key => {
-    if (sale[key as keyof Sale] !== undefined) {
-      if (key === 'date' && sale.date instanceof Date) {
-        updateData[key] = sale.date.toISOString();
-      } else if (key === 'items' && sale.items) {
-        // Convert CartItem[] to JSON-serializable object
-        updateData[key] = JSON.parse(JSON.stringify(sale.items));
-      } else {
-        updateData[key] = sale[key as keyof Sale];
-      }
-    }
-  });
-
-  const { data, error } = await supabase
+  const { count, error } = await supabase
     .from("sales")
-    .update(updateData)
-    .eq("id", id)
-    .select();
-
+    .select("*", { count: 'exact', head: true })
+    .gte("date", startOfDay)
+    .lt("date", endOfDay);
+    
   if (error) {
-    console.error("Error updating sale:", error);
+    console.error("Error counting today's invoices:", error);
     throw error;
   }
-
-  return mapDbSaleToSale(data[0]) as Sale;
-}
-
-export async function deleteSale(id: string) {
-  const { error } = await supabase
-    .from("sales")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting sale:", error);
-    throw error;
-  }
-
-  return true;
+  
+  // Format: YYMMDD-XXXX where XXXX is the sequential number for the day
+  const sequentialNumber = ((count || 0) + 1).toString().padStart(4, '0');
+  return `${year}${month}${day}-${sequentialNumber}`;
 }
