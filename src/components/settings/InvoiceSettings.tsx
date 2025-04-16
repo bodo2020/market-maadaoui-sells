@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { siteConfig } from "@/config/site";
+import { siteConfig, updateSiteConfig } from "@/config/site";
 import { File, Eye, Upload, Image as ImageIcon } from "lucide-react";
 import { Sale } from "@/types";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
@@ -19,6 +18,7 @@ export default function InvoiceSettings() {
   const { toast } = useToast();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
     footer: siteConfig.invoice?.footer || "شكراً لزيارتكم!",
     website: siteConfig.invoice?.website || "",
@@ -30,6 +30,20 @@ export default function InvoiceSettings() {
     logoChoice: siteConfig.invoice?.logoChoice || "store",
     customLogoUrl: siteConfig.invoice?.customLogoUrl || null,
   });
+
+  useEffect(() => {
+    setSettings({
+      footer: siteConfig.invoice?.footer || "شكراً لزيارتكم!",
+      website: siteConfig.invoice?.website || "",
+      fontSize: siteConfig.invoice?.fontSize || "normal",
+      showVat: siteConfig.invoice?.showVat || true,
+      template: siteConfig.invoice?.template || "default",
+      notes: siteConfig.invoice?.notes || "",
+      paymentInstructions: siteConfig.invoice?.paymentInstructions || "",
+      logoChoice: siteConfig.invoice?.logoChoice || "store",
+      customLogoUrl: siteConfig.invoice?.customLogoUrl || null,
+    });
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -57,7 +71,6 @@ export default function InvoiceSettings() {
       const fileName = `invoice_logo_${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
       
-      // Upload the file
       const { error: uploadError } = await supabase.storage
         .from('store')
         .upload(filePath, file, {
@@ -70,7 +83,6 @@ export default function InvoiceSettings() {
         throw uploadError;
       }
       
-      // Get the public URL
       const { data } = supabase.storage.from('store').getPublicUrl(filePath);
       
       if (data) {
@@ -94,14 +106,40 @@ export default function InvoiceSettings() {
   };
 
   const handleSaveSettings = () => {
-    // In a real app, this would save to the database
-    toast({
-      title: "تم",
-      description: "تم حفظ إعدادات الفواتير بنجاح",
-    });
+    try {
+      setSaving(true);
+      
+      updateSiteConfig({
+        vatNumber: (document.getElementById('vatNumber') as HTMLInputElement)?.value || "",
+        invoice: {
+          footer: settings.footer,
+          website: settings.website,
+          fontSize: settings.fontSize,
+          showVat: settings.showVat,
+          template: settings.template,
+          notes: settings.notes,
+          paymentInstructions: settings.paymentInstructions,
+          logoChoice: settings.logoChoice,
+          customLogoUrl: settings.customLogoUrl,
+        }
+      });
+      
+      toast({
+        title: "تم",
+        description: "تم حفظ إعدادات الفواتير بنجاح",
+      });
+    } catch (error) {
+      console.error("Error saving invoice settings:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء حفظ الإعدادات",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // Sample invoice data for preview with complete Product objects
   const sampleSale: Sale = {
     id: "preview-invoice",
     date: new Date().toISOString(),
@@ -409,9 +447,14 @@ export default function InvoiceSettings() {
         </TabsContent>
       </Tabs>
 
-      <Button onClick={handleSaveSettings}>حفظ إعدادات الفواتير</Button>
+      <Button 
+        onClick={handleSaveSettings} 
+        className="w-full"
+        disabled={saving}
+      >
+        {saving ? 'جاري الحفظ...' : 'حفظ إعدادات الفواتير'}
+      </Button>
 
-      {/* Invoice Preview Dialog */}
       <InvoiceDialog
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
@@ -419,7 +462,6 @@ export default function InvoiceSettings() {
         previewMode={true}
         settings={{
           ...settings,
-          // Determine which logo URL to use based on the logo choice
           logoChoice: settings.logoChoice,
           customLogoUrl: settings.customLogoUrl,
           logo: settings.logoChoice === 'store' 
