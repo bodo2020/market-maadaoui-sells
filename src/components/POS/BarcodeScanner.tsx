@@ -84,7 +84,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
         videoRef.current.srcObject = stream;
         setHasPermission(true);
         
-        // Start scanning after camera is ready
+        // Start scanning automatically after camera is ready
         videoRef.current.onloadedmetadata = () => {
           startBarcodeScanning();
         };
@@ -110,10 +110,10 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
 
     setScanning(true);
 
-    // Start scanning at regular intervals
+    // Start scanning at regular intervals (adjust timing for performance)
     scanIntervalRef.current = window.setInterval(() => {
       scanBarcode();
-    }, 300) as unknown as number;
+    }, 200) as unknown as number; // Scan more frequently (every 200ms)
   };
 
   const scanBarcode = async () => {
