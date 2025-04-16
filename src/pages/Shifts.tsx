@@ -26,16 +26,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Shift, User } from "@/types";
-import { Clock, Calendar, Check, ClockIcon, UserPlus, Loader2, Search, Download } from "lucide-react";
+import { Clock, Calendar, Check, UserPlus, Loader2, Search, Download } from "lucide-react";
 import { startShift, endShift, getShifts, exportEmployeesToExcel } from "@/services/supabase/userService";
 import { fetchUsers } from "@/services/supabase/userService";
 import { format, parseISO, differenceInHours, differenceInMinutes } from "date-fns";
-import { ar } from "date-fns/locale";
+import { ar } from "date-fns/locale/ar";
 
 export default function Shifts() {
   const { toast } = useToast();
@@ -43,20 +40,17 @@ export default function Shifts() {
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  // Fetch all users
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ["users"],
     queryFn: fetchUsers
   });
 
-  // Fetch shifts based on selected employee
   const { data: shifts, isLoading: shiftsLoading } = useQuery({
     queryKey: ["shifts", selectedEmployee],
     queryFn: () => getShifts(selectedEmployee),
     enabled: !!selectedEmployee
   });
 
-  // Start shift mutation
   const startShiftMutation = useMutation({
     mutationFn: (employeeId: string) => startShift(employeeId),
     onSuccess: () => {
@@ -76,7 +70,6 @@ export default function Shifts() {
     },
   });
 
-  // End shift mutation
   const endShiftMutation = useMutation({
     mutationFn: (shiftId: string) => endShift(shiftId),
     onSuccess: () => {
@@ -96,13 +89,11 @@ export default function Shifts() {
     },
   });
 
-  // Filter users by search term
   const filteredUsers = users?.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Format date
   const formatDate = (dateString: string) => {
     try {
       return format(parseISO(dateString), "PPP", { locale: ar });
@@ -111,7 +102,6 @@ export default function Shifts() {
     }
   };
 
-  // Format time
   const formatTime = (dateString: string) => {
     try {
       return format(parseISO(dateString), "p", { locale: ar });
@@ -120,7 +110,6 @@ export default function Shifts() {
     }
   };
 
-  // Calculate duration
   const calculateDuration = (startTime: string, endTime?: string | null) => {
     if (!endTime) return "جارية";
     
@@ -137,7 +126,6 @@ export default function Shifts() {
     }
   };
 
-  // Handle employee export
   const handleExport = async () => {
     try {
       await exportEmployeesToExcel();
@@ -168,7 +156,6 @@ export default function Shifts() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-7">
-        {/* Employees sidebar */}
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>الموظفين</CardTitle>
@@ -211,7 +198,6 @@ export default function Shifts() {
           </CardContent>
         </Card>
 
-        {/* Shifts content */}
         <Card className="md:col-span-5">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
