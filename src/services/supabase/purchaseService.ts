@@ -46,8 +46,27 @@ export async function createPurchase(purchaseData: any) {
       return null;
     }
 
-    // Then update product quantities if items were provided
+    // Then add items to the purchase_items table if they were provided
     if (purchaseData.items && purchaseData.items.length > 0) {
+      const purchaseItems = purchaseData.items.map((item: any) => ({
+        purchase_id: purchase.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price: item.price,
+        total: item.total
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("purchase_items")
+        .insert(purchaseItems);
+
+      if (itemsError) {
+        console.error("Error adding purchase items:", itemsError);
+        // We don't return early here - we'll still update the product quantities even if
+        // storing the line items fails
+      }
+
+      // Update product quantities
       for (const item of purchaseData.items) {
         // Get current product
         const { data: product, error: productError } = await supabase
@@ -85,6 +104,7 @@ export async function createPurchase(purchaseData: any) {
 
 export async function deletePurchase(id: string) {
   try {
+    // Note: We don't need to manually delete purchase items because of the ON DELETE CASCADE constraint
     const { error } = await supabase.from("purchases").delete().eq("id", id);
 
     if (error) {

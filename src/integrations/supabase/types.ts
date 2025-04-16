@@ -185,6 +185,101 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_items: {
+        Row: {
+          created_at: string
+          id: string
+          price: number
+          product_id: string
+          purchase_id: string
+          quantity: number
+          total: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          price: number
+          product_id: string
+          purchase_id: string
+          quantity: number
+          total: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          price?: number
+          product_id?: string
+          purchase_id?: string
+          quantity?: number
+          total?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_items_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchases: {
+        Row: {
+          created_at: string
+          date: string
+          description: string | null
+          id: string
+          invoice_file_url: string | null
+          invoice_number: string
+          paid: number
+          supplier_id: string
+          total: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          description?: string | null
+          id?: string
+          invoice_file_url?: string | null
+          invoice_number: string
+          paid: number
+          supplier_id: string
+          total: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          description?: string | null
+          id?: string
+          invoice_file_url?: string | null
+          invoice_number?: string
+          paid?: number
+          supplier_id?: string
+          total?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           card_amount: number | null
