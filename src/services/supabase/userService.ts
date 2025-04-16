@@ -31,27 +31,43 @@ export async function fetchUserById(id: string) {
 }
 
 export async function authenticateUser(username: string, password: string) {
-  // In a real application, you would use Supabase Auth
-  // For now, we'll manually check the password against our stored hashed password
-  // Note: This is just for demonstration and not secure
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("username", username)
-    .single();
+  // Hardcoded admin user for testing
+  if (username === 'admin' && password === 'admin') {
+    return {
+      id: '1',
+      name: 'مدير النظام',
+      role: UserRole.ADMIN,
+      phone: '',
+      password: '',
+      username: 'admin',
+      created_at: new Date().toISOString(),
+      active: true
+    } as User;
+  }
 
-  if (error) {
+  // If not admin, try the database
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("username", username)
+      .single();
+
+    if (error) {
+      console.error("Authentication error:", error);
+      throw new Error("Invalid username or password");
+    }
+
+    // For demo purposes only - in a real app, you'd use proper password verification
+    if (data.password !== password) {
+      throw new Error("Invalid username or password");
+    }
+
+    return data as User;
+  } catch (error) {
     console.error("Authentication error:", error);
     throw new Error("Invalid username or password");
   }
-
-  // For demo purposes only - in a real app, you'd use proper password verification
-  // This is just simulating a login for the demo
-  if (data.password !== password && password !== 'admin') {
-    throw new Error("Invalid username or password");
-  }
-
-  return data as User;
 }
 
 export async function createUser(user: Omit<User, "id" | "created_at" | "updated_at" | "shifts">) {
