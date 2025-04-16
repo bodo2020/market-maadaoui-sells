@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -105,6 +104,29 @@ export interface Shift {
   start_time: Date | string;
   end_time?: Date | string;
   total_hours?: number;
+  created_at: Date | string;
+  updated_at?: Date | string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contact_person?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  created_at: Date | string;
+  updated_at?: Date | string;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
   created_at: Date | string;
   updated_at?: Date | string;
 }

@@ -12,6 +12,7 @@ import Login from "./pages/Login";
 import POS from "./pages/POS";
 import ProductManagement from "./pages/ProductManagement";
 import InventoryManagement from "./pages/InventoryManagement";
+import SuppliersCustomers from "./pages/SuppliersCustomers";
 import Reports from "./pages/Reports";
 import EmployeeManagement from "./pages/EmployeeManagement";
 import ExpenseManagement from "./pages/ExpenseManagement";
@@ -52,6 +53,12 @@ function App() {
               <Route path="/inventory" element={
                 <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.EMPLOYEE]}>
                   <InventoryManagement />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/suppliers-customers" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.EMPLOYEE]}>
+                  <SuppliersCustomers />
                 </ProtectedRoute>
               } />
               
