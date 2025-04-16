@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, Expense } from "@/types";
 
@@ -245,4 +244,159 @@ export async function fetchAllTransactions(): Promise<any[]> {
   // Combine and sort by date (most recent first)
   return [...incomeTransactions, ...expenseTransactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+/**
+ * Export report to Excel file
+ * @param period The time period for the report
+ * @param reportType The type of report to export
+ */
+export async function exportReportToExcel(period: string, reportType: string): Promise<void> {
+  // Import required libraries for Excel export
+  const Excel = await import('exceljs');
+  const FileSaver = await import('file-saver');
+  
+  // Create a new workbook
+  const workbook = new Excel.default.Workbook();
+  const worksheet = workbook.addWorksheet('تقرير');
+  
+  // Set right-to-left mode for Arabic support
+  worksheet.views = [{ rightToLeft: true }];
+  
+  // Add worksheet header based on report type
+  let headerRow: string[] = [];
+  switch(reportType) {
+    case 'sales':
+      headerRow = ['رقم الفاتورة', 'التاريخ', 'عدد العناصر', 'المجموع', 'الربح', 'طريقة الدفع'];
+      break;
+    case 'products':
+      headerRow = ['المنتج', 'الكمية المباعة', 'سعر الوحدة', 'إجمالي المبيعات', 'نسبة المبيعات', 'الربح'];
+      break;
+    case 'profitability':
+      headerRow = ['المنتج', 'سعر البيع', 'سعر الشراء', 'هامش الربح', 'الكمية المباعة', 'إجمالي الربح', 'نسبة من إجمالي الربح'];
+      break;
+    case 'trends':
+      headerRow = ['الشهر', 'الإيرادات'];
+      break;
+    default:
+      headerRow = ['البند', 'القيمة'];
+  }
+  
+  // Add header row
+  worksheet.addRow(headerRow);
+  
+  // Format header row
+  worksheet.getRow(1).font = { bold: true, size: 14 };
+  worksheet.getRow(1).alignment = { horizontal: 'center' };
+  
+  // Get data based on report type and period
+  let data: any[] = [];
+  
+  try {
+    switch(reportType) {
+      case 'sales':
+        const { data: salesData } = await supabase
+          .from("sales")
+          .select("*")
+          .order("date", { ascending: false });
+        
+        // Add sales data to worksheet
+        if (salesData) {
+          salesData.forEach(sale => {
+            const itemsCount = sale.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+            worksheet.addRow([
+              sale.invoice_number,
+              new Date(sale.date).toLocaleDateString('ar-EG'),
+              `${itemsCount} عنصر`,
+              sale.total,
+              sale.profit,
+              sale.payment_method === 'cash' ? 'نقداً' : 
+              sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'
+            ]);
+          });
+        }
+        break;
+        
+      case 'products':
+        // Get sales data and calculate product stats
+        const { data: salesForProducts } = await supabase
+          .from("sales")
+          .select("*");
+          
+        if (salesForProducts) {
+          const productsMap = new Map();
+          
+          salesForProducts.forEach((sale: any) => {
+            sale.items.forEach((item: any) => {
+              const productId = item.product.id;
+              if (productsMap.has(productId)) {
+                const existing = productsMap.get(productId);
+                existing.quantitySold += item.quantity;
+                existing.revenue += item.total;
+              } else {
+                productsMap.set(productId, {
+                  product: item.product,
+                  quantitySold: item.quantity,
+                  revenue: item.total
+                });
+              }
+            });
+          });
+          
+          const totalRevenue = salesForProducts.reduce((sum: number, sale: any) => sum + sale.total, 0);
+          
+          // Add product data to worksheet
+          Array.from(productsMap.values()).forEach(item => {
+            const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
+            worksheet.addRow([
+              item.product.name,
+              item.quantitySold,
+              item.product.price,
+              item.revenue,
+              totalRevenue > 0 ? ((item.revenue / totalRevenue) * 100).toFixed(1) + '%' : '0%',
+              profit
+            ]);
+          });
+        }
+        break;
+        
+      case 'trends':
+        const revenueData = await fetchMonthlyRevenue();
+        
+        // Add revenue data to worksheet
+        revenueData.forEach(item => {
+          worksheet.addRow([item.name, item.amount]);
+        });
+        break;
+        
+      default:
+        // General financial summary
+        const summary = await fetchFinancialSummary();
+        worksheet.addRow(['إجمالي الإيرادات', summary.totalRevenue]);
+        worksheet.addRow(['إجمالي المصروفات', summary.totalExpenses]);
+        worksheet.addRow(['صافي الربح', summary.netProfit]);
+        worksheet.addRow(['هامش الربح', summary.profitMargin.toFixed(1) + '%']);
+        worksheet.addRow(['رصيد الصندوق', summary.cashBalance]);
+    }
+    
+    // Format number columns
+    worksheet.columns.forEach(column => {
+      if (column.number > 2) { // Skip first two columns (usually text)
+        column.numFmt = '#,##0.00';
+      }
+    });
+    
+    // Generate Excel file
+    const buffer = await workbook.xlsx.writeBuffer();
+    
+    // Create a Blob and save file
+    const date = new Date().toISOString().split('T')[0];
+    const fileName = `تقرير_${reportType}_${date}.xlsx`;
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    FileSaver.saveAs(blob, fileName);
+    
+  } catch (error) {
+    console.error("Error exporting report to Excel:", error);
+    throw error;
+  }
 }

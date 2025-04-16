@@ -56,13 +56,15 @@ import { CartItem, Product, Sale } from "@/types";
 import { 
   fetchMonthlyRevenue, 
   fetchExpensesByCategory, 
-  fetchFinancialSummary 
+  fetchFinancialSummary,
+  exportReportToExcel 
 } from "@/services/supabase/financeService";
 import { 
   ChartContainer, 
   ChartTooltip, 
   ChartTooltipContent 
 } from "@/components/ui/chart";
+import { toast } from "sonner";
 
 function formatCurrency(amount: number): string {
   return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}`;
@@ -82,35 +84,29 @@ export default function Reports() {
     queryFn: fetchProducts
   });
   
-  // Fetch revenue data from Supabase
   const { data: revenueData, isLoading: revenueLoading } = useQuery({
     queryKey: ['monthlyRevenue'],
     queryFn: fetchMonthlyRevenue
   });
   
-  // Fetch expense data from Supabase
   const { data: expenseData, isLoading: expensesLoading } = useQuery({
     queryKey: ['expensesByCategory'],
     queryFn: fetchExpensesByCategory
   });
   
-  // Fetch financial summary data
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
     queryKey: ['financialSummary'],
     queryFn: fetchFinancialSummary
   });
   
-  // Calculate total sales and profits
   const filteredSales = sales || [];
   const totalSales = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
   const totalProfit = filteredSales.reduce((sum, sale) => sum + sale.profit, 0);
   const totalItems = filteredSales.reduce((sum, sale) => 
     sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
   
-  // Calculate profit margin correctly
   const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
   
-  // Get top selling products
   const productsSoldMap = new Map<string, { product: Product; quantitySold: number; revenue: number }>();
   
   filteredSales.forEach(sale => {
@@ -134,9 +130,15 @@ export default function Reports() {
     .sort((a, b) => b.quantitySold - a.quantitySold)
     .slice(0, 5);
   
-  const handleExportReport = () => {
-    alert('سيتم تنفيذ تصدير التقرير قريبًا');
-    // TODO: Implement report export functionality
+  const handleExportReport = async () => {
+    try {
+      toast.loading("جاري تصدير التقرير...");
+      await exportReportToExcel(dateRange, reportType);
+      toast.success("تم تصدير التقرير بنجاح");
+    } catch (error) {
+      console.error("Error exporting report:", error);
+      toast.error("حدث خطأ أثناء تصدير التقرير");
+    }
   };
   
   return (
@@ -520,13 +522,17 @@ export default function Reports() {
                         ) : (
                           <>
                             <div className="text-3xl font-bold text-green-600">
-                              {Math.max(...Array.from(productsSoldMap.values()).map(item => {
-                                const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
-                                return Math.round((profit / item.revenue) * 100);
-                              }), 0)}%
+                              {Math.max(...Array.from(productsSoldMap.values())
+                                .filter(item => item.revenue > 0)
+                                .map(item => {
+                                  const cost = item.product.purchase_price * item.quantitySold;
+                                  const profit = item.revenue - cost;
+                                  return Math.round((profit / item.revenue) * 100);
+                                }), 0)}%
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">
                               لمنتج {Array.from(productsSoldMap.values())
+                                .filter(item => item.revenue > 0)
                                 .sort((a, b) => {
                                   const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
                                   const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
@@ -554,20 +560,21 @@ export default function Reports() {
                               {Math.min(...Array.from(productsSoldMap.values())
                                 .filter(item => item.revenue > 0)
                                 .map(item => {
-                                  const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
+                                  const cost = item.product.purchase_price * item.quantitySold;
+                                  const profit = item.revenue - cost;
                                   return Math.round((profit / item.revenue) * 100);
                                 }), 0)}%
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">
                               لمنتج {Array.from(productsSoldMap.values())
+                                .filter(item => item.revenue > 0)
                                 .sort((a, b) => {
                                   const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
                                   const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
                                   const marginA = profitA / a.revenue;
                                   const marginB = profitB / b.revenue;
                                   return marginA - marginB;
-                                })
-                                .filter(item => item.revenue > 0)[0]?.product.name || ''}
+                                })[0]?.product.name || ''}
                             </div>
                           </>
                         )}
@@ -599,7 +606,8 @@ export default function Reports() {
                               return profitB - profitA;
                             })
                             .map(item => {
-                              const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
+                              const cost = item.product.purchase_price * item.quantitySold;
+                              const profit = item.revenue - cost;
                               const margin = item.revenue > 0 ? (profit / item.revenue) * 100 : 0;
                               
                               return (
