@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -10,95 +9,7 @@ import {
 } from "lucide-react";
 import { CartItem, Product } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-
-// Demo products
-const demoProducts: Product[] = [
-  {
-    id: "1",
-    name: "سكر 1 كيلو",
-    barcode: "6221031954818",
-    image_urls: ["/placeholder.svg"],
-    quantity: 100,
-    price: 45,
-    purchase_price: 40,
-    is_offer: false,
-    category_id: "1",
-    is_bulk: false,
-    barcode_type: "normal",
-    bulk_enabled: false,
-    created_at: new Date(),
-    updated_at: new Date()
-  },
-  {
-    id: "2",
-    name: "زيت عباد الشمس 1 لتر",
-    barcode: "6221031951255",
-    image_urls: ["/placeholder.svg"],
-    quantity: 50,
-    price: 60,
-    purchase_price: 52,
-    is_offer: true,
-    offer_price: 55,
-    category_id: "1",
-    is_bulk: false,
-    barcode_type: "normal",
-    bulk_enabled: false,
-    created_at: new Date(),
-    updated_at: new Date()
-  },
-  {
-    id: "3",
-    name: "أرز مصري 5 كيلو",
-    barcode: "6221031953392",
-    image_urls: ["/placeholder.svg"],
-    quantity: 30,
-    price: 180,
-    purchase_price: 160,
-    is_offer: false,
-    category_id: "1",
-    is_bulk: true,
-    barcode_type: "normal",
-    bulk_enabled: true,
-    bulk_quantity: 5,
-    bulk_price: 850,
-    bulk_barcode: "6221031953393",
-    created_at: new Date(),
-    updated_at: new Date()
-  },
-  {
-    id: "4",
-    name: "شاي ليبتون 100 كيس",
-    barcode: "6221031958762",
-    image_urls: ["/placeholder.svg"],
-    quantity: 45,
-    price: 120,
-    purchase_price: 110,
-    is_offer: true,
-    offer_price: 115,
-    category_id: "2",
-    is_bulk: false,
-    barcode_type: "normal",
-    bulk_enabled: false,
-    created_at: new Date(),
-    updated_at: new Date()
-  },
-  {
-    id: "5",
-    name: "تفاح أحمر",
-    barcode: "2000123456789",
-    image_urls: ["/placeholder.svg"],
-    quantity: 80,
-    price: 35,
-    purchase_price: 30,
-    is_offer: false,
-    category_id: "1",
-    is_bulk: false,
-    barcode_type: "scale",
-    bulk_enabled: false,
-    created_at: new Date(),
-    updated_at: new Date()
-  }
-];
+import { fetchProducts } from "@/services/supabase/productService";
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -107,13 +18,36 @@ export default function POS() {
   const [weightInput, setWeightInput] = useState<string>("");
   const [showWeightDialog, setShowWeightDialog] = useState(false);
   const [currentScaleProduct, setCurrentScaleProduct] = useState<Product | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        setIsLoading(true);
+        const data = await fetchProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error("Error loading products:", error);
+        toast({
+          title: "خطأ في تحميل المنتجات",
+          description: "حدث خطأ أثناء تحميل المنتجات، يرجى المحاولة مرة أخرى.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadProducts();
+  }, [toast]);
   
   const handleSearch = () => {
     if (!search) return;
     
     // Check if it's a bulk barcode
-    const bulkProduct = demoProducts.find(p => p.bulk_enabled && p.bulk_barcode === search);
+    const bulkProduct = products.find(p => p.bulk_enabled && p.bulk_barcode === search);
     if (bulkProduct) {
       handleAddBulkToCart(bulkProduct);
       setSearch("");
@@ -122,9 +56,9 @@ export default function POS() {
     
     // Check if it's a scale barcode (starts with 2)
     if (search.startsWith("2")) {
-      const scaleProduct = demoProducts.find(p => 
+      const scaleProduct = products.find(p => 
         p.barcode_type === "scale" && 
-        search.substring(0, 7) === p.barcode.substring(0, 7)
+        search.substring(0, 7) === p.barcode?.substring(0, 7)
       );
       
       if (scaleProduct) {
@@ -138,7 +72,7 @@ export default function POS() {
     }
     
     // Regular search
-    const results = demoProducts.filter(
+    const results = products.filter(
       product => 
         product.barcode === search || 
         product.name.includes(search)
@@ -147,7 +81,7 @@ export default function POS() {
     setSearchResults(results);
     
     // If we found exact barcode match for a regular product, add to cart
-    const exactMatch = demoProducts.find(p => 
+    const exactMatch = products.find(p => 
       p.barcode === search && 
       p.barcode_type === "normal" && 
       !p.bulk_enabled
@@ -406,7 +340,7 @@ export default function POS() {
                         <CardContent className="p-3">
                           <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
                             <img 
-                              src={product.image_urls[0]} 
+                              src={product.image_urls?.[0] || "/placeholder.svg"} 
                               alt={product.name}
                               className="h-16 w-16 object-contain"
                             />
@@ -457,70 +391,80 @@ export default function POS() {
               <div className="mt-6">
                 <h3 className="font-semibold mb-4">المنتجات المقترحة</h3>
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {demoProducts.slice(0, 8).map(product => (
-                    <Card 
-                      key={product.id} 
-                      className="cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={() => {
-                        if (product.barcode_type === "scale") {
-                          setCurrentScaleProduct(product);
-                          setShowWeightDialog(true);
-                        } else if (product.bulk_enabled && product.bulk_barcode) {
-                          handleAddBulkToCart(product);
-                        } else {
-                          handleAddToCart(product);
-                        }
-                      }}
-                    >
-                      <CardContent className="p-3">
-                        <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
-                          <img 
-                            src={product.image_urls[0]} 
-                            alt={product.name}
-                            className="h-16 w-16 object-contain"
-                          />
-                        </div>
-                        <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
-                        
-                        {/* Product icons/badges */}
-                        <div className="flex gap-1 my-1">
-                          {product.barcode_type === "scale" && (
-                            <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
-                              <Scale className="h-3 w-3 ml-1" />
-                              بالوزن
-                            </span>
-                          )}
-                          {product.bulk_enabled && (
-                            <span className="bg-amber-100 text-amber-800 text-xs rounded px-1.5 py-0.5 flex items-center">
-                              <Box className="h-3 w-3 ml-1" />
-                              جملة
-                            </span>
-                          )}
-                        </div>
-                        
-                        <div className="flex justify-between items-center mt-2">
-                          <p className="text-sm font-bold">
-                            {product.barcode_type === "scale" ? (
-                              <span>{product.price} / كجم</span>
-                            ) : product.is_offer && product.offer_price ? (
-                              <>
-                                <span className="text-primary">{product.offer_price}</span>
-                                <span className="mr-1 text-xs text-muted-foreground line-through">{product.price}</span>
-                              </>
-                            ) : (
-                              <span>{product.price}</span>
+                {isLoading ? (
+                  <div className="flex justify-center items-center h-40">
+                    <p className="text-muted-foreground">جاري تحميل المنتجات...</p>
+                  </div>
+                ) : products.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <p>لا توجد منتجات متاحة</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {products.slice(0, 8).map(product => (
+                      <Card 
+                        key={product.id} 
+                        className="cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => {
+                          if (product.barcode_type === "scale") {
+                            setCurrentScaleProduct(product);
+                            setShowWeightDialog(true);
+                          } else if (product.bulk_enabled && product.bulk_barcode) {
+                            handleAddBulkToCart(product);
+                          } else {
+                            handleAddToCart(product);
+                          }
+                        }}
+                      >
+                        <CardContent className="p-3">
+                          <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
+                            <img 
+                              src={product.image_urls?.[0] || "/placeholder.svg"} 
+                              alt={product.name}
+                              className="h-16 w-16 object-contain"
+                            />
+                          </div>
+                          <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
+                          
+                          {/* Product icons/badges */}
+                          <div className="flex gap-1 my-1">
+                            {product.barcode_type === "scale" && (
+                              <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
+                                <Scale className="h-3 w-3 ml-1" />
+                                بالوزن
+                              </span>
                             )}
-                            <span className="mr-1 text-xs">{siteConfig.currency}</span>
-                          </p>
-                          {product.is_offer && (
-                            <Tag className="h-4 w-4 text-primary" />
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                            {product.bulk_enabled && (
+                              <span className="bg-amber-100 text-amber-800 text-xs rounded px-1.5 py-0.5 flex items-center">
+                                <Box className="h-3 w-3 ml-1" />
+                                جملة
+                              </span>
+                            )}
+                          </div>
+                          
+                          <div className="flex justify-between items-center mt-2">
+                            <p className="text-sm font-bold">
+                              {product.barcode_type === "scale" ? (
+                                <span>{product.price} / كجم</span>
+                              ) : product.is_offer && product.offer_price ? (
+                                <>
+                                  <span className="text-primary">{product.offer_price}</span>
+                                  <span className="mr-1 text-xs text-muted-foreground line-through">{product.price}</span>
+                                </>
+                              ) : (
+                                <span>{product.price}</span>
+                              )}
+                              <span className="mr-1 text-xs">{siteConfig.currency}</span>
+                            </p>
+                            {product.is_offer && (
+                              <Tag className="h-4 w-4 text-primary" />
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
