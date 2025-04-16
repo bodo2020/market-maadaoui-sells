@@ -7,24 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
-import { LogIn, UserPlus } from "lucide-react";
-import { UserRole } from "@/types";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { createUser } from "@/services/supabase/userService";
+import { LogIn, Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
   // Login state
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Register state
-  const [registerName, setRegisterName] = useState("");
-  const [registerPhone, setRegisterPhone] = useState("");
-  const [registerUsername, setRegisterUsername] = useState(""); // New field for username
-  const [registerPassword, setRegisterPassword] = useState("");
-  const [registerRole, setRegisterRole] = useState<UserRole>(UserRole.CASHIER);
-  const [isRegistering, setIsRegistering] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
   const { login, isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -53,57 +43,14 @@ export default function Login() {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!registerName || !registerUsername || !registerPassword) {
-      toast({
-        title: "خطأ",
-        description: "يرجى إدخال جميع البيانات المطلوبة",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setIsRegistering(true);
-      await createUser({
-        name: registerName,
-        phone: registerPhone,
-        password: registerPassword,
-        role: registerRole,
-        username: registerUsername, // Use the explicit username field
-      });
-      
-      toast({
-        title: "تم التسجيل بنجاح",
-        description: "يمكنك الآن تسجيل الدخول باستخدام اسم المستخدم وكلمة المرور",
-      });
-      
-      // Reset form
-      setRegisterName("");
-      setRegisterPhone("");
-      setRegisterUsername("");
-      setRegisterPassword("");
-      setRegisterRole(UserRole.CASHIER);
-    } catch (error) {
-      console.error("Registration failed:", error);
-      toast({
-        title: "فشل في التسجيل",
-        description: typeof error === 'object' && error !== null && 'message' in error 
-          ? String(error.message) 
-          : "حدث خطأ أثناء محاولة إنشاء حساب جديد",
-        variant: "destructive"
-      });
-    } finally {
-      setIsRegistering(false);
-    }
-  };
-
   // If user is already authenticated, redirect to dashboard
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -115,139 +62,61 @@ export default function Login() {
               أدخل بيانات الدخول للوصول إلى لوحة التحكم
             </CardDescription>
           </CardHeader>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid grid-cols-2 mx-6">
-              <TabsTrigger value="login">تسجيل الدخول</TabsTrigger>
-              <TabsTrigger value="register">إنشاء حساب</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="login">
-              <CardContent className="space-y-4 pt-4">
-                <form onSubmit={handleLogin}>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="username">اسم المستخدم</Label>
-                      <Input
-                        id="username"
-                        placeholder="اسم المستخدم"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password">كلمة المرور</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        placeholder="كلمة المرور"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
-                      disabled={isLoading}
+          <CardContent className="space-y-4 pt-4">
+            <form onSubmit={handleLogin}>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">اسم المستخدم</Label>
+                  <Input
+                    id="username"
+                    placeholder="اسم المستخدم"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">كلمة المرور</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="كلمة المرور"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button 
+                      type="button"
+                      onClick={togglePasswordVisibility} 
+                      className="absolute inset-y-0 right-0 flex items-center pr-3"
                     >
-                      {isLoading ? (
-                        <span className="flex items-center">
-                          <span className="animate-spin mr-2">◌</span>
-                          جاري التحميل...
-                        </span>
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
                       ) : (
-                        <span className="flex items-center">
-                          <LogIn className="mr-2 h-4 w-4" />
-                          تسجيل الدخول
-                        </span>
+                        <Eye className="h-4 w-4 text-gray-400" />
                       )}
-                    </Button>
+                    </button>
                   </div>
-                </form>
-              </CardContent>
-              <CardFooter className="flex justify-center">
-                <p className="text-sm text-muted-foreground">
-                  * استخدم اسم المستخدم: admin وكلمة المرور: admin للدخول
-                </p>
-              </CardFooter>
-            </TabsContent>
-            
-            <TabsContent value="register">
-              <CardContent className="space-y-4 pt-4">
-                <form onSubmit={handleRegister}>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="register-name">الاسم</Label>
-                      <Input
-                        id="register-name"
-                        placeholder="الاسم"
-                        value={registerName}
-                        onChange={(e) => setRegisterName(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-username">اسم المستخدم</Label>
-                      <Input
-                        id="register-username"
-                        placeholder="اسم المستخدم للدخول"
-                        value={registerUsername}
-                        onChange={(e) => setRegisterUsername(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-phone">رقم الهاتف</Label>
-                      <Input
-                        id="register-phone"
-                        placeholder="رقم الهاتف"
-                        value={registerPhone}
-                        onChange={(e) => setRegisterPhone(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-password">كلمة المرور</Label>
-                      <Input
-                        id="register-password"
-                        type="password"
-                        placeholder="كلمة المرور"
-                        value={registerPassword}
-                        onChange={(e) => setRegisterPassword(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="register-role">الدور</Label>
-                      <select 
-                        id="register-role"
-                        className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                        value={registerRole}
-                        onChange={(e) => setRegisterRole(e.target.value as UserRole)}
-                      >
-                        <option value={UserRole.ADMIN}>مدير</option>
-                        <option value={UserRole.CASHIER}>كاشير</option>
-                        <option value={UserRole.EMPLOYEE}>موظف</option>
-                        <option value={UserRole.DELIVERY}>توصيل</option>
-                      </select>
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
-                      disabled={isRegistering}
-                    >
-                      {isRegistering ? (
-                        <span className="flex items-center">
-                          <span className="animate-spin mr-2">◌</span>
-                          جاري التسجيل...
-                        </span>
-                      ) : (
-                        <span className="flex items-center">
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          إنشاء حساب
-                        </span>
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </TabsContent>
-          </Tabs>
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center">
+                      <span className="animate-spin mr-2">◌</span>
+                      جاري التحميل...
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      <LogIn className="mr-2 h-4 w-4" />
+                      تسجيل الدخول
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
         </Card>
       </div>
     </div>
