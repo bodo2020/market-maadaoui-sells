@@ -44,18 +44,7 @@ export default function StoreSettings() {
       const file = e.target.files[0];
       const fileExt = file.name.split('.').pop();
       const fileName = `logo_${Date.now()}.${fileExt}`;
-      const filePath = `store/${fileName}`;
-      
-      // Check if the bucket exists, if not we'll get an error
-      const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('store');
-      
-      // If bucket doesn't exist, create it
-      if (bucketError && bucketError.message.includes('does not exist')) {
-        await supabase.storage.createBucket('store', {
-          public: true,
-          fileSizeLimit: 5242880, // 5MB
-        });
-      }
+      const filePath = `${fileName}`;
       
       // Upload the file
       const { error: uploadError } = await supabase.storage
@@ -66,6 +55,7 @@ export default function StoreSettings() {
         });
         
       if (uploadError) {
+        console.error("Upload error:", uploadError);
         throw uploadError;
       }
       
@@ -92,13 +82,22 @@ export default function StoreSettings() {
     }
   };
 
-  const handleSaveSettings = () => {
-    // In a real app, this would save to a database
-    // For now, just show a success message
-    toast({
-      title: "تم",
-      description: "تم حفظ الإعدادات بنجاح",
-    });
+  const handleSaveSettings = async () => {
+    try {
+      // In a real app, we would save to the database
+      // For now, just show a success message
+      toast({
+        title: "تم",
+        description: "تم حفظ الإعدادات بنجاح",
+      });
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء حفظ الإعدادات",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
