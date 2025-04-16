@@ -16,7 +16,8 @@ import {
   FileText,
   Receipt,
   Home,
-  UserPlus
+  UserPlus,
+  Banknote
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -101,6 +102,12 @@ export default function Sidebar() {
           label="العملاء والموردين"
           href="/suppliers-customers"
           active={currentPath === "/suppliers-customers"}
+        />
+        <SidebarItem
+          icon={<Banknote size={20} />}
+          label="المالية"
+          href="/finance"
+          active={currentPath === "/finance"}
         />
         <SidebarItem
           icon={<FileText size={20} />}
