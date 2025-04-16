@@ -64,6 +64,7 @@ export default function InvoiceSettings() {
           image_urls: [],
           is_offer: false,
           bulk_enabled: false,
+          is_bulk: false, // Added the missing property
           created_at: new Date().toISOString(),
         },
         quantity: 2,
@@ -81,6 +82,7 @@ export default function InvoiceSettings() {
           image_urls: [],
           is_offer: false,
           bulk_enabled: false,
+          is_bulk: false, // Added the missing property
           created_at: new Date().toISOString(),
         },
         quantity: 1,
