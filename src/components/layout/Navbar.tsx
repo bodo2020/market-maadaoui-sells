@@ -42,8 +42,8 @@ export default function Navbar() {
       // Show toast for new notifications
       newNotifications.forEach(notification => {
         if (!notification.read) {
-          toast({
-            title: "تنبيه المخزون المنخفض",
+          // Fix: We need to call toast as a function, not render it directly
+          toast("تنبيه المخزون المنخفض", {
             description: `المنتج "${notification.product.name}" منخفض المخزون (${notification.product.quantity} وحدة متبقية)`,
           });
         }

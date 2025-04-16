@@ -121,8 +121,8 @@ export const checkLowStockProducts = async (): Promise<StockNotification[]> => {
 export const showLowStockToast = (notification: StockNotification): void => {
   const { product } = notification;
   
-  toast({
-    title: "تنبيه المخزون المنخفض",
+  // Fix: We need to call toast as a function, not render it directly
+  toast("تنبيه المخزون المنخفض", {
     description: `المنتج "${product.name}" منخفض المخزون (${product.quantity} وحدة متبقية)`,
     duration: 5000
   });
