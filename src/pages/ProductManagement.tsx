@@ -146,15 +146,6 @@ export default function ProductManagement() {
       return;
     }
 
-    if (newProduct.barcode_type === "scale" && (!newProduct.barcode?.startsWith("2") || newProduct.barcode.length !== 13)) {
-      toast({
-        title: "خطأ",
-        description: "باركود الميزان يجب أن يبدأ بالرقم 2 ويتكون من 13 رقم",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setLoading(true);
     try {
       const productToAdd: Omit<Product, "id" | "created_at" | "updated_at"> = {
