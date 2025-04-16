@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -27,29 +26,23 @@ import { Textarea } from "@/components/ui/textarea";
 export default function SupplierPurchases() {
   const queryClient = useQueryClient();
   
-  // Supplier selection state
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
   const [selectedSupplierName, setSelectedSupplierName] = useState<string>("");
   const [selectedSupplierBalance, setSelectedSupplierBalance] = useState<number | null>(null);
   
-  // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
   const [subtotal, setSubtotal] = useState<number>(0);
   const [paid, setPaid] = useState<number>(0);
   
-  // Product search state
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   
-  // Invoice details
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState("");
   
-  // Dialog states
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   
-  // Fetch suppliers and products
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
     queryFn: fetchSuppliers
@@ -60,7 +53,6 @@ export default function SupplierPurchases() {
     queryFn: fetchProducts
   });
   
-  // Create purchase mutation
   const createPurchaseMutation = useMutation({
     mutationFn: createPurchase,
     onSuccess: () => {
@@ -76,7 +68,6 @@ export default function SupplierPurchases() {
     }
   });
   
-  // Filter products based on search term
   useEffect(() => {
     if (searchTerm.trim() === "") {
       setFilteredProducts([]);
@@ -92,13 +83,11 @@ export default function SupplierPurchases() {
     setFilteredProducts(filtered);
   }, [searchTerm, products]);
   
-  // Calculate subtotal whenever cart changes
   useEffect(() => {
     const total = cart.reduce((sum, item) => sum + item.total, 0);
     setSubtotal(total);
   }, [cart]);
   
-  // Handle selecting a supplier
   const handleSupplierSelect = (supplierId: string) => {
     setSelectedSupplierId(supplierId);
     const supplier = suppliers.find(s => s.id === supplierId);
@@ -106,19 +95,16 @@ export default function SupplierPurchases() {
     setSelectedSupplierBalance(supplier?.balance || null);
   };
   
-  // Add product to cart
   const addProductToCart = (product: Product) => {
     const existingItemIndex = cart.findIndex(item => item.product.id === product.id);
     
     if (existingItemIndex >= 0) {
-      // If product already in cart, increase quantity
       const updatedCart = [...cart];
       const item = updatedCart[existingItemIndex];
       item.quantity += 1;
       item.total = item.price * item.quantity;
       setCart(updatedCart);
     } else {
-      // Add new product to cart
       const newItem: CartItem = {
         product: product,
         quantity: 1,
@@ -130,12 +116,10 @@ export default function SupplierPurchases() {
       setCart([...cart, newItem]);
     }
     
-    // Clear search after adding
     setSearchTerm("");
     setFilteredProducts([]);
   };
   
-  // Update item quantity in cart
   const updateItemQuantity = (index: number, quantity: number) => {
     if (quantity <= 0) return;
     
@@ -145,7 +129,6 @@ export default function SupplierPurchases() {
     setCart(updatedCart);
   };
   
-  // Update item price in cart
   const updateItemPrice = (index: number, price: number) => {
     if (price < 0) return;
     
@@ -155,14 +138,12 @@ export default function SupplierPurchases() {
     setCart(updatedCart);
   };
   
-  // Remove item from cart
   const removeFromCart = (index: number) => {
     const updatedCart = [...cart];
     updatedCart.splice(index, 1);
     setCart(updatedCart);
   };
   
-  // Save purchase
   const savePurchase = () => {
     if (!selectedSupplierId) {
       toast.error("الرجاء اختيار مورد");
@@ -177,11 +158,10 @@ export default function SupplierPurchases() {
     setIsConfirmDialogOpen(true);
   };
   
-  // Confirm and create purchase
   const confirmPurchase = () => {
     const purchaseData = {
       supplier_id: selectedSupplierId,
-      invoice_number: invoiceNumber, // This will be auto-generated if empty
+      invoice_number: invoiceNumber,
       date: invoiceDate,
       total: subtotal,
       paid: paid,
@@ -198,7 +178,6 @@ export default function SupplierPurchases() {
     setIsConfirmDialogOpen(false);
   };
   
-  // Reset purchase state
   const resetPurchase = () => {
     setCart([]);
     setSubtotal(0);
@@ -211,13 +190,11 @@ export default function SupplierPurchases() {
     setDescription("");
   };
 
-  // Helper function to format balance
   const formatBalance = (balance: number | null) => {
     if (balance === null) return "0.00";
     return balance.toFixed(2);
   };
 
-  // Helper function to determine balance status
   const getBalanceStatus = (balance: number | null) => {
     if (!balance) return "neutral";
     if (balance > 0) return "negative"; // Business owes money to supplier
@@ -233,7 +210,6 @@ export default function SupplierPurchases() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Left column - Supplier and Product Search */}
           <div className="md:col-span-2 space-y-4">
             <Card>
               <CardHeader>
@@ -269,7 +245,7 @@ export default function SupplierPurchases() {
                       )}
                       
                       {getBalanceStatus(selectedSupplierBalance) === "positive" && (
-                        <Badge variant="success" className="mr-auto bg-green-600">
+                        <Badge variant="default" className="mr-auto bg-green-600">
                           دائن بـ {formatBalance(Math.abs(selectedSupplierBalance || 0))}
                         </Badge>
                       )}
@@ -385,7 +361,6 @@ export default function SupplierPurchases() {
             </Card>
           </div>
           
-          {/* Right column - Cart */}
           <div className="space-y-4">
             <Card>
               <CardHeader>
@@ -498,7 +473,6 @@ export default function SupplierPurchases() {
         </div>
       </div>
       
-      {/* Confirm Purchase Dialog */}
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
         <DialogContent>
           <DialogHeader>

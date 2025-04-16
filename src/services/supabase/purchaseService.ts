@@ -114,7 +114,7 @@ export async function createPurchase(purchaseData: any) {
           .eq("id", purchaseData.supplier_id)
           .single();
 
-        if (!supplierError) {
+        if (!supplierError && supplier) {
           // Update supplier balance
           // Negative balance means the supplier owes the business money
           // Positive balance means the business owes money to the supplier
