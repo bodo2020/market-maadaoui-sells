@@ -19,7 +19,6 @@ import ExpenseManagement from "./pages/ExpenseManagement";
 import Finance from "./pages/Finance";
 import Invoices from "./pages/Invoices";
 import Settings from "./pages/Settings";
-import Shifts from "./pages/Shifts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -91,12 +90,6 @@ function App() {
               <Route path="/expenses" element={
                 <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                   <ExpenseManagement />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/shifts" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <Shifts />
                 </ProtectedRoute>
               } />
               
