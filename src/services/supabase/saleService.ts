@@ -112,6 +112,8 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
   template?: string;
   notes?: string;
   paymentInstructions?: string;
+  logoChoice?: string;
+  customLogoUrl?: string | null;
 }) {
   // Get formatted date
   const saleDate = new Date(sale.date);
@@ -139,6 +141,14 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
     fontSizeHeader = "18pt";
     fontSizeTitle = "12pt";
     fontSizeTotal = "14pt";
+  }
+
+  // Determine which logo to use
+  let logoUrl = null;
+  if (storeInfo.logoChoice === 'store') {
+    logoUrl = storeInfo.logo;
+  } else if (storeInfo.logoChoice === 'custom') {
+    logoUrl = storeInfo.customLogoUrl;
   }
   
   // Generate HTML
@@ -248,7 +258,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
     <body>
       <div class="invoice-container">
         <div class="header">
-          ${storeInfo.logo ? `<img src="${storeInfo.logo}" class="logo" alt="شعار المتجر">` : ''}
+          ${logoUrl ? `<img src="${logoUrl}" class="logo" alt="شعار المتجر">` : ''}
           <div class="store-name">${storeInfo.name}</div>
           <div class="store-info">
             ${storeInfo.address}<br>
@@ -346,6 +356,8 @@ export function printInvoice(sale: Sale, storeInfo: {
   template?: string;
   notes?: string;
   paymentInstructions?: string;
+  logoChoice?: string;
+  customLogoUrl?: string | null;
 }) {
   const invoiceHTML = generateInvoiceHTML(sale, storeInfo);
   

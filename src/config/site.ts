@@ -20,5 +20,7 @@ export const siteConfig = {
     template: "default", // default, compact, detailed
     notes: "",
     paymentInstructions: "",
+    logoChoice: "store", // store, none, custom
+    customLogoUrl: null,
   }
 }

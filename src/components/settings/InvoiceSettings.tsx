@@ -10,13 +10,15 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { siteConfig } from "@/config/site";
-import { File, Eye } from "lucide-react";
+import { File, Eye, Upload, Image as ImageIcon } from "lucide-react";
 import { Sale } from "@/types";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function InvoiceSettings() {
   const { toast } = useToast();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [settings, setSettings] = useState({
     footer: siteConfig.invoice?.footer || "شكراً لزيارتكم!",
     website: siteConfig.invoice?.website || "",
@@ -25,6 +27,8 @@ export default function InvoiceSettings() {
     template: siteConfig.invoice?.template || "default",
     notes: siteConfig.invoice?.notes || "",
     paymentInstructions: siteConfig.invoice?.paymentInstructions || "",
+    logoChoice: siteConfig.invoice?.logoChoice || "store",
+    customLogoUrl: siteConfig.invoice?.customLogoUrl || null,
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -38,6 +42,55 @@ export default function InvoiceSettings() {
 
   const handleSelectChange = (name: string, value: string) => {
     setSettings({ ...settings, [name]: value });
+  };
+
+  const handleCustomLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true);
+      
+      if (!e.target.files || e.target.files.length === 0) {
+        return;
+      }
+      
+      const file = e.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `invoice_logo_${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+      
+      // Upload the file
+      const { error: uploadError } = await supabase.storage
+        .from('store')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+        
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw uploadError;
+      }
+      
+      // Get the public URL
+      const { data } = supabase.storage.from('store').getPublicUrl(filePath);
+      
+      if (data) {
+        setSettings({ ...settings, customLogoUrl: data.publicUrl });
+        
+        toast({
+          title: "تم",
+          description: "تم رفع الشعار بنجاح",
+        });
+      }
+    } catch (error) {
+      console.error("Error uploading logo:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء رفع الشعار",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSaveSettings = () => {
@@ -121,6 +174,7 @@ export default function InvoiceSettings() {
           <TabsTrigger value="general">معلومات عامة</TabsTrigger>
           <TabsTrigger value="design">تصميم الفاتورة</TabsTrigger>
           <TabsTrigger value="content">محتوى إضافي</TabsTrigger>
+          <TabsTrigger value="logo">شعار الفاتورة</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-4">
@@ -248,6 +302,111 @@ export default function InvoiceSettings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="logo" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>شعار الفاتورة</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="logoChoice">اختيار الشعار</Label>
+                <Select 
+                  defaultValue={settings.logoChoice} 
+                  onValueChange={(value) => handleSelectChange("logoChoice", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر مصدر الشعار" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="store">استخدام شعار المتجر</SelectItem>
+                    <SelectItem value="custom">استخدام شعار مخصص</SelectItem>
+                    <SelectItem value="none">بدون شعار</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {settings.logoChoice === 'custom' && (
+                <div className="space-y-2 mt-4">
+                  <Label>شعار مخصص للفاتورة</Label>
+                  
+                  <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 h-48">
+                    {settings.customLogoUrl ? (
+                      <div className="relative w-full h-full">
+                        <img
+                          src={settings.customLogoUrl}
+                          alt="شعار مخصص للفاتورة"
+                          className="w-full h-full object-contain"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="absolute top-0 right-0 m-2"
+                          onClick={() => setSettings({ ...settings, customLogoUrl: null })}
+                        >
+                          إزالة
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-muted-foreground">
+                        <ImageIcon className="w-16 h-16 mb-4" />
+                        <p className="text-sm text-center mb-2">اسحب الشعار هنا أو انقر للتحميل</p>
+                        <p className="text-xs text-center">PNG, JPG أو WEBP (الحد الأقصى: 5MB)</p>
+                      </div>
+                    )}
+                    
+                    <Input
+                      id="custom-logo-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleCustomLogoUpload}
+                      disabled={uploading}
+                    />
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2"
+                    onClick={() => document.getElementById('custom-logo-upload')?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <span className="flex items-center">
+                        <span className="animate-spin mr-2">⏳</span> جاري الرفع...
+                      </span>
+                    ) : (
+                      <span className="flex items-center">
+                        <Upload className="ml-2 h-4 w-4" /> تحميل شعار جديد
+                      </span>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {settings.logoChoice === 'store' && siteConfig.logoUrl && (
+                <div className="flex justify-center mt-4 border rounded p-4">
+                  <div className="text-center">
+                    <p className="mb-2 text-sm text-muted-foreground">سيتم استخدام شعار المتجر الحالي:</p>
+                    <img
+                      src={siteConfig.logoUrl}
+                      alt="شعار المتجر"
+                      className="h-32 object-contain mx-auto"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {settings.logoChoice === 'store' && !siteConfig.logoUrl && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mt-4">
+                  <p className="text-amber-800 text-sm">
+                    لم يتم تعيين شعار للمتجر. قم بتعيين شعار المتجر من إعدادات المتجر أولاً.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <Button onClick={handleSaveSettings}>حفظ إعدادات الفواتير</Button>
@@ -258,7 +417,15 @@ export default function InvoiceSettings() {
         onClose={() => setIsPreviewOpen(false)}
         sale={sampleSale}
         previewMode={true}
-        settings={settings}
+        settings={{
+          ...settings,
+          // Determine which logo URL to use based on the logo choice
+          logo: settings.logoChoice === 'store' 
+            ? siteConfig.logoUrl 
+            : settings.logoChoice === 'custom' 
+              ? settings.customLogoUrl 
+              : null
+        }}
       />
     </div>
   );
