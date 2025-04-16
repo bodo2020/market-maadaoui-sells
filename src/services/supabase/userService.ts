@@ -85,20 +85,27 @@ export async function authenticateUser(username: string, password: string) {
       } as User;
     }
 
-    // If not admin, try the database
+    // If not admin, try the database - use maybeSingle() instead of single() to handle cases where no user is found
     const { data, error } = await supabase
       .from("users")
       .select("*")
       .eq("username", username)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("Authentication error:", error);
       throw new Error("Invalid username or password");
     }
 
+    // If no user is found
+    if (!data) {
+      console.error("User not found");
+      throw new Error("Invalid username or password");
+    }
+
     // For demo purposes only - in a real app, you'd use proper password verification
     if (data.password !== password) {
+      console.error("Password mismatch");
       throw new Error("Invalid username or password");
     }
 

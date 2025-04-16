@@ -21,6 +21,7 @@ export default function Login() {
   // Register state
   const [registerName, setRegisterName] = useState("");
   const [registerPhone, setRegisterPhone] = useState("");
+  const [registerUsername, setRegisterUsername] = useState(""); // New field for username
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerRole, setRegisterRole] = useState<UserRole>(UserRole.CASHIER);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -55,7 +56,7 @@ export default function Login() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!registerName || !registerPhone || !registerPassword) {
+    if (!registerName || !registerUsername || !registerPassword) {
       toast({
         title: "خطأ",
         description: "يرجى إدخال جميع البيانات المطلوبة",
@@ -71,17 +72,18 @@ export default function Login() {
         phone: registerPhone,
         password: registerPassword,
         role: registerRole,
-        username: registerPhone, // Using phone as username as specified in the userService
+        username: registerUsername, // Use the explicit username field
       });
       
       toast({
         title: "تم التسجيل بنجاح",
-        description: "يمكنك الآن تسجيل الدخول باستخدام رقم الهاتف وكلمة المرور",
+        description: "يمكنك الآن تسجيل الدخول باستخدام اسم المستخدم وكلمة المرور",
       });
       
       // Reset form
       setRegisterName("");
       setRegisterPhone("");
+      setRegisterUsername("");
       setRegisterPassword("");
       setRegisterRole(UserRole.CASHIER);
     } catch (error) {
@@ -180,6 +182,15 @@ export default function Login() {
                         placeholder="الاسم"
                         value={registerName}
                         onChange={(e) => setRegisterName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="register-username">اسم المستخدم</Label>
+                      <Input
+                        id="register-username"
+                        placeholder="اسم المستخدم للدخول"
+                        value={registerUsername}
+                        onChange={(e) => setRegisterUsername(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
