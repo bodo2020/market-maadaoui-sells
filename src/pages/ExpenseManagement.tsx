@@ -56,7 +56,6 @@ import {
 import { expenses, formatCurrency } from "@/data/mockData";
 import { Expense } from "@/types";
 
-// Expense categories
 const expenseCategories = [
   { id: "rent", name: "إيجار", icon: <Building2 className="h-4 w-4" /> },
   { id: "utilities", name: "مرافق", icon: <Zap className="h-4 w-4" /> },
@@ -72,7 +71,6 @@ export default function ExpenseManagement() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
-  // Filtered expenses based on search and category
   const filteredExpenses = allExpenses.filter(expense => {
     const matchesSearch = expense.description.includes(search) || 
                           expense.type.includes(search);
@@ -80,10 +78,8 @@ export default function ExpenseManagement() {
     return matchesSearch && matchesCategory;
   });
   
-  // Calculate total expenses
   const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   
-  // Group expenses by category
   const expensesByCategory = filteredExpenses.reduce((groups, expense) => {
     const category = expense.type;
     if (!groups[category]) {
@@ -93,14 +89,11 @@ export default function ExpenseManagement() {
     return groups;
   }, {} as Record<string, Expense[]>);
   
-  // Get total by category
   const getTotalByCategory = (category: string) => {
     return (expensesByCategory[category] || []).reduce((sum, expense) => sum + expense.amount, 0);
   };
   
-  // Functions to handle adding a new expense
   const handleAddExpense = () => {
-    // In a real app, this would validate and add the expense to the database
     setIsAddDialogOpen(false);
   };
   
@@ -180,7 +173,6 @@ export default function ExpenseManagement() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Expense List */}
         <div className="md:col-span-2">
           <Card>
             <CardHeader className="pb-3">
@@ -288,7 +280,7 @@ export default function ExpenseManagement() {
                                   <Pencil className="ml-2 h-4 w-4" />
                                   تعديل
                                 </DropdownMenuItem>
-                                {expense.receiptUrl && (
+                                {expense.receipt_url && (
                                   <DropdownMenuItem>
                                     <FileImage className="ml-2 h-4 w-4" />
                                     عرض الإيصال
@@ -311,7 +303,6 @@ export default function ExpenseManagement() {
           </Card>
         </div>
         
-        {/* Expense Summary */}
         <div>
           <Card>
             <CardHeader className="pb-3">
@@ -378,7 +369,6 @@ export default function ExpenseManagement() {
         </div>
       </div>
       
-      {/* Add Expense Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[525px]">
           <DialogHeader>

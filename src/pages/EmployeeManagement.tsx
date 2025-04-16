@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -77,10 +76,10 @@ export default function EmployeeManagement() {
       if (employee.id === employeeId) {
         const newShift: Shift = {
           id: Date.now().toString(),
-          employeeId,
-          startTime: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date()
+          employee_id: employeeId,
+          start_time: new Date(),
+          created_at: new Date(),
+          updated_at: new Date()
         };
         return {
           ...employee,
@@ -96,18 +95,18 @@ export default function EmployeeManagement() {
     setEmployees(employees.map(employee => {
       if (employee.id === employeeId) {
         const shifts = [...employee.shifts];
-        const activeShiftIndex = shifts.findIndex(shift => !shift.endTime);
+        const activeShiftIndex = shifts.findIndex(shift => !shift.end_time);
         
         if (activeShiftIndex !== -1) {
           const now = new Date();
-          const startTime = shifts[activeShiftIndex].startTime;
-          const hoursWorked = (now.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+          const startTime = shifts[activeShiftIndex].start_time;
+          const hoursWorked = (now.getTime() - new Date(startTime).getTime()) / (1000 * 60 * 60);
           
           shifts[activeShiftIndex] = {
             ...shifts[activeShiftIndex],
-            endTime: now,
-            totalHours: hoursWorked,
-            updatedAt: now
+            end_time: now,
+            total_hours: hoursWorked,
+            updated_at: now
           };
         }
         
@@ -124,7 +123,7 @@ export default function EmployeeManagement() {
   const hasActiveShift = (employeeId: string) => {
     const employee = employees.find(e => e.id === employeeId);
     if (!employee) return false;
-    return employee.shifts.some(shift => !shift.endTime);
+    return employee.shifts.some(shift => !shift.end_time);
   };
   
   // Get total hours worked
@@ -133,8 +132,8 @@ export default function EmployeeManagement() {
     if (!employee) return 0;
     
     return employee.shifts.reduce((total, shift) => {
-      if (shift.totalHours) {
-        return total + shift.totalHours;
+      if (shift.total_hours) {
+        return total + shift.total_hours;
       }
       return total;
     }, 0);
@@ -359,7 +358,7 @@ export default function EmployeeManagement() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">كلمة المرور</Label>
-                <Input id="password" type="password" placeholder="كلمة المرور" />
+                <Input id="password" type="password" placeholder="كلمة الم��ور" />
               </div>
             </div>
             
@@ -406,7 +405,7 @@ export default function EmployeeManagement() {
                         <TableRow key={shift.id}>
                           <TableCell>#{index + 1}</TableCell>
                           <TableCell>
-                            {shift.startTime.toLocaleTimeString('ar-EG', {
+                            {new Date(shift.start_time).toLocaleTimeString('ar-EG', {
                               hour: '2-digit',
                               minute: '2-digit',
                               day: '2-digit',
@@ -414,7 +413,7 @@ export default function EmployeeManagement() {
                             })}
                           </TableCell>
                           <TableCell>
-                            {shift.endTime ? shift.endTime.toLocaleTimeString('ar-EG', {
+                            {shift.end_time ? new Date(shift.end_time).toLocaleTimeString('ar-EG', {
                               hour: '2-digit',
                               minute: '2-digit',
                               day: '2-digit',
@@ -422,10 +421,10 @@ export default function EmployeeManagement() {
                             }) : '-'}
                           </TableCell>
                           <TableCell>
-                            {shift.totalHours ? shift.totalHours.toFixed(1) : '-'}
+                            {shift.total_hours ? shift.total_hours.toFixed(1) : '-'}
                           </TableCell>
                           <TableCell>
-                            {shift.endTime ? (
+                            {shift.end_time ? (
                               <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
                                 مكتملة
                               </span>

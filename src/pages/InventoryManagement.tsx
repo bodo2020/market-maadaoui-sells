@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -125,7 +126,7 @@ export default function InventoryManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {inventory.reduce((total, product) => total + (product.purchasePrice * product.quantity), 0).toFixed(2)} {siteConfig.currency}
+              {inventory.reduce((total, product) => total + (product.purchase_price * product.quantity), 0).toFixed(2)} {siteConfig.currency}
             </div>
             <p className="text-xs text-muted-foreground">القيمة الإجمالية بسعر الشراء</p>
           </CardContent>
@@ -171,7 +172,7 @@ export default function InventoryManagement() {
                       <TableCell>
                         <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center">
                           <img 
-                            src={product.imageUrls[0]} 
+                            src={product.image_urls[0]} 
                             alt={product.name}
                             className="h-6 w-6 object-contain"
                           />
@@ -250,7 +251,7 @@ export default function InventoryManagement() {
                     <TableCell>
                       <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center">
                         <img 
-                          src={product.imageUrls[0]} 
+                          src={product.image_urls[0]} 
                           alt={product.name}
                           className="h-6 w-6 object-contain"
                         />
@@ -258,7 +259,7 @@ export default function InventoryManagement() {
                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.barcode}</TableCell>
-                    <TableCell>{product.purchasePrice} {siteConfig.currency}</TableCell>
+                    <TableCell>{product.purchase_price} {siteConfig.currency}</TableCell>
                     <TableCell>
                       {product.quantity > 10 ? (
                         <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
@@ -275,10 +276,12 @@ export default function InventoryManagement() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {(product.purchasePrice * product.quantity).toFixed(2)} {siteConfig.currency}
+                      {(product.purchase_price * product.quantity).toFixed(2)} {siteConfig.currency}
                     </TableCell>
                     <TableCell>
-                      {product.updated_at.toLocaleDateString('ar-EG')}
+                      {typeof product.updated_at === 'string' 
+                        ? new Date(product.updated_at).toLocaleDateString('ar-EG')
+                        : product.updated_at.toLocaleDateString('ar-EG')}
                     </TableCell>
                     <TableCell>
                       <Button 
@@ -335,7 +338,7 @@ export default function InventoryManagement() {
               <div className="flex items-center gap-3 p-3 border rounded-md">
                 <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
                   <img 
-                    src={selectedProduct.imageUrls[0]} 
+                    src={selectedProduct.image_urls[0]} 
                     alt={selectedProduct.name}
                     className="h-8 w-8 object-contain"
                   />
@@ -366,7 +369,7 @@ export default function InventoryManagement() {
                 id="purchasePrice" 
                 type="number" 
                 min="0"
-                defaultValue={selectedProduct?.purchasePrice}
+                defaultValue={selectedProduct?.purchase_price}
                 disabled
               />
             </div>
@@ -374,7 +377,7 @@ export default function InventoryManagement() {
             {selectedProduct && stockToAdd > 0 && (
               <div className="p-3 bg-primary/10 rounded-md">
                 <p className="text-sm">
-                  إجمالي التكلفة: {(selectedProduct.purchasePrice * stockToAdd).toFixed(2)} {siteConfig.currency}
+                  إجمالي التكلفة: {(selectedProduct.purchase_price * stockToAdd).toFixed(2)} {siteConfig.currency}
                 </p>
                 <p className="text-sm">
                   المخزون بعد الإضافة: {selectedProduct.quantity + stockToAdd} وحدة
