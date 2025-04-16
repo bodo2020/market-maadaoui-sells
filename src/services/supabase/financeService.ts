@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, Expense } from "@/types";
+import * as ExcelJS from 'exceljs';
+import * as FileSaver from 'file-saver';
 
 export interface RevenueData {
   name: string;
@@ -21,7 +23,6 @@ export interface FinancialSummary {
 }
 
 export async function fetchFinancialSummary(): Promise<FinancialSummary> {
-  // Get sales data for total revenue calculation
   const { data: salesData, error: salesError } = await supabase
     .from("sales")
     .select("total, profit");
@@ -31,7 +32,6 @@ export async function fetchFinancialSummary(): Promise<FinancialSummary> {
     throw salesError;
   }
   
-  // Get expenses data for total expenses calculation
   const { data: expensesData, error: expensesError } = await supabase
     .from("expenses")
     .select("amount");
@@ -41,16 +41,13 @@ export async function fetchFinancialSummary(): Promise<FinancialSummary> {
     throw expensesError;
   }
   
-  // Calculate financial summary
   const totalRevenue = salesData.reduce((sum, sale) => sum + Number(sale.total), 0);
   const totalProfit = salesData.reduce((sum, sale) => sum + Number(sale.profit), 0);
   const totalExpenses = expensesData.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const netProfit = totalProfit - totalExpenses;
   const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
   
-  // For cash balance, we use a simplified approach
-  // In a real system, you would need to track all cash movements
-  const cashBalance = netProfit; // Simplified calculation
+  const cashBalance = netProfit;
   
   return {
     totalRevenue,
@@ -62,33 +59,26 @@ export async function fetchFinancialSummary(): Promise<FinancialSummary> {
 }
 
 export async function fetchMonthlyRevenue(): Promise<RevenueData[]> {
-  // Get current date
   const now = new Date();
   const currentYear = now.getFullYear();
   
-  // Define month names in Arabic
   const monthNames = [
     "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", 
     "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
   ];
   
-  // Initialize result array with all months
   const monthlyRevenue: RevenueData[] = [];
   
-  // Get 6 months of data (or specify a different range)
   const months = 6;
   
-  // Fetch sales grouped by month
   for (let i = 0; i < months; i++) {
-    const monthIndex = (now.getMonth() - i + 12) % 12; // Handle wrapping around to previous year
+    const monthIndex = (now.getMonth() - i + 12) % 12;
     const monthName = monthNames[monthIndex];
     
-    // Calculate start and end date for the month
     const year = currentYear - (now.getMonth() < monthIndex ? 1 : 0);
     const startDate = new Date(year, monthIndex, 1).toISOString();
     const endDate = new Date(year, monthIndex + 1, 0).toISOString();
     
-    // Query sales for this month
     const { data, error } = await supabase
       .from("sales")
       .select("total")
@@ -100,10 +90,8 @@ export async function fetchMonthlyRevenue(): Promise<RevenueData[]> {
       continue;
     }
     
-    // Calculate total for the month
     const amount = data.reduce((sum, sale) => sum + Number(sale.total), 0);
     
-    // Add to result (in reverse chronological order)
     monthlyRevenue.unshift({
       name: monthName,
       amount
@@ -114,7 +102,6 @@ export async function fetchMonthlyRevenue(): Promise<RevenueData[]> {
 }
 
 export async function fetchExpensesByCategory(): Promise<ExpenseData[]> {
-  // Fetch all expenses
   const { data, error } = await supabase
     .from("expenses")
     .select("type, amount");
@@ -124,7 +111,6 @@ export async function fetchExpensesByCategory(): Promise<ExpenseData[]> {
     throw error;
   }
   
-  // Group expenses by type
   const categories: Record<string, number> = {};
   data.forEach(expense => {
     const type = expense.type || "أخرى";
@@ -134,13 +120,11 @@ export async function fetchExpensesByCategory(): Promise<ExpenseData[]> {
     categories[type] += Number(expense.amount);
   });
   
-  // Predefined colors for expense categories
   const colors = [
     "#4338ca", "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", 
     "#ec4899", "#f43f5e", "#ef4444", "#f59e0b", "#84cc16"
   ];
   
-  // Convert to the expected format
   const result: ExpenseData[] = Object.entries(categories).map(([name, value], index) => ({
     name,
     value,
@@ -151,7 +135,6 @@ export async function fetchExpensesByCategory(): Promise<ExpenseData[]> {
 }
 
 export async function fetchRecentTransactions(limit = 6): Promise<any[]> {
-  // Fetch recent sales (income)
   const { data: sales, error: salesError } = await supabase
     .from("sales")
     .select("id, total, date, invoice_number")
@@ -163,7 +146,6 @@ export async function fetchRecentTransactions(limit = 6): Promise<any[]> {
     throw salesError;
   }
   
-  // Fetch recent expenses (expense)
   const { data: expenses, error: expensesError } = await supabase
     .from("expenses")
     .select("id, amount, date, description, type")
@@ -175,7 +157,6 @@ export async function fetchRecentTransactions(limit = 6): Promise<any[]> {
     throw expensesError;
   }
   
-  // Format sales as transactions
   const incomeTransactions = sales.map(sale => ({
     id: sale.id,
     type: "income",
@@ -184,7 +165,6 @@ export async function fetchRecentTransactions(limit = 6): Promise<any[]> {
     date: sale.date
   }));
   
-  // Format expenses as transactions
   const expenseTransactions = expenses.map(expense => ({
     id: expense.id,
     type: "expense",
@@ -193,7 +173,6 @@ export async function fetchRecentTransactions(limit = 6): Promise<any[]> {
     date: expense.date
   }));
   
-  // Combine and sort by date (most recent first)
   const transactions = [...incomeTransactions, ...expenseTransactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, limit);
@@ -202,7 +181,6 @@ export async function fetchRecentTransactions(limit = 6): Promise<any[]> {
 }
 
 export async function fetchAllTransactions(): Promise<any[]> {
-  // Similar to fetchRecentTransactions but without the limit
   const { data: sales, error: salesError } = await supabase
     .from("sales")
     .select("id, total, date, invoice_number")
@@ -223,7 +201,6 @@ export async function fetchAllTransactions(): Promise<any[]> {
     throw expensesError;
   }
   
-  // Format sales as transactions
   const incomeTransactions = sales.map(sale => ({
     id: sale.id,
     type: "income",
@@ -232,7 +209,6 @@ export async function fetchAllTransactions(): Promise<any[]> {
     date: sale.date
   }));
   
-  // Format expenses as transactions
   const expenseTransactions = expenses.map(expense => ({
     id: expense.id,
     type: "expense",
@@ -241,7 +217,6 @@ export async function fetchAllTransactions(): Promise<any[]> {
     date: expense.date
   }));
   
-  // Combine and sort by date (most recent first)
   return [...incomeTransactions, ...expenseTransactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
@@ -252,18 +227,11 @@ export async function fetchAllTransactions(): Promise<any[]> {
  * @param reportType The type of report to export
  */
 export async function exportReportToExcel(period: string, reportType: string): Promise<void> {
-  // Import required libraries for Excel export
-  const Excel = await import('exceljs');
-  const FileSaver = await import('file-saver');
-  
-  // Create a new workbook
-  const workbook = new Excel.default.Workbook();
+  const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('تقرير');
   
-  // Set right-to-left mode for Arabic support
   worksheet.views = [{ rightToLeft: true }];
   
-  // Add worksheet header based on report type
   let headerRow: string[] = [];
   switch(reportType) {
     case 'sales':
@@ -282,15 +250,10 @@ export async function exportReportToExcel(period: string, reportType: string): P
       headerRow = ['البند', 'القيمة'];
   }
   
-  // Add header row
   worksheet.addRow(headerRow);
   
-  // Format header row
   worksheet.getRow(1).font = { bold: true, size: 14 };
   worksheet.getRow(1).alignment = { horizontal: 'center' };
-  
-  // Get data based on report type and period
-  let data: any[] = [];
   
   try {
     switch(reportType) {
@@ -300,10 +263,11 @@ export async function exportReportToExcel(period: string, reportType: string): P
           .select("*")
           .order("date", { ascending: false });
         
-        // Add sales data to worksheet
         if (salesData) {
           salesData.forEach(sale => {
-            const itemsCount = sale.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+            const items = sale.items as any[];
+            const itemsCount = items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+            
             worksheet.addRow([
               sale.invoice_number,
               new Date(sale.date).toLocaleDateString('ar-EG'),
@@ -318,7 +282,6 @@ export async function exportReportToExcel(period: string, reportType: string): P
         break;
         
       case 'products':
-        // Get sales data and calculate product stats
         const { data: salesForProducts } = await supabase
           .from("sales")
           .select("*");
@@ -327,7 +290,9 @@ export async function exportReportToExcel(period: string, reportType: string): P
           const productsMap = new Map();
           
           salesForProducts.forEach((sale: any) => {
-            sale.items.forEach((item: any) => {
+            const items = sale.items as any[];
+            
+            items.forEach((item: any) => {
               const productId = item.product.id;
               if (productsMap.has(productId)) {
                 const existing = productsMap.get(productId);
@@ -345,7 +310,6 @@ export async function exportReportToExcel(period: string, reportType: string): P
           
           const totalRevenue = salesForProducts.reduce((sum: number, sale: any) => sum + sale.total, 0);
           
-          // Add product data to worksheet
           Array.from(productsMap.values()).forEach(item => {
             const profit = item.revenue - (item.product.purchase_price * item.quantitySold);
             worksheet.addRow([
@@ -363,14 +327,12 @@ export async function exportReportToExcel(period: string, reportType: string): P
       case 'trends':
         const revenueData = await fetchMonthlyRevenue();
         
-        // Add revenue data to worksheet
         revenueData.forEach(item => {
           worksheet.addRow([item.name, item.amount]);
         });
         break;
         
       default:
-        // General financial summary
         const summary = await fetchFinancialSummary();
         worksheet.addRow(['إجمالي الإيرادات', summary.totalRevenue]);
         worksheet.addRow(['إجمالي المصروفات', summary.totalExpenses]);
@@ -379,17 +341,14 @@ export async function exportReportToExcel(period: string, reportType: string): P
         worksheet.addRow(['رصيد الصندوق', summary.cashBalance]);
     }
     
-    // Format number columns
     worksheet.columns.forEach(column => {
-      if (column.number > 2) { // Skip first two columns (usually text)
+      if (column.number > 2) {
         column.numFmt = '#,##0.00';
       }
     });
     
-    // Generate Excel file
     const buffer = await workbook.xlsx.writeBuffer();
     
-    // Create a Blob and save file
     const date = new Date().toISOString().split('T')[0];
     const fileName = `تقرير_${reportType}_${date}.xlsx`;
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
