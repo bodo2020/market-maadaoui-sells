@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -31,6 +30,7 @@ import {
 import { UserRole, User } from "@/types";
 import { fetchUsers, createUser, updateUser, deleteUser } from "@/services/supabase/userService";
 import { Loader2, UserPlus, Pencil, Trash2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -47,6 +47,7 @@ export default function UsersManagement() {
     active: true
   });
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     loadUsers();
@@ -55,6 +56,18 @@ export default function UsersManagement() {
   const loadUsers = async () => {
     try {
       setLoading(true);
+      
+      // Check if the current user is authenticated and is an admin
+      if (!currentUser || currentUser.role !== UserRole.ADMIN) {
+        toast({
+          title: "خطأ في الصلاحيات",
+          description: "ليس لديك صلاحية للوصول إلى هذه الصفحة",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+      
       const data = await fetchUsers();
       setUsers(data);
     } catch (error) {
@@ -211,6 +224,15 @@ export default function UsersManagement() {
         return role;
     }
   };
+
+  if (!currentUser || currentUser.role !== UserRole.ADMIN) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <h2 className="text-2xl font-bold text-destructive mb-4">خطأ في الصلاحيات</h2>
+        <p className="text-muted-foreground">ليس لديك صلاحية للوصول إلى هذه الصفحة</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

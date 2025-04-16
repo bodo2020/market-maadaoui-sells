@@ -1,35 +1,39 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { User, UserRole, Shift } from "@/types";
 
 export async function fetchUsers() {
-  const { data, error } = await supabase
-    .from("users")
-    .select("*");
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*");
 
-  if (error) {
-    console.error("Error fetching users:", error);
+    if (error) {
+      console.error("Error fetching users:", error);
+      throw error;
+    }
+
+    // Fetch shifts for each user
+    const usersWithShifts = await Promise.all(
+      data.map(async (user) => {
+        const { data: shifts, error: shiftsError } = await supabase
+          .from("shifts")
+          .select("*")
+          .eq("employee_id", user.id);
+
+        if (shiftsError) {
+          console.error("Error fetching shifts for user:", shiftsError);
+          return { ...user, shifts: [] };
+        }
+
+        return { ...user, shifts: shifts || [] };
+      })
+    );
+
+    return usersWithShifts as User[];
+  } catch (error) {
+    console.error("Error in fetchUsers:", error);
     throw error;
   }
-
-  // Fetch shifts for each user
-  const usersWithShifts = await Promise.all(
-    data.map(async (user) => {
-      const { data: shifts, error: shiftsError } = await supabase
-        .from("shifts")
-        .select("*")
-        .eq("employee_id", user.id);
-
-      if (shiftsError) {
-        console.error("Error fetching shifts for user:", shiftsError);
-        return { ...user, shifts: [] };
-      }
-
-      return { ...user, shifts: shifts || [] };
-    })
-  );
-
-  return usersWithShifts as User[];
 }
 
 export async function fetchUserById(id: string) {
@@ -59,23 +63,23 @@ export async function fetchUserById(id: string) {
 }
 
 export async function authenticateUser(username: string, password: string) {
-  // Hardcoded admin user for testing
-  if (username === 'admin' && password === 'admin') {
-    return {
-      id: '1',
-      name: 'مدير النظام',
-      role: UserRole.ADMIN,
-      phone: '',
-      password: '',
-      username: 'admin',
-      created_at: new Date().toISOString(),
-      active: true,
-      shifts: []
-    } as User;
-  }
-
-  // If not admin, try the database
   try {
+    // Hardcoded admin user for testing
+    if (username === 'admin' && password === 'admin') {
+      return {
+        id: '1',
+        name: 'مدير النظام',
+        role: UserRole.ADMIN,
+        phone: '',
+        password: '',
+        username: 'admin',
+        created_at: new Date().toISOString(),
+        active: true,
+        shifts: []
+      } as User;
+    }
+
+    // If not admin, try the database
     const { data, error } = await supabase
       .from("users")
       .select("*")
