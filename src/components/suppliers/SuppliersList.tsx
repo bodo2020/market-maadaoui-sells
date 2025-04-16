@@ -11,6 +11,7 @@ import SupplierForm from "./SupplierForm";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function SuppliersList() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -56,6 +57,15 @@ export default function SuppliersList() {
       (supplier.email || "").toLowerCase().includes(searchTermLower)
     );
   });
+
+  // Mock data for supplier transactions (to be implemented with a real backend)
+  const getSupplierTransactions = (supplierId: string) => {
+    return [
+      { id: 1, date: "2023-04-20", amount: 100, type: "debt", description: "فاتورة شراء منتجات" },
+      { id: 2, date: "2023-04-21", amount: 41, type: "credit", description: "دفعة جزئية" },
+      { id: 3, date: "2023-04-25", amount: 59, type: "credit", description: "دفعة نهائية" }
+    ];
+  };
   
   return (
     <Card className="w-full">
@@ -102,74 +112,116 @@ export default function SuppliersList() {
               </TableHeader>
               <TableBody>
                 {filteredSuppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
-                    <TableCell className="font-medium">{supplier.name}</TableCell>
-                    <TableCell>{supplier.contact_person || "—"}</TableCell>
-                    <TableCell>
-                      {supplier.phone ? (
-                        <div className="flex items-center">
-                          <Phone className="h-4 w-4 mr-1" />
-                          {supplier.phone}
+                  <React.Fragment key={supplier.id}>
+                    <TableRow>
+                      <TableCell className="font-medium">{supplier.name}</TableCell>
+                      <TableCell>{supplier.contact_person || "—"}</TableCell>
+                      <TableCell>
+                        {supplier.phone ? (
+                          <div className="flex items-center">
+                            <Phone className="h-4 w-4 mr-1" />
+                            {supplier.phone}
+                          </div>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {supplier.email ? (
+                          <div className="flex items-center">
+                            <Mail className="h-4 w-4 mr-1" />
+                            {supplier.email}
+                          </div>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {supplier.address ? (
+                          <div className="flex items-center">
+                            <Building className="h-4 w-4 mr-1" />
+                            {supplier.address}
+                          </div>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {supplier.balance !== undefined ? (
+                          <div className="flex items-center">
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            {supplier.balance > 0 ? (
+                              <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">
+                                علينا: {supplier.balance}
+                              </Badge>
+                            ) : supplier.balance < 0 ? (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
+                                لنا: {Math.abs(supplier.balance)}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">متوازن</Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge variant="outline">0</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditClick(supplier)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive"
+                            onClick={() => handleDeleteClick(supplier.id)}
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      ) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {supplier.email ? (
-                        <div className="flex items-center">
-                          <Mail className="h-4 w-4 mr-1" />
-                          {supplier.email}
-                        </div>
-                      ) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {supplier.address ? (
-                        <div className="flex items-center">
-                          <Building className="h-4 w-4 mr-1" />
-                          {supplier.address}
-                        </div>
-                      ) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {supplier.balance !== undefined ? (
-                        <div className="flex items-center">
-                          <CreditCard className="h-4 w-4 mr-1" />
-                          {supplier.balance > 0 ? (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
-                              لنا: {supplier.balance}
-                            </Badge>
-                          ) : supplier.balance < 0 ? (
-                            <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">
-                              علينا: {Math.abs(supplier.balance)}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">متوازن</Badge>
-                          )}
-                        </div>
-                      ) : (
-                        <Badge variant="outline">0</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditClick(supplier)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive"
-                          onClick={() => handleDeleteClick(supplier.id)}
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell colSpan={7} className="p-0">
+                        <Accordion type="single" collapsible className="w-full">
+                          <AccordionItem value={supplier.id}>
+                            <AccordionTrigger className="py-2 px-4 text-sm">
+                              عرض تفاصيل المعاملات المالية
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="p-4">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>التاريخ</TableHead>
+                                      <TableHead>الوصف</TableHead>
+                                      <TableHead>المبلغ</TableHead>
+                                      <TableHead>النوع</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {getSupplierTransactions(supplier.id).map(transaction => (
+                                      <TableRow key={transaction.id}>
+                                        <TableCell>{transaction.date}</TableCell>
+                                        <TableCell>{transaction.description}</TableCell>
+                                        <TableCell>{Math.abs(transaction.amount)}</TableCell>
+                                        <TableCell>
+                                          {transaction.type === 'debt' ? 
+                                            <Badge variant="outline" className="bg-red-50 text-red-700">علينا</Badge> : 
+                                            <Badge variant="outline" className="bg-green-50 text-green-700">لنا</Badge>
+                                          }
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>
