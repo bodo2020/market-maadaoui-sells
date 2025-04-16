@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Supplier } from "@/types";
-import { fetchSuppliers, deleteSupplier } from "@/services/supabase/supplierService";
+import { fetchSuppliers, deleteSupplier, fetchSupplierTransactions } from "@/services/supabase/supplierService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -17,6 +17,7 @@ export default function SuppliersList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [expandedSuppliers, setExpandedSuppliers] = useState<Record<string, boolean>>({});
   
   const queryClient = useQueryClient();
   
@@ -58,13 +59,20 @@ export default function SuppliersList() {
     );
   });
 
-  // Mock data for supplier transactions (to be implemented with a real backend)
-  const getSupplierTransactions = (supplierId: string) => {
-    return [
-      { id: 1, date: "2023-04-20", amount: 100, type: "debt", description: "فاتورة شراء منتجات" },
-      { id: 2, date: "2023-04-21", amount: 41, type: "credit", description: "دفعة جزئية" },
-      { id: 3, date: "2023-04-25", amount: 59, type: "credit", description: "دفعة نهائية" }
-    ];
+  // Function to toggle transaction details and fetch data if needed
+  const toggleTransactionDetails = (supplierId: string) => {
+    if (!expandedSuppliers[supplierId]) {
+      // Only fetch transactions when expanding
+      queryClient.prefetchQuery({
+        queryKey: ["supplierTransactions", supplierId],
+        queryFn: () => fetchSupplierTransactions(supplierId)
+      });
+    }
+    
+    setExpandedSuppliers(prev => ({
+      ...prev,
+      [supplierId]: !prev[supplierId]
+    }));
   };
   
   return (
@@ -185,37 +193,17 @@ export default function SuppliersList() {
                       <TableCell colSpan={7} className="p-0">
                         <Accordion type="single" collapsible className="w-full">
                           <AccordionItem value={supplier.id}>
-                            <AccordionTrigger className="py-2 px-4 text-sm">
+                            <AccordionTrigger 
+                              className="py-2 px-4 text-sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                toggleTransactionDetails(supplier.id);
+                              }}
+                            >
                               عرض تفاصيل المعاملات المالية
                             </AccordionTrigger>
                             <AccordionContent>
-                              <div className="p-4">
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead>التاريخ</TableHead>
-                                      <TableHead>الوصف</TableHead>
-                                      <TableHead>المبلغ</TableHead>
-                                      <TableHead>النوع</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {getSupplierTransactions(supplier.id).map(transaction => (
-                                      <TableRow key={transaction.id}>
-                                        <TableCell>{transaction.date}</TableCell>
-                                        <TableCell>{transaction.description}</TableCell>
-                                        <TableCell>{Math.abs(transaction.amount)}</TableCell>
-                                        <TableCell>
-                                          {transaction.type === 'debt' ? 
-                                            <Badge variant="outline" className="bg-red-50 text-red-700">علينا</Badge> : 
-                                            <Badge variant="outline" className="bg-green-50 text-green-700">لنا</Badge>
-                                          }
-                                        </TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </div>
+                              <SupplierTransactions supplierId={supplier.id} />
                             </AccordionContent>
                           </AccordionItem>
                         </Accordion>
@@ -243,5 +231,51 @@ export default function SuppliersList() {
         </SheetContent>
       </Sheet>
     </Card>
+  );
+}
+
+// Separate component for supplier transactions
+function SupplierTransactions({ supplierId }: { supplierId: string }) {
+  const { data: transactions = [], isLoading } = useQuery({
+    queryKey: ["supplierTransactions", supplierId],
+    queryFn: () => fetchSupplierTransactions(supplierId)
+  });
+  
+  if (isLoading) {
+    return <div className="p-4 text-center">جاري تحميل المعاملات...</div>;
+  }
+  
+  if (transactions.length === 0) {
+    return <div className="p-4 text-center text-muted-foreground">لا توجد معاملات لهذا المورد</div>;
+  }
+  
+  return (
+    <div className="p-4">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>التاريخ</TableHead>
+            <TableHead>الوصف</TableHead>
+            <TableHead>المبلغ</TableHead>
+            <TableHead>النوع</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {transactions.map(transaction => (
+            <TableRow key={transaction.id}>
+              <TableCell>{new Date(transaction.date).toLocaleDateString('ar-EG')}</TableCell>
+              <TableCell>{transaction.description}</TableCell>
+              <TableCell>{transaction.amount}</TableCell>
+              <TableCell>
+                {transaction.type === 'debt' ? 
+                  <Badge variant="outline" className="bg-red-50 text-red-700">علينا</Badge> : 
+                  <Badge variant="outline" className="bg-green-50 text-green-700">لنا</Badge>
+                }
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

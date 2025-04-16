@@ -106,3 +106,38 @@ export async function getSupplierById(id: string) {
     return null;
   }
 }
+
+export async function fetchSupplierTransactions(supplierId: string) {
+  try {
+    const { data, error } = await supabase
+      .from("purchases")
+      .select("id, date, total, paid, invoice_number, description")
+      .eq("supplier_id", supplierId)
+      .order("date", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching supplier transactions:", error);
+      toast.error("فشل في جلب معاملات المورد");
+      return [];
+    }
+
+    const transactions = data.map(purchase => {
+      const remaining = purchase.total - purchase.paid;
+      return {
+        id: purchase.id,
+        date: purchase.date,
+        description: purchase.description || `فاتورة رقم ${purchase.invoice_number}`,
+        amount: Math.abs(remaining),
+        // If remaining > 0, we owe the supplier money (debt)
+        // If remaining < 0, the supplier owes us money (credit)
+        type: remaining > 0 ? "debt" : "credit"
+      };
+    });
+
+    return transactions;
+  } catch (error) {
+    console.error("Unexpected error fetching supplier transactions:", error);
+    toast.error("حدث خطأ غير متوقع");
+    return [];
+  }
+}
