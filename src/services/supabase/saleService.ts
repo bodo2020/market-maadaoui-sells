@@ -1,6 +1,49 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Sale } from "@/types";
+import { Sale, CartItem } from "@/types";
+import { Json } from "@/integrations/supabase/types";
+
+// Interface to match the database schema
+interface DbSale {
+  id: string;
+  date: string;
+  items: Json;
+  cashier_id?: string;
+  subtotal: number;
+  discount: number;
+  total: number;
+  profit: number;
+  payment_method: string;
+  card_amount?: number;
+  cash_amount?: number;
+  customer_name?: string;
+  customer_phone?: string;
+  invoice_number: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+// Convert database sale to app sale
+function dbSaleToAppSale(dbSale: DbSale): Sale {
+  return {
+    id: dbSale.id,
+    date: dbSale.date,
+    items: dbSale.items as unknown as CartItem[],
+    cashier_id: dbSale.cashier_id,
+    subtotal: dbSale.subtotal,
+    discount: dbSale.discount,
+    total: dbSale.total,
+    profit: dbSale.profit,
+    payment_method: dbSale.payment_method as 'cash' | 'card' | 'mixed',
+    card_amount: dbSale.card_amount,
+    cash_amount: dbSale.cash_amount,
+    customer_name: dbSale.customer_name,
+    customer_phone: dbSale.customer_phone,
+    invoice_number: dbSale.invoice_number,
+    created_at: dbSale.created_at,
+    updated_at: dbSale.updated_at
+  };
+}
 
 export async function fetchSales() {
   const { data, error } = await supabase
@@ -13,7 +56,7 @@ export async function fetchSales() {
     throw error;
   }
 
-  return data as Sale[];
+  return (data as DbSale[]).map(dbSaleToAppSale);
 }
 
 export async function fetchSaleById(id: string) {
@@ -28,7 +71,7 @@ export async function fetchSaleById(id: string) {
     throw error;
   }
 
-  return data as Sale;
+  return dbSaleToAppSale(data as DbSale);
 }
 
 export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
@@ -39,7 +82,7 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
     .from("sales")
     .insert([{
       date: dateValue,
-      items: sale.items,
+      items: sale.items as unknown as Json,
       cashier_id: sale.cashier_id,
       subtotal: sale.subtotal,
       discount: sale.discount,
@@ -59,7 +102,7 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
     throw error;
   }
 
-  return data[0] as Sale;
+  return dbSaleToAppSale(data[0] as DbSale);
 }
 
 export async function updateSale(id: string, sale: Partial<Sale>) {
@@ -72,6 +115,9 @@ export async function updateSale(id: string, sale: Partial<Sale>) {
       if (key === 'date' || key === 'created_at' || key === 'updated_at') {
         const value = sale[key as keyof Sale];
         updateData[key] = value instanceof Date ? value.toISOString() : value;
+      } else if (key === 'items') {
+        // Handle items array by converting to Json
+        updateData['items'] = sale.items as unknown as Json;
       } else {
         updateData[key] = sale[key as keyof Sale];
       }
@@ -89,7 +135,7 @@ export async function updateSale(id: string, sale: Partial<Sale>) {
     throw error;
   }
 
-  return data[0] as Sale;
+  return dbSaleToAppSale(data[0] as DbSale);
 }
 
 export async function deleteSale(id: string) {
