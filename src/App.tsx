@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import {
   BrowserRouter as Router,
@@ -16,7 +17,7 @@ import Products from "./pages/Products";
 import Categories from "./pages/Categories";
 import Expenses from "./pages/Expenses";
 import Users from "./pages/Users";
-import Pos from "./pages/Pos";
+import POS from "./pages/POS"; // Fixed casing to match the file name
 import Settings from "./pages/Settings";
 import InvoiceList from "./pages/InvoiceList";
 import InvoiceDetail from "./pages/InvoiceDetail";
@@ -137,7 +138,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <MainLayout>
-                  <Pos />
+                  <POS />
                 </MainLayout>
               </ProtectedRoute>
             }
