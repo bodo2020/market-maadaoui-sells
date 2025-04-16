@@ -48,7 +48,7 @@ export default function InvoiceSettings() {
     });
   };
 
-  // Sample invoice data for preview
+  // Sample invoice data for preview with complete Product objects
   const sampleSale: Sale = {
     id: "preview-invoice",
     date: new Date().toISOString(),
@@ -60,9 +60,15 @@ export default function InvoiceSettings() {
           name: "منتج تجريبي 1",
           price: 125,
           purchase_price: 100,
+          quantity: 50,
+          image_urls: [],
+          is_offer: false,
+          bulk_enabled: false,
+          created_at: new Date().toISOString(),
         },
         quantity: 2,
         price: 125,
+        discount: 0,
         total: 250,
       },
       {
@@ -71,9 +77,15 @@ export default function InvoiceSettings() {
           name: "منتج تجريبي 2",
           price: 75,
           purchase_price: 50,
+          quantity: 30,
+          image_urls: [],
+          is_offer: false,
+          bulk_enabled: false,
+          created_at: new Date().toISOString(),
         },
         quantity: 1,
         price: 75,
+        discount: 0,
         total: 75,
       }
     ],
@@ -85,6 +97,7 @@ export default function InvoiceSettings() {
     profit: 100,
     customer_name: "عميل تجريبي",
     customer_phone: "01234567890",
+    created_at: new Date().toISOString(),
   };
 
   return (
