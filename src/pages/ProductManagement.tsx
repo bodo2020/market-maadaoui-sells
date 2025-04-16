@@ -26,7 +26,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { 
@@ -40,7 +39,8 @@ import {
   Tag,
   Barcode,
   Box,
-  Loader2
+  Loader2,
+  ScanLine
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,6 +56,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, createProduct, updateProduct, deleteProduct } from "@/services/supabase/productService";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button as ShadcnButton } from "@/components/ui/button";
+import { Dialog as ShadcnDialog } from "@/components/ui/dialog";
 
 export default function ProductManagement() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -71,6 +73,9 @@ export default function ProductManagement() {
     image_urls: ["/placeholder.svg"],
     quantity: 0,
   });
+  const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState("");
+  const [scannedWeight, setScannedWeight] = useState("");
   const { toast } = useToast();
   
   useEffect(() => {
@@ -220,7 +225,63 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
-  
+
+  const handleBarcodeScanning = () => {
+    setIsBarcodeDialogOpen(true);
+  };
+
+  const validateWeightBarcode = (barcode: string) => {
+    // Check if barcode starts with 2 and has the correct length
+    if (
+      !barcode.startsWith('2') || 
+      barcode.length !== 13 || 
+      !/^\d+$/.test(barcode)
+    ) {
+      toast({
+        title: "خطأ",
+        description: "باركود الميزان غير صالح. يجب أن يبدأ برقم 2 ويتكون من 13 رقم.",
+        variant: "destructive"
+      });
+      return false;
+    }
+
+    // Parse product code and weight
+    const productCode = barcode.slice(1, 5);
+    const weight = parseInt(barcode.slice(5, 11)) / 1000; // convert to kg
+    const checkDigit = barcode.slice(-1);
+
+    // Additional validations can be added here
+    setNewProduct(prev => ({
+      ...prev,
+      barcode_type: 'scale',
+      barcode: barcode,
+      name: `منتج وزني ${productCode}`,
+      quantity: 1,
+    }));
+
+    return true;
+  };
+
+  const handleBarcodeSubmit = () => {
+    if (scannedBarcode) {
+      if (scannedBarcode.startsWith('2')) {
+        // Weight-based barcode
+        if (validateWeightBarcode(scannedBarcode)) {
+          setIsBarcodeDialogOpen(false);
+        }
+      } else {
+        // Normal barcode
+        setNewProduct(prev => ({
+          ...prev,
+          barcode_type: 'normal',
+          barcode: scannedBarcode,
+        }));
+        setIsBarcodeDialogOpen(false);
+      }
+      setScannedBarcode("");
+    }
+  };
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -391,6 +452,14 @@ export default function ProductManagement() {
             <DialogDescription>
               أدخل تفاصيل المنتج. اضغط حفظ عند الانتهاء.
             </DialogDescription>
+            <Button 
+              variant="outline" 
+              onClick={handleBarcodeScanning}
+              className="self-start"
+            >
+              <ScanLine className="ml-2 h-4 w-4" />
+              مسح الباركود
+            </Button>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh]">
             <div className="grid gap-4 py-4 px-1">
@@ -643,6 +712,38 @@ export default function ProductManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Add Barcode Scanning Dialog */}
+      <ShadcnDialog open={isBarcodeDialogOpen} onOpenChange={setIsBarcodeDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>مسح الباركود</DialogTitle>
+            <DialogDescription>
+              للمنتجات العادية: قم بمسح الباركود الخاص بالمنتج
+              للمنتجات الموزونة: قم بوزن المنتج ومسح الباركود الصادر من الميزان
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="barcode" className="text-right">
+                الباركود
+              </Label>
+              <Input
+                id="barcode"
+                value={scannedBarcode}
+                onChange={(e) => setScannedBarcode(e.target.value)}
+                className="col-span-3"
+                placeholder="أدخل الباركود أو امسحه"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <ShadcnButton type="button" onClick={handleBarcodeSubmit}>
+              تأكيد
+            </ShadcnButton>
+          </DialogFooter>
+        </DialogContent>
+      </ShadcnDialog>
     </MainLayout>
   );
 }
