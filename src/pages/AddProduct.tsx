@@ -1,8 +1,9 @@
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,11 +25,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
-import { useNavigate } from "react-router-dom";
-import { createProduct } from "@/services/supabase/productService";
+import { createProduct, updateProduct, fetchProductById } from "@/services/supabase/productService";
 import { CustomSwitch } from "@/components/ui/custom-switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Image, ScanLine, Upload } from "lucide-react";
+import { Image, ScanLine, Upload, Bell, Loader2 } from "lucide-react";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 
 // Form validation schema
@@ -56,6 +56,7 @@ const productFormSchema = z.object({
   is_service: z.boolean().default(false),
   track_inventory: z.boolean().default(true),
   unit: z.string().default("قطعة"),
+  notify_quantity: z.coerce.number().nonnegative().optional(),
 });
 
 // Product categories
@@ -93,11 +94,17 @@ const barcodeTypes = [
 
 export default function AddProduct() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const productId = searchParams.get("id");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [productImage, setProductImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showScanner, setShowScanner] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
+  const [notifyQuantity, setNotifyQuantity] = useState<number>(5);
 
   // Initialize form with default values
   const form = useForm<z.infer<typeof productFormSchema>>({
@@ -116,8 +123,50 @@ export default function AddProduct() {
       is_service: false,
       track_inventory: true,
       unit: "قطعة",
+      notify_quantity: 5,
     },
   });
+
+  // Fetch product data if we're editing
+  useEffect(() => {
+    if (productId) {
+      setIsLoading(true);
+      setIsEditing(true);
+      
+      fetchProductById(productId)
+        .then((product) => {
+          // Populate the form with product data
+          form.reset({
+            name: product.name,
+            description: product.description || "",
+            barcode: product.barcode || "",
+            barcode_type: product.barcode_type || "normal",
+            category: product.category_id || "others",
+            price: product.price,
+            purchase_price: product.purchase_price,
+            quantity: product.quantity || 0,
+            is_offer: product.is_offer || false,
+            offer_price: product.offer_price,
+            is_service: product.quantity === -1, // If quantity is -1, it's a service
+            track_inventory: product.quantity !== -1,
+            unit: product.unit_of_measure || "قطعة",
+          });
+          
+          // Set image preview if product has an image
+          if (product.image_urls && product.image_urls.length > 0 && product.image_urls[0] !== "/placeholder.svg") {
+            setImagePreview(product.image_urls[0]);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching product:", error);
+          toast.error("حدث خطأ أثناء تحميل بيانات المنتج");
+          navigate("/products");
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [productId, form, navigate]);
 
   // Handle image selection
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,6 +232,7 @@ export default function AddProduct() {
   // Watch values for conditional rendering
   const isService = form.watch("is_service");
   const barcodeType = form.watch("barcode_type");
+  const isOffer = form.watch("is_offer");
 
   // Handle form submission
   const onSubmit = async (values: z.infer<typeof productFormSchema>) => {
@@ -218,12 +268,12 @@ export default function AddProduct() {
         ? [imagePreview] 
         : ["/placeholder.svg"];
       
-      // Remove track_inventory from the data we send to the database
-      // since it's not supported in the schema yet
-      const { track_inventory, ...productData } = values;
+      // Remove track_inventory and notify_quantity from the data we send to the database
+      // since they're not supported in the schema yet
+      const { track_inventory, notify_quantity, ...productData } = values;
       
       // Add all required properties for the Product type
-      await createProduct({
+      const productToSave = {
         name: productData.name,
         price: productData.price,
         purchase_price: productData.purchase_price,
@@ -238,22 +288,44 @@ export default function AddProduct() {
         is_bulk: false,
         category_id: productData.category,
         unit_of_measure: productData.unit,
-      });
+      };
       
-      toast.success("تم إضافة المنتج بنجاح");
+      if (isEditing && productId) {
+        // Update existing product
+        await updateProduct(productId, productToSave);
+        toast.success("تم تحديث المنتج بنجاح");
+      } else {
+        // Create new product
+        await createProduct(productToSave);
+        toast.success("تم إضافة المنتج بنجاح");
+      }
+      
       navigate("/products");
     } catch (error) {
-      console.error("Error adding product:", error);
-      toast.error("حدث خطأ أثناء إضافة المنتج");
+      console.error("Error saving product:", error);
+      toast.error("حدث خطأ أثناء حفظ المنتج");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex justify-center items-center h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="mr-2">جاري تحميل بيانات المنتج...</span>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">إضافة منتج جديد</h1>
+        <h1 className="text-2xl font-bold">
+          {isEditing ? "تعديل المنتج" : "إضافة منتج جديد"}
+        </h1>
         <Button variant="outline" onClick={() => navigate("/products")}>
           العودة إلى المنتجات
         </Button>
@@ -261,7 +333,7 @@ export default function AddProduct() {
 
       <Card>
         <CardHeader>
-          <CardTitle>معلومات المنتج</CardTitle>
+          <CardTitle>{isEditing ? "تعديل معلومات المنتج" : "معلومات المنتج"}</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -291,6 +363,7 @@ export default function AddProduct() {
                         <Select
                           onValueChange={field.onChange}
                           defaultValue={field.value}
+                          value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -353,7 +426,7 @@ export default function AddProduct() {
                   </div>
                 </div>
 
-                {/* Continue with the rest of the form fields */}
+                {/* Category and units fields */}
                 <FormField
                   control={form.control}
                   name="category"
@@ -362,7 +435,7 @@ export default function AddProduct() {
                       <FormLabel>تصنيف المنتج *</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -390,7 +463,7 @@ export default function AddProduct() {
                       <FormLabel>وحدة القياس *</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -410,6 +483,7 @@ export default function AddProduct() {
                   )}
                 />
 
+                {/* Price fields */}
                 <FormField
                   control={form.control}
                   name="price"
@@ -438,6 +512,7 @@ export default function AddProduct() {
                   )}
                 />
 
+                {/* Quantity and stock notification fields */}
                 <FormField
                   control={form.control}
                   name="quantity"
@@ -456,6 +531,39 @@ export default function AddProduct() {
                   )}
                 />
 
+                <div className="space-y-2">
+                  <FormLabel>تنبيهني عندما تنخفض الكمية</FormLabel>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant={notifyEnabled ? "default" : "outline"}
+                      className="gap-2"
+                      onClick={() => setNotifyEnabled(!notifyEnabled)}
+                      disabled={isService}
+                    >
+                      <Bell className="h-4 w-4" />
+                      {notifyEnabled ? "تنبيه نشط" : "تفعيل التنبيهات"}
+                    </Button>
+                    
+                    {notifyEnabled && (
+                      <Input 
+                        type="number"
+                        value={notifyQuantity}
+                        onChange={(e) => setNotifyQuantity(parseInt(e.target.value))}
+                        className="w-24"
+                        min={1}
+                        disabled={isService}
+                      />
+                    )}
+                  </div>
+                  {notifyEnabled && (
+                    <FormDescription>
+                      سيتم تنبيهك عندما تقل الكمية عن {notifyQuantity} {form.watch("unit")}
+                    </FormDescription>
+                  )}
+                </div>
+
+                {/* Service toggle and inventory tracking options */}
                 <div className="space-y-6">
                   <div className="border p-4 rounded-lg space-y-2">
                     <div className="flex items-center justify-between">
@@ -475,6 +583,7 @@ export default function AddProduct() {
                                   field.onChange(checked);
                                   if (checked) {
                                     form.setValue("track_inventory", false);
+                                    setNotifyEnabled(false);
                                   }
                                 }}
                               />
@@ -510,6 +619,7 @@ export default function AddProduct() {
                   </div>
                 </div>
 
+                {/* Offer price fields */}
                 <FormField
                   control={form.control}
                   name="is_offer"
@@ -547,7 +657,7 @@ export default function AddProduct() {
                             const value = e.target.value ? parseFloat(e.target.value) : undefined;
                             field.onChange(value);
                           }}
-                          disabled={!form.watch("is_offer")}
+                          disabled={!isOffer}
                           placeholder="0.00"
                         />
                       </FormControl>
@@ -632,7 +742,14 @@ export default function AddProduct() {
                   إلغاء
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "جاري الإضافة..." : "إضافة المنتج"}
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {isEditing ? "جاري التحديث..." : "جاري الإضافة..."}
+                    </>
+                  ) : (
+                    isEditing ? "تحديث المنتج" : "إضافة المنتج"
+                  )}
                 </Button>
               </div>
             </form>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -60,8 +59,10 @@ import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchProduc
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { Dialog as ShadcnDialog } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 
 export default function ProductManagement() {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -409,19 +410,7 @@ export default function ProductManagement() {
   };
 
   const handleEditClick = async (product: Product) => {
-    try {
-      // Fetch the latest product data to ensure we have the most up-to-date information
-      const freshProduct = await fetchProductById(product.id);
-      setProductToEdit(freshProduct);
-      setIsEditDialogOpen(true);
-    } catch (error) {
-      console.error("Error fetching product for edit:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء تحميل بيانات المنتج",
-        variant: "destructive"
-      });
-    }
+    navigate(`/add-product?id=${product.id}`);
   };
 
   const handleAddOfferClick = (product: Product) => {
@@ -437,7 +426,7 @@ export default function ProductManagement() {
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">إدارة المنتجات</h1>
-        <Button onClick={() => setIsAddDialogOpen(true)} disabled={loading}>
+        <Button onClick={() => navigate("/add-product")} disabled={loading}>
           <Plus className="ml-2 h-4 w-4" />
           إضافة منتج جديد
         </Button>
@@ -549,7 +538,7 @@ export default function ProductManagement() {
                           ) : (product.quantity || 0) > 0 ? (
                             <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">مخزون منخفض</span>
                           ) : (
-                            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">غير متوفر</span>
+                            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">غير متوف��</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -594,254 +583,6 @@ export default function ProductManagement() {
           )}
         </CardContent>
       </Card>
-      
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[480px] max-w-[95%] w-full">
-          <DialogHeader>
-            <DialogTitle>إضافة منتج جديد</DialogTitle>
-            <DialogDescription>
-              أدخل تفاصيل المنتج. اضغط حفظ عند الانتهاء.
-            </DialogDescription>
-            <div className="flex space-x-2 self-start">
-              <Button 
-                variant="outline" 
-                onClick={handleBarcodeScanning}
-                className="ml-2"
-              >
-                <ScanLine className="ml-2 h-4 w-4" />
-                مسح الباركود
-              </Button>
-            </div>
-          </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
-            <div className="grid gap-4 py-4 px-1">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">اسم المنتج</Label>
-                  <Input 
-                    id="name" 
-                    placeholder="اسم المنتج" 
-                    value={newProduct.name || ""}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="barcode_type">نوع الباركود</Label>
-                  <Select 
-                    onValueChange={(value) => handleSelectChange(value, "barcode_type")}
-                    value={newProduct.barcode_type}
-                  >
-                    <SelectTrigger id="barcode_type">
-                      <SelectValue placeholder="اختر نوع الباركود" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="normal">عادي</SelectItem>
-                      <SelectItem value="scale">ميزان</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="barcode">
-                    {newProduct.barcode_type === "scale" ? "رمز المنتج (6 أرقام)" : "الباركود"}
-                  </Label>
-                  <Input 
-                    id="barcode" 
-                    placeholder={newProduct.barcode_type === "scale" ? "أدخل 1-6 أرقام" : "الباركود"} 
-                    value={newProduct.barcode || ""}
-                    onChange={handleInputChange}
-                  />
-                  {newProduct.barcode_type === "scale" && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      أدخل رمز المنتج فقط (1-6 أرقام). سيتم تخزينه كرمز من 6 أرقام.
-                    </p>
-                  )}
-                  {newProduct.barcode_type === "scale" && newProduct.barcode && newProduct.barcode.length > 0 && (
-                    <p className="text-xs text-primary mt-1">
-                      رمز المنتج المخزن: {newProduct.barcode.padStart(6, '0')}
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="quantity">الكمية</Label>
-                  <Input 
-                    id="quantity" 
-                    type="number" 
-                    placeholder="0" 
-                    value={newProduct.quantity || ""}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price">سعر البيع</Label>
-                  <Input 
-                    id="price" 
-                    type="number" 
-                    placeholder="0.00" 
-                    value={newProduct.price || ""}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="purchase_price">سعر الشراء</Label>
-                  <Input 
-                    id="purchase_price" 
-                    type="number" 
-                    placeholder="0.00" 
-                    value={newProduct.purchase_price || ""}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="is_offer" 
-                    checked={newProduct.is_offer}
-                    onCheckedChange={(checked) => handleCheckboxChange(!!checked, "is_offer")} 
-                  />
-                  <Label htmlFor="is_offer" className="mr-2">هذا المنتج مخفض</Label>
-                </div>
-              </div>
-              
-              {newProduct.is_offer && (
-                <div className="space-y-2 pt-2 border-t">
-                  <Label htmlFor="offer_price">سعر العرض</Label>
-                  <Input 
-                    id="offer_price" 
-                    type="number" 
-                    placeholder="0.00" 
-                    value={newProduct.offer_price || ""}
-                    onChange={handleInputChange}
-                  />
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="bulk_enabled" 
-                    checked={newProduct.bulk_enabled}
-                    onCheckedChange={(checked) => handleCheckboxChange(!!checked, "bulk_enabled")} 
-                  />
-                  <Label htmlFor="bulk_enabled" className="mr-2">تمكين البيع بالجملة</Label>
-                </div>
-              </div>
-              
-              {newProduct.bulk_enabled && (
-                <div className="grid grid-cols-3 gap-4 pt-2 border-t">
-                  <div className="space-y-2">
-                    <Label htmlFor="bulk_quantity">كمية العبوة</Label>
-                    <Input 
-                      id="bulk_quantity" 
-                      type="number" 
-                      placeholder="عدد الوحدات" 
-                      value={newProduct.bulk_quantity || ""}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bulk_price">سعر الجملة</Label>
-                    <Input 
-                      id="bulk_price" 
-                      type="number" 
-                      placeholder="0.00" 
-                      value={newProduct.bulk_price || ""}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bulk_barcode">باركود الجملة</Label>
-                    <Input 
-                      id="bulk_barcode" 
-                      placeholder="باركود عبوة الجملة" 
-                      value={newProduct.bulk_barcode || ""}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="category_id">الفئة</Label>
-                <Input 
-                  id="category_id" 
-                  placeholder="الفئة" 
-                  value={newProduct.category_id || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="description">وصف المنتج</Label>
-                <Input 
-                  id="description" 
-                  placeholder="وصف المنتج" 
-                  value={newProduct.description || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="manufacturer_name">الشركة المصنعة</Label>
-                <Input 
-                  id="manufacturer_name" 
-                  placeholder="الشركة المصنعة" 
-                  value={newProduct.manufacturer_name || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="unit_of_measure">وحدة القياس</Label>
-                <Input 
-                  id="unit_of_measure" 
-                  placeholder="وحدة القياس (قطعة، كجم، لتر)" 
-                  value={newProduct.unit_of_measure || ""}
-                  onChange={handleInputChange}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="image">صورة المنتج</Label>
-                <div className="flex items-center gap-2">
-                  <div className="h-20 w-20 border rounded overflow-hidden flex items-center justify-center bg-gray-50">
-                    {newProduct.image_urls && newProduct.image_urls[0] ? (
-                      <img 
-                        src={newProduct.image_urls[0]} 
-                        alt="صورة المنتج" 
-                        className="max-h-full max-w-full object-contain"
-                      />
-                    ) : (
-                      <ImageIcon className="h-10 w-10 text-gray-300" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <Input id="image" type="file" />
-                    <p className="text-xs text-muted-foreground mt-1">يمكنك تحميل صورة أو استخدام الصورة الافتراضية</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </ScrollArea>
-          <DialogFooter>
-            <Button 
-              type="button" 
-              onClick={handleSaveProduct}
-              disabled={loading}
-            >
-              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-              حفظ المنتج
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       
       <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -889,216 +630,6 @@ export default function ProductManagement() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[480px] max-w-[95%] w-full">
-          <DialogHeader>
-            <DialogTitle>تعديل المنتج</DialogTitle>
-            <DialogDescription>
-              قم بتعديل تفاصيل المنتج. اضغط حفظ عند الانتهاء.
-            </DialogDescription>
-          </DialogHeader>
-          {productToEdit && (
-            <ScrollArea className="max-h-[70vh]">
-              <div className="grid gap-4 py-4 px-1">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">اسم المنتج</Label>
-                    <Input 
-                      id="name" 
-                      placeholder="اسم المنتج" 
-                      value={productToEdit.name || ""}
-                      onChange={handleEditInputChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="barcode_type">نوع الباركود</Label>
-                    <Select 
-                      onValueChange={(value) => handleEditSelectChange(value, "barcode_type")}
-                      value={productToEdit.barcode_type || "normal"}
-                      disabled
-                    >
-                      <SelectTrigger id="barcode_type">
-                        <SelectValue placeholder="اختر نوع الباركود" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="normal">عادي</SelectItem>
-                        <SelectItem value="scale">ميزان</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="barcode">
-                      {productToEdit.barcode_type === "scale" ? "رمز المنتج (6 أرقام)" : "الباركود"}
-                    </Label>
-                    <Input 
-                      id="barcode" 
-                      placeholder={productToEdit.barcode_type === "scale" ? "أدخل 1-6 أرقام" : "الباركود"} 
-                      value={productToEdit.barcode || ""}
-                      onChange={handleEditInputChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="quantity">الكمية</Label>
-                    <Input 
-                      id="quantity" 
-                      type="number" 
-                      placeholder="0" 
-                      value={productToEdit.quantity || ""}
-                      onChange={handleEditInputChange}
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="price">سعر البيع</Label>
-                    <Input 
-                      id="price" 
-                      type="number" 
-                      placeholder="0.00" 
-                      value={productToEdit.price || ""}
-                      onChange={handleEditInputChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="purchase_price">سعر الشراء</Label>
-                    <Input 
-                      id="purchase_price" 
-                      type="number" 
-                      placeholder="0.00" 
-                      value={productToEdit.purchase_price || ""}
-                      onChange={handleEditInputChange}
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="is_offer" 
-                      checked={productToEdit.is_offer}
-                      onCheckedChange={(checked) => handleEditCheckboxChange(!!checked, "is_offer")} 
-                    />
-                    <Label htmlFor="is_offer" className="mr-2">هذا المنتج مخفض</Label>
-                  </div>
-                </div>
-                
-                {productToEdit.is_offer && (
-                  <div className="space-y-2 pt-2 border-t">
-                    <Label htmlFor="offer_price">سعر العرض</Label>
-                    <Input 
-                      id="offer_price" 
-                      type="number" 
-                      placeholder="0.00" 
-                      value={productToEdit.offer_price || ""}
-                      onChange={handleEditInputChange}
-                    />
-                  </div>
-                )}
-                
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="bulk_enabled" 
-                      checked={productToEdit.bulk_enabled}
-                      onCheckedChange={(checked) => handleEditCheckboxChange(!!checked, "bulk_enabled")} 
-                    />
-                    <Label htmlFor="bulk_enabled" className="mr-2">تمكين البيع بالجملة</Label>
-                  </div>
-                </div>
-                
-                {productToEdit.bulk_enabled && (
-                  <div className="grid grid-cols-3 gap-4 pt-2 border-t">
-                    <div className="space-y-2">
-                      <Label htmlFor="bulk_quantity">كمية العبوة</Label>
-                      <Input 
-                        id="bulk_quantity" 
-                        type="number" 
-                        placeholder="عدد الوحدات" 
-                        value={productToEdit.bulk_quantity || ""}
-                        onChange={handleEditInputChange}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="bulk_price">سعر الجملة</Label>
-                      <Input 
-                        id="bulk_price" 
-                        type="number" 
-                        placeholder="0.00" 
-                        value={productToEdit.bulk_price || ""}
-                        onChange={handleEditInputChange}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="bulk_barcode">باركود الجملة</Label>
-                      <Input 
-                        id="bulk_barcode" 
-                        placeholder="باركود عبوة الجملة" 
-                        value={productToEdit.bulk_barcode || ""}
-                        onChange={handleEditInputChange}
-                      />
-                    </div>
-                  </div>
-                )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="category_id">الفئة</Label>
-                  <Input 
-                    id="category_id" 
-                    placeholder="الفئة" 
-                    value={productToEdit.category_id || ""}
-                    onChange={handleEditInputChange}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="description">وصف المنتج</Label>
-                  <Input 
-                    id="description" 
-                    placeholder="وصف المنتج" 
-                    value={productToEdit.description || ""}
-                    onChange={handleEditInputChange}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="manufacturer_name">الشركة المصنعة</Label>
-                  <Input 
-                    id="manufacturer_name" 
-                    placeholder="الشركة المصنعة" 
-                    value={productToEdit.manufacturer_name || ""}
-                    onChange={handleEditInputChange}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="unit_of_measure">وحدة القياس</Label>
-                  <Input 
-                    id="unit_of_measure" 
-                    placeholder="وحدة القياس (قطعة، كجم، لتر)" 
-                    value={productToEdit.unit_of_measure || ""}
-                    onChange={handleEditInputChange}
-                  />
-                </div>
-              </div>
-            </ScrollArea>
-          )}
-          <DialogFooter>
-            <Button 
-              type="button" 
-              onClick={handleEditProduct}
-              disabled={loading}
-            >
-              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-              حفظ التغييرات
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={isOfferDialogOpen} onOpenChange={setIsOfferDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
