@@ -1,3 +1,5 @@
+
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -5,7 +7,10 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import { UserRole } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
+// Import pages
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import POS from "./pages/POS";
@@ -31,6 +36,42 @@ import AddBanner from "./pages/AddBanner";
 const queryClient = new QueryClient();
 
 function App() {
+  useEffect(() => {
+    const initStorage = async () => {
+      try {
+        // Check if we can list files in the banners bucket
+        const { error } = await supabase.storage.from('banners').list();
+        
+        // If there's an error accessing the bucket, try to create it using the edge function
+        if (error) {
+          console.log("Attempting to create banners bucket via edge function...");
+          
+          const response = await fetch(
+            "https://qzvpayjaadbmpayeglon.functions.supabase.co/create_banners_bucket",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY || ""}`,
+              },
+            }
+          );
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error("Error creating banners bucket:", errorData);
+          } else {
+            console.log("Banners bucket created/verified successfully");
+          }
+        }
+      } catch (error) {
+        console.error("Storage initialization error:", error);
+      }
+    };
+
+    initStorage();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

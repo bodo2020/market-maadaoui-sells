@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Product } from "@/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 // Define the type for banner data from the database
 interface BannerData {
@@ -59,6 +61,7 @@ export default function AddBanner() {
   const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
   const [companies, setCompanies] = useState<{id: string, name: string}[]>([]);
   const [filterType, setFilterType] = useState<"none" | "category" | "company">("none");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (bannerId) {
@@ -67,7 +70,22 @@ export default function AddBanner() {
     fetchProducts();
     fetchCategories();
     fetchCompanies();
+    checkBannersBucket();
   }, [bannerId]);
+
+  const checkBannersBucket = async () => {
+    try {
+      // Try to list files in the banners bucket to check if it exists
+      const { error } = await supabase.storage.from('banners').list();
+      
+      // If there's an error, the bucket might not exist
+      if (error) {
+        console.log("Banners bucket may not exist or have permissions issues:", error);
+      }
+    } catch (err) {
+      console.error("Error checking banners bucket:", err);
+    }
+  };
 
   const fetchBanner = async () => {
     try {
@@ -181,7 +199,44 @@ export default function AddBanner() {
     });
   }, [products, selectedProducts, searchTerm]);
 
+  const uploadImage = async (file: File): Promise<string> => {
+    setUploading(true);
+    setError(null);
+    
+    try {
+      // Generate a unique file name
+      const fileName = `banner-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      
+      // Get the URL to a storage bucket called 'banners'
+      const { data, error } = await supabase.storage
+        .from('banners')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Get the public URL of the uploaded file
+      const { data: urlData } = supabase.storage
+        .from('banners')
+        .getPublicUrl(fileName);
+        
+      return urlData.publicUrl;
+    } catch (error: any) {
+      console.error("Error uploading image:", error);
+      setError(`خطأ في رفع الصورة: ${error.message || 'حدث خطأ غير معروف'}`);
+      throw error;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSave = async () => {
+    setError(null);
+    
     if (!formData.title) {
       toast.error("يرجى إدخال عنوان البانر");
       return;
@@ -197,27 +252,12 @@ export default function AddBanner() {
       let imageUrl = formData.image_url;
 
       if (imageFile) {
-        setUploading(true);
-        const fileName = `banner-${Date.now()}-${imageFile.name}`;
-        
-        const { error: bucketError } = await supabase.rpc('create_bucket_if_not_exists', {
-          bucket_name: 'banners'
-        });
-        
-        if (bucketError) throw bucketError;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('banners')
-          .upload(fileName, imageFile);
-
-        if (uploadError) throw uploadError;
-        
-        const { data: urlData } = supabase.storage
-          .from('banners')
-          .getPublicUrl(fileName);
-          
-        imageUrl = urlData.publicUrl;
-        setUploading(false);
+        try {
+          imageUrl = await uploadImage(imageFile);
+        } catch (error) {
+          setSaving(false);
+          return; // Exit if image upload fails
+        }
       }
 
       const bannerData = {
@@ -245,8 +285,9 @@ export default function AddBanner() {
       }
 
       navigate('/banners');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving banner:", error);
+      setError(`خطأ في حفظ البانر: ${error.message || 'حدث خطأ غير معروف'}`);
       toast.error("حدث خطأ أثناء حفظ البانر");
     } finally {
       setSaving(false);
@@ -279,6 +320,13 @@ export default function AddBanner() {
             حفظ
           </Button>
         </div>
+
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Banner Details */}

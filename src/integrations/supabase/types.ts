@@ -48,6 +48,48 @@ export type Database = {
         }
         Relationships: []
       }
+      cart_items: {
+        Row: {
+          created_at: string | null
+          id: string
+          product_id: string
+          quantity: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          product_id: string
+          quantity?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          product_id?: string
+          quantity?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cart_items_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_tracking: {
         Row: {
           closing_balance: number | null
@@ -245,6 +287,42 @@ export type Database = {
         }
         Relationships: []
       }
+      favorites: {
+        Row: {
+          created_at: string | null
+          id: string
+          product_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          product_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          product_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       online_orders: {
         Row: {
           created_at: string | null
@@ -396,6 +474,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          full_name: string
+          id: string
+          location: string | null
+          phone_number: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          full_name: string
+          id: string
+          location?: string | null
+          phone_number: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          full_name?: string
+          id?: string
+          location?: string | null
+          phone_number?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       purchase_items: {
         Row: {
