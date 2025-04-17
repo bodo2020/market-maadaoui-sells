@@ -58,7 +58,13 @@ export default function ProductsGrid({ products, onRefresh }: ProductsGridProps)
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-500">المخزون</span>
-                <Badge variant={product.quantity > 10 ? "success" : product.quantity > 0 ? "warning" : "destructive"}>
+                <Badge 
+                  variant={
+                    product.quantity > 10 ? "secondary" : 
+                    product.quantity > 0 ? "default" : 
+                    "destructive"
+                  }
+                >
                   {product.quantity} وحدة
                 </Badge>
               </div>
