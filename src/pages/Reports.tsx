@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -34,7 +33,7 @@ import {
   Store, 
   ShoppingCart, 
   Users, 
-  Calendar,
+  Calendar as CalendarLucideIcon,
   DollarSign,
   Percent,
   CalendarIcon
@@ -86,7 +85,6 @@ export default function Reports() {
   const [endDate, setEndDate] = useState<Date | undefined>(endOfMonth(new Date()));
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
-  // Query parameters with date range
   const queryParams = {
     dateRange,
     startDate,
@@ -154,17 +152,14 @@ export default function Reports() {
     .sort((a, b) => b.quantitySold - a.quantitySold)
     .slice(0, 5);
 
-  // Handle date range change
   const handleDateRangeChange = (value: string) => {
     setDateRange(value);
-    // Reset date picker selections when changing to preset ranges
     if (value !== "custom") {
       setStartDate(undefined);
       setEndDate(undefined);
     }
   };
 
-  // Handle date selection in the calendar
   const handleDateSelect = (date: Date | undefined) => {
     if (!startDate || (startDate && endDate)) {
       setStartDate(date);
@@ -179,7 +174,6 @@ export default function Reports() {
     }
   };
   
-  // Get formatted date range string for display
   const getDateRangeText = () => {
     if (dateRange === "custom" && startDate && endDate) {
       return `${format(startDate, "dd/MM/yyyy")} - ${format(endDate, "dd/MM/yyyy")}`;
@@ -195,7 +189,6 @@ export default function Reports() {
     }[dateRange] || "اختر الفترة";
   };
 
-  // Handle export report
   const handleExportReport = async () => {
     try {
       toast.loading("جاري تصدير التقرير...");
