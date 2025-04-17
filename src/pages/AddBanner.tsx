@@ -15,6 +15,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import type { Product } from "@/types";
 
+// Define the type for banner data from the database
+interface BannerData {
+  id: string;
+  title: string;
+  image_url: string;
+  link: string | null;
+  active: boolean | null;
+  position: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  products?: string[]; // Custom field not in database schema
+  category_id?: string | null; // Custom field not in database schema
+  company_id?: string | null; // Custom field not in database schema
+}
+
 export default function AddBanner() {
   const [searchParams] = useSearchParams();
   const bannerId = searchParams.get("id");
@@ -63,20 +80,24 @@ export default function AddBanner() {
       if (error) throw error;
       
       if (data) {
-        setFormData({
-          title: data.title,
-          image_url: data.image_url,
-          link: data.link || "",
-          active: data.active !== null ? data.active : true,
-          position: data.position !== null ? data.position : 0,
-          products: Array.isArray(data.products) ? data.products : [],
-          category_id: data.category_id || null,
-          company_id: data.company_id || null
-        });
-        setPreviewUrl(data.image_url);
+        // Cast data to BannerData to handle custom fields
+        const bannerData = data as unknown as BannerData;
         
-        if (data.products && Array.isArray(data.products) && data.products.length > 0) {
-          fetchSelectedProducts(data.products);
+        setFormData({
+          title: bannerData.title,
+          image_url: bannerData.image_url,
+          link: bannerData.link || "",
+          active: bannerData.active !== null ? bannerData.active : true,
+          position: bannerData.position !== null ? bannerData.position : 0,
+          products: Array.isArray(bannerData.products) ? bannerData.products : [],
+          category_id: bannerData.category_id || null,
+          company_id: bannerData.company_id || null
+        });
+        setPreviewUrl(bannerData.image_url);
+        
+        // Check if products exist and fetch them
+        if (bannerData.products && Array.isArray(bannerData.products) && bannerData.products.length > 0) {
+          fetchSelectedProducts(bannerData.products);
         }
       }
     } catch (error) {
