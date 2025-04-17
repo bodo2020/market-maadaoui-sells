@@ -40,9 +40,7 @@ export default function POS() {
   const [currentSale, setCurrentSale] = useState<Sale | null>(null);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -79,6 +77,26 @@ export default function POS() {
       }
     };
   }, [barcodeBuffer]);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        setIsLoading(true);
+        const data = await fetchProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error("Error loading products:", error);
+        toast({
+          title: "خطأ في تحميل المنتجات",
+          description: "حدث خطأ أثناء تحميل المنتجات، يرجى المحاولة مرة أخرى.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadProducts();
+  }, [toast]);
 
   const processBarcode = async (barcode: string) => {
     if (barcode.length < 5) return;
@@ -125,26 +143,6 @@ export default function POS() {
       });
     }
   };
-
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        setIsLoading(true);
-        const data = await fetchProducts();
-        setProducts(data);
-      } catch (error) {
-        console.error("Error loading products:", error);
-        toast({
-          title: "خطأ في تحميل المنتجات",
-          description: "حدث خطأ أثناء تحميل المنتجات، يرجى المحاولة مرة أخرى.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadProducts();
-  }, [toast]);
 
   const handleSearch = async () => {
     if (!search) return;
@@ -825,4 +823,4 @@ export default function POS() {
                   <Check className="h-6 w-6 text-green-600" />
                 </div>
                 <h3 className="font-semibold text-lg">تمت عملية البيع بنجاح</h3>
-                <p className="
+                <p className="text-muted-
