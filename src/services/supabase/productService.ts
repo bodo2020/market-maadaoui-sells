@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -180,9 +181,8 @@ export async function updateProduct(id: string, product: Partial<Product>) {
     }
   }
 
-  // Create a simple update object with field by field assignments
-  // This avoids the deep type instantiation issue
-  const updateData: {[key: string]: any} = {};
+  // Create a new object for update to avoid type issues
+  const updateData: Record<string, any> = {};
   
   // Only add fields that are defined in the product object
   if (product.name !== undefined) updateData.name = product.name;
