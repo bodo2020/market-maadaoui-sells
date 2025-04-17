@@ -215,28 +215,9 @@ export default function POS() {
   };
 
   const handleAddToCart = (product: Product) => {
-    // Check if product has zero or negative quantity
-    if ((product.quantity || 0) <= 0) {
-      toast({
-        title: "المنتج غير متوفر",
-        description: `المنتج "${product.name}" غير متوفر في المخزون`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
+    // Remove the quantity check and allow any product to be added to cart
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
-      // Check if adding more would exceed available quantity
-      if (existingItem.quantity + 1 > (product.quantity || 0)) {
-        toast({
-          title: "الكمية غير متوفرة",
-          description: `الكمية المتوفرة من المنتج "${product.name}" هي ${product.quantity}`,
-          variant: "destructive"
-        });
-        return;
-      }
-      
       setCartItems(cartItems.map(item => item.product.id === product.id ? {
         ...item,
         quantity: item.quantity + 1,
@@ -257,16 +238,7 @@ export default function POS() {
   };
 
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
-    // Check if product has zero or negative quantity
-    if ((product.quantity || 0) <= 0) {
-      toast({
-        title: "المنتج غير متوفر",
-        description: `المنتج "${product.name}" غير متوفر في المخزون`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
+    // Remove the quantity check and allow any weight product to be added
     const itemPrice = product.price * weight;
     const discountPerKg = product.is_offer && product.offer_price ? product.price - product.offer_price : 0;
     setCartItems([...cartItems, {
@@ -288,16 +260,7 @@ export default function POS() {
   };
 
   const handleAddBulkToCart = (product: Product) => {
-    // Check if product has zero or negative quantity
-    if ((product.quantity || 0) <= 0) {
-      toast({
-        title: "المنتج غير متوفر",
-        description: `عبوة الجملة للمنتج "${product.name}" غير متوفرة في المخزون`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
+    // Remove the quantity check and allow any bulk product to be added
     if (!product.bulk_enabled || !product.bulk_quantity || !product.bulk_price) {
       toast({
         title: "خطأ",
@@ -347,16 +310,7 @@ export default function POS() {
         
         const newQuantity = Math.max(1, item.quantity + change);
         
-        // Check if increasing quantity would exceed available stock
-        if (change > 0 && newQuantity > (item.product.quantity || 0)) {
-          toast({
-            title: "الكمية غير متوفرة",
-            description: `الكمية المتوفرة من المنتج "${item.product.name}" هي ${item.product.quantity}`,
-            variant: "destructive"
-          });
-          return item;
-        }
-        
+        // Allow unlimited quantity increase
         let price = item.price;
         let total = item.weight !== null ? item.price : newQuantity * price;
         return {
@@ -801,97 +755,4 @@ export default function POS() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label htmlFor="customerName">اسم العميل</Label>
-                      <Input id="customerName" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="customerPhone">رقم الهاتف</Label>
-                      <Input id="customerPhone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <h3 className="font-semibold">طريقة الدفع</h3>
-                  <RadioGroup value={paymentMethod} onValueChange={value => handlePaymentMethodChange(value as 'cash' | 'card' | 'mixed')} className="flex space-x-2 space-x-reverse">
-                    <div className="flex items-center space-x-2 space-x-reverse">
-                      <RadioGroupItem value="cash" id="cash" />
-                      <Label htmlFor="cash" className="flex items-center">
-                        <Banknote className="ml-2 h-4 w-4" />
-                        نقدي
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2 space-x-reverse">
-                      <RadioGroupItem value="card" id="card" />
-                      <Label htmlFor="card" className="flex items-center">
-                        <CardIcon className="ml-2 h-4 w-4" />
-                        بطاقة
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2 space-x-reverse">
-                      <RadioGroupItem value="mixed" id="mixed" />
-                      <Label htmlFor="mixed" className="flex items-center">
-                        <CardIcon className="ml-2 h-4 w-4" />
-                        مختلط
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-                
-                <div className="space-y-3">
-                  <h3 className="font-semibold">تفاصيل الدفع</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(paymentMethod === 'cash' || paymentMethod === 'mixed') && <div className="space-y-1">
-                        <Label htmlFor="cashAmount" className="flex items-center">
-                          <Banknote className="ml-2 h-4 w-4" />
-                          المبلغ النقدي
-                        </Label>
-                        <Input id="cashAmount" type="number" step="0.01" min="0" value={cashAmount} onChange={e => setCashAmount(e.target.value)} />
-                      </div>}
-                    
-                    {(paymentMethod === 'card' || paymentMethod === 'mixed') && <div className="space-y-1">
-                        <Label htmlFor="cardAmount" className="flex items-center">
-                          <CardIcon className="ml-2 h-4 w-4" />
-                          مبلغ البطاقة
-                        </Label>
-                        <Input id="cardAmount" type="number" step="0.01" min="0" value={cardAmount} onChange={e => setCardAmount(e.target.value)} />
-                      </div>}
-                  </div>
-                  
-                  {paymentMethod === 'mixed' && <div className="text-sm">
-                      <span className="text-muted-foreground">مجموع الدفع: </span>
-                      <span className={`font-bold ${parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0") !== total ? "text-red-500" : "text-green-500"}`}>
-                        {(parseFloat(cashAmount || "0") + parseFloat(cardAmount || "0")).toFixed(2)} {siteConfig.currency}
-                      </span>
-                    </div>}
-                  
-                  {paymentMethod === 'cash' && parseFloat(cashAmount || "0") > total && <div className="text-sm">
-                      <span className="text-muted-foreground">المبلغ المتبقي: </span>
-                      <span className="font-bold">{calculateChange().toFixed(2)} {siteConfig.currency}</span>
-                    </div>}
-                </div>
-                
-                <div className="rounded-lg bg-muted p-3">
-                  <div className="flex justify-between font-bold">
-                    <span>الإجمالي:</span>
-                    <span>{total.toFixed(2)} {siteConfig.currency}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <DialogFooter className="sm:justify-start">
-                <Button type="submit" disabled={isProcessing || !validatePayment()} onClick={completeSale}>
-                  {isProcessing ? "جاري المعالجة..." : "تأكيد البيع"}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setIsCheckoutOpen(false)}>
-                  إلغاء
-                </Button>
-              </DialogFooter>
-            </>}
-        </DialogContent>
-      </Dialog>
-      
-      <InvoiceDialog isOpen={showInvoice} onClose={() => setShowInvoice(false)} sale={currentSale} />
-      
-      <BarcodeScanner isOpen={showBarcodeScanner} onClose={() => setShowBarcodeScanner(false)} onScan={handleBarcodeScan} />
-    </MainLayout>;
-}
+                      <Input id="customerName" value={customerName} onChange={e => set
