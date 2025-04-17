@@ -29,19 +29,24 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState<StockNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
+  // Load notifications on mount and when notifications change
+  const loadNotifications = () => {
+    setNotifications(getNotifications());
+  };
+
   // Load notifications on mount and periodically check for low stock
   useEffect(() => {
     // Load existing notifications
-    setNotifications(getNotifications());
+    loadNotifications();
     
     // Check for low stock products initially
     const checkStock = async () => {
       const newNotifications = await checkLowStockProducts();
-      setNotifications(getNotifications());
+      loadNotifications();
       
       // Show toast for new notifications
       newNotifications.forEach(notification => {
-        if (!notification.read) {
+        if (!notification.read && !notification.displayed) {
           // Fix: We need to call toast as a function, not render it directly
           toast("تنبيه المخزون المنخفض", {
             description: `المنتج "${notification.product.name}" منخفض المخزون (${notification.product.quantity} وحدة متبقية)`,
@@ -66,7 +71,8 @@ export default function Navbar() {
   const handleNotificationClick = (notification: StockNotification) => {
     // Mark the notification as read
     markNotificationAsRead(notification.id);
-    setNotifications(getNotifications());
+    // Update notifications state immediately after marking as read
+    loadNotifications();
     
     // Navigate to inventory management page
     navigate('/inventory');
@@ -77,7 +83,8 @@ export default function Navbar() {
 
   const handleMarkAllAsRead = () => {
     markAllNotificationsAsRead();
-    setNotifications(getNotifications());
+    // Update notifications state immediately after marking all as read
+    loadNotifications();
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;

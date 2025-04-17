@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
-import { LogIn, Eye, EyeOff } from "lucide-react";
+import { LogIn, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Login() {
   // Login state
@@ -15,6 +16,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   
   const { login, isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -22,7 +24,10 @@ export default function Login() {
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
+    
     if (!username || !password) {
+      setLoginError("يرجى إدخال اسم المستخدم وكلمة المرور");
       toast({
         title: "خطأ",
         description: "يرجى إدخال اسم المستخدم وكلمة المرور",
@@ -36,7 +41,8 @@ export default function Login() {
       await login(username, password);
       // We don't need to navigate manually, as the authentication state will trigger the redirect
     } catch (error) {
-      // Error is handled in the auth context
+      // Show explicit error message
+      setLoginError("اسم المستخدم أو كلمة المرور غير صحيحة");
       console.error("Login failed:", error);
     } finally {
       setIsLoading(false);
@@ -63,6 +69,13 @@ export default function Login() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-4">
+            {loginError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertTriangle className="h-4 w-4 ml-2" />
+                <AlertDescription>{loginError}</AlertDescription>
+              </Alert>
+            )}
+            
             <form onSubmit={handleLogin}>
               <div className="space-y-4">
                 <div className="space-y-2">
