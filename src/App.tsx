@@ -11,12 +11,12 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import POS from "./pages/POS";
 import ProductManagement from "./pages/ProductManagement";
+import AddProduct from "./pages/AddProduct";
 import InventoryManagement from "./pages/InventoryManagement";
 import SuppliersCustomers from "./pages/SuppliersCustomers";
 import Reports from "./pages/Reports";
 import EmployeeManagement from "./pages/EmployeeManagement";
 import ExpenseManagement from "./pages/ExpenseManagement";
-import Finance from "./pages/Finance";
 import Invoices from "./pages/Invoices";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -53,6 +53,12 @@ function App() {
                 </ProtectedRoute>
               } />
               
+              <Route path="/add-product" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <AddProduct />
+                </ProtectedRoute>
+              } />
+              
               <Route path="/inventory" element={
                 <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.EMPLOYEE]}>
                   <InventoryManagement />
@@ -79,7 +85,7 @@ function App() {
               
               <Route path="/finance" element={
                 <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <Finance />
+                  <Reports />
                 </ProtectedRoute>
               } />
               

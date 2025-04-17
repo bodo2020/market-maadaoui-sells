@@ -20,7 +20,8 @@ import {
   Banknote,
   Truck,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  PlusCircle
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -105,6 +106,12 @@ export default function Sidebar() {
           active={currentPath === "/products"}
         />
         <SidebarItem
+          icon={<PlusCircle size={20} />}
+          label={collapsed ? "" : "إضافة منتج"}
+          href="/add-product"
+          active={currentPath === "/add-product"}
+        />
+        <SidebarItem
           icon={<Receipt size={20} />}
           label={collapsed ? "" : "الفواتير"}
           href="/invoices"
@@ -112,9 +119,9 @@ export default function Sidebar() {
         />
         <SidebarItem
           icon={<BarChart4 size={20} />}
-          label={collapsed ? "" : "التقارير"}
+          label={collapsed ? "" : "التقارير والمالية"}
           href="/reports"
-          active={currentPath === "/reports"}
+          active={currentPath === "/reports" || currentPath === "/finance"}
         />
         <SidebarItem
           icon={<Store size={20} />}
@@ -127,12 +134,6 @@ export default function Sidebar() {
           label={collapsed ? "" : "العملاء والموردين"}
           href="/suppliers-customers"
           active={currentPath === "/suppliers-customers"}
-        />
-        <SidebarItem
-          icon={<Banknote size={20} />}
-          label={collapsed ? "" : "المالية"}
-          href="/finance"
-          active={currentPath === "/finance"}
         />
         <SidebarItem
           icon={<FileText size={20} />}
