@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -148,4 +147,16 @@ export interface Purchase {
   invoice_file_url?: string;
   created_at: string;
   updated_at?: string;
+  suppliers?: { name: string };
+  items?: PurchaseItem[];
+}
+
+export interface PurchaseItem {
+  id: string;
+  purchase_id: string;
+  product_id: string;
+  quantity: number;
+  price: number;
+  total: number;
+  products?: { name: string };
 }
