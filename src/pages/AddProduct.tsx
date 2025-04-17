@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -124,7 +123,14 @@ export default function AddProduct() {
       
       // Add all required properties for the Product type
       await createProduct({
-        ...values,
+        name: values.name, // Explicitly include required fields
+        price: values.price,
+        purchase_price: values.purchase_price,
+        quantity: values.quantity,
+        description: values.description,
+        barcode: values.barcode,
+        is_offer: values.is_offer,
+        offer_price: values.offer_price,
         image_urls: [], // Add empty array for image_urls
         bulk_enabled: false, // Set default value for bulk_enabled
         is_bulk: false, // Set default value for is_bulk
