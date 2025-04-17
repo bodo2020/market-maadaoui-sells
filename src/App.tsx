@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -147,7 +148,17 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              <Route path="/categories/:id" element={<Categories />} />
+              <Route path="/categories" element={
+                <ProtectedRoute>
+                  <Categories />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/categories/:id" element={
+                <ProtectedRoute>
+                  <Categories />
+                </ProtectedRoute>
+              } />
               
               <Route path="*" element={<NotFound />} />
             </Routes>
