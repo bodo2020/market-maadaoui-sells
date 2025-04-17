@@ -1,8 +1,8 @@
 
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
-import { checkLowStockProducts, showLowStockToasts } from "@/services/notificationService";
+
 // Lazy load pages
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const POS = lazy(() => import("@/pages/POS"));
@@ -33,24 +33,9 @@ import "./App.css";
 import { Toaster } from "@/components/ui/sonner";
 
 function App() {
-  // Initialize notifications system on app load
-  useEffect(() => {
-    const initNotifications = async () => {
-      try {
-        await checkLowStockProducts();
-        showLowStockToasts();
-      } catch (error) {
-        console.error("Failed to initialize notifications:", error);
-        // Don't block app rendering if notifications fail
-      }
-    };
-    
-    initNotifications();
-  }, []);
-
   return (
     <Router>
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center">جاري التحميل...</div>}>
+      <Suspense fallback={<div>Loading...</div>}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/login" element={<Login />} />
