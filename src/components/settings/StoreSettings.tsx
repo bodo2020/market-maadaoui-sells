@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -92,8 +91,8 @@ export default function StoreSettings() {
       
       console.log("Saving settings:", settingsData);
       
-      // Update the site config - this function also saves to localStorage
-      updateSiteConfig({
+      // Update both siteConfig and Supabase
+      await updateSiteConfig({
         name: settingsData.storeName,
         address: settingsData.storeAddress,
         phone: settingsData.storePhone,
