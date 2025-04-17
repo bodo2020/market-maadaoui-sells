@@ -29,6 +29,10 @@ export default function Companies() {
         .order('name');
 
       if (error) throw error;
+      
+      // Debug the response
+      console.log("Companies data:", data);
+      
       setCompanies(data || []);
     } catch (error) {
       console.error('Error fetching companies:', error);
@@ -45,6 +49,11 @@ export default function Companies() {
         
         {loading ? (
           <p className="text-center">جاري التحميل...</p>
+        ) : companies.length === 0 ? (
+          <div className="text-center py-10">
+            <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-xl text-gray-500">لا توجد شركات حالياً</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {companies.map((company) => (
