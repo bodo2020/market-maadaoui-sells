@@ -1,4 +1,6 @@
 
+import { supabase } from "@/integrations/supabase/client";
+
 export type SiteConfig = {
   name: string;
   currency: string;
