@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,24 +5,10 @@ import * as z from "zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { createProduct, updateProduct, fetchProductById } from "@/services/supabase/productService";
 import { CustomSwitch } from "@/components/ui/custom-switch";
@@ -34,64 +19,102 @@ import BarcodeScanner from "@/components/POS/BarcodeScanner";
 // Form validation schema
 const productFormSchema = z.object({
   name: z.string().min(2, {
-    message: "يجب أن يحتوي اسم المنتج على حرفين على الأقل.",
+    message: "يجب أن يحتوي اسم المنتج على حرفين على الأقل."
   }),
   description: z.string().optional(),
   barcode: z.string().optional(),
   barcode_type: z.string().default("normal"),
   category: z.string(),
   price: z.coerce.number().positive({
-    message: "يجب أن يكون السعر رقمًا موجبًا.",
+    message: "يجب أن يكون السعر رقمًا موجبًا."
   }),
   purchase_price: z.coerce.number().positive({
-    message: "يجب أن يكون سعر الشراء رقمًا موجبًا.",
+    message: "يجب أن يكون سعر الشراء رقمًا موجبًا."
   }),
   quantity: z.coerce.number().nonnegative({
-    message: "يجب أن تكون الكمية صفر أو أكثر.",
+    message: "يجب أن تكون الكمية صفر أو أكثر."
   }),
   is_offer: z.boolean().default(false),
   offer_price: z.coerce.number().positive({
-    message: "يجب أن يكون سعر العرض رقمًا موجبًا.",
+    message: "يجب أن يكون سعر العرض رقمًا موجبًا."
   }).optional(),
   is_service: z.boolean().default(false),
   track_inventory: z.boolean().default(true),
   unit: z.string().default("قطعة"),
-  notify_quantity: z.coerce.number().nonnegative().optional(),
+  notify_quantity: z.coerce.number().nonnegative().optional()
 });
 
 // Product categories
-const categories = [
-  { id: "electronics", name: "إلكترونيات" },
-  { id: "clothing", name: "ملابس" },
-  { id: "food", name: "مواد غذائية" },
-  { id: "home", name: "منزل" },
-  { id: "beauty", name: "العناية الشخصية" },
-  { id: "toys", name: "ألعاب" },
-  { id: "sports", name: "رياضة" },
-  { id: "books", name: "كتب" },
-  { id: "others", name: "أخرى" },
-];
+const categories = [{
+  id: "electronics",
+  name: "إلكترونيات"
+}, {
+  id: "clothing",
+  name: "ملابس"
+}, {
+  id: "food",
+  name: "مواد غذائية"
+}, {
+  id: "home",
+  name: "منزل"
+}, {
+  id: "beauty",
+  name: "العناية الشخصية"
+}, {
+  id: "toys",
+  name: "ألعاب"
+}, {
+  id: "sports",
+  name: "رياضة"
+}, {
+  id: "books",
+  name: "كتب"
+}, {
+  id: "others",
+  name: "أخرى"
+}];
 
 // Product units
-const units = [
-  { id: "piece", name: "قطعة" },
-  { id: "kg", name: "كيلوجرام" },
-  { id: "g", name: "جرام" },
-  { id: "l", name: "لتر" },
-  { id: "ml", name: "مليلتر" },
-  { id: "m", name: "متر" },
-  { id: "cm", name: "سنتيمتر" },
-  { id: "box", name: "صندوق" },
-  { id: "bottle", name: "زجاجة" },
-  { id: "packet", name: "عبوة" },
-];
+const units = [{
+  id: "piece",
+  name: "قطعة"
+}, {
+  id: "kg",
+  name: "كيلوجرام"
+}, {
+  id: "g",
+  name: "جرام"
+}, {
+  id: "l",
+  name: "لتر"
+}, {
+  id: "ml",
+  name: "مليلتر"
+}, {
+  id: "m",
+  name: "متر"
+}, {
+  id: "cm",
+  name: "سنتيمتر"
+}, {
+  id: "box",
+  name: "صندوق"
+}, {
+  id: "bottle",
+  name: "زجاجة"
+}, {
+  id: "packet",
+  name: "عبوة"
+}];
 
 // Barcode types
-const barcodeTypes = [
-  { id: "normal", name: "عادي" },
-  { id: "scale", name: "ميزان" },
-];
-
+const barcodeTypes = [{
+  id: "normal",
+  name: "عادي"
+}, {
+  id: "scale",
+  name: "ميزان"
+}];
 export default function AddProduct() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -123,8 +146,8 @@ export default function AddProduct() {
       is_service: false,
       track_inventory: true,
       unit: "قطعة",
-      notify_quantity: 5,
-    },
+      notify_quantity: 5
+    }
   });
 
   // Fetch product data if we're editing
@@ -132,39 +155,36 @@ export default function AddProduct() {
     if (productId) {
       setIsLoading(true);
       setIsEditing(true);
-      
-      fetchProductById(productId)
-        .then((product) => {
-          // Populate the form with product data
-          form.reset({
-            name: product.name,
-            description: product.description || "",
-            barcode: product.barcode || "",
-            barcode_type: product.barcode_type || "normal",
-            category: product.category_id || "others",
-            price: product.price,
-            purchase_price: product.purchase_price,
-            quantity: product.quantity || 0,
-            is_offer: product.is_offer || false,
-            offer_price: product.offer_price,
-            is_service: product.quantity === -1, // If quantity is -1, it's a service
-            track_inventory: product.quantity !== -1,
-            unit: product.unit_of_measure || "قطعة",
-          });
-          
-          // Set image preview if product has an image
-          if (product.image_urls && product.image_urls.length > 0 && product.image_urls[0] !== "/placeholder.svg") {
-            setImagePreview(product.image_urls[0]);
-          }
-        })
-        .catch((error) => {
-          console.error("Error fetching product:", error);
-          toast.error("حدث خطأ أثناء تحميل بيانات المنتج");
-          navigate("/products");
-        })
-        .finally(() => {
-          setIsLoading(false);
+      fetchProductById(productId).then(product => {
+        // Populate the form with product data
+        form.reset({
+          name: product.name,
+          description: product.description || "",
+          barcode: product.barcode || "",
+          barcode_type: product.barcode_type || "normal",
+          category: product.category_id || "others",
+          price: product.price,
+          purchase_price: product.purchase_price,
+          quantity: product.quantity || 0,
+          is_offer: product.is_offer || false,
+          offer_price: product.offer_price,
+          is_service: product.quantity === -1,
+          // If quantity is -1, it's a service
+          track_inventory: product.quantity !== -1,
+          unit: product.unit_of_measure || "قطعة"
         });
+
+        // Set image preview if product has an image
+        if (product.image_urls && product.image_urls.length > 0 && product.image_urls[0] !== "/placeholder.svg") {
+          setImagePreview(product.image_urls[0]);
+        }
+      }).catch(error => {
+        console.error("Error fetching product:", error);
+        toast.error("حدث خطأ أثناء تحميل بيانات المنتج");
+        navigate("/products");
+      }).finally(() => {
+        setIsLoading(false);
+      });
     }
   }, [productId, form, navigate]);
 
@@ -173,7 +193,7 @@ export default function AddProduct() {
     const file = e.target.files?.[0];
     if (file) {
       setProductImage(file);
-      
+
       // Create a preview URL
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -199,18 +219,15 @@ export default function AddProduct() {
     e.preventDefault();
     e.stopPropagation();
   }, []);
-
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      
+
       // Check if the file is an image
       if (file.type.startsWith('image/')) {
         setProductImage(file);
-        
         const reader = new FileReader();
         reader.onloadend = () => {
           setImagePreview(reader.result as string);
@@ -238,17 +255,17 @@ export default function AddProduct() {
   const onSubmit = async (values: z.infer<typeof productFormSchema>) => {
     try {
       setIsSubmitting(true);
-      
+
       // If product is a service, set quantity to -1 and disable inventory tracking
       if (values.is_service) {
         values.quantity = -1;
       }
-      
+
       // If offer is not enabled, remove offer price
       if (!values.is_offer) {
         values.offer_price = undefined;
       }
-      
+
       // Format barcode for scale products if needed
       let formattedBarcode = values.barcode;
       if (values.barcode_type === "scale" && values.barcode) {
@@ -256,22 +273,24 @@ export default function AddProduct() {
         if (values.barcode.length > 6) {
           formattedBarcode = values.barcode.substring(0, 6);
         }
-        
+
         // Ensure it's exactly 6 digits by padding with zeros if needed
         while (formattedBarcode && formattedBarcode.length < 6) {
           formattedBarcode = '0' + formattedBarcode;
         }
       }
-      
+
       // Create image URLs array - will be a placeholder if no image was uploaded
-      const imageUrls = imagePreview 
-        ? [imagePreview] 
-        : ["/placeholder.svg"];
-      
+      const imageUrls = imagePreview ? [imagePreview] : ["/placeholder.svg"];
+
       // Remove track_inventory and notify_quantity from the data we send to the database
       // since they're not supported in the schema yet
-      const { track_inventory, notify_quantity, ...productData } = values;
-      
+      const {
+        track_inventory,
+        notify_quantity,
+        ...productData
+      } = values;
+
       // Add all required properties for the Product type
       const productToSave = {
         name: productData.name,
@@ -287,9 +306,8 @@ export default function AddProduct() {
         bulk_enabled: false,
         is_bulk: false,
         category_id: productData.category,
-        unit_of_measure: productData.unit,
+        unit_of_measure: productData.unit
       };
-      
       if (isEditing && productId) {
         // Update existing product
         await updateProduct(productId, productToSave);
@@ -299,7 +317,6 @@ export default function AddProduct() {
         await createProduct(productToSave);
         toast.success("تم إضافة المنتج بنجاح");
       }
-      
       navigate("/products");
     } catch (error) {
       console.error("Error saving product:", error);
@@ -308,20 +325,15 @@ export default function AddProduct() {
       setIsSubmitting(false);
     }
   };
-
   if (isLoading) {
-    return (
-      <MainLayout>
+    return <MainLayout>
         <div className="flex justify-center items-center h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span className="mr-2">جاري تحميل بيانات المنتج...</span>
         </div>
-      </MainLayout>
-    );
+      </MainLayout>;
   }
-
-  return (
-    <MainLayout>
+  return <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">
           {isEditing ? "تعديل المنتج" : "إضافة منتج جديد"}
@@ -339,292 +351,155 @@ export default function AddProduct() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="name" render={({
+                field
+              }) => <FormItem>
                       <FormLabel>اسم المنتج *</FormLabel>
                       <FormControl>
                         <Input placeholder="اسم المنتج" {...field} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
 
                 <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="barcode_type"
-                    render={({ field }) => (
-                      <FormItem>
+                  <FormField control={form.control} name="barcode_type" render={({
+                  field
+                }) => <FormItem>
                         <FormLabel>نوع الباركود</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          value={field.value}
-                        >
+                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="اختر نوع الباركود" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {barcodeTypes.map((type) => (
-                              <SelectItem key={type.id} value={type.id}>
+                            {barcodeTypes.map(type => <SelectItem key={type.id} value={type.id}>
                                 {type.name}
-                              </SelectItem>
-                            ))}
+                              </SelectItem>)}
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          {field.value === "scale" 
-                            ? "منتجات الميزان تحتاج إلى رمز خاص (6 أرقام)" 
-                            : "الباركود العادي للمنتجات"}
+                          {field.value === "scale" ? "منتجات الميزان تحتاج إلى رمز خاص (6 أرقام)" : "الباركود العادي للمنتجات"}
                         </FormDescription>
                         <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      </FormItem>} />
 
                   <div className="flex items-center gap-2">
-                    <FormField
-                      control={form.control}
-                      name="barcode"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
+                    <FormField control={form.control} name="barcode" render={({
+                    field
+                  }) => <FormItem className="flex-1">
                           <FormLabel>
                             {barcodeType === "scale" ? "رمز المنتج (6 أرقام)" : "الباركود"}
                           </FormLabel>
                           <div className="flex gap-2">
                             <FormControl>
-                              <Input 
-                                placeholder={barcodeType === "scale" ? "أدخل 1-6 أرقام" : "الباركود"}
-                                {...field}
-                              />
+                              <Input placeholder={barcodeType === "scale" ? "أدخل 1-6 أرقام" : "الباركود"} {...field} />
                             </FormControl>
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              size="icon"
-                              onClick={handleBarcodeScanning}
-                              title="مسح الباركود باستخدام الكاميرا"
-                            >
+                            <Button type="button" variant="outline" size="icon" onClick={handleBarcodeScanning} title="مسح الباركود باستخدام الكاميرا">
                               <ScanLine className="h-4 w-4" />
                             </Button>
                           </div>
-                          {barcodeType === "scale" && field.value && (
-                            <FormDescription>
+                          {barcodeType === "scale" && field.value && <FormDescription>
                               رمز المنتج المخزن: {field.value.padStart(6, '0')}
-                            </FormDescription>
-                          )}
+                            </FormDescription>}
                           <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                        </FormItem>} />
                   </div>
                 </div>
 
                 {/* Category and units fields */}
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="category" render={({
+                field
+              }) => <FormItem>
                       <FormLabel>تصنيف المنتج *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="اختر تصنيف" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
+                          {categories.map(category => <SelectItem key={category.id} value={category.id}>
                               {category.name}
-                            </SelectItem>
-                          ))}
+                            </SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
 
-                <FormField
-                  control={form.control}
-                  name="unit"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="unit" render={({
+                field
+              }) => <FormItem>
                       <FormLabel>وحدة القياس *</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="اختر وحدة القياس" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {units.map((unit) => (
-                            <SelectItem key={unit.id} value={unit.name}>
+                          {units.map(unit => <SelectItem key={unit.id} value={unit.name}>
                               {unit.name}
-                            </SelectItem>
-                          ))}
+                            </SelectItem>)}
                         </SelectContent>
                       </Select>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
 
                 {/* Price fields */}
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="price" render={({
+                field
+              }) => <FormItem>
                       <FormLabel>سعر البيع *</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" {...field} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
 
-                <FormField
-                  control={form.control}
-                  name="purchase_price"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="purchase_price" render={({
+                field
+              }) => <FormItem>
                       <FormLabel>سعر الشراء *</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" {...field} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
 
                 {/* Quantity and stock notification fields */}
-                <FormField
-                  control={form.control}
-                  name="quantity"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="quantity" render={({
+                field
+              }) => <FormItem>
                       <FormLabel>الكمية *</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          {...field} 
-                          disabled={form.watch("is_service")} 
-                        />
+                        <Input type="number" {...field} disabled={form.watch("is_service")} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
 
                 <div className="space-y-2">
                   <FormLabel>تنبيهني عندما تنخفض الكمية</FormLabel>
                   <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant={notifyEnabled ? "default" : "outline"}
-                      className="gap-2"
-                      onClick={() => setNotifyEnabled(!notifyEnabled)}
-                      disabled={isService}
-                    >
+                    <Button type="button" variant={notifyEnabled ? "default" : "outline"} className="gap-2" onClick={() => setNotifyEnabled(!notifyEnabled)} disabled={isService}>
                       <Bell className="h-4 w-4" />
                       {notifyEnabled ? "تنبيه نشط" : "تفعيل التنبيهات"}
                     </Button>
                     
-                    {notifyEnabled && (
-                      <Input 
-                        type="number"
-                        value={notifyQuantity}
-                        onChange={(e) => setNotifyQuantity(parseInt(e.target.value))}
-                        className="w-24"
-                        min={1}
-                        disabled={isService}
-                      />
-                    )}
+                    {notifyEnabled && <Input type="number" value={notifyQuantity} onChange={e => setNotifyQuantity(parseInt(e.target.value))} className="w-24" min={1} disabled={isService} />}
                   </div>
-                  {notifyEnabled && (
-                    <FormDescription>
+                  {notifyEnabled && <FormDescription>
                       سيتم تنبيهك عندما تقل الكمية عن {notifyQuantity} {form.watch("unit")}
-                    </FormDescription>
-                  )}
+                    </FormDescription>}
                 </div>
 
                 {/* Service toggle and inventory tracking options */}
-                <div className="space-y-6">
-                  <div className="border p-4 rounded-lg space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium">خدمة (وليس منتج)</h3>
-                        <p className="text-sm text-muted-foreground">الخدمات لا تحتاج إلى تتبع المخزون</p>
-                      </div>
-                      <FormField
-                        control={form.control}
-                        name="is_service"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0">
-                            <FormControl>
-                              <CustomSwitch
-                                checked={field.value}
-                                onCheckedChange={(checked) => {
-                                  field.onChange(checked);
-                                  if (checked) {
-                                    form.setValue("track_inventory", false);
-                                    setNotifyEnabled(false);
-                                  }
-                                }}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="border p-4 rounded-lg space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium">تتبع المخزون</h3>
-                        <p className="text-sm text-muted-foreground">تنبيهات عند انخفاض المخزون</p>
-                      </div>
-                      <FormField
-                        control={form.control}
-                        name="track_inventory"
-                        render={({ field }) => (
-                          <FormItem className="space-y-0">
-                            <FormControl>
-                              <CustomSwitch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                disabled={form.watch("is_service")}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-                </div>
+                
 
                 {/* Offer price fields */}
-                <FormField
-                  control={form.control}
-                  name="is_offer"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                <FormField control={form.control} name="is_offer" render={({
+                field
+              }) => <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
                         <FormLabel className="text-base">سعر العرض</FormLabel>
                         <FormDescription>
@@ -632,96 +507,48 @@ export default function AddProduct() {
                         </FormDescription>
                       </div>
                       <FormControl>
-                        <CustomSwitch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <CustomSwitch checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
 
-                <FormField
-                  control={form.control}
-                  name="offer_price"
-                  render={({ field }) => (
-                    <FormItem>
+                <FormField control={form.control} name="offer_price" render={({
+                field
+              }) => <FormItem>
                       <FormLabel>سعر العرض</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          {...field}
-                          value={field.value || ""}
-                          onChange={(e) => {
-                            const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                            field.onChange(value);
-                          }}
-                          disabled={!isOffer}
-                          placeholder="0.00"
-                        />
+                        <Input type="number" step="0.01" {...field} value={field.value || ""} onChange={e => {
+                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                    field.onChange(value);
+                  }} disabled={!isOffer} placeholder="0.00" />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormItem>} />
               </div>
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
+              <FormField control={form.control} name="description" render={({
+              field
+            }) => <FormItem>
                     <FormLabel>وصف المنتج</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="وصف المنتج (اختياري)"
-                        className="resize-none"
-                        {...field}
-                      />
+                      <Textarea placeholder="وصف المنتج (اختياري)" className="resize-none" {...field} />
                     </FormControl>
                     <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  </FormItem>} />
 
               <div className="border rounded-lg p-4">
                 <h3 className="font-medium mb-2">صورة المنتج</h3>
                 <div className="flex items-start gap-4">
-                  <div 
-                    className={`h-32 w-32 border rounded-md overflow-hidden flex items-center justify-center bg-gray-50 cursor-pointer ${!imagePreview ? 'border-dashed' : ''}`}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    onClick={openFileDialog}
-                  >
-                    {imagePreview ? (
-                      <img 
-                        src={imagePreview} 
-                        alt="Product preview" 
-                        className="h-full w-full object-contain"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-gray-400 p-2">
+                  <div className={`h-32 w-32 border rounded-md overflow-hidden flex items-center justify-center bg-gray-50 cursor-pointer ${!imagePreview ? 'border-dashed' : ''}`} onDragOver={handleDragOver} onDrop={handleDrop} onClick={openFileDialog}>
+                    {imagePreview ? <img src={imagePreview} alt="Product preview" className="h-full w-full object-contain" /> : <div className="flex flex-col items-center justify-center text-gray-400 p-2">
                         <Image className="h-10 w-10 mb-1" />
                         <span className="text-xs text-center">اسحب صورة هنا</span>
-                      </div>
-                    )}
+                      </div>}
                   </div>
                   <div className="flex-1 space-y-2">
-                    <label 
-                      htmlFor="product-image"
-                      className="flex items-center gap-2 border rounded-md p-2 cursor-pointer hover:bg-gray-50"
-                    >
+                    <label htmlFor="product-image" className="flex items-center gap-2 border rounded-md p-2 cursor-pointer hover:bg-gray-50">
                       <Upload className="h-4 w-4" />
                       <span>اختر صورة</span>
-                      <input
-                        id="product-image"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleImageChange}
-                        ref={fileInputRef}
-                      />
+                      <input id="product-image" type="file" accept="image/*" className="hidden" onChange={handleImageChange} ref={fileInputRef} />
                     </label>
                     <p className="text-xs text-muted-foreground">
                       يمكنك تحميل صورة بصيغة JPG، PNG. الحد الأقصى 5 ميجابايت.
@@ -734,22 +561,14 @@ export default function AddProduct() {
               </div>
 
               <div className="flex justify-end gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate("/products")}
-                >
+                <Button type="button" variant="outline" onClick={() => navigate("/products")}>
                   إلغاء
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
+                  {isSubmitting ? <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       {isEditing ? "جاري التحديث..." : "جاري الإضافة..."}
-                    </>
-                  ) : (
-                    isEditing ? "تحديث المنتج" : "إضافة المنتج"
-                  )}
+                    </> : isEditing ? "تحديث المنتج" : "إضافة المنتج"}
                 </Button>
               </div>
             </form>
@@ -757,11 +576,6 @@ export default function AddProduct() {
         </CardContent>
       </Card>
       
-      <BarcodeScanner 
-        isOpen={showScanner} 
-        onClose={() => setShowScanner(false)}
-        onScan={handleBarcodeResult}
-      />
-    </MainLayout>
-  );
+      <BarcodeScanner isOpen={showScanner} onClose={() => setShowScanner(false)} onScan={handleBarcodeResult} />
+    </MainLayout>;
 }
