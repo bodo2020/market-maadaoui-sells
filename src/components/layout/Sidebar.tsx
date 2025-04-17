@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   BarChart4,
@@ -144,56 +143,13 @@ export default function Sidebar() {
           href="/pos"
           active={currentPath === "/pos"}
         />
-
-        {!collapsed && (
-          <div className="mb-1">
-            <Button
-              variant="ghost"
-              className="w-full justify-between items-center"
-              onClick={() => setShowCategories(!showCategories)}
-            >
-              <div className="flex items-center gap-2">
-                <FolderOpen size={20} />
-                <span>الأقسام</span>
-              </div>
-              <ChevronDown
-                size={16}
-                className={cn(
-                  "transition-transform duration-200",
-                  showCategories ? "rotate-180" : ""
-                )}
-              />
-            </Button>
-            {showCategories && (
-              <div className="mr-4 mt-1 space-y-1 border-r pr-2">
-                <SidebarItem
-                  icon={<FolderOpen size={16} />}
-                  label="كل الأقسام"
-                  href="/categories"
-                  active={currentPath === "/categories"}
-                />
-                {categories.map((category) => (
-                  <SidebarItem
-                    key={category.id}
-                    icon={<FolderOpen size={16} />}
-                    label={category.name}
-                    href={`/categories/${category.id}`}
-                    active={currentPath === `/categories/${category.id}`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
         
-        {collapsed && (
-          <SidebarItem
-            icon={<FolderOpen size={20} />}
-            label=""
-            href="/categories"
-            active={currentPath.startsWith("/categories")}
-          />
-        )}
+        <SidebarItem
+          icon={<FolderOpen size={20} />}
+          label={collapsed ? "" : "الاقسام"}
+          href="/categories"
+          active={currentPath.startsWith("/categories")}
+        />
         
         {isAdmin && (
           <>
