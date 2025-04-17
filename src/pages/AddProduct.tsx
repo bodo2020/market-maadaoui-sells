@@ -122,9 +122,9 @@ export default function AddProduct() {
         values.offer_price = undefined;
       }
       
+      // Modified this line to remove the id property which was causing the error
       await createProduct({
         ...values,
-        id: crypto.randomUUID(),
         created_at: new Date().toISOString(),
       });
       
