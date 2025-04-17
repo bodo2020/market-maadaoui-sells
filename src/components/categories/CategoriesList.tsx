@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -34,7 +33,7 @@ interface CategoryFromDB {
   description: string | null;
   level: string;
   parent_id: string | null;
-  image_url?: string | null;
+  image_url: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -65,13 +64,8 @@ export default function CategoriesList() {
       
       // Safely map level to our enum type
       const typedCategories: Category[] = dbCategories.map(cat => ({
-        id: cat.id,
-        name: cat.name,
-        description: cat.description,
-        // Cast level to our union type, defaulting to 'category' if invalid
+        ...cat,
         level: isValidLevel(cat.level) ? cat.level as 'category' | 'subcategory' | 'subsubcategory' : 'category',
-        parent_id: cat.parent_id,
-        image_url: cat.image_url,
         children: [],
       }));
 

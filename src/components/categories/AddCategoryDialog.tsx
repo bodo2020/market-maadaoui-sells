@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,12 +24,12 @@ interface AddCategoryDialogProps {
   onSuccess: () => void;
 }
 
-export default function AddCategoryDialog({
+const AddCategoryDialog = ({
   open,
   onOpenChange,
   parentCategory,
   onSuccess
-}: AddCategoryDialogProps) {
+}: AddCategoryDialogProps) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
@@ -208,3 +207,5 @@ export default function AddCategoryDialog({
     </Dialog>
   );
 }
+
+export default AddCategoryDialog;
