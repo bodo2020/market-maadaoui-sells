@@ -20,8 +20,7 @@ import {
   Banknote,
   Truck,
   ChevronLeft,
-  ChevronRight,
-  PlusCircle
+  ChevronRight
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -104,12 +103,6 @@ export default function Sidebar() {
           label={collapsed ? "" : "المنتجات"}
           href="/products"
           active={currentPath === "/products"}
-        />
-        <SidebarItem
-          icon={<PlusCircle size={20} />}
-          label={collapsed ? "" : "إضافة منتج"}
-          href="/add-product"
-          active={currentPath === "/add-product"}
         />
         <SidebarItem
           icon={<Receipt size={20} />}

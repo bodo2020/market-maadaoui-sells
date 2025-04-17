@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { 
@@ -38,12 +38,16 @@ import {
   Filter,
   Download,
   Truck,
-  Loader2
+  Loader2,
+  Bell,
+  Edit,
+  PlusCircle
 } from "lucide-react";
 import { Product } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, updateProduct } from "@/services/supabase/productService";
+import { checkLowStockProducts, showLowStockToasts } from "@/services/notificationService";
 
 export default function InventoryManagement() {
   const [inventory, setInventory] = useState<Product[]>([]);
@@ -53,9 +57,18 @@ export default function InventoryManagement() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [stockToAdd, setStockToAdd] = useState(0);
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   useEffect(() => {
     loadProducts();
+    
+    // Check for low stock and display notifications
+    const checkStock = async () => {
+      await checkLowStockProducts();
+      showLowStockToasts();
+    };
+    
+    checkStock();
   }, []);
 
   const loadProducts = async () => {
@@ -120,6 +133,10 @@ export default function InventoryManagement() {
       }
     }
   };
+
+  const handleAddProduct = () => {
+    navigate("/add-product");
+  };
   
   return (
     <MainLayout>
@@ -145,6 +162,13 @@ export default function InventoryManagement() {
           >
             <Truck className="ml-2 h-4 w-4" />
             إضافة مخزون
+          </Button>
+          <Button 
+            variant="default" 
+            onClick={handleAddProduct}
+          >
+            <PlusCircle className="ml-2 h-4 w-4" />
+            إضافة منتج
           </Button>
         </div>
       </div>
@@ -238,18 +262,28 @@ export default function InventoryManagement() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Button 
-                          size="sm" 
-                          onClick={() => {
-                            setSelectedProduct(product);
-                            setStockToAdd(0);
-                            setIsAddStockDialogOpen(true);
-                          }}
-                          disabled={loading}
-                        >
-                          <Plus className="ml-2 h-4 w-4" />
-                          إضافة مخزون
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setStockToAdd(0);
+                              setIsAddStockDialogOpen(true);
+                            }}
+                            disabled={loading}
+                          >
+                            <Plus className="ml-2 h-4 w-4" />
+                            إضافة مخزون
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/add-product?id=${product.id}`)}
+                          >
+                            <Edit className="ml-2 h-4 w-4" />
+                            تعديل
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -351,19 +385,29 @@ export default function InventoryManagement() {
                               : '-'}
                         </TableCell>
                         <TableCell>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setStockToAdd(0);
-                              setIsAddStockDialogOpen(true);
-                            }}
-                            disabled={loading}
-                          >
-                            <Plus className="ml-2 h-4 w-4" />
-                            إضافة
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedProduct(product);
+                                setStockToAdd(0);
+                                setIsAddStockDialogOpen(true);
+                              }}
+                              disabled={loading}
+                            >
+                              <Plus className="ml-2 h-4 w-4" />
+                              إضافة
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate(`/add-product?id=${product.id}`)}
+                            >
+                              <Edit className="ml-2 h-4 w-4" />
+                              تعديل
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
