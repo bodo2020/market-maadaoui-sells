@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -47,6 +46,8 @@ export function AddProductDialog({
   const [quantity, setQuantity] = useState<number | ''>('');
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [barcode, setBarcode] = useState('');
+  const [barcodeType, setBarcodeType] = useState<'normal' | 'scale'>('normal');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,10 +69,11 @@ export function AddProductDialog({
         category_id: selectedCategory,
         subcategory_id: selectedSubcategory,
         subsubcategory_id: selectedSubsubcategory,
+        barcode: barcode || null,
+        barcode_type: barcodeType,
         bulk_enabled: false,
         is_bulk: false,
         is_offer: false,
-        barcode_type: 'normal'
       });
 
       toast.success("تم إضافة المنتج بنجاح");
@@ -92,6 +94,8 @@ export function AddProductDialog({
     setPurchasePrice('');
     setQuantity('');
     setImages([]);
+    setBarcode('');
+    setBarcodeType('normal');
     onClose();
   };
 
@@ -219,6 +223,29 @@ export function AddProductDialog({
               value={images}
               onChange={setImages}
               onRemove={(url) => setImages(images.filter((image) => image !== url))}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="barcodeType">نوع الباركود</Label>
+            <select
+              id="barcodeType"
+              value={barcodeType}
+              onChange={(e) => setBarcodeType(e.target.value as 'normal' | 'scale')}
+              className="w-full p-2 border rounded-md mt-1"
+            >
+              <option value="normal">عادي</option>
+              <option value="scale">ميزان</option>
+            </select>
+          </div>
+
+          <div>
+            <Label htmlFor="barcode">الباركود (اختياري)</Label>
+            <Input
+              id="barcode"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              placeholder="أدخل الباركود"
             />
           </div>
 
