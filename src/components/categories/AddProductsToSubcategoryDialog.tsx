@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,8 +37,38 @@ export default function AddProductsToSubcategoryDialog({
     products.filter(p => p.subsubcategory_id === categoryId)
   );
   const [saving, setSaving] = useState(false);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const availableProducts = products.filter(p => 
+  useEffect(() => {
+    if (open) {
+      fetchAllProducts();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    // Update selected products when the products prop changes
+    setSelectedProducts(products.filter(p => p.subsubcategory_id === categoryId));
+  }, [products, categoryId]);
+
+  const fetchAllProducts = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*");
+      
+      if (error) throw error;
+      setAllProducts(data || []);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      toast.error("حدث خطأ أثناء تحميل المنتجات");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const availableProducts = allProducts.filter(p => 
     !selectedProducts.find(sp => sp.id === p.id) &&
     p.name.toLowerCase().includes(searchAvailable.toLowerCase())
   );
@@ -117,35 +147,41 @@ export default function AddProductsToSubcategoryDialog({
               </div>
               <ScrollArea className="h-[400px] border rounded-md">
                 <div className="p-4 space-y-2">
-                  {filteredSelectedProducts.map(product => (
-                    <div
-                      key={product.id}
-                      className="flex items-center justify-between p-2 border rounded hover:bg-muted/50"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 bg-muted rounded overflow-hidden">
-                          <img
-                            src={product.image_urls?.[0] || "/placeholder.svg"}
-                            alt={product.name}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <div>
-                          <div className="font-medium">{product.name}</div>
-                          <Badge variant="outline" className="mt-1">
-                            {product.quantity} في المخزون
-                          </Badge>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemove(product)}
+                  {filteredSelectedProducts.length > 0 ? (
+                    filteredSelectedProducts.map(product => (
+                      <div
+                        key={product.id}
+                        className="flex items-center justify-between p-2 border rounded hover:bg-muted/50"
                       >
-                        <X className="h-4 w-4 text-destructive" />
-                      </Button>
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 bg-muted rounded overflow-hidden">
+                            <img
+                              src={product.image_urls?.[0] || "/placeholder.svg"}
+                              alt={product.name}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-medium">{product.name}</div>
+                            <Badge variant="outline" className="mt-1">
+                              {product.quantity} في المخزون
+                            </Badge>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemove(product)}
+                        >
+                          <X className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      لم يتم اختيار أي منتجات بعد
                     </div>
-                  ))}
+                  )}
                 </div>
               </ScrollArea>
             </div>
@@ -166,35 +202,45 @@ export default function AddProductsToSubcategoryDialog({
               </div>
               <ScrollArea className="h-[400px] border rounded-md">
                 <div className="p-4 space-y-2">
-                  {availableProducts.map(product => (
-                    <div
-                      key={product.id}
-                      className="flex items-center justify-between p-2 border rounded hover:bg-muted/50"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 bg-muted rounded overflow-hidden">
-                          <img
-                            src={product.image_urls?.[0] || "/placeholder.svg"}
-                            alt={product.name}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <div>
-                          <div className="font-medium">{product.name}</div>
-                          <Badge variant="outline" className="mt-1">
-                            {product.quantity} في المخزون
-                          </Badge>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleAdd(product)}
-                      >
-                        <Plus className="h-4 w-4 text-primary" />
-                      </Button>
+                  {loading ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      جاري تحميل المنتجات...
                     </div>
-                  ))}
+                  ) : availableProducts.length > 0 ? (
+                    availableProducts.map(product => (
+                      <div
+                        key={product.id}
+                        className="flex items-center justify-between p-2 border rounded hover:bg-muted/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 bg-muted rounded overflow-hidden">
+                            <img
+                              src={product.image_urls?.[0] || "/placeholder.svg"}
+                              alt={product.name}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-medium">{product.name}</div>
+                            <Badge variant="outline" className="mt-1">
+                              {product.quantity} في المخزون
+                            </Badge>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleAdd(product)}
+                        >
+                          <Plus className="h-4 w-4 text-primary" />
+                        </Button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      لا توجد منتجات متاحة للإضافة
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </div>
