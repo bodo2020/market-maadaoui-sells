@@ -28,8 +28,9 @@ export default function StoreSettings() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Load settings from localStorage on mount
+  // Load settings from siteConfig on mount
   useEffect(() => {
+    console.log("Loading store settings from siteConfig:", siteConfig);
     setSettingsData({
       storeName: siteConfig.name || "",
       storeAddress: siteConfig.address || "",
@@ -89,7 +90,9 @@ export default function StoreSettings() {
     try {
       setSaving(true);
       
-      // Update the site config
+      console.log("Saving settings:", settingsData);
+      
+      // Update the site config - this function also saves to localStorage
       updateSiteConfig({
         name: settingsData.storeName,
         address: settingsData.storeAddress,

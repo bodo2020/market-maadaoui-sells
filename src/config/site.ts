@@ -25,7 +25,8 @@ export type SiteConfig = {
   }
 }
 
-export let siteConfig: SiteConfig = {
+// Default site configuration
+const defaultSiteConfig: SiteConfig = {
   name: "ماركت المعداوي",
   currency: "ج.م",
   description: "نظام نقاط البيع لماركت المعداوي",
@@ -49,17 +50,26 @@ export let siteConfig: SiteConfig = {
     logoChoice: "store", // store, none, custom
     customLogoUrl: null,
   }
-}
+};
+
+// Initialize with default config
+export let siteConfig: SiteConfig = { ...defaultSiteConfig };
 
 // Function to update site config
 export function updateSiteConfig(newConfig: Partial<SiteConfig>) {
+  // First update the current runtime instance
   siteConfig = { 
     ...siteConfig, 
     ...newConfig 
   };
   
-  // Save to localStorage for persistence
-  localStorage.setItem('siteConfig', JSON.stringify(siteConfig));
+  // Then save to localStorage for persistence
+  try {
+    localStorage.setItem('siteConfig', JSON.stringify(siteConfig));
+    console.log("Site config saved to localStorage:", siteConfig);
+  } catch (error) {
+    console.error("Failed to save site config to localStorage:", error);
+  }
   
   return siteConfig;
 }
@@ -68,7 +78,9 @@ export function updateSiteConfig(newConfig: Partial<SiteConfig>) {
 try {
   const savedConfig = localStorage.getItem('siteConfig');
   if (savedConfig) {
-    siteConfig = { ...siteConfig, ...JSON.parse(savedConfig) };
+    const parsedConfig = JSON.parse(savedConfig);
+    console.log("Loaded site config from localStorage:", parsedConfig);
+    siteConfig = { ...defaultSiteConfig, ...parsedConfig };
   }
 } catch (error) {
   console.error("Failed to load saved site config:", error);
