@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -56,7 +55,6 @@ export default function CategoriesList() {
       let parentCategory = null;
       let currentLevel = null;
       
-      // If we have a parent ID, fetch its details to determine level
       if (parentId) {
         const { data: parent, error: parentError } = await supabase
           .from('categories')
@@ -69,10 +67,8 @@ export default function CategoriesList() {
         currentLevel = parent.level;
       }
       
-      // Determine what level we're fetching
       const levelToFetch = getNextLevel(currentLevel);
       
-      // Fetch categories at the determined level with the parent_id
       let query = supabase
         .from('categories')
         .select('*')
@@ -88,14 +84,12 @@ export default function CategoriesList() {
       
       if (error) throw error;
 
-      // Map database response to Category type
       const typedCategories: Category[] = (data || []).map(cat => ({
         ...cat,
         level: isValidLevel(cat.level) ? cat.level as 'category' | 'subcategory' | 'subsubcategory' : 'category',
         product_count: 0
       }));
       
-      // Fetch product counts for each category
       await Promise.all(typedCategories.map(async (category) => {
         const { count, error } = await supabase
           .from('products')
@@ -117,13 +111,12 @@ export default function CategoriesList() {
       setCategories(typedCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
-      toast.error("حدث خطأ أثناء تحميل التصنيفات");
+      toast.error("حدث خطأ أثناء تحم��ل التصنيفات");
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper function to validate level values
   const isValidLevel = (level: string): boolean => {
     return ['category', 'subcategory', 'subsubcategory'].includes(level);
   };
@@ -203,10 +196,8 @@ export default function CategoriesList() {
             className="border rounded-lg overflow-hidden hover:border-primary transition-colors cursor-pointer"
             onClick={() => {
               if (category.level === 'subsubcategory') {
-                // For subsubcategories, navigate to detail page to see products
                 navigateToCategory(category);
               } else {
-                // For other levels, navigate to see children
                 navigate(`/categories/${category.id}`);
               }
             }}
@@ -265,7 +256,6 @@ export default function CategoriesList() {
         ))}
       </div>
 
-      {/* Fallback view for when there are no cards */}
       {categories.length === 0 && (
         <div className="text-center p-8 bg-gray-50 rounded-lg border">
           <FolderPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
@@ -277,7 +267,11 @@ export default function CategoriesList() {
       <AddCategoryDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        parentCategory={parentId ? { id: parentId, level: getNextLevel(null) as any } : null}
+        parentCategory={parentId ? { 
+          id: parentId, 
+          name: "", 
+          level: getNextLevel(null) as any 
+        } : null}
         onSuccess={fetchCategories}
       />
     </div>
