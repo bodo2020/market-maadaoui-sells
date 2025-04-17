@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -27,6 +26,7 @@ import Companies from "./pages/Companies";
 import Banners from "./pages/Banners";
 import OnlineOrders from "./pages/OnlineOrders";
 import Categories from "./pages/Categories";
+import AddBanner from "./pages/AddBanner";
 
 const queryClient = new QueryClient();
 
@@ -136,11 +136,9 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              <Route path="/banners" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <Banners />
-                </ProtectedRoute>
-              } />
+              <Route path="/banners" element={<Banners />} />
+              <Route path="/banners/add" element={<AddBanner />} />
+              <Route path="/banners/edit" element={<AddBanner />} />
               
               <Route path="/online-orders" element={
                 <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>

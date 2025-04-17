@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -24,7 +23,6 @@ import {
   MoveUp,
   MoveDown
 } from "lucide-react";
-import BannerFormDialog from "@/components/banners/BannerFormDialog";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useNavigate } from "react-router-dom";
 
 interface Banner {
   id: string;
@@ -51,10 +50,10 @@ interface Banner {
 export default function Banners() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBanner, setSelectedBanner] = useState<Banner | null>(null);
   const [updating, setUpdating] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchBanners();
@@ -198,10 +197,7 @@ export default function Banners() {
       <div className="container mx-auto p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">البانرات الإعلانية</h1>
-          <Button onClick={() => {
-            setSelectedBanner(null);
-            setIsFormOpen(true);
-          }}>
+          <Button onClick={() => navigate('/banners/add')}>
             <PlusCircle className="ml-2 h-4 w-4" />
             إضافة بانر جديد
           </Button>
@@ -317,10 +313,7 @@ export default function Banners() {
                               <Button 
                                 variant="ghost" 
                                 size="icon"
-                                onClick={() => {
-                                  setSelectedBanner(banner);
-                                  setIsFormOpen(true);
-                                }}
+                                onClick={() => navigate(`/banners/edit?id=${banner.id}`)}
                               >
                                 <PenSquare className="h-4 w-4" />
                               </Button>
@@ -358,14 +351,6 @@ export default function Banners() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Banner Form Dialog */}
-      <BannerFormDialog
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        onSaved={fetchBanners}
-        banner={selectedBanner || undefined}
-      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
