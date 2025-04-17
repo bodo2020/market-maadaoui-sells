@@ -91,20 +91,6 @@ export function AddProductDialog({ companyId, onClose, onSuccess }: AddProductDi
         ...values,
         image_urls: [imageUrl],
         company_id: companyId,
-        bulk_enabled: false,
-        is_bulk: false,
-        is_offer: false,
-        barcode: null,
-        barcode_type: null,
-        bulk_barcode: null,
-        bulk_price: null,
-        bulk_quantity: null,
-        category_id: null,
-        manufacturer_name: null,
-        offer_price: null,
-        subcategory_id: null,
-        subsubcategory_id: null,
-        unit_of_measure: null
       });
 
       toast.success("Product added successfully");
