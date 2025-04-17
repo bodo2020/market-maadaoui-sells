@@ -90,7 +90,13 @@ export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale
     throw error;
   }
   
-  return data || [];
+  // Convert the items field from JSON to CartItem[] in each sale
+  return (data || []).map(sale => ({
+    ...sale,
+    items: Array.isArray(sale.items) 
+      ? sale.items as unknown as CartItem[]  // If already an array
+      : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
+  }));
 }
 
 export async function fetchSaleById(id: string) {
