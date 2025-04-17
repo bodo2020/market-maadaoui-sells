@@ -74,12 +74,14 @@ export default function StoreSettings() {
           } else {
             console.log("Store bucket created successfully");
             
-            // Create a policy to make the bucket public
-            const { error: policyError } = await supabase.rpc('create_storage_policy', {
-              bucket_name: 'store',
-              policy_name: 'Public Access',
-              definition: 'true',
-              operation: 'SELECT'
+            // Call the edge function instead of RPC
+            const { error: policyError } = await supabase.functions.invoke('create_storage_policy', {
+              body: {
+                bucket_name: 'store',
+                policy_name: 'Public Access',
+                definition: 'true',
+                operation: 'SELECT'
+              }
             });
             
             if (policyError) {
