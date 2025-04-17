@@ -120,6 +120,14 @@ export default function CompanyDetails() {
     setSelectedSubsubcategory(null);
   };
 
+  const handleAddProduct = () => {
+    setIsAddProductDialogOpen(true);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    navigate(`/add-product?id=${product.id}`);
+  };
+
   const filteredProducts = products.filter(product => {
     if (!searchQuery) {
       if (selectedSubsubcategory) {
@@ -212,7 +220,7 @@ export default function CompanyDetails() {
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-center">
                   <div>
-                    <CardTitle>منتجات {company.name}</CardTitle>
+                    <CardTitle>منتجات {company?.name}</CardTitle>
                     <CardDescription>قائمة المنتجات المرتبطة بالشركة</CardDescription>
                   </div>
                   <Button onClick={handleAddProduct}>
@@ -327,8 +335,8 @@ export default function CompanyDetails() {
         <AddProductDialog 
           isOpen={isAddProductDialogOpen} 
           onClose={() => setIsAddProductDialogOpen(false)} 
-          onProductAdded={() => loadCompanyDetails(company.id)} 
-          companyId={company.id}
+          onProductAdded={() => loadCompanyDetails(company?.id || '')} 
+          companyId={company?.id || ''}
           categories={categories}
           subcategories={subcategories}
           subsubcategories={subsubcategories}
