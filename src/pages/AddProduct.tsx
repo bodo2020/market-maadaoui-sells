@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,6 +29,8 @@ import { useNavigate } from "react-router-dom";
 import { createProduct } from "@/services/supabase/productService";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Toggle } from "@/components/ui/toggle";
+import { Image, ScanLine, Upload } from "lucide-react";
 
 // Form validation schema
 const productFormSchema = z.object({
@@ -37,6 +39,7 @@ const productFormSchema = z.object({
   }),
   description: z.string().optional(),
   barcode: z.string().optional(),
+  barcode_type: z.string().default("normal"),
   category: z.string(),
   price: z.coerce.number().positive({
     message: "يجب أن يكون السعر رقمًا موجبًا.",
@@ -83,9 +86,17 @@ const units = [
   { id: "packet", name: "عبوة" },
 ];
 
+// Barcode types
+const barcodeTypes = [
+  { id: "normal", name: "عادي" },
+  { id: "scale", name: "ميزان" },
+];
+
 export default function AddProduct() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [productImage, setProductImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Initialize form with default values
   const form = useForm<z.infer<typeof productFormSchema>>({
@@ -94,6 +105,7 @@ export default function AddProduct() {
       name: "",
       description: "",
       barcode: "",
+      barcode_type: "normal",
       category: "others",
       price: 0,
       purchase_price: 0,
@@ -105,6 +117,32 @@ export default function AddProduct() {
       unit: "قطعة",
     },
   });
+
+  // Handle image selection
+  const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setProductImage(file);
+      
+      // Create a preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
+  // Handle barcode scanning
+  const handleBarcodeScanning = useCallback(() => {
+    // Here you would implement barcode scanning
+    // For now, we'll just show a toast message
+    toast.info("قريبا: سيتم تفعيل ميزة مسح الباركود");
+  }, []);
+
+  // Watch values for conditional rendering
+  const isService = form.watch("is_service");
+  const barcodeType = form.watch("barcode_type");
 
   // Handle form submission
   const onSubmit = async (values: z.infer<typeof productFormSchema>) => {
@@ -122,22 +160,42 @@ export default function AddProduct() {
         values.offer_price = undefined;
       }
       
+      // Format barcode for scale products if needed
+      let formattedBarcode = values.barcode;
+      if (values.barcode_type === "scale" && values.barcode) {
+        // If user entered more than 6 digits, extract just the product code part
+        if (values.barcode.length > 6) {
+          formattedBarcode = values.barcode.substring(0, 6);
+        }
+        
+        // Ensure it's exactly 6 digits by padding with zeros if needed
+        while (formattedBarcode && formattedBarcode.length < 6) {
+          formattedBarcode = '0' + formattedBarcode;
+        }
+      }
+      
+      // Create image URLs array - will be a placeholder if no image was uploaded
+      const imageUrls = imagePreview 
+        ? [imagePreview] 
+        : ["/placeholder.svg"];
+      
       // Add all required properties for the Product type
       await createProduct({
-        name: values.name, // Explicitly include required fields
+        name: values.name,
         price: values.price,
         purchase_price: values.purchase_price,
         quantity: values.quantity,
         description: values.description,
-        barcode: values.barcode,
+        barcode: formattedBarcode,
+        barcode_type: values.barcode_type,
         is_offer: values.is_offer,
         offer_price: values.offer_price,
-        image_urls: [], // Add empty array for image_urls
-        bulk_enabled: false, // Set default value for bulk_enabled
-        is_bulk: false, // Set default value for is_bulk
-        category_id: values.category, // Map category to category_id expected by the Product type
-        unit_of_measure: values.unit, // Map unit to unit_of_measure
-        track_inventory: values.track_inventory, // Add the track_inventory field
+        image_urls: imageUrls,
+        bulk_enabled: false,
+        is_bulk: false,
+        category_id: values.category,
+        unit_of_measure: values.unit,
+        track_inventory: values.track_inventory,
       });
       
       toast.success("تم إضافة المنتج بنجاح");
@@ -181,22 +239,76 @@ export default function AddProduct() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="barcode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>الباركود</FormLabel>
-                      <FormControl>
-                        <Input placeholder="الباركود (اختياري)" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        يمكنك إضافة الباركود يدويًا أو تركه فارغًا
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="barcode_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>نوع الباركود</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="اختر نوع الباركود" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {barcodeTypes.map((type) => (
+                              <SelectItem key={type.id} value={type.id}>
+                                {type.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          {field.value === "scale" 
+                            ? "منتجات الميزان تحتاج إلى رمز خاص (6 أرقام)" 
+                            : "الباركود العادي للمنتجات"}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <FormField
+                      control={form.control}
+                      name="barcode"
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormLabel>
+                            {barcodeType === "scale" ? "رمز المنتج (6 أرقام)" : "الباركود"}
+                          </FormLabel>
+                          <div className="flex gap-2">
+                            <FormControl>
+                              <Input 
+                                placeholder={barcodeType === "scale" ? "أدخل 1-6 أرقام" : "الباركود"}
+                                {...field}
+                              />
+                            </FormControl>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              size="icon"
+                              onClick={handleBarcodeScanning}
+                            >
+                              <ScanLine className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {barcodeType === "scale" && field.value && (
+                            <FormDescription>
+                              رمز المنتج المخزن: {field.value.padStart(6, '0')}
+                            </FormDescription>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
 
                 <FormField
                   control={form.control}
@@ -300,63 +412,69 @@ export default function AddProduct() {
                   )}
                 />
 
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="is_service"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                        <div className="space-y-0.5">
-                          <FormLabel>خدمة (وليس منتج)</FormLabel>
-                          <FormDescription>
-                            الخدمات لا تحتاج إلى تتبع المخزون
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={(checked) => {
-                              field.onChange(checked);
-                              if (checked) {
-                                form.setValue("track_inventory", false);
-                              }
-                            }}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                <div className="space-y-6">
+                  <div className="border p-4 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium">خدمة (وليس منتج)</h3>
+                        <p className="text-sm text-muted-foreground">الخدمات لا تحتاج إلى تتبع المخزون</p>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="is_service"
+                        render={({ field }) => (
+                          <FormItem className="space-y-0">
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={(checked) => {
+                                  field.onChange(checked);
+                                  if (checked) {
+                                    form.setValue("track_inventory", false);
+                                  }
+                                }}
+                                className="bg-white data-[state=checked]:bg-green-700"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name="track_inventory"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                        <div className="space-y-0.5">
-                          <FormLabel>تتبع المخزون</FormLabel>
-                          <FormDescription>
-                            تنبيهات عند انخفاض المخزون
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={form.watch("is_service")}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  <div className="border p-4 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium">تتبع المخزون</h3>
+                        <p className="text-sm text-muted-foreground">تنبيهات عند انخفاض المخزون</p>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="track_inventory"
+                        render={({ field }) => (
+                          <FormItem className="space-y-0">
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                disabled={form.watch("is_service")}
+                                className="bg-white data-[state=checked]:bg-green-700"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <FormField
                   control={form.control}
                   name="is_offer"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                       <div className="space-y-0.5">
-                        <FormLabel>عرض</FormLabel>
+                        <FormLabel className="text-base">سعر العرض</FormLabel>
                         <FormDescription>
                           تفعيل سعر العرض للمنتج
                         </FormDescription>
@@ -365,6 +483,7 @@ export default function AddProduct() {
                         <Switch
                           checked={field.value}
                           onCheckedChange={field.onChange}
+                          className="bg-white data-[state=checked]:bg-green-700"
                         />
                       </FormControl>
                     </FormItem>
@@ -395,7 +514,6 @@ export default function AddProduct() {
                     </FormItem>
                   )}
                 />
-
               </div>
 
               <FormField
@@ -415,6 +533,42 @@ export default function AddProduct() {
                   </FormItem>
                 )}
               />
+
+              <div className="border rounded-lg p-4">
+                <h3 className="font-medium mb-2">صورة المنتج</h3>
+                <div className="flex items-start gap-4">
+                  <div className="h-32 w-32 border rounded-md overflow-hidden flex items-center justify-center bg-gray-50">
+                    {imagePreview ? (
+                      <img 
+                        src={imagePreview} 
+                        alt="Product preview" 
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <Image className="h-10 w-10 text-gray-300" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <label 
+                      htmlFor="product-image"
+                      className="flex items-center gap-2 border rounded-md p-2 cursor-pointer hover:bg-gray-50"
+                    >
+                      <Upload className="h-4 w-4" />
+                      <span>اختر صورة</span>
+                      <input
+                        id="product-image"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageChange}
+                      />
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      يمكنك تحميل صورة بصيغة JPG، PNG. الحد الأقصى 5 ميجابايت.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               <div className="flex justify-end gap-3">
                 <Button
