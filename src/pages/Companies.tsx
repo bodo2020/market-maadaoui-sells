@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
 import { Company, fetchCompanies, deleteCompany } from "@/services/supabase/companyService";
 
 export default function Companies() {
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -64,6 +66,10 @@ export default function Companies() {
       setIsDeleteDialogOpen(false);
       setSelectedCompany(null);
     }
+  };
+
+  const handleCompanyClick = (company: Company) => {
+    navigate(`/company/${company.id}`);
   };
 
   const filteredCompanies = companies.filter(company => 
@@ -115,7 +121,7 @@ export default function Companies() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCompanies.map((company) => (
               <Card key={company.id} className="overflow-hidden">
-                <CardContent className="p-6">
+                <CardContent className="p-6 cursor-pointer" onClick={() => handleCompanyClick(company)}>
                   <div className="aspect-square w-full relative mb-4">
                     {company.logo_url ? (
                       <img 
@@ -137,7 +143,8 @@ export default function Companies() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setSelectedCompany(company);
                         setIsEditDialogOpen(true);
                       }}
@@ -148,7 +155,8 @@ export default function Companies() {
                     <Button 
                       variant="destructive" 
                       size="sm"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setSelectedCompany(company);
                         setIsDeleteDialogOpen(true);
                       }}

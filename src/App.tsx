@@ -30,6 +30,7 @@ import Banners from "./pages/Banners";
 import OnlineOrders from "./pages/OnlineOrders";
 import Categories from "./pages/Categories";
 import AddBanner from "./pages/AddBanner";
+import CompanyDetails from "./pages/CompanyDetails";
 
 const queryClient = new QueryClient();
 
@@ -187,6 +188,8 @@ function App() {
                   <Categories />
                 </ProtectedRoute>
               } />
+              
+              <Route path="/company/:id" element={<CompanyDetails />} />
               
               <Route path="*" element={<NotFound />} />
             </Routes>
