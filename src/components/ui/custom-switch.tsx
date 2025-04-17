@@ -15,6 +15,7 @@ const CustomSwitch = React.forwardRef<
     )}
     {...props}
     ref={ref}
+    dir="ltr" // Force left-to-right direction for the switch
   >
     <SwitchPrimitives.Thumb
       className={cn(

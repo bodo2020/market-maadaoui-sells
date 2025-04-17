@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -27,7 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { createProduct } from "@/services/supabase/productService";
-import { Switch } from "@/components/ui/switch";
+import { CustomSwitch } from "@/components/ui/custom-switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Toggle } from "@/components/ui/toggle";
 import { Image, ScanLine, Upload } from "lucide-react";
@@ -97,6 +97,7 @@ export default function AddProduct() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [productImage, setProductImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize form with default values
   const form = useForm<z.infer<typeof productFormSchema>>({
@@ -135,10 +136,69 @@ export default function AddProduct() {
 
   // Handle barcode scanning
   const handleBarcodeScanning = useCallback(() => {
-    // Here you would implement barcode scanning
-    // For now, we'll just show a toast message
-    toast.info("قريبا: سيتم تفعيل ميزة مسح الباركود");
+    // Here you would implement barcode scanning or open device camera
+    try {
+      // Check if the browser supports the MediaDevices API
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        // Request camera access to scan barcode
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+          .then(stream => {
+            // After getting camera access, you could implement a barcode detection logic
+            // For now, we'll just show that we got camera access
+            toast.info("تم فتح الكاميرا، جاري التطوير لمسح الباركود");
+            
+            // Close the stream after a short delay (simulating a scan)
+            setTimeout(() => {
+              stream.getTracks().forEach(track => track.stop());
+            }, 3000);
+          })
+          .catch(err => {
+            console.error("Error accessing camera:", err);
+            toast.error("لم نتمكن من الوصول إلى الكاميرا");
+          });
+      } else {
+        toast.error("متصفحك لا يدعم الوصول إلى الكاميرا");
+      }
+    } catch (error) {
+      console.error("Error in barcode scanning:", error);
+      toast.error("حدث خطأ أثناء محاولة مسح الباركود");
+    }
   }, []);
+
+  // Handle drag and drop for image upload
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      
+      // Check if the file is an image
+      if (file.type.startsWith('image/')) {
+        setProductImage(file);
+        
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        toast.error("الرجاء إرفاق ملف صورة فقط");
+      }
+    }
+  }, []);
+
+  // Open file dialog when clicking on the dropzone
+  const openFileDialog = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
 
   // Watch values for conditional rendering
   const isService = form.watch("is_service");
@@ -294,6 +354,7 @@ export default function AddProduct() {
                               variant="outline" 
                               size="icon"
                               onClick={handleBarcodeScanning}
+                              title="مسح الباركود باستخدام الكاميرا"
                             >
                               <ScanLine className="h-4 w-4" />
                             </Button>
@@ -425,7 +486,7 @@ export default function AddProduct() {
                         render={({ field }) => (
                           <FormItem className="space-y-0">
                             <FormControl>
-                              <Switch
+                              <CustomSwitch
                                 checked={field.value}
                                 onCheckedChange={(checked) => {
                                   field.onChange(checked);
@@ -433,7 +494,6 @@ export default function AddProduct() {
                                     form.setValue("track_inventory", false);
                                   }
                                 }}
-                                className="bg-white data-[state=checked]:bg-green-700"
                               />
                             </FormControl>
                           </FormItem>
@@ -454,11 +514,10 @@ export default function AddProduct() {
                         render={({ field }) => (
                           <FormItem className="space-y-0">
                             <FormControl>
-                              <Switch
+                              <CustomSwitch
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
                                 disabled={form.watch("is_service")}
-                                className="bg-white data-[state=checked]:bg-green-700"
                               />
                             </FormControl>
                           </FormItem>
@@ -480,10 +539,9 @@ export default function AddProduct() {
                         </FormDescription>
                       </div>
                       <FormControl>
-                        <Switch
+                        <CustomSwitch
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          className="bg-white data-[state=checked]:bg-green-700"
                         />
                       </FormControl>
                     </FormItem>
@@ -537,7 +595,12 @@ export default function AddProduct() {
               <div className="border rounded-lg p-4">
                 <h3 className="font-medium mb-2">صورة المنتج</h3>
                 <div className="flex items-start gap-4">
-                  <div className="h-32 w-32 border rounded-md overflow-hidden flex items-center justify-center bg-gray-50">
+                  <div 
+                    className={`h-32 w-32 border rounded-md overflow-hidden flex items-center justify-center bg-gray-50 ${!imagePreview ? 'border-dashed' : ''}`}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    onClick={openFileDialog}
+                  >
                     {imagePreview ? (
                       <img 
                         src={imagePreview} 
@@ -545,7 +608,10 @@ export default function AddProduct() {
                         className="h-full w-full object-contain"
                       />
                     ) : (
-                      <Image className="h-10 w-10 text-gray-300" />
+                      <div className="flex flex-col items-center justify-center text-gray-400 p-2">
+                        <Image className="h-10 w-10 mb-1" />
+                        <span className="text-xs text-center">اسحب صورة هنا</span>
+                      </div>
                     )}
                   </div>
                   <div className="flex-1 space-y-2">
@@ -561,10 +627,14 @@ export default function AddProduct() {
                         accept="image/*"
                         className="hidden"
                         onChange={handleImageChange}
+                        ref={fileInputRef}
                       />
                     </label>
                     <p className="text-xs text-muted-foreground">
                       يمكنك تحميل صورة بصيغة JPG، PNG. الحد الأقصى 5 ميجابايت.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      يمكنك أيضاً سحب وإفلات الصورة مباشرة في المربع.
                     </p>
                   </div>
                 </div>
