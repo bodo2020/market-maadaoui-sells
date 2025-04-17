@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import { UserRole } from "@/types";
@@ -25,6 +25,7 @@ import CashTracking from "./pages/CashTracking";
 import Companies from "./pages/Companies";
 import Banners from "./pages/Banners";
 import OnlineOrders from "./pages/OnlineOrders";
+import Categories from "./pages/Categories";
 
 const queryClient = new QueryClient();
 
@@ -34,7 +35,7 @@ function App() {
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
-          <BrowserRouter>
+          <Router>
             <Routes>
               <Route path="/login" element={<Login />} />
               
@@ -146,9 +147,11 @@ function App() {
                 </ProtectedRoute>
               } />
               
+              <Route path="/categories" element={<Categories />} />
+              
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
+          </Router>
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
