@@ -28,6 +28,34 @@ export default function LogoUpload({ logoUrl, onLogoChange }: LogoUploadProps) {
       const fileName = `logo_${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
       
+      // Check if bucket exists and create it if not
+      const { data: buckets } = await supabase.storage.listBuckets();
+      if (!buckets?.some(bucket => bucket.name === 'store')) {
+        try {
+          const { error: bucketError } = await supabase.storage.createBucket('store', {
+            public: true
+          });
+          if (bucketError) {
+            console.error("Error creating bucket:", bucketError);
+            throw bucketError;
+          }
+          
+          // Set public access policy for the bucket
+          const { error: policyError } = await supabase.storage.from('store').createSignedUrl(
+            'dummy.txt', 
+            60
+          );
+          
+          if (policyError && policyError.message !== 'The resource was not found') {
+            console.error("Error setting up bucket policy:", policyError);
+          }
+        } catch (bucketCreationError) {
+          console.error("Failed to create bucket:", bucketCreationError);
+          // If we couldn't create the bucket, we'll try to upload anyway
+          // as it might already exist with different permissions
+        }
+      }
+      
       // Upload the file
       const { error: uploadError } = await supabase.storage
         .from('store')

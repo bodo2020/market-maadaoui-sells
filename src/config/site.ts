@@ -71,7 +71,10 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
       .select('id')
       .limit(1);
       
-    if (fetchError) throw fetchError;
+    if (fetchError) {
+      console.error("Error checking for existing settings:", fetchError);
+      throw fetchError;
+    }
     
     let updateOperation;
     
@@ -113,7 +116,10 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
     
     const { error } = await updateOperation;
     
-    if (error) throw error;
+    if (error) {
+      console.error("Error saving to Supabase:", error);
+      throw error;
+    }
     
     // Save to localStorage as backup
     localStorage.setItem('siteConfig', JSON.stringify(siteConfig));
@@ -129,15 +135,19 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
 }
 
 // Load settings on initial load
-(async () => {
+export async function loadSiteConfig() {
   try {
+    console.log("Loading site config from Supabase...");
     // Try to load from Supabase first
     const { data: settings, error } = await supabase
       .from('store_settings')
       .select('*')
       .limit(1);
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error loading from Supabase:", error);
+      throw error;
+    }
 
     if (settings && settings.length > 0) {
       const storeSettings = settings[0];
@@ -157,6 +167,7 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
         logo: storeSettings.logo_url, // Set logo to match logoUrl for invoice compatibility
       };
       console.info("Loaded site config from Supabase:", siteConfig);
+      return siteConfig;
     } else {
       console.info("No settings found in Supabase, using defaults or localStorage");
       // Fall back to localStorage if no Supabase settings found
@@ -170,6 +181,7 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
           // Since we found settings in localStorage but not in Supabase,
           // let's save them to Supabase for future use
           await updateSiteConfig(siteConfig);
+          return siteConfig;
         }
       } catch (localError) {
         console.error("Failed to load saved site config from localStorage:", localError);
@@ -185,9 +197,15 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
         const parsedConfig = JSON.parse(savedConfig);
         siteConfig = { ...defaultSiteConfig, ...parsedConfig };
         console.info("Loaded site config from localStorage:", siteConfig);
+        return siteConfig;
       }
     } catch (localError) {
       console.error("Failed to load saved site config from localStorage:", localError);
     }
   }
-})();
+  
+  return siteConfig;
+}
+
+// Initial load
+loadSiteConfig();
