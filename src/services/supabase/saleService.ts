@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, CartItem } from "@/types";
 
@@ -91,12 +92,20 @@ export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale
   }
   
   // Convert the items field from JSON to CartItem[] in each sale
+  // Also ensure payment_method is one of the allowed values
   return (data || []).map(sale => ({
     ...sale,
+    // Ensure payment_method is one of the allowed values in the Sale type
+    payment_method: (sale.payment_method === 'cash' || 
+                    sale.payment_method === 'card' || 
+                    sale.payment_method === 'mixed') 
+                    ? sale.payment_method as 'cash' | 'card' | 'mixed'
+                    : 'cash', // Default to 'cash' if invalid value
+    // Parse items properly
     items: Array.isArray(sale.items) 
       ? sale.items as unknown as CartItem[]  // If already an array
       : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
-  }));
+  })) as Sale[];
 }
 
 export async function fetchSaleById(id: string) {
@@ -114,6 +123,12 @@ export async function fetchSaleById(id: string) {
   // Convert the returned data to match our Sale type
   return {
     ...data,
+    // Ensure payment_method is one of the allowed values
+    payment_method: (data.payment_method === 'cash' || 
+                    data.payment_method === 'card' || 
+                    data.payment_method === 'mixed') 
+                    ? data.payment_method as 'cash' | 'card' | 'mixed'
+                    : 'cash', // Default to 'cash' if invalid value
     items: data.items as unknown as CartItem[]
   } as Sale;
 }
