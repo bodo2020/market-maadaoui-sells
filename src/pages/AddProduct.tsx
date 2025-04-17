@@ -23,14 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/sonner";
 import { useNavigate } from "react-router-dom";
 import { createProduct } from "@/services/supabase/productService";
 import { CustomSwitch } from "@/components/ui/custom-switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Toggle } from "@/components/ui/toggle";
 import { Image, ScanLine, Upload } from "lucide-react";
+import BarcodeScanner from "@/components/POS/BarcodeScanner";
 
 // Form validation schema
 const productFormSchema = z.object({
@@ -98,6 +97,7 @@ export default function AddProduct() {
   const [productImage, setProductImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   // Initialize form with default values
   const form = useForm<z.infer<typeof productFormSchema>>({
@@ -136,34 +136,14 @@ export default function AddProduct() {
 
   // Handle barcode scanning
   const handleBarcodeScanning = useCallback(() => {
-    // Here you would implement barcode scanning or open device camera
-    try {
-      // Check if the browser supports the MediaDevices API
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        // Request camera access to scan barcode
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-          .then(stream => {
-            // After getting camera access, you could implement a barcode detection logic
-            // For now, we'll just show that we got camera access
-            toast.info("تم فتح الكاميرا، جاري التطوير لمسح الباركود");
-            
-            // Close the stream after a short delay (simulating a scan)
-            setTimeout(() => {
-              stream.getTracks().forEach(track => track.stop());
-            }, 3000);
-          })
-          .catch(err => {
-            console.error("Error accessing camera:", err);
-            toast.error("لم نتمكن من الوصول إلى الكاميرا");
-          });
-      } else {
-        toast.error("متصفحك لا يدعم الوصول إلى الكاميرا");
-      }
-    } catch (error) {
-      console.error("Error in barcode scanning:", error);
-      toast.error("حدث خطأ أثناء محاولة مسح الباركود");
-    }
+    setShowScanner(true);
   }, []);
+
+  // Handle barcode result
+  const handleBarcodeResult = useCallback((barcode: string) => {
+    form.setValue("barcode", barcode);
+    toast.success(`تم مسح الباركود: ${barcode}`);
+  }, [form]);
 
   // Handle drag and drop for image upload
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -212,7 +192,6 @@ export default function AddProduct() {
       // If product is a service, set quantity to -1 and disable inventory tracking
       if (values.is_service) {
         values.quantity = -1;
-        values.track_inventory = false;
       }
       
       // If offer is not enabled, remove offer price
@@ -239,23 +218,26 @@ export default function AddProduct() {
         ? [imagePreview] 
         : ["/placeholder.svg"];
       
+      // Remove track_inventory from the data we send to the database
+      // since it's not supported in the schema yet
+      const { track_inventory, ...productData } = values;
+      
       // Add all required properties for the Product type
       await createProduct({
-        name: values.name,
-        price: values.price,
-        purchase_price: values.purchase_price,
-        quantity: values.quantity,
-        description: values.description,
+        name: productData.name,
+        price: productData.price,
+        purchase_price: productData.purchase_price,
+        quantity: productData.quantity,
+        description: productData.description,
         barcode: formattedBarcode,
-        barcode_type: values.barcode_type,
-        is_offer: values.is_offer,
-        offer_price: values.offer_price,
+        barcode_type: productData.barcode_type,
+        is_offer: productData.is_offer,
+        offer_price: productData.offer_price,
         image_urls: imageUrls,
         bulk_enabled: false,
         is_bulk: false,
-        category_id: values.category,
-        unit_of_measure: values.unit,
-        track_inventory: values.track_inventory,
+        category_id: productData.category,
+        unit_of_measure: productData.unit,
       });
       
       toast.success("تم إضافة المنتج بنجاح");
@@ -371,6 +353,7 @@ export default function AddProduct() {
                   </div>
                 </div>
 
+                {/* Continue with the rest of the form fields */}
                 <FormField
                   control={form.control}
                   name="category"
@@ -596,7 +579,7 @@ export default function AddProduct() {
                 <h3 className="font-medium mb-2">صورة المنتج</h3>
                 <div className="flex items-start gap-4">
                   <div 
-                    className={`h-32 w-32 border rounded-md overflow-hidden flex items-center justify-center bg-gray-50 ${!imagePreview ? 'border-dashed' : ''}`}
+                    className={`h-32 w-32 border rounded-md overflow-hidden flex items-center justify-center bg-gray-50 cursor-pointer ${!imagePreview ? 'border-dashed' : ''}`}
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
                     onClick={openFileDialog}
@@ -656,6 +639,12 @@ export default function AddProduct() {
           </Form>
         </CardContent>
       </Card>
+      
+      <BarcodeScanner 
+        isOpen={showScanner} 
+        onClose={() => setShowScanner(false)}
+        onScan={handleBarcodeResult}
+      />
     </MainLayout>
   );
 }

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -128,6 +129,7 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
   }
   
   // Only include fields that exist in the database schema
+  // Remove track_inventory from the data to match the schema
   const finalProductData = {
     name: productData.name,
     barcode: productData.barcode,
@@ -148,8 +150,7 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
     bulk_barcode: productData.bulk_barcode,
     manufacturer_name: productData.manufacturer_name,
     unit_of_measure: productData.unit_of_measure,
-    is_bulk: productData.is_bulk || false,
-    track_inventory: productData.track_inventory
+    is_bulk: productData.is_bulk || false
   };
 
   const { data, error } = await supabase
