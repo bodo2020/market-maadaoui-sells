@@ -1,3 +1,5 @@
+
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
@@ -16,7 +18,9 @@ import {
   Home,
   UserPlus,
   Banknote,
-  Truck
+  Truck,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -47,100 +51,119 @@ export default function Sidebar() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const currentPath = window.location.pathname;
+  const [collapsed, setCollapsed] = useState(false);
   
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
   
+  const toggleSidebar = () => {
+    setCollapsed(!collapsed);
+  };
+  
   return (
-    <div className="w-64 border-l bg-white h-screen overflow-y-auto p-4 flex flex-col">
-      <div className="flex items-center justify-center mb-8 mt-4">
-        <h1 className="text-xl font-bold text-primary">{siteConfig.name}</h1>
+    <div className={cn(
+      "border-l bg-white h-screen overflow-y-auto flex flex-col transition-all duration-300",
+      collapsed ? "w-20" : "w-64"
+    )}>
+      <div className="flex items-center justify-between p-4">
+        {!collapsed && <h1 className="text-xl font-bold text-primary">{siteConfig.name}</h1>}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={toggleSidebar} 
+          className="ml-auto"
+        >
+          {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+        </Button>
       </div>
       
-      <div className="flex-1 space-y-1">
+      <div className="flex-1 space-y-1 px-4">
         <SidebarItem
           icon={<Home size={20} />}
-          label="الرئيسية"
+          label={collapsed ? "" : "الرئيسية"}
           href="/"
           active={currentPath === "/"}
         />
         <SidebarItem
           icon={<ShoppingCart size={20} />}
-          label="نقطة البيع"
+          label={collapsed ? "" : "نقطة البيع"}
           href="/pos"
           active={currentPath === "/pos"}
         />
         <SidebarItem
+          icon={<Truck size={20} />}
+          label={collapsed ? "" : "مشتريات الموردين"}
+          href="/supplier-purchases"
+          active={currentPath === "/supplier-purchases"}
+        />
+        <SidebarItem
           icon={<PackageOpen size={20} />}
-          label="المنتجات"
+          label={collapsed ? "" : "المنتجات"}
           href="/products"
           active={currentPath === "/products"}
         />
         <SidebarItem
           icon={<Receipt size={20} />}
-          label="الفواتير"
+          label={collapsed ? "" : "الفواتير"}
           href="/invoices"
           active={currentPath === "/invoices"}
         />
         <SidebarItem
           icon={<BarChart4 size={20} />}
-          label="التقارير"
+          label={collapsed ? "" : "التقارير"}
           href="/reports"
           active={currentPath === "/reports"}
         />
         <SidebarItem
           icon={<Store size={20} />}
-          label="المخزون"
+          label={collapsed ? "" : "المخزون"}
           href="/inventory"
           active={currentPath === "/inventory"}
         />
         <SidebarItem
           icon={<UserPlus size={20} />}
-          label="العملاء والموردين"
+          label={collapsed ? "" : "العملاء والموردين"}
           href="/suppliers-customers"
           active={currentPath === "/suppliers-customers"}
         />
         <SidebarItem
           icon={<Banknote size={20} />}
-          label="المالية"
+          label={collapsed ? "" : "المالية"}
           href="/finance"
           active={currentPath === "/finance"}
         />
         <SidebarItem
           icon={<FileText size={20} />}
-          label="المصروفات"
+          label={collapsed ? "" : "المصروفات"}
           href="/expenses"
           active={currentPath === "/expenses"}
         />
         <SidebarItem
           icon={<Users size={20} />}
-          label="الموظفين"
+          label={collapsed ? "" : "الموظفين"}
           href="/employees"
           active={currentPath === "/employees"}
         />
         <SidebarItem
           icon={<Settings size={20} />}
-          label="الإعدادات"
+          label={collapsed ? "" : "الإعدادات"}
           href="/settings"
           active={currentPath === "/settings"}
-        />
-        <SidebarItem
-          icon={<Truck size={20} />}
-          label="مشتريات الموردين"
-          href="/supplier-purchases"
-          active={currentPath === "/supplier-purchases"}
         />
       </div>
       
       <Button 
         variant="outline" 
-        className="mt-4 gap-2 w-full justify-start"
+        className={cn(
+          "m-4 gap-2 w-auto justify-start",
+          collapsed && "p-2"
+        )}
         onClick={handleLogout}
       >
         <LogOut size={20} />
-        <span>تسجيل الخروج</span>
+        {!collapsed && <span>تسجيل الخروج</span>}
       </Button>
     </div>
   );

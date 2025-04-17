@@ -1,4 +1,3 @@
-
 import { Product } from "@/types";
 import { fetchProducts } from "./supabase/productService";
 import { toast } from "@/components/ui/sonner";
@@ -9,6 +8,7 @@ export interface StockNotification {
   type: 'low_stock';
   read: boolean;
   createdAt: Date;
+  displayed: boolean;
 }
 
 // Default threshold for low stock, can be configurable in the future
@@ -25,7 +25,8 @@ export const getNotifications = (): StockNotification[] => {
   try {
     return JSON.parse(storedNotifications).map((notification: any) => ({
       ...notification,
-      createdAt: new Date(notification.createdAt)
+      createdAt: new Date(notification.createdAt),
+      displayed: notification.displayed || false
     }));
   } catch (error) {
     console.error("Error parsing notifications from storage:", error);
@@ -49,10 +50,16 @@ export const addNotification = (notification: StockNotification): void => {
   
   if (existingIndex >= 0) {
     // Update existing notification
-    notifications[existingIndex] = notification;
+    notifications[existingIndex] = {
+      ...notification,
+      displayed: notifications[existingIndex].displayed
+    };
   } else {
-    // Add new notification
-    notifications.push(notification);
+    // Add new notification (not displayed yet)
+    notifications.push({
+      ...notification,
+      displayed: false
+    });
   }
   
   saveNotifications(notifications);
@@ -74,6 +81,18 @@ export const markNotificationAsRead = (notificationId: string): void => {
 export const markAllNotificationsAsRead = (): void => {
   const notifications = getNotifications();
   const updatedNotifications = notifications.map(notification => ({ ...notification, read: true }));
+  
+  saveNotifications(updatedNotifications);
+};
+
+// Mark notification as displayed
+export const markNotificationAsDisplayed = (notificationId: string): void => {
+  const notifications = getNotifications();
+  const updatedNotifications = notifications.map(notification => 
+    notification.id === notificationId 
+      ? { ...notification, displayed: true } 
+      : notification
+  );
   
   saveNotifications(updatedNotifications);
 };
@@ -103,7 +122,8 @@ export const checkLowStockProducts = async (): Promise<StockNotification[]> => {
         product,
         type: 'low_stock',
         read: false,
-        createdAt: new Date()
+        createdAt: new Date(),
+        displayed: false
       };
       
       addNotification(notification);
@@ -117,13 +137,21 @@ export const checkLowStockProducts = async (): Promise<StockNotification[]> => {
   }
 };
 
-// Show toast notification for low stock products
+// Show toast notification for low stock products (only if not displayed yet)
 export const showLowStockToast = (notification: StockNotification): void => {
-  const { product } = notification;
+  // Only show toast if this notification hasn't been displayed yet
+  const notifications = getNotifications();
+  const existingNotification = notifications.find(n => n.id === notification.id);
   
-  // Fix: We need to call toast as a function, not render it directly
-  toast("تنبيه المخزون المنخفض", {
-    description: `المنتج "${product.name}" منخفض المخزون (${product.quantity} وحدة متبقية)`,
-    duration: 5000
-  });
+  if (existingNotification && !existingNotification.displayed) {
+    const { product } = notification;
+    
+    toast("تنبيه المخزون المنخفض", {
+      description: `المنتج "${product.name}" منخفض المخزون (${product.quantity} وحدة متبقية)`,
+      duration: 5000
+    });
+    
+    // Mark this notification as displayed so it won't show again
+    markNotificationAsDisplayed(notification.id);
+  }
 };
