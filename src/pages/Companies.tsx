@@ -1,12 +1,13 @@
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Building2, Plus, PenSquare, Trash2, Search } from "lucide-react";
+import { Building2, Plus, PenSquare, Trash2, Search, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import CompanyForm from "@/components/companies/CompanyForm";
 import { 
@@ -22,6 +23,7 @@ import {
 import { Company, fetchCompanies, deleteCompany } from "@/services/supabase/companyService";
 
 export default function Companies() {
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -69,6 +71,10 @@ export default function Companies() {
   const filteredCompanies = companies.filter(company => 
     company.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const navigateToCompanyDetail = (companyId: string) => {
+    navigate(`/companies/${companyId}`);
+  };
 
   return (
     <MainLayout>
@@ -134,6 +140,14 @@ export default function Companies() {
                     <p className="text-gray-500 text-center mt-2 line-clamp-2">{company.description}</p>
                   )}
                   <div className="flex justify-center mt-4 gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => navigateToCompanyDetail(company.id)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      عرض
+                    </Button>
                     <Button 
                       variant="outline" 
                       size="sm"

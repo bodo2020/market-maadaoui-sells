@@ -1,169 +1,72 @@
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
+
+import { lazy, Suspense } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
-import { UserRole } from "@/types";
 
-import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
-import POS from "./pages/POS";
-import ProductManagement from "./pages/ProductManagement";
-import AddProduct from "./pages/AddProduct";
-import InventoryManagement from "./pages/InventoryManagement";
-import SuppliersCustomers from "./pages/SuppliersCustomers";
-import Reports from "./pages/Reports";
-import EmployeeManagement from "./pages/EmployeeManagement";
-import ExpenseManagement from "./pages/ExpenseManagement";
-import Invoices from "./pages/Invoices";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
-import Purchases from "./pages/Purchases";
-import SupplierPurchases from "./pages/SupplierPurchases";
-import CashTracking from "./pages/CashTracking";
-import Companies from "./pages/Companies";
-import Banners from "./pages/Banners";
-import OnlineOrders from "./pages/OnlineOrders";
-import Categories from "./pages/Categories";
-import AddBanner from "./pages/AddBanner";
+// Lazy load pages
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const POS = lazy(() => import("@/pages/POS"));
+const ProductManagement = lazy(() => import("@/pages/ProductManagement"));
+const AddProduct = lazy(() => import("@/pages/AddProduct"));
+const Categories = lazy(() => import("@/pages/Categories"));
+const Invoices = lazy(() => import("@/pages/Invoices"));
+const SuppliersCustomers = lazy(() => import("@/pages/SuppliersCustomers"));
+const SupplierPurchases = lazy(() => import("@/pages/SupplierPurchases"));
+const Purchases = lazy(() => import("@/pages/Purchases"));
+const Finance = lazy(() => import("@/pages/Finance"));
+const ExpenseManagement = lazy(() => import("@/pages/ExpenseManagement"));
+const CashTracking = lazy(() => import("@/pages/CashTracking"));
+const InventoryManagement = lazy(() => import("@/pages/InventoryManagement"));
+const OnlineOrders = lazy(() => import("@/pages/OnlineOrders"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const EmployeeManagement = lazy(() => import("@/pages/EmployeeManagement"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Login = lazy(() => import("@/pages/Login"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
+const Banners = lazy(() => import("@/pages/Banners"));
+const AddBanner = lazy(() => import("@/pages/AddBanner"));
+const Companies = lazy(() => import("@/pages/Companies"));
+// Import the new company detail page
+const CompanyDetail = lazy(() => import("@/components/companies/CompanyDetail"));
 
-const queryClient = new QueryClient();
+import "./App.css";
+import { Toaster } from "@/components/ui/sonner";
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/pos" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.CASHIER]}>
-                  <POS />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/products" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <ProductManagement />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/add-product" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <AddProduct />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/inventory" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.EMPLOYEE]}>
-                  <InventoryManagement />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/suppliers-customers" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.EMPLOYEE]}>
-                  <SuppliersCustomers />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/purchases" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <Purchases />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/supplier-purchases" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <SupplierPurchases />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/finance" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <Reports />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/reports" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <Reports />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/invoices" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.CASHIER]}>
-                  <Invoices />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/employees" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <EmployeeManagement />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/expenses" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <ExpenseManagement />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/settings" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/cash-tracking" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <CashTracking />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/companies" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <Companies />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/banners" element={<Banners />} />
-              <Route path="/banners/add" element={<AddBanner />} />
-              <Route path="/banners/edit" element={<AddBanner />} />
-              
-              <Route path="/online-orders" element={
-                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-                  <OnlineOrders />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/categories" element={
-                <ProtectedRoute>
-                  <Categories />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="/categories/:id" element={
-                <ProtectedRoute>
-                  <Categories />
-                </ProtectedRoute>
-              } />
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Router>
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <Router>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/login" element={<Login />} />
+          
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
+          <Route path="/products" element={<ProtectedRoute><ProductManagement /></ProtectedRoute>} />
+          <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+          <Route path="/categories/*" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+          <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
+          <Route path="/suppliers-customers" element={<ProtectedRoute><SuppliersCustomers /></ProtectedRoute>} />
+          <Route path="/supplier-purchases" element={<ProtectedRoute><SupplierPurchases /></ProtectedRoute>} />
+          <Route path="/purchases" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
+          <Route path="/finances" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
+          <Route path="/expenses" element={<ProtectedRoute><ExpenseManagement /></ProtectedRoute>} />
+          <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />
+          <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
+          <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
+          <Route path="/settings/*" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
+          <Route path="/add-banner" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
+          <Route path="/companies" element={<ProtectedRoute><Companies /></ProtectedRoute>} />
+          <Route path="/companies/:companyId" element={<ProtectedRoute><CompanyDetail /></ProtectedRoute>} />
+          
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+      <Toaster position="top-right" />
+    </Router>
   );
 }
 
