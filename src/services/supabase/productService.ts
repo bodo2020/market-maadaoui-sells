@@ -181,29 +181,56 @@ export async function updateProduct(id: string, product: Partial<Product>) {
     }
   }
 
-  // Create a simple map to store update values without causing type recursion
-  const updateData: Record<string, unknown> = {};
+  // Define a fixed update data structure to avoid type recursion
+  type UpdateDataType = {
+    name?: string;
+    barcode?: string;
+    description?: string;
+    image_urls?: string[];
+    quantity?: number;
+    price?: number;
+    purchase_price?: number;
+    offer_price?: number;
+    is_offer?: boolean;
+    category_id?: string;
+    subcategory_id?: string;
+    subsubcategory_id?: string;
+    company_id?: string;
+    barcode_type?: string;
+    bulk_enabled?: boolean;
+    bulk_quantity?: number;
+    bulk_price?: number;
+    bulk_barcode?: string;
+    manufacturer_name?: string;
+    unit_of_measure?: string;
+    is_bulk?: boolean;
+  };
   
-  // List of valid product fields to include in the update
-  const validFields = [
-    'name', 'barcode', 'description', 'image_urls', 'quantity', 
-    'price', 'purchase_price', 'offer_price', 'is_offer',
-    'category_id', 'subcategory_id', 'subsubcategory_id', 'company_id',
-    'barcode_type', 'bulk_enabled', 'bulk_quantity', 'bulk_price', 
-    'bulk_barcode', 'manufacturer_name', 'unit_of_measure',
-    'is_bulk'
-  ];
+  // Initialize empty update data object
+  const updateData: UpdateDataType = {};
   
-  // Manually add each property to avoid type recursion issues
-  for (const key of validFields) {
-    if (key in product) {
-      // Use type assertion to avoid TypeScript errors
-      const value = product[key as keyof typeof product];
-      if (value !== undefined) {
-        updateData[key] = value;
-      }
-    }
-  }
+  // Explicitly map fields from product to updateData
+  if ('name' in product && product.name !== undefined) updateData.name = product.name;
+  if ('barcode' in product && product.barcode !== undefined) updateData.barcode = product.barcode;
+  if ('description' in product && product.description !== undefined) updateData.description = product.description;
+  if ('image_urls' in product && product.image_urls !== undefined) updateData.image_urls = product.image_urls;
+  if ('quantity' in product && product.quantity !== undefined) updateData.quantity = product.quantity;
+  if ('price' in product && product.price !== undefined) updateData.price = product.price;
+  if ('purchase_price' in product && product.purchase_price !== undefined) updateData.purchase_price = product.purchase_price;
+  if ('offer_price' in product && product.offer_price !== undefined) updateData.offer_price = product.offer_price;
+  if ('is_offer' in product && product.is_offer !== undefined) updateData.is_offer = product.is_offer;
+  if ('category_id' in product && product.category_id !== undefined) updateData.category_id = product.category_id;
+  if ('subcategory_id' in product && product.subcategory_id !== undefined) updateData.subcategory_id = product.subcategory_id;
+  if ('subsubcategory_id' in product && product.subsubcategory_id !== undefined) updateData.subsubcategory_id = product.subsubcategory_id;
+  if ('company_id' in product && product.company_id !== undefined) updateData.company_id = product.company_id;
+  if ('barcode_type' in product && product.barcode_type !== undefined) updateData.barcode_type = product.barcode_type;
+  if ('bulk_enabled' in product && product.bulk_enabled !== undefined) updateData.bulk_enabled = product.bulk_enabled;
+  if ('bulk_quantity' in product && product.bulk_quantity !== undefined) updateData.bulk_quantity = product.bulk_quantity;
+  if ('bulk_price' in product && product.bulk_price !== undefined) updateData.bulk_price = product.bulk_price;
+  if ('bulk_barcode' in product && product.bulk_barcode !== undefined) updateData.bulk_barcode = product.bulk_barcode;
+  if ('manufacturer_name' in product && product.manufacturer_name !== undefined) updateData.manufacturer_name = product.manufacturer_name;
+  if ('unit_of_measure' in product && product.unit_of_measure !== undefined) updateData.unit_of_measure = product.unit_of_measure;
+  if ('is_bulk' in product && product.is_bulk !== undefined) updateData.is_bulk = product.is_bulk;
 
   const { data, error } = await supabase
     .from("products")
