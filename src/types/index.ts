@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -58,7 +59,7 @@ export interface Product {
   category_id?: string;
   subcategory_id?: string;
   subsubcategory_id?: string;
-  company_id?: string; 
+  company_id?: string; // Add company_id field
   barcode_type?: string;
   bulk_enabled: boolean;
   bulk_quantity?: number;
@@ -77,8 +78,6 @@ export interface Product {
   is_bulk_scan?: boolean;
   // Track inventory property
   track_inventory?: boolean;
-  // Add notify_quantity property
-  notify_quantity?: number;
 }
 
 export interface CartItem {
