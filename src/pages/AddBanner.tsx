@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +16,6 @@ import type { Product } from "@/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
-// Define the type for banner data from the database
 interface BannerData {
   id: string;
   title: string;
@@ -76,12 +74,10 @@ export default function AddBanner() {
 
   const checkBannersBucket = async () => {
     try {
-      // Try to list files in the banners bucket to check if it exists
       const { error } = await supabase.storage.from('banners').list();
       
-      // If there's an error, the bucket might not exist
       if (error) {
-        console.log("Banners bucket may not exist or have permissions issues:", error);
+        console.log("Banners bucket needs to be created:", error);
         await createBannersBucket();
       }
     } catch (err) {
@@ -102,24 +98,25 @@ export default function AddBanner() {
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${supabase.auth.getSession() 
-              ? `${(await supabase.auth.getSession()).data.session?.access_token}` 
-              : ""}`
+            "Content-Type": "application/json"
           },
         }
       );
       
+      const result = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Error creating banners bucket:", errorData);
-        setError(`خطأ في إنشاء مجلد البانرات: ${errorData.error || 'حدث خطأ غير معروف'}`);
+        console.error("Error creating banners bucket:", result);
+        setError(`خطأ في إنشاء مجلد البانرات: ${result.error || 'حدث خطأ غير معروف'}`);
       } else {
-        console.log("Banners bucket created/verified successfully");
-        // Re-check bucket after creation
+        console.log("Banners bucket response:", result);
+        
         const { error: checkError } = await supabase.storage.from('banners').list();
         if (checkError) {
-          setError("تم إنشاء مجلد البانرات لكن لا يمكن الوصول إليه. يرجى التحقق من الإعدادات.");
+          console.error("Bucket still not accessible after creation:", checkError);
+          setError("تم محاولة إنشاء مجلد البانرات لكن لا يمكن الوصول إليه. يرجى التحقق من الإعدادات.");
+        } else {
+          toast.success("تم إنشاء مجلد البانرات بنجاح");
         }
       }
     } catch (error: any) {
@@ -141,7 +138,6 @@ export default function AddBanner() {
       if (error) throw error;
       
       if (data) {
-        // Cast data to BannerData to handle custom fields
         const bannerData = data as unknown as BannerData;
         
         setFormData({
@@ -156,7 +152,6 @@ export default function AddBanner() {
         });
         setPreviewUrl(bannerData.image_url);
         
-        // Check if products exist and fetch them
         if (bannerData.products && Array.isArray(bannerData.products) && bannerData.products.length > 0) {
           fetchSelectedProducts(bannerData.products);
         }
@@ -224,16 +219,13 @@ export default function AddBanner() {
       console.error("Error fetching companies:", error);
     }
   };
-  
-  // Filter products based on search term
+
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      // Don't include products that are already selected
       if (selectedProducts.some(p => p.id === product.id)) {
         return false;
       }
       
-      // Filter by search term
       if (searchTerm) {
         return product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -247,18 +239,20 @@ export default function AddBanner() {
     setError(null);
     
     try {
-      // First, check if bucket exists and create if missing
       const { error: bucketCheckError } = await supabase.storage.from('banners').list();
       
       if (bucketCheckError) {
         console.log("Bucket check failed, trying to create it:", bucketCheckError);
         await createBannersBucket();
+        
+        const { error: recheckError } = await supabase.storage.from('banners').list();
+        if (recheckError) {
+          throw new Error("مجلد البانرات غير متاح حتى بعد محاولة إنشاءه. يرجى المحاولة مرة أخرى لاحقًا.");
+        }
       }
       
-      // Generate a unique file name
       const fileName = `banner-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
       
-      // Get the URL to a storage bucket called 'banners'
       const { data, error } = await supabase.storage
         .from('banners')
         .upload(fileName, file, {
@@ -267,29 +261,9 @@ export default function AddBanner() {
         });
       
       if (error) {
-        if (error.message.includes("bucket") || error.message.includes("Bucket")) {
-          await createBannersBucket();
-          // Try one more time after creating the bucket
-          const { data: retryData, error: retryError } = await supabase.storage
-            .from('banners')
-            .upload(fileName, file, {
-              cacheControl: '3600',
-              upsert: false
-            });
-          
-          if (retryError) throw retryError;
-          
-          const { data: retryUrlData } = supabase.storage
-            .from('banners')
-            .getPublicUrl(fileName);
-          
-          return retryUrlData.publicUrl;
-        } else {
-          throw error;
-        }
+        throw error;
       }
       
-      // Get the public URL of the uploaded file
       const { data: urlData } = supabase.storage
         .from('banners')
         .getPublicUrl(fileName);
@@ -326,7 +300,7 @@ export default function AddBanner() {
           imageUrl = await uploadImage(imageFile);
         } catch (error) {
           setSaving(false);
-          return; // Exit if image upload fails
+          return;
         }
       }
 
@@ -406,7 +380,6 @@ export default function AddBanner() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Banner Details */}
           <Card>
             <CardContent className="pt-6 space-y-4">
               <div className="space-y-2">
@@ -571,12 +544,10 @@ export default function AddBanner() {
             </CardContent>
           </Card>
           
-          {/* Product Selection */}
           <Card>
             <CardContent className="pt-6 space-y-4">
               <h3 className="font-medium">إضافة منتجات للبانر</h3>
               
-              {/* Selected Products */}
               <div className="space-y-2">
                 <Label>المنتجات المختارة ({selectedProducts.length})</Label>
                 <div className="border rounded-md h-32 overflow-auto p-2">
@@ -618,7 +589,6 @@ export default function AddBanner() {
                 </div>
               </div>
               
-              {/* Product Search */}
               <div className="space-y-2">
                 <Label>إضافة منتجات</Label>
                 <div className="relative">

@@ -7,7 +7,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import { UserRole } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 // Import pages
 import Dashboard from "./pages/Dashboard";
@@ -38,29 +37,21 @@ function App() {
   useEffect(() => {
     const initStorage = async () => {
       try {
-        // Check if we can list files in the banners bucket
-        const { error } = await supabase.storage.from('banners').list();
-        
-        // If there's an error accessing the bucket, try to create it using the edge function
-        if (error) {
-          console.log("Attempting to create banners bucket via edge function...");
-          
-          const response = await fetch(
-            "https://qzvpayjaadbmpayeglon.functions.supabase.co/create_banners_bucket",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-            }
-          );
-          
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error("Error creating banners bucket:", errorData);
-          } else {
-            console.log("Banners bucket created/verified successfully");
+        // Attempt to create banners bucket when the app starts
+        const response = await fetch(
+          "https://qzvpayjaadbmpayeglon.functions.supabase.co/create_banners_bucket",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
           }
+        );
+        
+        if (!response.ok) {
+          console.error("Warning: Could not initialize banners bucket at startup");
+        } else {
+          console.log("Banners bucket verified at startup");
         }
       } catch (error) {
         console.error("Storage initialization error:", error);
