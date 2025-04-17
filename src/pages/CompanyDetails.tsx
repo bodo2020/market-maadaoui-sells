@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -11,8 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Company, Product } from "@/types";
 import { fetchCompanyById } from "@/services/supabase/companyService";
 import { fetchProductsByCompany } from "@/services/supabase/productService";
-import ProductGrid from "@/components/ProductGrid";
-import AddProductDialog from "@/components/AddProductDialog";
+import { ProductGrid } from "@/components/products/ProductGrid";
+import { AddProductDialog } from "@/components/products/AddProductDialog";
 
 export default function CompanyDetails() {
   const { id } = useParams();
