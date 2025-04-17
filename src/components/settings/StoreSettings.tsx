@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
 import { Upload, Image as ImageIcon } from "lucide-react";
 import { siteConfig, updateSiteConfig } from "@/config/site";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,11 +19,11 @@ interface SettingsData {
 
 export default function StoreSettings() {
   const [settingsData, setSettingsData] = useState<SettingsData>({
-    storeName: siteConfig.name,
-    storeAddress: siteConfig.address || "",
-    storePhone: siteConfig.phone || "",
-    storeEmail: siteConfig.email || "",
-    logoUrl: siteConfig.logoUrl || null,
+    storeName: "",
+    storeAddress: "",
+    storePhone: "",
+    storeEmail: "",
+    logoUrl: null,
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -32,7 +31,7 @@ export default function StoreSettings() {
   // Load settings from localStorage on mount
   useEffect(() => {
     setSettingsData({
-      storeName: siteConfig.name,
+      storeName: siteConfig.name || "",
       storeAddress: siteConfig.address || "",
       storePhone: siteConfig.phone || "",
       storeEmail: siteConfig.email || "",
@@ -76,7 +75,6 @@ export default function StoreSettings() {
       
       if (data) {
         setSettingsData({ ...settingsData, logoUrl: data.publicUrl });
-        
         toast.success("تم رفع الشعار بنجاح");
       }
     } catch (error) {
@@ -100,15 +98,6 @@ export default function StoreSettings() {
         logoUrl: settingsData.logoUrl,
         logo: settingsData.logoUrl, // Update logo as well for invoice compatibility
       });
-      
-      // Store settings in local storage too for persistence
-      localStorage.setItem('storeSettings', JSON.stringify({
-        name: settingsData.storeName,
-        address: settingsData.storeAddress,
-        phone: settingsData.storePhone,
-        email: settingsData.storeEmail,
-        logoUrl: settingsData.logoUrl,
-      }));
       
       toast.success("تم حفظ الإعدادات بنجاح");
     } catch (error) {

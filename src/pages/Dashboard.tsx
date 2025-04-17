@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import MainLayout from "@/components/layout/MainLayout";
@@ -158,7 +159,17 @@ export default function Dashboard() {
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">مرحباً بك في {siteConfig.name}</h1>
+        {siteConfig.logoUrl ? (
+          <div className="h-12">
+            <img 
+              src={siteConfig.logoUrl} 
+              alt={siteConfig.name}
+              className="h-full object-contain" 
+            />
+          </div>
+        ) : (
+          <h1 className="text-2xl font-bold">مرحباً بك في {siteConfig.name}</h1>
+        )}
         <p className="text-muted-foreground">
           {new Date().toLocaleDateString('ar-EG', { 
             weekday: 'long', 

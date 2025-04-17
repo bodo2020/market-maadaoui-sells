@@ -68,12 +68,24 @@ export default function Sidebar() {
       collapsed ? "w-20" : "w-64"
     )}>
       <div className="flex items-center justify-between p-4">
-        {!collapsed && <h1 className="text-xl font-bold text-primary">{siteConfig.name}</h1>}
+        {!collapsed && (
+          <>
+            {siteConfig.logoUrl ? (
+              <img 
+                src={siteConfig.logoUrl} 
+                alt={siteConfig.name} 
+                className="h-8 object-contain"
+              />
+            ) : (
+              <h1 className="text-xl font-bold text-primary">{siteConfig.name}</h1>
+            )}
+          </>
+        )}
         <Button 
           variant="ghost" 
           size="icon" 
           onClick={toggleSidebar} 
-          className="ml-auto"
+          className={collapsed ? "mx-auto" : "ml-auto"}
         >
           {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
         </Button>
