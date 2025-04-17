@@ -138,7 +138,7 @@ export default function AddProduct() {
       barcode: "",
       barcode_type: "normal",
       category: "others",
-      company: "",
+      company: "null",
       price: 0,
       purchase_price: 0,
       quantity: 0,
@@ -182,7 +182,7 @@ export default function AddProduct() {
           barcode: product.barcode || "",
           barcode_type: product.barcode_type || "normal",
           category: product.category_id || "others",
-          company: product.company_id || "",
+          company: product.company_id || "null",
           price: product.price,
           purchase_price: product.purchase_price,
           quantity: product.quantity || 0,
@@ -307,7 +307,7 @@ export default function AddProduct() {
         bulk_enabled: false,
         is_bulk: false,
         category_id: productData.category,
-        company_id: company || null,
+        company_id: company === "null" ? null : company,
         unit_of_measure: productData.unit
       };
 
@@ -440,7 +440,7 @@ export default function AddProduct() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">بدون شركة</SelectItem>
+                          <SelectItem value="null">بدون شركة</SelectItem>
                           {companies.map(company => (
                             <SelectItem key={company.id} value={company.id}>
                               {company.name}
