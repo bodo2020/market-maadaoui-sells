@@ -143,7 +143,7 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
     category_id: productData.category_id,
     subcategory_id: productData.subcategory_id,
     subsubcategory_id: productData.subsubcategory_id,
-    company_id: productData.company_id, // Add company_id field
+    company_id: productData.company_id, 
     barcode_type: productData.barcode_type,
     bulk_enabled: productData.bulk_enabled,
     bulk_quantity: productData.bulk_quantity,
@@ -181,30 +181,26 @@ export async function updateProduct(id: string, product: Partial<Product>) {
     }
   }
 
-  // Use a type-safe approach to avoid recursive type issues
-  const updateData: Record<string, any> = {};
+  // Create a simple map to store update values without causing type recursion
+  const updateData: Record<string, unknown> = {};
   
-  // Only include fields that are present in the product object and exist in the database
+  // List of valid product fields to include in the update
   const validFields = [
     'name', 'barcode', 'description', 'image_urls', 'quantity', 
     'price', 'purchase_price', 'offer_price', 'is_offer',
     'category_id', 'subcategory_id', 'subsubcategory_id', 'company_id',
     'barcode_type', 'bulk_enabled', 'bulk_quantity', 'bulk_price', 
     'bulk_barcode', 'manufacturer_name', 'unit_of_measure',
-    'created_at', 'updated_at', 'is_bulk'
+    'is_bulk'
   ];
   
-  // Safely copy properties without causing type recursion
-  for (const key of Object.keys(product)) {
-    if (validFields.includes(key)) {
+  // Manually add each property to avoid type recursion issues
+  for (const key of validFields) {
+    if (key in product) {
+      // Use type assertion to avoid TypeScript errors
       const value = product[key as keyof typeof product];
       if (value !== undefined) {
-        // Convert Date objects to ISO strings if needed
-        if (key === 'created_at' || key === 'updated_at') {
-          updateData[key] = value instanceof Date ? (value as Date).toISOString() : value;
-        } else {
-          updateData[key] = value;
-        }
+        updateData[key] = value;
       }
     }
   }
