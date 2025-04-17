@@ -59,6 +59,8 @@ export interface Product {
   calculated_price?: number;
   // Property to indicate if the product was scanned with its bulk barcode
   is_bulk_scan?: boolean;
+  // Track inventory property
+  track_inventory?: boolean;
 }
 
 export interface CartItem {

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -136,6 +137,7 @@ export default function AddProduct() {
         is_bulk: false, // Set default value for is_bulk
         category_id: values.category, // Map category to category_id expected by the Product type
         unit_of_measure: values.unit, // Map unit to unit_of_measure
+        track_inventory: values.track_inventory, // Add the track_inventory field
       });
       
       toast.success("تم إضافة المنتج بنجاح");
