@@ -1,52 +1,57 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders, status: 204 });
-  }
-
   try {
-    // Create a Supabase client with the service role key
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    // Create a Supabase client with the Auth context of the logged in user
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    )
 
-    const { bucket_name, policy_name, definition, operation } = await req.json();
+    const { data: { user } } = await supabaseClient.auth.getUser()
+    
+    // Only allow admins to create buckets
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { headers: { 'Content-Type': 'application/json' }, status: 401 }
+      )
+    }
 
-    // SQL query to create the policy
-    const { data, error } = await supabaseAdmin.rpc("create_storage_policy", {
-      bucket_name,
-      policy_name,
-      definition,
-      operation
-    });
+    // Get the bucket name from the request
+    const { bucketName } = await req.json()
+    
+    if (!bucketName) {
+      return new Response(
+        JSON.stringify({ error: 'Bucket name is required' }),
+        { headers: { 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+
+    // Create the bucket if it doesn't exist
+    const { data, error } = await supabaseClient.rpc('create_bucket_if_not_exists', {
+      bucket_name: bucketName
+    })
 
     if (error) {
-      console.error("Error creating storage policy:", error);
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
+      throw error
     }
 
     return new Response(
-      JSON.stringify({ success: true, data }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      JSON.stringify({ success: true, message: `Bucket ${bucketName} has been created or already exists` }),
+      { headers: { 'Content-Type': 'application/json' }, status: 200 }
+    )
   } catch (error) {
-    console.error("Server error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    );
+      { headers: { 'Content-Type': 'application/json' }, status: 500 }
+    )
   }
-});
+})
