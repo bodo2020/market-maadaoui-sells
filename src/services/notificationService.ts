@@ -1,3 +1,4 @@
+
 import { Product } from "@/types";
 import { fetchProducts } from "./supabase/productService";
 import { toast } from "@/components/ui/sonner";
@@ -8,7 +9,7 @@ export interface StockNotification {
   type: 'low_stock';
   read: boolean;
   createdAt: Date;
-  displayed: boolean;
+  displayed: boolean; // Track if notification has been displayed
 }
 
 // Default threshold for low stock, can be configurable in the future
@@ -49,7 +50,7 @@ export const addNotification = (notification: StockNotification): void => {
   );
   
   if (existingIndex >= 0) {
-    // Update existing notification
+    // Update existing notification but preserve the displayed state
     notifications[existingIndex] = {
       ...notification,
       displayed: notifications[existingIndex].displayed
@@ -138,12 +139,17 @@ export const checkLowStockProducts = async (): Promise<StockNotification[]> => {
 };
 
 // Show toast notification for low stock products (only if not displayed yet)
-export const showLowStockToast = (notification: StockNotification): void => {
-  // Only show toast if this notification hasn't been displayed yet
+export const showLowStockToasts = (): void => {
+  // Get all notifications
   const notifications = getNotifications();
-  const existingNotification = notifications.find(n => n.id === notification.id);
   
-  if (existingNotification && !existingNotification.displayed) {
+  // Filter for unread and not displayed notifications only
+  const newNotifications = notifications.filter(notification => 
+    !notification.read && !notification.displayed
+  );
+  
+  // Show toast for each new notification
+  newNotifications.forEach(notification => {
     const { product } = notification;
     
     toast("تنبيه المخزون المنخفض", {
@@ -153,5 +159,5 @@ export const showLowStockToast = (notification: StockNotification): void => {
     
     // Mark this notification as displayed so it won't show again
     markNotificationAsDisplayed(notification.id);
-  }
+  });
 };

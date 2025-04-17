@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Bell, BellDot, User, LogOut, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ import {
   markNotificationAsRead, 
   markAllNotificationsAsRead, 
   checkLowStockProducts,
+  showLowStockToasts,
   StockNotification
 } from "@/services/notificationService";
 import { toast } from "@/components/ui/sonner";
@@ -41,18 +41,11 @@ export default function Navbar() {
     
     // Check for low stock products initially
     const checkStock = async () => {
-      const newNotifications = await checkLowStockProducts();
+      await checkLowStockProducts();
+      // Show toasts for new notifications only
+      showLowStockToasts();
+      // Refresh notifications list after checking
       loadNotifications();
-      
-      // Show toast for new notifications
-      newNotifications.forEach(notification => {
-        if (!notification.read && !notification.displayed) {
-          // Fix: We need to call toast as a function, not render it directly
-          toast("تنبيه المخزون المنخفض", {
-            description: `المنتج "${notification.product.name}" منخفض المخزون (${notification.product.quantity} وحدة متبقية)`,
-          });
-        }
-      });
     };
     
     checkStock();
