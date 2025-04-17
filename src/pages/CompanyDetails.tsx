@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -12,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Company, Product } from "@/types";
 import { fetchCompanyById } from "@/services/supabase/companyService";
 import { fetchProductsByCompany } from "@/services/supabase/productService";
+import ProductGrid from "@/components/ProductGrid";
+import AddProductDialog from "@/components/AddProductDialog";
 
 export default function CompanyDetails() {
   const { id } = useParams();
@@ -20,6 +21,7 @@ export default function CompanyDetails() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -31,11 +33,9 @@ export default function CompanyDetails() {
     try {
       setLoading(true);
       
-      // Fetch company details
       const companyData = await fetchCompanyById(companyId);
       setCompany(companyData);
       
-      // Fetch company products
       const productsData = await fetchProductsByCompany(companyId);
       setProducts(productsData);
     } catch (error) {
@@ -49,6 +49,14 @@ export default function CompanyDetails() {
   const filteredProducts = products.filter(product => 
     product.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleAddProduct = () => {
+    setIsAddProductDialogOpen(true);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    navigate(`/add-product?id=${product.id}`);
+  };
 
   if (loading) {
     return (
@@ -139,7 +147,7 @@ export default function CompanyDetails() {
                     <CardTitle>منتجات {company.name}</CardTitle>
                     <CardDescription>قائمة المنتجات المرتبطة بالشركة</CardDescription>
                   </div>
-                  <Button onClick={() => navigate(`/add-product?company_id=${company.id}`)}>
+                  <Button onClick={handleAddProduct}>
                     <Plus className="mr-2 h-4 w-4" />
                     إضافة منتج جديد
                   </Button>
@@ -159,50 +167,10 @@ export default function CompanyDetails() {
                   </Button>
                 </div>
                 
-                {filteredProducts.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-xl text-gray-500">
-                      لا توجد منتجات مرتبطة بهذه الشركة حالياً
-                    </p>
-                    <Button 
-                      variant="link" 
-                      onClick={() => navigate(`/add-product?company_id=${company.id}`)}
-                      className="mt-2"
-                    >
-                      إضافة منتج جديد
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredProducts.map((product) => (
-                      <Card key={product.id} className="overflow-hidden">
-                        <div className="aspect-video w-full relative">
-                          <img
-                            src={product.image_urls?.[0] || "/placeholder.svg"}
-                            alt={product.name}
-                            className="w-full h-full object-contain bg-gray-50 p-2"
-                          />
-                        </div>
-                        <CardContent className="p-4">
-                          <h3 className="font-medium truncate">{product.name}</h3>
-                          <div className="flex justify-between items-center mt-2">
-                            <span className="text-sm text-gray-500">
-                              {product.price} ج.م
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => navigate(`/add-product?id=${product.id}`)}
-                            >
-                              عرض التفاصيل
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                <ProductGrid 
+                  products={filteredProducts}
+                  onEditProduct={handleEditProduct}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -251,6 +219,13 @@ export default function CompanyDetails() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <AddProductDialog
+          isOpen={isAddProductDialogOpen}
+          onClose={() => setIsAddProductDialogOpen(false)}
+          onProductAdded={() => loadCompanyDetails(company.id)}
+          companyId={company.id}
+        />
       </div>
     </MainLayout>
   );
