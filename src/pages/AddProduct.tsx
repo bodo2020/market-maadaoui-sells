@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -122,10 +121,9 @@ export default function AddProduct() {
         values.offer_price = undefined;
       }
       
-      // Modified this line to remove the id property which was causing the error
+      // Modified: Removed both id and created_at properties as they should be handled by the service
       await createProduct({
         ...values,
-        created_at: new Date().toISOString(),
       });
       
       toast.success("تم إضافة المنتج بنجاح");
