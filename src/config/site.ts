@@ -56,16 +56,8 @@ const defaultSiteConfig: SiteConfig = {
 // Initialize with default config
 export let siteConfig: SiteConfig = { ...defaultSiteConfig };
 
-// Function to update site config
-export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
-  // First update the current runtime instance
-  siteConfig = { 
-    ...siteConfig, 
-    ...newConfig 
-  };
-  
-  console.log("Updating site config:", siteConfig);
-  
+// Function to directly update Supabase with settings
+const updateSupabaseSettings = async (config: SiteConfig) => {
   try {
     // Check if store_settings table has any records
     const { data: existingSettings, error: fetchError } = await supabase
@@ -78,7 +70,6 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
       throw fetchError;
     }
     
-    // Log the check result
     console.log("Existing settings check:", existingSettings);
     
     let response;
@@ -89,16 +80,16 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
       response = await supabase
         .from('store_settings')
         .update({
-          name: siteConfig.name,
-          address: siteConfig.address,
-          phone: siteConfig.phone,
-          email: siteConfig.email,
-          logo_url: siteConfig.logoUrl,
-          vat_number: siteConfig.vatNumber,
-          currency: siteConfig.currency,
-          description: siteConfig.description,
-          primary_color: siteConfig.primaryColor,
-          rtl: siteConfig.rtl,
+          name: config.name,
+          address: config.address,
+          phone: config.phone,
+          email: config.email,
+          logo_url: config.logoUrl,
+          vat_number: config.vatNumber,
+          currency: config.currency,
+          description: config.description,
+          primary_color: config.primaryColor,
+          rtl: config.rtl,
           updated_at: new Date().toISOString()
         })
         .eq('id', existingSettings[0].id);
@@ -108,25 +99,46 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
       response = await supabase
         .from('store_settings')
         .insert({
-          name: siteConfig.name,
-          address: siteConfig.address,
-          phone: siteConfig.phone,
-          email: siteConfig.email,
-          logo_url: siteConfig.logoUrl,
-          vat_number: siteConfig.vatNumber,
-          currency: siteConfig.currency,
-          description: siteConfig.description,
-          primary_color: siteConfig.primaryColor,
-          rtl: siteConfig.rtl
+          name: config.name,
+          address: config.address,
+          phone: config.phone,
+          email: config.email,
+          logo_url: config.logoUrl,
+          vat_number: config.vatNumber,
+          currency: config.currency,
+          description: config.description,
+          primary_color: config.primaryColor,
+          rtl: config.rtl
         });
     }
     
-    console.log("Supabase response:", response);
+    console.log("Supabase update response:", response);
     
     if (response.error) {
       console.error("Error saving to Supabase:", response.error);
       throw response.error;
     }
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to save settings to Supabase:", error);
+    throw error;
+  }
+};
+
+// Function to update site config
+export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
+  // First update the current runtime instance
+  siteConfig = { 
+    ...siteConfig, 
+    ...newConfig 
+  };
+  
+  console.log("Updating site config:", siteConfig);
+  
+  try {
+    // First try to update Supabase
+    await updateSupabaseSettings(siteConfig);
     
     // Save to localStorage as backup
     localStorage.setItem('siteConfig', JSON.stringify(siteConfig));
@@ -189,7 +201,7 @@ export async function loadSiteConfig() {
           
           // Since we found settings in localStorage but not in Supabase,
           // let's save them to Supabase for future use
-          await updateSiteConfig(siteConfig);
+          await updateSupabaseSettings(siteConfig);
           return siteConfig;
         }
       } catch (localError) {

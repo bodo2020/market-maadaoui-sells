@@ -49,27 +49,56 @@ export default function StoreSettings() {
       }
     };
 
-    // Init storage bucket if needed
-    const initStorageBucket = async () => {
+    // Initialize storage bucket if needed
+    const createStorageBucket = async () => {
       try {
-        const { data: buckets } = await supabase.storage.listBuckets();
+        // First check if the bucket exists
+        const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+        
+        if (bucketsError) {
+          console.error("Error listing buckets:", bucketsError);
+          return;
+        }
+        
+        console.log("Existing buckets:", buckets);
+        
+        // If bucket doesn't exist, create it
         if (!buckets?.some(bucket => bucket.name === 'store')) {
-          const { error } = await supabase.storage.createBucket('store', {
+          console.log("Creating store bucket...");
+          const { error: createError } = await supabase.storage.createBucket('store', {
             public: true
           });
-          if (error) {
-            console.error("Error creating bucket:", error);
+          
+          if (createError) {
+            console.error("Error creating store bucket:", createError);
           } else {
-            console.log("Created store bucket successfully");
+            console.log("Store bucket created successfully");
+            
+            // Create a policy to make the bucket public
+            const { error: policyError } = await supabase.rpc('create_storage_policy', {
+              bucket_name: 'store',
+              policy_name: 'Public Access',
+              definition: 'true',
+              operation: 'SELECT'
+            });
+            
+            if (policyError) {
+              console.error("Error creating bucket policy:", policyError);
+            } else {
+              console.log("Created public access policy for store bucket");
+            }
           }
+        } else {
+          console.log("Store bucket already exists");
         }
       } catch (error) {
-        console.error("Error initializing storage bucket:", error);
+        console.error("Error setting up storage bucket:", error);
       }
     };
 
     // Run both operations
-    Promise.all([fetchSettings(), initStorageBucket()]);
+    fetchSettings();
+    createStorageBucket();
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -30,28 +30,6 @@ export default function LogoUpload({ logoUrl, onLogoChange }: LogoUploadProps) {
       
       console.log("Uploading logo:", { fileName, filePath });
       
-      // Check if bucket exists and create it if not
-      const { data: buckets } = await supabase.storage.listBuckets();
-      console.log("Existing buckets:", buckets);
-      
-      if (!buckets?.some(bucket => bucket.name === 'store')) {
-        try {
-          console.log("Creating store bucket");
-          const { error: bucketError } = await supabase.storage.createBucket('store', {
-            public: true
-          });
-          
-          if (bucketError) {
-            console.error("Error creating bucket:", bucketError);
-            throw bucketError;
-          }
-          
-          console.log("Store bucket created successfully");
-        } catch (bucketCreationError) {
-          console.error("Failed to create bucket:", bucketCreationError);
-        }
-      }
-      
       // Upload the file
       console.log("Uploading file to store bucket");
       const { error: uploadError, data: uploadData } = await supabase.storage

@@ -1,1 +1,5 @@
+
 project_id = "qzvpayjaadbmpayeglon"
+
+[functions.create_storage_policy]
+verify_jwt = true
