@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, CartItem } from "@/types";
 
@@ -69,22 +68,29 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
   }
 }
 
-export async function fetchSales() {
-  const { data, error } = await supabase
-    .from("sales")
-    .select("*")
-    .order("date", { ascending: false });
-
+export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale[]> {
+  let query = supabase.from("sales").select("*").order("date", { ascending: false });
+  
+  if (startDate && endDate) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    
+    query = query
+      .gte("date", start.toISOString())
+      .lte("date", end.toISOString());
+  }
+  
+  const { data, error } = await query;
+  
   if (error) {
     console.error("Error fetching sales:", error);
     throw error;
   }
-
-  // Convert all items in the array to match our Sale type
-  return data.map(sale => ({
-    ...sale,
-    items: sale.items as unknown as CartItem[]
-  })) as Sale[];
+  
+  return data || [];
 }
 
 export async function fetchSaleById(id: string) {

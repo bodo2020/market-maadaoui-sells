@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { useQuery } from "@tanstack/react-query";
@@ -35,7 +36,8 @@ import {
   Users, 
   Calendar,
   DollarSign,
-  Percent
+  Percent,
+  CalendarIcon
 } from "lucide-react";
 import { 
   BarChart, 
@@ -57,7 +59,9 @@ import {
   fetchMonthlyRevenue, 
   fetchExpensesByCategory, 
   fetchFinancialSummary,
-  exportReportToExcel 
+  exportReportToExcel,
+  fetchCashierPerformance,
+  CashierPerformance
 } from "@/services/supabase/financeService";
 import { 
   ChartContainer, 
@@ -65,6 +69,11 @@ import {
   ChartTooltipContent 
 } from "@/components/ui/chart";
 import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, startOfMonth, endOfMonth } from "date-fns";
+import { ar } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 function formatCurrency(amount: number): string {
   return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}`;
@@ -73,10 +82,20 @@ function formatCurrency(amount: number): string {
 export default function Reports() {
   const [dateRange, setDateRange] = useState("month");
   const [reportType, setReportType] = useState("sales");
+  const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
+  const [endDate, setEndDate] = useState<Date | undefined>(endOfMonth(new Date()));
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  // Query parameters with date range
+  const queryParams = {
+    dateRange,
+    startDate,
+    endDate
+  };
   
   const { data: sales, isLoading: salesLoading } = useQuery({
-    queryKey: ['sales'],
-    queryFn: fetchSales
+    queryKey: ['sales', queryParams],
+    queryFn: () => fetchSales(startDate, endDate)
   });
 
   const { data: products, isLoading: productsLoading } = useQuery({
@@ -85,18 +104,23 @@ export default function Reports() {
   });
   
   const { data: revenueData, isLoading: revenueLoading } = useQuery({
-    queryKey: ['monthlyRevenue'],
-    queryFn: fetchMonthlyRevenue
+    queryKey: ['monthlyRevenue', queryParams],
+    queryFn: () => fetchMonthlyRevenue(dateRange, startDate, endDate)
   });
   
   const { data: expenseData, isLoading: expensesLoading } = useQuery({
-    queryKey: ['expensesByCategory'],
-    queryFn: fetchExpensesByCategory
+    queryKey: ['expensesByCategory', queryParams],
+    queryFn: () => fetchExpensesByCategory(dateRange, startDate, endDate)
   });
   
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
-    queryKey: ['financialSummary'],
-    queryFn: fetchFinancialSummary
+    queryKey: ['financialSummary', queryParams],
+    queryFn: () => fetchFinancialSummary(dateRange, startDate, endDate)
+  });
+
+  const { data: cashierPerformance, isLoading: cashierLoading } = useQuery({
+    queryKey: ['cashierPerformance', queryParams],
+    queryFn: () => fetchCashierPerformance(dateRange, startDate, endDate)
   });
   
   const filteredSales = sales || [];
@@ -129,11 +153,53 @@ export default function Reports() {
   const topSellingProducts = Array.from(productsSoldMap.values())
     .sort((a, b) => b.quantitySold - a.quantitySold)
     .slice(0, 5);
+
+  // Handle date range change
+  const handleDateRangeChange = (value: string) => {
+    setDateRange(value);
+    // Reset date picker selections when changing to preset ranges
+    if (value !== "custom") {
+      setStartDate(undefined);
+      setEndDate(undefined);
+    }
+  };
+
+  // Handle date selection in the calendar
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!startDate || (startDate && endDate)) {
+      setStartDate(date);
+      setEndDate(undefined);
+    } else {
+      if (date && date < startDate) {
+        setEndDate(startDate);
+        setStartDate(date);
+      } else {
+        setEndDate(date);
+      }
+    }
+  };
   
+  // Get formatted date range string for display
+  const getDateRangeText = () => {
+    if (dateRange === "custom" && startDate && endDate) {
+      return `${format(startDate, "dd/MM/yyyy")} - ${format(endDate, "dd/MM/yyyy")}`;
+    }
+    
+    return {
+      "day": "اليوم",
+      "week": "هذا الأسبوع",
+      "month": "هذا الشهر",
+      "quarter": "هذا الربع",
+      "year": "هذا العام",
+      "custom": "مخصص"
+    }[dateRange] || "اختر الفترة";
+  };
+
+  // Handle export report
   const handleExportReport = async () => {
     try {
       toast.loading("جاري تصدير التقرير...");
-      await exportReportToExcel(dateRange, reportType);
+      await exportReportToExcel(dateRange, reportType, startDate, endDate);
       toast.success("تم تصدير التقرير بنجاح");
     } catch (error) {
       console.error("Error exporting report:", error);
@@ -150,18 +216,82 @@ export default function Reports() {
             <Download className="ml-2 h-4 w-4" />
             تصدير التقرير
           </Button>
-          <Select defaultValue={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="اختر الفترة" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="day">اليوم</SelectItem>
-              <SelectItem value="week">هذا الأسبوع</SelectItem>
-              <SelectItem value="month">هذا الشهر</SelectItem>
-              <SelectItem value="quarter">هذا الربع</SelectItem>
-              <SelectItem value="year">هذا العام</SelectItem>
-            </SelectContent>
-          </Select>
+          
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-auto flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                <span>{getDateRangeText()}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="p-4 border-b">
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <Button 
+                    variant={dateRange === "day" ? "default" : "outline"} 
+                    size="sm" 
+                    onClick={() => handleDateRangeChange("day")}
+                  >
+                    اليوم
+                  </Button>
+                  <Button 
+                    variant={dateRange === "week" ? "default" : "outline"} 
+                    size="sm" 
+                    onClick={() => handleDateRangeChange("week")}
+                  >
+                    هذا الأسبوع
+                  </Button>
+                  <Button 
+                    variant={dateRange === "month" ? "default" : "outline"} 
+                    size="sm" 
+                    onClick={() => handleDateRangeChange("month")}
+                  >
+                    هذا الشهر
+                  </Button>
+                  <Button 
+                    variant={dateRange === "year" ? "default" : "outline"} 
+                    size="sm" 
+                    onClick={() => handleDateRangeChange("year")}
+                  >
+                    هذا العام
+                  </Button>
+                  <Button 
+                    variant={dateRange === "custom" ? "default" : "outline"} 
+                    size="sm" 
+                    onClick={() => handleDateRangeChange("custom")}
+                    className="col-span-2"
+                  >
+                    مخصص
+                  </Button>
+                </div>
+                {dateRange === "custom" && (
+                  <div className="text-center text-sm mb-2">
+                    {startDate && !endDate 
+                      ? "اختر تاريخ الانتهاء"
+                      : !startDate 
+                        ? "اختر تاريخ البدء" 
+                        : `${format(startDate, "dd/MM/yyyy")} - ${format(endDate!, "dd/MM/yyyy")}`}
+                  </div>
+                )}
+              </div>
+              {dateRange === "custom" && (
+                <Calendar
+                  mode="range"
+                  selected={{
+                    from: startDate,
+                    to: endDate
+                  }}
+                  onSelect={(range) => {
+                    setStartDate(range?.from);
+                    setEndDate(range?.to);
+                  }}
+                  locale={ar}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              )}
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
       
@@ -259,11 +389,7 @@ export default function Reports() {
             <CardHeader>
               <CardTitle>تقرير المبيعات</CardTitle>
               <CardDescription>
-                {dateRange === "day" && "إحصائيات المبيعات لليوم الحالي"}
-                {dateRange === "week" && "إحصائيات المبيعات للأسبوع الحالي"}
-                {dateRange === "month" && "إحصائيات المبيعات للشهر الحالي"}
-                {dateRange === "quarter" && "إحصائيات المبيعات للربع الحالي"}
-                {dateRange === "year" && "إحصائيات المبيعات للعام الحالي"}
+                {getDateRangeText()}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -479,9 +605,122 @@ export default function Reports() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                سيتم قريبًا توفير تقارير مفصلة عن أداء الكاشير
-              </div>
+              {cashierLoading ? (
+                <p className="text-center py-4 text-muted-foreground">جاري تحميل البيانات...</p>
+              ) : !cashierPerformance || cashierPerformance.length === 0 ? (
+                <p className="text-center py-4 text-muted-foreground">لا توجد بيانات للعرض</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">أفضل كاشير مبيعاً</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl font-bold">
+                          {cashierPerformance[0].name}
+                        </div>
+                        <div className="text-muted-foreground text-sm mt-1">
+                          {formatCurrency(cashierPerformance[0].totalSales)} ({cashierPerformance[0].salesCount} فاتورة)
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">أعلى متوسط فاتورة</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl font-bold">
+                          {[...cashierPerformance]
+                            .filter(c => c.salesCount > 0)
+                            .sort((a, b) => b.averageSale - a.averageSale)[0]?.name || '-'}
+                        </div>
+                        <div className="text-muted-foreground text-sm mt-1">
+                          {formatCurrency([...cashierPerformance]
+                            .filter(c => c.salesCount > 0)
+                            .sort((a, b) => b.averageSale - a.averageSale)[0]?.averageSale || 0)} / فاتورة
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">أعلى ربحية</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-xl font-bold">
+                          {[...cashierPerformance]
+                            .sort((a, b) => b.totalProfit - a.totalProfit)[0]?.name || '-'}
+                        </div>
+                        <div className="text-muted-foreground text-sm mt-1">
+                          {formatCurrency([...cashierPerformance]
+                            .sort((a, b) => b.totalProfit - a.totalProfit)[0]?.totalProfit || 0)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="mb-6">
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={cashierPerformance} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <RechartsTooltip 
+                            formatter={(value: number) => formatCurrency(value)} 
+                          />
+                          <Bar dataKey="totalSales" name="المبيعات" fill="#4338ca" />
+                          <Bar dataKey="totalProfit" name="الأرباح" fill="#10b981" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>اسم الكاشير</TableHead>
+                          <TableHead>عدد المبيعات</TableHead>
+                          <TableHead>إجمالي المبيعات</TableHead>
+                          <TableHead>متوسط قيمة الفاتورة</TableHead>
+                          <TableHead>إجمالي الربح</TableHead>
+                          <TableHead>نسبة من المبيعات</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cashierPerformance.map(cashier => {
+                          const totalSalesAll = cashierPerformance.reduce((sum, c) => sum + c.totalSales, 0);
+                          const salesPercentage = totalSalesAll > 0 
+                            ? (cashier.totalSales / totalSalesAll) * 100 
+                            : 0;
+                            
+                          return (
+                            <TableRow key={cashier.id}>
+                              <TableCell className="font-medium">{cashier.name}</TableCell>
+                              <TableCell>{cashier.salesCount} فاتورة</TableCell>
+                              <TableCell>{formatCurrency(cashier.totalSales)}</TableCell>
+                              <TableCell>
+                                {cashier.salesCount > 0 
+                                  ? formatCurrency(cashier.averageSale) 
+                                  : formatCurrency(0)}
+                              </TableCell>
+                              <TableCell className="text-green-600">
+                                {formatCurrency(cashier.totalProfit)}
+                              </TableCell>
+                              <TableCell>
+                                {salesPercentage.toFixed(1)}%
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

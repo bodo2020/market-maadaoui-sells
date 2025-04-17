@@ -1,7 +1,10 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { Sale, Expense } from "@/types";
+import { Sale, Expense, User } from "@/types";
 import * as ExcelJS from 'exceljs';
 import * as FileSaver from 'file-saver';
+import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 export interface RevenueData {
   name: string;
@@ -22,10 +25,65 @@ export interface FinancialSummary {
   cashBalance: number;
 }
 
-export async function fetchFinancialSummary(): Promise<FinancialSummary> {
+export interface CashierPerformance {
+  id: string;
+  name: string;
+  salesCount: number;
+  totalSales: number;
+  totalProfit: number;
+  averageSale: number;
+}
+
+export async function fetchDateRangeData(dateRange: string, startDate?: Date, endDate?: Date) {
+  const now = new Date();
+  let start: Date;
+  let end: Date;
+  
+  if (startDate && endDate) {
+    start = startOfDay(startDate);
+    end = endOfDay(endDate);
+  } else {
+    switch (dateRange) {
+      case "day":
+        start = startOfDay(now);
+        end = endOfDay(now);
+        break;
+      case "week":
+        start = startOfWeek(now, { weekStartsOn: 6 }); // Saturday as week start for Arabic locale
+        end = endOfWeek(now, { weekStartsOn: 6 });
+        break;
+      case "month":
+        start = startOfMonth(now);
+        end = endOfMonth(now);
+        break;
+      case "quarter":
+        // Get the current quarter start
+        const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+        start = new Date(now.getFullYear(), quarterMonth, 1);
+        end = new Date(now.getFullYear(), quarterMonth + 3, 0);
+        break;
+      case "year":
+        start = startOfYear(now);
+        end = endOfYear(now);
+        break;
+      default:
+        // Default to last 30 days
+        start = subDays(now, 30);
+        end = now;
+    }
+  }
+  
+  return { start, end };
+}
+
+export async function fetchFinancialSummary(dateRange: string = "month", startDate?: Date, endDate?: Date): Promise<FinancialSummary> {
+  const { start, end } = await fetchDateRangeData(dateRange, startDate, endDate);
+  
   const { data: salesData, error: salesError } = await supabase
     .from("sales")
-    .select("total, profit");
+    .select("total, profit")
+    .gte("date", start.toISOString())
+    .lte("date", end.toISOString());
     
   if (salesError) {
     console.error("Error fetching sales for financial summary:", salesError);
@@ -34,7 +92,9 @@ export async function fetchFinancialSummary(): Promise<FinancialSummary> {
   
   const { data: expensesData, error: expensesError } = await supabase
     .from("expenses")
-    .select("amount");
+    .select("amount")
+    .gte("date", start.toISOString())
+    .lte("date", end.toISOString());
     
   if (expensesError) {
     console.error("Error fetching expenses for financial summary:", expensesError);
@@ -58,7 +118,7 @@ export async function fetchFinancialSummary(): Promise<FinancialSummary> {
   };
 }
 
-export async function fetchMonthlyRevenue(): Promise<RevenueData[]> {
+export async function fetchMonthlyRevenue(dateRange: string = "month", startDate?: Date, endDate?: Date): Promise<RevenueData[]> {
   const now = new Date();
   const currentYear = now.getFullYear();
   
@@ -101,10 +161,14 @@ export async function fetchMonthlyRevenue(): Promise<RevenueData[]> {
   return monthlyRevenue;
 }
 
-export async function fetchExpensesByCategory(): Promise<ExpenseData[]> {
+export async function fetchExpensesByCategory(dateRange: string = "month", startDate?: Date, endDate?: Date): Promise<ExpenseData[]> {
+  const { start, end } = await fetchDateRangeData(dateRange, startDate, endDate);
+  
   const { data, error } = await supabase
     .from("expenses")
-    .select("type, amount");
+    .select("type, amount")
+    .gte("date", start.toISOString())
+    .lte("date", end.toISOString());
     
   if (error) {
     console.error("Error fetching expenses by category:", error);
@@ -134,23 +198,35 @@ export async function fetchExpensesByCategory(): Promise<ExpenseData[]> {
   return result;
 }
 
-export async function fetchRecentTransactions(limit = 6): Promise<any[]> {
-  const { data: sales, error: salesError } = await supabase
+export async function fetchRecentTransactions(limit = 6, dateRange?: string, startDate?: Date, endDate?: Date): Promise<any[]> {
+  let query = supabase
     .from("sales")
     .select("id, total, date, invoice_number")
-    .order("date", { ascending: false })
-    .limit(limit);
+    .order("date", { ascending: false });
+    
+  if (dateRange || (startDate && endDate)) {
+    const { start, end } = await fetchDateRangeData(dateRange || "month", startDate, endDate);
+    query = query.gte("date", start.toISOString()).lte("date", end.toISOString());
+  }
+  
+  const { data: sales, error: salesError } = await query.limit(limit);
     
   if (salesError) {
     console.error("Error fetching recent sales:", salesError);
     throw salesError;
   }
   
-  const { data: expenses, error: expensesError } = await supabase
+  let expensesQuery = supabase
     .from("expenses")
     .select("id, amount, date, description, type")
-    .order("date", { ascending: false })
-    .limit(limit);
+    .order("date", { ascending: false });
+    
+  if (dateRange || (startDate && endDate)) {
+    const { start, end } = await fetchDateRangeData(dateRange || "month", startDate, endDate);
+    expensesQuery = expensesQuery.gte("date", start.toISOString()).lte("date", end.toISOString());
+  }
+  
+  const { data: expenses, error: expensesError } = await expensesQuery.limit(limit);
     
   if (expensesError) {
     console.error("Error fetching recent expenses:", expensesError);
@@ -221,24 +297,99 @@ export async function fetchAllTransactions(): Promise<any[]> {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
+export async function fetchCashierPerformance(dateRange: string = "month", startDate?: Date, endDate?: Date): Promise<CashierPerformance[]> {
+  const { start, end } = await fetchDateRangeData(dateRange, startDate, endDate);
+  
+  // Fetch all sales within the date range that have a cashier_id
+  const { data: sales, error: salesError } = await supabase
+    .from("sales")
+    .select("*, cashier_id")
+    .gte("date", start.toISOString())
+    .lte("date", end.toISOString())
+    .not("cashier_id", "is", null);
+    
+  if (salesError) {
+    console.error("Error fetching sales for cashier performance:", salesError);
+    throw salesError;
+  }
+  
+  // Fetch all users with CASHIER role
+  const { data: cashiers, error: cashiersError } = await supabase
+    .from("users")
+    .select("id, name, username")
+    .eq("role", "cashier");
+    
+  if (cashiersError) {
+    console.error("Error fetching cashiers:", cashiersError);
+    throw cashiersError;
+  }
+  
+  // Calculate performance metrics for each cashier
+  const cashierMap = new Map<string, CashierPerformance>();
+  
+  // Initialize map with all cashiers
+  cashiers.forEach(cashier => {
+    cashierMap.set(cashier.id, {
+      id: cashier.id,
+      name: cashier.name,
+      salesCount: 0,
+      totalSales: 0,
+      totalProfit: 0,
+      averageSale: 0
+    });
+  });
+  
+  // Process sales data
+  sales.forEach(sale => {
+    if (sale.cashier_id && cashierMap.has(sale.cashier_id)) {
+      const cashierData = cashierMap.get(sale.cashier_id)!;
+      cashierData.salesCount += 1;
+      cashierData.totalSales += Number(sale.total);
+      cashierData.totalProfit += Number(sale.profit);
+    }
+  });
+  
+  // Calculate average sale for each cashier
+  cashierMap.forEach(cashier => {
+    if (cashier.salesCount > 0) {
+      cashier.averageSale = cashier.totalSales / cashier.salesCount;
+    }
+  });
+  
+  return Array.from(cashierMap.values())
+    .sort((a, b) => b.totalSales - a.totalSales);
+}
+
 /**
  * Export report to Excel file
  * @param period The time period for the report
  * @param reportType The type of report to export
+ * @param startDate Optional start date for custom range
+ * @param endDate Optional end date for custom range
  */
-export async function exportReportToExcel(period: string, reportType: string): Promise<void> {
+export async function exportReportToExcel(
+  period: string, 
+  reportType: string, 
+  startDate?: Date, 
+  endDate?: Date
+): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('تقرير');
   
   worksheet.views = [{ rightToLeft: true }];
   
   let headerRow: string[] = [];
+  const { start, end } = await fetchDateRangeData(period, startDate, endDate);
+  
   switch(reportType) {
     case 'sales':
       headerRow = ['رقم الفاتورة', 'التاريخ', 'عدد العناصر', 'المجموع', 'الربح', 'طريقة الدفع'];
       break;
     case 'products':
       headerRow = ['المنتج', 'الكمية المباعة', 'سعر الوحدة', 'إجمالي المبيعات', 'نسبة المبيعات', 'الربح'];
+      break;
+    case 'cashiers':
+      headerRow = ['اسم الكاشير', 'عدد المبيعات', 'إجمالي المبيعات', 'متوسط قيمة الفاتورة', 'إجمالي الربح', 'نسبة من المبيعات'];
       break;
     case 'profitability':
       headerRow = ['المنتج', 'سعر البيع', 'سعر الشراء', 'هامش الربح', 'الكمية المباعة', 'إجمالي الربح', 'نسبة من إجمالي الربح'];
@@ -261,6 +412,8 @@ export async function exportReportToExcel(period: string, reportType: string): P
         const { data: salesData } = await supabase
           .from("sales")
           .select("*")
+          .gte("date", start.toISOString())
+          .lte("date", end.toISOString())
           .order("date", { ascending: false });
         
         if (salesData) {
@@ -284,7 +437,9 @@ export async function exportReportToExcel(period: string, reportType: string): P
       case 'products':
         const { data: salesForProducts } = await supabase
           .from("sales")
-          .select("*");
+          .select("*")
+          .gte("date", start.toISOString())
+          .lte("date", end.toISOString());
           
         if (salesForProducts) {
           const productsMap = new Map();
@@ -324,8 +479,27 @@ export async function exportReportToExcel(period: string, reportType: string): P
         }
         break;
         
+      case 'cashiers':
+        const cashiersData = await fetchCashierPerformance(period, startDate, endDate);
+        
+        if (cashiersData) {
+          const totalSales = cashiersData.reduce((sum, cashier) => sum + cashier.totalSales, 0);
+          
+          cashiersData.forEach(cashier => {
+            worksheet.addRow([
+              cashier.name,
+              cashier.salesCount,
+              cashier.totalSales,
+              cashier.averageSale.toFixed(2),
+              cashier.totalProfit,
+              totalSales > 0 ? ((cashier.totalSales / totalSales) * 100).toFixed(1) + '%' : '0%'
+            ]);
+          });
+        }
+        break;
+        
       case 'trends':
-        const revenueData = await fetchMonthlyRevenue();
+        const revenueData = await fetchMonthlyRevenue(period, startDate, endDate);
         
         revenueData.forEach(item => {
           worksheet.addRow([item.name, item.amount]);
@@ -333,7 +507,7 @@ export async function exportReportToExcel(period: string, reportType: string): P
         break;
         
       default:
-        const summary = await fetchFinancialSummary();
+        const summary = await fetchFinancialSummary(period, startDate, endDate);
         worksheet.addRow(['إجمالي الإيرادات', summary.totalRevenue]);
         worksheet.addRow(['إجمالي المصروفات', summary.totalExpenses]);
         worksheet.addRow(['صافي الربح', summary.netProfit]);
