@@ -34,6 +34,23 @@ interface Order {
   items: OrderItem[];
 }
 
+// Define a type for database response to handle type differences
+type OrderFromDB = {
+  id: string;
+  created_at: string;
+  total: number;
+  status: string;
+  payment_status: string;
+  payment_method: string | null;
+  shipping_address: string | null;
+  items: any;
+  customer_id?: string;
+  tracking_number?: string | null;
+  shipping_cost?: number | null;
+  notes?: string | null;
+  updated_at?: string | null;
+};
+
 export default function OnlineOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,13 +68,44 @@ export default function OnlineOrders() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setOrders(data || []);
+      
+      // Transform data to match Order interface
+      const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => ({
+        id: item.id,
+        created_at: item.created_at,
+        total: item.total,
+        // Validate that status is one of the allowed values
+        status: validateOrderStatus(item.status),
+        // Validate that payment_status is one of the allowed values
+        payment_status: validatePaymentStatus(item.payment_status),
+        payment_method: item.payment_method,
+        shipping_address: item.shipping_address,
+        items: Array.isArray(item.items) ? item.items : [],
+      }));
+      
+      setOrders(transformedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast.error("حدث خطأ أثناء تحميل الطلبات");
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to validate order status
+  const validateOrderStatus = (status: string): Order['status'] => {
+    const validStatuses: Order['status'][] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    return validStatuses.includes(status as Order['status']) 
+      ? (status as Order['status']) 
+      : 'pending';
+  };
+
+  // Helper function to validate payment status
+  const validatePaymentStatus = (status: string): Order['payment_status'] => {
+    const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
+    return validStatuses.includes(status as Order['payment_status']) 
+      ? (status as Order['payment_status']) 
+      : 'pending';
   };
 
   const getStatusBadge = (status: Order['status']) => {
