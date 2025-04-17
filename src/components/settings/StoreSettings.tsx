@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, Image as ImageIcon } from "lucide-react";
 import { siteConfig, updateSiteConfig } from "@/config/site";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface SettingsData {
   storeName: string;
@@ -27,7 +28,6 @@ export default function StoreSettings() {
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -77,18 +77,11 @@ export default function StoreSettings() {
       if (data) {
         setSettingsData({ ...settingsData, logoUrl: data.publicUrl });
         
-        toast({
-          title: "تم",
-          description: "تم رفع الشعار بنجاح",
-        });
+        toast.success("تم رفع الشعار بنجاح");
       }
     } catch (error) {
       console.error("Error uploading logo:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء رفع الشعار",
-        variant: "destructive",
-      });
+      toast.error("حدث خطأ أثناء رفع الشعار");
     } finally {
       setUploading(false);
     }
@@ -108,17 +101,19 @@ export default function StoreSettings() {
         logo: settingsData.logoUrl, // Update logo as well for invoice compatibility
       });
       
-      toast({
-        title: "تم",
-        description: "تم حفظ الإعدادات بنجاح",
-      });
+      // Store settings in local storage too for persistence
+      localStorage.setItem('storeSettings', JSON.stringify({
+        name: settingsData.storeName,
+        address: settingsData.storeAddress,
+        phone: settingsData.storePhone,
+        email: settingsData.storeEmail,
+        logoUrl: settingsData.logoUrl,
+      }));
+      
+      toast.success("تم حفظ الإعدادات بنجاح");
     } catch (error) {
       console.error("Error saving settings:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء حفظ الإعدادات",
-        variant: "destructive",
-      });
+      toast.error("حدث خطأ أثناء حفظ الإعدادات");
     } finally {
       setSaving(false);
     }
