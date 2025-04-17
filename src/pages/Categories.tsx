@@ -16,12 +16,12 @@ export default function Categories() {
         ) : (
           <>
             <div className="flex justify-between items-center mb-6">
-              <h1 className="text-2xl font-bold">إدارة التصنيفات</h1>
+              <h1 className="text-2xl font-bold">الأقسام</h1>
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>التصنيفات</CardTitle>
+                <CardTitle>جميع الأقسام</CardTitle>
               </CardHeader>
               <CardContent>
                 <CategoriesList />

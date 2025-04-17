@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Save, ArrowLeft, FolderPlus, Trash, Edit } from "lucide-react";
+import { Loader2, Save, ArrowLeft, FolderPlus, Trash, Edit, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import AddCategoryDialog from "./AddCategoryDialog";
+import CategoriesList from "./CategoriesList";
 
 interface Category {
   id: string;
@@ -27,6 +28,7 @@ interface Category {
   parent_id: string | null;
   image_url?: string | null;
   children?: Category[];
+  product_count?: number;
 }
 
 export default function CategoryDetail() {
@@ -39,7 +41,7 @@ export default function CategoryDetail() {
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [subcategories, setSubcategories] = useState<Category[]>([]);
+  const [productCount, setProductCount] = useState(0);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
   useEffect(() => {
@@ -72,20 +74,21 @@ export default function CategoryDetail() {
       setDescription(categoryWithType.description || "");
       setImagePreview(categoryWithType.image_url || null);
       
-      // Fetch subcategories if this is a category or subcategory
-      if (categoryWithType.level !== 'subsubcategory') {
-        const { data: subData, error: subError } = await supabase
-          .from('categories')
-          .select('*')
-          .eq('parent_id', id)
-          .order('name');
-          
-        if (subError) throw subError;
+      // Get product count for this category
+      const { count, error: countError } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq(
+          categoryWithType.level === 'category' 
+            ? 'category_id' 
+            : categoryWithType.level === 'subcategory' 
+              ? 'subcategory_id' 
+              : 'subsubcategory_id', 
+          id
+        );
         
-        setSubcategories(subData.map(sub => ({
-          ...sub,
-          level: sub.level as 'category' | 'subcategory' | 'subsubcategory'
-        })));
+      if (!countError) {
+        setProductCount(count || 0);
       }
       
     } catch (error) {
@@ -160,28 +163,11 @@ export default function CategoryDetail() {
     }
   };
 
-  const handleDeleteSubcategory = async (subcategoryId: string) => {
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', subcategoryId);
-
-      if (error) throw error;
-      
-      toast.success("تم حذف التصنيف الفرعي بنجاح");
-      fetchCategory(); // Refresh data
-    } catch (error) {
-      console.error('Error deleting subcategory:', error);
-      toast.error("حدث خطأ أثناء حذف التصنيف الفرعي");
-    }
-  };
-
   const getLevelLabel = (level: Category['level']) => {
     const labels = {
-      category: 'تصنيف رئيسي',
-      subcategory: 'تصنيف فرعي',
-      subsubcategory: 'تصنيف فرعي ثانوي'
+      category: 'قسم رئيسي',
+      subcategory: 'قسم فرعي',
+      subsubcategory: 'فئة'
     };
     return labels[level];
   };
@@ -203,28 +189,32 @@ export default function CategoryDetail() {
           onClick={() => navigate('/categories')}
         >
           <ArrowLeft className="h-4 w-4 ml-1" />
-          العودة للتصنيفات
+          العودة للأقسام
         </Button>
         <h1 className="text-2xl font-bold">{category?.name}</h1>
         <Badge variant="outline" className="mr-2">
           {category ? getLevelLabel(category.level) : ''}
+        </Badge>
+        <Badge variant="secondary" className="mr-2 flex items-center gap-1">
+          <Package className="h-3 w-3" />
+          {productCount} منتج
         </Badge>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>تفاصيل التصنيف</CardTitle>
-            <CardDescription>تعديل بيانات التصنيف</CardDescription>
+            <CardTitle>تفاصيل {getLevelLabel(category?.level || 'category')}</CardTitle>
+            <CardDescription>تعديل بيانات {category?.name}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="name">اسم التصنيف</Label>
+              <Label htmlFor="name">الاسم</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="أدخل اسم التصنيف"
+                placeholder="أدخل الاسم"
                 required
               />
             </div>
@@ -234,12 +224,12 @@ export default function CategoryDetail() {
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="أدخل وصف التصنيف"
+                placeholder="أدخل الوصف"
                 rows={4}
               />
             </div>
             <div>
-              <Label htmlFor="image">صورة التصنيف</Label>
+              <Label htmlFor="image">الصورة</Label>
               <div className="mt-2 mb-4">
                 {imagePreview ? (
                   <div className="relative w-full h-48 rounded-md overflow-hidden border">
@@ -286,83 +276,38 @@ export default function CategoryDetail() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>التصنيفات الفرعية</CardTitle>
-              <CardDescription>
-                إدارة التصنيفات الفرعية ضمن {category?.name}
-              </CardDescription>
-            </div>
-            {category && category.level !== 'subsubcategory' && (
-              <Button onClick={() => setShowAddDialog(true)}>
-                <FolderPlus className="h-4 w-4 ml-2" />
-                إضافة تصنيف فرعي
-              </Button>
-            )}
+          <CardHeader>
+            <CardTitle>
+              {category?.level === 'category' ? 'الأقسام الفرعية' : 
+               category?.level === 'subcategory' ? 'الفئات' : 
+               'المنتجات'}
+            </CardTitle>
+            <CardDescription>
+              {category?.level === 'subsubcategory' ? 
+                `المنتجات ضمن فئة ${category?.name}` : 
+                `إدارة ${category?.level === 'category' ? 'الأقسام الفرعية' : 'الفئات'} ضمن ${category?.name}`}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {subcategories.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {subcategories.map((sub) => (
-                  <div 
-                    key={sub.id} 
-                    className="border rounded-lg overflow-hidden hover:border-primary transition-colors"
-                  >
-                    <div className="h-24 bg-gray-100 relative">
-                      {sub.image_url ? (
-                        <img 
-                          src={sub.image_url} 
-                          alt={sub.name} 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <FolderPlus className="h-10 w-10 text-gray-300" />
-                        </div>
-                      )}
-                      <Badge variant="outline" className="absolute top-2 right-2 bg-white">
-                        {getLevelLabel(sub.level)}
-                      </Badge>
-                    </div>
-                    <div className="p-3">
-                      <h3 className="font-semibold mb-1">{sub.name}</h3>
-                      <div className="flex justify-end gap-2 mt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/categories/${sub.id}`)}
-                        >
-                          <Edit className="h-4 w-4 ml-1" />
-                          تعديل
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteSubcategory(sub.id)}
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {category?.level !== 'subsubcategory' ? (
+              <CategoriesList />
             ) : (
               <div className="text-center p-8 bg-gray-50 rounded-lg border">
-                <FolderPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <h3 className="text-lg font-medium">لا توجد تصنيفات فرعية</h3>
-                {category && category.level !== 'subsubcategory' ? (
-                  <p className="text-gray-500 mb-4">يمكنك إضافة تصنيفات فرعية من خلال الزر أعلاه</p>
-                ) : (
-                  <p className="text-gray-500 mb-4">لا يمكن إضافة تصنيفات فرعية للمستوى الثالث</p>
-                )}
+                <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <h3 className="text-lg font-medium">
+                  {productCount > 0 ? `يوجد ${productCount} منتج في هذه الفئة` : 'لا توجد منتجات في هذه الفئة'}
+                </h3>
+                <p className="text-gray-500 mb-4">يمكنك إضافة منتجات جديدة من صفحة المنتجات</p>
+                <Button onClick={() => navigate('/products')}>
+                  الذهاب إلى صفحة المنتجات
+                </Button>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {category && (
+      {category && category.level !== 'subsubcategory' && (
         <AddCategoryDialog
           open={showAddDialog}
           onOpenChange={setShowAddDialog}

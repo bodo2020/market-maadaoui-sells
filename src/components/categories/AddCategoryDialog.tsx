@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 interface Category {
   id: string;
   name: string;
-  description: string | null;
-  level: 'category' | 'subcategory' | 'subsubcategory';
-  parent_id: string | null;
+  description?: string | null;
+  level?: 'category' | 'subcategory' | 'subsubcategory';
+  parent_id?: string | null;
   image_url?: string | null;
 }
 
@@ -112,20 +113,31 @@ const AddCategoryDialog = ({
     }
   };
 
+  const getLevelLabel = (level: Category['level']) => {
+    const labels = {
+      category: 'قسم رئيسي',
+      subcategory: 'قسم فرعي',
+      subsubcategory: 'فئة'
+    };
+    return labels[level || 'category'];
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>إضافة تصنيف جديد</DialogTitle>
+          <DialogTitle>
+            إضافة {parentCategory ? getLevelLabel(getLevel()) : 'قسم رئيسي'} جديد
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="name">اسم التصنيف</Label>
+            <Label htmlFor="name">الاسم</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="أدخل اسم التصنيف"
+              placeholder="أدخل الاسم"
               required
             />
           </div>
@@ -135,11 +147,11 @@ const AddCategoryDialog = ({
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="أدخل وصف التصنيف"
+              placeholder="أدخل الوصف"
             />
           </div>
           <div>
-            <Label htmlFor="image">صورة التصنيف (اختياري)</Label>
+            <Label htmlFor="image">الصورة (اختياري)</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="image"
@@ -164,10 +176,10 @@ const AddCategoryDialog = ({
             <Input
               value={
                 getLevel() === 'category'
-                  ? 'تصنيف رئيسي'
+                  ? 'قسم رئيسي'
                   : getLevel() === 'subcategory'
-                  ? 'تصنيف فرعي'
-                  : 'تصنيف فرعي ثانوي'
+                  ? 'قسم فرعي'
+                  : 'فئة'
               }
               disabled
               className="bg-muted"

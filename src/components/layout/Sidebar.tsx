@@ -154,7 +154,7 @@ export default function Sidebar() {
             >
               <div className="flex items-center gap-2">
                 <FolderOpen size={20} />
-                <span>التصنيفات</span>
+                <span>الأقسام</span>
               </div>
               <ChevronDown
                 size={16}
@@ -168,7 +168,7 @@ export default function Sidebar() {
               <div className="mr-4 mt-1 space-y-1 border-r pr-2">
                 <SidebarItem
                   icon={<FolderOpen size={16} />}
-                  label="كل التصنيفات"
+                  label="كل الأقسام"
                   href="/categories"
                   active={currentPath === "/categories"}
                 />
