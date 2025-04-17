@@ -28,18 +28,27 @@ export default function LogoUpload({ logoUrl, onLogoChange }: LogoUploadProps) {
       const fileName = `logo_${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
       
-      // Create 'store' bucket if it doesn't exist
+      // Check if bucket exists and create it if not
       const { data: buckets } = await supabase.storage.listBuckets();
-      if (!buckets?.find(bucket => bucket.name === 'store')) {
-        const { error: bucketError } = await supabase.storage.createBucket('store', {
-          public: true
-        });
-        if (bucketError) {
-          console.error("Error creating bucket:", bucketError);
-          throw bucketError;
+      if (!buckets?.some(bucket => bucket.name === 'store')) {
+        try {
+          const { error: bucketError } = await supabase.storage.createBucket('store', {
+            public: true
+          });
+          if (bucketError) {
+            console.error("Error creating bucket:", bucketError);
+            throw bucketError;
+          }
+        } catch (bucketCreationError) {
+          console.error("Failed to create bucket:", bucketCreationError);
+          // If we couldn't create the bucket, we'll try to upload anyway
+          // as it might already exist with different permissions
         }
       }
       
+      // Set up storage RLS policy if needed (this is handled by SQL normally)
+      
+      // Upload the file
       const { error: uploadError } = await supabase.storage
         .from('store')
         .upload(filePath, file, {
@@ -52,6 +61,7 @@ export default function LogoUpload({ logoUrl, onLogoChange }: LogoUploadProps) {
         throw uploadError;
       }
       
+      // Get the public URL
       const { data } = supabase.storage.from('store').getPublicUrl(filePath);
       
       if (data) {

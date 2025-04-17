@@ -144,28 +144,28 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
       
       siteConfig = {
         ...defaultSiteConfig,
-        name: storeSettings.name,
+        name: storeSettings.name || defaultSiteConfig.name,
         address: storeSettings.address || '',
         phone: storeSettings.phone || '',
         email: storeSettings.email || '',
         logoUrl: storeSettings.logo_url,
         vatNumber: storeSettings.vat_number || '',
-        currency: storeSettings.currency,
-        description: storeSettings.description || '',
-        primaryColor: storeSettings.primary_color,
-        rtl: storeSettings.rtl,
+        currency: storeSettings.currency || defaultSiteConfig.currency,
+        description: storeSettings.description || defaultSiteConfig.description,
+        primaryColor: storeSettings.primary_color || defaultSiteConfig.primaryColor,
+        rtl: storeSettings.rtl !== undefined ? storeSettings.rtl : defaultSiteConfig.rtl,
         logo: storeSettings.logo_url, // Set logo to match logoUrl for invoice compatibility
       };
-      console.log("Loaded site config from Supabase:", siteConfig);
+      console.info("Loaded site config from Supabase:", siteConfig);
     } else {
-      console.log("No settings found in Supabase, using defaults or localStorage");
+      console.info("No settings found in Supabase, using defaults or localStorage");
       // Fall back to localStorage if no Supabase settings found
       try {
         const savedConfig = localStorage.getItem('siteConfig');
         if (savedConfig) {
           const parsedConfig = JSON.parse(savedConfig);
           siteConfig = { ...defaultSiteConfig, ...parsedConfig };
-          console.log("Loaded site config from localStorage:", siteConfig);
+          console.info("Loaded site config from localStorage:", siteConfig);
           
           // Since we found settings in localStorage but not in Supabase,
           // let's save them to Supabase for future use
@@ -184,7 +184,7 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
       if (savedConfig) {
         const parsedConfig = JSON.parse(savedConfig);
         siteConfig = { ...defaultSiteConfig, ...parsedConfig };
-        console.log("Loaded site config from localStorage:", siteConfig);
+        console.info("Loaded site config from localStorage:", siteConfig);
       }
     } catch (localError) {
       console.error("Failed to load saved site config from localStorage:", localError);
