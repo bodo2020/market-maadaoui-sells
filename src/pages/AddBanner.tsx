@@ -400,8 +400,11 @@ export default function AddBanner() {
                 <div className="space-y-2">
                   <Label>اختر القسم</Label>
                   <Select 
-                    value={formData.category_id || ""}
-                    onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+                    value={formData.category_id || "null"} 
+                    onValueChange={(value) => setFormData({ 
+                      ...formData, 
+                      category_id: value === "null" ? null : value 
+                    })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="اختر القسم" />
@@ -421,8 +424,11 @@ export default function AddBanner() {
                 <div className="space-y-2">
                   <Label>اختر الشركة</Label>
                   <Select 
-                    value={formData.company_id || ""}
-                    onValueChange={(value) => setFormData({ ...formData, company_id: value })}
+                    value={formData.company_id || "null"} 
+                    onValueChange={(value) => setFormData({ 
+                      ...formData, 
+                      company_id: value === "null" ? null : value  
+                    })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الشركة" />
