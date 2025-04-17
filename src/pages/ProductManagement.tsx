@@ -3,56 +3,12 @@ import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { 
-  Search, 
-  Plus, 
-  Pencil, 
-  Trash2, 
-  Package, 
-  ArrowUpDown,
-  MoreHorizontal,
-  Tag,
-  Barcode,
-  Box,
-  Loader2,
-  ScanLine,
-  Image as ImageIcon,
-  FolderOpen,
-  Building2
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Search, Plus, Pencil, Trash2, Package, ArrowUpDown, MoreHorizontal, Tag, Barcode, Box, Loader2, ScanLine, Image as ImageIcon, FolderOpen, Building2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Product } from "@/types";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -63,7 +19,6 @@ import { Button as ShadcnButton } from "@/components/ui/button";
 import { Dialog as ShadcnDialog } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import ProductAssignmentDialog from "@/components/products/ProductAssignmentDialog";
-
 export default function ProductManagement() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
@@ -77,7 +32,7 @@ export default function ProductManagement() {
     bulk_enabled: false,
     is_offer: false,
     image_urls: ["/placeholder.svg"],
-    quantity: 0,
+    quantity: 0
   });
   const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState("");
@@ -88,12 +43,12 @@ export default function ProductManagement() {
   const [productToAddOffer, setProductToAddOffer] = useState<Product | null>(null);
   const [isAssignCategoryOpen, setIsAssignCategoryOpen] = useState(false);
   const [isAssignCompanyOpen, setIsAssignCompanyOpen] = useState(false);
-  const { toast } = useToast();
-  
+  const {
+    toast
+  } = useToast();
   useEffect(() => {
     loadProducts();
   }, []);
-
   const loadProducts = async () => {
     setLoading(true);
     try {
@@ -110,15 +65,13 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
-  
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(search.toLowerCase()) || 
-    (product.barcode && product.barcode.includes(search))
-  );
-
+  const filteredProducts = products.filter(product => product.name.toLowerCase().includes(search.toLowerCase()) || product.barcode && product.barcode.includes(search));
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value, type } = e.target;
-    
+    const {
+      id,
+      value,
+      type
+    } = e.target;
     if (id === "barcode" && newProduct.barcode_type === "scale") {
       const cleanValue = value.replace(/\D/g, '').substring(0, 5);
       setNewProduct({
@@ -132,10 +85,12 @@ export default function ProductManagement() {
       });
     }
   };
-
   const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value, type } = e.target;
-    
+    const {
+      id,
+      value,
+      type
+    } = e.target;
     if (id === "barcode" && productToEdit?.barcode_type === "scale") {
       const cleanValue = value.replace(/\D/g, '').substring(0, 5);
       setProductToEdit({
@@ -149,35 +104,30 @@ export default function ProductManagement() {
       } as Product);
     }
   };
-
   const handleSelectChange = (value: string, field: string) => {
     setNewProduct({
       ...newProduct,
       [field]: value
     });
   };
-
   const handleEditSelectChange = (value: string, field: string) => {
     setProductToEdit({
       ...productToEdit,
       [field]: value
     } as Product);
   };
-
   const handleCheckboxChange = (checked: boolean, field: string) => {
     setNewProduct({
       ...newProduct,
       [field]: checked
     });
   };
-
   const handleEditCheckboxChange = (checked: boolean, field: string) => {
     setProductToEdit({
       ...productToEdit,
       [field]: checked
     } as Product);
   };
-
   const handleSaveProduct = async () => {
     if (!newProduct.name || !newProduct.price || !newProduct.purchase_price) {
       toast({
@@ -187,7 +137,6 @@ export default function ProductManagement() {
       });
       return;
     }
-
     setLoading(true);
     try {
       const productToAdd: Omit<Product, "id" | "created_at" | "updated_at"> = {
@@ -212,9 +161,7 @@ export default function ProductManagement() {
         unit_of_measure: newProduct.unit_of_measure || null,
         is_bulk: false
       };
-
       const addedProduct = await createProduct(productToAdd);
-      
       setProducts([...products, addedProduct]);
       setNewProduct({
         barcode_type: "normal",
@@ -225,10 +172,9 @@ export default function ProductManagement() {
         is_bulk: false
       });
       setIsAddDialogOpen(false);
-      
       toast({
         title: "تم بنجاح",
-        description: "تم إضافة المنتج بنجاح",
+        description: "تم إضافة المنتج بنجاح"
       });
     } catch (error) {
       console.error("Error adding product:", error);
@@ -241,7 +187,6 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
-
   const handleEditProduct = async () => {
     if (!productToEdit || !productToEdit.name || !productToEdit.price || !productToEdit.purchase_price) {
       toast({
@@ -251,18 +196,15 @@ export default function ProductManagement() {
       });
       return;
     }
-
     setLoading(true);
     try {
       const updatedProduct = await updateProduct(productToEdit.id, productToEdit);
-      
       setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
       setIsEditDialogOpen(false);
       setProductToEdit(null);
-      
       toast({
         title: "تم بنجاح",
-        description: "تم تحديث المنتج بنجاح",
+        description: "تم تحديث المنتج بنجاح"
       });
     } catch (error) {
       console.error("Error updating product:", error);
@@ -275,20 +217,17 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
-
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
-    
     setLoading(true);
     try {
       await deleteProduct(productToDelete.id);
       setProducts(products.filter(p => p.id !== productToDelete.id));
       setIsDeleteConfirmOpen(false);
       setProductToDelete(null);
-      
       toast({
         title: "تم بنجاح",
-        description: "تم حذف المنتج بنجاح",
+        description: "تم حذف المنتج بنجاح"
       });
     } catch (error) {
       console.error("Error deleting product:", error);
@@ -301,7 +240,6 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
-
   const handleAddOffer = async () => {
     if (!productToAddOffer || !productToAddOffer.offer_price) {
       toast({
@@ -311,21 +249,18 @@ export default function ProductManagement() {
       });
       return;
     }
-
     setLoading(true);
     try {
       const updatedProduct = await updateProduct(productToAddOffer.id, {
         is_offer: true,
         offer_price: productToAddOffer.offer_price
       });
-      
       setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
       setIsOfferDialogOpen(false);
       setProductToAddOffer(null);
-      
       toast({
         title: "تم بنجاح",
-        description: "تم إضافة العرض بنجاح",
+        description: "تم إضافة العرض بنجاح"
       });
     } catch (error) {
       console.error("Error adding offer:", error);
@@ -338,11 +273,9 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
-
   const handleBarcodeScanning = () => {
     setIsBarcodeDialogOpen(true);
   };
-
   const validateWeightBarcode = (barcode: string) => {
     if (!/^\d{1,6}$/.test(barcode)) {
       toast({
@@ -352,56 +285,47 @@ export default function ProductManagement() {
       });
       return false;
     }
-
     let formattedBarcode = barcode;
     while (formattedBarcode.length < 6) {
       formattedBarcode = '0' + formattedBarcode;
     }
-    
     setNewProduct(prev => ({
       ...prev,
       barcode_type: 'scale',
       barcode: formattedBarcode,
       unit_of_measure: 'كجم'
     }));
-
     toast({
       title: "تم تعيين رمز المنتج",
-      description: `رمز المنتج: ${formattedBarcode}`,
+      description: `رمز المنتج: ${formattedBarcode}`
     });
-
     return true;
   };
-
   const handleBarcodeSubmit = () => {
     if (scannedBarcode) {
       if (scannedBarcode.startsWith('2') && scannedBarcode.length === 13) {
         const productCode = scannedBarcode.substring(1, 7);
-        
         setNewProduct(prev => ({
           ...prev,
           barcode_type: 'scale',
           barcode: productCode,
           unit_of_measure: 'كجم'
         }));
-        
         setIsBarcodeDialogOpen(false);
-        
         toast({
           title: "تم قراءة باركود الميزان",
-          description: `رمز المنتج: ${productCode}`,
+          description: `رمز المنتج: ${productCode}`
         });
       } else {
         setNewProduct(prev => ({
           ...prev,
           barcode_type: 'normal',
-          barcode: scannedBarcode,
+          barcode: scannedBarcode
         }));
         setIsBarcodeDialogOpen(false);
-        
         toast({
           title: "تم قراءة الباركود",
-          description: `الباركود: ${scannedBarcode}`,
+          description: `الباركود: ${scannedBarcode}`
         });
       }
       setScannedBarcode("");
@@ -413,11 +337,9 @@ export default function ProductManagement() {
       });
     }
   };
-
   const handleEditClick = async (product: Product) => {
     navigate(`/add-product?id=${product.id}`);
   };
-
   const handleAddOfferClick = (product: Product) => {
     setProductToAddOffer({
       ...product,
@@ -426,9 +348,7 @@ export default function ProductManagement() {
     });
     setIsOfferDialogOpen(true);
   };
-
-  return (
-    <MainLayout>
+  return <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">إدارة المنتجات</h1>
         <Button onClick={() => navigate("/add-product")} disabled={loading}>
@@ -449,24 +369,16 @@ export default function ProductManagement() {
         </CardHeader>
         <CardContent>
           <div className="flex gap-2 mb-6">
-            <Input 
-              placeholder="ابحث بالاسم أو الباركود" 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="max-w-sm"
-            />
+            <Input placeholder="ابحث بالاسم أو الباركود" value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
             <Button variant="outline">
               <Search className="ml-2 h-4 w-4" />
               بحث
             </Button>
           </div>
           
-          {loading ? (
-            <div className="flex justify-center items-center py-16">
+          {loading ? <div className="flex justify-center items-center py-16">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="rounded-md border">
+            </div> : <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -487,64 +399,38 @@ export default function ProductManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredProducts.length === 0 ? (
-                    <TableRow>
+                  {filteredProducts.length === 0 ? <TableRow>
                       <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         لا توجد منتجات مطابقة للبحث
                       </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredProducts.map(product => (
-                      <TableRow key={product.id}>
+                    </TableRow> : filteredProducts.map(product => <TableRow key={product.id}>
                         <TableCell>
                           <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
-                            <img 
-                              src={product.image_urls ? product.image_urls[0] : "/placeholder.svg"} 
-                              alt={product.name}
-                              className="h-8 w-8 object-contain"
-                            />
+                            <img src={product.image_urls ? product.image_urls[0] : "/placeholder.svg"} alt={product.name} className="h-8 w-8 object-contain" />
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.barcode}</TableCell>
                         <TableCell>
-                          {product.barcode_type === "scale" ? (
-                            <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">ميزان</span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">عادي</span>
-                          )}
+                          {product.barcode_type === "scale" ? <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">ميزان</span> : <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">عادي</span>}
                         </TableCell>
                         <TableCell>
-                          {product.is_offer && product.offer_price ? (
-                            <div>
+                          {product.is_offer && product.offer_price ? <div>
                               <span className="text-primary font-medium">{product.offer_price} {siteConfig.currency}</span>
                               <span className="mr-2 text-xs text-muted-foreground line-through">{product.price} {siteConfig.currency}</span>
-                            </div>
-                          ) : (
-                            <span>{product.price} {siteConfig.currency}</span>
-                          )}
+                            </div> : <span>{product.price} {siteConfig.currency}</span>}
                         </TableCell>
                         <TableCell className="text-center">{product.quantity}</TableCell>
                         <TableCell>
-                          {product.bulk_enabled ? (
-                            <div className="flex items-center">
+                          {product.bulk_enabled ? <div className="flex items-center">
                               <Box className="h-4 w-4 text-green-600 mr-1" />
                               <span className="text-xs">
                                 {product.bulk_quantity} وحدة - {product.bulk_price} {siteConfig.currency}
                               </span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">غير متاح</span>
-                          )}
+                            </div> : <span className="text-xs text-muted-foreground">غير متاح</span>}
                         </TableCell>
                         <TableCell>
-                          {(product.quantity || 0) > 10 ? (
-                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">م��وفر</span>
-                          ) : (product.quantity || 0) > 0 ? (
-                            <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">مخزون منخفض</span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">غير متوف��</span>
-                          )}
+                          {(product.quantity || 0) > 10 ? <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">متوفر</span> : (product.quantity || 0) > 0 ? <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">مخزون منخفض</span> : <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">غير متوف��</span>}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -560,48 +446,40 @@ export default function ProductManagement() {
                                 <Pencil className="ml-2 h-4 w-4" />
                                 تعديل
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => {
-                                  setProductToDelete(product);
-                                  setIsDeleteConfirmOpen(true);
-                                }}
-                              >
+                              <DropdownMenuItem className="text-destructive" onClick={() => {
+                        setProductToDelete(product);
+                        setIsDeleteConfirmOpen(true);
+                      }}>
                                 <Trash2 className="ml-2 h-4 w-4" />
                                 حذف
                               </DropdownMenuItem>
-                              {!product.is_offer && (
-                                <DropdownMenuItem onClick={() => handleAddOfferClick(product)}>
+                              {!product.is_offer && <DropdownMenuItem onClick={() => handleAddOfferClick(product)}>
                                   <Tag className="ml-2 h-4 w-4" />
                                   إضافة عرض
-                                </DropdownMenuItem>
-                              )}
+                                </DropdownMenuItem>}
                               
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => {
-                                setProductToEdit(product);
-                                setIsAssignCategoryOpen(true);
-                              }}>
+                        setProductToEdit(product);
+                        setIsAssignCategoryOpen(true);
+                      }}>
                                 <FolderOpen className="ml-2 h-4 w-4" />
                                 تغيير القسم
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => {
-                                setProductToEdit(product);
-                                setIsAssignCompanyOpen(true);
-                              }}>
+                        setProductToEdit(product);
+                        setIsAssignCompanyOpen(true);
+                      }}>
                                 <Building2 className="ml-2 h-4 w-4" />
                                 تغيير الشركة
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
-                      </TableRow>
-                    ))
-                  )}
+                      </TableRow>)}
                 </TableBody>
               </Table>
-            </div>
-          )}
+            </div>}
         </CardContent>
       </Card>
       
@@ -614,14 +492,9 @@ export default function ProductManagement() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {productToDelete && (
-              <div className="flex items-center gap-3 p-3 border rounded-md">
+            {productToDelete && <div className="flex items-center gap-3 p-3 border rounded-md">
                 <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
-                  <img 
-                    src={productToDelete.image_urls ? productToDelete.image_urls[0] : "/placeholder.svg"} 
-                    alt={productToDelete.name}
-                    className="h-8 w-8 object-contain"
-                  />
+                  <img src={productToDelete.image_urls ? productToDelete.image_urls[0] : "/placeholder.svg"} alt={productToDelete.name} className="h-8 w-8 object-contain" />
                 </div>
                 <div>
                   <h4 className="font-medium">{productToDelete.name}</h4>
@@ -629,21 +502,13 @@ export default function ProductManagement() {
                     الباركود: {productToDelete.barcode}
                   </p>
                 </div>
-              </div>
-            )}
+              </div>}
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsDeleteConfirmOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>
               إلغاء
             </Button>
-            <Button 
-              variant="destructive"
-              onClick={handleDeleteProduct}
-              disabled={loading}
-            >
+            <Button variant="destructive" onClick={handleDeleteProduct} disabled={loading}>
               {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
               حذف
             </Button>
@@ -660,15 +525,10 @@ export default function ProductManagement() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {productToAddOffer && (
-              <div className="space-y-4">
+            {productToAddOffer && <div className="space-y-4">
                 <div className="flex items-center gap-3 p-3 border rounded-md">
                   <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
-                    <img 
-                      src={productToAddOffer.image_urls ? productToAddOffer.image_urls[0] : "/placeholder.svg"} 
-                      alt={productToAddOffer.name}
-                      className="h-8 w-8 object-contain"
-                    />
+                    <img src={productToAddOffer.image_urls ? productToAddOffer.image_urls[0] : "/placeholder.svg"} alt={productToAddOffer.name} className="h-8 w-8 object-contain" />
                   </div>
                   <div>
                     <h4 className="font-medium">{productToAddOffer.name}</h4>
@@ -680,39 +540,24 @@ export default function ProductManagement() {
                 
                 <div className="space-y-2">
                   <Label htmlFor="offer_price">سعر العرض</Label>
-                  <Input 
-                    id="offer_price" 
-                    type="number" 
-                    placeholder="0.00" 
-                    value={productToAddOffer.offer_price || ""}
-                    onChange={(e) => setProductToAddOffer({
-                      ...productToAddOffer,
-                      offer_price: Number(e.target.value)
-                    })}
-                  />
+                  <Input id="offer_price" type="number" placeholder="0.00" value={productToAddOffer.offer_price || ""} onChange={e => setProductToAddOffer({
+                ...productToAddOffer,
+                offer_price: Number(e.target.value)
+              })} />
                 </div>
                 
-                {productToAddOffer.offer_price && productToAddOffer.price && (
-                  <div className="text-sm p-2 bg-muted rounded-md">
+                {productToAddOffer.offer_price && productToAddOffer.price && <div className="text-sm p-2 bg-muted rounded-md">
                     نسبة الخصم: <span className="font-medium text-primary">
-                      {Math.round((1 - (productToAddOffer.offer_price / productToAddOffer.price)) * 100)}%
+                      {Math.round((1 - productToAddOffer.offer_price / productToAddOffer.price) * 100)}%
                     </span>
-                  </div>
-                )}
-              </div>
-            )}
+                  </div>}
+              </div>}
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsOfferDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setIsOfferDialogOpen(false)}>
               إلغاء
             </Button>
-            <Button 
-              onClick={handleAddOffer}
-              disabled={loading}
-            >
+            <Button onClick={handleAddOffer} disabled={loading}>
               {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
               إضافة العرض
             </Button>
@@ -743,14 +588,7 @@ export default function ProductManagement() {
               <Label htmlFor="barcode" className="text-right">
                 الباركود
               </Label>
-              <Input
-                id="barcode"
-                value={scannedBarcode}
-                onChange={(e) => setScannedBarcode(e.target.value)}
-                className="col-span-3"
-                placeholder="أدخل الباركود أو امسحه"
-                autoFocus
-              />
+              <Input id="barcode" value={scannedBarcode} onChange={e => setScannedBarcode(e.target.value)} className="col-span-3" placeholder="أدخل الباركود أو امسحه" autoFocus />
             </div>
           </div>
           <DialogFooter>
@@ -761,21 +599,8 @@ export default function ProductManagement() {
         </DialogContent>
       </ShadcnDialog>
       
-      <ProductAssignmentDialog
-        open={isAssignCategoryOpen}
-        onOpenChange={setIsAssignCategoryOpen}
-        product={productToEdit}
-        onSaved={loadProducts}
-        type="category"
-      />
+      <ProductAssignmentDialog open={isAssignCategoryOpen} onOpenChange={setIsAssignCategoryOpen} product={productToEdit} onSaved={loadProducts} type="category" />
       
-      <ProductAssignmentDialog
-        open={isAssignCompanyOpen}
-        onOpenChange={setIsAssignCompanyOpen}
-        product={productToEdit}
-        onSaved={loadProducts}
-        type="company"
-      />
-    </MainLayout>
-  );
+      <ProductAssignmentDialog open={isAssignCompanyOpen} onOpenChange={setIsAssignCompanyOpen} product={productToEdit} onSaved={loadProducts} type="company" />
+    </MainLayout>;
 }
