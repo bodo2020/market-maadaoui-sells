@@ -45,6 +45,10 @@ export default function CategoryDetail() {
   const [productCount, setProductCount] = useState(0);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAddProductsDialog, setShowAddProductsDialog] = useState(false);
+  const [parentCategories, setParentCategories] = useState<{
+    categoryId: string | null;
+    subcategoryId: string | null;
+  }>({ categoryId: null, subcategoryId: null });
 
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -82,6 +86,21 @@ export default function CategoryDetail() {
       setName(categoryWithType.name);
       setDescription(categoryWithType.description || "");
       setImagePreview(categoryWithType.image_url || null);
+
+      if (categoryWithType.level === 'subsubcategory' && categoryWithType.parent_id) {
+        const { data: parentData } = await supabase
+          .from('categories')
+          .select('*, parent:parent_id(*)')
+          .eq('id', categoryWithType.parent_id)
+          .single();
+
+        if (parentData) {
+          setParentCategories({
+            categoryId: parentData.parent?.id || null,
+            subcategoryId: parentData.id
+          });
+        }
+      }
       
       const { count, error: countError } = await supabase
         .from('products')
@@ -337,7 +356,7 @@ export default function CategoryDetail() {
               <div className="text-center p-8 bg-gray-50 rounded-lg border">
                 <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                 <h3 className="text-lg font-medium">
-                  {productCount > 0 ? `يوجد ${productCount} منتج في هذه الفئة` : 'لا توجد منتجات في هذه الفئة'}
+                  {productCount > 0 ? `يوجد ${productCount} منتج في هذه الفئة` : 'لا تو��د منتجات في هذه الفئة'}
                 </h3>
                 <p className="text-gray-500 mb-4">يمكنك إضافة منتجات جديدة من صفحة المنتجات</p>
                 <Button onClick={() => navigate('/products')}>
@@ -397,6 +416,7 @@ export default function CategoryDetail() {
           categoryId={category.id}
           onSuccess={fetchProducts}
           products={products}
+          parentCategories={parentCategories}
         />
       )}
     </div>

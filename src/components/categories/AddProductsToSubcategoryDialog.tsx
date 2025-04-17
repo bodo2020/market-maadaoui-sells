@@ -4,11 +4,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Product } from "@/types";
-import { Search, Plus, X, Check } from "lucide-react";
+import { Search, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { updateProduct } from "@/services/supabase/productService";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AddProductsToSubcategoryDialogProps {
   open: boolean;
@@ -16,6 +17,10 @@ interface AddProductsToSubcategoryDialogProps {
   categoryId: string;
   onSuccess?: () => void;
   products: Product[];
+  parentCategories?: {
+    categoryId: string | null;
+    subcategoryId: string | null;
+  };
 }
 
 export default function AddProductsToSubcategoryDialog({
@@ -23,7 +28,8 @@ export default function AddProductsToSubcategoryDialog({
   onOpenChange,
   categoryId,
   onSuccess,
-  products
+  products,
+  parentCategories
 }: AddProductsToSubcategoryDialogProps) {
   const [searchSelected, setSearchSelected] = useState("");
   const [searchAvailable, setSearchAvailable] = useState("");
@@ -52,20 +58,28 @@ export default function AddProductsToSubcategoryDialog({
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Update products with new subsubcategory_id
+      // Update products with new category hierarchy
       await Promise.all([
-        // Add subsubcategory_id to selected products
+        // Add products to selected subsubcategory and parent categories
         ...selectedProducts.map(product =>
-          updateProduct(product.id, { subsubcategory_id: categoryId })
+          updateProduct(product.id, {
+            subsubcategory_id: categoryId,
+            subcategory_id: parentCategories?.subcategoryId || null,
+            category_id: parentCategories?.categoryId || null
+          })
         ),
-        // Remove subsubcategory_id from unselected products
+        // Remove category associations from unselected products
         ...products
           .filter(p => 
             p.subsubcategory_id === categoryId && 
             !selectedProducts.find(sp => sp.id === p.id)
           )
           .map(product =>
-            updateProduct(product.id, { subsubcategory_id: null })
+            updateProduct(product.id, {
+              subsubcategory_id: null,
+              subcategory_id: null,
+              category_id: null
+            })
           )
       ]);
 
