@@ -310,6 +310,7 @@ export type Database = {
           bulk_price: number | null
           bulk_quantity: number | null
           category_id: string | null
+          company_id: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -335,6 +336,7 @@ export type Database = {
           bulk_price?: number | null
           bulk_quantity?: number | null
           category_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -360,6 +362,7 @@ export type Database = {
           bulk_price?: number | null
           bulk_quantity?: number | null
           category_id?: string | null
+          company_id?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -377,7 +380,22 @@ export type Database = {
           unit_of_measure?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_product_category"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_product_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_items: {
         Row: {

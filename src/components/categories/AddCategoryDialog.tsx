@@ -61,17 +61,22 @@ const AddCategoryDialog = ({
     const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
     const filePath = `categories/${fileName}`;
 
-    const { data, error } = await supabase.storage
-      .from('images')
-      .upload(filePath, file);
+    try {
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file);
 
-    if (error) throw error;
+      if (uploadError) throw uploadError;
 
-    const { data: urlData } = supabase.storage
-      .from('images')
-      .getPublicUrl(filePath);
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
 
-    return urlData.publicUrl;
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
