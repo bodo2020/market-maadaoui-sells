@@ -62,6 +62,7 @@ export default function AddBanner() {
   const [companies, setCompanies] = useState<{id: string, name: string}[]>([]);
   const [filterType, setFilterType] = useState<"none" | "category" | "company">("none");
   const [error, setError] = useState<string | null>(null);
+  const [creatingBucket, setCreatingBucket] = useState(false);
 
   useEffect(() => {
     if (bannerId) {
@@ -81,9 +82,51 @@ export default function AddBanner() {
       // If there's an error, the bucket might not exist
       if (error) {
         console.log("Banners bucket may not exist or have permissions issues:", error);
+        await createBannersBucket();
       }
     } catch (err) {
       console.error("Error checking banners bucket:", err);
+      await createBannersBucket();
+    }
+  };
+
+  const createBannersBucket = async () => {
+    setCreatingBucket(true);
+    setError(null);
+    
+    try {
+      console.log("Attempting to create banners bucket via edge function...");
+      
+      const response = await fetch(
+        "https://qzvpayjaadbmpayeglon.functions.supabase.co/create_banners_bucket",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${supabase.auth.getSession() 
+              ? `${(await supabase.auth.getSession()).data.session?.access_token}` 
+              : ""}`
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error creating banners bucket:", errorData);
+        setError(`خطأ في إنشاء مجلد البانرات: ${errorData.error || 'حدث خطأ غير معروف'}`);
+      } else {
+        console.log("Banners bucket created/verified successfully");
+        // Re-check bucket after creation
+        const { error: checkError } = await supabase.storage.from('banners').list();
+        if (checkError) {
+          setError("تم إنشاء مجلد البانرات لكن لا يمكن الوصول إليه. يرجى التحقق من الإعدادات.");
+        }
+      }
+    } catch (error: any) {
+      console.error("Storage initialization error:", error);
+      setError(`خطأ في تهيئة التخزين: ${error.message || 'حدث خطأ غير معروف'}`);
+    } finally {
+      setCreatingBucket(false);
     }
   };
 
@@ -204,6 +247,14 @@ export default function AddBanner() {
     setError(null);
     
     try {
+      // First, check if bucket exists and create if missing
+      const { error: bucketCheckError } = await supabase.storage.from('banners').list();
+      
+      if (bucketCheckError) {
+        console.log("Bucket check failed, trying to create it:", bucketCheckError);
+        await createBannersBucket();
+      }
+      
       // Generate a unique file name
       const fileName = `banner-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
       
@@ -216,7 +267,26 @@ export default function AddBanner() {
         });
       
       if (error) {
-        throw error;
+        if (error.message.includes("bucket") || error.message.includes("Bucket")) {
+          await createBannersBucket();
+          // Try one more time after creating the bucket
+          const { data: retryData, error: retryError } = await supabase.storage
+            .from('banners')
+            .upload(fileName, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
+          
+          if (retryError) throw retryError;
+          
+          const { data: retryUrlData } = supabase.storage
+            .from('banners')
+            .getPublicUrl(fileName);
+          
+          return retryUrlData.publicUrl;
+        } else {
+          throw error;
+        }
       }
       
       // Get the public URL of the uploaded file
@@ -313,10 +383,10 @@ export default function AddBanner() {
           </div>
           <Button 
             onClick={handleSave} 
-            disabled={saving || uploading}
+            disabled={saving || uploading || creatingBucket}
             className="min-w-[120px]"
           >
-            {(saving || uploading) && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+            {(saving || uploading || creatingBucket) && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
             حفظ
           </Button>
         </div>
@@ -325,6 +395,13 @@ export default function AddBanner() {
           <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {creatingBucket && (
+          <Alert className="mb-6">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <AlertDescription>جاري إنشاء مجلد البانرات...</AlertDescription>
           </Alert>
         )}
 
