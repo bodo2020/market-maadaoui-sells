@@ -9,9 +9,103 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      banners: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          end_date: string | null
+          id: string
+          image_url: string
+          link: string | null
+          position: number | null
+          start_date: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          image_url: string
+          link?: string | null
+          position?: number | null
+          start_date?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          image_url?: string
+          link?: string | null
+          position?: number | null
+          start_date?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      cash_tracking: {
+        Row: {
+          closing_balance: number | null
+          created_at: string | null
+          created_by: string | null
+          date: string
+          difference: number | null
+          id: string
+          notes: string | null
+          opening_balance: number | null
+          updated_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          closing_balance?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          difference?: number | null
+          id?: string
+          notes?: string | null
+          opening_balance?: number | null
+          updated_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          closing_balance?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          difference?: number | null
+          id?: string
+          notes?: string | null
+          opening_balance?: number | null
+          updated_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_tracking_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_tracking_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string | null
+          description: string | null
           id: string
           name: string
           parent_id: string | null
@@ -19,6 +113,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          description?: string | null
           id?: string
           name: string
           parent_id?: string | null
@@ -26,6 +121,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          description?: string | null
           id?: string
           name?: string
           parent_id?: string | null
@@ -40,6 +136,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      companies: {
+        Row: {
+          address: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       customers: {
         Row: {
@@ -106,6 +238,62 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      online_orders: {
+        Row: {
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          items: Json
+          notes: string | null
+          payment_method: string | null
+          payment_status: string | null
+          shipping_address: string | null
+          shipping_cost: number | null
+          status: string
+          total: number
+          tracking_number: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          items: Json
+          notes?: string | null
+          payment_method?: string | null
+          payment_status?: string | null
+          shipping_address?: string | null
+          shipping_cost?: number | null
+          status?: string
+          total: number
+          tracking_number?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          payment_method?: string | null
+          payment_status?: string | null
+          shipping_address?: string | null
+          shipping_cost?: number | null
+          status?: string
+          total?: number
+          tracking_number?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "online_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
@@ -511,6 +699,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_bucket_if_not_exists: {
+        Args: { bucket_name: string }
+        Returns: undefined
+      }
       get_admin_role: {
         Args: Record<PropertyKey, never>
         Returns: string

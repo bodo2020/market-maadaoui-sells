@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { siteConfig } from "@/config/site";
@@ -20,7 +19,11 @@ import {
   Banknote,
   Truck,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CircleDollarSign,
+  Building2,
+  ImageIcon,
+  ShoppingBag
 } from "lucide-react";
 
 interface SidebarItemProps {
@@ -48,10 +51,12 @@ function SidebarItem({ icon, label, href, active }: SidebarItemProps) {
 }
 
 export default function Sidebar() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const currentPath = window.location.pathname;
   const [collapsed, setCollapsed] = useState(false);
+  
+  const isAdmin = user?.role === 'admin';
   
   const handleLogout = () => {
     logout();
@@ -98,60 +103,102 @@ export default function Sidebar() {
           href="/"
           active={currentPath === "/"}
         />
+        
         <SidebarItem
           icon={<ShoppingCart size={20} />}
           label={collapsed ? "" : "نقطة البيع"}
           href="/pos"
           active={currentPath === "/pos"}
         />
-        <SidebarItem
-          icon={<Truck size={20} />}
-          label={collapsed ? "" : "مشتريات الموردين"}
-          href="/supplier-purchases"
-          active={currentPath === "/supplier-purchases"}
-        />
-        <SidebarItem
-          icon={<PackageOpen size={20} />}
-          label={collapsed ? "" : "المنتجات"}
-          href="/products"
-          active={currentPath === "/products"}
-        />
+        
+        {isAdmin && (
+          <>
+            <SidebarItem
+              icon={<CircleDollarSign size={20} />}
+              label={collapsed ? "" : "متابعة النقدية"}
+              href="/cash-tracking"
+              active={currentPath === "/cash-tracking"}
+            />
+            
+            <SidebarItem
+              icon={<Truck size={20} />}
+              label={collapsed ? "" : "مشتريات الموردين"}
+              href="/supplier-purchases"
+              active={currentPath === "/supplier-purchases"}
+            />
+            
+            <SidebarItem
+              icon={<PackageOpen size={20} />}
+              label={collapsed ? "" : "المنتجات"}
+              href="/products"
+              active={currentPath === "/products"}
+            />
+            
+            <SidebarItem
+              icon={<Building2 size={20} />}
+              label={collapsed ? "" : "الشركات"}
+              href="/companies"
+              active={currentPath === "/companies"}
+            />
+            
+            <SidebarItem
+              icon={<ImageIcon size={20} />}
+              label={collapsed ? "" : "البانرات"}
+              href="/banners"
+              active={currentPath === "/banners"}
+            />
+            
+            <SidebarItem
+              icon={<ShoppingBag size={20} />}
+              label={collapsed ? "" : "الطلبات الإلكترونية"}
+              href="/online-orders"
+              active={currentPath === "/online-orders"}
+            />
+          </>
+        )}
+        
         <SidebarItem
           icon={<Receipt size={20} />}
           label={collapsed ? "" : "الفواتير"}
           href="/invoices"
           active={currentPath === "/invoices"}
         />
+        
         <SidebarItem
           icon={<BarChart4 size={20} />}
           label={collapsed ? "" : "التقارير والمالية"}
           href="/reports"
           active={currentPath === "/reports" || currentPath === "/finance"}
         />
+        
         <SidebarItem
           icon={<Store size={20} />}
           label={collapsed ? "" : "المخزون"}
           href="/inventory"
           active={currentPath === "/inventory"}
         />
+        
         <SidebarItem
           icon={<UserPlus size={20} />}
           label={collapsed ? "" : "العملاء والموردين"}
           href="/suppliers-customers"
           active={currentPath === "/suppliers-customers"}
         />
+        
         <SidebarItem
           icon={<FileText size={20} />}
           label={collapsed ? "" : "المصروفات"}
           href="/expenses"
           active={currentPath === "/expenses"}
         />
+        
         <SidebarItem
           icon={<Users size={20} />}
           label={collapsed ? "" : "الموظفين"}
           href="/employees"
           active={currentPath === "/employees"}
         />
+        
         <SidebarItem
           icon={<Settings size={20} />}
           label={collapsed ? "" : "الإعدادات"}

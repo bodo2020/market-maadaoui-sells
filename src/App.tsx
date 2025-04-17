@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -22,6 +21,10 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Purchases from "./pages/Purchases";
 import SupplierPurchases from "./pages/SupplierPurchases";
+import CashTracking from "./pages/CashTracking";
+import Companies from "./pages/Companies";
+import Banners from "./pages/Banners";
+import OnlineOrders from "./pages/OnlineOrders";
 
 const queryClient = new QueryClient();
 
@@ -116,6 +119,30 @@ function App() {
               <Route path="/settings" element={
                 <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                   <Settings />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/cash-tracking" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <CashTracking />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/companies" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <Companies />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/banners" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <Banners />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/online-orders" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <OnlineOrders />
                 </ProtectedRoute>
               } />
               
