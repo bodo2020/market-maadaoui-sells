@@ -1,9 +1,12 @@
+
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   BarChart4,
   Store,
@@ -23,19 +26,29 @@ import {
   CircleDollarSign,
   Building2,
   ImageIcon,
-  ShoppingBag
+  ShoppingBag,
+  FolderOpen,
+  ChevronDown
 } from "lucide-react";
+
+interface Category {
+  id: string;
+  name: string;
+  level: string;
+  image_url?: string | null;
+}
 
 interface SidebarItemProps {
   icon: JSX.Element;
   label: string;
   href: string;
   active?: boolean;
+  onClick?: () => void;
 }
 
-function SidebarItem({ icon, label, href, active }: SidebarItemProps) {
+function SidebarItem({ icon, label, href, active, onClick }: SidebarItemProps) {
   return (
-    <Link to={href}>
+    <Link to={href} onClick={onClick}>
       <Button
         variant={active ? "default" : "ghost"}
         className={cn(
@@ -53,8 +66,11 @@ function SidebarItem({ icon, label, href, active }: SidebarItemProps) {
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const currentPath = window.location.pathname;
+  const location = useLocation();
+  const currentPath = location.pathname;
   const [collapsed, setCollapsed] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [showCategories, setShowCategories] = useState(false);
   
   const isAdmin = user?.role === 'admin';
   
@@ -66,6 +82,25 @@ export default function Sidebar() {
   const toggleSidebar = () => {
     setCollapsed(!collapsed);
   };
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('id, name, level, image_url')
+          .eq('level', 'category')
+          .order('name');
+        
+        if (error) throw error;
+        setCategories(data || []);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
   
   return (
     <div className={cn(
@@ -110,6 +145,56 @@ export default function Sidebar() {
           href="/pos"
           active={currentPath === "/pos"}
         />
+
+        {!collapsed && (
+          <div className="mb-1">
+            <Button
+              variant="ghost"
+              className="w-full justify-between items-center"
+              onClick={() => setShowCategories(!showCategories)}
+            >
+              <div className="flex items-center gap-2">
+                <FolderOpen size={20} />
+                <span>التصنيفات</span>
+              </div>
+              <ChevronDown
+                size={16}
+                className={cn(
+                  "transition-transform duration-200",
+                  showCategories ? "rotate-180" : ""
+                )}
+              />
+            </Button>
+            {showCategories && (
+              <div className="mr-4 mt-1 space-y-1 border-r pr-2">
+                <SidebarItem
+                  icon={<FolderOpen size={16} />}
+                  label="كل التصنيفات"
+                  href="/categories"
+                  active={currentPath === "/categories"}
+                />
+                {categories.map((category) => (
+                  <SidebarItem
+                    key={category.id}
+                    icon={<FolderOpen size={16} />}
+                    label={category.name}
+                    href={`/categories/${category.id}`}
+                    active={currentPath === `/categories/${category.id}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {collapsed && (
+          <SidebarItem
+            icon={<FolderOpen size={20} />}
+            label=""
+            href="/categories"
+            active={currentPath.startsWith("/categories")}
+          />
+        )}
         
         {isAdmin && (
           <>

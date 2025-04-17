@@ -147,7 +147,7 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              <Route path="/categories" element={<Categories />} />
+              <Route path="/categories/:id" element={<Categories />} />
               
               <Route path="*" element={<NotFound />} />
             </Routes>

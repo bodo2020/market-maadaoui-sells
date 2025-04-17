@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 
 interface Category {
   id: string;
@@ -15,6 +15,7 @@ interface Category {
   description: string | null;
   level: 'category' | 'subcategory' | 'subsubcategory';
   parent_id: string | null;
+  image_url?: string | null;
 }
 
 interface AddCategoryDialogProps {
@@ -33,6 +34,8 @@ export default function AddCategoryDialog({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const getLevel = (): Category['level'] => {
     if (!parentCategory) return 'category';
@@ -40,16 +43,53 @@ export default function AddCategoryDialog({
     return 'subsubcategory';
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      // Create image preview
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadImage = async (file: File) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+    const filePath = `categories/${fileName}`;
+
+    const { data, error } = await supabase.storage
+      .from('images')
+      .upload(filePath, file);
+
+    if (error) throw error;
+
+    const { data: urlData } = supabase.storage
+      .from('images')
+      .getPublicUrl(filePath);
+
+    return urlData.publicUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setLoading(true);
 
+      let image_url = null;
+      if (imageFile) {
+        image_url = await uploadImage(imageFile);
+      }
+
       const newCategory = {
         name,
         description: description || null,
         level: getLevel(),
-        parent_id: parentCategory?.id || null
+        parent_id: parentCategory?.id || null,
+        image_url
       };
 
       const { error } = await supabase
@@ -63,6 +103,8 @@ export default function AddCategoryDialog({
       onOpenChange(false);
       setName("");
       setDescription("");
+      setImageFile(null);
+      setImagePreview(null);
     } catch (error) {
       console.error('Error adding category:', error);
       toast.error("حدث خطأ أثناء إضافة التصنيف");
@@ -96,6 +138,27 @@ export default function AddCategoryDialog({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="أدخل وصف التصنيف"
             />
+          </div>
+          <div>
+            <Label htmlFor="image">صورة التصنيف (اختياري)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="image"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="flex-1"
+              />
+              {imagePreview && (
+                <div className="w-12 h-12 rounded overflow-hidden border">
+                  <img 
+                    src={imagePreview} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <Label>المستوى</Label>

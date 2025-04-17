@@ -28,6 +28,7 @@ export interface Category {
   children?: Category[];
   level?: 'category' | 'subcategory' | 'subsubcategory';
   description?: string | null;
+  image_url?: string | null;
   created_at: Date | string;
   updated_at?: Date | string;
 }

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ChevronRight, FolderPlus, Trash } from "lucide-react";
+import { Loader2, ChevronRight, FolderPlus, Trash, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -13,6 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
+import { useNavigate } from "react-router-dom";
 import AddCategoryDialog from "./AddCategoryDialog";
 
 interface Category {
@@ -21,6 +23,7 @@ interface Category {
   description: string | null;
   level: 'category' | 'subcategory' | 'subsubcategory';
   parent_id: string | null;
+  image_url?: string | null;
   children?: Category[];
 }
 
@@ -31,6 +34,7 @@ interface CategoryFromDB {
   description: string | null;
   level: string;
   parent_id: string | null;
+  image_url?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -40,6 +44,7 @@ export default function CategoriesList() {
   const [loading, setLoading] = useState(true);
   const [selectedParent, setSelectedParent] = useState<Category | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchCategories();
@@ -66,6 +71,7 @@ export default function CategoriesList() {
         // Cast level to our union type, defaulting to 'category' if invalid
         level: isValidLevel(cat.level) ? cat.level as 'category' | 'subcategory' | 'subsubcategory' : 'category',
         parent_id: cat.parent_id,
+        image_url: cat.image_url,
         children: [],
       }));
 
@@ -121,6 +127,10 @@ export default function CategoriesList() {
     }
   };
 
+  const navigateToCategory = (category: Category) => {
+    navigate(`/categories/${category.id}`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
@@ -151,55 +161,76 @@ export default function CategoriesList() {
         </Button>
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>الاسم</TableHead>
-            <TableHead>المستوى</TableHead>
-            <TableHead>الوصف</TableHead>
-            <TableHead>الإجراءات</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {(selectedParent ? selectedParent.children || [] : categories).map((category) => (
-            <TableRow key={category.id}>
-              <TableCell>{category.name}</TableCell>
-              <TableCell>
-                <Badge variant="outline">{getLevelLabel(category.level)}</Badge>
-              </TableCell>
-              <TableCell>{category.description || '-'}</TableCell>
-              <TableCell>
-                <div className="flex gap-2">
-                  {category.level !== 'subsubcategory' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedParent(category)}
-                    >
-                      عرض الفرعية
-                      <ChevronRight className="h-4 w-4 mr-2" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleDelete(category.id)}
-                  >
-                    <Trash className="h-4 w-4" />
-                  </Button>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        {(selectedParent ? selectedParent.children || [] : categories).map((category) => (
+          <div 
+            key={category.id} 
+            className="border rounded-lg overflow-hidden hover:border-primary transition-colors cursor-pointer"
+            onClick={() => {
+              if (category.level !== 'subsubcategory' && category.children && category.children.length > 0) {
+                setSelectedParent(category);
+              } else {
+                navigateToCategory(category);
+              }
+            }}
+          >
+            <div className="h-40 bg-gray-100 relative">
+              {category.image_url ? (
+                <img 
+                  src={category.image_url} 
+                  alt={category.name} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <FolderPlus className="h-16 w-16 text-gray-300" />
                 </div>
-              </TableCell>
-            </TableRow>
-          ))}
-          {(selectedParent ? selectedParent.children?.length === 0 : categories.length === 0) && (
-            <TableRow>
-              <TableCell colSpan={4} className="text-center">
-                لا توجد تصنيفات مسجلة
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+              )}
+              <Badge variant="outline" className="absolute top-2 right-2 bg-white">
+                {getLevelLabel(category.level)}
+              </Badge>
+            </div>
+            <div className="p-4">
+              <h3 className="font-semibold text-lg mb-1">{category.name}</h3>
+              {category.description && (
+                <p className="text-gray-500 text-sm line-clamp-2">{category.description}</p>
+              )}
+              <div className="flex justify-between items-center mt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigateToCategory(category);
+                  }}
+                >
+                  <Edit className="h-4 w-4 ml-1" />
+                  تعديل
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(category.id);
+                  }}
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Fallback table view for when there are no cards */}
+      {(selectedParent ? selectedParent.children?.length === 0 : categories.length === 0) && (
+        <div className="text-center p-8 bg-gray-50 rounded-lg border">
+          <FolderPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-lg font-medium">لا توجد تصنيفات</h3>
+          <p className="text-gray-500 mb-4">يمكنك إضافة تصنيفات جديدة من خلال الزر أعلاه</p>
+        </div>
+      )}
 
       <AddCategoryDialog
         open={showAddDialog}
