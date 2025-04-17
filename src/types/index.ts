@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -23,8 +24,10 @@ export interface User {
 export interface Category {
   id: string;
   name: string;
-  parent_id?: string;
+  parent_id?: string | null;
   children?: Category[];
+  level?: 'category' | 'subcategory' | 'subsubcategory';
+  description?: string | null;
   created_at: Date | string;
   updated_at?: Date | string;
 }

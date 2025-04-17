@@ -24,6 +24,17 @@ interface Category {
   children?: Category[];
 }
 
+// Type for the raw database response
+interface CategoryFromDB {
+  id: string;
+  name: string;
+  description: string | null;
+  level: string;
+  parent_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export default function CategoriesList() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,10 +55,24 @@ export default function CategoriesList() {
 
       if (error) throw error;
 
+      // Map database response to Category type
+      const dbCategories = data as CategoryFromDB[];
+      
+      // Safely map level to our enum type
+      const typedCategories: Category[] = dbCategories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        description: cat.description,
+        // Cast level to our union type, defaulting to 'category' if invalid
+        level: isValidLevel(cat.level) ? cat.level as 'category' | 'subcategory' | 'subsubcategory' : 'category',
+        parent_id: cat.parent_id,
+        children: [],
+      }));
+
       // Organize categories into a hierarchy
-      const mainCategories = (data || []).filter(cat => cat.level === 'category');
-      const subcategories = (data || []).filter(cat => cat.level === 'subcategory');
-      const subsubcategories = (data || []).filter(cat => cat.level === 'subsubcategory');
+      const mainCategories = typedCategories.filter(cat => cat.level === 'category');
+      const subcategories = typedCategories.filter(cat => cat.level === 'subcategory');
+      const subsubcategories = typedCategories.filter(cat => cat.level === 'subsubcategory');
 
       // Add subcategories to their parent categories
       mainCategories.forEach(cat => {
@@ -64,6 +89,11 @@ export default function CategoriesList() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to validate level values
+  const isValidLevel = (level: string): boolean => {
+    return ['category', 'subcategory', 'subsubcategory'].includes(level);
   };
 
   const getLevelLabel = (level: Category['level']) => {
