@@ -350,7 +350,7 @@ export default function ProductManagement() {
   };
   return <MainLayout>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">إدارة المنتجات</h1>
+        <h1 className="text-xs text-justify font-thin py-0">إدارة المنتجات</h1>
         <Button onClick={() => navigate("/add-product")} disabled={loading}>
           <Plus className="ml-2 h-4 w-4" />
           إضافة منتج جديد
