@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +18,7 @@ import {
 } from "@/components/ui/card";
 import AddCategoryDialog from "./AddCategoryDialog";
 import CategoriesList from "./CategoriesList";
+import ProductsGrid from "./ProductsGrid"; // We'll create this component
 
 interface Category {
   id: string;
@@ -44,9 +44,18 @@ export default function CategoryDetail() {
   const [productCount, setProductCount] = useState(0);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+
   useEffect(() => {
     fetchCategory();
   }, [id]);
+
+  useEffect(() => {
+    if (category) {
+      fetchProducts();
+    }
+  }, [category]);
 
   const fetchCategory = async () => {
     if (!id) return;
@@ -97,6 +106,34 @@ export default function CategoryDetail() {
       navigate('/categories');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    if (!category) return;
+    
+    try {
+      setLoadingProducts(true);
+      let query = supabase.from('products').select('*');
+      
+      // Query based on category level
+      if (category.level === 'category') {
+        query = query.eq('category_id', id);
+      } else if (category.level === 'subcategory') {
+        query = query.eq('subcategory_id', id);
+      } else if (category.level === 'subsubcategory') {
+        query = query.eq('subsubcategory_id', id);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      toast.error("حدث خطأ أثناء تحميل المنتجات");
+    } finally {
+      setLoadingProducts(false);
     }
   };
 
@@ -170,6 +207,10 @@ export default function CategoryDetail() {
       subsubcategory: 'فئة'
     };
     return labels[level];
+  };
+
+  const handleAddProductClick = () => {
+    navigate(`/add-product?${category.level}_id=${id}`);
   };
 
   if (loading) {
@@ -306,6 +347,32 @@ export default function CategoryDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>المنتجات</CardTitle>
+              <CardDescription>
+                {`المنتجات في ${category?.name || ''}`}
+              </CardDescription>
+            </div>
+            <Button onClick={handleAddProductClick}>
+              <Package className="ml-2 h-4 w-4" />
+              إضافة منتج جديد
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingProducts ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <ProductsGrid products={products} onRefresh={fetchProducts} />
+          )}
+        </CardContent>
+      </Card>
 
       {category && category.level !== 'subsubcategory' && (
         <AddCategoryDialog
