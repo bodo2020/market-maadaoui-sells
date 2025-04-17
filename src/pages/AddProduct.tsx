@@ -35,6 +35,7 @@ const productFormSchema = z.object({
   quantity: z.coerce.number().nonnegative({
     message: "يجب أن تكون الكمية صفر أو أكثر."
   }),
+  notify_quantity: z.coerce.number().nonnegative().optional(),
   is_offer: z.boolean().default(false),
   offer_price: z.coerce.number().positive({
     message: "يجب أن يكون سعر العرض رقمًا موجبًا."
@@ -42,7 +43,6 @@ const productFormSchema = z.object({
   is_service: z.boolean().default(false),
   track_inventory: z.boolean().default(true),
   unit: z.string().default("قطعة"),
-  notify_quantity: z.coerce.number().nonnegative().optional()
 });
 
 const categories = [{
@@ -336,7 +336,8 @@ export default function AddProduct() {
       </MainLayout>;
   }
 
-  return <MainLayout>
+  return (
+    <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">
           {isEditing ? "تعديل المنتج" : "إضافة منتج جديد"}
@@ -345,7 +346,7 @@ export default function AddProduct() {
           العودة إلى المنتجات
         </Button>
       </div>
-
+      
       <Card>
         <CardHeader>
           <CardTitle>{isEditing ? "تعديل معلومات المنتج" : "معلومات المنتج"}</CardTitle>
@@ -354,81 +355,57 @@ export default function AddProduct() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField control={form.control} name="name" render={({
-                field
-              }) => <FormItem>
+                {/* Product Name and Image Section */}
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField control={form.control} name="name" render={({field}) => (
+                    <FormItem>
                       <FormLabel>اسم المنتج *</FormLabel>
                       <FormControl>
                         <Input placeholder="اسم المنتج" {...field} />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>} />
+                    </FormItem>
+                  )} />
 
-                <div className="space-y-4">
-                  <FormField control={form.control} name="barcode_type" render={({
-                  field
-                }) => <FormItem>
-                        <FormLabel>نوع الباركود</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="اختر نوع الباركود" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {barcodeTypes.map(type => <SelectItem key={type.id} value={type.id}>
-                                {type.name}
-                              </SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          {field.value === "scale" ? "منتجات الميزان تحتاج إلى رمز خاص (6 أرقام)" : "الباركود العادي للمنتجات"}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>} />
-
-                  <div className="flex items-center gap-2">
-                    <FormField control={form.control} name="barcode" render={({
-                    field
-                  }) => <FormItem className="flex-1">
-                          <FormLabel>
-                            {barcodeType === "scale" ? "رمز المنتج (6 أرقام)" : "الباركود"}
-                          </FormLabel>
-                          <div className="flex gap-2">
-                            <FormControl>
-                              <Input placeholder={barcodeType === "scale" ? "أدخل 1-6 أرقام" : "الباركود"} {...field} />
-                            </FormControl>
-                            <Button type="button" variant="outline" size="icon" onClick={handleBarcodeScanning} title="مسح الباركود باستخدام الكاميرا">
-                              <ScanLine className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          {barcodeType === "scale" && field.value && <FormDescription>
-                              رمز المنتج المخزن: {field.value.padStart(6, '0')}
-                            </FormDescription>}
-                          <FormMessage />
-                        </FormItem>} />
+                  <div className="space-y-2">
+                    <FormLabel>صورة المنتج</FormLabel>
+                    <div className={`h-32 w-full border rounded-md overflow-hidden flex items-center justify-center bg-gray-50 cursor-pointer ${!imagePreview ? 'border-dashed' : ''}`} onDragOver={handleDragOver} onDrop={handleDrop} onClick={openFileDialog}>
+                      {imagePreview ? (
+                        <img src={imagePreview} alt="Product preview" className="h-full w-full object-contain" />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-gray-400 p-2">
+                          <Image className="h-10 w-10 mb-1" />
+                          <span className="text-xs text-center">اسحب صورة هنا</span>
+                          <input id="product-image" type="file" accept="image/*" className="hidden" onChange={handleImageChange} ref={fileInputRef} />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <FormField control={form.control} name="category" render={({
-                field
-              }) => <FormItem>
-                      <FormLabel>تصنيف المنتج *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="اختر تصنيف" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {categories.map(category => <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>} />
+                {/* Basic Info Section */}
+                <FormField control={form.control} name="category" render={({field}) => (
+                  <FormItem>
+                    <FormLabel>تصنيف المنتج *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="اختر تصنيف" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map(category => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
+                {/* Company and Unit Section */}
                 <FormField control={form.control} name="company" render={({
                 field
               }) => <FormItem>
@@ -470,6 +447,7 @@ export default function AddProduct() {
                       <FormMessage />
                     </FormItem>} />
 
+                {/* Price Section */}
                 <FormField control={form.control} name="price" render={({
                 field
               }) => <FormItem>
@@ -490,59 +468,99 @@ export default function AddProduct() {
                       <FormMessage />
                     </FormItem>} />
 
-                <FormField control={form.control} name="quantity" render={({
-                field
-              }) => <FormItem>
+                {/* Quantity and Notification Section */}
+                <div className="space-y-4">
+                  <FormField control={form.control} name="quantity" render={({field}) => (
+                    <FormItem>
                       <FormLabel>الكمية *</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} disabled={form.watch("is_service")} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>} />
-
-                <div className="space-y-2">
-                  <FormLabel>تنبيهني عندما تنخفض الكمية</FormLabel>
-                  <div className="flex items-center gap-2">
-                    <Button type="button" variant={notifyEnabled ? "default" : "outline"} className="gap-2" onClick={() => setNotifyEnabled(!notifyEnabled)} disabled={isService}>
-                      <Bell className="h-4 w-4" />
-                      {notifyEnabled ? "تنبيه نشط" : "تفعيل التنبيهات"}
-                    </Button>
-                    
-                    {notifyEnabled && <Input type="number" value={notifyQuantity} onChange={e => setNotifyQuantity(parseInt(e.target.value))} className="w-24" min={1} disabled={isService} />}
-                  </div>
-                  {notifyEnabled && <FormDescription>
-                      سيتم تنبيهك عندما تقل الكمية عن {notifyQuantity} {form.watch("unit")}
-                    </FormDescription>}
+                      <div className="space-y-2">
+                        <FormControl>
+                          <Input type="number" {...field} disabled={form.watch("is_service")} />
+                        </FormControl>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            type="button" 
+                            variant={notifyEnabled ? "default" : "outline"} 
+                            className="gap-2" 
+                            onClick={() => setNotifyEnabled(!notifyEnabled)}
+                            disabled={isService}
+                          >
+                            <Bell className="h-4 w-4" />
+                            {notifyEnabled ? "تنبيه نشط" : "تفعيل التنبيهات"}
+                          </Button>
+                          {notifyEnabled && (
+                            <FormField control={form.control} name="notify_quantity" render={({field}) => (
+                              <FormItem className="flex-1">
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    placeholder="حد التنبيه"
+                                    className="w-24"
+                                    {...field}
+                                    onChange={(e) => {
+                                      const value = parseInt(e.target.value);
+                                      field.onChange(value);
+                                      setNotifyQuantity(value);
+                                    }}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )} />
+                          )}
+                        </div>
+                        {notifyEnabled && (
+                          <FormDescription>
+                            سيتم تنبيهك عندما تقل الكمية عن {notifyQuantity} {form.watch("unit")}
+                          </FormDescription>
+                        )}
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )} />
                 </div>
 
-                <FormField control={form.control} name="is_offer" render={({
-                field
-              }) => <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">سعر العرض</FormLabel>
-                        <FormDescription>
-                          تفعيل سعر العرض للمنتج
-                        </FormDescription>
+                {/* Offer Section */}
+                <FormField control={form.control} name="is_offer" render={({field}) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">سعر العرض</FormLabel>
+                      <FormDescription>تفعيل سعر العرض للمنتج</FormDescription>
+                    </div>
+                    <FormControl>
+                      <div className="relative">
+                        <CustomSwitch 
+                          checked={field.value} 
+                          onCheckedChange={field.onChange}
+                          className="!rtl:data-[state=checked]:translate-x-5 !rtl:data-[state=unchecked]:translate-x-0"
+                        />
                       </div>
-                      <FormControl>
-                        <CustomSwitch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                    </FormItem>} />
+                    </FormControl>
+                  </FormItem>
+                )} />
 
-                <FormField control={form.control} name="offer_price" render={({
-                field
-              }) => <FormItem>
+                {isOffer && (
+                  <FormField control={form.control} name="offer_price" render={({field}) => (
+                    <FormItem>
                       <FormLabel>سعر العرض</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} value={field.value || ""} onChange={e => {
-                    const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                    field.onChange(value);
-                  }} disabled={!isOffer} placeholder="0.00" />
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          {...field}
+                          value={field.value || ""}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                            field.onChange(value);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
-                    </FormItem>} />
+                    </FormItem>
+                  )} />
+                )}
               </div>
 
+              {/* Description Section */}
               <FormField control={form.control} name="description" render={({
               field
             }) => <FormItem>
@@ -553,31 +571,7 @@ export default function AddProduct() {
                     <FormMessage />
                   </FormItem>} />
 
-              <div className="border rounded-lg p-4">
-                <h3 className="font-medium mb-2">صورة المنتج</h3>
-                <div className="flex items-start gap-4">
-                  <div className={`h-32 w-32 border rounded-md overflow-hidden flex items-center justify-center bg-gray-50 cursor-pointer ${!imagePreview ? 'border-dashed' : ''}`} onDragOver={handleDragOver} onDrop={handleDrop} onClick={openFileDialog}>
-                    {imagePreview ? <img src={imagePreview} alt="Product preview" className="h-full w-full object-contain" /> : <div className="flex flex-col items-center justify-center text-gray-400 p-2">
-                        <Image className="h-10 w-10 mb-1" />
-                        <span className="text-xs text-center">اسحب صورة هنا</span>
-                      </div>}
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    <label htmlFor="product-image" className="flex items-center gap-2 border rounded-md p-2 cursor-pointer hover:bg-gray-50">
-                      <Upload className="h-4 w-4" />
-                      <span>اختر صورة</span>
-                      <input id="product-image" type="file" accept="image/*" className="hidden" onChange={handleImageChange} ref={fileInputRef} />
-                    </label>
-                    <p className="text-xs text-muted-foreground">
-                      يمكنك تحميل صورة بصيغة JPG، PNG. الحد الأقصى 5 ميجابايت.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      يمكنك أيضاً سحب وإفلات الصورة مباشرة في المربع.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
+              {/* Submit Buttons */}
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => navigate("/products")}>
                   إلغاء
@@ -594,6 +588,8 @@ export default function AddProduct() {
         </CardContent>
       </Card>
       
+      {/* Barcode Scanner Dialog */}
       <BarcodeScanner isOpen={showScanner} onClose={() => setShowScanner(false)} onScan={handleBarcodeResult} />
-    </MainLayout>;
+    </MainLayout>
+  );
 }
