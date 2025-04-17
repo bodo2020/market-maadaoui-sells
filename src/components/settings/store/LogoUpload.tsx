@@ -28,36 +28,33 @@ export default function LogoUpload({ logoUrl, onLogoChange }: LogoUploadProps) {
       const fileName = `logo_${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
       
+      console.log("Uploading logo:", { fileName, filePath });
+      
       // Check if bucket exists and create it if not
       const { data: buckets } = await supabase.storage.listBuckets();
+      console.log("Existing buckets:", buckets);
+      
       if (!buckets?.some(bucket => bucket.name === 'store')) {
         try {
+          console.log("Creating store bucket");
           const { error: bucketError } = await supabase.storage.createBucket('store', {
             public: true
           });
+          
           if (bucketError) {
             console.error("Error creating bucket:", bucketError);
             throw bucketError;
           }
           
-          // Set public access policy for the bucket
-          const { error: policyError } = await supabase.storage.from('store').createSignedUrl(
-            'dummy.txt', 
-            60
-          );
-          
-          if (policyError && policyError.message !== 'The resource was not found') {
-            console.error("Error setting up bucket policy:", policyError);
-          }
+          console.log("Store bucket created successfully");
         } catch (bucketCreationError) {
           console.error("Failed to create bucket:", bucketCreationError);
-          // If we couldn't create the bucket, we'll try to upload anyway
-          // as it might already exist with different permissions
         }
       }
       
       // Upload the file
-      const { error: uploadError } = await supabase.storage
+      console.log("Uploading file to store bucket");
+      const { error: uploadError, data: uploadData } = await supabase.storage
         .from('store')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -69,8 +66,12 @@ export default function LogoUpload({ logoUrl, onLogoChange }: LogoUploadProps) {
         throw uploadError;
       }
       
+      console.log("Upload successful:", uploadData);
+      
       // Get the public URL
       const { data } = supabase.storage.from('store').getPublicUrl(filePath);
+      
+      console.log("Generated public URL:", data);
       
       if (data) {
         onLogoChange(data.publicUrl);

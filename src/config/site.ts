@@ -64,6 +64,8 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
     ...newConfig 
   };
   
+  console.log("Updating site config:", siteConfig);
+  
   try {
     // Check if store_settings table has any records
     const { data: existingSettings, error: fetchError } = await supabase
@@ -76,11 +78,15 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
       throw fetchError;
     }
     
-    let updateOperation;
+    // Log the check result
+    console.log("Existing settings check:", existingSettings);
+    
+    let response;
     
     if (existingSettings && existingSettings.length > 0) {
       // Update existing record
-      updateOperation = supabase
+      console.log("Updating existing record:", existingSettings[0].id);
+      response = await supabase
         .from('store_settings')
         .update({
           name: siteConfig.name,
@@ -98,7 +104,8 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
         .eq('id', existingSettings[0].id);
     } else {
       // Insert new record if none exists
-      updateOperation = supabase
+      console.log("Inserting new record");
+      response = await supabase
         .from('store_settings')
         .insert({
           name: siteConfig.name,
@@ -114,11 +121,11 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
         });
     }
     
-    const { error } = await updateOperation;
+    console.log("Supabase response:", response);
     
-    if (error) {
-      console.error("Error saving to Supabase:", error);
-      throw error;
+    if (response.error) {
+      console.error("Error saving to Supabase:", response.error);
+      throw response.error;
     }
     
     // Save to localStorage as backup
@@ -143,6 +150,8 @@ export async function loadSiteConfig() {
       .from('store_settings')
       .select('*')
       .limit(1);
+
+    console.log("Supabase settings load:", { settings, error });
 
     if (error) {
       console.error("Error loading from Supabase:", error);

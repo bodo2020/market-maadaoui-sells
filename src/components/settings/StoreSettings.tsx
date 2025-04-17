@@ -29,7 +29,7 @@ export default function StoreSettings() {
     const fetchSettings = async () => {
       setLoading(true);
       try {
-        // Load site config from Supabase or localStorage
+        // Load site config from Supabase
         const config = await loadSiteConfig();
         
         setSettingsData({
@@ -80,6 +80,8 @@ export default function StoreSettings() {
   const handleSaveSettings = async () => {
     try {
       setSaving(true);
+      
+      console.log("Saving settings:", settingsData);
       
       const updatedConfig = {
         name: settingsData.storeName,
