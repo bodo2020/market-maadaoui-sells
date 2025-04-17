@@ -181,7 +181,8 @@ export async function updateProduct(id: string, product: Partial<Product>) {
     }
   }
 
-  const updateData: any = {};
+  // Use a type-safe approach to avoid recursive type issues
+  const updateData: Record<string, any> = {};
   
   // Only include fields that are present in the product object and exist in the database
   const validFields = [
@@ -193,17 +194,20 @@ export async function updateProduct(id: string, product: Partial<Product>) {
     'created_at', 'updated_at', 'is_bulk'
   ];
   
-  Object.keys(product).forEach(key => {
-    if (product[key as keyof Product] !== undefined && validFields.includes(key)) {
-      // Convert Date objects to ISO strings if needed
-      if (key === 'created_at' || key === 'updated_at') {
-        const value = product[key as keyof Product];
-        updateData[key] = value instanceof Date ? value.toISOString() : value;
-      } else {
-        updateData[key] = product[key as keyof Product];
+  // Safely copy properties without causing type recursion
+  for (const key of Object.keys(product)) {
+    if (validFields.includes(key)) {
+      const value = product[key as keyof typeof product];
+      if (value !== undefined) {
+        // Convert Date objects to ISO strings if needed
+        if (key === 'created_at' || key === 'updated_at') {
+          updateData[key] = value instanceof Date ? (value as Date).toISOString() : value;
+        } else {
+          updateData[key] = value;
+        }
       }
     }
-  });
+  }
 
   const { data, error } = await supabase
     .from("products")

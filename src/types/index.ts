@@ -33,6 +33,18 @@ export interface Category {
   updated_at?: Date | string;
 }
 
+export interface Company {
+  id: string;
+  name: string;
+  logo_url?: string | null;
+  description?: string | null;
+  address?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  created_at?: Date | string;
+  updated_at?: Date | string;
+}
+
 export interface Product {
   id: string;
   name: string;
