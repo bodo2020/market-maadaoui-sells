@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Save, ArrowLeft, FolderPlus, Trash, Edit, Package } from "lucide-react";
+import { Loader2, Save, ArrowLeft, FolderPlus, Trash, Edit, Package, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,8 @@ import {
 } from "@/components/ui/card";
 import AddCategoryDialog from "./AddCategoryDialog";
 import CategoriesList from "./CategoriesList";
-import ProductsGrid from "./ProductsGrid"; // We'll create this component
+import ProductsGrid from "./ProductsGrid";
+import AddProductsToSubcategoryDialog from "./AddProductsToSubcategoryDialog";
 
 interface Category {
   id: string;
@@ -43,6 +44,7 @@ export default function CategoryDetail() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [productCount, setProductCount] = useState(0);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showAddProductsDialog, setShowAddProductsDialog] = useState(false);
 
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -63,7 +65,6 @@ export default function CategoryDetail() {
     try {
       setLoading(true);
       
-      // Fetch the category
       const { data: categoryData, error: categoryError } = await supabase
         .from('categories')
         .select('*')
@@ -72,7 +73,6 @@ export default function CategoryDetail() {
 
       if (categoryError) throw categoryError;
       
-      // Set category data
       const categoryWithType = {
         ...categoryData,
         level: categoryData.level as 'category' | 'subcategory' | 'subsubcategory'
@@ -83,7 +83,6 @@ export default function CategoryDetail() {
       setDescription(categoryWithType.description || "");
       setImagePreview(categoryWithType.image_url || null);
       
-      // Get product count for this category
       const { count, error: countError } = await supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
@@ -116,7 +115,6 @@ export default function CategoryDetail() {
       setLoadingProducts(true);
       let query = supabase.from('products').select('*');
       
-      // Query based on category level
       if (category.level === 'category') {
         query = query.eq('category_id', id);
       } else if (category.level === 'subcategory') {
@@ -141,7 +139,6 @@ export default function CategoryDetail() {
     const file = e.target.files?.[0];
     if (file) {
       setImageFile(file);
-      // Create image preview
       const reader = new FileReader();
       reader.onload = () => {
         setImagePreview(reader.result as string);
@@ -191,7 +188,7 @@ export default function CategoryDetail() {
       if (error) throw error;
       
       toast.success("تم حفظ التغييرات بنجاح");
-      fetchCategory(); // Refresh data
+      fetchCategory();
     } catch (error) {
       console.error('Error updating category:', error);
       toast.error("حدث خطأ أثناء حفظ التغييرات");
@@ -211,6 +208,10 @@ export default function CategoryDetail() {
 
   const handleAddProductClick = () => {
     navigate(`/add-product?${category.level}_id=${id}`);
+  };
+
+  const handleAddProductsClick = () => {
+    setShowAddProductsDialog(true);
   };
 
   if (loading) {
@@ -357,10 +358,16 @@ export default function CategoryDetail() {
                 {`المنتجات في ${category?.name || ''}`}
               </CardDescription>
             </div>
-            <Button onClick={handleAddProductClick}>
-              <Package className="ml-2 h-4 w-4" />
-              إضافة منتج جديد
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleAddProductsClick}>
+                <Plus className="ml-2 h-4 w-4" />
+                إضافة منتجات
+              </Button>
+              <Button onClick={handleAddProductClick}>
+                <Package className="ml-2 h-4 w-4" />
+                إضافة منتج جديد
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -380,6 +387,16 @@ export default function CategoryDetail() {
           onOpenChange={setShowAddDialog}
           parentCategory={category}
           onSuccess={fetchCategory}
+        />
+      )}
+
+      {category && (
+        <AddProductsToSubcategoryDialog
+          open={showAddProductsDialog}
+          onOpenChange={setShowAddProductsDialog}
+          categoryId={category.id}
+          onSuccess={fetchProducts}
+          products={products}
         />
       )}
     </div>
