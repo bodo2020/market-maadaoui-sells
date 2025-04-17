@@ -26,17 +26,65 @@ export default function StoreSettings() {
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Load settings from siteConfig on mount
   useEffect(() => {
-    console.log("Loading store settings from siteConfig:", siteConfig);
-    setSettingsData({
-      storeName: siteConfig.name || "",
-      storeAddress: siteConfig.address || "",
-      storePhone: siteConfig.phone || "",
-      storeEmail: siteConfig.email || "",
-      logoUrl: siteConfig.logoUrl || null,
-    });
+    const loadSettings = async () => {
+      setLoading(true);
+      try {
+        // Force refresh from Supabase first
+        const { data: storeSettings, error } = await supabase
+          .from('store_settings')
+          .select('*')
+          .limit(1);
+          
+        if (error) throw error;
+        
+        // If we have settings from Supabase, use those
+        if (storeSettings && storeSettings.length > 0) {
+          const settings = storeSettings[0];
+          
+          setSettingsData({
+            storeName: settings.name || "",
+            storeAddress: settings.address || "",
+            storePhone: settings.phone || "",
+            storeEmail: settings.email || "",
+            logoUrl: settings.logo_url || null,
+          });
+          
+          console.log("Loaded store settings from Supabase:", settings);
+        } else {
+          // Otherwise fallback to current siteConfig
+          setSettingsData({
+            storeName: siteConfig.name || "",
+            storeAddress: siteConfig.address || "",
+            storePhone: siteConfig.phone || "",
+            storeEmail: siteConfig.email || "",
+            logoUrl: siteConfig.logoUrl || null,
+          });
+          
+          console.log("No settings found in Supabase, using siteConfig:", siteConfig);
+        }
+      } catch (error) {
+        console.error("Error loading store settings:", error);
+        
+        // Fallback to siteConfig
+        setSettingsData({
+          storeName: siteConfig.name || "",
+          storeAddress: siteConfig.address || "",
+          storePhone: siteConfig.phone || "",
+          storeEmail: siteConfig.email || "",
+          logoUrl: siteConfig.logoUrl || null,
+        });
+        
+        toast.error("حدث خطأ أثناء تحميل إعدادات المتجر");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSettings();
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,6 +104,18 @@ export default function StoreSettings() {
       const fileExt = file.name.split('.').pop();
       const fileName = `logo_${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
+      
+      // Create 'store' bucket if it doesn't exist
+      const { data: buckets } = await supabase.storage.listBuckets();
+      if (!buckets?.find(bucket => bucket.name === 'store')) {
+        const { error: bucketError } = await supabase.storage.createBucket('store', {
+          public: true
+        });
+        if (bucketError) {
+          console.error("Error creating bucket:", bucketError);
+          throw bucketError;
+        }
+      }
       
       // Upload the file
       const { error: uploadError } = await supabase.storage
@@ -109,6 +169,14 @@ export default function StoreSettings() {
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center p-12">
+        <div className="animate-pulse">جاري تحميل إعدادات المتجر...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

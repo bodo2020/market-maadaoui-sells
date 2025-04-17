@@ -65,30 +65,63 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
   };
   
   try {
-    // Update the store settings in Supabase
-    const { error } = await supabase
+    // Check if store_settings table has any records
+    const { data: existingSettings, error: fetchError } = await supabase
       .from('store_settings')
-      .update({
-        name: siteConfig.name,
-        address: siteConfig.address,
-        phone: siteConfig.phone,
-        email: siteConfig.email,
-        logo_url: siteConfig.logoUrl,
-        vat_number: siteConfig.vatNumber,
-        currency: siteConfig.currency,
-        description: siteConfig.description,
-        primary_color: siteConfig.primaryColor,
-        rtl: siteConfig.rtl,
-      })
-      .eq('id', (await supabase.from('store_settings').select('id').single()).data?.id);
-
+      .select('id')
+      .limit(1);
+      
+    if (fetchError) throw fetchError;
+    
+    let updateOperation;
+    
+    if (existingSettings && existingSettings.length > 0) {
+      // Update existing record
+      updateOperation = supabase
+        .from('store_settings')
+        .update({
+          name: siteConfig.name,
+          address: siteConfig.address,
+          phone: siteConfig.phone,
+          email: siteConfig.email,
+          logo_url: siteConfig.logoUrl,
+          vat_number: siteConfig.vatNumber,
+          currency: siteConfig.currency,
+          description: siteConfig.description,
+          primary_color: siteConfig.primaryColor,
+          rtl: siteConfig.rtl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingSettings[0].id);
+    } else {
+      // Insert new record if none exists
+      updateOperation = supabase
+        .from('store_settings')
+        .insert({
+          name: siteConfig.name,
+          address: siteConfig.address,
+          phone: siteConfig.phone,
+          email: siteConfig.email,
+          logo_url: siteConfig.logoUrl,
+          vat_number: siteConfig.vatNumber,
+          currency: siteConfig.currency,
+          description: siteConfig.description,
+          primary_color: siteConfig.primaryColor,
+          rtl: siteConfig.rtl
+        });
+    }
+    
+    const { error } = await updateOperation;
+    
     if (error) throw error;
     
     // Save to localStorage as backup
     localStorage.setItem('siteConfig', JSON.stringify(siteConfig));
-    console.log("Site config saved:", siteConfig);
+    console.log("Site config saved successfully:", siteConfig);
   } catch (error) {
-    console.error("Failed to save site config:", error);
+    console.error("Failed to save site config to Supabase:", error);
+    // Still save to localStorage even if Supabase fails
+    localStorage.setItem('siteConfig', JSON.stringify(siteConfig));
     throw error;
   }
   
@@ -102,29 +135,48 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
     const { data: settings, error } = await supabase
       .from('store_settings')
       .select('*')
-      .single();
+      .limit(1);
 
     if (error) throw error;
 
-    if (settings) {
+    if (settings && settings.length > 0) {
+      const storeSettings = settings[0];
+      
       siteConfig = {
         ...defaultSiteConfig,
-        name: settings.name,
-        address: settings.address || '',
-        phone: settings.phone || '',
-        email: settings.email || '',
-        logoUrl: settings.logo_url,
-        vatNumber: settings.vat_number || '',
-        currency: settings.currency,
-        description: settings.description || '',
-        primaryColor: settings.primary_color,
-        rtl: settings.rtl,
-        logo: settings.logo_url, // Set logo to match logoUrl for invoice compatibility
+        name: storeSettings.name,
+        address: storeSettings.address || '',
+        phone: storeSettings.phone || '',
+        email: storeSettings.email || '',
+        logoUrl: storeSettings.logo_url,
+        vatNumber: storeSettings.vat_number || '',
+        currency: storeSettings.currency,
+        description: storeSettings.description || '',
+        primaryColor: storeSettings.primary_color,
+        rtl: storeSettings.rtl,
+        logo: storeSettings.logo_url, // Set logo to match logoUrl for invoice compatibility
       };
       console.log("Loaded site config from Supabase:", siteConfig);
+    } else {
+      console.log("No settings found in Supabase, using defaults or localStorage");
+      // Fall back to localStorage if no Supabase settings found
+      try {
+        const savedConfig = localStorage.getItem('siteConfig');
+        if (savedConfig) {
+          const parsedConfig = JSON.parse(savedConfig);
+          siteConfig = { ...defaultSiteConfig, ...parsedConfig };
+          console.log("Loaded site config from localStorage:", siteConfig);
+          
+          // Since we found settings in localStorage but not in Supabase,
+          // let's save them to Supabase for future use
+          await updateSiteConfig(siteConfig);
+        }
+      } catch (localError) {
+        console.error("Failed to load saved site config from localStorage:", localError);
+      }
     }
-  } catch (error) {
-    console.error("Failed to load from Supabase, falling back to localStorage:", error);
+  } catch (supabaseError) {
+    console.error("Failed to load from Supabase, falling back to localStorage:", supabaseError);
     
     // Fall back to localStorage if Supabase fails
     try {
@@ -134,8 +186,8 @@ export async function updateSiteConfig(newConfig: Partial<SiteConfig>) {
         siteConfig = { ...defaultSiteConfig, ...parsedConfig };
         console.log("Loaded site config from localStorage:", siteConfig);
       }
-    } catch (error) {
-      console.error("Failed to load saved site config:", error);
+    } catch (localError) {
+      console.error("Failed to load saved site config from localStorage:", localError);
     }
   }
 })();
