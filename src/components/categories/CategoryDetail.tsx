@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Save, ArrowLeft, FolderPlus, Trash, Edit, Package, Plus } from "lucide-react";
+import { Loader2, Save, ArrowLeft, FolderPlus, Package, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -242,7 +243,7 @@ export default function CategoryDetail() {
   }
 
   return (
-    <div>
+    <div className="max-w-[1400px] mx-auto">
       <div className="flex items-center mb-6">
         <Button 
           variant="ghost" 
@@ -356,11 +357,16 @@ export default function CategoryDetail() {
               <div className="text-center p-8 bg-gray-50 rounded-lg border">
                 <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                 <h3 className="text-lg font-medium">
-                  {productCount > 0 ? `يوجد ${productCount} منتج في هذه الفئة` : 'لا تو��د منتجات في هذه الفئة'}
+                  {productCount > 0 ? `يوجد ${productCount} منتج في هذه الفئة` : 'لا توجد منتجات في هذه الفئة'}
                 </h3>
-                <p className="text-gray-500 mb-4">يمكنك إضافة منتجات جديدة من صفحة المنتجات</p>
-                <Button onClick={() => navigate('/products')}>
-                  الذهاب إلى صفحة المنتجات
+                <p className="text-gray-500 mb-4">يمكنك إضافة منتجات من خلال زر إضافة منتجات</p>
+                <Button 
+                  onClick={handleAddProductsClick}
+                  variant="outline"
+                  className="hover:bg-primary hover:text-primary-foreground"
+                >
+                  <Plus className="ml-2 h-4 w-4" />
+                  إضافة منتجات
                 </Button>
               </div>
             )}
@@ -377,16 +383,15 @@ export default function CategoryDetail() {
                 {`المنتجات في ${category?.name || ''}`}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={handleAddProductsClick}>
+            {category?.level === 'subsubcategory' && (
+              <Button 
+                onClick={handleAddProductsClick}
+                className="hover:bg-primary hover:text-primary-foreground"
+              >
                 <Plus className="ml-2 h-4 w-4" />
                 إضافة منتجات
               </Button>
-              <Button onClick={handleAddProductClick}>
-                <Package className="ml-2 h-4 w-4" />
-                إضافة منتج جديد
-              </Button>
-            </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
