@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -121,9 +122,14 @@ export default function AddProduct() {
         values.offer_price = undefined;
       }
       
-      // Modified: Removed both id and created_at properties as they should be handled by the service
+      // Add all required properties for the Product type
       await createProduct({
         ...values,
+        image_urls: [], // Add empty array for image_urls
+        bulk_enabled: false, // Set default value for bulk_enabled
+        is_bulk: false, // Set default value for is_bulk
+        category_id: values.category, // Map category to category_id expected by the Product type
+        unit_of_measure: values.unit, // Map unit to unit_of_measure
       });
       
       toast.success("تم إضافة المنتج بنجاح");
