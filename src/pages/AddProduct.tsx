@@ -117,14 +117,16 @@ export default function AddProduct() {
   const [subsubcategories, setSubsubcategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [barcode, setBarcode] = useState<string>('');
+  const [barcodeType, setBarcodeType] = useState<'normal' | 'scale'>('normal');
 
   const form = useForm<z.infer<typeof productFormSchema>>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
       name: "",
       description: "",
-      barcode: "",
-      barcode_type: "normal",
+      barcode: '',
+      barcode_type: 'normal',
       category_id: undefined,
       subcategory_id: undefined,
       subsubcategory_id: undefined,
@@ -701,6 +703,58 @@ export default function AddProduct() {
                     </FormItem>
                   )} />
                 )}
+              </div>
+
+              {/* Add these fields before the submit buttons section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="barcode_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>نوع الباركود</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر نوع الباركود" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="normal">عادي</SelectItem>
+                          <SelectItem value="scale">ميزان</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="barcode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>الباركود (اختياري)</FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="أدخل الباركود"
+                          />
+                        </FormControl>
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          onClick={handleBarcodeScanning}
+                        >
+                          <ScanLine className="h-4 w-4 ml-2" />
+                          مسح
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               {/* Description Section */}
