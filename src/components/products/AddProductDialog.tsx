@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -218,15 +219,6 @@ export function AddProductDialog({
           </div>
 
           <div>
-            <Label>صور المنتج</Label>
-            <ImageUpload
-              value={images}
-              onChange={setImages}
-              onRemove={(url) => setImages(images.filter((image) => image !== url))}
-            />
-          </div>
-
-          <div>
             <Label htmlFor="barcodeType">نوع الباركود</Label>
             <select
               id="barcodeType"
@@ -246,6 +238,15 @@ export function AddProductDialog({
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
               placeholder="أدخل الباركود"
+            />
+          </div>
+
+          <div>
+            <Label>صور المنتج</Label>
+            <ImageUpload
+              value={images}
+              onChange={setImages}
+              onRemove={(url) => setImages(images.filter((image) => image !== url))}
             />
           </div>
 
