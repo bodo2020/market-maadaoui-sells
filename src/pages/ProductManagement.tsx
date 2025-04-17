@@ -60,6 +60,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { Dialog as ShadcnDialog } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
+import ProductAssignmentDialog from "@/components/products/ProductAssignmentDialog";
 
 export default function ProductManagement() {
   const navigate = useNavigate();
@@ -83,6 +84,8 @@ export default function ProductManagement() {
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false);
   const [productToAddOffer, setProductToAddOffer] = useState<Product | null>(null);
+  const [isAssignCategoryOpen, setIsAssignCategoryOpen] = useState(false);
+  const [isAssignCompanyOpen, setIsAssignCompanyOpen] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -571,6 +574,22 @@ export default function ProductManagement() {
                                   إضافة عرض
                                 </DropdownMenuItem>
                               )}
+                              
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => {
+                                setProductToEdit(product);
+                                setIsAssignCategoryOpen(true);
+                              }}>
+                                <FolderOpen className="ml-2 h-4 w-4" />
+                                تغيير القسم
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                setProductToEdit(product);
+                                setIsAssignCompanyOpen(true);
+                              }}>
+                                <Building2 className="ml-2 h-4 w-4" />
+                                تغيير الشركة
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -739,6 +758,22 @@ export default function ProductManagement() {
           </DialogFooter>
         </DialogContent>
       </ShadcnDialog>
+      
+      <ProductAssignmentDialog
+        open={isAssignCategoryOpen}
+        onOpenChange={setIsAssignCategoryOpen}
+        product={productToEdit}
+        onSaved={loadProducts}
+        type="category"
+      />
+      
+      <ProductAssignmentDialog
+        open={isAssignCompanyOpen}
+        onOpenChange={setIsAssignCompanyOpen}
+        product={productToEdit}
+        onSaved={loadProducts}
+        type="company"
+      />
     </MainLayout>
   );
 }

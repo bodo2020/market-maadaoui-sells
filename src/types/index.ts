@@ -47,6 +47,7 @@ export interface Product {
   category_id?: string;
   subcategory_id?: string;
   subsubcategory_id?: string;
+  company_id?: string; // Add company_id field
   barcode_type?: string;
   bulk_enabled: boolean;
   bulk_quantity?: number;

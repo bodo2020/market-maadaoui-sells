@@ -15,8 +15,8 @@ import { CustomSwitch } from "@/components/ui/custom-switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Image, ScanLine, Upload, Bell, Loader2 } from "lucide-react";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
+import { fetchCompanies } from "@/services/supabase/companyService";
 
-// Form validation schema
 const productFormSchema = z.object({
   name: z.string().min(2, {
     message: "يجب أن يحتوي اسم المنتج على حرفين على الأقل."
@@ -25,6 +25,7 @@ const productFormSchema = z.object({
   barcode: z.string().optional(),
   barcode_type: z.string().default("normal"),
   category: z.string(),
+  company: z.string(),
   price: z.coerce.number().positive({
     message: "يجب أن يكون السعر رقمًا موجبًا."
   }),
@@ -44,7 +45,6 @@ const productFormSchema = z.object({
   notify_quantity: z.coerce.number().nonnegative().optional()
 });
 
-// Product categories
 const categories = [{
   id: "electronics",
   name: "إلكترونيات"
@@ -74,7 +74,6 @@ const categories = [{
   name: "أخرى"
 }];
 
-// Product units
 const units = [{
   id: "piece",
   name: "قطعة"
@@ -107,7 +106,6 @@ const units = [{
   name: "عبوة"
 }];
 
-// Barcode types
 const barcodeTypes = [{
   id: "normal",
   name: "عادي"
@@ -115,6 +113,7 @@ const barcodeTypes = [{
   id: "scale",
   name: "ميزان"
 }];
+
 export default function AddProduct() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -128,8 +127,9 @@ export default function AddProduct() {
   const [isEditing, setIsEditing] = useState(false);
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [notifyQuantity, setNotifyQuantity] = useState<number>(5);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
 
-  // Initialize form with default values
   const form = useForm<z.infer<typeof productFormSchema>>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
@@ -138,6 +138,7 @@ export default function AddProduct() {
       barcode: "",
       barcode_type: "normal",
       category: "others",
+      company: "",
       price: 0,
       purchase_price: 0,
       quantity: 0,
@@ -150,31 +151,49 @@ export default function AddProduct() {
     }
   });
 
-  // Fetch product data if we're editing
+  useEffect(() => {
+    const loadCompanies = async () => {
+      try {
+        setLoadingCompanies(true);
+        const companiesData = await fetchCompanies();
+        setCompanies(companiesData.map(company => ({
+          id: company.id,
+          name: company.name
+        })));
+      } catch (error) {
+        console.error("Error loading companies:", error);
+        toast.error("حدث خطأ أثناء تحميل بيانات الشركات");
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+
+    loadCompanies();
+  }, []);
+
   useEffect(() => {
     if (productId) {
       setIsLoading(true);
       setIsEditing(true);
       fetchProductById(productId).then(product => {
-        // Populate the form with product data
         form.reset({
           name: product.name,
           description: product.description || "",
           barcode: product.barcode || "",
           barcode_type: product.barcode_type || "normal",
           category: product.category_id || "others",
+          company: product.company_id || "",
           price: product.price,
           purchase_price: product.purchase_price,
           quantity: product.quantity || 0,
           is_offer: product.is_offer || false,
           offer_price: product.offer_price,
           is_service: product.quantity === -1,
-          // If quantity is -1, it's a service
           track_inventory: product.quantity !== -1,
-          unit: product.unit_of_measure || "قطعة"
+          unit: product.unit_of_measure || "قطعة",
+          notify_quantity: 5
         });
 
-        // Set image preview if product has an image
         if (product.image_urls && product.image_urls.length > 0 && product.image_urls[0] !== "/placeholder.svg") {
           setImagePreview(product.image_urls[0]);
         }
@@ -188,13 +207,11 @@ export default function AddProduct() {
     }
   }, [productId, form, navigate]);
 
-  // Handle image selection
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setProductImage(file);
 
-      // Create a preview URL
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -203,18 +220,15 @@ export default function AddProduct() {
     }
   }, []);
 
-  // Handle barcode scanning
   const handleBarcodeScanning = useCallback(() => {
     setShowScanner(true);
   }, []);
 
-  // Handle barcode result
   const handleBarcodeResult = useCallback((barcode: string) => {
     form.setValue("barcode", barcode);
     toast.success(`تم مسح الباركود: ${barcode}`);
   }, [form]);
 
-  // Handle drag and drop for image upload
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -225,7 +239,6 @@ export default function AddProduct() {
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
 
-      // Check if the file is an image
       if (file.type.startsWith('image/')) {
         setProductImage(file);
         const reader = new FileReader();
@@ -239,59 +252,47 @@ export default function AddProduct() {
     }
   }, []);
 
-  // Open file dialog when clicking on the dropzone
   const openFileDialog = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-  // Watch values for conditional rendering
   const isService = form.watch("is_service");
   const barcodeType = form.watch("barcode_type");
   const isOffer = form.watch("is_offer");
 
-  // Handle form submission
   const onSubmit = async (values: z.infer<typeof productFormSchema>) => {
     try {
       setIsSubmitting(true);
 
-      // If product is a service, set quantity to -1 and disable inventory tracking
       if (values.is_service) {
         values.quantity = -1;
       }
 
-      // If offer is not enabled, remove offer price
       if (!values.is_offer) {
         values.offer_price = undefined;
       }
 
-      // Format barcode for scale products if needed
       let formattedBarcode = values.barcode;
       if (values.barcode_type === "scale" && values.barcode) {
-        // If user entered more than 6 digits, extract just the product code part
         if (values.barcode.length > 6) {
           formattedBarcode = values.barcode.substring(0, 6);
         }
-
-        // Ensure it's exactly 6 digits by padding with zeros if needed
         while (formattedBarcode && formattedBarcode.length < 6) {
           formattedBarcode = '0' + formattedBarcode;
         }
       }
 
-      // Create image URLs array - will be a placeholder if no image was uploaded
       const imageUrls = imagePreview ? [imagePreview] : ["/placeholder.svg"];
 
-      // Remove track_inventory and notify_quantity from the data we send to the database
-      // since they're not supported in the schema yet
       const {
         track_inventory,
         notify_quantity,
+        company,
         ...productData
       } = values;
 
-      // Add all required properties for the Product type
       const productToSave = {
         name: productData.name,
         price: productData.price,
@@ -306,14 +307,14 @@ export default function AddProduct() {
         bulk_enabled: false,
         is_bulk: false,
         category_id: productData.category,
+        company_id: company || null,
         unit_of_measure: productData.unit
       };
+
       if (isEditing && productId) {
-        // Update existing product
         await updateProduct(productId, productToSave);
         toast.success("تم تحديث المنتج بنجاح");
       } else {
-        // Create new product
         await createProduct(productToSave);
         toast.success("تم إضافة المنتج بنجاح");
       }
@@ -325,6 +326,7 @@ export default function AddProduct() {
       setIsSubmitting(false);
     }
   };
+
   if (isLoading) {
     return <MainLayout>
         <div className="flex justify-center items-center h-[60vh]">
@@ -333,6 +335,7 @@ export default function AddProduct() {
         </div>
       </MainLayout>;
   }
+
   return <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">
@@ -407,7 +410,6 @@ export default function AddProduct() {
                   </div>
                 </div>
 
-                {/* Category and units fields */}
                 <FormField control={form.control} name="category" render={({
                 field
               }) => <FormItem>
@@ -422,6 +424,28 @@ export default function AddProduct() {
                           {categories.map(category => <SelectItem key={category.id} value={category.id}>
                               {category.name}
                             </SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>} />
+
+                <FormField control={form.control} name="company" render={({
+                field
+              }) => <FormItem>
+                      <FormLabel>الشركة المصنعة</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر الشركة المصنعة" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">بدون شركة</SelectItem>
+                          {companies.map(company => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -446,7 +470,6 @@ export default function AddProduct() {
                       <FormMessage />
                     </FormItem>} />
 
-                {/* Price fields */}
                 <FormField control={form.control} name="price" render={({
                 field
               }) => <FormItem>
@@ -467,7 +490,6 @@ export default function AddProduct() {
                       <FormMessage />
                     </FormItem>} />
 
-                {/* Quantity and stock notification fields */}
                 <FormField control={form.control} name="quantity" render={({
                 field
               }) => <FormItem>
@@ -493,10 +515,6 @@ export default function AddProduct() {
                     </FormDescription>}
                 </div>
 
-                {/* Service toggle and inventory tracking options */}
-                
-
-                {/* Offer price fields */}
                 <FormField control={form.control} name="is_offer" render={({
                 field
               }) => <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">

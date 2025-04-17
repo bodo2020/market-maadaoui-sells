@@ -143,6 +143,7 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
     category_id: productData.category_id,
     subcategory_id: productData.subcategory_id,
     subsubcategory_id: productData.subsubcategory_id,
+    company_id: productData.company_id, // Add company_id field
     barcode_type: productData.barcode_type,
     bulk_enabled: productData.bulk_enabled,
     bulk_quantity: productData.bulk_quantity,
@@ -186,7 +187,7 @@ export async function updateProduct(id: string, product: Partial<Product>) {
   const validFields = [
     'name', 'barcode', 'description', 'image_urls', 'quantity', 
     'price', 'purchase_price', 'offer_price', 'is_offer',
-    'category_id', 'subcategory_id', 'subsubcategory_id',
+    'category_id', 'subcategory_id', 'subsubcategory_id', 'company_id',
     'barcode_type', 'bulk_enabled', 'bulk_quantity', 'bulk_price', 
     'bulk_barcode', 'manufacturer_name', 'unit_of_measure',
     'created_at', 'updated_at', 'is_bulk'
@@ -230,4 +231,32 @@ export async function deleteProduct(id: string) {
   }
 
   return true;
+}
+
+export async function fetchProductsByCategory(categoryId: string) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("category_id", categoryId);
+
+  if (error) {
+    console.error("Error fetching products by category:", error);
+    throw error;
+  }
+
+  return data as Product[];
+}
+
+export async function fetchProductsByCompany(companyId: string) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("company_id", companyId);
+
+  if (error) {
+    console.error("Error fetching products by company:", error);
+    throw error;
+  }
+
+  return data as Product[];
 }
