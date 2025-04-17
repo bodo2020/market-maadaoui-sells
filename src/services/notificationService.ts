@@ -12,6 +12,9 @@ export interface StockNotification {
   displayed: boolean; // Track if notification has been displayed
 }
 
+// Default threshold for low stock, can be configurable in the future
+const LOW_STOCK_THRESHOLD = 10;
+
 // Store notifications in local storage to persist between sessions
 const NOTIFICATIONS_STORAGE_KEY = 'stock-notifications';
 
@@ -109,14 +112,7 @@ export const removeNotification = (notificationId: string): void => {
 export const checkLowStockProducts = async (): Promise<StockNotification[]> => {
   try {
     const products = await fetchProducts();
-    const lowStockProducts = products.filter(product => {
-      // Check if product has a custom notify_quantity threshold
-      const threshold = product.notify_quantity !== undefined && product.notify_quantity !== null
-        ? product.notify_quantity
-        : 10; // Default threshold
-      
-      return (product.quantity || 0) < threshold;
-    });
+    const lowStockProducts = products.filter(product => (product.quantity || 0) < LOW_STOCK_THRESHOLD);
     
     const notifications: StockNotification[] = [];
     
@@ -155,10 +151,9 @@ export const showLowStockToasts = (): void => {
   // Show toast for each new notification
   newNotifications.forEach(notification => {
     const { product } = notification;
-    const threshold = product.notify_quantity || 10;
     
     toast("تنبيه المخزون المنخفض", {
-      description: `المنتج "${product.name}" منخفض المخزون (${product.quantity} وحدة متبقية من أصل ${threshold})`,
+      description: `المنتج "${product.name}" منخفض المخزون (${product.quantity} وحدة متبقية)`,
       duration: 5000
     });
     

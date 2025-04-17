@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -151,8 +150,7 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
     bulk_barcode: productData.bulk_barcode,
     manufacturer_name: productData.manufacturer_name,
     unit_of_measure: productData.unit_of_measure,
-    is_bulk: productData.is_bulk || false,
-    notify_quantity: productData.notify_quantity
+    is_bulk: productData.is_bulk || false
   };
 
   const { data, error } = await supabase
@@ -190,7 +188,6 @@ export async function updateProduct(id: string, product: {
   manufacturer_name?: string | null;
   unit_of_measure?: string | null;
   is_bulk?: boolean;
-  notify_quantity?: number | null;
 }) {
   const { data, error } = await supabase
     .from("products")
