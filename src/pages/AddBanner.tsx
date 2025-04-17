@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -63,13 +64,18 @@ export default function AddBanner() {
       
       if (data) {
         setFormData({
-          ...data,
+          title: data.title,
+          image_url: data.image_url,
           link: data.link || "",
-          products: data.products || []
+          active: data.active !== null ? data.active : true,
+          position: data.position !== null ? data.position : 0,
+          products: Array.isArray(data.products) ? data.products : [],
+          category_id: data.category_id || null,
+          company_id: data.company_id || null
         });
         setPreviewUrl(data.image_url);
         
-        if (data.products && data.products.length > 0) {
+        if (data.products && Array.isArray(data.products) && data.products.length > 0) {
           fetchSelectedProducts(data.products);
         }
       }
@@ -136,6 +142,23 @@ export default function AddBanner() {
       console.error("Error fetching companies:", error);
     }
   };
+  
+  // Filter products based on search term
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      // Don't include products that are already selected
+      if (selectedProducts.some(p => p.id === product.id)) {
+        return false;
+      }
+      
+      // Filter by search term
+      if (searchTerm) {
+        return product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+               (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
+      }
+      return true;
+    });
+  }, [products, selectedProducts, searchTerm]);
 
   const handleSave = async () => {
     if (!formData.title) {
@@ -281,7 +304,6 @@ export default function AddBanner() {
                   id="active"
                   checked={formData.active}
                   onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
-                  dir="ltr"
                 />
               </div>
               
@@ -357,7 +379,7 @@ export default function AddBanner() {
                 <div className="space-y-2">
                   <Label>اختر القسم</Label>
                   <Select 
-                    value={formData.category_id || ""} 
+                    value={formData.category_id || ""}
                     onValueChange={(value) => setFormData({ ...formData, category_id: value })}
                   >
                     <SelectTrigger>
@@ -378,7 +400,7 @@ export default function AddBanner() {
                 <div className="space-y-2">
                   <Label>اختر الشركة</Label>
                   <Select 
-                    value={formData.company_id || ""} 
+                    value={formData.company_id || ""}
                     onValueChange={(value) => setFormData({ ...formData, company_id: value })}
                   >
                     <SelectTrigger>
