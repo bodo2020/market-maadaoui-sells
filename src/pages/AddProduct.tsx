@@ -11,11 +11,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import { createProduct, updateProduct, fetchProductById } from "@/services/supabase/productService";
-import { CustomSwitch } from "@/components/ui/custom-switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Image, ScanLine, Upload, Bell, Loader2 } from "lucide-react";
-import BarcodeScanner from "@/components/POS/BarcodeScanner";
+import { Image, Loader2, ScanLine, Upload, Bell } from "lucide-react";
+import { CustomSwitch } from "@/components/ui/custom-switch";
 import { fetchCompanies } from "@/services/supabase/companyService";
+import { supabase } from "@/integrations/supabase/client";
+import BarcodeScanner from "@/components/POS/BarcodeScanner";
+
+interface Category {
+  id: string;
+  name: string;
+  level: 'category' | 'subcategory' | 'subsubcategory';
+  parent_id: string | null;
+}
 
 const productFormSchema = z.object({
   name: z.string().min(2, {
@@ -24,7 +32,9 @@ const productFormSchema = z.object({
   description: z.string().optional(),
   barcode: z.string().optional(),
   barcode_type: z.string().default("normal"),
-  category: z.string(),
+  category_id: z.string().optional(),
+  subcategory_id: z.string().optional(),
+  subsubcategory_id: z.string().optional(),
   company: z.string(),
   price: z.coerce.number().positive({
     message: "يجب أن يكون السعر رقمًا موجبًا."
@@ -44,35 +54,6 @@ const productFormSchema = z.object({
   track_inventory: z.boolean().default(true),
   unit: z.string().default("قطعة"),
 });
-
-const categories = [{
-  id: "electronics",
-  name: "إلكترونيات"
-}, {
-  id: "clothing",
-  name: "ملابس"
-}, {
-  id: "food",
-  name: "مواد غذائية"
-}, {
-  id: "home",
-  name: "منزل"
-}, {
-  id: "beauty",
-  name: "العناية الشخصية"
-}, {
-  id: "toys",
-  name: "ألعاب"
-}, {
-  id: "sports",
-  name: "رياضة"
-}, {
-  id: "books",
-  name: "كتب"
-}, {
-  id: "others",
-  name: "أخرى"
-}];
 
 const units = [{
   id: "piece",
@@ -129,6 +110,13 @@ export default function AddProduct() {
   const [notifyQuantity, setNotifyQuantity] = useState<number>(5);
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
+  
+  // Categories state
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Category[]>([]);
+  const [subsubcategories, setSubsubcategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof productFormSchema>>({
     resolver: zodResolver(productFormSchema),
@@ -137,7 +125,9 @@ export default function AddProduct() {
       description: "",
       barcode: "",
       barcode_type: "normal",
-      category: "others",
+      category_id: undefined,
+      subcategory_id: undefined,
+      subsubcategory_id: undefined,
       company: "null",
       price: 0,
       purchase_price: 0,
@@ -150,6 +140,71 @@ export default function AddProduct() {
       notify_quantity: 5
     }
   });
+
+  // Fetch main categories on component mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .is('parent_id', null)
+        .eq('level', 'category');
+      
+      if (!error && data) {
+        setCategories(data as Category[]);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
+
+  // Fetch subcategories when a category is selected
+  useEffect(() => {
+    const fetchSubcategories = async () => {
+      if (selectedCategory) {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*')
+          .eq('parent_id', selectedCategory)
+          .eq('level', 'subcategory');
+        
+        if (!error && data) {
+          setSubcategories(data as Category[]);
+          setSubsubcategories([]); // Reset sub-subcategories
+          setSelectedSubcategory(null);
+          form.setValue('subcategory_id', undefined);
+          form.setValue('subsubcategory_id', undefined);
+        }
+      } else {
+        setSubcategories([]);
+        setSubsubcategories([]);
+      }
+    };
+    
+    fetchSubcategories();
+  }, [selectedCategory, form]);
+
+  // Fetch sub-subcategories when a subcategory is selected
+  useEffect(() => {
+    const fetchSubsubcategories = async () => {
+      if (selectedSubcategory) {
+        const { data, error } = await supabase
+          .from('categories')
+          .select('*')
+          .eq('parent_id', selectedSubcategory)
+          .eq('level', 'subsubcategory');
+        
+        if (!error && data) {
+          setSubsubcategories(data as Category[]);
+          form.setValue('subsubcategory_id', undefined);
+        }
+      } else {
+        setSubsubcategories([]);
+      }
+    };
+    
+    fetchSubsubcategories();
+  }, [selectedSubcategory, form]);
 
   useEffect(() => {
     const loadCompanies = async () => {
@@ -181,7 +236,9 @@ export default function AddProduct() {
           description: product.description || "",
           barcode: product.barcode || "",
           barcode_type: product.barcode_type || "normal",
-          category: product.category_id || "others",
+          category_id: product.category_id || undefined,
+          subcategory_id: product.subcategory_id || undefined,
+          subsubcategory_id: product.subsubcategory_id || undefined,
           company: product.company_id || "null",
           price: product.price,
           purchase_price: product.purchase_price,
@@ -306,7 +363,9 @@ export default function AddProduct() {
         image_urls: imageUrls,
         bulk_enabled: false,
         is_bulk: false,
-        category_id: productData.category,
+        category_id: values.category_id,
+        subcategory_id: values.subcategory_id,
+        subsubcategory_id: values.subsubcategory_id,
         company_id: company === "null" ? null : company,
         unit_of_measure: productData.unit
       };
@@ -369,7 +428,12 @@ export default function AddProduct() {
 
                   <div className="space-y-2">
                     <FormLabel>صورة المنتج</FormLabel>
-                    <div className={`h-32 w-full border rounded-md overflow-hidden flex items-center justify-center bg-gray-50 cursor-pointer ${!imagePreview ? 'border-dashed' : ''}`} onDragOver={handleDragOver} onDrop={handleDrop} onClick={openFileDialog}>
+                    <div 
+                      className={`h-32 w-full border rounded-md overflow-hidden flex items-center justify-center bg-gray-50 cursor-pointer ${!imagePreview ? 'border-dashed' : ''}`} 
+                      onDragOver={handleDragOver} 
+                      onDrop={handleDrop} 
+                      onClick={openFileDialog}
+                    >
                       {imagePreview ? (
                         <img src={imagePreview} alt="Product preview" className="h-full w-full object-contain" />
                       ) : (
@@ -383,29 +447,101 @@ export default function AddProduct() {
                   </div>
                 </div>
 
-                {/* Basic Info Section */}
-                <FormField control={form.control} name="category" render={({field}) => (
-                  <FormItem>
-                    <FormLabel>تصنيف المنتج *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="اختر تصنيف" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map(category => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                {/* Categories Section */}
+                <FormField
+                  control={form.control}
+                  name="category_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>القسم الرئيسي *</FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          setSelectedCategory(value);
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر القسم الرئيسي" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                {/* Company and Unit Section */}
+                {selectedCategory && (
+                  <FormField
+                    control={form.control}
+                    name="subcategory_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>القسم الفرعي</FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            setSelectedSubcategory(value);
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="اختر القسم الفرعي" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {subcategories.map((subcategory) => (
+                              <SelectItem key={subcategory.id} value={subcategory.id}>
+                                {subcategory.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {selectedSubcategory && (
+                  <FormField
+                    control={form.control}
+                    name="subsubcategory_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>الفئة</FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="اختر الفئة" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {subsubcategories.map((subsubcategory) => (
+                              <SelectItem key={subsubcategory.id} value={subsubcategory.id}>
+                                {subsubcategory.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
                 <FormField control={form.control} name="company" render={({
                 field
               }) => <FormItem>
