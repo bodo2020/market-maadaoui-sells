@@ -47,20 +47,20 @@ export default function Finance() {
   
   // Fetch financial summary data
   const { data: summaryData, isLoading: isLoadingSummary } = useQuery({
-    queryKey: ['financialSummary'],
-    queryFn: fetchFinancialSummary
+    queryKey: ['financialSummary', period],
+    queryFn: () => fetchFinancialSummary(period)
   });
   
   // Fetch revenue data
   const { data: revenueData, isLoading: isLoadingRevenue } = useQuery({
-    queryKey: ['monthlyRevenue'],
-    queryFn: fetchMonthlyRevenue
+    queryKey: ['monthlyRevenue', period],
+    queryFn: () => fetchMonthlyRevenue(period)
   });
   
   // Fetch expense data
   const { data: expenseData, isLoading: isLoadingExpenses } = useQuery({
-    queryKey: ['expensesByCategory'],
-    queryFn: fetchExpensesByCategory
+    queryKey: ['expensesByCategory', period],
+    queryFn: () => fetchExpensesByCategory(period)
   });
   
   // Fetch recent transactions

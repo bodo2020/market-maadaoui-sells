@@ -92,7 +92,7 @@ export default function Reports() {
   };
   
   const { data: sales, isLoading: salesLoading } = useQuery({
-    queryKey: ['sales', queryParams],
+    queryKey: ['sales', startDate, endDate],
     queryFn: () => fetchSales(startDate, endDate)
   });
 
@@ -102,22 +102,22 @@ export default function Reports() {
   });
   
   const { data: revenueData, isLoading: revenueLoading } = useQuery({
-    queryKey: ['monthlyRevenue', queryParams],
+    queryKey: ['monthlyRevenue', dateRange, startDate, endDate],
     queryFn: () => fetchMonthlyRevenue(dateRange, startDate, endDate)
   });
   
   const { data: expenseData, isLoading: expensesLoading } = useQuery({
-    queryKey: ['expensesByCategory', queryParams],
+    queryKey: ['expensesByCategory', dateRange, startDate, endDate],
     queryFn: () => fetchExpensesByCategory(dateRange, startDate, endDate)
   });
   
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
-    queryKey: ['financialSummary', queryParams],
+    queryKey: ['financialSummary', dateRange, startDate, endDate],
     queryFn: () => fetchFinancialSummary(dateRange, startDate, endDate)
   });
 
   const { data: cashierPerformance, isLoading: cashierLoading } = useQuery({
-    queryKey: ['cashierPerformance', queryParams],
+    queryKey: ['cashierPerformance', dateRange, startDate, endDate],
     queryFn: () => fetchCashierPerformance(dateRange, startDate, endDate)
   });
   

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import MainLayout from "@/components/layout/MainLayout";
@@ -64,7 +63,7 @@ export default function Dashboard() {
   
   const { data: sales, isLoading: salesLoading } = useQuery({
     queryKey: ['sales'],
-    queryFn: fetchSales
+    queryFn: () => fetchSales()
   });
 
   const { data: products, isLoading: productsLoading } = useQuery({
@@ -72,7 +71,6 @@ export default function Dashboard() {
     queryFn: fetchProducts
   });
 
-  // Calculate dashboard stats
   const todaySales = sales?.filter(sale => {
     const saleDate = new Date(sale.date);
     saleDate.setHours(0, 0, 0, 0);
@@ -82,10 +80,8 @@ export default function Dashboard() {
   const totalSalesToday = todaySales.reduce((sum, sale) => sum + sale.total, 0);
   const totalProfitToday = todaySales.reduce((sum, sale) => sum + sale.profit, 0);
   
-  // Calculate low stock products
   const lowStockProducts = products?.filter(product => product.quantity <= 5) || [];
   
-  // Calculate monthly sales
   const thisMonth = today.getMonth();
   const thisYear = today.getFullYear();
   
@@ -97,12 +93,10 @@ export default function Dashboard() {
   const totalMonthlySales = monthlySales.reduce((sum, sale) => sum + sale.total, 0);
   const totalMonthlyTransactions = monthlySales.length;
   
-  // Get the most recent sales
   const recentSales = [...(sales || [])]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
   
-  // Calculate top selling products
   const productsSoldMap = new Map<string, { product: Product; quantitySold: number; revenue: number }>();
   
   sales?.forEach(sale => {
@@ -126,7 +120,6 @@ export default function Dashboard() {
     .sort((a, b) => b.quantitySold - a.quantitySold)
     .slice(0, 5);
 
-  // Demo data for the dashboard when no real data is available
   const stats = [
     {
       title: "إجمالي المبيعات اليوم",

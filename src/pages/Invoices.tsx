@@ -36,7 +36,7 @@ const Invoices = () => {
     refetch: refetchSales 
   } = useQuery({
     queryKey: ['sales'],
-    queryFn: fetchSales
+    queryFn: () => fetchSales()
   });
 
   // Fetch all purchases
