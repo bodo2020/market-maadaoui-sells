@@ -618,7 +618,14 @@ export default function AddProduct() {
                             type="button" 
                             variant={notifyEnabled ? "default" : "outline"} 
                             className="gap-2" 
-                            onClick={() => setNotifyEnabled(!notifyEnabled)}
+                            onClick={() => {
+                              setNotifyEnabled(!notifyEnabled);
+                              if (!notifyEnabled) {
+                                form.setValue("notify_quantity", 5);
+                              } else {
+                                form.setValue("notify_quantity", undefined);
+                              }
+                            }}
                             disabled={isService}
                           >
                             <Bell className="h-4 w-4" />
