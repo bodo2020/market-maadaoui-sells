@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -307,8 +308,10 @@ export default function AddBanner() {
       const bannerData = {
         ...formData,
         image_url: imageUrl,
-        products: selectedProducts.map(p => p.id),
-        link: formData.link || null
+        products: selectedProducts.map(p => p.id), // Now properly mapped to string[]
+        link: formData.link || null,
+        category_id: formData.category_id === "null" ? null : formData.category_id,
+        company_id: formData.company_id === "null" ? null : formData.company_id
       };
 
       if (bannerId) {
