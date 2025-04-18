@@ -29,6 +29,7 @@ import {
   ChevronDown,
   MapPin
 } from "lucide-react";
+import { useNotificationStore } from "@/stores/notificationStore";
 
 interface Category {
   id: string;
@@ -43,9 +44,10 @@ interface SidebarItemProps {
   href: string;
   active?: boolean;
   onClick?: () => void;
+  badge?: number;
 }
 
-function SidebarItem({ icon, label, href, active, onClick }: SidebarItemProps) {
+function SidebarItem({ icon, label, href, active, onClick, badge }: SidebarItemProps) {
   return (
     <Link to={href} onClick={onClick}>
       <Button
@@ -57,6 +59,11 @@ function SidebarItem({ icon, label, href, active, onClick }: SidebarItemProps) {
       >
         {icon}
         <span>{label}</span>
+        {badge !== undefined && (
+          <span className="ml-auto w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-white text-xs">
+            {badge}
+          </span>
+        )}
       </Button>
     </Link>
   );
@@ -70,6 +77,7 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [showCategories, setShowCategories] = useState(false);
+  const { unreadOrders } = useNotificationStore();
   
   const isAdmin = user?.role === 'admin';
   
@@ -194,6 +202,7 @@ export default function Sidebar() {
               label={collapsed ? "" : "الطلبات الإلكترونية"}
               href="/online-orders"
               active={currentPath === "/online-orders"}
+              badge={unreadOrders > 0 ? unreadOrders : undefined}
             />
             
             <SidebarItem
