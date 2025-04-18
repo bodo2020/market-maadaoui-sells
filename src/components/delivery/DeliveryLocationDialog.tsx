@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -26,10 +26,19 @@ export default function DeliveryLocationDialog({
   const [city, setCity] = useState("");
   const [area, setArea] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
+  const [name, setName] = useState("");
   const [price, setPrice] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState("");
   const [active, setActive] = useState(true);
   const [notes, setNotes] = useState("");
+
+  // Generate name based on location data
+  useEffect(() => {
+    if (governorate && city) {
+      const generatedName = `${governorate} - ${city}${area ? ` - ${area}` : ''}${neighborhood ? ` - ${neighborhood}` : ''}`;
+      setName(generatedName);
+    }
+  }, [governorate, city, area, neighborhood]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +46,7 @@ export default function DeliveryLocationDialog({
       setLoading(true);
       await createDeliveryLocation({
         provider_id: providerId,
+        name, // include the name field
         governorate,
         city,
         area,
@@ -62,6 +72,7 @@ export default function DeliveryLocationDialog({
     setCity("");
     setArea("");
     setNeighborhood("");
+    setName("");
     setPrice(0);
     setEstimatedTime("");
     setActive(true);
@@ -119,6 +130,18 @@ export default function DeliveryLocationDialog({
               onChange={(e) => setNeighborhood(e.target.value)}
               placeholder="أدخل اسم الحي"
               className="text-right"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="name">الاسم المعروض (يتم إنشاؤه تلقائيًا)</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="الاسم المعروض للمنطقة"
+              className="text-right"
+              required
             />
           </div>
 

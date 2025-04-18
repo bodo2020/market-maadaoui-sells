@@ -35,9 +35,16 @@ export async function fetchDeliveryLocations(providerId: string) {
 }
 
 export async function createDeliveryLocation(location: Omit<DeliveryLocation, 'id' | 'created_at' | 'updated_at'>) {
+  // Create a composite name for the location if none is provided
+  // This addresses the name field requirement in the database
+  const locationWithName = {
+    ...location,
+    name: location.name || `${location.governorate} - ${location.city}${location.area ? ` - ${location.area}` : ''}${location.neighborhood ? ` - ${location.neighborhood}` : ''}`
+  };
+
   const { data, error } = await supabase
     .from('delivery_locations')
-    .insert([location])
+    .insert([locationWithName])
     .select()
     .single();
     
@@ -46,6 +53,26 @@ export async function createDeliveryLocation(location: Omit<DeliveryLocation, 'i
 }
 
 export async function updateDeliveryLocation(id: string, updates: Partial<DeliveryLocation>) {
+  // If updating governorate, city, area or neighborhood and no name is provided,
+  // generate a new composite name
+  if ((updates.governorate || updates.city || updates.area || updates.neighborhood) && !updates.name) {
+    // We need to fetch the current location to create the updated name
+    const { data: currentLocation } = await supabase
+      .from('delivery_locations')
+      .select('*')
+      .eq('id', id)
+      .single();
+      
+    if (currentLocation) {
+      const gov = updates.governorate || currentLocation.governorate;
+      const city = updates.city || currentLocation.city;
+      const area = updates.area || currentLocation.area;
+      const neighborhood = updates.neighborhood || currentLocation.neighborhood;
+      
+      updates.name = `${gov} - ${city}${area ? ` - ${area}` : ''}${neighborhood ? ` - ${neighborhood}` : ''}`;
+    }
+  }
+
   const { data, error } = await supabase
     .from('delivery_locations')
     .update(updates)

@@ -10,6 +10,7 @@ export interface ShippingProvider {
 export interface DeliveryLocation {
   id: string;
   provider_id: string;
+  name: string; // This field is required by the database
   governorate: string;
   city: string;
   area?: string;
