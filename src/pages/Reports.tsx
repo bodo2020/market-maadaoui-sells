@@ -718,7 +718,7 @@ export default function Reports() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="profitability" className="space-y-4">
+        <TabsContent value="profitability" className="space-y-4 dir-rtl">
           <Card>
             <CardHeader>
               <CardTitle>تحليل الربحية</CardTitle>
@@ -738,7 +738,7 @@ export default function Reports() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-3xl font-bold flex items-center">
-                          <Percent className="h-6 w-6 mr-1 text-primary" />
+                          <Percent className="h-6 w-6 ml-1 text-primary" />
                           {Math.round(profitMargin)}%
                         </div>
                       </CardContent>
@@ -759,7 +759,7 @@ export default function Reports() {
                                 .map(item => {
                                   const cost = item.product.purchase_price * item.quantitySold;
                                   const profit = item.revenue - cost;
-                                  return Math.round((profit / item.revenue) * 100);
+                                  return Math.round((profit / cost) * 100);
                                 }), 0)}%
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">
@@ -768,8 +768,10 @@ export default function Reports() {
                                 .sort((a, b) => {
                                   const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
                                   const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
-                                  const marginA = profitA / a.revenue;
-                                  const marginB = profitB / b.revenue;
+                                  const costA = a.product.purchase_price * a.quantitySold;
+                                  const costB = b.product.purchase_price * b.quantitySold;
+                                  const marginA = profitA / costA;
+                                  const marginB = profitB / costB;
                                   return marginB - marginA;
                                 })[0]?.product.name || ''}
                             </div>
@@ -794,7 +796,7 @@ export default function Reports() {
                                 .map(item => {
                                   const cost = item.product.purchase_price * item.quantitySold;
                                   const profit = item.revenue - cost;
-                                  return Math.round((profit / item.revenue) * 100);
+                                  return Math.round((profit / cost) * 100);
                                 }), 0)}%
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">
@@ -803,8 +805,10 @@ export default function Reports() {
                                 .sort((a, b) => {
                                   const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
                                   const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
-                                  const marginA = profitA / a.revenue;
-                                  const marginB = profitB / b.revenue;
+                                  const costA = a.product.purchase_price * a.quantitySold;
+                                  const costB = b.product.purchase_price * b.quantitySold;
+                                  const marginA = profitA / costA;
+                                  const marginB = profitB / costB;
                                   return marginA - marginB;
                                 })[0]?.product.name || ''}
                             </div>
@@ -840,7 +844,7 @@ export default function Reports() {
                             .map(item => {
                               const cost = item.product.purchase_price * item.quantitySold;
                               const profit = item.revenue - cost;
-                              const margin = item.revenue > 0 ? (profit / item.revenue) * 100 : 0;
+                              const margin = cost > 0 ? (profit / cost) * 100 : 0;
                               
                               return (
                                 <TableRow key={item.product.id}>
