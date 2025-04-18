@@ -79,7 +79,10 @@ export default function DeliveryLocationsTable() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>المحافظة</TableHead>
+              <TableHead>المدينة</TableHead>
               <TableHead>المنطقة</TableHead>
+              <TableHead>الحي</TableHead>
               <TableHead>سعر التوصيل</TableHead>
               <TableHead>الوقت المتوقع</TableHead>
               <TableHead>الحالة</TableHead>
@@ -90,14 +93,17 @@ export default function DeliveryLocationsTable() {
           <TableBody>
             {locations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">
+                <TableCell colSpan={9} className="text-center">
                   لا توجد مناطق توصيل مسجلة
                 </TableCell>
               </TableRow>
             ) : (
               locations.map((location) => (
                 <TableRow key={location.id}>
-                  <TableCell>{location.name}</TableCell>
+                  <TableCell>{location.governorate || "-"}</TableCell>
+                  <TableCell>{location.city || "-"}</TableCell>
+                  <TableCell>{location.area || "-"}</TableCell>
+                  <TableCell>{location.neighborhood || "-"}</TableCell>
                   <TableCell>{location.price}</TableCell>
                   <TableCell>{location.estimated_time || "-"}</TableCell>
                   <TableCell>

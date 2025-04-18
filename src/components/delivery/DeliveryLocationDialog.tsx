@@ -14,6 +14,10 @@ interface DeliveryLocationDialogProps {
   onOpenChange: (open: boolean) => void;
   location?: {
     id: string;
+    governorate?: string;
+    city?: string;
+    area?: string;
+    neighborhood?: string;
     name: string;
     price: number;
     estimated_time?: string;
@@ -28,6 +32,10 @@ export default function DeliveryLocationDialog({
   location
 }: DeliveryLocationDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [governorate, setGovernorate] = useState(location?.governorate || "");
+  const [city, setCity] = useState(location?.city || "");
+  const [area, setArea] = useState(location?.area || "");
+  const [neighborhood, setNeighborhood] = useState(location?.neighborhood || "");
   const [name, setName] = useState(location?.name || "");
   const [price, setPrice] = useState(location?.price || 0);
   const [estimatedTime, setEstimatedTime] = useState(location?.estimated_time || "");
@@ -39,7 +47,11 @@ export default function DeliveryLocationDialog({
     try {
       setLoading(true);
       const locationData = {
-        name,
+        governorate,
+        city,
+        area,
+        neighborhood,
+        name: name || `${governorate} - ${city} - ${area}${neighborhood ? ` - ${neighborhood}` : ''}`,
         price,
         estimated_time: estimatedTime,
         active,
@@ -66,7 +78,7 @@ export default function DeliveryLocationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] rtl">
         <DialogHeader>
           <DialogTitle>
             {location ? "تعديل منطقة التوصيل" : "إضافة منطقة توصيل جديدة"}
@@ -75,13 +87,49 @@ export default function DeliveryLocationDialog({
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">اسم المنطقة</Label>
+            <Label htmlFor="governorate">المحافظة</Label>
             <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="أدخل اسم المنطقة"
+              id="governorate"
+              value={governorate}
+              onChange={(e) => setGovernorate(e.target.value)}
+              placeholder="أدخل اسم المحافظة"
+              className="text-right"
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="city">المدينة</Label>
+            <Input
+              id="city"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="أدخل اسم المدينة"
+              className="text-right"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="area">المنطقة</Label>
+            <Input
+              id="area"
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              placeholder="أدخل اسم المنطقة"
+              className="text-right"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="neighborhood">الحي</Label>
+            <Input
+              id="neighborhood"
+              value={neighborhood}
+              onChange={(e) => setNeighborhood(e.target.value)}
+              placeholder="أدخل اسم الحي (اختياري)"
+              className="text-right"
             />
           </div>
           
@@ -93,6 +141,7 @@ export default function DeliveryLocationDialog({
               value={price}
               onChange={(e) => setPrice(Number(e.target.value))}
               placeholder="أدخل سعر التوصيل"
+              className="text-right"
               required
             />
           </div>
@@ -104,16 +153,17 @@ export default function DeliveryLocationDialog({
               value={estimatedTime}
               onChange={(e) => setEstimatedTime(e.target.value)}
               placeholder="مثال: 30-45 دقيقة"
+              className="text-right"
             />
           </div>
           
           <div className="flex items-center justify-between">
-            <Label htmlFor="active">تفعيل المنطقة</Label>
             <Switch
               id="active"
               checked={active}
               onCheckedChange={setActive}
             />
+            <Label htmlFor="active">تفعيل المنطقة</Label>
           </div>
           
           <div className="space-y-2">
@@ -123,19 +173,20 @@ export default function DeliveryLocationDialog({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="أي ملاحظات إضافية..."
+              className="text-right"
             />
           </div>
           
           <div className="flex justify-end gap-2">
+            <Button type="submit" disabled={loading}>
+              {loading ? "جاري الحفظ..." : location ? "تحديث" : "إضافة"}
+            </Button>
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
               إلغاء
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "جاري الحفظ..." : location ? "تحديث" : "إضافة"}
             </Button>
           </div>
         </form>

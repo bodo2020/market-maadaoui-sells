@@ -3,6 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface DeliveryLocation {
   id: string;
+  governorate?: string;
+  city?: string;
+  area?: string;
+  neighborhood?: string;
   name: string;
   price: number;
   estimated_time?: string;
