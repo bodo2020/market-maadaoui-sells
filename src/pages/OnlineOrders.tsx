@@ -241,7 +241,7 @@ export default function OnlineOrders() {
                         <TableHead>المبلغ</TableHead>
                         <TableHead>حالة الطلب</TableHead>
                         <TableHead>حالة الدفع</TableHead>
-                        
+                        <TableHead>الإجراءات</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
