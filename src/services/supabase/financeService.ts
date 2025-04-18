@@ -34,17 +34,6 @@ export interface CashierPerformance {
   averageSale: number;
 }
 
-/**
- * Calculate profit margin using the formula: (selling price - cost) / selling price * 100
- * @param revenue Total revenue/selling price
- * @param cost Total cost
- * @returns Profit margin percentage
- */
-export function calculateProfitMargin(revenue: number, cost: number): number {
-  if (revenue <= 0) return 0;
-  return ((revenue - cost) / revenue) * 100;
-}
-
 export async function fetchDateRangeData(dateRange: string, startDate?: Date, endDate?: Date) {
   const now = new Date();
   let start: Date;
@@ -145,8 +134,8 @@ export async function fetchFinancialSummary(dateRange: string = "month", startDa
   const totalExpenses = expensesData?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
   
   const netProfit = totalProfit - totalExpenses;
-  // Calculate profit margin using the new function
-  const profitMargin = calculateProfitMargin(totalRevenue, totalRevenue - totalProfit);
+  // Calculate profit margin as (total profit / total revenue) * 100
+  const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
   
   const cashBalance = netProfit; // You might want to adjust this based on your business logic
   
