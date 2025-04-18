@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -269,7 +268,7 @@ export default function OnlineOrders() {
           </div>
         </div>
 
-        <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full mb-6">
+        <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full mb-6 dir-rtl">
           <TabsList className="grid grid-cols-7 mb-4">
             <TabsTrigger value="all" className="relative font-semibold">
               الجميع

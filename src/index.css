@@ -94,3 +94,19 @@
   padding-right: 0.75rem;
   padding-left: 2rem;
 }
+
+/* Fix table alignment for RTL */
+.dir-rtl th, .dir-rtl td {
+  text-align: right;
+}
+
+/* Fix input with icons for RTL */
+.dir-rtl .relative svg:first-child {
+  right: 0.75rem;
+  left: auto;
+}
+
+.dir-rtl .relative svg:last-child {
+  left: 0.75rem;
+  right: auto;
+}
