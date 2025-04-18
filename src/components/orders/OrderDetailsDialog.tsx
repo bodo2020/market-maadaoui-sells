@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Pencil, Mail, Phone, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { PaymentConfirmationDialog } from "./PaymentConfirmationDialog";
 
 interface OrderDetailsDialogProps {
   order: Order | null;
@@ -24,6 +24,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onStatusUpdated 
   const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
   const [shippingStatus, setShippingStatus] = useState<'pending' | 'shipped' | 'delivered'>('pending');
   const [isUpdatingShipping, setIsUpdatingShipping] = useState(false);
+  const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
 
   if (!order) return null;
 
@@ -105,7 +106,7 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onStatusUpdated 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-full h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">تجهيز المنتجات #{order.id.slice(0, 8)}</DialogTitle>
         </DialogHeader>
@@ -164,12 +165,22 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onStatusUpdated 
               </div>
               
               <div className="flex items-center gap-3 mt-4">
-                <Badge 
-                  variant={getPaymentStatusVariant(order.payment_status)} 
-                  className="px-4 py-2 text-base w-full flex justify-center items-center"
-                >
-                  {order.payment_status === 'paid' ? 'مدفوع بالكامل' : 'بانتظار الدفع'}
-                </Badge>
+                {order.payment_status === 'pending' ? (
+                  <Button 
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setPaymentConfirmOpen(true)}
+                  >
+                    بانتظار الدفع
+                  </Button>
+                ) : (
+                  <Badge 
+                    variant="default"
+                    className="px-4 py-2 text-base w-full flex justify-center items-center"
+                  >
+                    مدفوع بالكامل
+                  </Badge>
+                )}
               </div>
 
               <div className="mt-6 space-y-3">
@@ -322,6 +333,15 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onStatusUpdated 
           open={updateStatusOpen}
           onOpenChange={setUpdateStatusOpen}
           onStatusUpdated={() => {
+            if (onStatusUpdated) onStatusUpdated();
+          }}
+        />
+
+        <PaymentConfirmationDialog
+          open={paymentConfirmOpen}
+          onOpenChange={setPaymentConfirmOpen}
+          orderId={order.id}
+          onConfirm={() => {
             if (onStatusUpdated) onStatusUpdated();
           }}
         />
