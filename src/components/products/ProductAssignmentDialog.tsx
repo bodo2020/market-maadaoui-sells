@@ -1,20 +1,26 @@
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { Product } from "@/types";
-import { updateProduct } from "@/services/supabase/productService";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchMainCategories, fetchSubcategories, fetchSubsubcategories } from "@/services/supabase/categoryService";
 
 interface ProductAssignmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
   onSaved: () => void;
-  type: "category" | "company";
+  type: 'category' | 'company';
 }
 
 export default function ProductAssignmentDialog({
@@ -24,74 +30,147 @@ export default function ProductAssignmentDialog({
   onSaved,
   type
 }: ProductAssignmentDialogProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [options, setOptions] = useState<{ id: string; name: string }[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("");
-
+  const [loading, setLoading] = useState(false);
+  const [mainCategories, setMainCategories] = useState<any[]>([]);
+  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [subsubcategories, setSubsubcategories] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
+  const [selectedSubsubcategory, setSelectedSubsubcategory] = useState<string>("");
+  const [selectedCompany, setSelectedCompany] = useState<string>("");
+  
   useEffect(() => {
-    if (open && product) {
-      setIsLoading(true);
-      
-      // Set the initial selected value based on product data
-      if (type === "category") {
-        setSelectedId(product.category_id || "");
-      } else if (type === "company") {
-        setSelectedId(product.company_id || "");
-      }
-      
-      // Load options from database
-      const fetchOptions = async () => {
-        try {
-          if (type === "category") {
-            const { data, error } = await supabase
-              .from("categories")
-              .select("id, name")
-              .eq("level", "category")
-              .order("name");
-            
-            if (error) throw error;
-            setOptions(data || []);
-          } else if (type === "company") {
-            const { data, error } = await supabase
-              .from("companies")
-              .select("id, name")
-              .order("name");
-            
-            if (error) throw error;
-            setOptions(data || []);
-          }
-        } catch (error) {
-          console.error(`Error loading ${type === "category" ? "categories" : "companies"}:`, error);
-          toast.error(`حدث خطأ أثناء تحميل ${type === "category" ? "الأقسام" : "الشركات"}`);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      
-      fetchOptions();
+    if (open) {
+      loadInitialData();
     }
-  }, [open, product, type]);
+  }, [open, product]);
+  
+  const loadInitialData = async () => {
+    setLoading(true);
+    try {
+      if (type === 'category') {
+        // Fetch main categories
+        const mainCategoriesData = await fetchMainCategories();
+        setMainCategories(mainCategoriesData);
+        
+        // Set initial values from product
+        if (product) {
+          if (product.main_category_id) {
+            setSelectedMainCategory(product.main_category_id);
+            
+            // If there's a main category, load its subcategories
+            const subcategoriesData = await fetchSubcategories(product.main_category_id);
+            setSubcategories(subcategoriesData);
+            
+            if (product.subcategory_id) {
+              setSelectedSubcategory(product.subcategory_id);
+              
+              // If there's a subcategory, load its subsubcategories
+              const subsubcategoriesData = await fetchSubsubcategories(product.subcategory_id);
+              setSubsubcategories(subsubcategoriesData);
+              
+              if (product.subsubcategory_id) {
+                setSelectedSubsubcategory(product.subsubcategory_id);
+              }
+            }
+          }
+        }
+      } else if (type === 'company') {
+        // Fetch companies
+        const { data: companiesData, error } = await supabase
+          .from('companies')
+          .select('*')
+          .order('name');
+          
+        if (error) throw error;
+        setCompanies(companiesData);
+        
+        // Set initial company if product has one
+        if (product && product.company_id) {
+          setSelectedCompany(product.company_id);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+      toast.error("حدث خطأ أثناء تحميل البيانات");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleMainCategoryChange = async (value: string) => {
+    setSelectedMainCategory(value);
+    setSelectedSubcategory("");
+    setSelectedSubsubcategory("");
+    setSubcategories([]);
+    setSubsubcategories([]);
+    
+    if (value) {
+      try {
+        const subcategoriesData = await fetchSubcategories(value);
+        setSubcategories(subcategoriesData);
+      } catch (error) {
+        console.error('Error fetching subcategories:', error);
+        toast.error("حدث خطأ أثناء تحميل الأقسام الفرعية");
+      }
+    }
+  };
+  
+  const handleSubcategoryChange = async (value: string) => {
+    setSelectedSubcategory(value);
+    setSelectedSubsubcategory("");
+    setSubsubcategories([]);
+    
+    if (value) {
+      try {
+        const subsubcategoriesData = await fetchSubsubcategories(value);
+        setSubsubcategories(subsubcategoriesData);
+      } catch (error) {
+        console.error('Error fetching subsubcategories:', error);
+        toast.error("حدث خطأ أثناء تحميل الفئات");
+      }
+    }
+  };
   
   const handleSave = async () => {
     if (!product) return;
     
-    setIsSaving(true);
+    setLoading(true);
     try {
-      const updateData = type === "category" 
-        ? { category_id: selectedId || null } 
-        : { company_id: selectedId || null };
+      if (type === 'category') {
+        const updateData: Record<string, any> = {
+          main_category_id: selectedMainCategory || null,
+          subcategory_id: selectedSubcategory || null,
+          subsubcategory_id: selectedSubsubcategory || null
+        };
+        
+        const { error } = await supabase
+          .from('products')
+          .update(updateData)
+          .eq('id', product.id);
+          
+        if (error) throw error;
+        
+        toast.success("تم تحديث تصنيف المنتج بنجاح");
+      } else if (type === 'company') {
+        const { error } = await supabase
+          .from('products')
+          .update({ company_id: selectedCompany || null })
+          .eq('id', product.id);
+          
+        if (error) throw error;
+        
+        toast.success("تم تحديث شركة المنتج بنجاح");
+      }
       
-      await updateProduct(product.id, updateData);
-      
-      toast.success(`تم تحديث ${type === "category" ? "القسم" : "الشركة"} بنجاح`);
       onSaved();
       onOpenChange(false);
     } catch (error) {
-      console.error(`Error updating product ${type}:`, error);
-      toast.error(`حدث خطأ أثناء تعديل ${type === "category" ? "القسم" : "الشركة"}`);
+      console.error('Error updating product:', error);
+      toast.error("حدث خطأ أثناء تحديث المنتج");
     } finally {
-      setIsSaving(false);
+      setLoading(false);
     }
   };
   
@@ -100,43 +179,125 @@ export default function ProductAssignmentDialog({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
-            {type === "category" ? "تعديل القسم" : "تعديل الشركة المصنعة"}
+            {type === 'category' ? 'تعيين تصنيف للمنتج' : 'تعيين شركة للمنتج'}
           </DialogTitle>
         </DialogHeader>
         
-        {isLoading ? (
-          <div className="flex justify-center items-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        ) : (
-          <div className="py-4">
-            <Select value={selectedId} onValueChange={setSelectedId}>
-              <SelectTrigger>
-                <SelectValue placeholder={type === "category" ? "اختر القسم" : "اختر الشركة"} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">
-                  {type === "category" ? "بدون قسم" : "بدون شركة"}
-                </SelectItem>
-                {options.map(option => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {option.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        <div className="py-4">
+          {loading && (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          )}
+          
+          {!loading && type === 'category' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  القسم الرئيسي
+                </label>
+                <Select
+                  value={selectedMainCategory}
+                  onValueChange={handleMainCategoryChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر القسم الرئيسي" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">بدون قسم</SelectItem>
+                    {mainCategories.map(category => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {selectedMainCategory && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    القسم الفرعي
+                  </label>
+                  <Select
+                    value={selectedSubcategory}
+                    onValueChange={handleSubcategoryChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر القسم الفرعي" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">بدون قسم فرعي</SelectItem>
+                      {subcategories.map(subcategory => (
+                        <SelectItem key={subcategory.id} value={subcategory.id}>
+                          {subcategory.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {selectedSubcategory && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    الفئة
+                  </label>
+                  <Select
+                    value={selectedSubsubcategory}
+                    onValueChange={setSelectedSubsubcategory}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر الفئة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">بدون فئة</SelectItem>
+                      {subsubcategories.map(subsubcategory => (
+                        <SelectItem key={subsubcategory.id} value={subsubcategory.id}>
+                          {subsubcategory.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {!loading && type === 'company' && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                الشركة
+              </label>
+              <Select
+                value={selectedCompany}
+                onValueChange={setSelectedCompany}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر الشركة" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">بدون شركة</SelectItem>
+                  {companies.map(company => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
         
-        <DialogFooter>
+        <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             إلغاء
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button onClick={handleSave} disabled={loading}>
+            {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
             حفظ
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
