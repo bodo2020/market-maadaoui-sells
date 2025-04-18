@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { siteConfig } from "@/config/site";
@@ -78,7 +77,6 @@ export default function Sidebar() {
   const [showCategories, setShowCategories] = useState(false);
   const { unreadOrders } = useNotificationStore();
   
-  // Mark orders as read if we're on the online orders page
   useEffect(() => {
     if (currentPath === "/online-orders") {
       markOrdersAsRead();
@@ -150,7 +148,6 @@ export default function Sidebar() {
           active={currentPath.startsWith("/categories")}
         />
         
-        {/* Show these items to admin only */}
         {isAdmin && (
           <>
             <SidebarItem
@@ -183,7 +180,6 @@ export default function Sidebar() {
           </>
         )}
         
-        {/* Items for both admin and cashier */}
         <SidebarItem
           icon={<Truck size={20} />}
           label={collapsed ? "" : "مشتريات الموردين"}

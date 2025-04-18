@@ -14,6 +14,8 @@ import { Search, Download, Plus, ChevronDown, Check, Package } from "lucide-reac
 import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { OrderActionsMenu } from "@/components/orders/OrderActionsMenu";
+import { OrderItemsDialog } from "@/components/orders/OrderItemsDialog";
 
 type OrderFromDB = {
   id: string;
@@ -39,6 +41,7 @@ export default function OnlineOrders() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedItems, setSelectedItems] = useState<any[] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const { markOrdersAsRead } = useNotificationStore();
@@ -251,6 +254,48 @@ export default function OnlineOrders() {
     toast.info("إنشاء طلب جديد");
   };
 
+  const handleArchive = (order: Order) => {
+    toast.success("تم أرشفة الطلب");
+  };
+
+  const handleCancel = async (order: Order) => {
+    try {
+      const { error } = await supabase
+        .from('online_orders')
+        .update({ status: 'cancelled' })
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      fetchOrders();
+      toast.success("تم إلغاء الطلب");
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      toast.error("حدث خطأ أثناء إلغاء الطلب");
+    }
+  };
+
+  const handleProcess = (order: Order) => {
+    setSelectedOrder(order);
+  };
+
+  const handleComplete = async (order: Order) => {
+    try {
+      const { error } = await supabase
+        .from('online_orders')
+        .update({ status: 'delivered' })
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      fetchOrders();
+      toast.success("تم اكتمال الطلب");
+    } catch (error) {
+      console.error('Error completing order:', error);
+      toast.error("حدث خطأ أثناء اكتمال الطلب");
+    }
+  };
+
   return (
     <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
@@ -305,12 +350,6 @@ export default function OnlineOrders() {
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-center">
                   <CardTitle>قائمة الطلبات</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">تم تحديد 1</span>
-                    <Button size="sm" variant="outline" className="flex items-center gap-1">
-                      المزيد <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -330,7 +369,7 @@ export default function OnlineOrders() {
                           <TableHead className="text-center">المبلغ</TableHead>
                           <TableHead className="text-center">حالة الدفع</TableHead>
                           <TableHead className="text-center">حالة الطلب</TableHead>
-                          <TableHead className="text-center">العناصر</TableHead>
+                          <TableHead className="text-center cursor-pointer">العناصر</TableHead>
                           <TableHead className="text-center">الإجراءات</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -343,8 +382,8 @@ export default function OnlineOrders() {
                           </TableRow>
                         ) : (
                           filteredOrders.map((order, index) => (
-                            <TableRow key={order.id}>
-                              <TableCell className="text-center">
+                            <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedOrder(order)}>
+                              <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                                 <Checkbox />
                               </TableCell>
                               <TableCell className="font-medium">#{order.id.slice(0, 8)}</TableCell>
@@ -355,7 +394,10 @@ export default function OnlineOrders() {
                                 <Button 
                                   variant="link" 
                                   className="p-0 h-auto text-right underline"
-                                  onClick={() => showCustomerProfile(order)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    showCustomerProfile(order);
+                                  }}
                                 >
                                   {order.customer_name || 'غير معروف'}
                                 </Button>
@@ -367,17 +409,22 @@ export default function OnlineOrders() {
                               <TableCell className="text-center">
                                 {getStatusBadge(order.status)}
                               </TableCell>
-                              <TableCell className="text-center">
+                              <TableCell 
+                                className="text-center cursor-pointer hover:text-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedItems(order.items);
+                                }}
+                              >
                                 {getOrderItemsCount(order)}
                               </TableCell>
-                              <TableCell className="text-center">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => setSelectedOrder(order)}
-                                >
-                                  عرض التفاصيل
-                                </Button>
+                              <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                <OrderActionsMenu
+                                  onArchive={() => handleArchive(order)}
+                                  onCancel={() => handleCancel(order)}
+                                  onProcess={() => handleProcess(order)}
+                                  onComplete={() => handleComplete(order)}
+                                />
                               </TableCell>
                             </TableRow>
                           ))
@@ -396,6 +443,12 @@ export default function OnlineOrders() {
           open={!!selectedOrder}
           onOpenChange={(open) => !open && setSelectedOrder(null)}
           onStatusUpdated={fetchOrders}
+        />
+        
+        <OrderItemsDialog
+          items={selectedItems || []}
+          open={!!selectedItems}
+          onClose={() => setSelectedItems(null)}
         />
         
         <CustomerProfileDialog
