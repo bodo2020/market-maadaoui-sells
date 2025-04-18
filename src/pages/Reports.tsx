@@ -718,7 +718,7 @@ export default function Reports() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="profitability">
+        <TabsContent value="profitability" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>تحليل الربحية</CardTitle>
@@ -855,7 +855,7 @@ export default function Reports() {
                                   <TableCell>
                                     <div className="flex items-center">
                                       <div 
-                                        className={`h-2 rounded-full mr-2 ${
+                                        className={`h-2 rounded-full ml-2 ${
                                           margin >= 30 ? 'bg-green-500' : 
                                           margin >= 20 ? 'bg-yellow-500' : 
                                           'bg-red-500'
@@ -868,7 +868,7 @@ export default function Reports() {
                                   <TableCell>{item.quantitySold} وحدة</TableCell>
                                   <TableCell className="text-green-600">{formatCurrency(profit)}</TableCell>
                                   <TableCell>
-                                    {totalProfit > 0 ? (profit / totalProfit * 100).toFixed(1) : 0}%
+                                    {totalProfit > 0 ? ((profit / totalProfit) * 100).toFixed(1) + '%' : '0%'}
                                   </TableCell>
                                 </TableRow>
                               );
