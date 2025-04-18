@@ -88,6 +88,14 @@ export function UpdateOrderStatusDialog({
     }
   };
 
+  const statusOptions: {value: Order['status'], label: string, icon: JSX.Element}[] = [
+    { value: 'pending', label: 'قيد الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
+    { value: 'processing', label: 'قيد المعالجة', icon: <Package className="h-4 w-4 text-blue-500" /> },
+    { value: 'shipped', label: 'تم الشحن', icon: <Truck className="h-4 w-4 text-indigo-500" /> },
+    { value: 'delivered', label: 'تم التسليم', icon: <Check className="h-4 w-4 text-green-500" /> },
+    { value: 'cancelled', label: 'ملغي', icon: <X className="h-4 w-4 text-red-500" /> }
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -107,16 +115,10 @@ export function UpdateOrderStatusDialog({
               onValueChange={(value) => setStatus(value as Order['status'])}
               className="grid gap-3"
             >
-              {[
-                { value: 'pending', label: 'قيد الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
-                { value: 'processing', label: 'قيد المعالجة', icon: <Package className="h-4 w-4 text-blue-500" /> },
-                { value: 'shipped', label: 'تم الشحن', icon: <Truck className="h-4 w-4 text-indigo-500" /> },
-                { value: 'delivered', label: 'تم التسليم', icon: <Check className="h-4 w-4 text-green-500" /> },
-                { value: 'cancelled', label: 'ملغي', icon: <X className="h-4 w-4 text-red-500" /> }
-              ].map((item) => (
+              {statusOptions.map((item) => (
                 <div 
                   key={item.value}
-                  className={`flex items-center space-x-2 space-x-reverse rounded-lg border-2 p-3 transition-colors ${getStatusClass(item.value as Order['status'])}`}
+                  className={`flex items-center space-x-2 space-x-reverse rounded-lg border-2 p-3 transition-colors ${getStatusClass(item.value)}`}
                 >
                   <RadioGroupItem value={item.value} id={item.value} />
                   <Label 
