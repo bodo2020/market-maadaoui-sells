@@ -8,7 +8,6 @@ import SubsubcategoriesList from "@/components/categories/SubsubcategoriesList";
 export default function CategoriesPage() {
   const { id, subId } = useParams<{ id: string; subId: string }>();
   
-  // Show the appropriate component based on the URL parameters
   return (
     <MainLayout>
       <div className="container py-6">
