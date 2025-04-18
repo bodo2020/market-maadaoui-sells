@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { siteConfig } from "@/config/site";
@@ -78,6 +79,7 @@ export default function Sidebar() {
   const { unreadOrders } = useNotificationStore();
   
   const isAdmin = user?.role === 'admin';
+  const isCashier = user?.role === 'cashier';
   
   const handleLogout = () => {
     logout();
@@ -139,6 +141,7 @@ export default function Sidebar() {
           active={currentPath.startsWith("/categories")}
         />
         
+        {/* Show these items to admin only */}
         {isAdmin && (
           <>
             <SidebarItem
@@ -146,20 +149,6 @@ export default function Sidebar() {
               label={collapsed ? "" : "متابعة النقدية"}
               href="/cash-tracking"
               active={currentPath === "/cash-tracking"}
-            />
-            
-            <SidebarItem
-              icon={<Truck size={20} />}
-              label={collapsed ? "" : "مشتريات الموردين"}
-              href="/supplier-purchases"
-              active={currentPath === "/supplier-purchases"}
-            />
-            
-            <SidebarItem
-              icon={<PackageOpen size={20} />}
-              label={collapsed ? "" : "المنتجات"}
-              href="/products"
-              active={currentPath === "/products"}
             />
             
             <SidebarItem
@@ -177,14 +166,6 @@ export default function Sidebar() {
             />
             
             <SidebarItem
-              icon={<ShoppingBag size={20} />}
-              label={collapsed ? "" : "الطلبات الإلكترونية"}
-              href="/online-orders"
-              active={currentPath === "/online-orders"}
-              badge={unreadOrders > 0 ? unreadOrders : undefined}
-            />
-            
-            <SidebarItem
               icon={<MapPin size={20} />}
               label={collapsed ? "" : "مناطق التوصيل"}
               href="/delivery-locations"
@@ -192,6 +173,29 @@ export default function Sidebar() {
             />
           </>
         )}
+        
+        {/* Items for both admin and cashier */}
+        <SidebarItem
+          icon={<Truck size={20} />}
+          label={collapsed ? "" : "مشتريات الموردين"}
+          href="/supplier-purchases"
+          active={currentPath === "/supplier-purchases"}
+        />
+        
+        <SidebarItem
+          icon={<PackageOpen size={20} />}
+          label={collapsed ? "" : "المنتجات"}
+          href="/products"
+          active={currentPath === "/products"}
+        />
+        
+        <SidebarItem
+          icon={<ShoppingBag size={20} />}
+          label={collapsed ? "" : "الطلبات الإلكترونية"}
+          href="/online-orders"
+          active={currentPath === "/online-orders"}
+          badge={unreadOrders > 0 ? unreadOrders : undefined}
+        />
         
         <SidebarItem
           icon={<Receipt size={20} />}
@@ -228,12 +232,14 @@ export default function Sidebar() {
           active={currentPath === "/expenses"}
         />
         
-        <SidebarItem
-          icon={<Users size={20} />}
-          label={collapsed ? "" : "الموظفين"}
-          href="/employees"
-          active={currentPath === "/employees"}
-        />
+        {isAdmin && (
+          <SidebarItem
+            icon={<Users size={20} />}
+            label={collapsed ? "" : "الموظفين"}
+            href="/employees"
+            active={currentPath === "/employees"}
+          />
+        )}
         
         <SidebarItem
           icon={<Settings size={20} />}

@@ -15,6 +15,7 @@ import {
 import { fetchSales } from "@/services/supabase/saleService";
 import { fetchProducts } from "@/services/supabase/productService";
 import { CartItem, Product, Sale } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface StatCardProps {
   title: string;
@@ -59,6 +60,8 @@ function formatCurrency(amount: number): string {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
@@ -121,7 +124,8 @@ export default function Dashboard() {
     .sort((a, b) => b.quantitySold - a.quantitySold)
     .slice(0, 5);
 
-  const stats = [
+  // Create different stats for admin and cashier
+  const adminStats = [
     {
       title: "إجمالي المبيعات اليوم",
       value: salesLoading ? `${siteConfig.currency} ...` : formatCurrency(totalSalesToday),
@@ -155,6 +159,28 @@ export default function Dashboard() {
       trendValue: "8% من الشهر الماضي"
     }
   ];
+
+  const cashierStats = [
+    {
+      title: "إجمالي المبيعات اليوم",
+      value: salesLoading ? `${siteConfig.currency} ...` : formatCurrency(totalSalesToday),
+      description: `${todaySales.length} معاملة اليوم`,
+      icon: <ShoppingCart size={16} />,
+      trend: "up" as const,
+      trendValue: "15% من الأمس"
+    },
+    {
+      title: "منتجات منخفضة المخزون",
+      value: productsLoading ? "..." : `${lowStockProducts.length}`,
+      description: "منتجات تحتاج إلى تجديد المخزون",
+      icon: <Package size={16} />,
+      trend: "down" as const,
+      trendValue: "3 أقل من الأسبوع الماضي"
+    }
+  ];
+
+  // Select which stats to display based on user role
+  const stats = isAdmin ? adminStats : cashierStats;
 
   return (
     <MainLayout>
