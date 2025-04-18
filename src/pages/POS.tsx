@@ -215,28 +215,9 @@ export default function POS() {
   };
 
   const handleAddToCart = (product: Product) => {
-    // Check if product has zero or negative quantity
-    if ((product.quantity || 0) <= 0) {
-      toast({
-        title: "المنتج غير متوفر",
-        description: `المنتج "${product.name}" غير متوفر في المخزون`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
+    // Remove quantity check that was blocking zero-quantity products
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
-      // Check if adding more would exceed available quantity
-      if (existingItem.quantity + 1 > (product.quantity || 0)) {
-        toast({
-          title: "الكمية غير متوفرة",
-          description: `الكمية المتوفرة من المنتج "${product.name}" هي ${product.quantity}`,
-          variant: "destructive"
-        });
-        return;
-      }
-      
       setCartItems(cartItems.map(item => item.product.id === product.id ? {
         ...item,
         quantity: item.quantity + 1,
