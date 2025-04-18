@@ -57,17 +57,34 @@ export function UpdateOrderStatusDialog({
   const getStatusIcon = (statusValue: Order['status']) => {
     switch (statusValue) {
       case 'pending':
-        return <Clock className="h-4 w-4" />;
+        return <Clock className="h-4 w-4 text-amber-500" />;
       case 'processing':
-        return <Package className="h-4 w-4" />;
+        return <Package className="h-4 w-4 text-blue-500" />;
       case 'shipped':
-        return <Truck className="h-4 w-4" />;
+        return <Truck className="h-4 w-4 text-indigo-500" />;
       case 'delivered':
-        return <Check className="h-4 w-4" />;
+        return <Check className="h-4 w-4 text-green-500" />;
       case 'cancelled':
-        return <X className="h-4 w-4" />;
+        return <X className="h-4 w-4 text-red-500" />;
       default:
         return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  const getStatusClass = (statusValue: Order['status']) => {
+    switch (statusValue) {
+      case 'pending':
+        return 'border-amber-500 hover:bg-amber-50';
+      case 'processing':
+        return 'border-blue-500 hover:bg-blue-50';
+      case 'shipped':
+        return 'border-indigo-500 hover:bg-indigo-50';
+      case 'delivered':
+        return 'border-green-500 hover:bg-green-50';
+      case 'cancelled':
+        return 'border-red-500 hover:bg-red-50';
+      default:
+        return '';
     }
   };
 
@@ -75,66 +92,63 @@ export function UpdateOrderStatusDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>تحديث حالة الطلب</DialogTitle>
+          <DialogTitle className="text-xl font-bold">تحديث حالة الطلب</DialogTitle>
         </DialogHeader>
         
         {order && (
-          <div className="space-y-4">
-            <div className="text-center">
-              <p className="text-muted-foreground mb-2">رقم الطلب: #{order.id.slice(0, 8)}</p>
-              <p className="text-sm">اختر حالة الطلب الجديدة</p>
+          <div className="space-y-6">
+            <div className="text-center space-y-2">
+              <p className="text-muted-foreground">رقم الطلب: #{order.id.slice(0, 8)}</p>
+              <p className="text-sm font-medium">اختر حالة الطلب الجديدة</p>
             </div>
             
-            <RadioGroup value={status} onValueChange={(value: Order['status']) => setStatus(value)}>
-              <div className="grid grid-cols-1 gap-2">
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="pending" id="pending" />
-                  <Label htmlFor="pending" className="flex items-center gap-2 cursor-pointer">
-                    <Clock className="h-4 w-4 text-amber-500" />
-                    قيد الانتظار
+            <RadioGroup 
+              value={status} 
+              onValueChange={(value: Order['status']) => setStatus(value)}
+              className="grid gap-3"
+            >
+              {[
+                { value: 'pending', label: 'قيد الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
+                { value: 'processing', label: 'قيد المعالجة', icon: <Package className="h-4 w-4 text-blue-500" /> },
+                { value: 'shipped', label: 'تم الشحن', icon: <Truck className="h-4 w-4 text-indigo-500" /> },
+                { value: 'delivered', label: 'تم التسليم', icon: <Check className="h-4 w-4 text-green-500" /> },
+                { value: 'cancelled', label: 'ملغي', icon: <X className="h-4 w-4 text-red-500" /> }
+              ].map((item) => (
+                <div 
+                  key={item.value}
+                  className={`flex items-center space-x-2 space-x-reverse rounded-lg border-2 p-3 transition-colors ${getStatusClass(item.value)}`}
+                >
+                  <RadioGroupItem value={item.value} id={item.value} />
+                  <Label 
+                    htmlFor={item.value} 
+                    className="flex flex-1 items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      {item.icon}
+                      {item.label}
+                    </span>
+                    {status === item.value && (
+                      <Check className="h-4 w-4 text-primary" />
+                    )}
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="processing" id="processing" />
-                  <Label htmlFor="processing" className="flex items-center gap-2 cursor-pointer">
-                    <Package className="h-4 w-4 text-blue-500" />
-                    قيد المعالجة
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="shipped" id="shipped" />
-                  <Label htmlFor="shipped" className="flex items-center gap-2 cursor-pointer">
-                    <Truck className="h-4 w-4 text-indigo-500" />
-                    تم الشحن
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="delivered" id="delivered" />
-                  <Label htmlFor="delivered" className="flex items-center gap-2 cursor-pointer">
-                    <Check className="h-4 w-4 text-green-500" />
-                    تم التسليم
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="cancelled" id="cancelled" />
-                  <Label htmlFor="cancelled" className="flex items-center gap-2 cursor-pointer">
-                    <X className="h-4 w-4 text-red-500" />
-                    ملغي
-                  </Label>
-                </div>
-              </div>
+              ))}
             </RadioGroup>
           </div>
         )}
         
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            className="w-full sm:w-auto"
+          >
             إلغاء
           </Button>
           <Button 
             onClick={updateOrderStatus} 
             disabled={isSubmitting || !order || status === order.status}
-            className="gap-2"
+            className="w-full sm:w-auto gap-2"
           >
             {getStatusIcon(status)}
             تحديث الحالة

@@ -79,6 +79,7 @@ export async function fetchDateRangeData(dateRange: string, startDate?: Date, en
 export async function fetchFinancialSummary(dateRange: string = "month", startDate?: Date, endDate?: Date): Promise<FinancialSummary> {
   const { start, end } = await fetchDateRangeData(dateRange, startDate, endDate);
   
+  // Fetch regular sales
   const { data: salesData, error: salesError } = await supabase
     .from("sales")
     .select("total, profit")
@@ -89,6 +90,29 @@ export async function fetchFinancialSummary(dateRange: string = "month", startDa
     console.error("Error fetching sales for financial summary:", salesError);
     throw salesError;
   }
+
+  // Fetch online orders that are delivered (completed sales)
+  const { data: onlineOrdersData, error: onlineOrdersError } = await supabase
+    .from("online_orders")
+    .select("total, items")
+    .eq("status", "delivered")
+    .gte("created_at", start.toISOString())
+    .lte("created_at", end.toISOString());
+    
+  if (onlineOrdersError) {
+    console.error("Error fetching online orders for financial summary:", onlineOrdersError);
+    throw onlineOrdersError;
+  }
+  
+  // Calculate profit from online orders
+  const onlineOrdersProfit = onlineOrdersData?.reduce((sum, order) => {
+    const items = order.items as any[];
+    const orderProfit = items.reduce((itemSum, item) => {
+      const profit = (item.price - item.purchase_price) * item.quantity;
+      return itemSum + profit;
+    }, 0);
+    return sum + orderProfit;
+  }, 0) || 0;
   
   const { data: expensesData, error: expensesError } = await supabase
     .from("expenses")
@@ -101,13 +125,19 @@ export async function fetchFinancialSummary(dateRange: string = "month", startDa
     throw expensesError;
   }
   
-  const totalRevenue = salesData.reduce((sum, sale) => sum + Number(sale.total), 0);
-  const totalProfit = salesData.reduce((sum, sale) => sum + Number(sale.profit), 0);
-  const totalExpenses = expensesData.reduce((sum, expense) => sum + Number(expense.amount), 0);
-  const netProfit = totalProfit - totalExpenses;
-  const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+  const totalRevenue = (salesData?.reduce((sum, sale) => sum + Number(sale.total), 0) || 0) +
+                      (onlineOrdersData?.reduce((sum, order) => sum + Number(order.total), 0) || 0);
+                      
+  const totalProfit = (salesData?.reduce((sum, sale) => sum + Number(sale.profit), 0) || 0) +
+                     onlineOrdersProfit;
+                     
+  const totalExpenses = expensesData?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
   
-  const cashBalance = netProfit;
+  const netProfit = totalProfit - totalExpenses;
+  // Calculate profit margin as (total profit / total revenue) * 100
+  const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+  
+  const cashBalance = netProfit; // You might want to adjust this based on your business logic
   
   return {
     totalRevenue,
