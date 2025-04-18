@@ -454,7 +454,7 @@ export default function ProductManagement() {
                         <TableCell>
                           {(product.quantity || 0) > 10 ? (
                             <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                              غير متوفر
+                              متوفر
                             </span>
                           ) : (product.quantity || 0) > 0 ? (
                             <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
@@ -603,7 +603,7 @@ export default function ProductManagement() {
       <ShadcnDialog open={isBarcodeDialogOpen} onOpenChange={setIsBarcodeDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>مسح الباركود</DialogTitle>
+            <DialogTitle>��سح الباركود</DialogTitle>
             <DialogDescription>
               للمنتجات العادية: قم بمسح الباركود الخاص بالمنتج
               <br />
