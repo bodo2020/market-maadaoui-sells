@@ -34,6 +34,8 @@ export default function ShippingProviderDialog({
       toast.success("تم إضافة شركة الشحن بنجاح");
       onSuccess?.();
       onOpenChange(false);
+      setName("");
+      setActive(true);
     } catch (error) {
       console.error('Error saving shipping provider:', error);
       toast.error("حدث خطأ أثناء حفظ شركة الشحن");

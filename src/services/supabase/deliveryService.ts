@@ -4,7 +4,7 @@ import { DeliveryLocation, ShippingProvider } from "@/types/shipping";
 
 export async function fetchShippingProviders() {
   const { data, error } = await supabase
-    .from('shipping_providers')
+    .from('delivery_providers')
     .select('*')
     .order('name');
     
@@ -14,7 +14,7 @@ export async function fetchShippingProviders() {
 
 export async function createShippingProvider(provider: Omit<ShippingProvider, 'id' | 'created_at' | 'updated_at'>) {
   const { data, error } = await supabase
-    .from('shipping_providers')
+    .from('delivery_providers')
     .insert([provider])
     .select()
     .single();

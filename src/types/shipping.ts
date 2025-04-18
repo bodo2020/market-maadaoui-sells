@@ -18,4 +18,6 @@ export interface DeliveryLocation {
   estimated_time?: string;
   active: boolean;
   notes?: string;
+  created_at?: string;
+  updated_at?: string;
 }

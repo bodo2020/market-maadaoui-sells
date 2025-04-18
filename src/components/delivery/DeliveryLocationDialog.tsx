@@ -29,6 +29,7 @@ export default function DeliveryLocationDialog({
   const [price, setPrice] = useState(0);
   const [estimatedTime, setEstimatedTime] = useState("");
   const [active, setActive] = useState(true);
+  const [notes, setNotes] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,17 +43,29 @@ export default function DeliveryLocationDialog({
         neighborhood,
         price,
         estimated_time: estimatedTime,
-        active
+        active,
+        notes
       });
       toast.success("تم إضافة منطقة التوصيل بنجاح");
       onSuccess?.();
-      onOpenChange(false);
+      resetForm();
     } catch (error) {
       console.error('Error saving delivery location:', error);
       toast.error("حدث خطأ أثناء حفظ منطقة التوصيل");
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setGovernorate("");
+    setCity("");
+    setArea("");
+    setNeighborhood("");
+    setPrice(0);
+    setEstimatedTime("");
+    setActive(true);
+    setNotes("");
   };
 
   return (
@@ -129,6 +142,17 @@ export default function DeliveryLocationDialog({
               value={estimatedTime}
               onChange={(e) => setEstimatedTime(e.target.value)}
               placeholder="مثال: 30-45 دقيقة"
+              className="text-right"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">ملاحظات</Label>
+            <Input
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="أية ملاحظات إضافية"
               className="text-right"
             />
           </div>

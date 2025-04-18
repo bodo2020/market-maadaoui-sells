@@ -27,8 +27,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ShippingProvider, DeliveryLocation } from "@/types/shipping";
-import DeliveryLocationDialog from "./DeliveryLocationDialog";
 import ShippingProviderDialog from "./ShippingProviderDialog";
+import { 
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 interface GroupedLocations {
   [governorate: string]: {
@@ -38,7 +43,11 @@ interface GroupedLocations {
   };
 }
 
-export default function DeliveryLocationsTable() {
+interface DeliveryLocationsTableProps {
+  onAddLocation?: (providerId: string) => void;
+}
+
+export default function DeliveryLocationsTable({ onAddLocation }: DeliveryLocationsTableProps) {
   const [providers, setProviders] = useState<ShippingProvider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [locations, setLocations] = useState<DeliveryLocation[]>([]);
@@ -46,7 +55,6 @@ export default function DeliveryLocationsTable() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
   const [showProviderDialog, setShowProviderDialog] = useState(false);
-  const [showLocationDialog, setShowLocationDialog] = useState(false);
 
   useEffect(() => {
     loadProviders();
@@ -84,6 +92,55 @@ export default function DeliveryLocationsTable() {
     }
   };
 
+  const groupLocationsByHierarchy = (locations: DeliveryLocation[]) => {
+    const grouped: GroupedLocations = {};
+    
+    locations.forEach(location => {
+      if (!grouped[location.governorate]) {
+        grouped[location.governorate] = {};
+      }
+      
+      if (!grouped[location.governorate][location.city]) {
+        grouped[location.governorate][location.city] = {};
+      }
+      
+      const area = location.area || 'عام';
+      
+      if (!grouped[location.governorate][location.city][area]) {
+        grouped[location.governorate][location.city][area] = [];
+      }
+      
+      grouped[location.governorate][location.city][area].push(location);
+    });
+    
+    return grouped;
+  };
+
+  const handleDeleteConfirm = (id: string) => {
+    setLocationToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteLocation = async () => {
+    if (!locationToDelete) return;
+    
+    try {
+      await deleteDeliveryLocation(locationToDelete);
+      toast.success("تم حذف منطقة التوصيل بنجاح");
+      if (selectedProvider) {
+        loadLocations(selectedProvider);
+      }
+    } catch (error) {
+      console.error('Error deleting location:', error);
+      toast.error("حدث خطأ أثناء حذف منطقة التوصيل");
+    } finally {
+      setDeleteConfirmOpen(false);
+      setLocationToDelete(null);
+    }
+  };
+
+  const groupedLocations = groupLocationsByHierarchy(locations);
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-6">
@@ -115,7 +172,7 @@ export default function DeliveryLocationsTable() {
           </Select>
 
           {selectedProvider && (
-            <Button onClick={() => setShowLocationDialog(true)}>
+            <Button onClick={() => onAddLocation && onAddLocation(selectedProvider)}>
               <Plus className="h-4 w-4 ml-2" />
               إضافة منطقة جديدة
             </Button>
@@ -130,7 +187,73 @@ export default function DeliveryLocationsTable() {
           <div className="text-center p-4">لا توجد مناطق توصيل مضافة</div>
         ) : (
           <div className="space-y-4">
-            {/* Here we'll add the nested structure for locations */}
+            <Accordion type="single" collapsible className="w-full">
+              {Object.keys(groupedLocations).map(governorate => (
+                <AccordionItem key={governorate} value={governorate}>
+                  <AccordionTrigger className="hover:bg-gray-50 px-4 py-2 rounded-md text-right font-medium">
+                    <div className="flex justify-between items-center w-full">
+                      <span>{governorate}</span>
+                      <Badge>{Object.keys(groupedLocations[governorate]).length} مدينة</Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="pl-4 space-y-2">
+                      <Accordion type="single" collapsible className="w-full">
+                        {Object.keys(groupedLocations[governorate]).map(city => (
+                          <AccordionItem key={city} value={city}>
+                            <AccordionTrigger className="hover:bg-gray-50 px-4 py-2 rounded-md text-right">
+                              <div className="flex justify-between items-center w-full">
+                                <span>{city}</span>
+                                <Badge>{Object.keys(groupedLocations[governorate][city]).length} منطقة</Badge>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="pl-4 space-y-2">
+                                {Object.keys(groupedLocations[governorate][city]).map(area => (
+                                  <div key={area} className="border rounded-md p-3">
+                                    <div className="font-medium text-right mb-2">{area}</div>
+                                    <div className="space-y-2">
+                                      {groupedLocations[governorate][city][area].map(location => (
+                                        <div 
+                                          key={location.id} 
+                                          className="flex justify-between items-center bg-gray-50 p-2 rounded-md"
+                                        >
+                                          <div className="flex gap-2">
+                                            <Button 
+                                              variant="outline" 
+                                              size="icon"
+                                              onClick={() => handleDeleteConfirm(location.id)}
+                                            >
+                                              <Trash2 className="h-4 w-4 text-red-500" />
+                                            </Button>
+                                            <Button variant="outline" size="icon">
+                                              <Pencil className="h-4 w-4" />
+                                            </Button>
+                                          </div>
+                                          <div className="text-right">
+                                            {location.neighborhood && (
+                                              <div className="text-sm text-gray-600">{location.neighborhood}</div>
+                                            )}
+                                            <div className="font-medium">{location.price} ج.م</div>
+                                            {location.estimated_time && (
+                                              <div className="text-sm text-gray-600">{location.estimated_time}</div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
         )}
       </div>
@@ -139,13 +262,6 @@ export default function DeliveryLocationsTable() {
         open={showProviderDialog}
         onOpenChange={setShowProviderDialog}
         onSuccess={loadProviders}
-      />
-
-      <DeliveryLocationDialog
-        open={showLocationDialog}
-        onOpenChange={setShowLocationDialog}
-        providerId={selectedProvider || ""}
-        onSuccess={() => loadLocations(selectedProvider!)}
       />
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
@@ -158,15 +274,7 @@ export default function DeliveryLocationsTable() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (locationToDelete) {
-                  deleteDeliveryLocation(locationToDelete);
-                  loadLocations(selectedProvider!);
-                  setDeleteConfirmOpen(false);
-                }
-              }}
-            >
+            <AlertDialogAction onClick={handleDeleteLocation}>
               حذف
             </AlertDialogAction>
           </AlertDialogFooter>
