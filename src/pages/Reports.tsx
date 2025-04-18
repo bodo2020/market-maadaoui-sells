@@ -718,7 +718,7 @@ export default function Reports() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="profitability" className="space-y-4 dir-rtl">
+        <TabsContent value="profitability" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>تحليل الربحية</CardTitle>
@@ -738,7 +738,7 @@ export default function Reports() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-3xl font-bold flex items-center">
-                          <Percent className="h-6 w-6 ml-1 text-primary" />
+                          <Percent className="h-6 w-6 mr-1 text-primary" />
                           {Math.round(profitMargin)}%
                         </div>
                       </CardContent>
