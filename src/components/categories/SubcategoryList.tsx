@@ -23,7 +23,7 @@ export default function SubcategoryList({ categoryId }: SubcategoryListProps) {
   
   useEffect(() => {
     if (categoryId) {
-      fetchSubcategories();
+      loadSubcategories();
       fetchParentCategory();
     }
   }, [categoryId]);
@@ -38,7 +38,7 @@ export default function SubcategoryList({ categoryId }: SubcategoryListProps) {
     }
   };
 
-  const fetchSubcategories = async () => {
+  const loadSubcategories = async () => {
     try {
       setLoading(true);
       const data = await fetchSubcategories(categoryId);
@@ -74,7 +74,7 @@ export default function SubcategoryList({ categoryId }: SubcategoryListProps) {
     try {
       await deleteSubcategory(subcategoryId);
       toast.success("تم حذف القسم الفرعي بنجاح");
-      await fetchSubcategories();
+      await loadSubcategories();
     } catch (error) {
       console.error('Error deleting subcategory:', error);
       toast.error("حدث خطأ أثناء حذف القسم الفرعي");
@@ -82,7 +82,7 @@ export default function SubcategoryList({ categoryId }: SubcategoryListProps) {
   };
 
   const navigateToSubcategory = (subcategory: Subcategory) => {
-    navigate(`/subcategories/${subcategory.id}`);
+    navigate(`/categories/${categoryId}/${subcategory.id}`);
   };
 
   if (loading) {
@@ -189,7 +189,7 @@ export default function SubcategoryList({ categoryId }: SubcategoryListProps) {
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
         categoryId={categoryId}
-        onSuccess={fetchSubcategories}
+        onSuccess={loadSubcategories}
       />
     </div>
   );

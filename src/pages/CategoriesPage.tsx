@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import MainCategoryList from "@/components/categories/MainCategoryList";
 import { useParams } from "react-router-dom";
