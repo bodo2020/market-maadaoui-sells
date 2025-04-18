@@ -12,7 +12,7 @@ import {
   DollarSign, 
   TrendingUp,
   Receipt,
-  Calendar,
+  Calendar as CalendarIcon,
   CreditCard,
   LineChart,
   ShoppingCart,
@@ -20,8 +20,7 @@ import {
   Users,
   Percent,
   BarChart4,
-  Download,
-  CalendarIcon
+  Download
 } from "lucide-react";
 import { 
   BarChart,
@@ -41,6 +40,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ar } from "date-fns/locale";
 import { toast } from "sonner";
+import { Calendar } from "@/components/ui/calendar";
 import { 
   fetchFinancialSummary, 
   fetchMonthlyRevenue, 
@@ -213,8 +213,10 @@ export default function Finance() {
                     to: endDate
                   }}
                   onSelect={(range) => {
-                    setStartDate(range?.from);
-                    setEndDate(range?.to);
+                    if (range) {
+                      setStartDate(range.from);
+                      setEndDate(range.to);
+                    }
                   }}
                   locale={ar}
                   initialFocus
