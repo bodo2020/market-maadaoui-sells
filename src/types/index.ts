@@ -226,4 +226,7 @@ export interface Order {
   payment_method: string | null;
   shipping_address: string | null;
   items: OrderItem[];
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
 }
