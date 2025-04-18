@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, Expense, User } from "@/types";
 import * as ExcelJS from 'exceljs';
@@ -32,6 +31,12 @@ export interface CashierPerformance {
   totalSales: number;
   totalProfit: number;
   averageSale: number;
+}
+
+// Utility function to calculate profit margin
+function calculateProfitMargin(sellingPrice: number, costPrice: number): number {
+  if (sellingPrice <= 0) return 0;
+  return ((sellingPrice - costPrice) / sellingPrice) * 100;
 }
 
 export async function fetchDateRangeData(dateRange: string, startDate?: Date, endDate?: Date) {
@@ -134,7 +139,8 @@ export async function fetchFinancialSummary(dateRange: string = "month", startDa
   const totalExpenses = expensesData?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
   
   const netProfit = totalProfit - totalExpenses;
-  // Calculate profit margin as (total profit / total revenue) * 100
+  
+  // Calculate profit margin using the formula (selling price - cost price) / selling price * 100
   const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
   
   const cashBalance = netProfit; // You might want to adjust this based on your business logic

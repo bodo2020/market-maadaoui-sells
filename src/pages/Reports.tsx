@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -76,6 +77,12 @@ import { cn } from "@/lib/utils";
 
 function formatCurrency(amount: number): string {
   return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}`;
+}
+
+// Utility function to calculate profit margin
+function calculateProfitMargin(sellingPrice: number, costPrice: number): number {
+  if (sellingPrice <= 0) return 0;
+  return ((sellingPrice - costPrice) / sellingPrice) * 100;
 }
 
 export default function Reports() {
@@ -377,7 +384,7 @@ export default function Reports() {
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="sales">
+        <TabsContent value="sales" dir="rtl">
           <Card>
             <CardHeader>
               <CardTitle>تقرير المبيعات</CardTitle>
@@ -457,7 +464,7 @@ export default function Reports() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="products">
+        <TabsContent value="products" dir="rtl">
           <Card>
             <CardHeader>
               <CardTitle>تقرير المنتجات الأكثر مبيعاً</CardTitle>
@@ -589,7 +596,7 @@ export default function Reports() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="cashiers">
+        <TabsContent value="cashiers" dir="rtl">
           <Card>
             <CardHeader>
               <CardTitle>تقرير أداء الكاشير</CardTitle>
@@ -718,7 +725,7 @@ export default function Reports() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="profitability" className="space-y-4 dir-rtl">
+        <TabsContent value="profitability" dir="rtl">
           <Card>
             <CardHeader>
               <CardTitle>تحليل الربحية</CardTitle>
@@ -757,22 +764,21 @@ export default function Reports() {
                               {Math.max(...Array.from(productsSoldMap.values())
                                 .filter(item => item.revenue > 0)
                                 .map(item => {
-                                  const cost = item.product.purchase_price * item.quantitySold;
-                                  const profit = item.revenue - cost;
-                                  return Math.round((profit / cost) * 100);
+                                  const sellingPrice = item.revenue / item.quantitySold;
+                                  const costPrice = item.product.purchase_price;
+                                  return Math.round(calculateProfitMargin(sellingPrice, costPrice));
                                 }), 0)}%
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">
                               لمنتج {Array.from(productsSoldMap.values())
                                 .filter(item => item.revenue > 0)
                                 .sort((a, b) => {
-                                  const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
-                                  const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
-                                  const costA = a.product.purchase_price * a.quantitySold;
-                                  const costB = b.product.purchase_price * b.quantitySold;
-                                  const marginA = profitA / costA;
-                                  const marginB = profitB / costB;
-                                  return marginB - marginA;
+                                  const sellingPriceA = a.revenue / a.quantitySold;
+                                  const sellingPriceB = b.revenue / b.quantitySold;
+                                  const costPriceA = a.product.purchase_price;
+                                  const costPriceB = b.product.purchase_price;
+                                  return calculateProfitMargin(sellingPriceB, costPriceB) - 
+                                         calculateProfitMargin(sellingPriceA, costPriceA);
                                 })[0]?.product.name || ''}
                             </div>
                           </>
@@ -794,22 +800,21 @@ export default function Reports() {
                               {Math.min(...Array.from(productsSoldMap.values())
                                 .filter(item => item.revenue > 0)
                                 .map(item => {
-                                  const cost = item.product.purchase_price * item.quantitySold;
-                                  const profit = item.revenue - cost;
-                                  return Math.round((profit / cost) * 100);
+                                  const sellingPrice = item.revenue / item.quantitySold;
+                                  const costPrice = item.product.purchase_price;
+                                  return Math.round(calculateProfitMargin(sellingPrice, costPrice));
                                 }), 0)}%
                             </div>
                             <div className="text-sm text-muted-foreground mt-1">
                               لمنتج {Array.from(productsSoldMap.values())
                                 .filter(item => item.revenue > 0)
                                 .sort((a, b) => {
-                                  const profitA = a.revenue - (a.product.purchase_price * a.quantitySold);
-                                  const profitB = b.revenue - (b.product.purchase_price * b.quantitySold);
-                                  const costA = a.product.purchase_price * a.quantitySold;
-                                  const costB = b.product.purchase_price * b.quantitySold;
-                                  const marginA = profitA / costA;
-                                  const marginB = profitB / costB;
-                                  return marginA - marginB;
+                                  const sellingPriceA = a.revenue / a.quantitySold;
+                                  const sellingPriceB = b.revenue / b.quantitySold;
+                                  const costPriceA = a.product.purchase_price;
+                                  const costPriceB = b.product.purchase_price;
+                                  return calculateProfitMargin(sellingPriceA, costPriceA) - 
+                                         calculateProfitMargin(sellingPriceB, costPriceB);
                                 })[0]?.product.name || ''}
                             </div>
                           </>
@@ -842,9 +847,10 @@ export default function Reports() {
                               return profitB - profitA;
                             })
                             .map(item => {
-                              const cost = item.product.purchase_price * item.quantitySold;
-                              const profit = item.revenue - cost;
-                              const margin = cost > 0 ? (profit / cost) * 100 : 0;
+                              const sellingPrice = item.revenue / item.quantitySold;
+                              const costPrice = item.product.purchase_price;
+                              const profit = item.revenue - (costPrice * item.quantitySold);
+                              const margin = calculateProfitMargin(sellingPrice, costPrice);
                               
                               return (
                                 <TableRow key={item.product.id}>
@@ -887,7 +893,7 @@ export default function Reports() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="trends">
+        <TabsContent value="trends" dir="rtl">
           <Card>
             <CardHeader>
               <CardTitle>اتجاهات المبيعات</CardTitle>
