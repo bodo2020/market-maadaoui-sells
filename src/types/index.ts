@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -50,6 +49,7 @@ export interface Subsubcategory {
   updated_at?: Date | string;
 }
 
+// Keep the Category interface for backward compatibility with existing components
 export interface Category {
   id: string;
   name: string;

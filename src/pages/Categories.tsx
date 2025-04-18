@@ -1,35 +1,14 @@
 
-import { useParams } from "react-router-dom";
-import MainLayout from "@/components/layout/MainLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import CategoriesList from "@/components/categories/CategoriesList";
-import CategoryDetail from "@/components/categories/CategoryDetail";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 
 export default function Categories() {
-  const { id } = useParams<{ id: string }>();
-
-  return (
-    <MainLayout>
-      <div className="container mx-auto p-6">
-        {id ? (
-          <CategoryDetail />
-        ) : (
-          <>
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-2xl font-bold">الأقسام</h1>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>جميع الأقسام</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CategoriesList />
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-    </MainLayout>
-  );
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    // Redirect to the new categories page
+    navigate("/categories");
+  }, [navigate]);
+  
+  return null;
 }
