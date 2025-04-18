@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -45,9 +44,15 @@ export default function OnlineOrders() {
 
   useEffect(() => {
     fetchOrders();
-    subscribeToOrders();
+    const channel = subscribeToOrders();
     
     markOrdersAsRead();
+    
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, [activeTab]);
 
   const subscribeToOrders = () => {
@@ -67,11 +72,20 @@ export default function OnlineOrders() {
           fetchOrders();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'online_orders'
+        },
+        (payload) => {
+          fetchOrders();
+        }
+      )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return channel;
   };
 
   const fetchOrders = async () => {
@@ -82,7 +96,6 @@ export default function OnlineOrders() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      // Apply status filter based on active tab
       if (activeTab === "pending") {
         query = query.eq('status', 'pending');
       } else if (activeTab === "processing") {
@@ -220,7 +233,6 @@ export default function OnlineOrders() {
   };
 
   const downloadOrders = () => {
-    // Implement orders export functionality
     toast.info("جاري تحميل الطلبات...");
   };
 
@@ -343,6 +355,7 @@ export default function OnlineOrders() {
           order={selectedOrder}
           open={!!selectedOrder}
           onOpenChange={(open) => !open && setSelectedOrder(null)}
+          onStatusUpdated={fetchOrders}
         />
         
         <CustomerProfileDialog

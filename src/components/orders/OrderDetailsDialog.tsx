@@ -6,14 +6,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Order } from "@/types/index";
 import { Separator } from "@/components/ui/separator";
+import { useState } from "react";
+import { UpdateOrderStatusDialog } from "./UpdateOrderStatusDialog";
 
 interface OrderDetailsDialogProps {
   order: Order | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onStatusUpdated?: () => void;
 }
 
-export function OrderDetailsDialog({ order, open, onOpenChange }: OrderDetailsDialogProps) {
+export function OrderDetailsDialog({ order, open, onOpenChange, onStatusUpdated }: OrderDetailsDialogProps) {
+  const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
+
   if (!order) return null;
 
   const formatDate = (date: string) => {
@@ -194,10 +199,19 @@ export function OrderDetailsDialog({ order, open, onOpenChange }: OrderDetailsDi
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             إغلاق
           </Button>
-          <Button>
+          <Button onClick={() => setUpdateStatusOpen(true)}>
             تحديث الحالة
           </Button>
         </div>
+
+        <UpdateOrderStatusDialog 
+          order={order}
+          open={updateStatusOpen}
+          onOpenChange={setUpdateStatusOpen}
+          onStatusUpdated={() => {
+            if (onStatusUpdated) onStatusUpdated();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
