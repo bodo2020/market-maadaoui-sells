@@ -62,9 +62,8 @@ export default function CompanyDetails() {
   const fetchCategories = async () => {
     try {
       const { data, error } = await supabase
-        .from('categories')
+        .from('main_categories')
         .select('id, name')
-        .eq('level', 'category')
         .order('name');
       
       if (error) throw error;
@@ -78,10 +77,9 @@ export default function CompanyDetails() {
   const fetchSubcategories = async (categoryId: string) => {
     try {
       const { data, error } = await supabase
-        .from('categories')
+        .from('subcategories')
         .select('id, name')
-        .eq('level', 'subcategory')
-        .eq('parent_id', categoryId)
+        .eq('category_id', categoryId)
         .order('name');
       
       if (error) throw error;
@@ -95,10 +93,9 @@ export default function CompanyDetails() {
   const fetchSubsubcategories = async (subcategoryId: string) => {
     try {
       const { data, error } = await supabase
-        .from('categories')
+        .from('subsubcategories')
         .select('id, name')
-        .eq('level', 'subsubcategory')
-        .eq('parent_id', subcategoryId)
+        .eq('subcategory_id', subcategoryId)
         .order('name');
       
       if (error) throw error;
@@ -194,7 +191,7 @@ export default function CompanyDetails() {
                   <span className="font-medium">البريد الإلكتروني:</span> {company.contact_email}
                 </div>}
               {company.contact_phone && <div className="text-sm">
-                  <span className="font-medium">رقم الهاتف:</span> {company.contact_phone}
+                  <span className="font-medium">رقم الهات��:</span> {company.contact_phone}
                 </div>}
               {company.address && <div className="text-sm">
                   <span className="font-medium">العنوان:</span> {company.address}

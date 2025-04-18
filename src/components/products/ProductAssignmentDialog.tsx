@@ -1,19 +1,20 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
-import { Product } from "@/types";
+import { Product, MainCategory, Subcategory, Subsubcategory } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchMainCategories, fetchSubcategories, fetchSubsubcategories } from "@/services/supabase/categoryService";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface ProductAssignmentDialogProps {
   open: boolean;
@@ -23,282 +24,307 @@ interface ProductAssignmentDialogProps {
   type: 'category' | 'company';
 }
 
-export default function ProductAssignmentDialog({
+const ProductAssignmentDialog = ({
   open,
   onOpenChange,
   product,
   onSaved,
   type
-}: ProductAssignmentDialogProps) {
+}: ProductAssignmentDialogProps) => {
   const [loading, setLoading] = useState(false);
-  const [mainCategories, setMainCategories] = useState<any[]>([]);
-  const [subcategories, setSubcategories] = useState<any[]>([]);
-  const [subsubcategories, setSubsubcategories] = useState<any[]>([]);
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("");
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
-  const [selectedSubsubcategory, setSelectedSubsubcategory] = useState<string>("");
-  const [selectedCompany, setSelectedCompany] = useState<string>("");
-  
+  const [categories, setCategories] = useState<MainCategory[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [subsubcategories, setSubsubcategories] = useState<Subsubcategory[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategoryLevel, setSelectedCategoryLevel] = useState<'category' | 'subcategory' | 'subsubcategory'>('category');
+
   useEffect(() => {
-    if (open) {
-      loadInitialData();
-    }
-  }, [open, product]);
-  
-  const loadInitialData = async () => {
-    setLoading(true);
-    try {
-      if (type === 'category') {
-        // Fetch main categories
-        const mainCategoriesData = await fetchMainCategories();
-        setMainCategories(mainCategoriesData);
+    const fetchCategories = async () => {
+      try {
+        setLoading(true);
         
-        // Set initial values from product
-        if (product) {
-          if (product.category_id) {
-            setSelectedMainCategory(product.category_id);
+        // Fetch main categories
+        const { data: mainCategories, error: mainError } = await supabase
+          .from('main_categories')
+          .select('*')
+          .order('name');
+        
+        if (mainError) throw mainError;
+        setCategories(mainCategories || []);
+        
+        // If a category is already assigned, select it
+        if (product?.category_id) {
+          setSelectedId(product.category_id);
+          setSelectedCategoryLevel('category');
+          
+          // Fetch subcategories for the selected category
+          const { data: subcategoriesData, error: subcategoriesError } = await supabase
+            .from('subcategories')
+            .select('*')
+            .eq('category_id', product.category_id)
+            .order('name');
+          
+          if (subcategoriesError) throw subcategoriesError;
+          setSubcategories(subcategoriesData || []);
+          
+          // If a subcategory is already assigned, select it
+          if (product?.subcategory_id) {
+            setSelectedId(product.subcategory_id);
+            setSelectedCategoryLevel('subcategory');
             
-            // If there's a main category, load its subcategories
-            const subcategoriesData = await fetchSubcategories(product.category_id);
-            setSubcategories(subcategoriesData);
+            // Fetch subsubcategories for the selected subcategory
+            const { data: subsubcategoriesData, error: subsubcategoriesError } = await supabase
+              .from('subsubcategories')
+              .select('*')
+              .eq('subcategory_id', product.subcategory_id)
+              .order('name');
             
-            if (product.subcategory_id) {
-              setSelectedSubcategory(product.subcategory_id);
-              
-              // If there's a subcategory, load its subsubcategories
-              const subsubcategoriesData = await fetchSubsubcategories(product.subcategory_id);
-              setSubsubcategories(subsubcategoriesData);
-              
-              if (product.subsubcategory_id) {
-                setSelectedSubsubcategory(product.subsubcategory_id);
-              }
+            if (subsubcategoriesError) throw subsubcategoriesError;
+            setSubsubcategories(subsubcategoriesData || []);
+            
+            // If a subsubcategory is already assigned, select it
+            if (product?.subsubcategory_id) {
+              setSelectedId(product.subsubcategory_id);
+              setSelectedCategoryLevel('subsubcategory');
             }
+          } else {
+            setSubsubcategories([]);
+          }
+        } else {
+          setSubcategories([]);
+          setSubsubcategories([]);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        toast.error('حدث خطأ أثناء تحميل الأقسام');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (type === 'category') {
+      fetchCategories();
+    }
+  }, [open, product, type]);
+
+  const updateProductCategory = async () => {
+    try {
+      setLoading(true);
+      
+      // Prepare update data
+      const updateData: any = {};
+      
+      if (type === 'category') {
+        // Determine category levels
+        if (selectedCategoryLevel === 'category') {
+          updateData.category_id = selectedId;
+          updateData.subcategory_id = null;
+          updateData.subsubcategory_id = null;
+        } else if (selectedCategoryLevel === 'subcategory') {
+          updateData.subcategory_id = selectedId;
+          updateData.subsubcategory_id = null;
+          // Find parent category
+          const { data } = await supabase
+            .from('subcategories')
+            .select('category_id')
+            .eq('id', selectedId)
+            .single();
+          updateData.category_id = data?.category_id;
+        } else if (selectedCategoryLevel === 'subsubcategory') {
+          updateData.subsubcategory_id = selectedId;
+          // Find parent subcategory and its parent category
+          const { data: subsubData } = await supabase
+            .from('subsubcategories')
+            .select('subcategory_id')
+            .eq('id', selectedId)
+            .single();
+          
+          updateData.subcategory_id = subsubData?.subcategory_id;
+          
+          if (subsubData?.subcategory_id) {
+            const { data: subData } = await supabase
+              .from('subcategories')
+              .select('category_id')
+              .eq('id', subsubData.subcategory_id)
+              .single();
+            
+            updateData.category_id = subData?.category_id;
           }
         }
       } else if (type === 'company') {
-        // Fetch companies
-        const { data: companiesData, error } = await supabase
-          .from('companies')
-          .select('*')
-          .order('name');
-          
-        if (error) throw error;
-        setCompanies(companiesData);
-        
-        // Set initial company if product has one
-        if (product && product.company_id) {
-          setSelectedCompany(product.company_id);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading initial data:', error);
-      toast.error("حدث خطأ أثناء تحميل البيانات");
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const handleMainCategoryChange = async (value: string) => {
-    setSelectedMainCategory(value);
-    setSelectedSubcategory("");
-    setSelectedSubsubcategory("");
-    setSubcategories([]);
-    setSubsubcategories([]);
-    
-    if (value) {
-      try {
-        const subcategoriesData = await fetchSubcategories(value);
-        setSubcategories(subcategoriesData);
-      } catch (error) {
-        console.error('Error fetching subcategories:', error);
-        toast.error("حدث خطأ أثناء تحميل الأقسام الفرعية");
-      }
-    }
-  };
-  
-  const handleSubcategoryChange = async (value: string) => {
-    setSelectedSubcategory(value);
-    setSelectedSubsubcategory("");
-    setSubsubcategories([]);
-    
-    if (value) {
-      try {
-        const subsubcategoriesData = await fetchSubsubcategories(value);
-        setSubsubcategories(subsubcategoriesData);
-      } catch (error) {
-        console.error('Error fetching subsubcategories:', error);
-        toast.error("حدث خطأ أثناء تحميل الفئات");
-      }
-    }
-  };
-  
-  const handleSave = async () => {
-    if (!product) return;
-    
-    setLoading(true);
-    try {
-      if (type === 'category') {
-        const updateData: Record<string, any> = {
-          category_id: selectedMainCategory || null,
-          subcategory_id: selectedSubcategory || null,
-          subsubcategory_id: selectedSubsubcategory || null
-        };
-        
-        const { error } = await supabase
-          .from('products')
-          .update(updateData)
-          .eq('id', product.id);
-          
-        if (error) throw error;
-        
-        toast.success("تم تحديث تصنيف المنتج بنجاح");
-      } else if (type === 'company') {
-        const { error } = await supabase
-          .from('products')
-          .update({ company_id: selectedCompany || null })
-          .eq('id', product.id);
-          
-        if (error) throw error;
-        
-        toast.success("تم تحديث شركة المنتج بنجاح");
+        updateData.company_id = selectedId;
       }
       
+      // Update the product
+      await supabase
+        .from('products')
+        .update(updateData)
+        .eq('id', product?.id);
+      
+      toast.success(`تم تحديث ${type === 'category' ? 'قسم' : 'شركة'} المنتج بنجاح`);
       onSaved();
       onOpenChange(false);
     } catch (error) {
       console.error('Error updating product:', error);
-      toast.error("حدث خطأ أثناء تحديث المنتج");
+      toast.error(`حدث خطأ أثناء تحديث ${type === 'category' ? 'قسم' : 'شركة'} المنتج`);
     } finally {
       setLoading(false);
     }
   };
-  
+
+  const filteredCategories = categories.filter(category =>
+    category.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredSubcategories = subcategories.filter(subcategory =>
+    subcategory.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredSubsubcategories = subsubcategories.filter(subsubcategory =>
+    subsubcategory.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>
-            {type === 'category' ? 'تعيين تصنيف للمنتج' : 'تعيين شركة للمنتج'}
+            تغيير {type === 'category' ? 'القسم' : 'الشركة'}
           </DialogTitle>
+          <DialogDescription>
+            اختر {type === 'category' ? 'القسم' : 'الشركة'} الذي تريد تعيينه لهذا المنتج.
+          </DialogDescription>
         </DialogHeader>
-        
-        <div className="py-4">
-          {loading && (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          )}
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="search" className="text-right">
+              بحث
+            </Label>
+            <Input
+              id="search"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
           
-          {!loading && type === 'category' && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  القسم الرئيسي
-                </label>
-                <Select
-                  value={selectedMainCategory}
-                  onValueChange={handleMainCategoryChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر القسم الرئيسي" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">بدون قسم</SelectItem>
-                    {mainCategories.map(category => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          {type === 'category' && (
+            <RadioGroup defaultValue={selectedCategoryLevel} onValueChange={setSelectedCategoryLevel} className="pb-4">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="category" id="category" />
+                <Label htmlFor="category">قسم رئيسي</Label>
               </div>
-              
-              {selectedMainCategory && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    القسم الفرعي
-                  </label>
-                  <Select
-                    value={selectedSubcategory}
-                    onValueChange={handleSubcategoryChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر القسم الفرعي" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">بدون قسم فرعي</SelectItem>
-                      {subcategories.map(subcategory => (
-                        <SelectItem key={subcategory.id} value={subcategory.id}>
-                          {subcategory.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              
-              {selectedSubcategory && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    الفئة
-                  </label>
-                  <Select
-                    value={selectedSubsubcategory}
-                    onValueChange={setSelectedSubsubcategory}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر الفئة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">بدون فئة</SelectItem>
-                      {subsubcategories.map(subsubcategory => (
-                        <SelectItem key={subsubcategory.id} value={subsubcategory.id}>
-                          {subsubcategory.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="subcategory" id="subcategory" />
+                <Label htmlFor="subcategory">قسم فرعي</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="subsubcategory" id="subsubcategory" />
+                <Label htmlFor="subsubcategory">فئة</Label>
+              </div>
+            </RadioGroup>
+          )}
+
+          {type === 'category' && selectedCategoryLevel === 'category' && (
+            <div className="space-y-2">
+              <Label>الأقسام الرئيسية</Label>
+              <div className="max-h-40 overflow-y-auto border rounded-md">
+                {loading ? (
+                  <div className="flex justify-center items-center p-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : filteredCategories.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">
+                    لا توجد أقسام رئيسية مطابقة للبحث
+                  </div>
+                ) : (
+                  <ul className="divide-y">
+                    {filteredCategories.map(category => (
+                      <li
+                        key={category.id}
+                        className={`p-2 cursor-pointer hover:bg-accent ${selectedId === category.id ? 'bg-accent text-accent-foreground' : ''}`}
+                        onClick={() => setSelectedId(category.id)}
+                      >
+                        {category.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
-          
-          {!loading && type === 'company' && (
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                الشركة
-              </label>
-              <Select
-                value={selectedCompany}
-                onValueChange={setSelectedCompany}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر الشركة" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">بدون شركة</SelectItem>
-                  {companies.map(company => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+          {type === 'category' && selectedCategoryLevel === 'subcategory' && (
+            <div className="space-y-2">
+              <Label>الأقسام الفرعية</Label>
+              <div className="max-h-40 overflow-y-auto border rounded-md">
+                {loading ? (
+                  <div className="flex justify-center items-center p-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : filteredSubcategories.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">
+                    لا توجد أقسام فرعية مطابقة للبحث
+                  </div>
+                ) : (
+                  <ul className="divide-y">
+                    {filteredSubcategories.map(subcategory => (
+                      <li
+                        key={subcategory.id}
+                        className={`p-2 cursor-pointer hover:bg-accent ${selectedId === subcategory.id ? 'bg-accent text-accent-foreground' : ''}`}
+                        onClick={() => setSelectedId(subcategory.id)}
+                      >
+                        {subcategory.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+
+          {type === 'category' && selectedCategoryLevel === 'subsubcategory' && (
+            <div className="space-y-2">
+              <Label>الفئات</Label>
+              <div className="max-h-40 overflow-y-auto border rounded-md">
+                {loading ? (
+                  <div className="flex justify-center items-center p-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : filteredSubsubcategories.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">
+                    لا توجد فئات مطابقة للبحث
+                  </div>
+                ) : (
+                  <ul className="divide-y">
+                    {filteredSubsubcategories.map(subsubcategory => (
+                      <li
+                        key={subsubcategory.id}
+                        className={`p-2 cursor-pointer hover:bg-accent ${selectedId === subsubcategory.id ? 'bg-accent text-accent-foreground' : ''}`}
+                        onClick={() => setSelectedId(subsubcategory.id)}
+                      >
+                        {subsubcategory.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
         </div>
-        
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             إلغاء
           </Button>
-          <Button onClick={handleSave} disabled={loading}>
+          <Button onClick={updateProductCategory} disabled={loading}>
             {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
             حفظ
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
+};
+
+export default ProductAssignmentDialog;

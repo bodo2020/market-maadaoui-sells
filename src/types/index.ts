@@ -25,8 +25,9 @@ export interface MainCategory {
   name: string;
   description?: string | null;
   image_url?: string | null;
-  created_at: Date | string;
-  updated_at?: Date | string;
+  created_at?: string;
+  updated_at?: string;
+  product_count?: number;
 }
 
 export interface Subcategory {
@@ -35,8 +36,8 @@ export interface Subcategory {
   description?: string | null;
   image_url?: string | null;
   category_id: string;
-  created_at: Date | string;
-  updated_at?: Date | string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Subsubcategory {
@@ -45,21 +46,17 @@ export interface Subsubcategory {
   description?: string | null;
   image_url?: string | null;
   subcategory_id: string;
-  created_at: Date | string;
-  updated_at?: Date | string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-// Keep the Category interface for backward compatibility with existing components
 export interface Category {
   id: string;
   name: string;
-  parent_id?: string | null;
-  children?: Category[];
-  level?: 'category' | 'subcategory' | 'subsubcategory';
   description?: string | null;
   image_url?: string | null;
-  created_at: Date | string;
-  updated_at?: Date | string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Company {
@@ -99,13 +96,10 @@ export interface Product {
   manufacturer_name?: string;
   is_bulk: boolean;
   unit_of_measure?: string;
-  // Properties for scale products calculation
   is_weight_based?: boolean;
   calculated_weight?: number;
   calculated_price?: number;
-  // Property to indicate if the product was scanned with its bulk barcode
   is_bulk_scan?: boolean;
-  // Track inventory property
   track_inventory?: boolean;
 }
 

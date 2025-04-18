@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -146,10 +145,9 @@ export default function AddProduct() {
   useEffect(() => {
     const fetchCategories = async () => {
       const { data, error } = await supabase
-        .from('categories')
+        .from('main_categories')
         .select('*')
-        .is('parent_id', null)
-        .eq('level', 'category');
+        .order('name');
       
       if (!error && data) {
         setCategories(data as Category[]);
@@ -164,10 +162,10 @@ export default function AddProduct() {
     const fetchSubcategories = async () => {
       if (selectedCategory) {
         const { data, error } = await supabase
-          .from('categories')
+          .from('subcategories')
           .select('*')
-          .eq('parent_id', selectedCategory)
-          .eq('level', 'subcategory');
+          .eq('category_id', selectedCategory)
+          .order('name');
         
         if (!error && data) {
           setSubcategories(data as Category[]);
@@ -190,10 +188,10 @@ export default function AddProduct() {
     const fetchSubsubcategories = async () => {
       if (selectedSubcategory) {
         const { data, error } = await supabase
-          .from('categories')
+          .from('subsubcategories')
           .select('*')
-          .eq('parent_id', selectedSubcategory)
-          .eq('level', 'subsubcategory');
+          .eq('subcategory_id', selectedSubcategory)
+          .order('name');
         
         if (!error && data) {
           setSubsubcategories(data as Category[]);

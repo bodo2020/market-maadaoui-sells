@@ -118,3 +118,18 @@ export async function fetchProductsBySubsubcategory(subsubcategoryId: string) {
 
   return data as Product[];
 }
+
+export async function fetchProductsByCompany(companyId: string) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("company_id", companyId)
+    .order("name");
+
+  if (error) {
+    console.error("Error fetching products by company:", error);
+    throw error;
+  }
+
+  return data as Product[];
+}
