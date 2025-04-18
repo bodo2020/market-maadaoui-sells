@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -19,6 +18,35 @@ export interface User {
   shifts?: Shift[];
   salary?: number;
   salary_type?: string;
+}
+
+export interface MainCategory {
+  id: string;
+  name: string;
+  description?: string | null;
+  image_url?: string | null;
+  created_at: Date | string;
+  updated_at?: Date | string;
+}
+
+export interface Subcategory {
+  id: string;
+  name: string;
+  description?: string | null;
+  image_url?: string | null;
+  category_id: string;
+  created_at: Date | string;
+  updated_at?: Date | string;
+}
+
+export interface Subsubcategory {
+  id: string;
+  name: string;
+  description?: string | null;
+  image_url?: string | null;
+  subcategory_id: string;
+  created_at: Date | string;
+  updated_at?: Date | string;
 }
 
 export interface Category {
@@ -59,7 +87,7 @@ export interface Product {
   category_id?: string;
   subcategory_id?: string;
   subsubcategory_id?: string;
-  company_id?: string; // Add company_id field
+  company_id?: string;
   barcode_type?: string;
   bulk_enabled: boolean;
   bulk_quantity?: number;

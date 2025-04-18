@@ -19,6 +19,7 @@ export type Database = {
           id: string
           image_url: string
           link: string | null
+          main_category_id: string | null
           position: number | null
           products: string[] | null
           start_date: string | null
@@ -34,6 +35,7 @@ export type Database = {
           id?: string
           image_url: string
           link?: string | null
+          main_category_id?: string | null
           position?: number | null
           products?: string[] | null
           start_date?: string | null
@@ -49,6 +51,7 @@ export type Database = {
           id?: string
           image_url?: string
           link?: string | null
+          main_category_id?: string | null
           position?: number | null
           products?: string[] | null
           start_date?: string | null
@@ -68,6 +71,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banners_main_category_id_fkey"
+            columns: ["main_category_id"]
+            isOneToOne: false
+            referencedRelation: "main_categories"
             referencedColumns: ["id"]
           },
         ]
@@ -347,6 +357,33 @@ export type Database = {
           },
         ]
       }
+      main_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       online_orders: {
         Row: {
           created_at: string | null
@@ -419,6 +456,7 @@ export type Database = {
           image_urls: string[] | null
           is_bulk: boolean | null
           is_offer: boolean | null
+          main_category_id: string | null
           manufacturer_name: string | null
           name: string
           offer_price: number | null
@@ -445,6 +483,7 @@ export type Database = {
           image_urls?: string[] | null
           is_bulk?: boolean | null
           is_offer?: boolean | null
+          main_category_id?: string | null
           manufacturer_name?: string | null
           name: string
           offer_price?: number | null
@@ -471,6 +510,7 @@ export type Database = {
           image_urls?: string[] | null
           is_bulk?: boolean | null
           is_offer?: boolean | null
+          main_category_id?: string | null
           manufacturer_name?: string | null
           name?: string
           offer_price?: number | null
@@ -495,6 +535,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_main_category_id_fkey"
+            columns: ["main_category_id"]
+            isOneToOne: false
+            referencedRelation: "main_categories"
             referencedColumns: ["id"]
           },
         ]
@@ -771,6 +818,82 @@ export type Database = {
           vat_number?: string | null
         }
         Relationships: []
+      }
+      subcategories: {
+        Row: {
+          category_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "main_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subsubcategories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          subcategory_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          subcategory_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          subcategory_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subsubcategories_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       suppliers: {
         Row: {

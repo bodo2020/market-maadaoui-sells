@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -225,6 +226,34 @@ export async function fetchProductsByCategory(categoryId: string) {
 
   if (error) {
     console.error("Error fetching products by category:", error);
+    throw error;
+  }
+
+  return data as Product[];
+}
+
+export async function fetchProductsBySubcategory(subcategoryId: string) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("subcategory_id", subcategoryId);
+
+  if (error) {
+    console.error("Error fetching products by subcategory:", error);
+    throw error;
+  }
+
+  return data as Product[];
+}
+
+export async function fetchProductsBySubsubcategory(subsubcategoryId: string) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("subsubcategory_id", subsubcategoryId);
+
+  if (error) {
+    console.error("Error fetching products by subsubcategory:", error);
     throw error;
   }
 
