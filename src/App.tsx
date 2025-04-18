@@ -31,6 +31,7 @@ import OnlineOrders from "./pages/OnlineOrders";
 import Categories from "./pages/Categories";
 import AddBanner from "./pages/AddBanner";
 import CompanyDetails from "./pages/CompanyDetails";
+import DeliveryLocations from "./pages/DeliveryLocations";
 
 const queryClient = new QueryClient();
 
@@ -190,6 +191,12 @@ function App() {
               } />
               
               <Route path="/company/:id" element={<CompanyDetails />} />
+              
+              <Route path="/delivery-locations" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <DeliveryLocations />
+                </ProtectedRoute>
+              } />
               
               <Route path="*" element={<NotFound />} />
             </Routes>

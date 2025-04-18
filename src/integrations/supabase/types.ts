@@ -288,6 +288,39 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_locations: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          estimated_time: string | null
+          id: string
+          name: string
+          notes: string | null
+          price: number
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          estimated_time?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          price?: number
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          estimated_time?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          price?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -388,6 +421,7 @@ export type Database = {
         Row: {
           created_at: string | null
           customer_id: string | null
+          delivery_location_id: string | null
           id: string
           items: Json
           notes: string | null
@@ -403,6 +437,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           customer_id?: string | null
+          delivery_location_id?: string | null
           id?: string
           items: Json
           notes?: string | null
@@ -418,6 +453,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           customer_id?: string | null
+          delivery_location_id?: string | null
           id?: string
           items?: Json
           notes?: string | null
@@ -436,6 +472,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "online_orders_delivery_location_id_fkey"
+            columns: ["delivery_location_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_locations"
             referencedColumns: ["id"]
           },
         ]

@@ -26,7 +26,8 @@ import {
   ImageIcon,
   ShoppingBag,
   FolderOpen,
-  ChevronDown
+  ChevronDown,
+  MapPin
 } from "lucide-react";
 
 interface Category {
@@ -193,6 +194,13 @@ export default function Sidebar() {
               label={collapsed ? "" : "الطلبات الإلكترونية"}
               href="/online-orders"
               active={currentPath === "/online-orders"}
+            />
+            
+            <SidebarItem
+              icon={<MapPin size={20} />}
+              label={collapsed ? "" : "مناطق التوصيل"}
+              href="/delivery-locations"
+              active={currentPath === "/delivery-locations"}
             />
           </>
         )}
