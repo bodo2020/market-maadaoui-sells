@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,7 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { createProduct, updateProduct, fetchProductById } from "@/services/supabase/productService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Image, Loader2, ScanLine, Upload, Bell } from "lucide-react";
@@ -117,8 +118,6 @@ export default function AddProduct() {
   const [subsubcategories, setSubsubcategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
-  const [barcode, setBarcode] = useState<string>('');
-  const [barcodeType, setBarcodeType] = useState<'normal' | 'scale'>('normal');
 
   const form = useForm<z.infer<typeof productFormSchema>>({
     resolver: zodResolver(productFormSchema),
@@ -292,6 +291,7 @@ export default function AddProduct() {
     e.preventDefault();
     e.stopPropagation();
   }, []);
+  
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -318,7 +318,7 @@ export default function AddProduct() {
   };
 
   const isService = form.watch("is_service");
-  const barcodeType = form.watch("barcode_type");
+  const formBarcodeType = form.watch("barcode_type");
   const isOffer = form.watch("is_offer");
 
   const onSubmit = async (values: z.infer<typeof productFormSchema>) => {
@@ -705,7 +705,7 @@ export default function AddProduct() {
                 )}
               </div>
 
-              {/* Add these fields before the submit buttons section */}
+              {/* Barcode Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}

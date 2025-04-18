@@ -1,0 +1,398 @@
+
+import { useState } from "react";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { createProduct } from "@/services/supabase/productService";
+import { Textarea } from "@/components/ui/textarea";
+
+// Product schema for simple product creation
+const productSchema = z.object({
+  name: z.string().min(2, { message: "يجب أن يحتوي اسم المنتج على حرفين على الأقل" }),
+  description: z.string().optional(),
+  barcode: z.string().optional(),
+  barcode_type: z.string().default("normal"),
+  price: z.coerce.number().positive({ message: "يجب أن يكون السعر رقمًا موجبًا" }),
+  purchase_price: z.coerce.number().positive({ message: "يجب أن يكون سعر الشراء رقمًا موجبًا" }),
+  quantity: z.coerce.number().nonnegative({ message: "يجب أن تكون الكمية صفر أو أكثر" }),
+  category_id: z.string().optional(),
+  subcategory_id: z.string().optional(),
+  subsubcategory_id: z.string().optional(),
+  unit_of_measure: z.string().default("قطعة"),
+});
+
+const units = [
+  { id: "piece", name: "قطعة" },
+  { id: "kg", name: "كيلوجرام" },
+  { id: "g", name: "جرام" },
+  { id: "l", name: "لتر" },
+  { id: "ml", name: "مليلتر" },
+  { id: "m", name: "متر" },
+  { id: "cm", name: "سنتيمتر" },
+  { id: "box", name: "صندوق" },
+  { id: "bottle", name: "زجاجة" },
+  { id: "packet", name: "عبوة" }
+];
+
+interface AddProductDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onProductAdded: () => void;
+  companyId: string;
+  categories: Array<{ id: string; name: string }>;
+  subcategories: Array<{ id: string; name: string }>;
+  subsubcategories: Array<{ id: string; name: string }>;
+  selectedCategory: string | null;
+  selectedSubcategory: string | null;
+  selectedSubsubcategory: string | null;
+  onCategoryChange: (categoryId: string | null) => void;
+  onSubcategoryChange: (subcategoryId: string | null) => void;
+  onSubsubcategoryChange: (subsubcategoryId: string | null) => void;
+}
+
+export function AddProductDialog({
+  isOpen,
+  onClose,
+  onProductAdded,
+  companyId,
+  categories,
+  subcategories,
+  subsubcategories,
+  selectedCategory,
+  selectedSubcategory,
+  selectedSubsubcategory,
+  onCategoryChange,
+  onSubcategoryChange,
+  onSubsubcategoryChange
+}: AddProductDialogProps) {
+  const [loading, setLoading] = useState(false);
+
+  const form = useForm<z.infer<typeof productSchema>>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      barcode: "",
+      barcode_type: "normal",
+      price: 0,
+      purchase_price: 0,
+      quantity: 0,
+      category_id: selectedCategory || undefined,
+      subcategory_id: selectedSubcategory || undefined,
+      subsubcategory_id: selectedSubsubcategory || undefined,
+      unit_of_measure: "قطعة",
+    },
+  });
+
+  const handleClose = () => {
+    form.reset();
+    onClose();
+  };
+
+  const onSubmit = async (values: z.infer<typeof productSchema>) => {
+    try {
+      setLoading(true);
+      
+      const productData = {
+        name: values.name,
+        description: values.description,
+        barcode: values.barcode,
+        barcode_type: values.barcode_type,
+        price: values.price,
+        purchase_price: values.purchase_price,
+        quantity: values.quantity,
+        image_urls: ["/placeholder.svg"],
+        company_id: companyId,
+        category_id: values.category_id,
+        subcategory_id: values.subcategory_id,
+        subsubcategory_id: values.subsubcategory_id,
+        unit_of_measure: values.unit_of_measure
+      };
+      
+      await createProduct(productData);
+      toast.success("تم إضافة المنتج بنجاح");
+      handleClose();
+      onProductAdded();
+    } catch (error) {
+      console.error("Error creating product:", error);
+      toast.error("حدث خطأ أثناء إنشاء المنتج");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>إضافة منتج جديد</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>اسم المنتج *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="اسم المنتج" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>سعر البيع *</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="purchase_price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>سعر الشراء *</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>الكمية *</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="unit_of_measure"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>وحدة القياس</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="وحدة القياس" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {units.map(unit => (
+                          <SelectItem key={unit.id} value={unit.name}>
+                            {unit.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="barcode_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>نوع الباركود</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="نوع الباركود" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="normal">عادي</SelectItem>
+                        <SelectItem value="scale">ميزان</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="barcode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>الباركود (اختياري)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="باركود المنتج" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="category_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>القسم الرئيسي</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      onCategoryChange(value);
+                    }}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر القسم الرئيسي" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {selectedCategory && (
+              <FormField
+                control={form.control}
+                name="subcategory_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>القسم الفرعي</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        onSubcategoryChange(value);
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="اختر القسم الفرعي" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {subcategories.map((subcategory) => (
+                          <SelectItem key={subcategory.id} value={subcategory.id}>
+                            {subcategory.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {selectedSubcategory && (
+              <FormField
+                control={form.control}
+                name="subsubcategory_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>الفئة</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        onSubsubcategoryChange(value);
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="اختر الفئة" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {subsubcategories.map((subsubcategory) => (
+                          <SelectItem key={subsubcategory.id} value={subsubcategory.id}>
+                            {subsubcategory.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>وصف المنتج</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="وصف المنتج (اختياري)"
+                      className="resize-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={handleClose}>
+                إلغاء
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    جاري الإضافة...
+                  </>
+                ) : (
+                  "إضافة المنتج"
+                )}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
