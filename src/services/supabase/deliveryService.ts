@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { DeliveryLocation, ShippingProvider } from "@/types/shipping";
 
@@ -179,6 +178,17 @@ export async function createNeighborhood(data: {
     
   if (error) throw error;
   return result as DeliveryLocation;
+}
+
+export async function createDeliveryLocation(location: Omit<DeliveryLocation, 'id' | 'created_at' | 'updated_at'>) {
+  const { data, error } = await supabase
+    .from('delivery_locations')
+    .insert([location])
+    .select()
+    .single();
+    
+  if (error) throw error;
+  return data as DeliveryLocation;
 }
 
 export async function updateDeliveryLocation(id: string, updates: Partial<DeliveryLocation>) {

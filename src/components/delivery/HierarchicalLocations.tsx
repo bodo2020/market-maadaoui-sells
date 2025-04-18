@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -51,6 +50,7 @@ import {
   deleteDeliveryLocation
 } from "@/services/supabase/deliveryService";
 import { DeliveryLocation, ShippingProvider, DeliveryGovernorate, DeliveryCity, DeliveryArea, DeliveryNeighborhood } from "@/types/shipping";
+import { siteConfig } from "@/config/site"; // Import siteConfig
 
 interface HierarchicalLocationsProps {
   providerId: string;
