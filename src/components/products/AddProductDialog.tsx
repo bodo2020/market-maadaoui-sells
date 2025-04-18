@@ -101,6 +101,7 @@ export function AddProductDialog({
     try {
       setLoading(true);
       
+      // Include all required properties from the Product type
       const productData = {
         name: values.name,
         description: values.description,
@@ -114,7 +115,17 @@ export function AddProductDialog({
         category_id: values.category_id,
         subcategory_id: values.subcategory_id,
         subsubcategory_id: values.subsubcategory_id,
-        unit_of_measure: values.unit_of_measure
+        unit_of_measure: values.unit_of_measure,
+        // Add the missing required properties
+        is_offer: false,
+        bulk_enabled: false,
+        is_bulk: false,
+        // Add optional properties with default values
+        offer_price: null,
+        bulk_quantity: null,
+        bulk_price: null,
+        bulk_barcode: null,
+        manufacturer_name: null
       };
       
       await createProduct(productData);
