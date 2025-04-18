@@ -100,13 +100,13 @@ export function UpdateOrderStatusDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">تحديث حالة الطلب</DialogTitle>
+          <DialogTitle className="text-xl font-bold">تجهيز المنتجات</DialogTitle>
         </DialogHeader>
         
         {order && (
-          <div className="space-y-6">
+          <div className="space-y-6 dir-rtl">
             <div className="text-center space-y-2">
-              <p className="text-muted-foreground">رقم الطلب: #{order.id.slice(0, 8)}</p>
+              <p className="text-muted-foreground">#{order.id.slice(0, 8)}</p>
               <p className="text-sm font-medium">اختر حالة الطلب الجديدة</p>
             </div>
             
@@ -139,7 +139,7 @@ export function UpdateOrderStatusDialog({
           </div>
         )}
         
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="gap-2 sm:gap-0 dir-rtl">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -152,8 +152,7 @@ export function UpdateOrderStatusDialog({
             disabled={isSubmitting || !order || status === order.status}
             className="w-full sm:w-auto gap-2"
           >
-            {getStatusIcon(status)}
-            تحديث الحالة
+            تحديث
           </Button>
         </DialogFooter>
       </DialogContent>

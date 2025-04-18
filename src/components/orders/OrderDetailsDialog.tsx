@@ -1,4 +1,5 @@
 
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -6,8 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Order } from "@/types/index";
 import { Separator } from "@/components/ui/separator";
-import { useState } from "react";
 import { UpdateOrderStatusDialog } from "./UpdateOrderStatusDialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Pencil, Mail, Phone, MapPin } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface OrderDetailsDialogProps {
   order: Order | null;
@@ -18,6 +22,8 @@ interface OrderDetailsDialogProps {
 
 export function OrderDetailsDialog({ order, open, onOpenChange, onStatusUpdated }: OrderDetailsDialogProps) {
   const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
+  const [shippingStatus, setShippingStatus] = useState<'pending' | 'shipped' | 'delivered'>('pending');
+  const [isUpdatingShipping, setIsUpdatingShipping] = useState(false);
 
   if (!order) return null;
 
@@ -44,8 +50,8 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onStatusUpdated 
 
   const getPaymentStatusLabel = (status: Order['payment_status']) => {
     const labels: Record<Order['payment_status'], string> = {
-      pending: "قيد الانتظار",
-      paid: "تم الدفع",
+      pending: "بانتظار الدفع",
+      paid: "مدفوع",
       failed: "فشل الدفع",
       refunded: "تم الاسترجاع"
     };
@@ -73,135 +79,242 @@ export function OrderDetailsDialog({ order, open, onOpenChange, onStatusUpdated 
     return variants[status];
   };
 
+  const updateShippingStatus = async (status: 'shipped' | 'delivered') => {
+    if (!order) return;
+    
+    try {
+      setIsUpdatingShipping(true);
+      
+      const { error } = await supabase
+        .from('online_orders')
+        .update({ status })
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      setShippingStatus(status);
+      toast.success(`تم تحديث حالة الشحن إلى ${status === 'shipped' ? 'خرج للتوصيل' : 'تم التوصيل'}`);
+      if (onStatusUpdated) onStatusUpdated();
+    } catch (error) {
+      console.error('Error updating shipping status:', error);
+      toast.error('حدث خطأ أثناء تحديث حالة الشحن');
+    } finally {
+      setIsUpdatingShipping(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>تفاصيل الطلب #{order.id.slice(0, 8)}</DialogTitle>
+          <DialogTitle className="text-xl">تجهيز المنتجات #{order.id.slice(0, 8)}</DialogTitle>
         </DialogHeader>
         
-        <div className="flex justify-between items-start flex-wrap md:flex-nowrap gap-6">
-          {/* Order Summary */}
-          <div className="space-y-6 w-full md:w-1/2">
-            <div className="space-y-2">
-              <h3 className="font-medium text-lg">معلومات الطلب</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">رقم الطلب</p>
-                  <p className="font-medium">#{order.id.slice(0, 8)}</p>
+        <div className="flex justify-between items-start flex-wrap md:flex-nowrap gap-6 dir-rtl">
+          {/* Order Items Section */}
+          <div className="w-full md:w-3/5 space-y-6">
+            <div>
+              <h3 className="font-medium text-lg mb-3">المنتجات</h3>
+              <ScrollArea className="h-[350px] rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-right">المنتج</TableHead>
+                      <TableHead className="text-center">الكمية</TableHead>
+                      <TableHead className="text-center">السعر</TableHead>
+                      <TableHead className="text-center">المجموع</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {order.items.map((item: any, index: number) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-3">
+                            {item.image_url && (
+                              <div className="w-10 h-10 rounded-md overflow-hidden">
+                                <img 
+                                  src={item.image_url} 
+                                  alt={item.product_name} 
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <span>{item.product_name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">{item.quantity}</TableCell>
+                        <TableCell className="text-center">{item.price} ج.م</TableCell>
+                        <TableCell className="text-center">{item.total || (item.price * item.quantity)} ج.م</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <Button 
+                  variant={order.status === 'processing' ? 'default' : 'outline'} 
+                  className="w-full" 
+                  onClick={() => setUpdateStatusOpen(true)}
+                >
+                  تجهيز المنتجات
+                </Button>
+              </div>
+              
+              <div className="flex items-center gap-3 mt-4">
+                <Badge 
+                  variant={getPaymentStatusVariant(order.payment_status)} 
+                  className="px-4 py-2 text-base w-full flex justify-center items-center"
+                >
+                  {order.payment_status === 'paid' ? 'مدفوع بالكامل' : 'بانتظار الدفع'}
+                </Badge>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <h3 className="font-medium text-lg">حالة التوصيل</h3>
+                <div className="flex gap-3">
+                  <Button 
+                    variant={order.status === 'shipped' ? 'default' : 'outline'}
+                    className="w-full"
+                    disabled={isUpdatingShipping || order.status === 'shipped' || order.status === 'delivered'}
+                    onClick={() => updateShippingStatus('shipped')}
+                  >
+                    خرج للتوصيل
+                  </Button>
+                  <Button 
+                    variant={order.status === 'delivered' ? 'default' : 'outline'}
+                    className="w-full"
+                    disabled={isUpdatingShipping || order.status === 'delivered'}
+                    onClick={() => updateShippingStatus('delivered')}
+                  >
+                    تم التوصيل
+                  </Button>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">تاريخ الطلب</p>
-                  <p className="font-medium">{formatDate(order.created_at)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">حالة الطلب</p>
-                  <Badge variant={getStatusVariant(order.status)}>{getStatusLabel(order.status)}</Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">حالة الدفع</p>
-                  <Badge variant={getPaymentStatusVariant(order.payment_status)}>
-                    {getPaymentStatusLabel(order.payment_status)}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">طريقة الدفع</p>
-                  <p className="font-medium">{order.payment_method || 'الدفع عند الاستلام'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">المبلغ الإجمالي</p>
-                  <p className="font-medium">{order.total} ج.م</p>
+              </div>
+
+              <div className="mt-4">
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span>المجموع الفرعي:</span>
+                    <span>{order.total} ج.م</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>الشحن:</span>
+                    <span>0 ج.م</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>الضرائب التقديرية:</span>
+                    <span>0 ج.م</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between font-bold">
+                    <span>المجموع:</span>
+                    <span>{order.total} ج.م</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>وسيلة الدفع:</span>
+                    <span>{order.payment_method || 'الدفع عند الاستلام'}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>المدفوع:</span>
+                    <span>0 ج.م</span>
+                  </div>
+                  <div className="flex justify-between font-bold">
+                    <span>المتبقي:</span>
+                    <span>{order.total} ج.م</span>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Customer Information */}
+          <div className="w-full md:w-2/5 space-y-6">
+            {/* Customer Notes */}
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-medium text-lg">ملاحظات من العميل</h3>
+                  <Button variant="ghost" size="sm" className="p-1 h-auto">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {order.notes || 'لا توجد ملاحظات من العميل'}
+                </p>
+              </CardContent>
+            </Card>
 
             {/* Customer Information */}
-            {order.customer_name && (
-              <div className="space-y-2">
-                <h3 className="font-medium text-lg">معلومات العميل</h3>
-                <div className="grid grid-cols-1 gap-2">
-                  <div>
-                    <p className="text-sm text-muted-foreground">الاسم</p>
-                    <p className="font-medium">{order.customer_name}</p>
-                  </div>
-                  {order.customer_phone && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">رقم الهاتف</p>
-                      <p className="font-medium">{order.customer_phone}</p>
-                    </div>
-                  )}
-                  {order.customer_email && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">البريد الإلكتروني</p>
-                      <p className="font-medium">{order.customer_email}</p>
-                    </div>
-                  )}
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-medium text-lg">بيانات العميل</h3>
                 </div>
-              </div>
-            )}
+                
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xl">
+                    {order.customer_name?.charAt(0) || 'غ'}
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-primary">{order.customer_name}</h4>
+                    <p className="text-sm text-muted-foreground">لا طلبات</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* Shipping Information */}
+            {/* Contact Information */}
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <h3 className="font-medium text-lg">بيانات التواصل</h3>
+                
+                {order.customer_email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <a 
+                      href={`mailto:${order.customer_email}`} 
+                      className="text-primary hover:underline"
+                    >
+                      {order.customer_email}
+                    </a>
+                  </div>
+                )}
+                
+                {order.customer_phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <a 
+                      href={`tel:${order.customer_phone}`} 
+                      className="text-primary hover:underline"
+                    >
+                      {order.customer_phone}
+                    </a>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Shipping Address */}
             {order.shipping_address && (
-              <div className="space-y-2">
-                <h3 className="font-medium text-lg">عنوان الشحن</h3>
-                <p className="text-sm">{order.shipping_address}</p>
-              </div>
+              <Card>
+                <CardContent className="p-4 space-y-3">
+                  <h3 className="font-medium text-lg">عنوان الشحن</h3>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                      <div>
+                        <p className="text-sm">{order.shipping_address}</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
-
-          <Separator orientation="vertical" className="h-auto hidden md:block" />
-
-          {/* Order Items */}
-          <div className="w-full md:w-1/2">
-            <h3 className="font-medium text-lg mb-2">المنتجات</h3>
-            <ScrollArea className="h-[300px] rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>المنتج</TableHead>
-                    <TableHead>الكمية</TableHead>
-                    <TableHead>السعر</TableHead>
-                    <TableHead>المجموع</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {order.items.map((item) => (
-                    <TableRow key={item.product_id}>
-                      <TableCell>{item.product_name}</TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>{item.price} ج.م</TableCell>
-                      <TableCell>{item.total} ج.م</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-
-            <div className="mt-4 space-y-2">
-              <div className="flex justify-between">
-                <span>المجموع الفرعي:</span>
-                <span>{order.total} ج.م</span>
-              </div>
-              <div className="flex justify-between">
-                <span>الشحن:</span>
-                <span>0 ج.م</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between font-bold">
-                <span>الإجمالي:</span>
-                <span>{order.total} ج.م</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            إغلاق
-          </Button>
-          <Button onClick={() => setUpdateStatusOpen(true)}>
-            تحديث الحالة
-          </Button>
         </div>
 
         <UpdateOrderStatusDialog 

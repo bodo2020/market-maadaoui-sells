@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -10,9 +11,10 @@ import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { Order, OrderItem } from "@/types/index";
 import { Input } from "@/components/ui/input";
-import { Search, Download } from "lucide-react";
+import { Search, Download, Plus, ChevronDown, Check, Package } from "lucide-react";
 import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type OrderFromDB = {
   id: string;
@@ -126,6 +128,7 @@ export default function OnlineOrders() {
         customer_name: item.customer_name || 'غير معروف',
         customer_email: item.customer_email || '',
         customer_phone: item.customer_phone || '',
+        notes: item.notes || '',
       }));
       
       setOrders(transformedOrders);
@@ -161,7 +164,7 @@ export default function OnlineOrders() {
     };
     
     const labels: Record<Order['status'], string> = {
-      pending: "قيد الانتظار",
+      pending: "بانتظار التجهيز",
       processing: "قيد المعالجة",
       shipped: "تم الشحن",
       delivered: "تم التسليم",
@@ -169,12 +172,9 @@ export default function OnlineOrders() {
     };
     
     return (
-      <div className="flex items-center gap-2">
-        {(status === 'pending' || status === 'processing') && 
-          <div className="w-2 h-2 rounded-full bg-green-500"></div>
-        }
-        <Badge variant={variants[status]}>{labels[status]}</Badge>
-      </div>
+      <Badge variant={variants[status]} className="mx-auto whitespace-nowrap">
+        {labels[status]}
+      </Badge>
     );
   };
 
@@ -187,20 +187,21 @@ export default function OnlineOrders() {
     };
     
     const labels: Record<Order['payment_status'], string> = {
-      pending: "قيد الانتظار",
-      paid: "تم الدفع",
+      pending: "بانتظار الدفع",
+      paid: "مدفوع",
       failed: "فشل الدفع",
       refunded: "تم الاسترجاع"
     };
     
     return (
-      <div className="flex items-center gap-2">
-        {status === 'pending' && 
-          <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-        }
-        <Badge variant={variants[status]}>{labels[status]}</Badge>
-      </div>
+      <Badge variant={variants[status]} className="mx-auto whitespace-nowrap">
+        {labels[status]}
+      </Badge>
     );
+  };
+
+  const getOrderItemsCount = (order: Order) => {
+    return order.items ? order.items.length : 0;
   };
 
   const getPendingOrdersCount = () => {
@@ -232,21 +233,37 @@ export default function OnlineOrders() {
     });
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('ar-EG', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
   const downloadOrders = () => {
     toast.info("جاري تحميل الطلبات...");
   };
 
+  const createNewOrder = () => {
+    toast.info("إنشاء طلب جديد");
+  };
+
   return (
     <MainLayout>
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">الطلبات الإلكترونية</h1>
+          <h1 className="text-2xl font-bold">الطلبات</h1>
           <div className="flex gap-2">
-            <Button onClick={downloadOrders} variant="outline" size="sm">
-              <Download className="ml-2 h-4 w-4" />
+            <Button onClick={downloadOrders} variant="outline" size="sm" className="flex items-center gap-1">
+              <Download className="h-4 w-4" />
               استخراج
             </Button>
-            <Button onClick={() => fetchOrders()} variant="default" size="sm">
+            <Button onClick={createNewOrder} variant="default" size="sm" className="flex items-center gap-1">
+              <Plus className="h-4 w-4" />
               أنشئ طلب
             </Button>
           </div>
@@ -254,19 +271,19 @@ export default function OnlineOrders() {
 
         <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full mb-6">
           <TabsList className="grid grid-cols-7 mb-4">
-            <TabsTrigger value="all" className="relative">
+            <TabsTrigger value="all" className="relative font-semibold">
               الجميع
               <Badge className="mr-2 bg-primary">{orders.length}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="pending" className="relative">
+            <TabsTrigger value="pending" className="relative font-semibold">
               بإنتظار التجهيز
               <Badge className="mr-2 bg-primary">{getPendingOrdersCount()}</Badge>
             </TabsTrigger>
-            <TabsTrigger value="processing">قيد المعالجة</TabsTrigger>
-            <TabsTrigger value="shipped">تم الشحن</TabsTrigger>
-            <TabsTrigger value="delivered">تم التسليم</TabsTrigger>
-            <TabsTrigger value="cancelled">ملغي</TabsTrigger>
-            <TabsTrigger value="unpaid" className="relative">
+            <TabsTrigger value="processing" className="font-semibold">قيد المعالجة</TabsTrigger>
+            <TabsTrigger value="shipped" className="font-semibold">تم الشحن</TabsTrigger>
+            <TabsTrigger value="delivered" className="font-semibold">تم التسليم</TabsTrigger>
+            <TabsTrigger value="cancelled" className="font-semibold">ملغي</TabsTrigger>
+            <TabsTrigger value="unpaid" className="relative font-semibold">
               غير مدفوع
               <Badge className="mr-2 bg-primary">{getUnpaidOrdersCount()}</Badge>
             </TabsTrigger>
@@ -274,10 +291,10 @@ export default function OnlineOrders() {
 
           <div className="mb-4 flex">
             <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="البحث والتصنيفات"
-                className="pr-10"
+                className="pl-10 pr-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -286,65 +303,89 @@ export default function OnlineOrders() {
 
           <TabsContent value={activeTab} className="m-0">
             <Card>
-              <CardHeader>
-                <CardTitle>قائمة الطلبات</CardTitle>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-center">
+                  <CardTitle>قائمة الطلبات</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">تم تحديد 1</span>
+                    <Button size="sm" variant="outline" className="flex items-center gap-1">
+                      المزيد <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <p>جاري التحميل...</p>
+                  <p className="text-center py-4">جاري التحميل...</p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>رقم الطلب</TableHead>
-                        <TableHead>التاريخ</TableHead>
-                        <TableHead>بيانات العميل</TableHead>
-                        <TableHead>المبلغ</TableHead>
-                        <TableHead>حالة الطلب</TableHead>
-                        <TableHead>حالة الدفع</TableHead>
-                        <TableHead>الإجراءات</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredOrders.length === 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center">
-                            لا توجد طلبات مسجلة
-                          </TableCell>
+                          <TableHead className="w-10 text-center">
+                            <Checkbox />
+                          </TableHead>
+                          <TableHead className="text-right">#</TableHead>
+                          <TableHead className="text-right">التاريخ</TableHead>
+                          <TableHead className="text-right">العميل</TableHead>
+                          <TableHead className="text-center">المبلغ</TableHead>
+                          <TableHead className="text-center">حالة الدفع</TableHead>
+                          <TableHead className="text-center">حالة الطلب</TableHead>
+                          <TableHead className="text-center">العناصر</TableHead>
+                          <TableHead className="text-center">الإجراءات</TableHead>
                         </TableRow>
-                      ) : (
-                        filteredOrders.map((order) => (
-                          <TableRow key={order.id}>
-                            <TableCell>#{order.id.slice(0, 8)}</TableCell>
-                            <TableCell>
-                              {new Date(order.created_at).toLocaleDateString('ar')}
-                            </TableCell>
-                            <TableCell>
-                              <Button 
-                                variant="link" 
-                                className="p-0 h-auto text-right underline"
-                                onClick={() => showCustomerProfile(order)}
-                              >
-                                {order.customer_name || 'غير معروف'}
-                              </Button>
-                            </TableCell>
-                            <TableCell>{order.total} ج.م</TableCell>
-                            <TableCell>{getStatusBadge(order.status)}</TableCell>
-                            <TableCell>{getPaymentStatusBadge(order.payment_status)}</TableCell>
-                            <TableCell>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => setSelectedOrder(order)}
-                              >
-                                عرض التفاصيل
-                              </Button>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredOrders.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center">
+                              لا توجد طلبات مسجلة
                             </TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                        ) : (
+                          filteredOrders.map((order, index) => (
+                            <TableRow key={order.id}>
+                              <TableCell className="text-center">
+                                <Checkbox />
+                              </TableCell>
+                              <TableCell className="font-medium">#{order.id.slice(0, 8)}</TableCell>
+                              <TableCell className="whitespace-nowrap">
+                                {formatDate(order.created_at)}
+                              </TableCell>
+                              <TableCell>
+                                <Button 
+                                  variant="link" 
+                                  className="p-0 h-auto text-right underline"
+                                  onClick={() => showCustomerProfile(order)}
+                                >
+                                  {order.customer_name || 'غير معروف'}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="text-center">{order.total} ج.م</TableCell>
+                              <TableCell className="text-center">
+                                {getPaymentStatusBadge(order.payment_status)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {getStatusBadge(order.status)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {getOrderItemsCount(order)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => setSelectedOrder(order)}
+                                >
+                                  عرض التفاصيل
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>

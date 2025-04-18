@@ -59,8 +59,8 @@ function SidebarItem({ icon, label, href, active, onClick, badge }: SidebarItemP
       >
         {icon}
         <span>{label}</span>
-        {badge !== undefined && (
-          <span className="ml-auto w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-white text-xs">
+        {badge !== undefined && badge > 0 && (
+          <span className="mr-auto w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-white text-xs">
             {badge}
           </span>
         )}
@@ -78,6 +78,13 @@ export default function Sidebar() {
   const [showCategories, setShowCategories] = useState(false);
   const { unreadOrders } = useNotificationStore();
   
+  // Mark orders as read if we're on the online orders page
+  useEffect(() => {
+    if (currentPath === "/online-orders") {
+      markOrdersAsRead();
+    }
+  }, [currentPath]);
+  
   const isAdmin = user?.role === 'admin';
   const isCashier = user?.role === 'cashier';
   
@@ -89,6 +96,8 @@ export default function Sidebar() {
   const toggleSidebar = () => {
     setCollapsed(!collapsed);
   };
+  
+  const { markOrdersAsRead } = useNotificationStore();
 
   return (
     <div className={cn(
@@ -194,7 +203,7 @@ export default function Sidebar() {
           label={collapsed ? "" : "الطلبات الإلكترونية"}
           href="/online-orders"
           active={currentPath === "/online-orders"}
-          badge={unreadOrders > 0 ? unreadOrders : undefined}
+          badge={unreadOrders}
         />
         
         <SidebarItem
