@@ -78,7 +78,7 @@ export async function fetchProductsByCategory(categoryId: string) {
   const { data, error } = await supabase
     .from("products")
     .select("*")
-    .eq("main_category_id", categoryId)
+    .eq("category_id", categoryId)
     .order("name");
 
   if (error) {

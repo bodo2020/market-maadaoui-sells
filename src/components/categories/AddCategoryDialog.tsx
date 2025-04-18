@@ -89,19 +89,44 @@ const AddCategoryDialog = ({
         image_url = await uploadImage(imageFile);
       }
 
-      const newCategory = {
-        name,
-        description: description || null,
-        level: getLevel(),
-        parent_id: parentCategory?.id || null,
-        image_url
-      };
-
-      const { error } = await supabase
-        .from('categories')
-        .insert([newCategory]);
-
-      if (error) throw error;
+      const level = getLevel();
+      
+      if (level === 'category') {
+        // Add main category
+        const { error } = await supabase
+          .from('main_categories')
+          .insert([{
+            name,
+            description: description || null,
+            image_url
+          }]);
+          
+        if (error) throw error;
+      } else if (level === 'subcategory' && parentCategory) {
+        // Add subcategory
+        const { error } = await supabase
+          .from('subcategories')
+          .insert([{
+            name,
+            description: description || null,
+            category_id: parentCategory.id,
+            image_url
+          }]);
+          
+        if (error) throw error;
+      } else if (level === 'subsubcategory' && parentCategory) {
+        // Add subsubcategory
+        const { error } = await supabase
+          .from('subsubcategories')
+          .insert([{
+            name,
+            description: description || null,
+            subcategory_id: parentCategory.id,
+            image_url
+          }]);
+          
+        if (error) throw error;
+      }
 
       toast.success("تم إضافة التصنيف بنجاح");
       onSuccess();

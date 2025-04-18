@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -6,27 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate, useParams } from "react-router-dom";
 import AddCategoryDialog from "./AddCategoryDialog";
+import { MainCategory, Subcategory, Subsubcategory } from "@/types";
 
 interface Category {
   id: string;
   name: string;
   description: string | null;
-  level: 'category' | 'subcategory' | 'subsubcategory';
-  parent_id: string | null;
   image_url: string | null;
   product_count?: number;
-}
-
-// Type for the raw database response
-interface CategoryFromDB {
-  id: string;
-  name: string;
-  description: string | null;
-  level: string;
-  parent_id: string | null;
-  image_url: string | null;
-  created_at: string | null;
-  updated_at: string | null;
 }
 
 export default function CategoriesList() {
@@ -42,73 +30,126 @@ export default function CategoriesList() {
     fetchCategories();
   }, [parentId]);
 
-  const getNextLevel = (currentLevel: string | null): 'category' | 'subcategory' | 'subsubcategory' => {
-    if (!currentLevel) return 'category';
-    if (currentLevel === 'category') return 'subcategory';
-    if (currentLevel === 'subcategory') return 'subsubcategory';
-    return 'subsubcategory';
-  };
-
   const fetchCategories = async () => {
     try {
       setLoading(true);
       let parentCategory = null;
-      let currentLevel = null;
       
       if (parentId) {
-        const { data: parent, error: parentError } = await supabase
-          .from('categories')
-          .select('*')
-          .eq('id', parentId)
-          .single();
-          
-        if (parentError) throw parentError;
-        parentCategory = parent;
-        currentLevel = parent.level;
-      }
-      
-      const levelToFetch = getNextLevel(currentLevel);
-      
-      let query = supabase
-        .from('categories')
-        .select('*')
-        .order('name');
-        
-      if (parentId) {
-        query = query.eq('parent_id', parentId);
-      } else {
-        query = query.is('parent_id', null).eq('level', 'category');
-      }
-        
-      const { data, error } = await query;
-      
-      if (error) throw error;
-
-      const typedCategories: Category[] = (data || []).map(cat => ({
-        ...cat,
-        level: isValidLevel(cat.level) ? cat.level as 'category' | 'subcategory' | 'subsubcategory' : 'category',
-        product_count: 0
-      }));
-      
-      await Promise.all(typedCategories.map(async (category) => {
-        const { count, error } = await supabase
-          .from('products')
-          .select('*', { count: 'exact', head: true })
-          .eq(
-            category.level === 'category' 
-              ? 'category_id' 
-              : category.level === 'subcategory' 
-                ? 'subcategory_id' 
-                : 'subsubcategory_id', 
-            category.id
-          );
-          
-        if (!error) {
-          category.product_count = count || 0;
+        // Check if it's a subcategory
+        try {
+          const { data: subcategory, error: subcategoryError } = await supabase
+            .from('subcategories')
+            .select('*')
+            .eq('id', parentId)
+            .single();
+            
+          if (!subcategoryError && subcategory) {
+            parentCategory = subcategory;
+            
+            // Fetch subsubcategories for this subcategory
+            const { data, error } = await supabase
+              .from('subsubcategories')
+              .select('*')
+              .eq('subcategory_id', parentId)
+              .order('name');
+              
+            if (error) throw error;
+            
+            const typedCategories: Category[] = (data || []).map(cat => ({
+              id: cat.id,
+              name: cat.name,
+              description: cat.description,
+              image_url: cat.image_url,
+              product_count: 0
+            }));
+            
+            // Get product counts
+            await Promise.all(typedCategories.map(async (category) => {
+              const { count, error } = await supabase
+                .from('products')
+                .select('*', { count: 'exact', head: true })
+                .eq('subsubcategory_id', category.id);
+                
+              if (!error) {
+                category.product_count = count || 0;
+              }
+            }));
+            
+            setCategories(typedCategories);
+            setLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking if it is a subcategory:', error);
         }
-      }));
-
-      setCategories(typedCategories);
+        
+        // If not a subcategory, check if it's a main category
+        try {
+          const { data: mainCategory, error: mainCategoryError } = await supabase
+            .from('main_categories')
+            .select('*')
+            .eq('id', parentId)
+            .single();
+            
+          if (!mainCategoryError && mainCategory) {
+            parentCategory = mainCategory;
+            
+            // Fetch subcategories for this main category
+            const { data, error } = await supabase
+              .from('subcategories')
+              .select('*')
+              .eq('category_id', parentId)
+              .order('name');
+              
+            if (error) throw error;
+            
+            const typedCategories: Category[] = (data || []).map(cat => ({
+              id: cat.id,
+              name: cat.name,
+              description: cat.description,
+              image_url: cat.image_url,
+              product_count: 0
+            }));
+            
+            // Get product counts
+            await Promise.all(typedCategories.map(async (category) => {
+              const { count, error } = await supabase
+                .from('products')
+                .select('*', { count: 'exact', head: true })
+                .eq('subcategory_id', category.id);
+                
+              if (!error) {
+                category.product_count = count || 0;
+              }
+            }));
+            
+            setCategories(typedCategories);
+            setLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking if it is a main category:', error);
+        }
+      } else {
+        // No parent ID, fetch main categories
+        const { data, error } = await supabase
+          .from('main_categories')
+          .select('*')
+          .order('name');
+          
+        if (error) throw error;
+        
+        const typedCategories: Category[] = (data || []).map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          description: cat.description,
+          image_url: cat.image_url,
+          product_count: cat.product_count || 0
+        }));
+        
+        setCategories(typedCategories);
+      }
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast.error("حدث خطأ أثناء تحم��ل التصنيفات");
@@ -117,11 +158,21 @@ export default function CategoriesList() {
     }
   };
 
-  const isValidLevel = (level: string): boolean => {
-    return ['category', 'subcategory', 'subsubcategory'].includes(level);
+  const getCategoryLevel = (): 'category' | 'subcategory' | 'subsubcategory' => {
+    if (!parentId) return 'category';
+    
+    // Check if parent is a main category
+    for (const category of categories) {
+      if (category.id === parentId) {
+        return 'subcategory';
+      }
+    }
+    
+    // If not a main category, it must be a subcategory
+    return 'subsubcategory';
   };
 
-  const getLevelLabel = (level: Category['level']) => {
+  const getLevelLabel = (level: 'category' | 'subcategory' | 'subsubcategory') => {
     const labels = {
       category: 'قسم رئيسي',
       subcategory: 'قسم فرعي',
@@ -132,12 +183,31 @@ export default function CategoriesList() {
 
   const handleDelete = async (categoryId: string) => {
     try {
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', categoryId);
-
-      if (error) throw error;
+      const level = getCategoryLevel();
+      
+      if (level === 'category') {
+        const { error } = await supabase
+          .from('main_categories')
+          .delete()
+          .eq('id', categoryId);
+        
+        if (error) throw error;
+      } else if (level === 'subcategory') {
+        const { error } = await supabase
+          .from('subcategories')
+          .delete()
+          .eq('id', categoryId);
+        
+        if (error) throw error;
+      } else if (level === 'subsubcategory') {
+        const { error } = await supabase
+          .from('subsubcategories')
+          .delete()
+          .eq('id', categoryId);
+        
+        if (error) throw error;
+      }
+      
       toast.success("تم حذف التصنيف بنجاح");
       await fetchCategories();
     } catch (error) {
@@ -151,11 +221,11 @@ export default function CategoriesList() {
   };
   
   const getCurrentLevelTitle = (): string => {
-    if (!parentId) return "الأقسام الرئيسية";
-    const currentLevel = categories[0]?.level;
+    const level = getCategoryLevel();
     
-    if (currentLevel === 'subcategory') return "الأقسام الفرعية";
-    if (currentLevel === 'subsubcategory') return "الفئات";
+    if (level === 'category') return "الأقسام الرئيسية";
+    if (level === 'subcategory') return "الأقسام الفرعية";
+    if (level === 'subsubcategory') return "الفئات";
     return "الأقسام";
   };
 
@@ -175,7 +245,7 @@ export default function CategoriesList() {
         </h2>
         <Button onClick={() => setShowAddDialog(true)}>
           <FolderPlus className="h-4 w-4 ml-2" />
-          إضافة {parentId ? categories.length > 0 ? getLevelLabel(categories[0].level) : "تصنيف جديد" : "قسم جديد"}
+          إضافة {getLevelLabel(getCategoryLevel())}
         </Button>
       </div>
 
@@ -194,13 +264,7 @@ export default function CategoriesList() {
           <div 
             key={category.id} 
             className="border rounded-lg overflow-hidden hover:border-primary transition-colors cursor-pointer"
-            onClick={() => {
-              if (category.level === 'subsubcategory') {
-                navigateToCategory(category);
-              } else {
-                navigate(`/categories/${category.id}`);
-              }
-            }}
+            onClick={() => navigateToCategory(category)}
           >
             <div className="h-40 bg-gray-100 relative">
               {category.image_url ? (
@@ -215,12 +279,12 @@ export default function CategoriesList() {
                 </div>
               )}
               <Badge variant="outline" className="absolute top-2 right-2 bg-white">
-                {getLevelLabel(category.level)}
+                {getLevelLabel(getCategoryLevel())}
               </Badge>
               
               <Badge variant="secondary" className="absolute top-2 left-2 flex items-center gap-1 bg-white">
                 <Package className="h-3 w-3" />
-                {category.product_count} منتج
+                {category.product_count || 0} منتج
               </Badge>
             </div>
             <div className="p-4">
@@ -270,7 +334,7 @@ export default function CategoriesList() {
         parentCategory={parentId ? { 
           id: parentId, 
           name: "", 
-          level: getNextLevel(null) as any 
+          level: getCategoryLevel() === 'category' ? 'category' : getCategoryLevel() === 'subcategory' ? 'subcategory' : 'subsubcategory'
         } : null}
         onSuccess={fetchCategories}
       />

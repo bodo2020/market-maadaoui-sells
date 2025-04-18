@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,6 +61,8 @@ export default function AddBanner() {
   const [filterType, setFilterType] = useState<"none" | "category" | "company">("none");
   const [error, setError] = useState<string | null>(null);
   const [creatingBucket, setCreatingBucket] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [categoryOptions, setCategoryOptions] = useState<{ value: string; label: string }[]>([]);
 
   useEffect(() => {
     if (bannerId) {
@@ -197,14 +198,21 @@ export default function AddBanner() {
   const fetchCategories = async () => {
     try {
       const { data, error } = await supabase
-        .from("categories")
-        .select("id, name")
-        .eq("level", "category");
+        .from('main_categories')
+        .select('id, name')
+        .order('name');
       
       if (error) throw error;
-      setCategories(data || []);
+      
+      const options = (data || []).map(cat => ({
+        value: cat.id,
+        label: cat.name
+      }));
+      
+      setCategoryOptions(options);
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      console.error('Error fetching categories:', error);
+      toast.error("حدث خطأ في تحميل الأقسام");
     }
   };
 
@@ -511,9 +519,9 @@ export default function AddBanner() {
                       <SelectValue placeholder="اختر القسم" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map(category => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
+                      {categoryOptions.map(category => (
+                        <SelectItem key={category.value} value={category.value}>
+                          {category.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

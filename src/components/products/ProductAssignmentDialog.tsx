@@ -56,11 +56,11 @@ export default function ProductAssignmentDialog({
         
         // Set initial values from product
         if (product) {
-          if (product.main_category_id) {
-            setSelectedMainCategory(product.main_category_id);
+          if (product.category_id) {
+            setSelectedMainCategory(product.category_id);
             
             // If there's a main category, load its subcategories
-            const subcategoriesData = await fetchSubcategories(product.main_category_id);
+            const subcategoriesData = await fetchSubcategories(product.category_id);
             setSubcategories(subcategoriesData);
             
             if (product.subcategory_id) {
@@ -140,7 +140,7 @@ export default function ProductAssignmentDialog({
     try {
       if (type === 'category') {
         const updateData: Record<string, any> = {
-          main_category_id: selectedMainCategory || null,
+          category_id: selectedMainCategory || null,
           subcategory_id: selectedSubcategory || null,
           subsubcategory_id: selectedSubsubcategory || null
         };
