@@ -31,6 +31,21 @@ export async function fetchProductById(id: string) {
   return data as Product;
 }
 
+export async function fetchProductByBarcode(barcode: string) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("barcode", barcode)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching product by barcode:", error);
+    throw error;
+  }
+
+  return data as Product | null;
+}
+
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
   const { data, error } = await supabase
     .from("products")

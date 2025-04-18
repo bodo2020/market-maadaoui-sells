@@ -57,6 +57,8 @@ export interface Category {
   image_url?: string | null;
   created_at?: string;
   updated_at?: string;
+  level?: 'category' | 'subcategory' | 'subsubcategory';
+  parent_id?: string | null;
 }
 
 export interface Company {

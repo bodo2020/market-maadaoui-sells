@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -210,7 +211,11 @@ const ProductAssignmentDialog = ({
           </div>
           
           {type === 'category' && (
-            <RadioGroup defaultValue={selectedCategoryLevel} onValueChange={setSelectedCategoryLevel} className="pb-4">
+            <RadioGroup 
+              defaultValue={selectedCategoryLevel} 
+              onValueChange={(value: 'category' | 'subcategory' | 'subsubcategory') => setSelectedCategoryLevel(value)} 
+              className="pb-4"
+            >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="category" id="category" />
                 <Label htmlFor="category">قسم رئيسي</Label>

@@ -1,63 +1,65 @@
-
-import { User, UserRole, Product, Category, Sale, Expense, Shift, Purchase } from "@/types";
+import { User, UserRole, Product, Category, Sale, Expense, Shift, Purchase, MainCategory, Subcategory } from "@/types";
 import { siteConfig } from "@/config/site";
 
 // Categories
-export const categories: Category[] = [
+export const categories: MainCategory[] = [
   {
     id: "1",
     name: "بقالة",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    children: [
-      {
-        id: "101",
-        name: "زيوت وسمن",
-        parent_id: "1",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: "102",
-        name: "أرز وسكر",
-        parent_id: "1",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: "103",
-        name: "معلبات",
-        parent_id: "1",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    ]
+    product_count: 10
   },
   {
     id: "2",
     name: "مشروبات",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    children: [
-      {
-        id: "201",
-        name: "شاي وقهوة",
-        parent_id: "2",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: "202",
-        name: "عصائر",
-        parent_id: "2",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    ]
+    product_count: 5
   },
   {
     id: "3",
     name: "منظفات",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    product_count: 3
+  }
+];
+
+// Subcategories
+export const subcategories: Subcategory[] = [
+  {
+    id: "101",
+    name: "زيوت وسمن",
+    category_id: "1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "102",
+    name: "أرز وسكر",
+    category_id: "1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "103",
+    name: "معلبات",
+    category_id: "1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "201",
+    name: "شاي وقهوة",
+    category_id: "2",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: "202",
+    name: "عصائر",
+    category_id: "2",
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   }

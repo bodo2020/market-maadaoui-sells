@@ -18,11 +18,34 @@ import { fetchCompanies } from "@/services/supabase/companyService";
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 
-interface Category {
+interface CategoryType {
   id: string;
   name: string;
-  level: 'category' | 'subcategory' | 'subsubcategory';
-  parent_id: string | null;
+  description?: string | null;
+  image_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  product_count?: number;
+}
+
+interface SubcategoryType {
+  id: string;
+  name: string;
+  description?: string | null;
+  image_url?: string | null;
+  category_id: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface SubsubcategoryType {
+  id: string;
+  name: string;
+  description?: string | null;
+  image_url?: string | null;
+  subcategory_id: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 const productFormSchema = z.object({
@@ -111,10 +134,9 @@ export default function AddProduct() {
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
   
-  // Categories state
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [subcategories, setSubcategories] = useState<Category[]>([]);
-  const [subsubcategories, setSubsubcategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<CategoryType[]>([]);
+  const [subcategories, setSubcategories] = useState<SubcategoryType[]>([]);
+  const [subsubcategories, setSubsubcategories] = useState<SubsubcategoryType[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
 
@@ -141,7 +163,6 @@ export default function AddProduct() {
     }
   });
 
-  // Fetch main categories on component mount
   useEffect(() => {
     const fetchCategories = async () => {
       const { data, error } = await supabase
@@ -150,14 +171,13 @@ export default function AddProduct() {
         .order('name');
       
       if (!error && data) {
-        setCategories(data as Category[]);
+        setCategories(data as CategoryType[]);
       }
     };
     
     fetchCategories();
   }, []);
 
-  // Fetch subcategories when a category is selected
   useEffect(() => {
     const fetchSubcategories = async () => {
       if (selectedCategory) {
@@ -168,7 +188,7 @@ export default function AddProduct() {
           .order('name');
         
         if (!error && data) {
-          setSubcategories(data as Category[]);
+          setSubcategories(data as SubcategoryType[]);
           setSubsubcategories([]); // Reset sub-subcategories
           setSelectedSubcategory(null);
           form.setValue('subcategory_id', undefined);
@@ -183,7 +203,6 @@ export default function AddProduct() {
     fetchSubcategories();
   }, [selectedCategory, form]);
 
-  // Fetch sub-subcategories when a subcategory is selected
   useEffect(() => {
     const fetchSubsubcategories = async () => {
       if (selectedSubcategory) {
@@ -194,7 +213,7 @@ export default function AddProduct() {
           .order('name');
         
         if (!error && data) {
-          setSubsubcategories(data as Category[]);
+          setSubsubcategories(data as SubsubcategoryType[]);
           form.setValue('subsubcategory_id', undefined);
         }
       } else {
@@ -414,7 +433,6 @@ export default function AddProduct() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Product Name and Image Section */}
                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField control={form.control} name="name" render={({field}) => (
                     <FormItem>
@@ -447,7 +465,6 @@ export default function AddProduct() {
                   </div>
                 </div>
 
-                {/* Categories Section */}
                 <FormField
                   control={form.control}
                   name="category_id"
@@ -583,7 +600,6 @@ export default function AddProduct() {
                       <FormMessage />
                     </FormItem>} />
 
-                {/* Price Section */}
                 <FormField control={form.control} name="price" render={({
                 field
               }) => <FormItem>
@@ -604,7 +620,6 @@ export default function AddProduct() {
                       <FormMessage />
                     </FormItem>} />
 
-                {/* Quantity and Notification Section */}
                 <div className="space-y-4">
                   <FormField control={form.control} name="quantity" render={({field}) => (
                     <FormItem>
@@ -662,7 +677,6 @@ export default function AddProduct() {
                   )} />
                 </div>
 
-                {/* Offer Section */}
                 <FormField control={form.control} name="is_offer" render={({field}) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
@@ -703,7 +717,6 @@ export default function AddProduct() {
                 )}
               </div>
 
-              {/* Barcode Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
@@ -755,7 +768,6 @@ export default function AddProduct() {
                 />
               </div>
 
-              {/* Description Section */}
               <FormField control={form.control} name="description" render={({
               field
             }) => <FormItem>
@@ -766,7 +778,6 @@ export default function AddProduct() {
                     <FormMessage />
                   </FormItem>} />
 
-              {/* Submit Buttons */}
               <div className="flex justify-end gap-3">
                 <Button type="button" variant="outline" onClick={() => navigate("/products")}>
                   إلغاء
@@ -783,7 +794,6 @@ export default function AddProduct() {
         </CardContent>
       </Card>
       
-      {/* Barcode Scanner Dialog */}
       <BarcodeScanner isOpen={showScanner} onClose={() => setShowScanner(false)} onScan={handleBarcodeResult} />
     </MainLayout>
   );
