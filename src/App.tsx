@@ -28,7 +28,7 @@ import CashTracking from "./pages/CashTracking";
 import Companies from "./pages/Companies";
 import Banners from "./pages/Banners";
 import OnlineOrders from "./pages/OnlineOrders";
-import Categories from "./pages/Categories";
+import CategoriesPage from "./pages/CategoriesPage";
 import AddBanner from "./pages/AddBanner";
 import CompanyDetails from "./pages/CompanyDetails";
 import DeliveryLocations from "./pages/DeliveryLocations";
@@ -180,13 +180,19 @@ function App() {
               
               <Route path="/categories" element={
                 <ProtectedRoute>
-                  <Categories />
+                  <CategoriesPage />
                 </ProtectedRoute>
               } />
               
               <Route path="/categories/:id" element={
                 <ProtectedRoute>
-                  <Categories />
+                  <CategoriesPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/categories/:id/:subId" element={
+                <ProtectedRoute>
+                  <CategoriesPage />
                 </ProtectedRoute>
               } />
               

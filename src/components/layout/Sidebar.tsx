@@ -4,7 +4,6 @@ import { siteConfig } from "@/config/site";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import {
   BarChart4,
   Store,
@@ -75,7 +74,6 @@ export default function Sidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
   const [collapsed, setCollapsed] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [showCategories, setShowCategories] = useState(false);
   const { unreadOrders } = useNotificationStore();
   
@@ -90,25 +88,6 @@ export default function Sidebar() {
     setCollapsed(!collapsed);
   };
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('categories')
-          .select('id, name, level, image_url')
-          .eq('level', 'category')
-          .order('name');
-        
-        if (error) throw error;
-        setCategories(data || []);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-      }
-    };
-
-    fetchCategories();
-  }, []);
-  
   return (
     <div className={cn(
       "border-l bg-white h-screen overflow-y-auto flex flex-col transition-all duration-300",
