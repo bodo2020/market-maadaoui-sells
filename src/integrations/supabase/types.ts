@@ -291,32 +291,79 @@ export type Database = {
       delivery_locations: {
         Row: {
           active: boolean | null
+          area: string | null
+          city: string | null
           created_at: string | null
           estimated_time: string | null
+          governorate: string | null
           id: string
           name: string
+          neighborhood: string | null
           notes: string | null
           price: number
+          provider_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          area?: string | null
+          city?: string | null
+          created_at?: string | null
+          estimated_time?: string | null
+          governorate?: string | null
+          id?: string
+          name: string
+          neighborhood?: string | null
+          notes?: string | null
+          price?: number
+          provider_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          area?: string | null
+          city?: string | null
+          created_at?: string | null
+          estimated_time?: string | null
+          governorate?: string | null
+          id?: string
+          name?: string
+          neighborhood?: string | null
+          notes?: string | null
+          price?: number
+          provider_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_locations_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_providers: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string
+          name: string
           updated_at: string | null
         }
         Insert: {
           active?: boolean | null
           created_at?: string | null
-          estimated_time?: string | null
           id?: string
           name: string
-          notes?: string | null
-          price?: number
           updated_at?: string | null
         }
         Update: {
           active?: boolean | null
           created_at?: string | null
-          estimated_time?: string | null
           id?: string
           name?: string
-          notes?: string | null
-          price?: number
           updated_at?: string | null
         }
         Relationships: []
