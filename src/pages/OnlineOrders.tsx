@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -9,25 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import { useNotificationStore } from "@/stores/notificationStore";
-
-export interface OrderItem {
-  product_id: string;
-  product_name: string;
-  quantity: number;
-  price: number;
-  total: number;
-}
-
-export interface Order {
-  id: string;
-  created_at: string;
-  total: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
-  payment_method: string | null;
-  shipping_address: string | null;
-  items: OrderItem[];
-}
+import { Order, OrderItem } from "@/types/index";
 
 type OrderFromDB = {
   id: string;

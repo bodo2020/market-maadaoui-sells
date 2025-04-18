@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -206,4 +207,23 @@ export interface PurchaseItem {
   price: number;
   total: number;
   products?: { name: string };
+}
+
+export interface OrderItem {
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  price: number;
+  total: number;
+}
+
+export interface Order {
+  id: string;
+  created_at: string;
+  total: number;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  payment_method: string | null;
+  shipping_address: string | null;
+  items: OrderItem[];
 }
