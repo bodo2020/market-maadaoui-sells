@@ -19,6 +19,7 @@ import { Button as ShadcnButton } from "@/components/ui/button";
 import { Dialog as ShadcnDialog } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import ProductAssignmentDialog from "@/components/products/ProductAssignmentDialog";
+
 export default function ProductManagement() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
@@ -46,9 +47,11 @@ export default function ProductManagement() {
   const {
     toast
   } = useToast();
+
   useEffect(() => {
     loadProducts();
   }, []);
+
   const loadProducts = async () => {
     setLoading(true);
     try {
@@ -65,7 +68,9 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
+
   const filteredProducts = products.filter(product => product.name.toLowerCase().includes(search.toLowerCase()) || product.barcode && product.barcode.includes(search));
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const {
       id,
@@ -85,6 +90,7 @@ export default function ProductManagement() {
       });
     }
   };
+
   const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const {
       id,
@@ -104,30 +110,35 @@ export default function ProductManagement() {
       } as Product);
     }
   };
+
   const handleSelectChange = (value: string, field: string) => {
     setNewProduct({
       ...newProduct,
       [field]: value
     });
   };
+
   const handleEditSelectChange = (value: string, field: string) => {
     setProductToEdit({
       ...productToEdit,
       [field]: value
     } as Product);
   };
+
   const handleCheckboxChange = (checked: boolean, field: string) => {
     setNewProduct({
       ...newProduct,
       [field]: checked
     });
   };
+
   const handleEditCheckboxChange = (checked: boolean, field: string) => {
     setProductToEdit({
       ...productToEdit,
       [field]: checked
     } as Product);
   };
+
   const handleSaveProduct = async () => {
     if (!newProduct.name || !newProduct.price || !newProduct.purchase_price) {
       toast({
@@ -187,6 +198,7 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
+
   const handleEditProduct = async () => {
     if (!productToEdit || !productToEdit.name || !productToEdit.price || !productToEdit.purchase_price) {
       toast({
@@ -217,6 +229,7 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
+
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
     setLoading(true);
@@ -240,6 +253,7 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
+
   const handleAddOffer = async () => {
     if (!productToAddOffer || !productToAddOffer.offer_price) {
       toast({
@@ -273,9 +287,11 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
+
   const handleBarcodeScanning = () => {
     setIsBarcodeDialogOpen(true);
   };
+
   const validateWeightBarcode = (barcode: string) => {
     if (!/^\d{1,6}$/.test(barcode)) {
       toast({
@@ -301,6 +317,7 @@ export default function ProductManagement() {
     });
     return true;
   };
+
   const handleBarcodeSubmit = () => {
     if (scannedBarcode) {
       if (scannedBarcode.startsWith('2') && scannedBarcode.length === 13) {
@@ -337,9 +354,11 @@ export default function ProductManagement() {
       });
     }
   };
+
   const handleEditClick = async (product: Product) => {
     navigate(`/add-product?id=${product.id}`);
   };
+
   const handleAddOfferClick = (product: Product) => {
     setProductToAddOffer({
       ...product,
@@ -348,7 +367,9 @@ export default function ProductManagement() {
     });
     setIsOfferDialogOpen(true);
   };
-  return <MainLayout>
+
+  return (
+    <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xs text-justify font-thin py-0">إدارة المنتجات</h1>
         <Button onClick={() => navigate("/add-product")} disabled={loading}>
@@ -403,7 +424,8 @@ export default function ProductManagement() {
                       <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         لا توجد منتجات مطابقة للبحث
                       </TableCell>
-                    </TableRow> : filteredProducts.map(product => <TableRow key={product.id}>
+                    </TableRow> : filteredProducts.map(product => (
+                      <TableRow key={product.id}>
                         <TableCell>
                           <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
                             <img src={product.image_urls ? product.image_urls[0] : "/placeholder.svg"} alt={product.name} className="h-8 w-8 object-contain" />
@@ -430,7 +452,19 @@ export default function ProductManagement() {
                             </div> : <span className="text-xs text-muted-foreground">غير متاح</span>}
                         </TableCell>
                         <TableCell>
-                          {(product.quantity || 0) > 10 ? <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">غير متوفر</span> : (product.quantity || 0) > 0 ? <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">مخزون منخفض</span> : <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">غير متوف��</span>}
+                          {(product.quantity || 0) > 10 ? (
+                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                              غير متوفر
+                            </span>
+                          ) : (product.quantity || 0) > 0 ? (
+                            <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                              مخزون منخفض
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
+                              غير متوفر
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -476,7 +510,8 @@ export default function ProductManagement() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
-                      </TableRow>)}
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </div>}
@@ -602,5 +637,6 @@ export default function ProductManagement() {
       <ProductAssignmentDialog open={isAssignCategoryOpen} onOpenChange={setIsAssignCategoryOpen} product={productToEdit} onSaved={loadProducts} type="category" />
       
       <ProductAssignmentDialog open={isAssignCompanyOpen} onOpenChange={setIsAssignCompanyOpen} product={productToEdit} onSaved={loadProducts} type="company" />
-    </MainLayout>;
+    </MainLayout>
+  );
 }
