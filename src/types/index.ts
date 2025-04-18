@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -225,4 +226,5 @@ export interface Order {
   customer_name?: string;
   customer_email?: string;
   customer_phone?: string;
+  notes?: string;
 }
