@@ -104,7 +104,7 @@ export function UpdateOrderStatusDialog({
             
             <RadioGroup 
               value={status} 
-              onValueChange={(value: Order['status']) => setStatus(value)}
+              onValueChange={(value) => setStatus(value as Order['status'])}
               className="grid gap-3"
             >
               {[
@@ -116,7 +116,7 @@ export function UpdateOrderStatusDialog({
               ].map((item) => (
                 <div 
                   key={item.value}
-                  className={`flex items-center space-x-2 space-x-reverse rounded-lg border-2 p-3 transition-colors ${getStatusClass(item.value)}`}
+                  className={`flex items-center space-x-2 space-x-reverse rounded-lg border-2 p-3 transition-colors ${getStatusClass(item.value as Order['status'])}`}
                 >
                   <RadioGroupItem value={item.value} id={item.value} />
                   <Label 
