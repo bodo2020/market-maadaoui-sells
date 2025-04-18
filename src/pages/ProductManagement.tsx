@@ -430,7 +430,7 @@ export default function ProductManagement() {
                             </div> : <span className="text-xs text-muted-foreground">غير متاح</span>}
                         </TableCell>
                         <TableCell>
-                          {(product.quantity || 0) > 10 ? <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">غير متوفر</span> : (product.quantity || 0) > 0 ? <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">مخزون منخفض</span> : <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">غير متوف��</span>}
+                          {(product.quantity || 0) > 10 ? <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">متوفر</span> : (product.quantity || 0) > 0 ? <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">مخزون منخفض</span> : <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">غير متوف��</span>}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
