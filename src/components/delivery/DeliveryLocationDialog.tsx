@@ -6,68 +6,47 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { createDeliveryLocation, updateDeliveryLocation } from "@/services/supabase/deliveryService";
+import { createDeliveryLocation } from "@/services/supabase/deliveryService";
 
 interface DeliveryLocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  location?: {
-    id: string;
-    governorate?: string;
-    city?: string;
-    area?: string;
-    neighborhood?: string;
-    name: string;
-    price: number;
-    estimated_time?: string;
-    active: boolean;
-    notes?: string;
-  };
+  providerId: string;
+  onSuccess?: () => void;
 }
 
 export default function DeliveryLocationDialog({
   open,
   onOpenChange,
-  location
+  providerId,
+  onSuccess
 }: DeliveryLocationDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [governorate, setGovernorate] = useState(location?.governorate || "");
-  const [city, setCity] = useState(location?.city || "");
-  const [area, setArea] = useState(location?.area || "");
-  const [neighborhood, setNeighborhood] = useState(location?.neighborhood || "");
-  const [name, setName] = useState(location?.name || "");
-  const [price, setPrice] = useState(location?.price || 0);
-  const [estimatedTime, setEstimatedTime] = useState(location?.estimated_time || "");
-  const [active, setActive] = useState(location?.active ?? true);
-  const [notes, setNotes] = useState(location?.notes || "");
+  const [governorate, setGovernorate] = useState("");
+  const [city, setCity] = useState("");
+  const [area, setArea] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [price, setPrice] = useState(0);
+  const [estimatedTime, setEstimatedTime] = useState("");
+  const [active, setActive] = useState(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setLoading(true);
-      const locationData = {
+      await createDeliveryLocation({
+        provider_id: providerId,
         governorate,
         city,
         area,
         neighborhood,
-        name: name || `${governorate} - ${city} - ${area}${neighborhood ? ` - ${neighborhood}` : ''}`,
         price,
         estimated_time: estimatedTime,
-        active,
-        notes
-      };
-
-      if (location?.id) {
-        await updateDeliveryLocation(location.id, locationData);
-        toast.success("تم تحديث منطقة التوصيل بنجاح");
-      } else {
-        await createDeliveryLocation(locationData);
-        toast.success("تم إضافة منطقة التوصيل بنجاح");
-      }
-
+        active
+      });
+      toast.success("تم إضافة منطقة التوصيل بنجاح");
+      onSuccess?.();
       onOpenChange(false);
-      window.location.reload();
     } catch (error) {
       console.error('Error saving delivery location:', error);
       toast.error("حدث خطأ أثناء حفظ منطقة التوصيل");
@@ -80,9 +59,7 @@ export default function DeliveryLocationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] rtl">
         <DialogHeader>
-          <DialogTitle>
-            {location ? "تعديل منطقة التوصيل" : "إضافة منطقة توصيل جديدة"}
-          </DialogTitle>
+          <DialogTitle>إضافة منطقة توصيل جديدة</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -118,7 +95,6 @@ export default function DeliveryLocationDialog({
               onChange={(e) => setArea(e.target.value)}
               placeholder="أدخل اسم المنطقة"
               className="text-right"
-              required
             />
           </div>
 
@@ -128,11 +104,11 @@ export default function DeliveryLocationDialog({
               id="neighborhood"
               value={neighborhood}
               onChange={(e) => setNeighborhood(e.target.value)}
-              placeholder="أدخل اسم الحي (اختياري)"
+              placeholder="أدخل اسم الحي"
               className="text-right"
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="price">سعر التوصيل</Label>
             <Input
@@ -145,7 +121,7 @@ export default function DeliveryLocationDialog({
               required
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="estimatedTime">الوقت المتوقع للتوصيل</Label>
             <Input
@@ -156,30 +132,19 @@ export default function DeliveryLocationDialog({
               className="text-right"
             />
           </div>
-          
+
           <div className="flex items-center justify-between">
+            <Label htmlFor="active">تفعيل المنطقة</Label>
             <Switch
               id="active"
               checked={active}
               onCheckedChange={setActive}
             />
-            <Label htmlFor="active">تفعيل المنطقة</Label>
           </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="notes">ملاحظات</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="أي ملاحظات إضافية..."
-              className="text-right"
-            />
-          </div>
-          
+
           <div className="flex justify-end gap-2">
             <Button type="submit" disabled={loading}>
-              {loading ? "جاري الحفظ..." : location ? "تحديث" : "إضافة"}
+              {loading ? "جاري الحفظ..." : "إضافة"}
             </Button>
             <Button
               type="button"

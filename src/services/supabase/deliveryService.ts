@@ -1,26 +1,34 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { DeliveryLocation, ShippingProvider } from "@/types/shipping";
 
-interface DeliveryLocation {
-  id: string;
-  governorate?: string;
-  city?: string;
-  area?: string;
-  neighborhood?: string;
-  name: string;
-  price: number;
-  estimated_time?: string;
-  active: boolean;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
+export async function fetchShippingProviders() {
+  const { data, error } = await supabase
+    .from('shipping_providers')
+    .select('*')
+    .order('name');
+    
+  if (error) throw error;
+  return data as ShippingProvider[];
 }
 
-export async function fetchDeliveryLocations() {
+export async function createShippingProvider(provider: Omit<ShippingProvider, 'id' | 'created_at' | 'updated_at'>) {
+  const { data, error } = await supabase
+    .from('shipping_providers')
+    .insert([provider])
+    .select()
+    .single();
+    
+  if (error) throw error;
+  return data as ShippingProvider;
+}
+
+export async function fetchDeliveryLocations(providerId: string) {
   const { data, error } = await supabase
     .from('delivery_locations')
     .select('*')
-    .order('name');
+    .eq('provider_id', providerId)
+    .order('governorate', { ascending: true });
     
   if (error) throw error;
   return data as DeliveryLocation[];
