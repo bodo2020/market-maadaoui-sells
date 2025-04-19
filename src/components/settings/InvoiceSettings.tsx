@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,6 @@ export default function InvoiceSettings() {
     customLogoUrl: siteConfig.invoice?.customLogoUrl || null,
   });
 
-  // Load settings from siteConfig when component mounts
   useEffect(() => {
     console.log("Loading invoice settings from siteConfig:", siteConfig.invoice);
     console.log("Store logo URL:", siteConfig.logoUrl);
@@ -167,6 +165,7 @@ export default function InvoiceSettings() {
         price: 125,
         discount: 0,
         total: 250,
+        weight: null,
       },
       {
         product: {
@@ -185,6 +184,7 @@ export default function InvoiceSettings() {
         price: 75,
         discount: 0,
         total: 75,
+        weight: null,
       }
     ],
     subtotal: 325,
@@ -196,6 +196,7 @@ export default function InvoiceSettings() {
     customer_name: "عميل تجريبي",
     customer_phone: "01234567890",
     created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
 
   return (
@@ -293,7 +294,7 @@ export default function InvoiceSettings() {
                       <SelectValue placeholder="اختر حجم الخط" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="small">صغير</SelectItem>
+                      <SelectItem value="small">صغي��</SelectItem>
                       <SelectItem value="normal">متوسط</SelectItem>
                       <SelectItem value="large">كبير</SelectItem>
                     </SelectContent>

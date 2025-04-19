@@ -37,7 +37,8 @@ export default function ExpenseSettings() {
     amount: 0,
     description: "",
     date: new Date().toISOString().split('T')[0],
-    receipt_url: ""
+    receipt_url: "",
+    category: "general", // Added default category
   });
   const { toast } = useToast();
 
@@ -73,7 +74,8 @@ export default function ExpenseSettings() {
       amount: 0,
       description: "",
       date: new Date().toISOString().split('T')[0],
-      receipt_url: ""
+      receipt_url: "",
+      category: "general",
     });
   };
 
@@ -88,7 +90,8 @@ export default function ExpenseSettings() {
       amount: expense.amount,
       description: expense.description,
       date: formattedDate,
-      receipt_url: expense.receipt_url || ""
+      receipt_url: expense.receipt_url || "",
+      category: expense.category,
     });
     setIsEditDialogOpen(true);
   };
@@ -109,7 +112,8 @@ export default function ExpenseSettings() {
         amount: formData.amount,
         description: formData.description,
         date: formData.date,
-        receipt_url: formData.receipt_url
+        receipt_url: formData.receipt_url,
+        category: formData.category,
       });
 
       toast({
@@ -139,7 +143,8 @@ export default function ExpenseSettings() {
         amount: formData.amount,
         description: formData.description,
         date: formData.date,
-        receipt_url: formData.receipt_url
+        receipt_url: formData.receipt_url,
+        category: formData.category,
       });
 
       toast({

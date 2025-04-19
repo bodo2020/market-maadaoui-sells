@@ -18,6 +18,8 @@ export interface User {
   active?: boolean;
   password?: string;
   shifts?: Shift[];
+  salary?: number;
+  salary_type?: string;
 }
 
 export interface Shift {
@@ -105,6 +107,10 @@ export interface Company {
   name: string;
   description?: string;
   image_url?: string;
+  logo_url?: string;
+  address?: string;
+  contact_email?: string;
+  contact_phone?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -174,6 +180,10 @@ export interface Purchase {
   card_amount?: number;
   created_at: string;
   updated_at: string;
+  invoice_number?: string;
+  paid?: number;
+  description?: string;
+  suppliers?: { name: string };
 }
 
 export interface PurchaseItem {
@@ -248,6 +258,13 @@ export interface Order {
   notes?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface OrderItem {
+  product: Product;
+  quantity: number;
+  price: number;
+  total: number;
 }
 
 export interface OnlineOrder {
