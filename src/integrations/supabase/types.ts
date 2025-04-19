@@ -392,6 +392,54 @@ export type Database = {
           },
         ]
       }
+      invoice_settings: {
+        Row: {
+          auto_print: boolean | null
+          auto_send_email: boolean | null
+          created_at: string | null
+          footer_text: string | null
+          id: string
+          invoice_prefix: string | null
+          next_invoice_number: number | null
+          show_contact: boolean | null
+          show_logo: boolean | null
+          show_tax_id: boolean | null
+          tax_id: string | null
+          terms_and_conditions: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_print?: boolean | null
+          auto_send_email?: boolean | null
+          created_at?: string | null
+          footer_text?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          next_invoice_number?: number | null
+          show_contact?: boolean | null
+          show_logo?: boolean | null
+          show_tax_id?: boolean | null
+          tax_id?: string | null
+          terms_and_conditions?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_print?: boolean | null
+          auto_send_email?: boolean | null
+          created_at?: string | null
+          footer_text?: string | null
+          id?: string
+          invoice_prefix?: string | null
+          next_invoice_number?: number | null
+          show_contact?: boolean | null
+          show_logo?: boolean | null
+          show_tax_id?: boolean | null
+          tax_id?: string | null
+          terms_and_conditions?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       main_categories: {
         Row: {
           created_at: string | null

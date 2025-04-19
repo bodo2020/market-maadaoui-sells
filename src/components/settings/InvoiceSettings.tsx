@@ -29,42 +29,21 @@ const invoiceSettingsSchema = z.object({
 
 type InvoiceSettingsValues = z.infer<typeof invoiceSettingsSchema>;
 
-// Create a sample receipt for demonstration
-const sampleReceipt = {
-  id: '1',
-  date: new Date().toISOString(),
-  invoice_number: 'INV-1001',
-  items: [
-    {
-      product: {
-        id: '1',
-        name: 'منتج تجريبي',
-        price: 50,
-        purchase_price: 40,
-        quantity: 100,
-        image_urls: [],
-        is_offer: false,
-        bulk_enabled: false,
-        is_bulk: false,
-        created_at: new Date().toISOString(),
-      },
-      quantity: 2,
-      price: 50,
-      discount: 0,
-      total: 100,
-    }
-  ],
-  subtotal: 100,
-  discount: 0,
-  total: 100,
-  payment_method: 'cash' as 'cash' | 'card' | 'mixed',
-  customer_name: 'عميل تجريبي',
-  customer_phone: '01012345678',
-  cashier_id: '1',
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  profit: 20,
-};
+interface InvoiceSettings {
+  id: string;
+  invoice_prefix: string;
+  next_invoice_number: number;
+  show_logo: boolean;
+  show_contact: boolean;
+  show_tax_id: boolean;
+  tax_id: string | null;
+  footer_text: string | null;
+  terms_and_conditions: string | null;
+  auto_send_email: boolean;
+  auto_print: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function InvoiceSettings() {
   const [isLoading, setIsLoading] = useState(false);
@@ -103,7 +82,7 @@ export default function InvoiceSettings() {
           auto_send_email: data.autoSendEmail,
           auto_print: data.autoPrint,
           updated_at: new Date().toISOString(),
-        }, {
+        } as InvoiceSettings, {
           onConflict: 'id'
         });
         
