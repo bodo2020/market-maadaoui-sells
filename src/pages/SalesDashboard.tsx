@@ -14,7 +14,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
 import { toast } from "sonner";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Sale } from "@/types";
+import { Sale, CartItem } from "@/types";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Banknote, TrendingUp, ShoppingCart, ShoppingBag, ArrowDown, ArrowUp } from "lucide-react";
 
@@ -39,7 +39,21 @@ export default function SalesDashboard() {
         .order('date', { ascending: false });
         
       if (error) throw error;
-      return data as Sale[];
+      
+      // Transform the data to match the Sale type
+      return (data || []).map(sale => ({
+        ...sale,
+        // Ensure payment_method is one of the allowed values in the Sale type
+        payment_method: (sale.payment_method === 'cash' || 
+                        sale.payment_method === 'card' || 
+                        sale.payment_method === 'mixed') 
+                        ? sale.payment_method as 'cash' | 'card' | 'mixed'
+                        : 'cash', // Default to 'cash' if invalid value
+        // Parse items properly
+        items: Array.isArray(sale.items) 
+          ? sale.items as unknown as CartItem[]  // If already an array
+          : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
+      })) as Sale[];
     }
   });
   
@@ -351,7 +365,7 @@ export default function SalesDashboard() {
                         <TableRow key={order.id}>
                           <TableCell>{order.id.substring(0, 8)}</TableCell>
                           <TableCell>{new Date(order.created_at).toLocaleDateString('ar-EG')}</TableCell>
-                          <TableCell>{order.customer_name || 'غير محدد'}</TableCell>
+                          <TableCell>{order.customer_id ? 'عميل' : 'غير محدد'}</TableCell>
                           <TableCell>
                             {order.status === 'waiting' ? 'في الانتظار' :
                              order.status === 'ready' ? 'جاهز' :
