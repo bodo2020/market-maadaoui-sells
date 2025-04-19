@@ -28,7 +28,7 @@ export default function MainLayout({
         const { count, error } = await supabase
           .from('online_orders')
           .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending');
+          .eq('status', 'waiting'); // Updated from 'pending' to 'waiting'
         
         if (error) throw error;
         setUnreadOrders(count || 0);

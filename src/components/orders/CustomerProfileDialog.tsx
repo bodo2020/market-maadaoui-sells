@@ -116,8 +116,8 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
                 
                 <div className="flex flex-wrap gap-2">
                   <Badge variant="secondary">{customer.order.items.length} منتج</Badge>
-                  <Badge variant={customer.order.status === 'pending' ? 'outline' : 'default'}>
-                    {customer.order.status === 'pending' ? 'قيد الانتظار' : 'تم الشحن'}
+                  <Badge variant={customer.order.status === 'waiting' ? 'outline' : 'default'}>
+                    {customer.order.status === 'waiting' ? 'قيد الانتظار' : 'تم الشحن'}
                   </Badge>
                 </div>
               </CardContent>
