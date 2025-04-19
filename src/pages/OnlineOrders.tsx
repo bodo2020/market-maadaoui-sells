@@ -1,5 +1,5 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { useOrdersData, OrderFilters } from "@/hooks/orders/useOrdersData";
 import { OrdersHeader } from "@/components/orders/OrdersHeader";
@@ -14,18 +14,15 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function OnlineOrders() {
-  // State for filters and dialogs
+  const navigate = useNavigate();
   const [filters, setFilters] = useState<OrderFilters>({ status: 'all' });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   
-  // Notification store for marking orders as read
   const { markOrdersAsRead } = useNotificationStore();
   
-  // Hook for fetching and managing orders
   const { 
     orders, 
     loading, 
@@ -33,13 +30,11 @@ export default function OnlineOrders() {
     confirmPayment,
     assignDeliveryPerson,
     cancelOrder,
-    refreshOrders
   } = useOrdersData({
     ...filters,
     searchQuery
   });
   
-  // Update filters when tab changes
   const handleTabChange = (value: string) => {
     console.log("Tab changed to:", value);
     setFilters(prev => {
@@ -48,7 +43,6 @@ export default function OnlineOrders() {
         status: value as OrderFilters['status'] 
       };
       
-      // When viewing pending orders, mark them as read
       if (value === 'pending') {
         markOrdersAsRead();
       }
@@ -57,53 +51,30 @@ export default function OnlineOrders() {
     });
   };
   
-  // Handle action for marking order as ready
   const handleMarkAsReady = (order: Order) => {
     if (order.status === 'processing') {
       updateOrderStatus(order.id, 'ready');
     }
   };
   
-  // Open details dialog
   const handleViewDetails = (order: Order) => {
-    setSelectedOrder(order);
-    setDetailsOpen(true);
+    navigate(`/orders/${order.id}`);
     
-    // Mark as read if viewing a pending order
     if (order.status === 'pending') {
       markOrdersAsRead();
     }
   };
   
-  // Handle payment confirmation action
   const handleConfirmPayment = (order: Order) => {
     setSelectedOrder(order);
-    
-    if (detailsOpen) {
-      setDetailsOpen(false);
-      setTimeout(() => {
-        setPaymentDialogOpen(true);
-      }, 300);
-    } else {
-      setPaymentDialogOpen(true);
-    }
+    setPaymentDialogOpen(true);
   };
   
-  // Handle order cancellation action
   const handleCancelOrder = (order: Order) => {
     setSelectedOrder(order);
-    
-    if (detailsOpen) {
-      setDetailsOpen(false);
-      setTimeout(() => {
-        setCancelDialogOpen(true);
-      }, 300);
-    } else {
-      setCancelDialogOpen(true);
-    }
+    setCancelDialogOpen(true);
   };
   
-  // Handle print invoice action
   const handlePrintInvoice = (order: Order) => {
     printOrderInvoice(order);
   };
@@ -116,7 +87,7 @@ export default function OnlineOrders() {
           onTabChange={handleTabChange}
           onSearchChange={setSearchQuery}
           searchQuery={searchQuery}
-          onRefresh={refreshOrders}
+          onRefresh={() => {}}
           isLoading={loading}
         />
         
@@ -150,20 +121,6 @@ export default function OnlineOrders() {
           )}
         </div>
         
-        {/* Order details dialog */}
-        {selectedOrder && (
-          <OrderDetailsDialog
-            order={selectedOrder}
-            open={detailsOpen}
-            onOpenChange={setDetailsOpen}
-            onPrintInvoice={handlePrintInvoice}
-            onMarkAsReady={handleMarkAsReady}
-            onAssignDelivery={refreshOrders}
-            onConfirmPayment={handleConfirmPayment}
-          />
-        )}
-        
-        {/* Payment confirmation dialog */}
         {selectedOrder && (
           <ConfirmPaymentDialog
             order={selectedOrder}
@@ -176,7 +133,6 @@ export default function OnlineOrders() {
           />
         )}
         
-        {/* Cancel order dialog */}
         {selectedOrder && (
           <CancelOrderDialog
             order={selectedOrder}

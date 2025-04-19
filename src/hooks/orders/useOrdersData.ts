@@ -15,9 +15,18 @@ export interface OrderFilters {
 
 export function useOrdersData(filters: OrderFilters = {}) {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [loading, setLoading] = useState(true);
   const { setUnreadOrders } = useNotificationStore();
+
+  useEffect(() => {
+    console.log("useEffect triggered with filters:", filters);
+    fetchOrders();
+    
+    const channel = setupRealtimeSubscription();
+    return () => {
+      cleanupRealtimeSubscription();
+    };
+  }, [filters]);
 
   const setupRealtimeSubscription = () => {
     const channel = supabase.channel('online-orders-changes')
@@ -136,20 +145,18 @@ export function useOrdersData(filters: OrderFilters = {}) {
 
   const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
     try {
-      const updates = {
-        status,
-        updated_at: new Date().toISOString()
-      };
-      
       const { error } = await supabase
         .from('online_orders')
-        .update(updates)
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', orderId);
       
       if (error) throw error;
       
       toast.success(`تم تحديث حالة الطلب إلى ${getOrderStatusText(status)}`);
-      refreshOrders();
+      await fetchOrders();
     } catch (error) {
       console.error('Error updating order status:', error);
       toast.error("حدث خطأ أثناء تحديث حالة الطلب");
@@ -191,7 +198,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
         toast.info('تم تحديث حالة الطلب إلى "قيد المعالجة"');
       }
       
-      refreshOrders();
+      await fetchOrders();
     } catch (error) {
       console.error('Error confirming payment:', error);
       toast.error('حدث خطأ أثناء تأكيد الدفع');
@@ -221,7 +228,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
       if (error) throw error;
       
       toast.success('تم تعيين مندوب التوصيل بنجاح');
-      refreshOrders();
+      await fetchOrders();
     } catch (error) {
       console.error('Error assigning delivery person:', error);
       toast.error('حدث خطأ أثناء تعيين مندوب التوصيل');
@@ -241,7 +248,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
       if (error) throw error;
       
       toast.success('تم إلغاء الطلب بنجاح');
-      refreshOrders();
+      await fetchOrders();
     } catch (error) {
       console.error('Error cancelling order:', error);
       toast.error('حدث خطأ أثناء إلغاء الطلب');
@@ -260,11 +267,6 @@ export function useOrdersData(filters: OrderFilters = {}) {
     }
   };
 
-  const refreshOrders = () => {
-    setLoading(true);
-    fetchOrders();
-  };
-
   return {
     orders,
     loading,
@@ -272,6 +274,6 @@ export function useOrdersData(filters: OrderFilters = {}) {
     confirmPayment,
     assignDeliveryPerson,
     cancelOrder,
-    refreshOrders
+    refreshOrders: fetchOrders
   };
 }
