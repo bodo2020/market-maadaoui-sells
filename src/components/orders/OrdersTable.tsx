@@ -32,6 +32,7 @@ export function OrdersTable({
     const variants: Record<Order['status'], "default" | "destructive" | "outline" | "secondary"> = {
       pending: "outline",
       processing: "secondary",
+      ready: "secondary", // Added the missing 'ready' status
       shipped: "default",
       delivered: "default",
       cancelled: "destructive"
@@ -39,6 +40,7 @@ export function OrdersTable({
     const labels: Record<Order['status'], string> = {
       pending: "بانتظار التجهيز",
       processing: "قيد المعالجة",
+      ready: "جاهز للتوصيل", // Added the missing 'ready' status
       shipped: "تم الشحن",
       delivered: "تم التسليم",
       cancelled: "ملغي"

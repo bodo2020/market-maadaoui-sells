@@ -4,7 +4,7 @@ import {
   Settings,
   ShoppingBag,
   Users,
-  Category as CategoryIcon,
+  Package as CategoryIcon,
   Truck,
   Percent,
   Coins,
@@ -39,23 +39,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useUser } from "@/contexts/UserContext";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNotificationStore } from "@/stores/notificationStore";
 
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout, isAuthenticated } = useAuth();
-  const { user, loading } = useUser();
+  const { logout, isAuthenticated, user, loading: authLoading } = useAuth();
   const [isClosing, setIsClosing] = useState(false);
   const { unreadOrders, markOrdersAsRead } = useNotificationStore();
 
   useEffect(() => {
-    if (!isAuthenticated && !loading) {
+    if (!isAuthenticated && !authLoading) {
       navigate("/login");
     }
-  }, [isAuthenticated, loading, navigate]);
+  }, [isAuthenticated, authLoading, navigate]);
 
   const handleLogout = async () => {
     setIsClosing(true);
@@ -189,7 +188,7 @@ const Sidebar = () => {
   ];
 
   const renderSidebarItems = () => {
-    const userRole = user?.role || "employee"; // Default to 'employee' if user or role is undefined
+    const userRole = user?.role || "employee";
 
     return sidebarItems.map((item, index) => {
       if (!item.roles.includes(userRole)) {
@@ -228,7 +227,7 @@ const Sidebar = () => {
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user?.username} alt={user?.name} />
                 <AvatarFallback>
-                  {loading ? (
+                  {authLoading ? (
                     <Skeleton className="h-8 w-8 rounded-full" />
                   ) : (
                     user?.name?.charAt(0) || "U"

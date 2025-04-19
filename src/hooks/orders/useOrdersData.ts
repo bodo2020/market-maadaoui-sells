@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Order } from "@/types";
+import { Order, OrderItem } from "@/types";
 import { useNotificationStore } from "@/stores/notificationStore";
 
 export type OrderStatus = 'pending' | 'processing' | 'ready' | 'shipped' | 'delivered' | 'cancelled';
@@ -87,22 +87,38 @@ export function useOrdersData(filters: OrderFilters = {}) {
       if (error) throw error;
       
       // Transform data into Order objects
-      const transformedOrders: Order[] = (data || []).map(item => ({
-        id: item.id,
-        created_at: item.created_at,
-        total: item.total,
-        status: transformStatus(item.status),
-        payment_status: transformPaymentStatus(item.payment_status),
-        payment_method: item.payment_method,
-        shipping_address: item.shipping_address,
-        items: Array.isArray(item.items) ? item.items : [],
-        customer_name: item.customers?.name || 'غير معروف',
-        customer_email: item.customers?.email || '',
-        customer_phone: item.customers?.phone || '',
-        notes: item.notes || '',
-        tracking_number: item.tracking_number || null,
-        delivery_person: item.delivery_person || null
-      }));
+      const transformedOrders: Order[] = (data || []).map(item => {
+        // Parse items to ensure they match OrderItem type
+        let parsedItems: OrderItem[] = [];
+        
+        if (Array.isArray(item.items)) {
+          parsedItems = item.items.map((item: any) => ({
+            product_id: item.product_id || '',
+            product_name: item.product_name || '',
+            quantity: item.quantity || 0,
+            price: item.price || 0,
+            total: item.total || 0,
+            image_url: item.image_url
+          }));
+        }
+        
+        return {
+          id: item.id,
+          created_at: item.created_at,
+          total: item.total,
+          status: transformStatus(item.status),
+          payment_status: transformPaymentStatus(item.payment_status),
+          payment_method: item.payment_method,
+          shipping_address: item.shipping_address,
+          items: parsedItems,
+          customer_name: item.customers?.name || 'غير معروف',
+          customer_email: item.customers?.email || '',
+          customer_phone: item.customers?.phone || '',
+          notes: item.notes || '',
+          tracking_number: item.tracking_number || null,
+          delivery_person: item.delivery_person || null
+        };
+      });
       
       setOrders(transformedOrders);
       
