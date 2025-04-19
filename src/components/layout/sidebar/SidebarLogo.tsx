@@ -1,0 +1,38 @@
+
+import { siteConfig } from "@/config/site";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
+interface SidebarLogoProps {
+  collapsed: boolean;
+  toggleSidebar: () => void;
+}
+
+export function SidebarLogo({ collapsed, toggleSidebar }: SidebarLogoProps) {
+  return (
+    <div className="flex items-center justify-between p-4">
+      {!collapsed && (
+        <>
+          {siteConfig.logoUrl ? (
+            <img 
+              src={siteConfig.logoUrl} 
+              alt={siteConfig.name} 
+              className="h-8 object-contain"
+            />
+          ) : (
+            <h1 className="text-xl font-bold text-primary">{siteConfig.name}</h1>
+          )}
+        </>
+      )}
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        onClick={toggleSidebar}
+        className={collapsed ? "mx-auto" : "ml-auto"}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+      </Button>
+    </div>
+  );
+}

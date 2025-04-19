@@ -1,9 +1,8 @@
+
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { siteConfig } from "@/config/site";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNotificationStore } from "@/stores/notificationStore";
 import {
   BarChart4,
   Store,
@@ -18,55 +17,16 @@ import {
   UserPlus,
   Banknote,
   Truck,
-  ChevronLeft,
-  ChevronRight,
   CircleDollarSign,
   Building2,
   ImageIcon,
   ShoppingBag,
   FolderOpen,
-  ChevronDown,
   MapPin
 } from "lucide-react";
-import { useNotificationStore } from "@/stores/notificationStore";
-
-interface Category {
-  id: string;
-  name: string;
-  level: string;
-  image_url?: string | null;
-}
-
-interface SidebarItemProps {
-  icon: JSX.Element;
-  label: string;
-  href: string;
-  active?: boolean;
-  onClick?: () => void;
-  badge?: number;
-}
-
-function SidebarItem({ icon, label, href, active, onClick, badge }: SidebarItemProps) {
-  return (
-    <Link to={href} onClick={onClick}>
-      <Button
-        variant={active ? "default" : "ghost"}
-        className={cn(
-          "w-full justify-start gap-2 mb-1",
-          active ? "bg-primary text-primary-foreground" : ""
-        )}
-      >
-        {icon}
-        <span>{label}</span>
-        {badge !== undefined && badge > 0 && (
-          <span className="mr-auto w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-white text-xs">
-            {badge}
-          </span>
-        )}
-      </Button>
-    </Link>
-  );
-}
+import { SidebarLogo } from "./sidebar/SidebarLogo";
+import { SidebarItem } from "./sidebar/SidebarItem";
+import { Button } from "@/components/ui/button";
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
@@ -74,14 +34,13 @@ export default function Sidebar() {
   const location = useLocation();
   const currentPath = location.pathname;
   const [collapsed, setCollapsed] = useState(false);
-  const [showCategories, setShowCategories] = useState(false);
-  const { unreadOrders } = useNotificationStore();
+  const { unreadOrders, markOrdersAsRead } = useNotificationStore();
   
   useEffect(() => {
     if (currentPath === "/online-orders") {
       markOrdersAsRead();
     }
-  }, [currentPath]);
+  }, [currentPath, markOrdersAsRead]);
   
   const isAdmin = user?.role === 'admin';
   const isCashier = user?.role === 'cashier';
@@ -94,163 +53,156 @@ export default function Sidebar() {
   const toggleSidebar = () => {
     setCollapsed(!collapsed);
   };
-  
-  const { markOrdersAsRead } = useNotificationStore();
 
   return (
     <div className={cn(
       "border-l bg-white h-screen overflow-y-auto flex flex-col transition-all duration-300",
       collapsed ? "w-20" : "w-64"
     )}>
-      <div className="flex items-center justify-between p-4">
-        {!collapsed && (
-          <>
-            {siteConfig.logoUrl ? (
-              <img 
-                src={siteConfig.logoUrl} 
-                alt={siteConfig.name} 
-                className="h-8 object-contain"
-              />
-            ) : (
-              <h1 className="text-xl font-bold text-primary">{siteConfig.name}</h1>
-            )}
-          </>
-        )}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={toggleSidebar} 
-          className={collapsed ? "mx-auto" : "ml-auto"}
-        >
-          {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-        </Button>
-      </div>
+      <SidebarLogo collapsed={collapsed} toggleSidebar={toggleSidebar} />
       
       <div className="flex-1 space-y-1 px-4">
         <SidebarItem
-          icon={<Home size={20} />}
-          label={collapsed ? "" : "الرئيسية"}
+          icon={Home}
+          label="الرئيسية"
           href="/"
           active={currentPath === "/"}
+          collapsed={collapsed}
         />
         
         <SidebarItem
-          icon={<ShoppingCart size={20} />}
-          label={collapsed ? "" : "نقطة البيع"}
+          icon={ShoppingCart}
+          label="نقطة البيع"
           href="/pos"
           active={currentPath === "/pos"}
+          collapsed={collapsed}
         />
         
         <SidebarItem
-          icon={<FolderOpen size={20} />}
-          label={collapsed ? "" : "الاقسام"}
+          icon={FolderOpen}
+          label="الاقسام"
           href="/categories"
           active={currentPath.startsWith("/categories")}
+          collapsed={collapsed}
         />
         
         {isAdmin && (
           <>
             <SidebarItem
-              icon={<CircleDollarSign size={20} />}
-              label={collapsed ? "" : "متابعة النقدية"}
+              icon={CircleDollarSign}
+              label="متابعة النقدية"
               href="/cash-tracking"
               active={currentPath === "/cash-tracking"}
+              collapsed={collapsed}
             />
             
             <SidebarItem
-              icon={<Building2 size={20} />}
-              label={collapsed ? "" : "الشركات"}
+              icon={Building2}
+              label="الشركات"
               href="/companies"
               active={currentPath === "/companies"}
+              collapsed={collapsed}
             />
             
             <SidebarItem
-              icon={<ImageIcon size={20} />}
-              label={collapsed ? "" : "البانرات"}
+              icon={ImageIcon}
+              label="البانرات"
               href="/banners"
               active={currentPath === "/banners"}
+              collapsed={collapsed}
             />
             
             <SidebarItem
-              icon={<MapPin size={20} />}
-              label={collapsed ? "" : "مناطق التوصيل"}
+              icon={MapPin}
+              label="مناطق التوصيل"
               href="/delivery-locations"
               active={currentPath === "/delivery-locations"}
+              collapsed={collapsed}
             />
           </>
         )}
         
         <SidebarItem
-          icon={<Truck size={20} />}
-          label={collapsed ? "" : "مشتريات الموردين"}
+          icon={Truck}
+          label="مشتريات الموردين"
           href="/supplier-purchases"
           active={currentPath === "/supplier-purchases"}
+          collapsed={collapsed}
         />
         
         <SidebarItem
-          icon={<PackageOpen size={20} />}
-          label={collapsed ? "" : "المنتجات"}
+          icon={PackageOpen}
+          label="المنتجات"
           href="/products"
           active={currentPath === "/products"}
+          collapsed={collapsed}
         />
         
         <SidebarItem
-          icon={<ShoppingBag size={20} />}
-          label={collapsed ? "" : "الطلبات الإلكترونية"}
+          icon={ShoppingBag}
+          label="الطلبات الإلكترونية"
           href="/online-orders"
           active={currentPath === "/online-orders"}
           badge={unreadOrders}
+          collapsed={collapsed}
         />
         
         <SidebarItem
-          icon={<Receipt size={20} />}
-          label={collapsed ? "" : "الفواتير"}
+          icon={Receipt}
+          label="الفواتير"
           href="/invoices"
           active={currentPath === "/invoices"}
+          collapsed={collapsed}
         />
         
         <SidebarItem
-          icon={<BarChart4 size={20} />}
-          label={collapsed ? "" : "التقارير والمالية"}
+          icon={BarChart4}
+          label="التقارير والمالية"
           href="/reports"
           active={currentPath === "/reports" || currentPath === "/finance"}
+          collapsed={collapsed}
         />
         
         <SidebarItem
-          icon={<Store size={20} />}
-          label={collapsed ? "" : "المخزون"}
+          icon={Store}
+          label="المخزون"
           href="/inventory"
           active={currentPath === "/inventory"}
+          collapsed={collapsed}
         />
         
         <SidebarItem
-          icon={<UserPlus size={20} />}
-          label={collapsed ? "" : "العملاء والموردين"}
+          icon={UserPlus}
+          label="العملاء والموردين"
           href="/suppliers-customers"
           active={currentPath === "/suppliers-customers"}
+          collapsed={collapsed}
         />
         
         <SidebarItem
-          icon={<FileText size={20} />}
-          label={collapsed ? "" : "المصروفات"}
+          icon={FileText}
+          label="المصروفات"
           href="/expenses"
           active={currentPath === "/expenses"}
+          collapsed={collapsed}
         />
         
         {isAdmin && (
           <SidebarItem
-            icon={<Users size={20} />}
-            label={collapsed ? "" : "الموظفين"}
+            icon={Users}
+            label="الموظفين"
             href="/employees"
             active={currentPath === "/employees"}
+            collapsed={collapsed}
           />
         )}
         
         <SidebarItem
-          icon={<Settings size={20} />}
-          label={collapsed ? "" : "الإعدادات"}
+          icon={Settings}
+          label="الإعدادات"
           href="/settings"
           active={currentPath === "/settings"}
+          collapsed={collapsed}
         />
       </div>
       
