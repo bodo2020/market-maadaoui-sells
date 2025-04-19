@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -21,7 +22,7 @@ export default function HierarchicalLocations() {
   const [governorates, setGovernorates] = useState<{ governorate: string }[]>([]);
   const [citiesByGovernorate, setCitiesByGovernorate] = useState<{ [key: string]: { city: string }[] }>({});
   const [areasByCity, setAreasByCity] = useState<{ [key: string]: { area: string }[] }>({});
-  const [neighborhoodsByArea, setNeighborhoodsByArea] = useState<{ [key: string]: { id: string; neighborhood: string, price: number }[] }>({});
+  const [neighborhoodsByArea, setNeighborhoodsByArea] = useState<{ [key: string]: { id: string; neighborhood: string, price: number, estimated_time?: string }[] }>({});
   
   const [showDialog, setShowDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'governorate' | 'city' | 'area' | 'neighborhood'>('governorate');
@@ -99,11 +100,25 @@ export default function HierarchicalLocations() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, level: string, parentInfo?: {
+    governorate?: string;
+    city?: string;
+    area?: string;
+  }) => {
     try {
       await deleteDeliveryLocation(id);
-      loadGovernorates();
       toast.success("تم حذف المنطقة بنجاح");
+      
+      // Reload the appropriate level based on what was deleted
+      if (level === 'governorate') {
+        loadGovernorates();
+      } else if (level === 'city' && parentInfo?.governorate) {
+        loadCities(parentInfo.governorate);
+      } else if (level === 'area' && parentInfo?.governorate && parentInfo?.city) {
+        loadAreas(parentInfo.governorate, parentInfo.city);
+      } else if (level === 'neighborhood' && parentInfo?.governorate && parentInfo?.city && parentInfo?.area) {
+        loadNeighborhoods(parentInfo.governorate, parentInfo.city, parentInfo.area);
+      }
     } catch (error) {
       console.error('Error deleting location:', error);
       toast.error("حدث خطأ أثناء حذف المنطقة");
@@ -112,6 +127,13 @@ export default function HierarchicalLocations() {
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end mb-4">
+        <Button onClick={() => handleAddClick('governorate')}>
+          <Plus className="ml-2 h-4 w-4" />
+          إضافة محافظة
+        </Button>
+      </div>
+      
       <Accordion type="multiple" className="w-full">
         {governorates.map(({ governorate }) => (
           <AccordionItem key={governorate} value={governorate}>
@@ -135,6 +157,19 @@ export default function HierarchicalLocations() {
                     }}
                   >
                     <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-red-500"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Need to get the ID for the governorate to delete it
+                      // For now, we'll reload all governorates after this operation
+                      handleDelete(governorate, 'governorate');
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
                 <span>{governorate}</span>
@@ -165,6 +200,18 @@ export default function HierarchicalLocations() {
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // For cities, we'll reload the cities for this governorate
+                              handleDelete(city, 'city', { governorate });
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                         <span>{city}</span>
                       </div>
@@ -194,6 +241,18 @@ export default function HierarchicalLocations() {
                                   >
                                     <Plus className="h-4 w-4" />
                                   </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-red-500"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      // For areas, we'll reload the areas for this city
+                                      handleDelete(area, 'area', { governorate, city });
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
                                 </div>
                                 <span>{area}</span>
                               </div>
@@ -210,16 +269,19 @@ export default function HierarchicalLocations() {
                                         variant="ghost"
                                         size="icon"
                                         className="h-8 w-8 text-red-500"
-                                        onClick={() => handleDelete(neighborhood.id)}
+                                        onClick={() => handleDelete(neighborhood.id, 'neighborhood', { governorate, city, area })}
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
                                     <div className="text-right">
                                       <div className="font-medium">{neighborhood.neighborhood}</div>
-                                      {neighborhood.price > 0 && (
+                                      <div className="text-sm text-muted-foreground">
+                                        السعر: {neighborhood.price} ج.م
+                                      </div>
+                                      {neighborhood.estimated_time && (
                                         <div className="text-sm text-muted-foreground">
-                                          السعر: {neighborhood.price} ج.م
+                                          الوقت المقدر: {neighborhood.estimated_time}
                                         </div>
                                       )}
                                     </div>

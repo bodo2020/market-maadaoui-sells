@@ -13,3 +13,19 @@ html {
 body {
   direction: rtl;
 }
+
+/* RTL helpers */
+.rtl-flip {
+  transform: scaleX(-1);
+}
+
+/* Fix for buttons in RTL layout */
+button svg {
+  margin-left: 0.25rem;
+  margin-right: 0;
+}
+
+/* RTL control for inputs */
+input[type="number"] {
+  text-align: right;
+}

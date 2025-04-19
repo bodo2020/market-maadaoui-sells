@@ -199,23 +199,48 @@ export async function updateDeliveryLocation(id: string, updates: Partial<Delive
 }
 
 export async function deleteDeliveryLocation(id: string) {
-  const { error } = await supabase
-    .from('delivery_locations')
-    .delete()
-    .eq('id', id);
+  console.log('Deleting location with ID:', id);
+  
+  try {
+    const { error } = await supabase
+      .from('delivery_locations')
+      .delete()
+      .eq('id', id);
+      
+    if (error) {
+      console.error('Error in deleteDeliveryLocation:', error);
+      throw error;
+    }
     
-  if (error) throw error;
+    console.log('Location deleted successfully');
+    return true;
+  } catch (err) {
+    console.error('Exception in deleteDeliveryLocation:', err);
+    throw err;
+  }
 }
 
 export async function fetchDeliveryTypes() {
-  const { data, error } = await supabase
-    .from('delivery_types')
-    .select('*')
-    .eq('active', true)
-    .order('name');
+  console.log('Fetching delivery types');
+  
+  try {
+    const { data, error } = await supabase
+      .from('delivery_types')
+      .select('*')
+      .eq('active', true)
+      .order('name');
+      
+    if (error) {
+      console.error('Error in fetchDeliveryTypes:', error);
+      throw error;
+    }
     
-  if (error) throw error;
-  return data;
+    console.log('Fetched delivery types:', data);
+    return data;
+  } catch (err) {
+    console.error('Exception in fetchDeliveryTypes:', err);
+    throw err;
+  }
 }
 
 export async function fetchDeliveryTypePricing(locationId: string) {
@@ -236,12 +261,24 @@ export async function createDeliveryTypePrice(data: {
   delivery_type_id: string;
   price: number;
 }) {
-  const { data: result, error } = await supabase
-    .from('delivery_type_pricing')
-    .insert([data])
-    .select()
-    .single();
+  console.log('Creating delivery type price:', data);
+  
+  try {
+    const { data: result, error } = await supabase
+      .from('delivery_type_pricing')
+      .insert([data])
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('Error in createDeliveryTypePrice:', error);
+      throw error;
+    }
     
-  if (error) throw error;
-  return result;
+    console.log('Created delivery type price:', result);
+    return result;
+  } catch (err) {
+    console.error('Exception in createDeliveryTypePrice:', err);
+    throw err;
+  }
 }

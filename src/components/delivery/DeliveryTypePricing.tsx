@@ -66,7 +66,9 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4" dir="rtl">
+      <h3 className="text-lg font-medium text-right mb-4">أسعار التوصيل</h3>
+      
       {deliveryTypes.length === 0 ? (
         <div className="text-center py-4">جاري تحميل أنواع التوصيل...</div>
       ) : (
