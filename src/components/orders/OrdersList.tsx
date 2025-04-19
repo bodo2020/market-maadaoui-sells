@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Order } from "@/types";
 import { formatDate } from "@/lib/utils";
-import { Printer, Package, Truck, CheckCircle, XCircle, User, CreditCard } from "lucide-react";
+import { Printer, Package, Truck, CheckCircle, XCircle, User, CreditCard, RotateCcw } from "lucide-react"; // Added RotateCcw import
 import { Checkbox } from "@/components/ui/checkbox";
 import { OrderFilters } from "@/hooks/orders/useOrdersData";
 
