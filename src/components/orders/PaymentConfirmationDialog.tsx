@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Order } from "@/types";
 
 interface PaymentConfirmationDialogProps {
   open: boolean;
@@ -35,9 +36,12 @@ export function PaymentConfirmationDialog({
       
       if (fetchError) throw fetchError;
       
+      // Define the payment status with the correct type
+      const paymentStatus: Order['payment_status'] = 'paid';
+      
       // Update payment status and order status if needed
       const updates = { 
-        payment_status: 'paid',
+        payment_status: paymentStatus,
         updated_at: new Date().toISOString()
       };
       
@@ -47,7 +51,7 @@ export function PaymentConfirmationDialog({
           .from('online_orders')
           .update({
             ...updates,
-            status: 'ready'
+            status: 'ready' as Order['status']
           })
           .eq('id', orderId);
         
