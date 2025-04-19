@@ -1,8 +1,6 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+
+import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
-import { Product, Category, Subcategory, Subsubcategory, MainCategory, Company } from "@/types";
 import {
   Card,
   CardContent,
@@ -11,188 +9,44 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
-import StatusFilter from "@/components/inventory/StatusFilter";
-import { Search, ScanLine } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Link } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
-import { MoreDropdown } from "@/components/products/MoreDropdown";
-import { 
-  fetchMainCategories, 
-  getCategoryHierarchy 
-} from "@/services/supabase/categoryService";
+import InventoryFilters from "@/components/inventory/InventoryFilters";
+import InventoryTable from "@/components/inventory/InventoryTable";
+import { useInventoryManagement } from "@/hooks/useInventoryManagement";
 
 export default function InventoryManagement() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [subsubcategories, setSubsubcategories] = useState<Subsubcategory[]>([]);
-  const [mainCategories, setMainCategories] = useState<MainCategory[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
-  const [selectedSubsubcategory, setSelectedSubsubcategory] = useState<string | null>(null);
-  const [selectedMainCategory, setSelectedMainCategory] = useState<string | null>(null);
-  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
-  const [sortField, setSortField] = useState<string>("name");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const {
+    products,
+    loading,
+    categories,
+    subcategories,
+    subsubcategories,
+    mainCategories,
+    companies,
+    searchQuery,
+    setSearchQuery,
+    selectedCategory,
+    setSelectedCategory,
+    selectedSubcategory,
+    setSelectedSubcategory,
+    selectedSubsubcategory,
+    setSelectedSubsubcategory,
+    selectedMainCategory,
+    setSelectedMainCategory,
+    selectedCompany,
+    setSelectedCompany,
+    sortField,
+    setSortField,
+    sortOrder,
+    setSortOrder,
+    statusFilter,
+    setStatusFilter,
+    clearFilters
+  } = useInventoryManagement();
 
-  useEffect(() => {
-    fetchProducts();
-    fetchCategoriesData();
-    fetchSubcategories();
-    fetchSubsubcategories();
-    fetchMainCategoriesData();
-    fetchCompanies();
-  }, [searchQuery, selectedCategory, selectedSubcategory, selectedSubsubcategory, selectedMainCategory, selectedCompany, sortField, sortOrder]);
-
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from("products")
-        .select("*")
-        .like("name", `%${searchQuery}%`);
-
-      if (selectedCategory) {
-        query = query.eq("category_id", selectedCategory);
-      }
-
-      if (selectedSubcategory) {
-        query = query.eq("subcategory_id", selectedSubcategory);
-      }
-
-      if (selectedSubsubcategory) {
-        query = query.eq("subsubcategory_id", selectedSubsubcategory);
-      }
-
-      if (selectedMainCategory) {
-        query = query.eq("main_category_id", selectedMainCategory);
-      }
-
-      if (selectedCompany) {
-        query = query.eq("company_id", selectedCompany);
-      }
-
-      query = query.order(sortField, { ascending: sortOrder === "asc" });
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("Error fetching products:", error);
-        toast.error("فشل في جلب المنتجات.");
-      }
-
-      setProducts(data || []);
-    } catch (error) {
-      console.error("Unexpected error fetching products:", error);
-      toast.error("حدث خطأ غير متوقع أثناء جلب المنتجات.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchCategoriesData = async () => {
-    try {
-      // Use getCategoryHierarchy from the categoryService
-      const categoriesData = await getCategoryHierarchy();
-      setCategories(categoriesData);
-    } catch (error) {
-      console.error("Unexpected error fetching categories:", error);
-      toast.error("حدث خطأ غير متوقع أثناء جلب الفئات.");
-    }
-  };
-
-  const fetchSubcategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("subcategories")
-        .select("*")
-        .order("name");
-
-      if (error) {
-        console.error("Error fetching subcategories:", error);
-        toast.error("فشل في جلب الفئات الفرعية.");
-      } else {
-        setSubcategories(data || []);
-      }
-    } catch (error) {
-      console.error("Unexpected error fetching subcategories:", error);
-      toast.error("حدث خطأ غير متوقع أثناء جلب الفئات الفرعية.");
-    }
-  };
-
-  const fetchSubsubcategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("subsubcategories")
-        .select("*")
-        .order("name");
-
-      if (error) {
-        console.error("Error fetching subsubcategories:", error);
-        toast.error("فشل في جلب الفئات الفرعية الفرعية.");
-      } else {
-        setSubsubcategories(data || []);
-      }
-    } catch (error) {
-      console.error("Unexpected error fetching subsubcategories:", error);
-      toast.error("حدث خطأ غير متوقع أثناء جلب الفئات الفرعية الفرعية.");
-    }
-  };
-
-  const fetchMainCategoriesData = async () => {
-    try {
-      const mainCategoriesData = await fetchMainCategories();
-      setMainCategories(mainCategoriesData);
-    } catch (error) {
-      console.error("Error fetching main categories:", error);
-      toast.error("فشل في جلب الفئات الرئيسية.");
-    }
-  };
-
-  const fetchCompanies = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("companies")
-        .select("*")
-        .order("name");
-
-      if (error) {
-        console.error("Error fetching companies:", error);
-        toast.error("فشل في جلب الشركات.");
-      } else {
-        setCompanies(data || []);
-      }
-    } catch (error) {
-      console.error("Unexpected error fetching companies:", error);
-      toast.error("حدث خطأ غير متوقع أثناء جلب الشركات.");
-    }
-  };
-
-  const clearFilters = () => {
-    setSearchQuery("");
-    setSelectedCategory(null);
-    setSelectedSubcategory(null);
-    setSelectedSubsubcategory(null);
-    setSelectedMainCategory(null);
-    setSelectedCompany(null);
+  const handleBarcodeScanned = (barcode: string) => {
+    setSearchQuery(barcode);
+    setIsScannerOpen(false);
   };
 
   const formatDate = (dateString: string | null | undefined) => {
@@ -203,47 +57,6 @@ export default function InventoryManagement() {
     } catch (error) {
       return "Invalid Date";
     }
-  };
-
-  // Type guard to ensure sortOrder is correctly typed
-  const handleSortOrderChange = (value: string) => {
-    if (value === "asc" || value === "desc") {
-      setSortOrder(value);
-    }
-  };
-
-  const handleBarcodeScanned = (barcode: string) => {
-    setSearchQuery(barcode);
-    setIsScannerOpen(false);
-  };
-
-  const getFilteredProducts = () => {
-    let filtered = products.filter(product => 
-      product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      (product.barcode && product.barcode.includes(searchQuery))
-    );
-
-    if (selectedCompany) {
-      filtered = filtered.filter(product => product.company_id === selectedCompany);
-    }
-
-    if (statusFilter !== "all") {
-      filtered = filtered.filter(product => {
-        const quantity = product.quantity || 0;
-        switch (statusFilter) {
-          case "available":
-            return quantity > 10;
-          case "low":
-            return quantity > 0 && quantity <= 10;
-          case "out":
-            return quantity === 0;
-          default:
-            return true;
-        }
-      });
-    }
-
-    return filtered;
   };
 
   return (
@@ -257,195 +70,42 @@ export default function InventoryManagement() {
             <CardDescription>عرض وتعديل المنتجات في المخزون</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-4 mb-6">
-              <div className="flex-1 flex gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="ابحث بالاسم أو الباركود" 
-                    value={searchQuery} 
-                    onChange={e => setSearchQuery(e.target.value)} 
-                    className="pl-10" 
-                  />
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  onClick={() => setIsScannerOpen(true)}
-                  className="shrink-0"
-                >
-                  <ScanLine className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              <div className="flex gap-2 flex-wrap">
-                <StatusFilter 
-                  value={statusFilter}
-                  onChange={setStatusFilter}
-                />
-                
-                <Select 
-                  value={selectedCompany || ""} 
-                  onValueChange={(value) => setSelectedCompany(value === "" ? null : value)}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="الشركة المصنعة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">الكل</SelectItem>
-                    {companies.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Select onValueChange={(value) => setSelectedCategory(value === "all" ? null : value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر فئة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">الكل</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <InventoryFilters 
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onBarcodeClick={() => setIsScannerOpen(true)}
+              statusFilter={statusFilter}
+              onStatusChange={setStatusFilter}
+              companies={companies}
+              selectedCompany={selectedCompany}
+              onCompanyChange={value => setSelectedCompany(value === "" ? null : value)}
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+              subcategories={subcategories}
+              selectedSubcategory={selectedSubcategory}
+              onSubcategoryChange={setSelectedSubcategory}
+              subsubcategories={subsubcategories}
+              selectedSubsubcategory={selectedSubsubcategory}
+              onSubsubcategoryChange={setSelectedSubsubcategory}
+              mainCategories={mainCategories}
+              selectedMainCategory={selectedMainCategory}
+              onMainCategoryChange={setSelectedMainCategory}
+              onClearFilters={clearFilters}
+              sortField={sortField}
+              onSortFieldChange={setSortField}
+              sortOrder={sortOrder}
+              onSortOrderChange={setSortOrder}
+            />
 
-                <Select onValueChange={(value) => setSelectedSubcategory(value === "all" ? null : value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر فئة فرعية" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">الكل</SelectItem>
-                    {subcategories.map((subcategory) => (
-                      <SelectItem key={subcategory.id} value={subcategory.id}>
-                        {subcategory.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select onValueChange={(value) => setSelectedSubsubcategory(value === "all" ? null : value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر فئة فرعية فرعية" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">الكل</SelectItem>
-                    {subsubcategories.map((subsubcategory) => (
-                      <SelectItem key={subsubcategory.id} value={subsubcategory.id}>
-                        {subsubcategory.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select onValueChange={(value) => setSelectedMainCategory(value === "all" ? null : value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر فئة رئيسية" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">الكل</SelectItem>
-                    {mainCategories.map((mainCategory) => (
-                      <SelectItem key={mainCategory.id} value={mainCategory.id}>
-                        {mainCategory.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="mt-6">
+              <InventoryTable 
+                products={products}
+                loading={loading}
+                categories={categories}
+                formatDate={formatDate}
+              />
             </div>
-
-            <div className="flex justify-between items-center mb-4">
-              <Button variant="outline" size="sm" onClick={clearFilters}>
-                إعادة تعيين الفلاتر
-              </Button>
-
-              <div className="flex items-center space-x-2 space-x-reverse">
-                <Label htmlFor="sort">ترتيب حسب</Label>
-                <Select value={sortField} onValueChange={setSortField}>
-                  <SelectTrigger id="sort">
-                    <SelectValue placeholder="اسم المنتج" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">اسم المنتج</SelectItem>
-                    <SelectItem value="price">السعر</SelectItem>
-                    <SelectItem value="quantity">الكمية</SelectItem>
-                    <SelectItem value="created_at">تاريخ الإنشاء</SelectItem>
-                    <SelectItem value="updated_at">تاريخ التعديل</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select 
-                  value={sortOrder} 
-                  onValueChange={handleSortOrderChange}
-                >
-                  <SelectTrigger id="order">
-                    <SelectValue placeholder="تصاعدي" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="asc">تصاعدي</SelectItem>
-                    <SelectItem value="desc">تنازلي</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center">
-                  تحميل...
-                </TableCell>
-              </TableRow>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>اسم المنتج</TableHead>
-                      <TableHead>السعر</TableHead>
-                      <TableHead>الكمية</TableHead>
-                      <TableHead>الفئة</TableHead>
-                      <TableHead>تاريخ الإنشاء</TableHead>
-                      <TableHead>تاريخ التعديل</TableHead>
-                      <TableHead className="text-center">الإجراءات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {getFilteredProducts().length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          لا توجد منتجات مطابقة للبحث
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      getFilteredProducts().map((product) => (
-                        <TableRow key={product.id}>
-                          <TableCell className="font-medium">{product.name}</TableCell>
-                          <TableCell>{product.price}</TableCell>
-                          <TableCell>
-                            {product.quantity !== null && product.quantity !== undefined
-                              ? product.quantity
-                              : "غير محدد"}
-                          </TableCell>
-                          <TableCell>
-                            {categories.find((cat) => cat.id === product.category_id)?.name || "غير مصنف"}
-                          </TableCell>
-                          <TableCell>{formatDate(product.created_at)}</TableCell>
-                          <TableCell>{formatDate(product.updated_at)}</TableCell>
-                          <TableCell className="text-center">
-                            <MoreDropdown product={product} />
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
           </CardContent>
         </Card>
 
