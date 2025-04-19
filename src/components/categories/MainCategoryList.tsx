@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Loader2, FolderPlus, Trash, Edit, Package } from "lucide-react";
@@ -22,7 +23,9 @@ export default function MainCategoryList() {
   const fetchCategories = async () => {
     try {
       setLoading(true);
+      console.log("Fetching main categories...");
       const data = await fetchMainCategories();
+      console.log("Main categories data:", data);
       
       const categoriesWithCount = await Promise.all(
         data.map(async (category) => {

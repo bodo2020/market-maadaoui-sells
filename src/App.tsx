@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import Login from "@/pages/Login";
@@ -56,6 +55,7 @@ function App() {
             <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
             <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
             <Route path="/categories/:id" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
+            <Route path="/categories/:id/:subId" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedRoute><ProductManagement /></ProtectedRoute>} />
             <Route path="/products/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
@@ -78,7 +78,6 @@ function App() {
             <Route path="/delivery-locations" element={<ProtectedRoute><DeliveryLocationsPage /></ProtectedRoute>} />
             <Route path="/delivery-locations/:id" element={<ProtectedRoute><DeliveryLocations /></ProtectedRoute>} />
             <Route path="/sales-dashboard" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
-            {/* Add the offers route */}
             <Route path="/offers" element={<ProtectedRoute><OffersPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -14,11 +14,6 @@ export default function CategoriesPage() {
       <div className="container py-6">
         <h1 className="text-2xl font-bold mb-6">تصنيفات المنتجات</h1>
         
-        {!id && !subId && (
-          // Main categories list
-          <MainCategoryList />
-        )}
-        
         {id && !subId && (
           // Subcategories list for a specific main category
           <SubcategoryList categoryId={id} />
