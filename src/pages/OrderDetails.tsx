@@ -1,3 +1,4 @@
+
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
@@ -32,7 +33,6 @@ export default function OrderDetails() {
   const fetchOrder = async () => {
     try {
       setIsLoading(true);
-      // Get order data with customer details if available
       const { data, error } = await supabase
         .from('online_orders')
         .select(`
@@ -140,8 +140,8 @@ export default function OrderDetails() {
       
       if (error) throw error;
       
+      setOrder(prev => prev ? { ...prev, status } : null);
       toast.success(`تم تحديث حالة الشحن إلى ${status === 'shipped' ? 'خرج للتوصيل' : 'تم التوصيل'}`);
-      fetchOrder();
     } catch (error) {
       console.error('Error updating shipping status:', error);
       toast.error('حدث خطأ أثناء تحديث حالة الشحن');
