@@ -91,14 +91,14 @@ const InventoryFilters = ({
           />
           
           <Select 
-            value={selectedCompany || ""} 
+            value={selectedCompany || "all"} 
             onValueChange={onCompanyChange}
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="الشركة المصنعة" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">الكل</SelectItem>
+              <SelectItem value="all">الكل</SelectItem>
               {companies.map((company) => (
                 <SelectItem key={company.id} value={company.id}>
                   {company.name}

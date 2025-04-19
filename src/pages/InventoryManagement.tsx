@@ -78,7 +78,7 @@ export default function InventoryManagement() {
               onStatusChange={setStatusFilter}
               companies={companies}
               selectedCompany={selectedCompany}
-              onCompanyChange={value => setSelectedCompany(value === "" ? null : value)}
+              onCompanyChange={value => setSelectedCompany(value === "all" ? null : value)}
               categories={categories}
               selectedCategory={selectedCategory}
               onCategoryChange={setSelectedCategory}

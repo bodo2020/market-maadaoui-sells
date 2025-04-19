@@ -163,6 +163,7 @@ export const useInventoryManagement = () => {
     setSelectedSubsubcategory(null);
     setSelectedMainCategory(null);
     setSelectedCompany(null);
+    setStatusFilter("all");
   };
 
   const getFilteredProducts = () => {
@@ -171,7 +172,7 @@ export const useInventoryManagement = () => {
       (product.barcode && product.barcode.includes(searchQuery))
     );
 
-    if (selectedCompany) {
+    if (selectedCompany && selectedCompany !== "all") {
       filtered = filtered.filter(product => product.company_id === selectedCompany);
     }
 
