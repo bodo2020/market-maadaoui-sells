@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -74,6 +75,7 @@ export default function DeliveryLocationDialog({
               city: parentData.city,
               area: parentData.area,
               neighborhood: name,
+              price: 0, // Add default price to fix the TypeScript error
               provider_id: providerId
             });
             setNewLocationId(result.id);
