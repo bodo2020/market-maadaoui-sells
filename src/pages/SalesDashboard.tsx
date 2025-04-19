@@ -55,103 +55,92 @@ export default function SalesDashboard() {
   const [toRegister, setToRegister] = useState<RegisterType>(RegisterType.ONLINE);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   
-  const fetchRecords = async () => {
-    try {
-      // Fetch store sales
-      const { data: storeSales = [], isLoading: isStoreSalesLoading } = useQuery({
-        queryKey: ['sales', dateRange],
-        queryFn: async () => {
-          const { data, error } = await supabase
-            .from('sales')
-            .select('*')
-            .gte('date', dateRange.from.toISOString())
-            .lte('date', dateRange.to.toISOString())
-            .order('date', { ascending: false });
-            
-          if (error) throw error;
-          
-          // Transform the data to match the Sale type
-          return (data || []).map(sale => ({
-            ...sale,
-            // Ensure payment_method is one of the allowed values in the Sale type
-            payment_method: (sale.payment_method === 'cash' || 
-                          sale.payment_method === 'card' || 
-                          sale.payment_method === 'mixed') 
-                          ? sale.payment_method as 'cash' | 'card' | 'mixed'
-                          : 'cash', // Default to 'cash' if invalid value
-            // Parse items properly
-            items: Array.isArray(sale.items) 
-              ? sale.items as unknown as CartItem[]  // If already an array
-              : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
-          })) as Sale[];
-        }
-      });
+  const { data: storeSales = [], isLoading: isStoreSalesLoading, refetch: refetchStoreSales } = useQuery({
+    queryKey: ['sales', dateRange],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sales')
+        .select('*')
+        .gte('date', dateRange.from.toISOString())
+        .lte('date', dateRange.to.toISOString())
+        .order('date', { ascending: false });
+        
+      if (error) throw error;
       
-      // Fetch online orders
-      const { data: onlineOrders = [], isLoading: isOnlineOrdersLoading } = useQuery({
-        queryKey: ['onlineOrders', dateRange],
-        queryFn: async () => {
-          const { data, error } = await supabase
-            .from('online_orders')
-            .select('*')
-            .gte('created_at', dateRange.from.toISOString())
-            .lte('created_at', dateRange.to.toISOString())
-            .order('created_at', { ascending: false });
-            
-          if (error) throw error;
-          return data;
-        }
-      });
-      
-      // Fetch cash tracking for store register
-      const { data: storeRecords = [], isLoading: isStoreRecordsLoading, refetch: refetchStoreRecords } = useQuery({
-        queryKey: ['cashRecords', RegisterType.STORE, dateRange],
-        queryFn: async () => {
-          try {
-            const data = await fetchCashRecords(RegisterType.STORE);
-            console.log("Store cash records:", data);
-            return data;
-          } catch (error) {
-            console.error("Error fetching store cash records:", error);
-            throw error;
-          }
-        }
-      });
-      
-      // Fetch cash tracking for online register
-      const { data: onlineRecords = [], isLoading: isOnlineRecordsLoading, refetch: refetchOnlineRecords } = useQuery({
-        queryKey: ['cashRecords', RegisterType.ONLINE, dateRange],
-        queryFn: async () => {
-          try {
-            const data = await fetchCashRecords(RegisterType.ONLINE);
-            console.log("Online cash records:", data);
-            return data;
-          } catch (error) {
-            console.error("Error fetching online cash records:", error);
-            throw error;
-          }
-        }
-      });
-      
-      // Fetch transfers between registers
-      const { data: transfers = [], isLoading: isTransfersLoading, refetch: refetchTransfers } = useQuery({
-        queryKey: ['registerTransfers', dateRange],
-        queryFn: async () => {
-          const { data, error } = await supabase
-            .from('register_transfers')
-            .select('*')
-            .gte('date', dateRange.from.toISOString().split('T')[0])
-            .lte('date', dateRange.to.toISOString().split('T')[0])
-            .order('date', { ascending: false });
-            
-          if (error) throw error;
-          return data;
-        }
-      });
-    } catch (error) {
-      console.error("Error fetching data:", error);
+      // Transform the data to match the Sale type
+      return (data || []).map(sale => ({
+        ...sale,
+        // Ensure payment_method is one of the allowed values in the Sale type
+        payment_method: (sale.payment_method === 'cash' || 
+                      sale.payment_method === 'card' || 
+                      sale.payment_method === 'mixed') 
+                      ? sale.payment_method as 'cash' | 'card' | 'mixed'
+                      : 'cash', // Default to 'cash' if invalid value
+        // Parse items properly
+        items: Array.isArray(sale.items) 
+          ? sale.items as unknown as CartItem[]  // If already an array
+          : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
+      })) as Sale[];
     }
-  };
+  });
+  
+  const { data: onlineOrders = [], isLoading: isOnlineOrdersLoading, refetch: refetchOnlineOrders } = useQuery({
+    queryKey: ['onlineOrders', dateRange],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('online_orders')
+        .select('*')
+        .gte('created_at', dateRange.from.toISOString())
+        .lte('created_at', dateRange.to.toISOString())
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      return data;
+    }
+  });
+  
+  const { data: storeRecords = [], isLoading: isStoreRecordsLoading, refetch: refetchStoreRecords } = useQuery({
+    queryKey: ['cashRecords', RegisterType.STORE, dateRange],
+    queryFn: async () => {
+      try {
+        const data = await fetchCashRecords(RegisterType.STORE);
+        console.log("Store cash records:", data);
+        return data;
+      } catch (error) {
+        console.error("Error fetching store cash records:", error);
+        throw error;
+      }
+    }
+  });
+  
+  const { data: onlineRecords = [], isLoading: isOnlineRecordsLoading, refetch: refetchOnlineRecords } = useQuery({
+    queryKey: ['cashRecords', RegisterType.ONLINE, dateRange],
+    queryFn: async () => {
+      try {
+        const data = await fetchCashRecords(RegisterType.ONLINE);
+        console.log("Online cash records:", data);
+        return data;
+      } catch (error) {
+        console.error("Error fetching online cash records:", error);
+        throw error;
+      }
+    }
+  });
+  
+  const { data: transfers = [], isLoading: isTransfersLoading, refetch: refetchTransfers } = useQuery({
+    queryKey: ['registerTransfers', dateRange],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('register_transfers')
+        .select('*')
+        .gte('date', dateRange.from.toISOString().split('T')[0])
+        .lte('date', dateRange.to.toISOString().split('T')[0])
+        .order('date', { ascending: false });
+        
+      if (error) throw error;
+      return data;
+    }
+  });
 
   const fetchCurrentBalance = async (registerType: RegisterType) => {
     try {
@@ -176,15 +165,12 @@ export default function SalesDashboard() {
     };
     
     loadBalances();
-    fetchRecords();
   }, [dateRange]);
 
-  // Calculate total sales
   const storeSalesTotal = storeSales.reduce((sum, sale) => sum + Number(sale.total), 0);
   const onlineOrdersTotal = onlineOrders.reduce((sum, order) => sum + Number(order.total), 0);
   const totalSales = storeSalesTotal + onlineOrdersTotal;
   
-  // Calculate total cash in each register with better error handling
   const storeBalance = storeRecords.length > 0 
     ? Number(storeRecords[0].closing_balance) || Number(storeRecords[0].opening_balance) 
     : 0;
@@ -193,7 +179,6 @@ export default function SalesDashboard() {
     ? Number(onlineRecords[0].closing_balance) || Number(onlineRecords[0].opening_balance) 
     : 0;
   
-  // Prepare chart data
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = subDays(new Date(), i);
     return {
@@ -207,7 +192,6 @@ export default function SalesDashboard() {
     };
   }).reverse();
   
-  // Handle cash withdrawal
   const handleWithdrawal = async () => {
     if (!withdrawalAmount || isNaN(Number(withdrawalAmount)) || Number(withdrawalAmount) <= 0) {
       toast.error("الرجاء إدخال مبلغ صحيح");
@@ -228,7 +212,6 @@ export default function SalesDashboard() {
       setWithdrawalNote("");
       setIsWithdrawalDialogOpen(false);
       
-      // Refetch data
       if (withdrawalRegister === RegisterType.STORE) {
         refetchStoreRecords();
       } else {
@@ -240,7 +223,6 @@ export default function SalesDashboard() {
     }
   };
   
-  // Handle cash deposit
   const handleDeposit = async () => {
     if (!depositAmount || isNaN(Number(depositAmount)) || Number(depositAmount) <= 0) {
       toast.error("الرجاء إدخال مبلغ صحيح");
@@ -261,7 +243,6 @@ export default function SalesDashboard() {
       setDepositNote("");
       setIsDepositDialogOpen(false);
       
-      // Refetch data
       if (depositRegister === RegisterType.STORE) {
         refetchStoreRecords();
       } else {
@@ -273,7 +254,6 @@ export default function SalesDashboard() {
     }
   };
   
-  // Handle transfer between registers
   const handleTransfer = async () => {
     if (!transferAmount || isNaN(Number(transferAmount)) || Number(transferAmount) <= 0) {
       toast.error("الرجاء إدخال مبلغ صحيح");
@@ -299,7 +279,6 @@ export default function SalesDashboard() {
       setTransferNote("");
       setIsTransferDialogOpen(false);
       
-      // Refetch all data
       refetchStoreRecords();
       refetchOnlineRecords();
       refetchTransfers();
