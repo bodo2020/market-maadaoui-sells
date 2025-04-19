@@ -136,6 +136,11 @@ export default function OnlineOrders() {
           paymentMethod = order.payment_method as 'card' | 'online';
         }
 
+        let paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded' = 'pending';
+        if (order.payment_status === 'paid' || order.payment_status === 'failed' || order.payment_status === 'refunded') {
+          paymentStatus = order.payment_status as 'paid' | 'failed' | 'refunded';
+        }
+
         return {
           id: order.id,
           customer_id: order.customer_id,
@@ -148,12 +153,12 @@ export default function OnlineOrders() {
           discount: 0,
           total: order.total,
           payment_method: paymentMethod,
-          payment_status: order.payment_status || 'pending',
+          payment_status: paymentStatus,
           shipping_address: order.shipping_address,
-          status: order.status || 'pending',
+          status: validateOrderStatus(order.status || 'pending'),
           notes: order.notes,
           created_at: order.created_at,
-          updated_at: order.updated_at,
+          updated_at: order.updated_at || order.created_at,
           delivery_location_id: order.delivery_location_id,
           shipping_cost: order.shipping_cost,
           tracking_number: order.tracking_number

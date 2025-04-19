@@ -1,16 +1,14 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
-import { siteConfig } from "@/config/site";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
+import { Product, Category, Subcategory, Subsubcategory, MainCategory, Company } from "@/types";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import {
   Table,
@@ -20,500 +18,432 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { 
-  Search, 
-  Plus, 
-  Package, 
-  AlertTriangle,
-  Filter,
-  Download,
-  Truck,
-  Loader2,
-  Bell,
-  Edit,
-  PlusCircle
-} from "lucide-react";
-import { Product } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useToast } from "@/hooks/use-toast";
-import { fetchProducts, updateProduct } from "@/services/supabase/productService";
-import { checkLowStockProducts, showLowStockToasts } from "@/services/notificationService";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { MoreDropdown } from "@/components/products/MoreDropdown";
+import { useQuery } from "@tanstack/react-query";
 
 export default function InventoryManagement() {
-  const [inventory, setInventory] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [subsubcategories, setSubsubcategories] = useState<Subsubcategory[]>([]);
+  const [mainCategories, setMainCategories] = useState<MainCategory[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [isAddStockDialogOpen, setIsAddStockDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [stockToAdd, setStockToAdd] = useState(0);
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  
-  useEffect(() => {
-    loadProducts();
-    
-    // Check for low stock and display notifications
-    const checkStock = async () => {
-      await checkLowStockProducts();
-      showLowStockToasts();
-    };
-    
-    checkStock();
-  }, []);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [selectedSubsubcategory, setSelectedSubsubcategory] = useState<string | null>(null);
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<string>("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
-  const loadProducts = async () => {
+  useEffect(() => {
+    fetchProducts();
+    fetchCategories();
+    fetchSubcategories();
+    fetchSubsubcategories();
+    fetchMainCategories();
+    fetchCompanies();
+  }, [searchQuery, selectedCategory, selectedSubcategory, selectedSubsubcategory, selectedMainCategory, selectedCompany, sortField, sortOrder]);
+
+  const fetchProducts = async () => {
     setLoading(true);
     try {
-      const products = await fetchProducts();
-      setInventory(products);
+      let query = supabase
+        .from("products")
+        .select("*")
+        .like("name", `%${searchQuery}%`);
+
+      if (selectedCategory) {
+        query = query.eq("category_id", selectedCategory);
+      }
+
+      if (selectedSubcategory) {
+        query = query.eq("subcategory_id", selectedSubcategory);
+      }
+
+      if (selectedSubsubcategory) {
+        query = query.eq("subsubcategory_id", selectedSubsubcategory);
+      }
+
+      if (selectedMainCategory) {
+        query = query.eq("main_category_id", selectedMainCategory);
+      }
+
+      if (selectedCompany) {
+        query = query.eq("company_id", selectedCompany);
+      }
+
+      query = query.order(sortField, { ascending: sortOrder === "asc" });
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Error fetching products:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch products.",
+          variant: "destructive",
+        });
+      }
+
+      setProducts(data || []);
     } catch (error) {
-      console.error("Error loading products:", error);
+      console.error("Unexpected error fetching products:", error);
       toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء تحميل المنتجات",
-        variant: "destructive"
+        title: "Error",
+        description: "An unexpected error occurred while fetching products.",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
-  
-  const filteredInventory = inventory.filter(product => 
-    (product.name && product.name.toLowerCase().includes(search.toLowerCase())) || 
-    (product.barcode && product.barcode.toString().includes(search))
-  );
 
-  // Products with low stock (less than 10 units)
-  const lowStockProducts = inventory.filter(product => (product.quantity || 0) < 10);
-  
-  const handleAddStock = async () => {
-    if (selectedProduct && stockToAdd > 0) {
-      setLoading(true);
-      try {
-        const updatedProduct = {
-          ...selectedProduct,
-          quantity: (selectedProduct.quantity || 0) + stockToAdd
-        };
-        
-        await updateProduct(selectedProduct.id, updatedProduct);
-        
-        setInventory(inventory.map(product => 
-          product.id === selectedProduct.id 
-            ? { ...product, quantity: (product.quantity || 0) + stockToAdd } 
-            : product
-        ));
-        
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("*")
+        .order("name");
+
+      if (error) {
+        console.error("Error fetching categories:", error);
         toast({
-          title: "تم بنجاح",
-          description: `تم إضافة ${stockToAdd} وحدات إلى المخزون`,
+          title: "Error",
+          description: "Failed to fetch categories.",
+          variant: "destructive",
         });
-        
-        setIsAddStockDialogOpen(false);
-        setStockToAdd(0);
-        setSelectedProduct(null);
-      } catch (error) {
-        console.error("Error updating stock:", error);
-        toast({
-          title: "خطأ",
-          description: "حدث خطاأ أثناء تحديث المخزون",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
       }
+
+      setCategories(data || []);
+    } catch (error) {
+      console.error("Unexpected error fetching categories:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while fetching categories.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleAddProduct = () => {
-    navigate("/add-product");
+  const fetchSubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("subcategories")
+        .select("*")
+        .order("name");
+
+      if (error) {
+        console.error("Error fetching subcategories:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch subcategories.",
+          variant: "destructive",
+        });
+      }
+
+      setSubcategories(data || []);
+    } catch (error) {
+      console.error("Unexpected error fetching subcategories:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while fetching subcategories.",
+        variant: "destructive",
+      });
+    }
   };
-  
+
+  const fetchSubsubcategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("subsubcategories")
+        .select("*")
+        .order("name");
+
+      if (error) {
+        console.error("Error fetching subsubcategories:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch subsubcategories.",
+          variant: "destructive",
+        });
+      }
+
+      setSubsubcategories(data || []);
+    } catch (error) {
+      console.error("Unexpected error fetching subsubcategories:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while fetching subsubcategories.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchMainCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("main_categories")
+        .select("*")
+        .order("name");
+
+      if (error) {
+        console.error("Error fetching main categories:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch main categories.",
+          variant: "destructive",
+        });
+      }
+
+      setMainCategories(data || []);
+    } catch (error) {
+      console.error("Unexpected error fetching main categories:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while fetching main categories.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("*")
+        .order("name");
+
+      if (error) {
+        console.error("Error fetching companies:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch companies.",
+          variant: "destructive",
+        });
+      }
+
+      setCompanies(data || []);
+    } catch (error) {
+      console.error("Unexpected error fetching companies:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while fetching companies.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedCategory(null);
+    setSelectedSubcategory(null);
+    setSelectedSubsubcategory(null);
+    setSelectedMainCategory(null);
+    setSelectedCompany(null);
+  };
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    } catch (error) {
+      return "Invalid Date";
+    }
+  };
+
   return (
     <MainLayout>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">إدارة المخزون</h1>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Filter className="ml-2 h-4 w-4" />
-            تصفية
-          </Button>
-          <Button variant="outline">
-            <Download className="ml-2 h-4 w-4" />
-            تصدير
-          </Button>
-          <Button 
-            variant="default"
-            onClick={() => {
-              setSelectedProduct(null);
-              setStockToAdd(0);
-              setIsAddStockDialogOpen(true);
-            }}
-            disabled={loading}
-          >
-            <Truck className="ml-2 h-4 w-4" />
-            إضافة مخزون
-          </Button>
-          <Button 
-            variant="default" 
-            onClick={handleAddProduct}
-          >
-            <PlusCircle className="ml-2 h-4 w-4" />
-            إضافة منتج
-          </Button>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="container mx-auto p-6 dir-rtl">
+        <h1 className="text-2xl font-bold mb-4">إدارة المخزون</h1>
+
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي المنتجات</CardTitle>
+          <CardHeader>
+            <CardTitle>قائمة المنتجات</CardTitle>
+            <CardDescription>عرض وتعديل المنتجات في المخزون</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{inventory.length}</div>
-            <p className="text-xs text-muted-foreground">منتج مسجل في النظام</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي كمية المخزون</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {inventory.reduce((total, product) => total + (product.quantity || 0), 0)}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="relative">
+                <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="ابحث عن منتج..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Select onValueChange={(value) => setSelectedCategory(value === "all" ? null : value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر فئة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">الكل</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select onValueChange={(value) => setSelectedSubcategory(value === "all" ? null : value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر فئة فرعية" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">الكل</SelectItem>
+                    {subcategories.map((subcategory) => (
+                      <SelectItem key={subcategory.id} value={subcategory.id}>
+                        {subcategory.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select onValueChange={(value) => setSelectedSubsubcategory(value === "all" ? null : value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر فئة فرعية فرعية" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">الكل</SelectItem>
+                    {subsubcategories.map((subsubcategory) => (
+                      <SelectItem key={subsubcategory.id} value={subsubcategory.id}>
+                        {subsubcategory.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select onValueChange={(value) => setSelectedMainCategory(value === "all" ? null : value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر فئة رئيسية" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">الكل</SelectItem>
+                    {mainCategories.map((mainCategory) => (
+                      <SelectItem key={mainCategory.id} value={mainCategory.id}>
+                        {mainCategory.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select onValueChange={(value) => setSelectedCompany(value === "all" ? null : value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="اختر شركة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">الكل</SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">وحدة متوفرة في المخزون</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">قيمة المخزون</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {inventory.reduce((total, product) => total + (product.purchase_price * (product.quantity || 0)), 0).toFixed(2)} {siteConfig.currency}
+
+            <div className="flex justify-between items-center mb-4">
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                إعادة تعيين الفلاتر
+              </Button>
+
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <Label htmlFor="sort">ترتيب حسب</Label>
+                <Select value={sortField} onValueChange={setSortField}>
+                  <SelectTrigger id="sort">
+                    <SelectValue placeholder="اسم المنتج" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">اسم المنتج</SelectItem>
+                    <SelectItem value="price">السعر</SelectItem>
+                    <SelectItem value="quantity">الكمية</SelectItem>
+                    <SelectItem value="created_at">تاريخ الإنشاء</SelectItem>
+                    <SelectItem value="updated_at">تاريخ التعديل</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortOrder} onValueChange={setSortOrder}>
+                  <SelectTrigger id="order">
+                    <SelectValue placeholder="تصاعدي" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="asc">تصاعدي</SelectItem>
+                    <SelectItem value="desc">تنازلي</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">القيمة الإجمالية بسعر الشراء</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">منتجات منخفضة المخزون</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-500">{lowStockProducts.length}</div>
-            <p className="text-xs text-muted-foreground">منتجات تحتاج إلى تجديد المخزون</p>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {lowStockProducts.length > 0 && (
-        <Card className="mb-6 border-yellow-200 bg-yellow-50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center">
-              <AlertTriangle className="text-yellow-500 ml-2 h-5 w-5" />
-              <CardTitle>تنبيه المخزون المنخفض</CardTitle>
-            </div>
-            <CardDescription>
-              المنتجات التالية تحتاج إلى تجديد المخزون
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border bg-white">
+
+            <ScrollArea>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[80px]">صورة</TableHead>
-                    <TableHead>المنتج</TableHead>
-                    <TableHead>الباركود</TableHead>
-                    <TableHead>المخزون الحالي</TableHead>
-                    <TableHead>الإجراء</TableHead>
+                    <TableHead>اسم المنتج</TableHead>
+                    <TableHead>السعر</TableHead>
+                    <TableHead>الكمية</TableHead>
+                    <TableHead>الفئة</TableHead>
+                    <TableHead>تاريخ الإنشاء</TableHead>
+                    <TableHead>تاريخ التعديل</TableHead>
+                    <TableHead className="text-center">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {lowStockProducts.map(product => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center">
-                          <img 
-                            src={product.image_urls ? product.image_urls[0] : "/placeholder.svg"} 
-                            alt={product.name}
-                            className="h-6 w-6 object-contain"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>{product.barcode}</TableCell>
-                      <TableCell>
-                        <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                          {product.quantity || 0} وحدة
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setStockToAdd(0);
-                              setIsAddStockDialogOpen(true);
-                            }}
-                            disabled={loading}
-                          >
-                            <Plus className="ml-2 h-4 w-4" />
-                            إضافة مخزون
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => navigate(`/add-product?id=${product.id}`)}
-                          >
-                            <Edit className="ml-2 h-4 w-4" />
-                            تعديل
-                          </Button>
-                        </div>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center">
+                        تحميل...
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>جميع المنتجات</CardTitle>
-              <CardDescription>إدارة مخزون المنتجات</CardDescription>
-            </div>
-            <Package className="h-5 w-5 text-muted-foreground" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2 mb-6">
-            <Input 
-              placeholder="ابحث بالاسم أو الباركود" 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="max-w-sm"
-            />
-            <Button variant="outline">
-              <Search className="ml-2 h-4 w-4" />
-              بحث
-            </Button>
-          </div>
-          
-          {loading ? (
-            <div className="flex justify-center items-center p-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[80px]">صورة</TableHead>
-                    <TableHead>المنتج</TableHead>
-                    <TableHead>الباركود</TableHead>
-                    <TableHead>سعر الشراء</TableHead>
-                    <TableHead>المخزون</TableHead>
-                    <TableHead>القيمة</TableHead>
-                    <TableHead>آخر تحديث</TableHead>
-                    <TableHead className="text-left">الإجراء</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredInventory.length === 0 ? (
+                  ) : products.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        لا توجد منتجات مطابقة للبحث
+                      <TableCell colSpan={7} className="text-center">
+                        لا توجد منتجات مسجلة.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredInventory.map(product => (
+                    products.map((product) => (
                       <TableRow key={product.id}>
-                        <TableCell>
-                          <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center">
-                            <img 
-                              src={product.image_urls ? product.image_urls[0] : "/placeholder.svg"} 
-                              alt={product.name}
-                              className="h-6 w-6 object-contain"
-                            />
-                          </div>
-                        </TableCell>
                         <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>{product.barcode}</TableCell>
-                        <TableCell>{product.purchase_price} {siteConfig.currency}</TableCell>
+                        <TableCell>{product.price}</TableCell>
                         <TableCell>
-                          {(product.quantity || 0) > 10 ? (
-                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                              {product.quantity || 0} وحدة
-                            </span>
-                          ) : (product.quantity || 0) > 0 ? (
-                            <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                              {product.quantity || 0} وحدة
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
-                              غير متوفر
-                            </span>
-                          )}
+                          {product.quantity !== null && product.quantity !== undefined
+                            ? product.quantity
+                            : "غير محدد"}
                         </TableCell>
                         <TableCell>
-                          {(product.purchase_price * (product.quantity || 0)).toFixed(2)} {siteConfig.currency}
+                          {categories.find((cat) => cat.id === product.category_id)?.name || "غير مصنف"}
                         </TableCell>
-                        <TableCell>
-                          {typeof product.updated_at === 'string' 
-                            ? new Date(product.updated_at).toLocaleDateString('ar-EG')
-                            : product.updated_at 
-                              ? new Date(product.updated_at.toString()).toLocaleDateString('ar-EG')
-                              : '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => {
-                                setSelectedProduct(product);
-                                setStockToAdd(0);
-                                setIsAddStockDialogOpen(true);
-                              }}
-                              disabled={loading}
-                            >
-                              <Plus className="ml-2 h-4 w-4" />
-                              إضافة
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => navigate(`/add-product?id=${product.id}`)}
-                            >
-                              <Edit className="ml-2 h-4 w-4" />
-                              تعديل
-                            </Button>
-                          </div>
+                        <TableCell>{formatDate(product.created_at)}</TableCell>
+                        <TableCell>{formatDate(product.updated_at)}</TableCell>
+                        <TableCell className="text-center">
+                          <MoreDropdown product={product} />
                         </TableCell>
                       </TableRow>
                     ))
                   )}
                 </TableBody>
               </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* Add Stock Dialog */}
-      <Dialog open={isAddStockDialogOpen} onOpenChange={setIsAddStockDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>إضافة مخزون</DialogTitle>
-            <DialogDescription>
-              أدخل كمية المخزون المراد إضافتها
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
-            <div className="grid gap-4 py-4 px-1">
-              {!selectedProduct ? (
-                <div className="space-y-2">
-                  <Label htmlFor="productSelect">اختر المنتج</Label>
-                  <select 
-                    id="productSelect"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
-                    onChange={(e) => {
-                      const product = inventory.find(p => p.id === e.target.value);
-                      setSelectedProduct(product || null);
-                    }}
-                    disabled={loading}
-                  >
-                    <option value="">-- اختر المنتج --</option>
-                    {inventory.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3 p-3 border rounded-md">
-                  <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
-                    <img 
-                      src={selectedProduct.image_urls ? selectedProduct.image_urls[0] : "/placeholder.svg"} 
-                      alt={selectedProduct.name}
-                      className="h-8 w-8 object-contain"
-                    />
-                  </div>
-                  <div>
-                    <h4 className="font-medium">{selectedProduct.name}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      المخزون الحالي: {selectedProduct.quantity || 0} وحدة
-                    </p>
-                  </div>
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="stockAmount">الكمية المراد إضافتها</Label>
-                <Input 
-                  id="stockAmount" 
-                  type="number" 
-                  min="1"
-                  value={stockToAdd}
-                  onChange={(e) => setStockToAdd(parseInt(e.target.value) || 0)}
-                  disabled={loading}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="purchasePrice">سعر الشراء للوحدة</Label>
-                <Input 
-                  id="purchasePrice" 
-                  type="number" 
-                  min="0"
-                  defaultValue={selectedProduct?.purchase_price}
-                  disabled
-                />
-              </div>
-              
-              {selectedProduct && stockToAdd > 0 && (
-                <div className="p-3 bg-primary/10 rounded-md">
-                  <p className="text-sm">
-                    إجمالي التكلفة: {(selectedProduct.purchase_price * stockToAdd).toFixed(2)} {siteConfig.currency}
-                  </p>
-                  <p className="text-sm">
-                    المخزون بعد الإضافة: {(selectedProduct.quantity || 0) + stockToAdd} وحدة
-                  </p>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-          <DialogFooter>
-            <Button 
-              type="submit" 
-              onClick={handleAddStock}
-              disabled={!selectedProduct || stockToAdd <= 0 || loading}
-            >
-              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-              إضافة المخزون
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
     </MainLayout>
   );
 }
