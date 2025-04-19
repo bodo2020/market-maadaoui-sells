@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export enum RegisterType {
@@ -133,12 +134,20 @@ export async function transferBetweenRegisters(
   userId: string
 ) {
   const fromBalance = await getLatestCashBalance(fromRegister);
-  const toBalance = await getLatestCashBalance(toRegister);
   
   if (fromBalance < amount) {
     throw new Error('لا يوجد رصيد كافي في الخزنة المصدر');
   }
   
+  // First, record the withdrawal from the source register
+  await recordCashTransaction(amount, 'withdrawal', fromRegister, 
+    `تحويل إلى خزنة ${toRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}: ${notes}`, userId);
+  
+  // Then, record the deposit to the destination register
+  await recordCashTransaction(amount, 'deposit', toRegister, 
+    `تحويل من خزنة ${fromRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}: ${notes}`, userId);
+  
+  // Record the transfer in the register_transfers table
   const { error: transferError } = await supabase
     .from('register_transfers')
     .insert([{
@@ -151,48 +160,6 @@ export async function transferBetweenRegisters(
     }]);
     
   if (transferError) throw transferError;
-  
-  const { error: transactionError } = await supabase
-    .from('cash_transactions')
-    .insert([{
-      transaction_date: new Date().toISOString(),
-      amount,
-      balance_after: fromBalance - amount,
-      transaction_type: 'transfer',
-      register_type: fromRegister,
-      notes: `تحويل إلى خزنة ${toRegister === 'store' ? 'المحل' : 'الأونلاين'}: ${notes}`,
-      created_by: userId
-    }]);
-    
-  if (transactionError) throw transactionError;
-  
-  const { error: sourceError } = await supabase
-    .from('cash_tracking')
-    .insert([{
-      date: new Date().toISOString().split('T')[0],
-      opening_balance: fromBalance,
-      closing_balance: fromBalance - amount,
-      difference: -amount,
-      notes: `تحويل إلى خزنة ${toRegister === 'store' ? 'المحل' : 'الأونلاين'}: ${notes}`,
-      created_by: userId,
-      register_type: fromRegister
-    }]);
-    
-  if (sourceError) throw sourceError;
-  
-  const { error: destError } = await supabase
-    .from('cash_tracking')
-    .insert([{
-      date: new Date().toISOString().split('T')[0],
-      opening_balance: toBalance,
-      closing_balance: toBalance + amount,
-      difference: amount,
-      notes: `تحويل من خزنة ${fromRegister === 'store' ? 'المحل' : 'الأونلاين'}: ${notes}`,
-      created_by: userId,
-      register_type: toRegister
-    }]);
-    
-  if (destError) throw destError;
   
   return true;
 }

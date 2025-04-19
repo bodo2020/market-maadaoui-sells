@@ -55,108 +55,136 @@ export default function SalesDashboard() {
   const [toRegister, setToRegister] = useState<RegisterType>(RegisterType.ONLINE);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   
-  // Fetch store sales
-  const { data: storeSales = [], isLoading: isStoreSalesLoading } = useQuery({
-    queryKey: ['sales', dateRange],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sales')
-        .select('*')
-        .gte('date', dateRange.from.toISOString())
-        .lte('date', dateRange.to.toISOString())
-        .order('date', { ascending: false });
-        
-      if (error) throw error;
+  const fetchRecords = async () => {
+    try {
+      // Fetch store sales
+      const { data: storeSales = [], isLoading: isStoreSalesLoading } = useQuery({
+        queryKey: ['sales', dateRange],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('sales')
+            .select('*')
+            .gte('date', dateRange.from.toISOString())
+            .lte('date', dateRange.to.toISOString())
+            .order('date', { ascending: false });
+            
+          if (error) throw error;
+          
+          // Transform the data to match the Sale type
+          return (data || []).map(sale => ({
+            ...sale,
+            // Ensure payment_method is one of the allowed values in the Sale type
+            payment_method: (sale.payment_method === 'cash' || 
+                          sale.payment_method === 'card' || 
+                          sale.payment_method === 'mixed') 
+                          ? sale.payment_method as 'cash' | 'card' | 'mixed'
+                          : 'cash', // Default to 'cash' if invalid value
+            // Parse items properly
+            items: Array.isArray(sale.items) 
+              ? sale.items as unknown as CartItem[]  // If already an array
+              : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
+          })) as Sale[];
+        }
+      });
       
-      // Transform the data to match the Sale type
-      return (data || []).map(sale => ({
-        ...sale,
-        // Ensure payment_method is one of the allowed values in the Sale type
-        payment_method: (sale.payment_method === 'cash' || 
-                        sale.payment_method === 'card' || 
-                        sale.payment_method === 'mixed') 
-                        ? sale.payment_method as 'cash' | 'card' | 'mixed'
-                        : 'cash', // Default to 'cash' if invalid value
-        // Parse items properly
-        items: Array.isArray(sale.items) 
-          ? sale.items as unknown as CartItem[]  // If already an array
-          : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
-      })) as Sale[];
+      // Fetch online orders
+      const { data: onlineOrders = [], isLoading: isOnlineOrdersLoading } = useQuery({
+        queryKey: ['onlineOrders', dateRange],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('online_orders')
+            .select('*')
+            .gte('created_at', dateRange.from.toISOString())
+            .lte('created_at', dateRange.to.toISOString())
+            .order('created_at', { ascending: false });
+            
+          if (error) throw error;
+          return data;
+        }
+      });
+      
+      // Fetch cash tracking for store register
+      const { data: storeRecords = [], isLoading: isStoreRecordsLoading, refetch: refetchStoreRecords } = useQuery({
+        queryKey: ['cashRecords', RegisterType.STORE, dateRange],
+        queryFn: async () => {
+          try {
+            const data = await fetchCashRecords(RegisterType.STORE);
+            console.log("Store cash records:", data);
+            return data;
+          } catch (error) {
+            console.error("Error fetching store cash records:", error);
+            throw error;
+          }
+        }
+      });
+      
+      // Fetch cash tracking for online register
+      const { data: onlineRecords = [], isLoading: isOnlineRecordsLoading, refetch: refetchOnlineRecords } = useQuery({
+        queryKey: ['cashRecords', RegisterType.ONLINE, dateRange],
+        queryFn: async () => {
+          try {
+            const data = await fetchCashRecords(RegisterType.ONLINE);
+            console.log("Online cash records:", data);
+            return data;
+          } catch (error) {
+            console.error("Error fetching online cash records:", error);
+            throw error;
+          }
+        }
+      });
+      
+      // Fetch transfers between registers
+      const { data: transfers = [], isLoading: isTransfersLoading, refetch: refetchTransfers } = useQuery({
+        queryKey: ['registerTransfers', dateRange],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('register_transfers')
+            .select('*')
+            .gte('date', dateRange.from.toISOString().split('T')[0])
+            .lte('date', dateRange.to.toISOString().split('T')[0])
+            .order('date', { ascending: false });
+            
+          if (error) throw error;
+          return data;
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching data:", error);
     }
-  });
-  
-  // Fetch online orders
-  const { data: onlineOrders = [], isLoading: isOnlineOrdersLoading } = useQuery({
-    queryKey: ['onlineOrders', dateRange],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('online_orders')
-        .select('*')
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString())
-        .order('created_at', { ascending: false });
-        
-      if (error) throw error;
-      return data;
+  };
+
+  const fetchCurrentBalance = async (registerType: RegisterType) => {
+    try {
+      const balance = await getLatestCashBalance(registerType);
+      console.log(`${registerType} balance:`, balance);
+      return balance;
+    } catch (error) {
+      console.error(`Error fetching ${registerType} balance:`, error);
+      return 0;
     }
-  });
-  
-  // Fetch cash tracking for store register
-  const { data: storeRecords = [], isLoading: isStoreRecordsLoading, refetch: refetchStoreRecords } = useQuery({
-    queryKey: ['cashRecords', RegisterType.STORE, dateRange],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('cash_tracking')
-        .select('*')
-        .eq('register_type', RegisterType.STORE)
-        .gte('date', dateRange.from.toISOString().split('T')[0])
-        .lte('date', dateRange.to.toISOString().split('T')[0])
-        .order('date', { ascending: false });
-        
-      if (error) throw error;
-      return data;
-    }
-  });
-  
-  // Fetch cash tracking for online register
-  const { data: onlineRecords = [], isLoading: isOnlineRecordsLoading, refetch: refetchOnlineRecords } = useQuery({
-    queryKey: ['cashRecords', RegisterType.ONLINE, dateRange],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('cash_tracking')
-        .select('*')
-        .eq('register_type', RegisterType.ONLINE)
-        .gte('date', dateRange.from.toISOString().split('T')[0])
-        .lte('date', dateRange.to.toISOString().split('T')[0])
-        .order('date', { ascending: false });
-        
-      if (error) throw error;
-      return data;
-    }
-  });
-  
-  // Fetch transfers between registers
-  const { data: transfers = [], isLoading: isTransfersLoading, refetch: refetchTransfers } = useQuery({
-    queryKey: ['registerTransfers', dateRange],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('register_transfers')
-        .select('*')
-        .gte('date', dateRange.from.toISOString().split('T')[0])
-        .lte('date', dateRange.to.toISOString().split('T')[0])
-        .order('date', { ascending: false });
-        
-      if (error) throw error;
-      return data;
-    }
-  });
+  };
+
+  useEffect(() => {
+    const loadBalances = async () => {
+      try {
+        const storeBalance = await fetchCurrentBalance(RegisterType.STORE);
+        const onlineBalance = await fetchCurrentBalance(RegisterType.ONLINE);
+        console.log("Fetched balances:", { storeBalance, onlineBalance });
+      } catch (error) {
+        console.error("Error loading balances:", error);
+      }
+    };
+    
+    loadBalances();
+    fetchRecords();
+  }, [dateRange]);
 
   // Calculate total sales
   const storeSalesTotal = storeSales.reduce((sum, sale) => sum + Number(sale.total), 0);
   const onlineOrdersTotal = onlineOrders.reduce((sum, order) => sum + Number(order.total), 0);
   const totalSales = storeSalesTotal + onlineOrdersTotal;
   
-  // Calculate total cash in each register
+  // Calculate total cash in each register with better error handling
   const storeBalance = storeRecords.length > 0 
     ? Number(storeRecords[0].closing_balance) || Number(storeRecords[0].opening_balance) 
     : 0;

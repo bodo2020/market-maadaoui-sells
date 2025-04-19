@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -20,7 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Wallet, Plus, Minus } from "lucide-react";
 
-// Define the CashRecord interface here to avoid type conflicts
 interface CashRecord {
   id: string;
   date: string;
@@ -48,19 +46,23 @@ export default function CashTracking() {
     try {
       setLoading(true);
       
-      // Fetch cash tracking records
+      console.log("Fetching cash records for register:", RegisterType.STORE);
       const { data: cashData, error: cashError } = await supabase
         .from('cash_tracking')
         .select('*')
         .eq('register_type', RegisterType.STORE)
         .order('date', { ascending: false });
       
-      if (cashError) throw cashError;
+      if (cashError) {
+        console.error('Error fetching cash records:', cashError);
+        throw cashError;
+      }
       
-      // Cast the data to our locally defined CashRecord type
+      console.log("Cash records fetched:", cashData);
+      
       setRecords(cashData as unknown as CashRecord[]);
       
-      // Fetch current balance
+      console.log("Fetching current balance for register:", RegisterType.STORE);
       const { data: balanceData, error: balanceError } = await supabase
         .from('cash_tracking')
         .select('closing_balance')
@@ -69,15 +71,23 @@ export default function CashTracking() {
         .order('created_at', { ascending: false })
         .limit(1);
       
-      if (balanceError) throw balanceError;
+      if (balanceError) {
+        console.error('Error fetching balance:', balanceError);
+        throw balanceError;
+      }
+      
+      console.log("Balance data fetched:", balanceData);
       
       if (balanceData && balanceData.length > 0) {
-        setCurrentBalance(balanceData[0].closing_balance || 0);
+        const balance = balanceData[0].closing_balance || 0;
+        console.log("Setting current balance to:", balance);
+        setCurrentBalance(balance);
       } else {
+        console.log("No balance data found, setting to 0");
         setCurrentBalance(0);
       }
     } catch (error) {
-      console.error('Error fetching cash records:', error);
+      console.error('Error in fetchRecords:', error);
       toast.error("حدث خطأ أثناء تحميل سجلات النقدية");
     } finally {
       setLoading(false);
@@ -93,7 +103,13 @@ export default function CashTracking() {
     try {
       setProcessingTransaction(true);
       
-      // Use the Edge Function instead of direct RPC call
+      console.log("Adding cash:", {
+        amount: parseFloat(amount),
+        transaction_type: 'deposit',
+        register_type: RegisterType.STORE,
+        notes: notes || "إيداع نقدي"
+      });
+      
       const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
         body: {
           amount: parseFloat(amount),
@@ -103,7 +119,12 @@ export default function CashTracking() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error response from Edge Function:", error);
+        throw error;
+      }
+      
+      console.log("Edge Function response:", data);
       
       toast.success("تم إضافة المبلغ بنجاح");
       setIsAddCashOpen(false);
@@ -132,7 +153,13 @@ export default function CashTracking() {
     try {
       setProcessingTransaction(true);
       
-      // Use the Edge Function instead of direct RPC call
+      console.log("Withdrawing cash:", {
+        amount: parseFloat(amount),
+        transaction_type: 'withdrawal',
+        register_type: RegisterType.STORE,
+        notes: notes || "سحب نقدي"
+      });
+      
       const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
         body: {
           amount: parseFloat(amount),
@@ -142,7 +169,12 @@ export default function CashTracking() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error response from Edge Function:", error);
+        throw error;
+      }
+      
+      console.log("Edge Function response:", data);
       
       toast.success("تم سحب المبلغ بنجاح");
       setIsWithdrawCashOpen(false);
@@ -242,7 +274,6 @@ export default function CashTracking() {
           </Table>
         </Card>
         
-        {/* Add Cash Dialog */}
         <Dialog open={isAddCashOpen} onOpenChange={setIsAddCashOpen}>
           <DialogContent className="sm:max-w-[425px]" dir="rtl">
             <DialogHeader>
@@ -286,7 +317,6 @@ export default function CashTracking() {
           </DialogContent>
         </Dialog>
         
-        {/* Withdraw Cash Dialog */}
         <Dialog open={isWithdrawCashOpen} onOpenChange={setIsWithdrawCashOpen}>
           <DialogContent className="sm:max-w-[425px]" dir="rtl">
             <DialogHeader>

@@ -40,40 +40,6 @@ serve(async (req) => {
 
     console.log('Processing transaction:', { amount, transaction_type, register_type, notes });
 
-    // Get the current balance
-    const { data: balanceData, error: balanceError } = await supabaseClient
-      .from('cash_tracking')
-      .select('closing_balance')
-      .eq('register_type', register_type)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(1);
-    
-    if (balanceError) {
-      console.error('Error fetching balance:', balanceError);
-      throw new Error('Error fetching current balance');
-    }
-    
-    const currentBalance = balanceData && balanceData.length > 0 ? balanceData[0].closing_balance : 0;
-    
-    // Calculate new balance
-    const newBalance = transaction_type === 'deposit' 
-      ? currentBalance + amount 
-      : currentBalance - amount;
-    
-    // Check for sufficient balance on withdrawal
-    if (transaction_type === 'withdrawal' && amount > currentBalance) {
-      return new Response(
-        JSON.stringify({ 
-          error: `Insufficient funds. Current balance: ${currentBalance}` 
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
-        }
-      );
-    }
-
     // Use the database function to handle transactions (this bypasses RLS)
     const { data: functionData, error: functionError } = await supabaseClient.rpc(
       'add_cash_transaction',
@@ -124,13 +90,29 @@ serve(async (req) => {
       console.error('Error retrieving tracking record:', trackingError);
     }
 
+    // Calculate the current balance for safety
+    let currentBalance = 0;
+    
+    // Get the current balance from the database
+    const { data: balanceData, error: balanceError } = await supabaseClient
+      .from('cash_tracking')
+      .select('closing_balance')
+      .eq('register_type', register_type)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    if (!balanceError && balanceData && balanceData.length > 0) {
+      currentBalance = balanceData[0].closing_balance || 0;
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true,
         transaction: transactionData || null,
         tracking: trackingData || null,
-        previous_balance: currentBalance,
-        new_balance: functionData || newBalance
+        previous_balance: currentBalance - (transaction_type === 'deposit' ? amount : -amount),
+        new_balance: currentBalance
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
