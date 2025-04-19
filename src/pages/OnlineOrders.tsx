@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useOrdersData, OrderFilters } from "@/hooks/orders/useOrdersData";
 import { OrdersHeader } from "@/components/orders/OrdersHeader";
@@ -38,25 +39,22 @@ export default function OnlineOrders() {
     searchQuery
   });
   
-  // Debug loading state
-  useEffect(() => {
-    console.log("Orders loading state:", loading);
-    console.log("Orders count:", orders.length);
-  }, [loading, orders]);
-  
   // Update filters when tab changes
   const handleTabChange = (value: string) => {
     console.log("Tab changed to:", value);
-    if (value === 'all') {
-      setFilters({ ...filters, status: 'all' });
-    } else {
-      setFilters({ ...filters, status: value as OrderFilters['status'] });
+    setFilters(prev => {
+      const newFilters = { 
+        ...prev, 
+        status: value as OrderFilters['status'] 
+      };
       
       // When viewing pending orders, mark them as read
       if (value === 'pending') {
         markOrdersAsRead();
       }
-    }
+      
+      return newFilters;
+    });
   };
   
   // Handle action for marking order as ready
@@ -109,11 +107,6 @@ export default function OnlineOrders() {
   const handlePrintInvoice = (order: Order) => {
     printOrderInvoice(order);
   };
-  
-  // Load initial data
-  useEffect(() => {
-    refreshOrders();
-  }, []);
   
   return (
     <MainLayout>
