@@ -395,7 +395,7 @@ export default function POS() {
         body: {
           amount: amountToRecord,
           transaction_type: 'deposit',
-          register_type: RegisterType.STORE,
+          register_type: 'store',
           notes: 'مبيعات نقطة البيع'
         }
       });

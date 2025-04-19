@@ -1280,6 +1280,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_cash_transaction: {
+        Args: {
+          p_amount: number
+          p_transaction_type: string
+          p_register_type: string
+          p_notes: string
+        }
+        Returns: number
+      }
       create_bucket_if_not_exists: {
         Args: { bucket_name: string }
         Returns: undefined
@@ -1296,6 +1305,7 @@ export type Database = {
     Enums: {
       order_payment_status: "pending" | "paid" | "failed" | "refunded"
       order_status: "waiting" | "ready" | "shipped" | "done"
+      register_type: "store" | "online"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1413,6 +1423,7 @@ export const Constants = {
     Enums: {
       order_payment_status: ["pending", "paid", "failed", "refunded"],
       order_status: ["waiting", "ready", "shipped", "done"],
+      register_type: ["store", "online"],
     },
   },
 } as const
