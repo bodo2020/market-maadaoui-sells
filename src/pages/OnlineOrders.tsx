@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -37,6 +38,7 @@ type OrderFromDB = {
   shipping_cost?: number | null;
   notes?: string | null;
   updated_at?: string | null;
+  delivery_person?: string | null;
 };
 
 export default function OnlineOrders() {
