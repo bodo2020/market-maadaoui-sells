@@ -15,6 +15,16 @@ import { Pencil, Mail, Phone, MapPin, Bike, RotateCcw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -25,6 +35,8 @@ export default function OrderDetails() {
   const [assignDeliveryOpen, setAssignDeliveryOpen] = useState(false);
   const [isUpdatingShipping, setIsUpdatingShipping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmStatusDialog, setConfirmStatusDialog] = useState(false);
+  const [statusToUpdate, setStatusToUpdate] = useState<Order['status'] | null>(null);
 
   useEffect(() => {
     fetchOrder();
@@ -137,6 +149,42 @@ export default function OrderDetails() {
     }
   };
 
+  const handleStatusClick = (status: Order['status']) => {
+    setStatusToUpdate(status);
+    setConfirmStatusDialog(true);
+  };
+
+  const confirmStatusUpdate = async () => {
+    if (!statusToUpdate || !order) return;
+    
+    try {
+      const { error } = await supabase
+        .from('online_orders')
+        .update({ 
+          status: statusToUpdate,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      // Reload the order data
+      await fetchOrder();
+      
+      toast.success(`تم تحديث حالة الطلب إلى ${
+        statusToUpdate === 'waiting' ? 'في الانتظار' : 
+        statusToUpdate === 'ready' ? 'جاهز للشحن' : 
+        statusToUpdate === 'shipped' ? 'تم الشحن' : 'تم التسليم'
+      }`);
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast.error('حدث خطأ أثناء تحديث حالة الطلب');
+    } finally {
+      setConfirmStatusDialog(false);
+      setStatusToUpdate(null);
+    }
+  };
+
   const getStatusBadgeColor = (status: Order['status']) => {
     const colors = {
       waiting: "bg-amber-100 text-amber-800 hover:bg-amber-200",
@@ -182,12 +230,32 @@ export default function OrderDetails() {
         <div className="flex justify-between items-center mb-6">
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">تجهيز الطلب #{order.id.slice(0, 8)}</h1>
-            <button onClick={() => setUpdateStatusOpen(true)} className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${getStatusBadgeColor(order.status)}`}>
-              {order.status === 'waiting' && 'في الانتظار'}
-              {order.status === 'ready' && 'جاهز للشحن'}
-              {order.status === 'shipped' && 'تم الشحن'}
-              {order.status === 'done' && 'تم التسليم'}
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => handleStatusClick('waiting')} 
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order.status === 'waiting' ? getStatusBadgeColor('waiting') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+              >
+                في الانتظار
+              </button>
+              <button 
+                onClick={() => handleStatusClick('ready')} 
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order.status === 'ready' ? getStatusBadgeColor('ready') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+              >
+                جاهز للشحن
+              </button>
+              <button 
+                onClick={() => handleStatusClick('shipped')} 
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order.status === 'shipped' ? getStatusBadgeColor('shipped') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+              >
+                تم الشحن
+              </button>
+              <button 
+                onClick={() => handleStatusClick('done')} 
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order.status === 'done' ? getStatusBadgeColor('done') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+              >
+                تم التسليم
+              </button>
+            </div>
           </div>
           <Button variant="outline" onClick={() => navigate('/online-orders')}>
             عودة
@@ -244,7 +312,8 @@ export default function OrderDetails() {
                     const { error } = await supabase
                       .from('online_orders')
                       .update({
-                        payment_status: 'pending'
+                        payment_status: 'pending',
+                        updated_at: new Date().toISOString()
                       })
                       .eq('id', order.id);
                     
@@ -408,6 +477,25 @@ export default function OrderDetails() {
           orderId={order.id} 
           onConfirm={fetchOrder} 
         />
+
+        <AlertDialog open={confirmStatusDialog} onOpenChange={setConfirmStatusDialog}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle>تأكيد تغيير حالة الطلب</AlertDialogTitle>
+              <AlertDialogDescription>
+                هل أنت متأكد من تغيير حالة الطلب إلى{" "}
+                {statusToUpdate === 'waiting' && 'في الانتظار'}
+                {statusToUpdate === 'ready' && 'جاهز للشحن'}
+                {statusToUpdate === 'shipped' && 'تم الشحن'}
+                {statusToUpdate === 'done' && 'تم التسليم'}؟
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row-reverse justify-center gap-2">
+              <AlertDialogAction onClick={confirmStatusUpdate}>تأكيد</AlertDialogAction>
+              <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>;
 }
