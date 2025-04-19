@@ -149,34 +149,8 @@ export default function OrderDetails() {
   };
 
   const handleStatusClick = async (status: Order['status']) => {
-    if (!order) return;
-    
-    try {
-      setIsUpdatingStatus(true);
-      
-      const { error } = await supabase
-        .from('online_orders')
-        .update({ 
-          status,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', order.id);
-      
-      if (error) throw error;
-      
-      await fetchOrder();
-      
-      toast.success(`تم تحديث حالة الطلب إلى ${
-        status === 'waiting' ? 'في الانتظار' : 
-        status === 'ready' ? 'جاهز للشحن' : 
-        status === 'shipped' ? 'تم الشحن' : 'تم التسليم'
-      }`);
-    } catch (error) {
-      console.error('Error updating order status:', error);
-      toast.error('حدث خطأ أثناء تحديث حالة الطلب');
-    } finally {
-      setIsUpdatingStatus(false);
-    }
+    setStatusToUpdate(status);
+    setConfirmStatusDialog(true);
   };
 
   const handlePaymentStatusUpdate = async (paymentStatus: 'pending' | 'paid') => {
@@ -224,27 +198,12 @@ export default function OrderDetails() {
           newStatus = 'waiting'; // Reset to waiting if at the end of the cycle
       }
       
-      const { error } = await supabase
-        .from('online_orders')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', order.id);
-      
-      if (error) throw error;
-      
-      await fetchOrder();
-      
-      toast.success(`تم تحديث حالة الطلب إلى ${
-        newStatus === 'waiting' ? 'في الانتظار' : 
-        newStatus === 'ready' ? 'جاهز للشحن' : 
-        newStatus === 'shipped' ? 'تم الشحن' : 'تم التسليم'
-      }`);
+      setStatusToUpdate(newStatus);
+      setConfirmStatusDialog(true);
+      setIsUpdatingStatus(false);
     } catch (error) {
       console.error('Error updating order status:', error);
       toast.error('حدث خطأ أثناء تحديث حالة الطلب');
-    } finally {
       setIsUpdatingStatus(false);
     }
   };
