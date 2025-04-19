@@ -74,51 +74,63 @@ serve(async (req) => {
       );
     }
 
-    // Insert cash transaction record WITH balance_after
+    // Use the database function to handle transactions (this bypasses RLS)
+    const { data: functionData, error: functionError } = await supabaseClient.rpc(
+      'add_cash_transaction',
+      {
+        p_amount: amount,
+        p_transaction_type: transaction_type,
+        p_register_type: register_type,
+        p_notes: notes || null
+      }
+    );
+
+    if (functionError) {
+      console.error('Error calling database function:', functionError);
+      return new Response(
+        JSON.stringify({ 
+          error: functionError.message || 'Error processing transaction'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        }
+      );
+    }
+
+    // Get the newly created records to return to the client
     const { data: transactionData, error: transactionError } = await supabaseClient
       .from('cash_transactions')
-      .insert([{
-        transaction_date: new Date().toISOString(),
-        amount,
-        transaction_type,
-        register_type,
-        notes: notes || null,
-        balance_after: newBalance // Set the balance_after field directly
-      }])
-      .select()
+      .select('*')
+      .eq('register_type', register_type)
+      .order('transaction_date', { ascending: false })
+      .limit(1)
       .single();
 
     if (transactionError) {
-      console.error('Error creating transaction record:', transactionError);
-      throw new Error('Error creating transaction record');
+      console.error('Error retrieving transaction:', transactionError);
     }
 
-    // Insert cash tracking record
     const { data: trackingData, error: trackingError } = await supabaseClient
       .from('cash_tracking')
-      .insert([{
-        date: new Date().toISOString().split('T')[0],
-        opening_balance: currentBalance,
-        closing_balance: newBalance,
-        difference: transaction_type === 'deposit' ? amount : -amount,
-        notes: notes || `${transaction_type === 'deposit' ? 'إيداع' : 'سحب'} نقدي`,
-        register_type
-      }])
-      .select()
+      .select('*')
+      .eq('register_type', register_type)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single();
 
     if (trackingError) {
-      console.error('Error creating tracking record:', trackingError);
-      throw new Error('Error creating tracking record');
+      console.error('Error retrieving tracking record:', trackingError);
     }
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        transaction: transactionData,
-        tracking: trackingData,
+        transaction: transactionData || null,
+        tracking: trackingData || null,
         previous_balance: currentBalance,
-        new_balance: newBalance
+        new_balance: functionData || newBalance
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
