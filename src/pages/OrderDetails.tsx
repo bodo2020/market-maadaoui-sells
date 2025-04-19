@@ -37,6 +37,8 @@ export default function OrderDetails() {
         .from('online_orders')
         .select(`
           *,
+          delivery_person,
+          tracking_number,
           customers(
             name,
             email,
