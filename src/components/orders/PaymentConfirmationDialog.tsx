@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -27,17 +26,41 @@ export function PaymentConfirmationDialog({
     try {
       setIsSubmitting(true);
       
+      // First, check the current order status
+      const { data: orderData, error: fetchError } = await supabase
+        .from('online_orders')
+        .select('status')
+        .eq('id', orderId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // Update payment status and order status if needed
+      let updates = { 
+        payment_status: 'paid',
+        updated_at: new Date().toISOString()
+      };
+      
+      // If order is still pending, automatically move it to processing state
+      if (orderData.status === 'pending') {
+        updates = {
+          ...updates,
+          status: 'processing'
+        };
+      }
+      
       const { error } = await supabase
         .from('online_orders')
-        .update({ 
-          payment_status: 'paid',
-          updated_at: new Date().toISOString()
-        })
+        .update(updates)
         .eq('id', orderId);
       
       if (error) throw error;
       
       toast.success('تم تأكيد الدفع بنجاح');
+      if (updates.status === 'processing') {
+        toast.info('تم تحديث حالة الطلب إلى "قيد المعالجة"');
+      }
+      
       onConfirm();
       onOpenChange(false);
     } catch (error) {
@@ -57,7 +80,7 @@ export function PaymentConfirmationDialog({
         <div className="space-y-4 py-4 text-center dir-rtl">
           <div>
             <p>هل أنت متأكد من تأكيد استلام هذا الدفع؟</p>
-            <p className="text-sm text-muted-foreground mt-2">سيتم تحديث حالة الدفع إلى "مدفوع".</p>
+            <p className="text-sm text-muted-foreground mt-2">سيتم تحديث حالة الدفع إلى "مدفوع" وتحديث حالة الطلب إذا لزم الأمر.</p>
           </div>
         </div>
         <DialogFooter className="flex flex-row gap-2 sm:justify-center">

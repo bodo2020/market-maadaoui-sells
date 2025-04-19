@@ -38,17 +38,28 @@ export function UpdateOrderStatusDialog({
     try {
       setIsSubmitting(true);
       
+      const updates: any = { 
+        status,
+        updated_at: new Date().toISOString()
+      };
+      
+      // If order is being delivered, also mark payment as completed if COD
+      if (status === 'delivered' && order.payment_method === 'cod' && order.payment_status === 'pending') {
+        updates.payment_status = 'paid';
+      }
+      
       const { error } = await supabase
         .from('online_orders')
-        .update({ 
-          status,
-          updated_at: new Date().toISOString()
-        })
+        .update(updates)
         .eq('id', order.id);
       
       if (error) throw error;
       
       toast.success('تم تحديث حالة الطلب بنجاح');
+      if (updates.payment_status === 'paid') {
+        toast.info('تم تحديث حالة الدفع إلى "مدفوع"');
+      }
+      
       onStatusUpdated();
       onOpenChange(false);
     } catch (error) {
@@ -141,6 +152,14 @@ export function UpdateOrderStatusDialog({
                 </div>
               ))}
             </RadioGroup>
+            
+            {status === 'delivered' && order.payment_method === 'cod' && order.payment_status === 'pending' && (
+              <div className="text-sm bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-2">
+                <p className="text-yellow-800">
+                  سيتم تحديث حالة الدفع تلقائيًا إلى "مدفوع" عند تحديث الحالة إلى "تم التسليم".
+                </p>
+              </div>
+            )}
           </div>
         )}
         

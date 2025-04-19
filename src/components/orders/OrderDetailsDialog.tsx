@@ -39,10 +39,39 @@ export function OrderDetailsDialog({
       
       const { error } = await supabase
         .from('online_orders')
-        .update({ status })
+        .update({ 
+          status,
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', order.id);
       
       if (error) throw error;
+      
+      // When order is shipped, notify the delivery person
+      if (status === 'shipped' && order.delivery_person) {
+        try {
+          // Send notification to delivery person via Supabase channel
+          const notificationChannel = supabase.channel('delivery-notifications');
+          await notificationChannel.subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+              await notificationChannel.send({
+                type: 'broadcast',
+                event: 'new-delivery',
+                payload: {
+                  order_id: order.id,
+                  delivery_person: order.delivery_person,
+                  customer_address: order.shipping_address,
+                  status: 'shipped'
+                }
+              });
+            }
+          });
+          
+          console.log('Delivery notification sent');
+        } catch (notifyError) {
+          console.error('Error sending delivery notification:', notifyError);
+        }
+      }
       
       if (onStatusUpdated) onStatusUpdated();
       toast.success(`تم تحديث حالة الشحن إلى ${status === 'shipped' ? 'خرج للتوصيل' : 'تم التوصيل'}`);
@@ -56,7 +85,7 @@ export function OrderDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[1400px] h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-[1000px] h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">تجهيز المنتجات #{order.id.slice(0, 8)}</DialogTitle>
         </DialogHeader>

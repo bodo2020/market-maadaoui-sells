@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Order } from "@/types";
+import { useNotificationStore } from "@/stores/notificationStore";
 
 export type OrderFromDB = {
   id: string;
@@ -28,9 +29,11 @@ export const useOrderManagement = (activeTab: string) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
+  const { setUnreadOrders } = useNotificationStore();
 
   useEffect(() => {
     fetchOrders();
+    fetchPendingOrdersCount();
     const channel = subscribeToOrders();
     return () => {
       if (channel) {
@@ -38,6 +41,21 @@ export const useOrderManagement = (activeTab: string) => {
       }
     };
   }, [activeTab, ordersRefreshKey]);
+
+  const fetchPendingOrdersCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('online_orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      
+      if (error) throw error;
+      
+      setUnreadOrders(count || 0);
+    } catch (error) {
+      console.error('Error fetching pending orders count:', error);
+    }
+  };
 
   const subscribeToOrders = () => {
     const channel = supabase.channel('online-orders')
@@ -50,6 +68,7 @@ export const useOrderManagement = (activeTab: string) => {
           description: "تم استلام طلب جديد"
         });
         fetchOrders();
+        fetchPendingOrdersCount();
       })
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -58,6 +77,7 @@ export const useOrderManagement = (activeTab: string) => {
       }, payload => {
         console.log("Order updated:", payload);
         fetchOrders();
+        fetchPendingOrdersCount();
       })
       .subscribe();
     return channel;

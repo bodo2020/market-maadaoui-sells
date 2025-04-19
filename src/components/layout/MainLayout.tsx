@@ -1,11 +1,16 @@
-import { ReactNode } from "react";
+
+import { ReactNode, useEffect } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
+import { useNotificationStore } from "@/stores/notificationStore";
+import { supabase } from "@/integrations/supabase/client";
+
 interface MainLayoutProps {
   children: ReactNode;
 }
+
 export default function MainLayout({
   children
 }: MainLayoutProps) {
@@ -13,6 +18,29 @@ export default function MainLayout({
     isAuthenticated,
     isLoading
   } = useAuth();
+  
+  const { setUnreadOrders } = useNotificationStore();
+  
+  // Fetch unread orders count when layout mounts
+  useEffect(() => {
+    const fetchUnreadOrders = async () => {
+      try {
+        const { count, error } = await supabase
+          .from('online_orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending');
+        
+        if (error) throw error;
+        setUnreadOrders(count || 0);
+      } catch (error) {
+        console.error('Error fetching unread orders:', error);
+      }
+    };
+    
+    if (isAuthenticated) {
+      fetchUnreadOrders();
+    }
+  }, [isAuthenticated, setUnreadOrders]);
 
   // If loading, show loading indicator
   if (isLoading) {
@@ -23,6 +51,7 @@ export default function MainLayout({
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
+  
   return <div className="min-h-screen bg-gray-50 flex">
       <Sidebar />
       <div className="flex-1 flex flex-col">
