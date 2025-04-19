@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export enum RegisterType {
@@ -87,6 +88,7 @@ export async function getLatestCashBalance(registerType: RegisterType) {
     .select('*')
     .eq('register_type', registerType)
     .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(1);
     
   if (error) throw error;
@@ -106,13 +108,17 @@ export async function recordCashTransaction(
   userId: string
 ) {
   try {
-    // Use the RPC function for handling cash transactions
-    const { data, error } = await supabase.rpc('add_cash_transaction', {
-      p_amount: amount,
-      p_transaction_type: transactionType,
-      p_register_type: registerType,
-      p_notes: notes
-    });
+    // Use a POST request with the function name as part of the URL
+    const { data, error } = await supabase
+      .from('cash_transactions')
+      .select('*')
+      .limit(1)
+      .then(() => supabase.rest.rpc.call('add_cash_transaction', {
+        p_amount: amount,
+        p_transaction_type: transactionType,
+        p_register_type: registerType,
+        p_notes: notes
+      }));
       
     if (error) throw error;
     
