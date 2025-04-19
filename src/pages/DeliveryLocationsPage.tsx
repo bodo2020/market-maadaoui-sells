@@ -45,6 +45,7 @@ export default function DeliveryLocationsPage() {
           open={showAddLocationDialog}
           onOpenChange={setShowAddLocationDialog}
           mode="governorate"
+          providerId={selectedProviderId}
           onSuccess={() => {
             toast.success("تم إضافة المحافظة بنجاح");
             setShowAddLocationDialog(false);

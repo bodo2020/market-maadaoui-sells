@@ -15,7 +15,7 @@ interface DeliveryLocationDialogProps {
     city?: string;
     area?: string;
   };
-  providerId?: string; // Added providerId as an optional prop
+  providerId?: string;
   onSuccess?: () => void;
 }
 
@@ -39,7 +39,7 @@ export default function DeliveryLocationDialog({
         case 'governorate':
           await createGovernorate({ 
             governorate: name,
-            provider_id: providerId // Pass providerId if available
+            provider_id: providerId 
           });
           break;
         case 'city':
@@ -47,7 +47,7 @@ export default function DeliveryLocationDialog({
             await createCity({
               governorate: parentData.governorate,
               city: name,
-              provider_id: providerId // Pass providerId if available
+              provider_id: providerId
             });
           }
           break;
@@ -57,7 +57,7 @@ export default function DeliveryLocationDialog({
               governorate: parentData.governorate,
               city: parentData.city,
               area: name,
-              provider_id: providerId // Pass providerId if available
+              provider_id: providerId
             });
           }
           break;
@@ -69,7 +69,7 @@ export default function DeliveryLocationDialog({
               area: parentData.area,
               neighborhood: name,
               price: 0,
-              provider_id: providerId // Pass providerId if available
+              provider_id: providerId
             });
           }
           break;
