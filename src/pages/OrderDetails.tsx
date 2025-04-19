@@ -30,9 +30,17 @@ export default function OrderDetails() {
 
   const fetchOrder = async () => {
     try {
+      // Get order data with customer details if available
       const { data, error } = await supabase
         .from('online_orders')
-        .select('*')
+        .select(`
+          *,
+          customers:customer_id (
+            name,
+            email,
+            phone
+          )
+        `)
         .eq('id', id)
         .single();
 
@@ -66,9 +74,15 @@ export default function OrderDetails() {
             product_name: item.product_name || '',
             quantity: item.quantity || 0,
             price: item.price || 0,
-            total: item.total || 0
+            total: item.total || 0,
+            image_url: item.image_url
           }));
         };
+        
+        // Get customer information
+        const customerName = data.customers?.name || 'غير معروف';
+        const customerEmail = data.customers?.email || '';
+        const customerPhone = data.customers?.phone || '';
         
         setOrder({
           id: data.id,
@@ -79,9 +93,9 @@ export default function OrderDetails() {
           payment_method: data.payment_method,
           shipping_address: data.shipping_address,
           items: transformItems(data.items),
-          customer_name: data.customer_name || 'غير معروف',
-          customer_email: data.customer_email || '',
-          customer_phone: data.customer_phone || '',
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
           notes: data.notes || '',
         });
       }
