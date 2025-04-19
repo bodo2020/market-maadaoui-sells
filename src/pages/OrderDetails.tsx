@@ -15,10 +15,9 @@ import { Pencil, Mail, Phone, MapPin, Bike, RotateCcw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
+
 export default function OrderDetails() {
-  const {
-    id
-  } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
@@ -26,16 +25,15 @@ export default function OrderDetails() {
   const [assignDeliveryOpen, setAssignDeliveryOpen] = useState(false);
   const [isUpdatingShipping, setIsUpdatingShipping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
     fetchOrder();
   }, [id]);
+
   const fetchOrder = async () => {
     try {
       setIsLoading(true);
-      const {
-        data,
-        error
-      } = await supabase.from('online_orders').select(`
+      const { data, error } = await supabase.from('online_orders').select(`
           *,
           customers(
             name,
@@ -43,16 +41,20 @@ export default function OrderDetails() {
             phone
           )
         `).eq('id', id).single();
+      
       if (error) throw error;
+      
       if (data) {
         const validateOrderStatus = (status: string): Order['status'] => {
           const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
           return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
         };
+        
         const validatePaymentStatus = (status: string): Order['payment_status'] => {
           const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
           return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
         };
+        
         const transformItems = (items: any): OrderItem[] => {
           if (!Array.isArray(items)) {
             try {
@@ -67,6 +69,7 @@ export default function OrderDetails() {
               return [];
             }
           }
+          
           return items.map((item: any) => ({
             product_id: item.product_id || '',
             product_name: item.product_name || '',
@@ -76,9 +79,11 @@ export default function OrderDetails() {
             image_url: item.image_url || null
           }));
         };
+        
         const customerName = data.customers?.name || 'غير معروف';
         const customerEmail = data.customers?.email || '';
         const customerPhone = data.customers?.phone || '';
+        
         setOrder({
           id: data.id,
           created_at: data.created_at,
@@ -103,18 +108,26 @@ export default function OrderDetails() {
       setIsLoading(false);
     }
   };
+
   const updateShippingStatus = async (status: 'shipped' | 'done') => {
     if (!order) return;
+    
     try {
       setIsUpdatingShipping(true);
-      const {
-        error
-      } = await supabase.from('online_orders').update({
-        status,
-        updated_at: new Date().toISOString()
-      }).eq('id', order.id);
+      
+      const { error } = await supabase
+        .from('online_orders')
+        .update({ 
+          status,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', order.id);
+      
       if (error) throw error;
+      
+      // Reload the order data to reflect the changes
       await fetchOrder();
+      
       toast.success(`تم تحديث حالة الشحن إلى ${status === 'shipped' ? 'خرج للتوصيل' : 'تم التوصيل'}`);
     } catch (error) {
       console.error('Error updating shipping status:', error);
@@ -123,6 +136,7 @@ export default function OrderDetails() {
       setIsUpdatingShipping(false);
     }
   };
+
   const getStatusBadgeColor = (status: Order['status']) => {
     const colors = {
       waiting: "bg-amber-100 text-amber-800 hover:bg-amber-200",
@@ -132,6 +146,7 @@ export default function OrderDetails() {
     };
     return colors[status] || "bg-gray-100 text-gray-800";
   };
+
   if (isLoading) {
     return <MainLayout>
         <div className="container mx-auto p-6">
@@ -141,6 +156,7 @@ export default function OrderDetails() {
         </div>
       </MainLayout>;
   }
+
   if (!order) {
     return <MainLayout>
         <div className="container mx-auto p-6">
@@ -150,6 +166,7 @@ export default function OrderDetails() {
         </div>
       </MainLayout>;
   }
+
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('ar', {
       year: 'numeric',
@@ -159,6 +176,7 @@ export default function OrderDetails() {
       minute: '2-digit'
     });
   };
+
   return <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
@@ -214,17 +232,6 @@ export default function OrderDetails() {
             </div>
 
             <div className="space-y-3">
-              {order.payment_status === 'pending' ? <Button variant="outline" className="w-full" onClick={() => setPaymentConfirmOpen(true)}>
-                  تأكيد الدفع
-                </Button> : <Badge variant="default" className="w-full px-4 py-2 text-base flex justify-center items-center">
-                  تم تأكيد الدفع
-                </Badge>}
-              <div className="flex justify-between items-center">
-                <Button variant={order.status === 'ready' ? 'default' : 'outline'} className="w-full" onClick={() => setUpdateStatusOpen(true)}>
-                  تحديث حالة الطلب
-                </Button>
-              </div>
-              
               <div className="flex items-center gap-3 mt-4">
                 {order.payment_status === 'pending' ? <Button variant="outline" className="w-full" onClick={() => setPaymentConfirmOpen(true)}>
                     تأكيد الدفع
@@ -234,13 +241,17 @@ export default function OrderDetails() {
                     </Badge>
                     <Button variant="outline" size="sm" className="w-1/4 flex items-center gap-2" onClick={async () => {
                   try {
-                    const {
-                      error
-                    } = await supabase.from('online_orders').update({
-                      payment_status: 'pending'
-                    }).eq('id', order.id);
+                    const { error } = await supabase
+                      .from('online_orders')
+                      .update({
+                        payment_status: 'pending'
+                      })
+                      .eq('id', order.id);
+                    
                     if (error) throw error;
-                    await fetchOrder();
+                    
+                    await fetchOrder(); // Reload data to reflect changes
+                    
                     toast.success('تم التراجع عن تأكيد الدفع');
                   } catch (error) {
                     console.error('Error reverting payment status:', error);
@@ -253,8 +264,12 @@ export default function OrderDetails() {
                   </div>}
               </div>
 
+              <div className="flex justify-between items-center">
+                <Button variant={order.status === 'ready' ? 'default' : 'outline'} className="w-full" onClick={() => setUpdateStatusOpen(true)}>
+                  تحديث حالة الطلب
+                </Button>
+              </div>
               
-
               <div className="mt-6 space-y-3">
                 <h3 className="font-medium text-lg">تعيين مندوب توصيل</h3>
                 <Button variant="outline" className="w-full flex gap-2 items-center justify-center" onClick={() => setAssignDeliveryOpen(true)}>
@@ -373,11 +388,26 @@ export default function OrderDetails() {
           </div>
         </div>
 
-        <UpdateOrderStatusDialog order={order} open={updateStatusOpen} onOpenChange={setUpdateStatusOpen} onStatusUpdated={fetchOrder} />
+        <UpdateOrderStatusDialog 
+          order={order} 
+          open={updateStatusOpen} 
+          onOpenChange={setUpdateStatusOpen} 
+          onStatusUpdated={fetchOrder} 
+        />
 
-        <PaymentConfirmationDialog open={paymentConfirmOpen} onOpenChange={setPaymentConfirmOpen} orderId={order.id} onConfirm={fetchOrder} />
+        <PaymentConfirmationDialog 
+          open={paymentConfirmOpen} 
+          onOpenChange={setPaymentConfirmOpen} 
+          orderId={order.id} 
+          onConfirm={fetchOrder} 
+        />
 
-        <AssignDeliveryPersonDialog open={assignDeliveryOpen} onOpenChange={setAssignDeliveryOpen} orderId={order.id} onConfirm={fetchOrder} />
+        <AssignDeliveryPersonDialog 
+          open={assignDeliveryOpen} 
+          onOpenChange={setAssignDeliveryOpen} 
+          orderId={order.id} 
+          onConfirm={fetchOrder} 
+        />
       </div>
     </MainLayout>;
 }
