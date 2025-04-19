@@ -1,8 +1,21 @@
+
 import { useState, useEffect } from "react";
 import { Home, LayoutDashboard, Settings, ShoppingBag, Users, Package as CategoryIcon, Truck, Percent, Coins, FileText, Archive, LogOut, LogIn, UserPlus, ListChecks, BarChart, Store, Package, Calendar, Wallet, MessageSquare, CircleUserRound, ClipboardList, Receipt, KanbanSquare } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Sidebar = () => {
   const location = useLocation();

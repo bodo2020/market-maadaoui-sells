@@ -16,7 +16,7 @@ export default function MainLayout({
 }: MainLayoutProps) {
   const {
     isAuthenticated,
-    isLoading
+    loading
   } = useAuth();
   
   const { setUnreadOrders } = useNotificationStore();
@@ -43,7 +43,7 @@ export default function MainLayout({
   }, [isAuthenticated, setUnreadOrders]);
 
   // If loading, show loading indicator
-  if (isLoading) {
+  if (loading) {
     return <div className="min-h-screen flex items-center justify-center">جاري التحميل...</div>;
   }
 
