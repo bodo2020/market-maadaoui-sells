@@ -36,30 +36,34 @@ export function PaymentConfirmationDialog({
       if (fetchError) throw fetchError;
       
       // Update payment status and order status if needed
-      let updates: { 
-        payment_status: string; 
-        updated_at: string;
-        status?: string;  // Make this property optional
-      } = { 
+      const updates = { 
         payment_status: 'paid',
         updated_at: new Date().toISOString()
       };
       
-      // If order is still pending, automatically move it to processing state
-      if (orderData.status === 'pending') {
-        updates.status = 'processing';
-      }
-      
-      const { error } = await supabase
-        .from('online_orders')
-        .update(updates)
-        .eq('id', orderId);
-      
-      if (error) throw error;
-      
-      toast.success('تم تأكيد الدفع بنجاح');
-      if (updates.status === 'processing') {
-        toast.info('تم تحديث حالة الطلب إلى "قيد المعالجة"');
+      // If order is still waiting, automatically move it to ready state
+      if (orderData.status === 'waiting') {
+        const { error } = await supabase
+          .from('online_orders')
+          .update({
+            ...updates,
+            status: 'ready'
+          })
+          .eq('id', orderId);
+        
+        if (error) throw error;
+        
+        toast.success('تم تأكيد الدفع بنجاح');
+        toast.info('تم تحديث حالة الطلب إلى "جاهز"');
+      } else {
+        const { error } = await supabase
+          .from('online_orders')
+          .update(updates)
+          .eq('id', orderId);
+        
+        if (error) throw error;
+        
+        toast.success('تم تأكيد الدفع بنجاح');
       }
       
       onConfirm();

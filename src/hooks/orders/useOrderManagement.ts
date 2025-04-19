@@ -47,7 +47,7 @@ export const useOrderManagement = (activeTab: string) => {
       const { count, error } = await supabase
         .from('online_orders')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+        .eq('status', 'waiting');
       
       if (error) throw error;
       
@@ -84,8 +84,8 @@ export const useOrderManagement = (activeTab: string) => {
   };
 
   const validateOrderStatus = (status: string): Order['status'] => {
-    const validStatuses: Order['status'][] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
-    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
+    const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
+    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
   };
 
   const validatePaymentStatus = (status: string): Order['payment_status'] => {
@@ -100,16 +100,14 @@ export const useOrderManagement = (activeTab: string) => {
         ascending: false
       });
       
-      if (activeTab === "pending") {
-        query = query.eq('status', 'pending');
-      } else if (activeTab === "processing") {
-        query = query.eq('status', 'processing');
+      if (activeTab === "waiting") {
+        query = query.eq('status', 'waiting');
+      } else if (activeTab === "ready") {
+        query = query.eq('status', 'ready');
       } else if (activeTab === "shipped") {
         query = query.eq('status', 'shipped');
-      } else if (activeTab === "delivered") {
-        query = query.eq('status', 'delivered');
-      } else if (activeTab === "cancelled") {
-        query = query.eq('status', 'cancelled');
+      } else if (activeTab === "done") {
+        query = query.eq('status', 'done');
       } else if (activeTab === "unpaid") {
         query = query.eq('payment_status', 'pending');
       }

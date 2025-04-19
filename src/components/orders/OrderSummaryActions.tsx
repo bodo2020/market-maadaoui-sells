@@ -10,7 +10,7 @@ interface OrderSummaryActionsProps {
   onUpdateStatus: () => void;
   onPaymentConfirm: () => void;
   onAssignDelivery: () => void;
-  onUpdateShipping: (status: 'shipped' | 'delivered') => void;
+  onUpdateShipping: (status: 'shipped' | 'done') => void;
   isUpdatingShipping: boolean;
 }
 
@@ -26,7 +26,7 @@ export function OrderSummaryActions({
     <div className="space-y-3">
       <div className="flex justify-between items-center">
         <Button 
-          variant={order.status === 'processing' ? 'default' : 'outline'} 
+          variant={order.status === 'ready' ? 'default' : 'outline'} 
           className="w-full" 
           onClick={onUpdateStatus}
         >
@@ -59,16 +59,16 @@ export function OrderSummaryActions({
           <Button 
             variant={order.status === 'shipped' ? 'default' : 'outline'}
             className="w-full"
-            disabled={isUpdatingShipping || order.status === 'shipped' || order.status === 'delivered'}
+            disabled={isUpdatingShipping || order.status === 'shipped' || order.status === 'done'}
             onClick={() => onUpdateShipping('shipped')}
           >
             خرج للتوصيل
           </Button>
           <Button 
-            variant={order.status === 'delivered' ? 'default' : 'outline'}
+            variant={order.status === 'done' ? 'default' : 'outline'}
             className="w-full"
-            disabled={isUpdatingShipping || order.status === 'delivered'}
-            onClick={() => onUpdateShipping('delivered')}
+            disabled={isUpdatingShipping || order.status === 'done'}
+            onClick={() => onUpdateShipping('done')}
           >
             تم التوصيل
           </Button>

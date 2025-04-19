@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Check, X, Clock, Package, Truck } from "lucide-react";
+import { Check, Clock, Package, Truck } from "lucide-react";
 import { Order } from "@/types/index";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +22,7 @@ export function UpdateOrderStatusDialog({
   onOpenChange,
   onStatusUpdated
 }: UpdateOrderStatusDialogProps) {
-  const [status, setStatus] = useState<Order['status']>(order?.status || 'pending');
+  const [status, setStatus] = useState<Order['status']>(order?.status || 'waiting');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset status when order changes
@@ -37,26 +38,33 @@ export function UpdateOrderStatusDialog({
     try {
       setIsSubmitting(true);
       
-      const updates: any = { 
+      const updates = { 
         status,
         updated_at: new Date().toISOString()
       };
       
-      // If order is being delivered, also mark payment as completed if COD
-      if (status === 'delivered' && order.payment_method === 'cod' && order.payment_status === 'pending') {
-        updates.payment_status = 'paid';
-      }
-      
-      const { error } = await supabase
-        .from('online_orders')
-        .update(updates)
-        .eq('id', order.id);
-      
-      if (error) throw error;
-      
-      toast.success('تم تحديث حالة الطلب بنجاح');
-      if (updates.payment_status === 'paid') {
+      // If order is done, also mark payment as completed if payment is pending
+      if (status === 'done' && order.payment_status === 'pending') {
+        await supabase
+          .from('online_orders')
+          .update({ 
+            status,
+            payment_status: 'paid',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', order.id);
+          
+        toast.success('تم تحديث حالة الطلب بنجاح');
         toast.info('تم تحديث حالة الدفع إلى "مدفوع"');
+      } else {
+        const { error } = await supabase
+          .from('online_orders')
+          .update(updates)
+          .eq('id', order.id);
+        
+        if (error) throw error;
+        
+        toast.success('تم تحديث حالة الطلب بنجاح');
       }
       
       onStatusUpdated();
@@ -69,40 +77,6 @@ export function UpdateOrderStatusDialog({
     }
   };
 
-  const getStatusIcon = (statusValue: Order['status']) => {
-    switch (statusValue) {
-      case 'pending':
-        return <Clock className="h-4 w-4 text-amber-500" />;
-      case 'processing':
-        return <Package className="h-4 w-4 text-blue-500" />;
-      case 'shipped':
-        return <Truck className="h-4 w-4 text-indigo-500" />;
-      case 'delivered':
-        return <Check className="h-4 w-4 text-green-500" />;
-      case 'cancelled':
-        return <X className="h-4 w-4 text-red-500" />;
-      default:
-        return <Clock className="h-4 w-4" />;
-    }
-  };
-
-  const getStatusClass = (statusValue: Order['status']) => {
-    switch (statusValue) {
-      case 'pending':
-        return 'border-amber-500 hover:bg-amber-50';
-      case 'processing':
-        return 'border-blue-500 hover:bg-blue-50';
-      case 'shipped':
-        return 'border-indigo-500 hover:bg-indigo-50';
-      case 'delivered':
-        return 'border-green-500 hover:bg-green-50';
-      case 'cancelled':
-        return 'border-red-500 hover:bg-red-50';
-      default:
-        return '';
-    }
-  };
-
   const statusOptions: {value: Order['status'], label: string, icon: JSX.Element}[] = [
     { value: 'waiting', label: 'في الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
     { value: 'ready', label: 'جاهز', icon: <Package className="h-4 w-4 text-green-500" /> },
@@ -111,7 +85,7 @@ export function UpdateOrderStatusDialog({
   ];
 
   const getStatusClass = (statusValue: Order['status']) => {
-    const classes = {
+    const classes: Record<Order['status'], string> = {
       waiting: 'border-amber-500 hover:bg-amber-50',
       ready: 'border-green-500 hover:bg-green-50',
       shipped: 'border-blue-500 hover:bg-blue-50',
@@ -161,10 +135,10 @@ export function UpdateOrderStatusDialog({
               ))}
             </RadioGroup>
             
-            {status === 'delivered' && order.payment_method === 'cod' && order.payment_status === 'pending' && (
+            {status === 'done' && order.payment_status === 'pending' && (
               <div className="text-sm bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-2">
                 <p className="text-yellow-800">
-                  سيتم تحديث حالة الدفع تلقائيًا إلى "مدفوع" عند تحديث الحالة إلى "تم التسليم".
+                  سيتم تحديث حالة الدفع تلقائيًا إلى "مدفوع" عند تحديث الحالة إلى "مكتمل".
                 </p>
               </div>
             )}

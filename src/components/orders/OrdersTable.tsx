@@ -1,3 +1,4 @@
+
 import { Order } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -103,7 +104,10 @@ export function OrdersTable({
               <Button
                 variant="link"
                 className="p-0 h-auto text-right underline"
-                onClick={() => onShowCustomer(order)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowCustomer(order);
+                }}
               >
                 {order.customer_name || 'غير معروف'}
               </Button>
@@ -118,7 +122,7 @@ export function OrdersTable({
             <TableCell className="text-center">
               {order.items?.length || 0}
             </TableCell>
-            <TableCell className="text-center">
+            <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
               <OrderActionsMenu
                 onArchive={() => onArchive(order)}
                 onCancel={() => onCancel(order)}

@@ -50,10 +50,10 @@ export default function OrderDetails() {
       
       if (data) {
         const validateOrderStatus = (status: string): Order['status'] => {
-          const validStatuses: Order['status'][] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+          const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
           return validStatuses.includes(status as Order['status']) 
             ? (status as Order['status']) 
-            : 'pending';
+            : 'waiting';
         };
         
         const validatePaymentStatus = (status: string): Order['payment_status'] => {
@@ -118,7 +118,7 @@ export default function OrderDetails() {
     }
   };
 
-  const updateShippingStatus = async (status: 'shipped' | 'delivered') => {
+  const updateShippingStatus = async (status: 'shipped' | 'done') => {
     if (!order) return;
     
     try {
@@ -240,7 +240,7 @@ export default function OrderDetails() {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <Button 
-                  variant={order.status === 'processing' ? 'default' : 'outline'} 
+                  variant={order.status === 'ready' ? 'default' : 'outline'} 
                   className="w-full" 
                   onClick={() => setUpdateStatusOpen(true)}
                 >
@@ -299,16 +299,16 @@ export default function OrderDetails() {
                   <Button 
                     variant={order.status === 'shipped' ? 'default' : 'outline'}
                     className="w-full"
-                    disabled={isUpdatingShipping || order.status === 'shipped' || order.status === 'delivered'}
+                    disabled={isUpdatingShipping || order.status === 'shipped' || order.status === 'done'}
                     onClick={() => updateShippingStatus('shipped')}
                   >
                     خرج للتوصيل
                   </Button>
                   <Button 
-                    variant={order.status === 'delivered' ? 'default' : 'outline'}
+                    variant={order.status === 'done' ? 'default' : 'outline'}
                     className="w-full"
-                    disabled={isUpdatingShipping || order.status === 'delivered'}
-                    onClick={() => updateShippingStatus('delivered')}
+                    disabled={isUpdatingShipping || order.status === 'done'}
+                    onClick={() => updateShippingStatus('done')}
                   >
                     تم التوصيل
                   </Button>

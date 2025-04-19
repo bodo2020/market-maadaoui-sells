@@ -31,7 +31,7 @@ export function OrderDetailsDialog({
 
   if (!order) return null;
 
-  const updateShippingStatus = async (status: 'shipped' | 'delivered') => {
+  const updateShippingStatus = async (status: 'shipped' | 'done') => {
     if (!order) return;
     
     try {

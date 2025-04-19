@@ -41,7 +41,7 @@ export default function OnlineOrders() {
     try {
       const { error } = await supabase.from('online_orders')
         .update({
-          status: 'delivered',
+          status: 'done',
           updated_at: new Date().toISOString()
         })
         .eq('id', order.id);
@@ -57,9 +57,14 @@ export default function OnlineOrders() {
 
   const handleCancel = async (order: Order) => {
     try {
+      // Since we don't have 'cancelled' status in our enum anymore, we need to handle this differently
+      // We'll move the order to 'done' and add a note that it was cancelled
+      const notes = `${order.notes ? order.notes + ' - ' : ''}تم إلغاء هذا الطلب`;
+      
       const { error } = await supabase.from('online_orders')
         .update({
-          status: 'cancelled',
+          status: 'done',
+          notes,
           updated_at: new Date().toISOString()
         })
         .eq('id', order.id);
