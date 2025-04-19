@@ -106,7 +106,7 @@ export default function OrderDetails() {
   };
 
   const handleStatusChange = async (status: Order['status']) => {
-    if (!order || order.status === status) return;
+    if (!order || order.status === status || isUpdatingStatus) return;
     
     try {
       setIsUpdatingStatus(true);
@@ -192,28 +192,28 @@ export default function OrderDetails() {
               <button 
                 onClick={() => handleStatusChange('waiting')} 
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'waiting' ? getStatusBadgeColor('waiting') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
-                disabled={isUpdatingStatus}
+                disabled={isUpdatingStatus || order.status === 'waiting'}
               >
                 في الانتظار
               </button>
               <button 
                 onClick={() => handleStatusChange('ready')} 
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'ready' ? getStatusBadgeColor('ready') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
-                disabled={isUpdatingStatus}
+                disabled={isUpdatingStatus || order.status === 'ready'}
               >
                 جاهز للشحن
               </button>
               <button 
                 onClick={() => handleStatusChange('shipped')} 
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'shipped' ? getStatusBadgeColor('shipped') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
-                disabled={isUpdatingStatus}
+                disabled={isUpdatingStatus || order.status === 'shipped'}
               >
                 تم الشحن
               </button>
               <button 
                 onClick={() => handleStatusChange('done')} 
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'done' ? getStatusBadgeColor('done') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
-                disabled={isUpdatingStatus}
+                disabled={isUpdatingStatus || order.status === 'done'}
               >
                 تم التسليم
               </button>
