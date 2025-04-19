@@ -31,6 +31,7 @@ import AddBanner from "@/pages/AddBanner";
 import DeliveryLocationsPage from "@/pages/DeliveryLocationsPage";
 import DeliveryLocations from "@/pages/DeliveryLocations";
 import SalesDashboard from "@/pages/SalesDashboard";
+import OffersPage from "@/pages/OffersPage";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
@@ -76,8 +77,9 @@ function App() {
             <Route path="/banners/add" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
             <Route path="/delivery-locations" element={<ProtectedRoute><DeliveryLocationsPage /></ProtectedRoute>} />
             <Route path="/delivery-locations/:id" element={<ProtectedRoute><DeliveryLocations /></ProtectedRoute>} />
-            {/* Add the new Sales Dashboard route */}
             <Route path="/sales-dashboard" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
+            {/* Add the offers route */}
+            <Route path="/offers" element={<ProtectedRoute><OffersPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <SonnerToaster position="top-center" richColors />
