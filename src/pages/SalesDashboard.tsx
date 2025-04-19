@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -19,7 +18,13 @@ import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
 import { Sale, CartItem } from "@/types";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Banknote, TrendingUp, ShoppingCart, ShoppingBag, ArrowDown, ArrowUp, ArrowLeftRight } from "lucide-react";
-import { RegisterType, fetchCashRecords, getLatestCashBalance, transferBetweenRegisters } from "@/services/supabase/cashTrackingService";
+import { 
+  RegisterType, 
+  fetchCashRecords, 
+  getLatestCashBalance, 
+  transferBetweenRegisters,
+  recordCashTransaction
+} from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -181,30 +186,14 @@ export default function SalesDashboard() {
       return;
     }
     
-    const currentBalance = withdrawalRegister === RegisterType.STORE ? storeBalance : onlineBalance;
-    
-    if (Number(withdrawalAmount) > currentBalance) {
-      toast.error("المبلغ المطلوب سحبه أكبر من المبلغ المتوفر");
-      return;
-    }
-    
     try {
-      const newBalance = currentBalance - Number(withdrawalAmount);
-      
-      // Create a new cash tracking record for the withdrawal
-      const { error } = await supabase
-        .from('cash_tracking')
-        .insert([{
-          date: new Date().toISOString().split('T')[0],
-          opening_balance: currentBalance,
-          closing_balance: newBalance,
-          difference: -Number(withdrawalAmount),
-          notes: `سحب نقدي: ${withdrawalNote}`,
-          created_by: user?.id,
-          register_type: withdrawalRegister
-        }]);
-        
-      if (error) throw error;
+      await recordCashTransaction(
+        Number(withdrawalAmount),
+        'withdrawal',
+        withdrawalRegister,
+        withdrawalNote,
+        user?.id || ''
+      );
       
       toast.success(`تم سحب ${withdrawalAmount} بنجاح من خزنة ${withdrawalRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
       setWithdrawalAmount("");
@@ -217,9 +206,9 @@ export default function SalesDashboard() {
       } else {
         refetchOnlineRecords();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing withdrawal:", error);
-      toast.error("حدث خطأ أثناء عملية السحب");
+      toast.error(error.message || "حدث خطأ أثناء عملية السحب");
     }
   };
   
@@ -231,23 +220,13 @@ export default function SalesDashboard() {
     }
     
     try {
-      const currentBalance = depositRegister === RegisterType.STORE ? storeBalance : onlineBalance;
-      const newBalance = currentBalance + Number(depositAmount);
-      
-      // Create a new cash tracking record for the deposit
-      const { error } = await supabase
-        .from('cash_tracking')
-        .insert([{
-          date: new Date().toISOString().split('T')[0],
-          opening_balance: currentBalance,
-          closing_balance: newBalance,
-          difference: Number(depositAmount),
-          notes: `إيداع نقدي: ${depositNote}`,
-          created_by: user?.id,
-          register_type: depositRegister
-        }]);
-        
-      if (error) throw error;
+      await recordCashTransaction(
+        Number(depositAmount),
+        'deposit',
+        depositRegister,
+        depositNote,
+        user?.id || ''
+      );
       
       toast.success(`تم إيداع ${depositAmount} بنجاح إلى خزنة ${depositRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
       setDepositAmount("");
@@ -260,9 +239,9 @@ export default function SalesDashboard() {
       } else {
         refetchOnlineRecords();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing deposit:", error);
-      toast.error("حدث خطأ أثناء عملية الإيداع");
+      toast.error(error.message || "حدث خطأ أثناء عملية الإيداع");
     }
   };
   

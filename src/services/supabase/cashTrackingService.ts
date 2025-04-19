@@ -31,6 +31,18 @@ interface TransferRecord {
   created_at?: string;
 }
 
+interface CashTransaction {
+  id: string;
+  transaction_date: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: 'deposit' | 'withdrawal' | 'transfer';
+  register_type: RegisterType;
+  notes?: string;
+  created_by?: string;
+  created_at?: string;
+}
+
 export async function fetchCashRecords(registerType?: RegisterType) {
   let query = supabase
     .from('cash_tracking')
@@ -87,6 +99,64 @@ export async function getLatestCashBalance(registerType: RegisterType) {
   return 0;
 }
 
+export async function recordCashTransaction(
+  amount: number,
+  transactionType: 'deposit' | 'withdrawal',
+  registerType: RegisterType,
+  notes: string,
+  userId: string
+) {
+  try {
+    // Get current balance
+    const currentBalance = await getLatestCashBalance(registerType);
+    
+    // Calculate new balance
+    const newBalance = transactionType === 'deposit' 
+      ? currentBalance + amount 
+      : currentBalance - amount;
+    
+    // Check if enough funds for withdrawal
+    if (transactionType === 'withdrawal' && newBalance < 0) {
+      throw new Error('لا يوجد رصيد كافي في الخزنة');
+    }
+    
+    // Create transaction record
+    const { error: transactionError } = await supabase
+      .from('cash_transactions')
+      .insert([{
+        transaction_date: new Date().toISOString(),
+        amount,
+        balance_after: newBalance,
+        transaction_type: transactionType,
+        register_type: registerType,
+        notes,
+        created_by: userId
+      }]);
+      
+    if (transactionError) throw transactionError;
+    
+    // Update cash tracking
+    const { error: cashTrackingError } = await supabase
+      .from('cash_tracking')
+      .insert([{
+        date: new Date().toISOString().split('T')[0],
+        opening_balance: currentBalance,
+        closing_balance: newBalance,
+        difference: transactionType === 'deposit' ? amount : -amount,
+        notes: `${transactionType === 'deposit' ? 'إيداع' : 'سحب'} نقدي: ${notes}`,
+        created_by: userId,
+        register_type: registerType
+      }]);
+      
+    if (cashTrackingError) throw cashTrackingError;
+    
+    return newBalance;
+  } catch (error) {
+    console.error(`Error during ${transactionType}:`, error);
+    throw error;
+  }
+}
+
 export async function transferBetweenRegisters(
   amount: number,
   fromRegister: RegisterType,
@@ -116,6 +186,21 @@ export async function transferBetweenRegisters(
     }]);
     
   if (transferError) throw transferError;
+  
+  // Create transaction record
+  const { error: transactionError } = await supabase
+    .from('cash_transactions')
+    .insert([{
+      transaction_date: new Date().toISOString(),
+      amount,
+      balance_after: fromBalance - amount,
+      transaction_type: 'transfer',
+      register_type: fromRegister,
+      notes: `تحويل إلى خزنة ${toRegister === 'store' ? 'المحل' : 'الأونلاين'}: ${notes}`,
+      created_by: userId
+    }]);
+    
+  if (transactionError) throw transactionError;
   
   // Update source register
   const { error: sourceError } = await supabase
@@ -158,4 +243,20 @@ export async function fetchTransfers() {
     
   if (error) throw error;
   return data as TransferRecord[];
+}
+
+export async function fetchCashTransactions(registerType?: RegisterType) {
+  let query = supabase
+    .from('cash_transactions')
+    .select('*')
+    .order('transaction_date', { ascending: false });
+    
+  if (registerType) {
+    query = query.eq('register_type', registerType);
+  }
+  
+  const { data, error } = await query;
+    
+  if (error) throw error;
+  return data as CashTransaction[];
 }
