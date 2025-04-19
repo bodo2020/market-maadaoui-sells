@@ -1,4 +1,3 @@
-
 import { Order } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OrderActionsMenu } from "./OrderActionsMenu";
+import { OrderStatusDropdown } from "./OrderStatusDropdown";
 import { useNavigate } from "react-router-dom";
 
 interface OrdersTableProps {
@@ -31,26 +31,6 @@ export function OrdersTable({
 }: OrdersTableProps) {
   const navigate = useNavigate();
 
-  const getStatusBadge = (status: Order['status']) => {
-    const variants: Record<string, { bg: string, text: string, label: string }> = {
-      waiting: { bg: "bg-amber-100", text: "text-amber-700", label: "في الانتظار" },
-      ready: { bg: "bg-green-100", text: "text-green-700", label: "جاهز" },
-      shipped: { bg: "bg-blue-100", text: "text-blue-700", label: "تم الشحن" },
-      done: { bg: "bg-gray-100", text: "text-gray-700", label: "مكتمل" }
-    };
-
-    const style = variants[status] || variants.waiting;
-    return (
-      <Badge className={`${style.bg} ${style.text} border-none`}>
-        {style.label}
-      </Badge>
-    );
-  };
-
-  const handleRowClick = (orderId: string) => {
-    navigate(`/online-orders/${orderId}`);
-  };
-
   const getPaymentStatusBadge = (status: Order['payment_status']) => {
     const variants: Record<Order['payment_status'], "default" | "destructive" | "outline" | "secondary"> = {
       pending: "outline",
@@ -67,6 +47,10 @@ export function OrdersTable({
     return <Badge variant={variants[status]} className="mx-auto whitespace-nowrap">
         {labels[status]}
       </Badge>;
+  };
+
+  const handleRowClick = (orderId: string) => {
+    navigate(`/online-orders/${orderId}`);
   };
 
   return (
@@ -117,7 +101,10 @@ export function OrdersTable({
               {getPaymentStatusBadge(order.payment_status)}
             </TableCell>
             <TableCell className="text-center">
-              {getStatusBadge(order.status)}
+              <OrderStatusDropdown 
+                order={order} 
+                onStatusChange={() => window.location.reload()}
+              />
             </TableCell>
             <TableCell className="text-center">
               {order.items?.length || 0}
