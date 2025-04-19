@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,7 +5,7 @@ import { useNotificationStore } from "@/stores/notificationStore";
 import { 
   BarChart4, Store, ShoppingCart, PackageOpen, Users, Settings, LogOut, FileText, 
   Receipt, Home, UserPlus, Banknote, Truck, CircleDollarSign, Building2, ImageIcon, 
-  ShoppingBag, FolderOpen, MapPin, TrendingUp 
+  ShoppingBag, FolderOpen, MapPin, TrendingUp, MapPinOff 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SidebarLogo } from "./sidebar/SidebarLogo";
@@ -70,7 +69,13 @@ export default function Sidebar() {
             
             <SidebarItem icon={ImageIcon} label="البانرات" href="/banners" active={currentPath === "/banners"} collapsed={collapsed} />
             
-            <SidebarItem icon={MapPin} label="مناطق التوصيل" href="/delivery-locations" active={currentPath === "/delivery-locations"} collapsed={collapsed} />
+            <SidebarItem 
+              icon={MapPin} 
+              label="مناطق التوصيل" 
+              href="/delivery-locations" 
+              active={currentPath === "/delivery-locations"} 
+              collapsed={collapsed} 
+            />
           </>}
         
         <SidebarItem icon={Truck} label="مشتريات الموردين" href="/supplier-purchases" active={currentPath === "/supplier-purchases"} collapsed={collapsed} />
