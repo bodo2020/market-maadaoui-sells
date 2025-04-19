@@ -18,33 +18,14 @@ export function useOrdersData(filters: OrderFilters = {}) {
   const [loading, setLoading] = useState(true);
   const { setUnreadOrders } = useNotificationStore();
 
-  useEffect(() => {
-    console.log("useEffect triggered with filters:", filters);
-    fetchOrders();
-    
-    const channel = setupRealtimeSubscription();
-    return () => {
-      cleanupRealtimeSubscription();
-    };
-  }, [filters]);
-
-  const setupRealtimeSubscription = () => {
-    const channel = supabase.channel('online-orders-changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'online_orders' }, 
-        (payload) => {
-          console.log('Order change detected:', payload);
-          toast.info('تم تحديث الطلبات', {
-            description: 'اضغط على زر التحديث لتحميل التغييرات'
-          });
-        })
-      .subscribe();
-      
-    return channel;
+  const transformStatus = (status: string): Order['status'] => {
+    const validStatuses: Order['status'][] = ['pending', 'processing', 'ready', 'shipped', 'delivered', 'cancelled'];
+    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
   };
 
-  const cleanupRealtimeSubscription = () => {
-    supabase.removeChannel(supabase.channel('online-orders-changes'));
+  const transformPaymentStatus = (status: string): Order['payment_status'] => {
+    const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
+    return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
   };
 
   const fetchOrders = async () => {
@@ -131,16 +112,6 @@ export function useOrdersData(filters: OrderFilters = {}) {
       setLoading(false);
       console.log("Orders loading finished");
     }
-  };
-
-  const transformStatus = (status: string): Order['status'] => {
-    const validStatuses: Order['status'][] = ['pending', 'processing', 'ready', 'shipped', 'delivered', 'cancelled'];
-    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
-  };
-
-  const transformPaymentStatus = (status: string): Order['payment_status'] => {
-    const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
-    return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
   };
 
   const updateOrderStatus = async (orderId: string, status: OrderStatus) => {

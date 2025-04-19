@@ -4,13 +4,11 @@ import MainLayout from "@/components/layout/MainLayout";
 import { useOrdersData, OrderFilters } from "@/hooks/orders/useOrdersData";
 import { OrdersHeader } from "@/components/orders/OrdersHeader";
 import { OrdersList } from "@/components/orders/OrdersList";
-import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import { ConfirmPaymentDialog } from "@/components/orders/ConfirmPaymentDialog";
 import { CancelOrderDialog } from "@/components/orders/CancelOrderDialog";
 import { Order } from "@/types";
 import { printOrderInvoice } from "@/services/orders/printOrderService";
 import { useNotificationStore } from "@/stores/notificationStore";
-import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function OnlineOrders() {
@@ -30,13 +28,17 @@ export default function OnlineOrders() {
     confirmPayment,
     assignDeliveryPerson,
     cancelOrder,
+    refreshOrders
   } = useOrdersData({
     ...filters,
     searchQuery
   });
+
+  useEffect(() => {
+    refreshOrders();
+  }, [filters, searchQuery]);
   
   const handleTabChange = (value: string) => {
-    console.log("Tab changed to:", value);
     setFilters(prev => {
       const newFilters = { 
         ...prev, 
@@ -51,17 +53,17 @@ export default function OnlineOrders() {
     });
   };
   
-  const handleMarkAsReady = (order: Order) => {
-    if (order.status === 'processing') {
-      updateOrderStatus(order.id, 'ready');
-    }
-  };
-  
   const handleViewDetails = (order: Order) => {
     navigate(`/orders/${order.id}`);
     
     if (order.status === 'pending') {
       markOrdersAsRead();
+    }
+  };
+  
+  const handleMarkAsReady = (order: Order) => {
+    if (order.status === 'processing') {
+      updateOrderStatus(order.id, 'ready');
     }
   };
   
@@ -87,7 +89,7 @@ export default function OnlineOrders() {
           onTabChange={handleTabChange}
           onSearchChange={setSearchQuery}
           searchQuery={searchQuery}
-          onRefresh={() => {}}
+          onRefresh={refreshOrders}
           isLoading={loading}
         />
         
