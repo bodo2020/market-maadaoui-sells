@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
@@ -9,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Mail, Phone, MapPin, Bike } from "lucide-react";
+import { Mail, Phone, MapPin, Bike, Check } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
@@ -21,6 +20,7 @@ export default function OrderDetails() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<Order['status'] | null>(null);
 
   useEffect(() => {
     fetchOrder();
@@ -105,17 +105,17 @@ export default function OrderDetails() {
     }
   };
 
-  const handleStatusChange = async (status: Order['status']) => {
-    if (!order || order.status === status || isUpdatingStatus) return;
+  const handleStatusChange = async () => {
+    if (!order || !selectedStatus || order.status === selectedStatus || isUpdatingStatus) return;
     
     try {
       setIsUpdatingStatus(true);
-      console.log("Updating order status to:", status, "for order ID:", id);
+      console.log("Updating order status to:", selectedStatus, "for order ID:", id);
       
       const { error } = await supabase
         .from('online_orders')
         .update({ 
-          status,
+          status: selectedStatus,
           updated_at: new Date().toISOString() 
         })
         .eq('id', id);
@@ -128,12 +128,13 @@ export default function OrderDetails() {
       console.log("Status updated successfully in Supabase");
       
       // Update the local state
-      setOrder(prev => prev ? { ...prev, status } : null);
+      setOrder(prev => prev ? { ...prev, status: selectedStatus } : null);
+      setSelectedStatus(null);
       
       toast.success(`تم تحديث حالة الطلب إلى ${
-        status === 'waiting' ? 'في الانتظار' : 
-        status === 'ready' ? 'جاهز للشحن' : 
-        status === 'shipped' ? 'تم الشحن' : 'تم التسليم'
+        selectedStatus === 'waiting' ? 'في الانتظار' : 
+        selectedStatus === 'ready' ? 'جاهز للشحن' : 
+        selectedStatus === 'shipped' ? 'تم الشحن' : 'تم التسليم'
       }`);
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -188,35 +189,47 @@ export default function OrderDetails() {
         <div className="flex justify-between items-center mb-6">
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">تجهيز الطلب #{order?.id.slice(0, 8)}</h1>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => handleStatusChange('waiting')} 
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'waiting' ? getStatusBadgeColor('waiting') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
-                disabled={isUpdatingStatus || order.status === 'waiting'}
-              >
-                في الانتظار
-              </button>
-              <button 
-                onClick={() => handleStatusChange('ready')} 
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'ready' ? getStatusBadgeColor('ready') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
-                disabled={isUpdatingStatus || order.status === 'ready'}
-              >
-                جاهز للشحن
-              </button>
-              <button 
-                onClick={() => handleStatusChange('shipped')} 
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'shipped' ? getStatusBadgeColor('shipped') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
-                disabled={isUpdatingStatus || order.status === 'shipped'}
-              >
-                تم الشحن
-              </button>
-              <button 
-                onClick={() => handleStatusChange('done')} 
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'done' ? getStatusBadgeColor('done') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
-                disabled={isUpdatingStatus || order.status === 'done'}
-              >
-                تم التسليم
-              </button>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setSelectedStatus('waiting')} 
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'waiting' ? getStatusBadgeColor('waiting') : order?.status === 'waiting' ? getStatusBadgeColor('waiting') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                  disabled={isUpdatingStatus || order.status === 'waiting'}
+                >
+                  في الانتظار
+                </button>
+                <button 
+                  onClick={() => setSelectedStatus('ready')} 
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'ready' ? getStatusBadgeColor('ready') : order?.status === 'ready' ? getStatusBadgeColor('ready') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                  disabled={isUpdatingStatus || order.status === 'ready'}
+                >
+                  جاهز للشحن
+                </button>
+                <button 
+                  onClick={() => setSelectedStatus('shipped')} 
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'shipped' ? getStatusBadgeColor('shipped') : order?.status === 'shipped' ? getStatusBadgeColor('shipped') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                  disabled={isUpdatingStatus || order.status === 'shipped'}
+                >
+                  تم الشحن
+                </button>
+                <button 
+                  onClick={() => setSelectedStatus('done')} 
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'done' ? getStatusBadgeColor('done') : order?.status === 'done' ? getStatusBadgeColor('done') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                  disabled={isUpdatingStatus || order.status === 'done'}
+                >
+                  تم التسليم
+                </button>
+              </div>
+              {selectedStatus && selectedStatus !== order.status && (
+                <Button
+                  onClick={handleStatusChange}
+                  disabled={isUpdatingStatus}
+                  className="flex items-center gap-2"
+                >
+                  <Check className="h-4 w-4" />
+                  تأكيد تحديث الحالة
+                </Button>
+              )}
             </div>
           </div>
           <Button variant="outline" onClick={() => navigate('/online-orders')}>
