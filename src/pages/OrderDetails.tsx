@@ -1,3 +1,4 @@
+
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 import { Mail, Phone, MapPin, Bike } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -18,6 +20,7 @@ export default function OrderDetails() {
   const [order, setOrder] = useState<Order | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
 
   useEffect(() => {
     fetchOrder();
@@ -103,7 +106,7 @@ export default function OrderDetails() {
   };
 
   const handleStatusChange = async (status: Order['status']) => {
-    if (!order) return;
+    if (!order || order.status === status) return;
     
     try {
       setIsUpdatingStatus(true);
@@ -114,11 +117,12 @@ export default function OrderDetails() {
           status,
           updated_at: new Date().toISOString() 
         })
-        .eq('id', order.id);
+        .eq('id', id);
       
       if (error) throw error;
       
-      await fetchOrder();
+      // Update the local state
+      setOrder(prev => prev ? { ...prev, status } : null);
       
       toast.success(`تم تحديث حالة الطلب إلى ${
         status === 'waiting' ? 'في الانتظار' : 
@@ -133,31 +137,13 @@ export default function OrderDetails() {
     }
   };
 
-  const handlePaymentStatusUpdate = async (paymentStatus: Order['payment_status']) => {
-    if (!order) return;
-    
-    try {
-      const { error } = await supabase
-        .from('online_orders')
-        .update({ 
-          payment_status: paymentStatus,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', order.id);
-      
-      if (error) throw error;
-      
-      await fetchOrder();
-      
-      toast.success(`تم تحديث حالة الدفع إلى ${
-        paymentStatus === 'paid' ? 'مدفوع' : 
-        paymentStatus === 'pending' ? 'في انتظار الدفع' :
-        paymentStatus === 'failed' ? 'فشل الدفع' : 'مسترجع'
-      }`);
-    } catch (error) {
-      console.error('Error updating payment status:', error);
-      toast.error('حدث خطأ أثناء تحديث حالة الدفع');
-    }
+  const handlePaymentStatusUpdate = async () => {
+    if (!order || order.payment_status === 'paid') return;
+    setPaymentConfirmOpen(true);
+  };
+
+  const onPaymentConfirmed = () => {
+    fetchOrder(); // Refresh order data after payment is confirmed
   };
 
   if (isLoading) {
@@ -282,7 +268,8 @@ export default function OrderDetails() {
                 <Button 
                   variant="outline" 
                   className="w-full" 
-                  onClick={() => handlePaymentStatusUpdate('paid')}
+                  onClick={handlePaymentStatusUpdate}
+                  disabled={order.payment_status === 'paid' || isUpdatingStatus}
                 >
                   {order?.payment_status === 'pending' ? 'تأكيد الدفع' : 'تم الدفع'}
                 </Button>
@@ -390,6 +377,13 @@ export default function OrderDetails() {
               </Card>}
           </div>
         </div>
+
+        <PaymentConfirmationDialog
+          open={paymentConfirmOpen}
+          onOpenChange={setPaymentConfirmOpen}
+          orderId={order.id}
+          onConfirm={onPaymentConfirmed}
+        />
       </div>
     </MainLayout>
   );
