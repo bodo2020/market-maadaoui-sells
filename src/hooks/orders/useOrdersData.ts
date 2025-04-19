@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -23,12 +22,12 @@ export function useOrdersData(filters: OrderFilters = {}) {
   useEffect(() => {
     console.log("useEffect triggered with filters:", filters);
     fetchOrders();
-    setupRealtimeSubscription();
     
+    const channel = setupRealtimeSubscription();
     return () => {
       cleanupRealtimeSubscription();
     };
-  }, [filters, refreshTrigger]);
+  }, [filters]);
 
   const setupRealtimeSubscription = () => {
     const channel = supabase.channel('online-orders-changes')
