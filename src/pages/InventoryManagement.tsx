@@ -28,7 +28,10 @@ import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { MoreDropdown } from "@/components/products/MoreDropdown";
-import { fetchCategories } from "@/services/supabase/categoryService";
+import { 
+  fetchMainCategories, 
+  getCategoryHierarchy 
+} from "@/services/supabase/categoryService";
 
 export default function InventoryManagement() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -52,7 +55,7 @@ export default function InventoryManagement() {
     fetchCategoriesData();
     fetchSubcategories();
     fetchSubsubcategories();
-    fetchMainCategories();
+    fetchMainCategoriesData();
     fetchCompanies();
   }, [searchQuery, selectedCategory, selectedSubcategory, selectedSubsubcategory, selectedMainCategory, selectedCompany, sortField, sortOrder]);
 
@@ -104,17 +107,9 @@ export default function InventoryManagement() {
 
   const fetchCategoriesData = async () => {
     try {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("*")
-        .order("name");
-
-      if (error) {
-        console.error("Error fetching categories:", error);
-        toast.error("فشل في جلب الفئات.");
-      } else {
-        setCategories(data || []);
-      }
+      // Use getCategoryHierarchy from the categoryService
+      const categoriesData = await getCategoryHierarchy();
+      setCategories(categoriesData);
     } catch (error) {
       console.error("Unexpected error fetching categories:", error);
       toast.error("حدث خطأ غير متوقع أثناء جلب الفئات.");
@@ -159,22 +154,13 @@ export default function InventoryManagement() {
     }
   };
 
-  const fetchMainCategories = async () => {
+  const fetchMainCategoriesData = async () => {
     try {
-      const { data, error } = await supabase
-        .from("main_categories")
-        .select("*")
-        .order("name");
-
-      if (error) {
-        console.error("Error fetching main categories:", error);
-        toast.error("فشل في جلب الفئات الرئيسية.");
-      } else {
-        setMainCategories(data || []);
-      }
+      const mainCategoriesData = await fetchMainCategories();
+      setMainCategories(mainCategoriesData);
     } catch (error) {
-      console.error("Unexpected error fetching main categories:", error);
-      toast.error("حدث خطأ غير متوقع أثناء جلب الفئات الرئيسية.");
+      console.error("Error fetching main categories:", error);
+      toast.error("فشل في جلب الفئات الرئيسية.");
     }
   };
 
@@ -213,6 +199,13 @@ export default function InventoryManagement() {
       return date.toLocaleDateString();
     } catch (error) {
       return "Invalid Date";
+    }
+  };
+
+  // Type guard to ensure sortOrder is correctly typed
+  const handleSortOrderChange = (value: string) => {
+    if (value === "asc" || value === "desc") {
+      setSortOrder(value);
     }
   };
 
@@ -334,7 +327,7 @@ export default function InventoryManagement() {
 
                 <Select 
                   value={sortOrder} 
-                  onValueChange={(value: "asc" | "desc") => setSortOrder(value)}
+                  onValueChange={handleSortOrderChange}
                 >
                   <SelectTrigger id="order">
                     <SelectValue placeholder="تصاعدي" />
