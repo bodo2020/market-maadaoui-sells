@@ -101,7 +101,7 @@ export function PaymentStatusBadge({
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger>
         <Badge variant={variant} className="flex items-center gap-2 cursor-pointer hover:opacity-80">
           <Icon className="h-4 w-4" />
           {label}
