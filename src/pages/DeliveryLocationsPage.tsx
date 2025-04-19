@@ -5,13 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { MapPin, Plus } from "lucide-react";
-import { fetchDeliveryLocations } from "@/services/supabase/deliveryService";
-import { DeliveryLocation } from "@/types/shipping";
+import { fetchDeliveryLocations, fetchShippingProviders } from "@/services/supabase/deliveryService";
+import { DeliveryLocation, ShippingProvider } from "@/types/shipping";
 import HierarchicalLocations from "@/components/delivery/HierarchicalLocations";
+import DeliveryLocationDialog from "@/components/delivery/DeliveryLocationDialog";
 
 export default function DeliveryLocationsPage() {
   const [locations, setLocations] = useState<DeliveryLocation[]>([]);
+  const [providers, setProviders] = useState<ShippingProvider[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddLocationDialog, setShowAddLocationDialog] = useState(false);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
 
   const loadLocations = async () => {
     try {
@@ -26,9 +30,31 @@ export default function DeliveryLocationsPage() {
     }
   };
 
+  const loadProviders = async () => {
+    try {
+      const providersData = await fetchShippingProviders();
+      setProviders(providersData);
+      if (providersData.length > 0 && !selectedProviderId) {
+        setSelectedProviderId(providersData[0].id);
+      }
+    } catch (error) {
+      console.error("Error loading shipping providers:", error);
+      toast.error("حدث خطأ أثناء تحميل شركات الشحن");
+    }
+  };
+
   useEffect(() => {
     loadLocations();
+    loadProviders();
   }, []);
+
+  const handleAddLocation = () => {
+    if (!selectedProviderId) {
+      toast.error("الرجاء اختيار شركة شحن أولاً");
+      return;
+    }
+    setShowAddLocationDialog(true);
+  };
 
   return (
     <MainLayout>
@@ -44,7 +70,7 @@ export default function DeliveryLocationsPage() {
                   <h2 className="text-lg font-semibold">مناطق التوصيل</h2>
                 </div>
                 
-                <Button onClick={() => toast.info("سيتم إضافة هذه الميزة قريبًا")}>
+                <Button onClick={handleAddLocation}>
                   <Plus className="mr-2 h-4 w-4" />
                   إضافة منطقة توصيل
                 </Button>
@@ -64,13 +90,22 @@ export default function DeliveryLocationsPage() {
             <p className="text-muted-foreground mb-4">
               قم بإضافة مناطق التوصيل لتسهيل إدارة الطلبات والشحن
             </p>
-            <Button onClick={() => toast.info("سيتم إضافة هذه الميزة قريبًا")}>
+            <Button onClick={handleAddLocation}>
               <Plus className="mr-2 h-4 w-4" />
               إضافة منطقة توصيل
             </Button>
           </div>
         ) : (
           <HierarchicalLocations locations={locations} onLocationUpdated={loadLocations} />
+        )}
+
+        {selectedProviderId && (
+          <DeliveryLocationDialog 
+            open={showAddLocationDialog}
+            onOpenChange={setShowAddLocationDialog}
+            providerId={selectedProviderId}
+            onSuccess={loadLocations}
+          />
         )}
       </div>
     </MainLayout>

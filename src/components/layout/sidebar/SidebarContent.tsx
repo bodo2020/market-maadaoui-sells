@@ -43,4 +43,3 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
     </div>
   );
 }
-

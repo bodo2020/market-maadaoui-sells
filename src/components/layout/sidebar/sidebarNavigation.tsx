@@ -37,4 +37,3 @@ export const generalNavigation: SidebarGroupData = {
     { icon: Settings, label: "الإعدادات", href: "/settings" }
   ]
 };
-

@@ -34,8 +34,11 @@ export default function DeliveryLocationDialog({
   const [prices, setPrices] = useState<{ [key: string]: { price: number; estimatedTime: string } }>({});
 
   useEffect(() => {
-    loadDeliveryTypes();
-  }, []);
+    if (open) {
+      loadDeliveryTypes();
+      resetForm();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (governorate && city) {
@@ -62,6 +65,12 @@ export default function DeliveryLocationDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!providerId) {
+      toast.error("يرجى تحديد شركة الشحن أولاً");
+      return;
+    }
+    
     try {
       setLoading(true);
       
@@ -72,27 +81,29 @@ export default function DeliveryLocationDialog({
         city,
         area,
         neighborhood,
-        provider_id: providerId, // This is important to include!
+        provider_id: providerId,
         price: 0, // Default price will be 0 since we're using delivery_type_pricing
         active,
         notes
       });
 
-      // Create pricing entries for each delivery type
-      await Promise.all(
-        Object.entries(prices).map(([typeId, { price, estimatedTime }]) =>
-          createDeliveryTypePrice({
-            delivery_location_id: location.id,
-            delivery_type_id: typeId,
-            price,
-            estimated_time: estimatedTime
-          })
-        )
-      );
+      // Create pricing entries for each delivery type if there are any delivery types
+      if (deliveryTypes.length > 0) {
+        await Promise.all(
+          Object.entries(prices).map(([typeId, { price, estimatedTime }]) =>
+            createDeliveryTypePrice({
+              delivery_location_id: location.id,
+              delivery_type_id: typeId,
+              price,
+              estimated_time: estimatedTime
+            })
+          )
+        );
+      }
 
       toast.success("تم إضافة منطقة التوصيل بنجاح");
       onSuccess?.();
-      resetForm();
+      onOpenChange(false); // Close the dialog after successful submission
     } catch (error) {
       console.error('Error saving delivery location:', error);
       toast.error("حدث خطأ أثناء حفظ منطقة التوصيل");
@@ -109,7 +120,6 @@ export default function DeliveryLocationDialog({
     setName("");
     setActive(true);
     setNotes("");
-    setPrices({});
   };
 
   return (
@@ -178,44 +188,50 @@ export default function DeliveryLocationDialog({
             />
           </div>
 
-          <div className="space-y-4">
-            <Label>أسعار التوصيل</Label>
-            {deliveryTypes.map((type) => (
-              <div key={type.id} className="space-y-2 border rounded-lg p-4">
-                <Label>{type.name}</Label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Label htmlFor={`price-${type.id}`}>السعر</Label>
-                    <Input
-                      id={`price-${type.id}`}
-                      type="number"
-                      value={prices[type.id]?.price || 0}
-                      onChange={(e) => setPrices(prev => ({
-                        ...prev,
-                        [type.id]: { ...prev[type.id], price: Number(e.target.value) }
-                      }))}
-                      placeholder="أدخل السعر"
-                      className="text-right"
-                      required
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Label htmlFor={`time-${type.id}`}>الوقت المتوقع</Label>
-                    <Input
-                      id={`time-${type.id}`}
-                      value={prices[type.id]?.estimatedTime || ''}
-                      onChange={(e) => setPrices(prev => ({
-                        ...prev,
-                        [type.id]: { ...prev[type.id], estimatedTime: e.target.value }
-                      }))}
-                      placeholder="مثال: 30-45 دقيقة"
-                      className="text-right"
-                    />
+          {deliveryTypes.length > 0 ? (
+            <div className="space-y-4">
+              <Label>أسعار التوصيل</Label>
+              {deliveryTypes.map((type) => (
+                <div key={type.id} className="space-y-2 border rounded-lg p-4">
+                  <Label>{type.name}</Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Label htmlFor={`price-${type.id}`}>السعر</Label>
+                      <Input
+                        id={`price-${type.id}`}
+                        type="number"
+                        value={prices[type.id]?.price || 0}
+                        onChange={(e) => setPrices(prev => ({
+                          ...prev,
+                          [type.id]: { ...prev[type.id], price: Number(e.target.value) }
+                        }))}
+                        placeholder="أدخل السعر"
+                        className="text-right"
+                        required
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Label htmlFor={`time-${type.id}`}>الوقت المتوقع</Label>
+                      <Input
+                        id={`time-${type.id}`}
+                        value={prices[type.id]?.estimatedTime || ''}
+                        onChange={(e) => setPrices(prev => ({
+                          ...prev,
+                          [type.id]: { ...prev[type.id], estimatedTime: e.target.value }
+                        }))}
+                        placeholder="مثال: 30-45 دقيقة"
+                        className="text-right"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 border rounded-lg">
+              <p className="text-muted-foreground">لا توجد أنواع توصيل متاحة</p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="notes">ملاحظات</Label>
