@@ -1,60 +1,21 @@
-import {
-  Home,
-  LayoutDashboard,
-  Settings,
-  ShoppingBag,
-  Users,
-  Package as CategoryIcon,
-  Truck,
-  Percent,
-  Coins,
-  FileText,
-  Archive,
-  LogOut,
-  LogIn,
-  UserPlus,
-  ListChecks,
-  BarChart,
-  Store,
-  Package,
-  Calendar,
-  Wallet,
-  MessageSquare,
-  CircleUserRound,
-  ClipboardList,
-  Receipt,
-  KanbanSquare,
-} from "lucide-react";
+import { useState, useEffect } from "react";
+import { Home, LayoutDashboard, Settings, ShoppingBag, Users, Package as CategoryIcon, Truck, Percent, Coins, FileText, Archive, LogOut, LogIn, UserPlus, ListChecks, BarChart, Store, Package, Calendar, Wallet, MessageSquare, CircleUserRound, ClipboardList, Receipt, KanbanSquare } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useNotificationStore } from "@/stores/notificationStore";
 
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout, isAuthenticated, user, loading: authLoading } = useAuth();
+  const { logout, isAuthenticated, user, loading } = useAuth();
   const [isClosing, setIsClosing] = useState(false);
   const { unreadOrders, markOrdersAsRead } = useNotificationStore();
 
   useEffect(() => {
-    if (!isAuthenticated && !authLoading) {
+    if (!isAuthenticated && !loading) {
       navigate("/login");
     }
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isAuthenticated, loading, navigate]);
 
   const handleLogout = async () => {
     setIsClosing(true);
@@ -227,7 +188,7 @@ const Sidebar = () => {
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user?.username} alt={user?.name} />
                 <AvatarFallback>
-                  {authLoading ? (
+                  {loading ? (
                     <Skeleton className="h-8 w-8 rounded-full" />
                   ) : (
                     user?.name?.charAt(0) || "U"
