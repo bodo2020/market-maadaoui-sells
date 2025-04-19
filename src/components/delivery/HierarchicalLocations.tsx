@@ -1,221 +1,184 @@
+
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { 
-  MapPin, 
-  Building, 
-  Home, 
-  Landmark,
-  ChevronRight,
-  Plus,
-  Edit2,
-  Trash2
-} from "lucide-react";
-import { 
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Plus } from "lucide-react";
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { DeliveryLocation } from "@/types/shipping";
-import { deleteDeliveryLocation, fetchDeliveryTypePricing } from "@/services/supabase/deliveryService";
+  fetchGovernorates,
+  fetchCities,
+  fetchAreas,
+  fetchNeighborhoods
+} from "@/services/supabase/deliveryService";
+import DeliveryLocationDialog from "./DeliveryLocationDialog";
 
-interface GroupedLocations {
-  [governorate: string]: {
-    [city: string]: {
-      [area: string]: DeliveryLocation[];
-    };
-  };
-}
-
-interface HierarchicalLocationsProps {
-  locations: DeliveryLocation[];
-  onLocationUpdated?: () => void;
-}
-
-export default function HierarchicalLocations({ 
-  locations,
-  onLocationUpdated
-}: HierarchicalLocationsProps) {
-  const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deliveryPricing, setDeliveryPricing] = useState<{[key: string]: any}>({});
-
-  const groupLocationsByHierarchy = (locations: DeliveryLocation[]) => {
-    const grouped: GroupedLocations = {};
-    
-    locations.forEach(location => {
-      const governorate = location.governorate || "عام";
-      const city = location.city || "عام";
-      const area = location.area || "عام";
-      
-      if (!grouped[governorate]) {
-        grouped[governorate] = {};
-      }
-      
-      if (!grouped[governorate][city]) {
-        grouped[governorate][city] = {};
-      }
-      
-      if (!grouped[governorate][city][area]) {
-        grouped[governorate][city][area] = [];
-      }
-      
-      if (location.neighborhood) {
-        grouped[governorate][city][area].push(location);
-      }
-    });
-    
-    return grouped;
-  };
-
-  const groupedLocations = groupLocationsByHierarchy(locations);
+export default function HierarchicalLocations() {
+  const [governorates, setGovernorates] = useState<{ governorate: string }[]>([]);
+  const [citiesByGovernorate, setCitiesByGovernorate] = useState<{ [key: string]: { city: string }[] }>({});
+  const [areasByCity, setAreasByCity] = useState<{ [key: string]: { area: string }[] }>({});
+  const [neighborhoodsByArea, setNeighborhoodsByArea] = useState<{ [key: string]: { id: string; neighborhood: string, price: number }[] }>({});
+  
+  const [showDialog, setShowDialog] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'governorate' | 'city' | 'area' | 'neighborhood'>('governorate');
+  const [selectedParent, setSelectedParent] = useState<{
+    governorate?: string;
+    city?: string;
+    area?: string;
+  }>({});
 
   useEffect(() => {
-    const loadPricingForLocations = async () => {
-      const pricingData: {[key: string]: any} = {};
-      
-      for (const location of locations) {
-        try {
-          const pricing = await fetchDeliveryTypePricing(location.id);
-          pricingData[location.id] = pricing;
-        } catch (error) {
-          console.error(`Error loading pricing for location ${location.id}:`, error);
+    loadGovernorates();
+  }, []);
+
+  const loadGovernorates = async () => {
+    try {
+      const data = await fetchGovernorates();
+      setGovernorates(data);
+    } catch (error) {
+      console.error('Error loading governorates:', error);
+      toast.error("حدث خطأ أثناء تحميل المحافظات");
+    }
+  };
+
+  const loadCities = async (governorate: string) => {
+    try {
+      const data = await fetchCities(governorate);
+      setCitiesByGovernorate(prev => ({ ...prev, [governorate]: data }));
+    } catch (error) {
+      console.error('Error loading cities:', error);
+      toast.error("حدث خطأ أثناء تحميل المدن");
+    }
+  };
+
+  const loadAreas = async (governorate: string, city: string) => {
+    try {
+      const data = await fetchAreas(governorate, city);
+      setAreasByCity(prev => ({ ...prev, [`${governorate}-${city}`]: data }));
+    } catch (error) {
+      console.error('Error loading areas:', error);
+      toast.error("حدث خطأ أثناء تحميل المناطق");
+    }
+  };
+
+  const loadNeighborhoods = async (governorate: string, city: string, area: string) => {
+    try {
+      const data = await fetchNeighborhoods(governorate, city, area);
+      setNeighborhoodsByArea(prev => ({ ...prev, [`${governorate}-${city}-${area}`]: data }));
+    } catch (error) {
+      console.error('Error loading neighborhoods:', error);
+      toast.error("حدث خطأ أثناء تحميل الأحياء");
+    }
+  };
+
+  const handleAddClick = (mode: 'governorate' | 'city' | 'area' | 'neighborhood', parentData?: {
+    governorate?: string;
+    city?: string;
+    area?: string;
+  }) => {
+    setDialogMode(mode);
+    setSelectedParent(parentData || {});
+    setShowDialog(true);
+  };
+
+  const handleSuccess = () => {
+    setShowDialog(false);
+    loadGovernorates();
+    if (selectedParent.governorate) {
+      loadCities(selectedParent.governorate);
+      if (selectedParent.city) {
+        loadAreas(selectedParent.governorate, selectedParent.city);
+        if (selectedParent.area) {
+          loadNeighborhoods(selectedParent.governorate, selectedParent.city, selectedParent.area);
         }
       }
-      
-      setDeliveryPricing(pricingData);
-    };
-    
-    if (locations.length > 0) {
-      loadPricingForLocations();
-    }
-  }, [locations]);
-
-  const handleDeleteLocation = async () => {
-    if (!locationToDelete) return;
-    
-    try {
-      await deleteDeliveryLocation(locationToDelete);
-      toast.success("تم حذف منطقة التوصيل بنجاح");
-      if (onLocationUpdated) {
-        onLocationUpdated();
-      }
-    } catch (error) {
-      console.error('Error deleting location:', error);
-      toast.error("حدث خطأ أثناء حذف منطقة التوصيل");
-    } finally {
-      setDeleteDialogOpen(false);
-      setLocationToDelete(null);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <MapPin className="mr-2 h-5 w-5" />
-            <span>مناطق التوصيل</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {Object.keys(groupedLocations).length === 0 ? (
-            <div className="text-center p-8">
-              <p className="text-muted-foreground">لا توجد مناطق توصيل</p>
-            </div>
-          ) : (
-            <Accordion type="single" collapsible className="w-full">
-              {Object.keys(groupedLocations).map(governorate => (
-                <AccordionItem key={governorate} value={governorate}>
-                  <AccordionTrigger className="hover:bg-gray-50 px-4 py-2 rounded-md text-right font-medium">
-                    <div className="flex justify-between items-center w-full">
-                      <div className="flex items-center">
-                        <Landmark className="mr-2 h-4 w-4 text-primary" />
-                        <span>{governorate}</span>
-                      </div>
-                      <Badge variant="outline">{Object.keys(groupedLocations[governorate]).length} مدينة</Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="pl-4 space-y-2">
-                      <Accordion type="single" collapsible className="w-full">
-                        {Object.keys(groupedLocations[governorate]).map(city => (
-                          <AccordionItem key={city} value={city}>
-                            <AccordionTrigger className="hover:bg-gray-50 px-4 py-2 rounded-md text-right">
-                              <div className="flex justify-between items-center w-full">
-                                <div className="flex items-center">
-                                  <Building className="mr-2 h-4 w-4 text-primary" />
-                                  <span>{city}</span>
-                                </div>
-                                <Badge variant="outline">{Object.keys(groupedLocations[governorate][city]).length} منطقة</Badge>
-                              </div>
+    <div className="space-y-4">
+      <Accordion type="multiple" className="w-full">
+        {governorates.map(({ governorate }) => (
+          <AccordionItem key={governorate} value={governorate}>
+            <AccordionTrigger
+              onClick={() => {
+                if (!citiesByGovernorate[governorate]) {
+                  loadCities(governorate);
+                }
+              }}
+              className="text-right"
+            >
+              {governorate}
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="pr-4 space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleAddClick('city', { governorate })}
+                >
+                  <Plus className="h-4 w-4 ml-2" />
+                  إضافة مدينة
+                </Button>
+                
+                {citiesByGovernorate[governorate]?.map(({ city }) => (
+                  <AccordionItem key={city} value={`${governorate}-${city}`}>
+                    <AccordionTrigger
+                      onClick={() => {
+                        if (!areasByCity[`${governorate}-${city}`]) {
+                          loadAreas(governorate, city);
+                        }
+                      }}
+                      className="text-right"
+                    >
+                      {city}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="pr-4 space-y-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddClick('area', { governorate, city })}
+                        >
+                          <Plus className="h-4 w-4 ml-2" />
+                          إضافة منطقة
+                        </Button>
+
+                        {areasByCity[`${governorate}-${city}`]?.map(({ area }) => (
+                          <AccordionItem key={area} value={`${governorate}-${city}-${area}`}>
+                            <AccordionTrigger
+                              onClick={() => {
+                                if (!neighborhoodsByArea[`${governorate}-${city}-${area}`]) {
+                                  loadNeighborhoods(governorate, city, area);
+                                }
+                              }}
+                              className="text-right"
+                            >
+                              {area}
                             </AccordionTrigger>
                             <AccordionContent>
-                              <div className="pl-4 space-y-2">
-                                {Object.keys(groupedLocations[governorate][city]).map(area => (
-                                  <div key={area} className="border rounded-md p-3">
-                                    <div className="font-medium text-right mb-2 flex items-center">
-                                      <Home className="mr-2 h-4 w-4 text-primary" />
-                                      <span>{area}</span>
-                                    </div>
-                                    <div className="space-y-2">
-                                      {groupedLocations[governorate][city][area].map(location => (
-                                        <div 
-                                          key={location.id} 
-                                          className="flex justify-between items-center bg-gray-50 p-2 rounded-md"
-                                        >
-                                          <div className="flex gap-2">
-                                            <Button 
-                                              variant="outline" 
-                                              size="sm"
-                                              onClick={() => {
-                                                setLocationToDelete(location.id);
-                                                setDeleteDialogOpen(true);
-                                              }}
-                                            >
-                                              <Trash2 className="h-4 w-4 text-red-500 mr-1" />
-                                              حذف
-                                            </Button>
-                                            <Button 
-                                              variant="outline" 
-                                              size="sm"
-                                              onClick={() => toast.info("سيتم إضافة ميزة التعديل قريبًا")}
-                                            >
-                                              <Edit2 className="h-4 w-4 mr-1" />
-                                              تعديل
-                                            </Button>
-                                          </div>
-                                          <div className="text-right">
-                                            {location.neighborhood && (
-                                              <div className="text-sm font-medium">{location.neighborhood}</div>
-                                            )}
-                                            <div className="space-y-1">
-                                              {deliveryPricing[location.id]?.map((pricing: any) => (
-                                                <div key={pricing.delivery_type_id} className="flex justify-between items-center text-sm">
-                                                  <span className="text-gray-600">{pricing.delivery_types.name}:</span>
-                                                  <span className="font-medium text-primary">{pricing.price} ج.م</span>
-                                                </div>
-                                              ))}
-                                            </div>
-                                            {location.estimated_time && (
-                                              <div className="text-sm text-gray-600">{location.estimated_time}</div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      ))}
+                              <div className="pr-4 space-y-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleAddClick('neighborhood', { governorate, city, area })}
+                                >
+                                  <Plus className="h-4 w-4 ml-2" />
+                                  إضافة حي
+                                </Button>
+
+                                {neighborhoodsByArea[`${governorate}-${city}-${area}`]?.map((neighborhood) => (
+                                  <div
+                                    key={neighborhood.id}
+                                    className="p-2 border rounded-lg mb-2 text-right"
+                                  >
+                                    <div className="font-medium">{neighborhood.neighborhood}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                      السعر: {neighborhood.price} ج.م
                                     </div>
                                   </div>
                                 ))}
@@ -223,32 +186,23 @@ export default function HierarchicalLocations({
                             </AccordionContent>
                           </AccordionItem>
                         ))}
-                      </Accordion>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          )}
-        </CardContent>
-      </Card>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>هل أنت متأكد من حذف منطقة التوصيل؟</AlertDialogTitle>
-            <AlertDialogDescription>
-              لا يمكن التراجع عن هذا الإجراء بعد تنفيذه.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>إلغاء</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteLocation}>
-              حذف
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeliveryLocationDialog
+        open={showDialog}
+        onOpenChange={setShowDialog}
+        mode={dialogMode}
+        parentData={selectedParent}
+        onSuccess={handleSuccess}
+      />
     </div>
   );
 }
