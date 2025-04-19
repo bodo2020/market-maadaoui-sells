@@ -77,7 +77,7 @@ export default function Invoices() {
     try {
       const { data, error } = await supabase
         .from("purchases")
-        .select("*, suppliers(name), items(*, products(name))")
+        .select("*, suppliers(name), items:purchase_items(*, products(name))")
         .eq("id", id)
         .single();
 
@@ -91,12 +91,26 @@ export default function Invoices() {
         return null;
       }
 
-      // Convert the data to match the Purchase interface
+      const purchaseItems = Array.isArray(data.items) 
+        ? data.items.map((item: any) => ({
+            product: item.products || { name: "Unknown Product", id: item.product_id },
+            quantity: item.quantity,
+            price: item.price,
+            total: item.total,
+            id: item.id,
+            purchase_id: item.purchase_id,
+            product_id: item.product_id,
+            created_at: item.created_at,
+            updated_at: item.updated_at
+          }))
+        : [];
+
       const purchaseData = {
         ...data,
-        subtotal: data.total, // Assuming total can be used as subtotal if not available
-        discount: 0, // Default value if not available
-        payment_method: 'cash' as 'cash' | 'card' | 'mixed', // Default value
+        items: purchaseItems,
+        subtotal: data.total,
+        discount: 0,
+        payment_method: 'cash' as 'cash' | 'card' | 'mixed',
       } as Purchase;
       
       setPurchase(purchaseData);

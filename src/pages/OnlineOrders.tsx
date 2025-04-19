@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import { useNotificationStore } from "@/stores/notificationStore";
-import { Order, OrderItem } from "@/types/index";
+import { Order, OrderItem, Json } from "@/types/index";
 import { Input } from "@/components/ui/input";
 import { Search, Download, Plus, ChevronDown, Check, Package } from "lucide-react";
 import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog";
@@ -118,29 +118,47 @@ export default function OnlineOrders() {
 
       if (error) throw error;
       
-      // Loop through data and add any missing properties
-      const transformedOrders: Order[] = (data || []).map(order => ({
-        id: order.id,
-        customer_id: order.customer_id,
-        customer_name: order.customer_name || 'Unknown Customer',
-        customer_phone: order.customer_phone || '',
-        customer_email: order.customer_email || '',
-        date: order.created_at,
-        items: Array.isArray(order.items) ? order.items : [],
-        subtotal: order.total,
-        discount: 0,
-        total: order.total,
-        payment_method: order.payment_method || 'cash',
-        payment_status: order.payment_status || 'pending',
-        shipping_address: order.shipping_address,
-        status: order.status,
-        notes: order.notes,
-        created_at: order.created_at,
-        updated_at: order.updated_at,
-        delivery_location_id: order.delivery_location_id,
-        shipping_cost: order.shipping_cost,
-        tracking_number: order.tracking_number
-      }));
+      const transformedOrders: Order[] = (data || []).map(order => {
+        let orderItems: any[] = [];
+        if (typeof order.items === 'string') {
+          try {
+            orderItems = JSON.parse(order.items);
+          } catch (e) {
+            console.error('Error parsing items JSON:', e);
+            orderItems = [];
+          }
+        } else if (Array.isArray(order.items)) {
+          orderItems = order.items;
+        }
+
+        let paymentMethod: 'cash' | 'card' | 'online' = 'cash';
+        if (order.payment_method === 'card' || order.payment_method === 'online') {
+          paymentMethod = order.payment_method as 'card' | 'online';
+        }
+
+        return {
+          id: order.id,
+          customer_id: order.customer_id,
+          customer_name: 'Unknown Customer',
+          customer_phone: '',
+          customer_email: '',
+          date: order.created_at,
+          items: orderItems,
+          subtotal: order.total,
+          discount: 0,
+          total: order.total,
+          payment_method: paymentMethod,
+          payment_status: order.payment_status || 'pending',
+          shipping_address: order.shipping_address,
+          status: order.status || 'pending',
+          notes: order.notes,
+          created_at: order.created_at,
+          updated_at: order.updated_at,
+          delivery_location_id: order.delivery_location_id,
+          shipping_cost: order.shipping_cost,
+          tracking_number: order.tracking_number
+        };
+      });
       
       setOrders(transformedOrders);
     } catch (error) {

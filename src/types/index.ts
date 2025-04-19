@@ -272,18 +272,15 @@ export interface Order {
 export interface OrderFromDB {
   id: string;
   customer_id?: string;
-  customer_name?: string;
-  customer_phone?: string;
-  customer_email?: string;
-  items: any;
+  items: Json; // This field can be a string or object from the database
   total: number;
-  payment_method: 'cash' | 'card' | 'online';
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  payment_method?: string;
+  payment_status?: string;
   shipping_address?: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: string;
   notes?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   delivery_location_id?: string;
   shipping_cost?: number;
   tracking_number?: string;
