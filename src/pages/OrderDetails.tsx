@@ -1,3 +1,4 @@
+
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
@@ -29,6 +30,8 @@ export default function OrderDetails() {
   const fetchOrder = async () => {
     try {
       setIsLoading(true);
+      console.log("Fetching order details for ID:", id);
+      
       const { data, error } = await supabase.from('online_orders').select(`
           *,
           customers(
@@ -68,7 +71,7 @@ export default function OrderDetails() {
           
           return items.map((item: any) => ({
             product_id: item.product_id || '',
-            product_name: item.product_name || '',
+            product_name: item.product_name || item.name || '',
             quantity: item.quantity || 0,
             price: item.price || 0,
             total: item.total || item.price * item.quantity || 0,
@@ -80,7 +83,7 @@ export default function OrderDetails() {
         const customerEmail = data.customers?.email || '';
         const customerPhone = data.customers?.phone || '';
         
-        setOrder({
+        const orderObj = {
           id: data.id,
           created_at: data.created_at,
           total: data.total,
@@ -95,7 +98,15 @@ export default function OrderDetails() {
           notes: data.notes || '',
           tracking_number: data.tracking_number || null,
           delivery_person: data.delivery_person || null
-        });
+        };
+        
+        console.log("Parsed order:", orderObj);
+        setOrder(orderObj);
+        // If there's a selected status that matches the current order status,
+        // clear the selected status to avoid confusion
+        if (selectedStatus === orderObj.status) {
+          setSelectedStatus(null);
+        }
       }
     } catch (error) {
       console.error('Error fetching order:', error);
@@ -112,24 +123,28 @@ export default function OrderDetails() {
       setIsUpdatingStatus(true);
       console.log("Updating order status to:", selectedStatus, "for order ID:", id);
       
-      const { error } = await supabase
+      // Create a new Date object and convert it to ISO string for the updated_at field
+      const currentTime = new Date().toISOString();
+      
+      const { error, data } = await supabase
         .from('online_orders')
         .update({ 
           status: selectedStatus,
-          updated_at: new Date().toISOString() 
+          updated_at: currentTime 
         })
-        .eq('id', id);
+        .eq('id', id)
+        .select();
       
       if (error) {
         console.error("Supabase update error:", error);
         throw error;
       }
       
+      console.log("Status update response:", data);
       console.log("Status updated successfully in Supabase");
       
       // Update the local state
       setOrder(prev => prev ? { ...prev, status: selectedStatus } : null);
-      setSelectedStatus(null);
       
       toast.success(`تم تحديث حالة الطلب إلى ${
         selectedStatus === 'waiting' ? 'في الانتظار' : 
@@ -137,8 +152,11 @@ export default function OrderDetails() {
         selectedStatus === 'shipped' ? 'تم الشحن' : 'تم التسليم'
       }`);
       
-      // Refetch the order to ensure we have the latest data from Supabase
-      fetchOrder();
+      // Clear the selected status
+      setSelectedStatus(null);
+      
+      // Refetch to ensure we have the latest data
+      await fetchOrder();
     } catch (error) {
       console.error('Error updating order status:', error);
       toast.error('حدث خطأ أثناء تحديث حالة الطلب');
@@ -241,8 +259,14 @@ export default function OrderDetails() {
                   disabled={isUpdatingStatus}
                   className="flex items-center gap-2 bg-primary hover:bg-primary/90"
                 >
-                  <Check className="h-4 w-4" />
-                  تأكيد تحديث الحالة
+                  {isUpdatingStatus ? (
+                    <>جاري التحديث...</>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" />
+                      تأكيد تحديث الحالة
+                    </>
+                  )}
                 </Button>
               )}
             </div>
