@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { fetchProductsBySubsubcategory } from "@/services/supabase/productService";
 import { Product } from "@/types";
-import ProductGrid from "@/components/products/ProductGrid";
+import { ProductGrid } from "@/components/products/ProductGrid";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Plus } from "lucide-react";
@@ -65,7 +65,7 @@ const SubsubcategoryProducts = ({ subsubcategoryId }: SubsubcategoryProductsProp
           </Button>
         </div>
       ) : (
-        <ProductGrid products={products} />
+        <ProductGrid products={products} onEditProduct={(product) => navigate(`/products/edit/${product.id}`)} />
       )}
     </div>
   );

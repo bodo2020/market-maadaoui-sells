@@ -7,11 +7,13 @@ import SubsubcategoriesList from "@/components/categories/SubsubcategoriesList";
 import CategoryDetail from "@/components/categories/CategoryDetail";
 import { useEffect, useState } from "react";
 import { fetchSubsubcategoryById, fetchSubcategoryById } from "@/services/supabase/categoryService";
+import SubsubcategoryProducts from "@/components/categories/SubsubcategoryProducts";
 
 export default function CategoriesPage() {
   const { id, subId } = useParams<{ id: string; subId: string }>();
   const location = useLocation();
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
+  const [showingSubsubcategoryProducts, setShowingSubsubcategoryProducts] = useState(false);
   
   // Check if we're on the subsubcategory route
   const isSubsubcategoryRoute = location.pathname.includes('/subsubcategories/');
@@ -24,6 +26,7 @@ export default function CategoriesPage() {
           const subsubcategory = await fetchSubsubcategoryById(id);
           if (subsubcategory && subsubcategory.subcategory_id) {
             setSubcategoryId(subsubcategory.subcategory_id);
+            setShowingSubsubcategoryProducts(true);
             
             // Get the parent category of the subcategory
             const subcategory = await fetchSubcategoryById(subsubcategory.subcategory_id);
@@ -47,6 +50,7 @@ export default function CategoriesPage() {
     } else if (subId) {
       // If we have a subId directly from params
       setSubcategoryId(subId);
+      setShowingSubsubcategoryProducts(false);
     }
   }, [id, subId, isSubsubcategoryRoute]);
   
@@ -55,9 +59,9 @@ export default function CategoriesPage() {
       <div className="container py-6">
         <h1 className="text-2xl font-bold mb-6">تصنيفات المنتجات</h1>
         
-        {isSubsubcategoryRoute && id && (
-          // Subsubcategories list for a specific subsubcategory ID from the URL
-          <SubsubcategoriesList subcategoryId={subcategoryId || ''} selectedSubsubcategoryId={id} />
+        {isSubsubcategoryRoute && id && subcategoryId && (
+          // Show subsubcategories list with the selected subsubcategory
+          <SubsubcategoriesList subcategoryId={subcategoryId} selectedSubsubcategoryId={id} />
         )}
         
         {!isSubsubcategoryRoute && id && !subId && (
@@ -70,8 +74,8 @@ export default function CategoriesPage() {
           <SubsubcategoriesList subcategoryId={subId} />
         )}
         
-        {/* Render CategoryDetail for all category views */}
-        {id && (
+        {/* Render CategoryDetail only if we're not showing subsubcategory products */}
+        {id && !showingSubsubcategoryProducts && !isSubsubcategoryRoute && (
           <CategoryDetail />
         )}
       </div>

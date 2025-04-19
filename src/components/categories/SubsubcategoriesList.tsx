@@ -5,20 +5,23 @@ import { Loader2, FolderPlus, Trash, Edit, Package, ArrowLeft } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { fetchSubsubcategories, deleteSubsubcategory, fetchSubcategoryById } from "@/services/supabase/categoryService";
+import { fetchSubsubcategories, deleteSubsubcategory, fetchSubcategoryById, fetchSubsubcategoryById } from "@/services/supabase/categoryService";
 import { Subsubcategory, Subcategory } from "@/types";
 import { fetchProductsBySubsubcategory } from "@/services/supabase/productService";
 import AddSubsubcategoryDialog from "./AddSubsubcategoryDialog";
+import SubsubcategoryProducts from "./SubsubcategoryProducts";
 
 interface SubsubcategoriesListProps {
   subcategoryId: string;
+  selectedSubsubcategoryId?: string;
 }
 
-export default function SubsubcategoriesList({ subcategoryId }: SubsubcategoriesListProps) {
+export default function SubsubcategoriesList({ subcategoryId, selectedSubsubcategoryId }: SubsubcategoriesListProps) {
   const [subsubcategories, setSubsubcategories] = useState<(Subsubcategory & { product_count?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [parentSubcategory, setParentSubcategory] = useState<Subcategory | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [selectedSubsubcategory, setSelectedSubsubcategory] = useState<Subsubcategory | null>(null);
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -27,6 +30,22 @@ export default function SubsubcategoriesList({ subcategoryId }: Subsubcategories
       fetchParentSubcategory();
     }
   }, [subcategoryId]);
+
+  useEffect(() => {
+    if (selectedSubsubcategoryId) {
+      fetchSelectedSubsubcategory(selectedSubsubcategoryId);
+    }
+  }, [selectedSubsubcategoryId]);
+
+  const fetchSelectedSubsubcategory = async (id: string) => {
+    try {
+      const subsubcategory = await fetchSubsubcategoryById(id);
+      setSelectedSubsubcategory(subsubcategory);
+    } catch (error) {
+      console.error('Error fetching selected subsubcategory:', error);
+      toast.error("حدث خطأ أثناء تحميل الفئة المحددة");
+    }
+  };
 
   const fetchParentSubcategory = async () => {
     try {
@@ -84,6 +103,31 @@ export default function SubsubcategoriesList({ subcategoryId }: Subsubcategories
   const navigateToSubsubcategory = (subsubcategory: Subsubcategory) => {
     navigate(`/subsubcategories/${subsubcategory.id}`);
   };
+
+  // If we're viewing a specific subsubcategory
+  if (selectedSubsubcategoryId && selectedSubsubcategory) {
+    return (
+      <div>
+        <Button 
+          variant="ghost" 
+          className="mb-4"
+          onClick={() => navigate(`/categories/${parentSubcategory?.category_id}/${subcategoryId}`)}
+        >
+          <ArrowLeft className="h-4 w-4 ml-1" />
+          العودة للفئات
+        </Button>
+
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-2">{selectedSubsubcategory.name}</h2>
+          {selectedSubsubcategory.description && (
+            <p className="text-gray-600">{selectedSubsubcategory.description}</p>
+          )}
+        </div>
+
+        <SubsubcategoryProducts subsubcategoryId={selectedSubsubcategoryId} />
+      </div>
+    );
+  }
 
   if (loading) {
     return (

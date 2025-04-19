@@ -26,13 +26,8 @@ export default function CategoryDetail() {
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  
-  // Determine which level we're dealing with
-  const getCategoryLevel = () => {
-    if (subId) return 'subsubcategory';
-    if (id) return 'subcategory';
-    return 'category';
-  };
+  const [categoryType, setCategoryType] = useState<'category' | 'subcategory' | 'subsubcategory' | null>(null);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   
   useEffect(() => {
     if (!id) return;
@@ -42,26 +37,49 @@ export default function CategoryDetail() {
         setLoading(true);
         
         if (subId) {
-          // Fetch subsubcategory
-          const subsubcategory = await fetchSubsubcategoryById(subId);
-          setName(subsubcategory.name);
-          setDescription(subsubcategory.description || "");
-          setImageUrl(subsubcategory.image_url);
-        } else if (id) {
-          // Check if it's a subcategory
+          // Try to fetch as subsubcategory first
+          try {
+            const subsubcategory = await fetchSubsubcategoryById(subId);
+            setName(subsubcategory.name);
+            setDescription(subsubcategory.description || "");
+            setImageUrl(subsubcategory.image_url);
+            setCategoryType('subsubcategory');
+            setCategoryId(subId);
+            return;
+          } catch (error) {
+            console.error('Error fetching subsubcategory:', error);
+          }
+        }
+        
+        // Try to fetch as subcategory
+        if (id) {
           try {
             const subcategory = await fetchSubcategoryById(id);
             setName(subcategory.name);
             setDescription(subcategory.description || "");
             setImageUrl(subcategory.image_url);
+            setCategoryType('subcategory');
+            setCategoryId(id);
+            return;
           } catch (error) {
-            // If not a subcategory, try as main category
-            const mainCategory = await fetchMainCategoryById(id);
-            setName(mainCategory.name);
-            setDescription(mainCategory.description || "");
-            setImageUrl(mainCategory.image_url);
+            console.error('Error fetching subcategory:', error);
           }
         }
+        
+        // Lastly, try as main category
+        try {
+          const mainCategory = await fetchMainCategoryById(id);
+          setName(mainCategory.name);
+          setDescription(mainCategory.description || "");
+          setImageUrl(mainCategory.image_url);
+          setCategoryType('category');
+          setCategoryId(id);
+        } catch (error) {
+          console.error('Error fetching main category:', error);
+          toast.error("حدث خطأ أثناء تحميل بيانات القسم");
+          setCategoryType(null);
+        }
+        
       } catch (error) {
         console.error('Error fetching category details:', error);
         toast.error("حدث خطأ أثناء تحميل بيانات القسم");
@@ -110,6 +128,11 @@ export default function CategoryDetail() {
   };
   
   const handleSave = async () => {
+    if (!categoryId || !categoryType) {
+      toast.error("لا يمكن تحديد نوع القسم للتحديث");
+      return;
+    }
+    
     if (!name) {
       toast.error("الاسم مطلوب");
       return;
@@ -129,17 +152,12 @@ export default function CategoryDetail() {
         image_url: updatedImageUrl
       };
       
-      if (subId) {
-        // Update subsubcategory
-        await updateSubsubcategory(subId, updatedData);
-      } else if (id) {
-        try {
-          // Try to update as subcategory
-          await updateSubcategory(id, updatedData);
-        } catch (error) {
-          // If not a subcategory, update as main category
-          await updateMainCategory(id, updatedData);
-        }
+      if (categoryType === 'subsubcategory') {
+        await updateSubsubcategory(categoryId, updatedData);
+      } else if (categoryType === 'subcategory') {
+        await updateSubcategory(categoryId, updatedData);
+      } else if (categoryType === 'category') {
+        await updateMainCategory(categoryId, updatedData);
       }
       
       toast.success("تم حفظ التغييرات بنجاح");
@@ -157,6 +175,16 @@ export default function CategoryDetail() {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  if (!categoryType) {
+    return (
+      <div className="mt-8 p-6 border rounded-lg bg-card">
+        <div className="text-center text-red-500">
+          لم يتم العثور على بيانات القسم. يرجى التحقق من الرابط والمحاولة مرة أخرى.
+        </div>
       </div>
     );
   }
