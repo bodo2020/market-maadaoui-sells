@@ -93,7 +93,8 @@ export async function fetchNeighborhoods(governorate: string, city: string, area
 
 export async function createGovernorate(data: { 
   governorate: string, 
-  name?: string
+  name?: string,
+  provider_id?: string
 }) {
   const locationWithName = {
     ...data,
@@ -113,7 +114,8 @@ export async function createGovernorate(data: {
 export async function createCity(data: { 
   governorate: string, 
   city: string,
-  name?: string
+  name?: string,
+  provider_id?: string
 }) {
   const locationWithName = {
     ...data,
@@ -134,7 +136,8 @@ export async function createArea(data: {
   governorate: string, 
   city: string,
   area: string,
-  name?: string
+  name?: string,
+  provider_id?: string
 }) {
   const locationWithName = {
     ...data,
@@ -158,7 +161,8 @@ export async function createNeighborhood(data: {
   neighborhood: string,
   price: number,
   estimated_time?: string,
-  name?: string
+  name?: string,
+  provider_id?: string
 }) {
   const locationWithName = {
     ...data,
