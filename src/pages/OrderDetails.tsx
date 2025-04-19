@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
@@ -11,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Pencil, Mail, Phone, MapPin, Bike, RotateCcw } from "lucide-react";
+import { Pencil, Mail, Phone, MapPin, Bike } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
@@ -138,7 +137,6 @@ export default function OrderDetails() {
       
       if (error) throw error;
       
-      // Reload the order data to reflect the changes
       await fetchOrder();
       
       toast.success(`تم تحديث حالة الشحن إلى ${status === 'shipped' ? 'خرج للتوصيل' : 'تم التوصيل'}`);
@@ -150,13 +148,8 @@ export default function OrderDetails() {
     }
   };
 
-  const handleStatusClick = (status: Order['status']) => {
-    setStatusToUpdate(status);
-    setConfirmStatusDialog(true);
-  };
-
-  const confirmStatusUpdate = async () => {
-    if (!statusToUpdate || !order) return;
+  const handleStatusClick = async (status: Order['status']) => {
+    if (!order) return;
     
     try {
       setIsUpdatingStatus(true);
@@ -164,28 +157,48 @@ export default function OrderDetails() {
       const { error } = await supabase
         .from('online_orders')
         .update({ 
-          status: statusToUpdate,
+          status,
           updated_at: new Date().toISOString() 
         })
         .eq('id', order.id);
       
       if (error) throw error;
       
-      // Reload the order data
       await fetchOrder();
       
       toast.success(`تم تحديث حالة الطلب إلى ${
-        statusToUpdate === 'waiting' ? 'في الانتظار' : 
-        statusToUpdate === 'ready' ? 'جاهز للشحن' : 
-        statusToUpdate === 'shipped' ? 'تم الشحن' : 'تم التسليم'
+        status === 'waiting' ? 'في الانتظار' : 
+        status === 'ready' ? 'جاهز للشحن' : 
+        status === 'shipped' ? 'تم الشحن' : 'تم التسليم'
       }`);
     } catch (error) {
       console.error('Error updating order status:', error);
       toast.error('حدث خطأ أثناء تحديث حالة الطلب');
     } finally {
       setIsUpdatingStatus(false);
-      setConfirmStatusDialog(false);
-      setStatusToUpdate(null);
+    }
+  };
+
+  const handlePaymentStatusUpdate = async (paymentStatus: 'pending' | 'paid') => {
+    if (!order) return;
+    
+    try {
+      const { error } = await supabase
+        .from('online_orders')
+        .update({ 
+          payment_status: paymentStatus,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      await fetchOrder();
+      
+      toast.success(`تم تحديث حالة الدفع إلى ${paymentStatus === 'paid' ? 'مدفوع' : 'في انتظار الدفع'}`);
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      toast.error('حدث خطأ أثناء تحديث حالة الدفع');
     }
   };
 
@@ -195,7 +208,6 @@ export default function OrderDetails() {
     try {
       setIsUpdatingStatus(true);
       
-      // Check current status and decide next status
       let newStatus: Order['status'];
       
       switch (order.status) {
@@ -222,7 +234,6 @@ export default function OrderDetails() {
       
       if (error) throw error;
       
-      // Reload the order data
       await fetchOrder();
       
       toast.success(`تم تحديث حالة الطلب إلى ${
@@ -287,24 +298,28 @@ export default function OrderDetails() {
               <button 
                 onClick={() => handleStatusClick('waiting')} 
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'waiting' ? getStatusBadgeColor('waiting') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                disabled={isUpdatingStatus}
               >
                 في الانتظار
               </button>
               <button 
                 onClick={() => handleStatusClick('ready')} 
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'ready' ? getStatusBadgeColor('ready') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                disabled={isUpdatingStatus}
               >
                 جاهز للشحن
               </button>
               <button 
                 onClick={() => handleStatusClick('shipped')} 
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'shipped' ? getStatusBadgeColor('shipped') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                disabled={isUpdatingStatus}
               >
                 تم الشحن
               </button>
               <button 
                 onClick={() => handleStatusClick('done')} 
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'done' ? getStatusBadgeColor('done') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                disabled={isUpdatingStatus}
               >
                 تم التسليم
               </button>
@@ -354,36 +369,25 @@ export default function OrderDetails() {
 
             <div className="space-y-3">
               <div className="flex items-center gap-3 mt-4">
-                {order?.payment_status === 'pending' ? <Button variant="outline" className="w-full" onClick={() => setPaymentConfirmOpen(true)}>
+                {order?.payment_status === 'pending' ? (
+                  <Button variant="outline" className="w-full" onClick={() => handlePaymentStatusUpdate('paid')}>
                     تأكيد الدفع
-                  </Button> : <div className="w-full flex gap-3">
+                  </Button>
+                ) : (
+                  <div className="w-full flex gap-3">
                     <Badge variant="default" className="px-4 py-2 text-base w-3/4 flex justify-center items-center">
                       تم تأكيد الدفع
                     </Badge>
-                    <Button variant="outline" size="sm" className="w-1/4 flex items-center gap-2" onClick={async () => {
-                  try {
-                    const { error } = await supabase
-                      .from('online_orders')
-                      .update({
-                        payment_status: 'pending',
-                        updated_at: new Date().toISOString()
-                      })
-                      .eq('id', order?.id);
-                    
-                    if (error) throw error;
-                    
-                    await fetchOrder(); // Reload data to reflect changes
-                    
-                    toast.success('تم التراجع عن تأكيد الدفع');
-                  } catch (error) {
-                    console.error('Error reverting payment status:', error);
-                    toast.error('حدث خطأ أثناء التراجع عن تأكيد الدفع');
-                  }
-                }}>
-                      <RotateCcw className="h-4 w-4" />
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-1/4 flex items-center gap-2" 
+                      onClick={() => handlePaymentStatusUpdate('pending')}
+                    >
                       تراجع
                     </Button>
-                  </div>}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between items-center">
