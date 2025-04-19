@@ -17,6 +17,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { OrderActionsMenu } from "@/components/orders/OrderActionsMenu";
 import { OrderItemsDialog } from "@/components/orders/OrderItemsDialog";
 import { useNavigate } from "react-router-dom";
+import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
+import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
+
 type OrderFromDB = {
   id: string;
   created_at: string;
@@ -35,6 +38,7 @@ type OrderFromDB = {
   notes?: string | null;
   updated_at?: string | null;
 };
+
 export default function OnlineOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,10 +47,15 @@ export default function OnlineOrders() {
   const [selectedItems, setSelectedItems] = useState<any[] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
+  const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
+  const [assignDeliveryOpen, setAssignDeliveryOpen] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const {
     markOrdersAsRead
   } = useNotificationStore();
   const navigate = useNavigate();
+
   useEffect(() => {
     fetchOrders();
     const channel = subscribeToOrders();
@@ -56,7 +65,8 @@ export default function OnlineOrders() {
         supabase.removeChannel(channel);
       }
     };
-  }, [activeTab]);
+  }, [activeTab, ordersRefreshKey]);
+
   const subscribeToOrders = () => {
     const channel = supabase.channel('online-orders').on('postgres_changes', {
       event: 'INSERT',
@@ -76,6 +86,7 @@ export default function OnlineOrders() {
     }).subscribe();
     return channel;
   };
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -122,14 +133,17 @@ export default function OnlineOrders() {
       setLoading(false);
     }
   };
+
   const validateOrderStatus = (status: string): Order['status'] => {
     const validStatuses: Order['status'][] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
     return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
   };
+
   const validatePaymentStatus = (status: string): Order['payment_status'] => {
     const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
     return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
   };
+
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<Order['status'], "default" | "destructive" | "outline" | "secondary"> = {
       pending: "outline",
@@ -149,6 +163,7 @@ export default function OnlineOrders() {
         {labels[status]}
       </Badge>;
   };
+
   const getPaymentStatusBadge = (status: Order['payment_status']) => {
     const variants: Record<Order['payment_status'], "default" | "destructive" | "outline" | "secondary"> = {
       pending: "outline",
@@ -166,20 +181,25 @@ export default function OnlineOrders() {
         {labels[status]}
       </Badge>;
   };
+
   const getOrderItemsCount = (order: Order) => {
     return order.items ? order.items.length : 0;
   };
+
   const getPendingOrdersCount = () => {
     return orders.filter(order => order.status === 'pending' || order.status === 'processing').length;
   };
+
   const getUnpaidOrdersCount = () => {
     return orders.filter(order => order.payment_status === 'pending').length;
   };
+
   const filteredOrders = orders.filter(order => {
     if (!searchQuery) return true;
     const searchLower = searchQuery.toLowerCase();
     return order.id.toLowerCase().includes(searchLower) || order.customer_name && order.customer_name.toLowerCase().includes(searchLower) || order.customer_phone && order.customer_phone.toLowerCase().includes(searchLower);
   });
+
   const showCustomerProfile = (order: Order) => {
     setSelectedCustomer({
       name: order.customer_name,
@@ -189,6 +209,7 @@ export default function OnlineOrders() {
       order: order
     });
   };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('ar-EG', {
@@ -199,15 +220,19 @@ export default function OnlineOrders() {
       minute: '2-digit'
     }).format(date);
   };
+
   const downloadOrders = () => {
     toast.info("جاري تحميل الطلبات...");
   };
+
   const createNewOrder = () => {
     toast.info("إنشاء طلب جديد");
   };
+
   const handleArchive = (order: Order) => {
     toast.success("تم أرشفة الطلب");
   };
+
   const handleCancel = async (order: Order) => {
     try {
       const {
@@ -223,9 +248,11 @@ export default function OnlineOrders() {
       toast.error("حدث خطأ أثناء إلغاء الطلب");
     }
   };
+
   const handleProcess = (order: Order) => {
     navigate(`/online-orders/${order.id}`);
   };
+
   const handleComplete = async (order: Order) => {
     try {
       const {
@@ -241,6 +268,21 @@ export default function OnlineOrders() {
       toast.error("حدث خطأ أثناء اكتمال الطلب");
     }
   };
+
+  const handlePaymentConfirm = (order: Order) => {
+    setCurrentOrderId(order.id);
+    setPaymentConfirmOpen(true);
+  };
+
+  const handleAssignDelivery = (order: Order) => {
+    setCurrentOrderId(order.id);
+    setAssignDeliveryOpen(true);
+  };
+
+  const handleOrderUpdated = () => {
+    setOrdersRefreshKey(prev => prev + 1);
+  };
+
   return <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
@@ -344,7 +386,14 @@ export default function OnlineOrders() {
                                 {getOrderItemsCount(order)}
                               </TableCell>
                               <TableCell className="text-center" onClick={e => e.stopPropagation()}>
-                                <OrderActionsMenu onArchive={() => handleArchive(order)} onCancel={() => handleCancel(order)} onProcess={() => handleProcess(order)} onComplete={() => handleComplete(order)} />
+                                <OrderActionsMenu 
+                                  onArchive={() => handleArchive(order)} 
+                                  onCancel={() => handleCancel(order)} 
+                                  onProcess={() => handleProcess(order)} 
+                                  onComplete={() => handleComplete(order)}
+                                  onPaymentConfirm={() => handlePaymentConfirm(order)}
+                                  onAssignDelivery={() => handleAssignDelivery(order)}
+                                />
                               </TableCell>
                             </TableRow>)}
                       </TableBody>
@@ -355,11 +404,42 @@ export default function OnlineOrders() {
           </TabsContent>
         </Tabs>
 
-        <OrderDetailsDialog order={selectedOrder} open={!!selectedOrder} onOpenChange={open => !open && setSelectedOrder(null)} onStatusUpdated={fetchOrders} />
+        <OrderDetailsDialog 
+          order={selectedOrder} 
+          open={!!selectedOrder} 
+          onOpenChange={open => !open && setSelectedOrder(null)} 
+          onStatusUpdated={handleOrderUpdated} 
+        />
         
-        <OrderItemsDialog items={selectedItems || []} open={!!selectedItems} onClose={() => setSelectedItems(null)} />
+        <OrderItemsDialog 
+          items={selectedItems || []} 
+          open={!!selectedItems} 
+          onClose={() => setSelectedItems(null)} 
+        />
         
-        <CustomerProfileDialog customer={selectedCustomer} open={!!selectedCustomer} onOpenChange={open => !open && setSelectedCustomer(null)} />
+        <CustomerProfileDialog 
+          customer={selectedCustomer} 
+          open={!!selectedCustomer} 
+          onOpenChange={open => !open && setSelectedCustomer(null)} 
+        />
+
+        {currentOrderId && (
+          <>
+            <PaymentConfirmationDialog
+              open={paymentConfirmOpen}
+              onOpenChange={setPaymentConfirmOpen}
+              orderId={currentOrderId}
+              onConfirm={handleOrderUpdated}
+            />
+            
+            <AssignDeliveryPersonDialog
+              open={assignDeliveryOpen}
+              onOpenChange={setAssignDeliveryOpen}
+              orderId={currentOrderId}
+              onConfirm={handleOrderUpdated}
+            />
+          </>
+        )}
       </div>
     </MainLayout>;
 }
