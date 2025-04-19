@@ -14,17 +14,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RegisterType, fetchCashRecords, getLatestCashBalance } from "@/services/supabase/cashTrackingService";
+import { RegisterType } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Wallet, Plus, Minus } from "lucide-react";
 
+// Define the CashRecord interface here to avoid type conflicts
 interface CashRecord {
   id: string;
   date: string;
   opening_balance: number;
-  closing_balance: number | null;
+  closing_balance: number;
   difference: number | null;
   notes: string | null;
   created_by: string;
@@ -46,12 +47,35 @@ export default function CashTracking() {
   const fetchRecords = async () => {
     try {
       setLoading(true);
-      const data = await fetchCashRecords(RegisterType.STORE);
-      setRecords(data || []);
+      
+      // Fetch cash tracking records
+      const { data: cashData, error: cashError } = await supabase
+        .from('cash_tracking')
+        .select('*')
+        .eq('register_type', RegisterType.STORE)
+        .order('date', { ascending: false });
+      
+      if (cashError) throw cashError;
+      
+      // Cast the data to our locally defined CashRecord type
+      setRecords(cashData as unknown as CashRecord[]);
       
       // Fetch current balance
-      const balance = await getLatestCashBalance(RegisterType.STORE);
-      setCurrentBalance(balance);
+      const { data: balanceData, error: balanceError } = await supabase
+        .from('cash_tracking')
+        .select('closing_balance')
+        .eq('register_type', RegisterType.STORE)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (balanceError) throw balanceError;
+      
+      if (balanceData && balanceData.length > 0) {
+        setCurrentBalance(balanceData[0].closing_balance || 0);
+      } else {
+        setCurrentBalance(0);
+      }
     } catch (error) {
       console.error('Error fetching cash records:', error);
       toast.error("حدث خطأ أثناء تحميل سجلات النقدية");
@@ -69,15 +93,15 @@ export default function CashTracking() {
     try {
       setProcessingTransaction(true);
       
-      // Use the recordCashTransaction function from cashTrackingService
-      const response = await supabase.rpc('add_cash_transaction', {
+      // Use the RPC function
+      const { data, error } = await supabase.rpc('add_cash_transaction', {
         p_amount: parseFloat(amount),
         p_transaction_type: 'deposit',
         p_register_type: RegisterType.STORE,
         p_notes: notes || "إيداع نقدي"
       });
 
-      if (response.error) throw response.error;
+      if (error) throw error;
       
       toast.success("تم إضافة المبلغ بنجاح");
       setIsAddCashOpen(false);
@@ -106,15 +130,15 @@ export default function CashTracking() {
     try {
       setProcessingTransaction(true);
       
-      // Use the supabase RPC function
-      const response = await supabase.rpc('add_cash_transaction', {
+      // Use the RPC function
+      const { data, error } = await supabase.rpc('add_cash_transaction', {
         p_amount: parseFloat(amount),
         p_transaction_type: 'withdrawal',
         p_register_type: RegisterType.STORE,
         p_notes: notes || "سحب نقدي"
       });
 
-      if (response.error) throw response.error;
+      if (error) throw error;
       
       toast.success("تم سحب المبلغ بنجاح");
       setIsWithdrawCashOpen(false);
@@ -202,7 +226,7 @@ export default function CashTracking() {
                       {record.difference && record.difference > 0 ? 'إيداع' : 'سحب'}
                     </TableCell>
                     <TableCell>{record.opening_balance.toFixed(2)}</TableCell>
-                    <TableCell>{record.closing_balance ? record.closing_balance.toFixed(2) : '-'}</TableCell>
+                    <TableCell>{record.closing_balance.toFixed(2)}</TableCell>
                     <TableCell className={record.difference && record.difference > 0 ? 'text-green-600' : 'text-red-500'}>
                       {record.difference ? Math.abs(record.difference).toFixed(2) : '-'}
                     </TableCell>

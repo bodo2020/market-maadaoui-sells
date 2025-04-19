@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export enum RegisterType {
@@ -6,11 +5,11 @@ export enum RegisterType {
   ONLINE = 'online'
 }
 
-interface CashRecord {
+export interface CashRecord {
   id: string;
   date: string;
   opening_balance: number;
-  closing_balance?: number;
+  closing_balance: number;
   difference?: number;
   notes?: string;
   created_by?: string;
@@ -20,7 +19,7 @@ interface CashRecord {
   register_type: RegisterType;
 }
 
-interface TransferRecord {
+export interface TransferRecord {
   id: string;
   date: string;
   amount: number;
@@ -31,7 +30,7 @@ interface TransferRecord {
   created_at?: string;
 }
 
-interface CashTransaction {
+export interface CashTransaction {
   id: string;
   transaction_date: string;
   amount: number;
@@ -107,58 +106,17 @@ export async function recordCashTransaction(
   userId: string
 ) {
   try {
-    // Get current balance
-    const currentBalance = await getLatestCashBalance(registerType);
-    
-    // Calculate new balance
-    const newBalance = transactionType === 'deposit' 
-      ? currentBalance + amount 
-      : currentBalance - amount;
-    
-    // Check if enough funds for withdrawal
-    if (transactionType === 'withdrawal' && newBalance < 0) {
-      throw new Error('لا يوجد رصيد كافي في الخزنة');
-    }
-    
-    // Create transaction record in cash_transactions
-    const { error: transactionError } = await supabase
-      .from('cash_transactions')
-      .insert([{
-        transaction_date: new Date().toISOString(),
-        amount,
-        balance_after: newBalance,
-        transaction_type: transactionType,
-        register_type: registerType,
-        notes,
-        created_by: userId
-      }]);
+    // Use the RPC function for handling cash transactions
+    const { data, error } = await supabase.rpc('add_cash_transaction', {
+      p_amount: amount,
+      p_transaction_type: transactionType,
+      p_register_type: registerType,
+      p_notes: notes
+    });
       
-    if (transactionError) throw transactionError;
+    if (error) throw error;
     
-    // Update cash tracking with RLS bypass using service_role if available
-    // The issue is here - we need to modify this to work with the RLS policy
-    const cashTrackingInsert = {
-      date: new Date().toISOString().split('T')[0],
-      opening_balance: currentBalance,
-      closing_balance: newBalance,
-      difference: transactionType === 'deposit' ? amount : -amount,
-      notes: `${transactionType === 'deposit' ? 'إيداع' : 'سحب'} نقدي: ${notes}`,
-      created_by: userId,
-      register_type: registerType
-    };
-    
-    const { error: cashTrackingError } = await supabase
-      .from('cash_tracking')
-      .insert([cashTrackingInsert]);
-      
-    if (cashTrackingError) {
-      console.error("Cash tracking error:", cashTrackingError);
-      // If there's an error with the cash_tracking table, but the transaction was recorded successfully,
-      // we'll return the new balance but log the error
-      return newBalance;
-    }
-    
-    return newBalance;
+    return data;
   } catch (error) {
     console.error(`Error during ${transactionType}:`, error);
     throw error;

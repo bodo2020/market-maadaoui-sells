@@ -384,22 +384,22 @@ export default function POS() {
   const recordSaleToCashRegister = async (amount: number, paymentMethod: string) => {
     if (paymentMethod !== 'cash' && paymentMethod !== 'mixed') return;
     
-    const cashAmount = paymentMethod === 'cash' 
+    const cashAmountToRecord = paymentMethod === 'cash' 
       ? amount 
       : parseFloat(cashAmount || "0");
       
-    if (cashAmount <= 0) return;
+    if (cashAmountToRecord <= 0) return;
     
     try {
-      const response = await supabase.rpc('add_cash_transaction', {
-        p_amount: cashAmount,
+      const { data, error } = await supabase.rpc('add_cash_transaction', {
+        p_amount: cashAmountToRecord,
         p_transaction_type: 'deposit',
         p_register_type: RegisterType.STORE,
         p_notes: 'مبيعات نقطة البيع'
       });
       
-      if (response.error) throw response.error;
-      console.log('Sale recorded to cash register:', response.data);
+      if (error) throw error;
+      console.log('Sale recorded to cash register:', data);
     } catch (error) {
       console.error('Error recording sale to cash register:', error);
     }
