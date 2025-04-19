@@ -227,4 +227,6 @@ export interface Order {
   customer_email?: string;
   customer_phone?: string;
   notes?: string;
+  tracking_number?: string | null;
+  delivery_person?: string | null;
 }

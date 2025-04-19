@@ -21,7 +21,10 @@ export function PaymentConfirmationDialog({
     try {
       const { error } = await supabase
         .from('online_orders')
-        .update({ payment_status: 'paid' })
+        .update({
+          payment_status: 'paid',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', orderId);
 
       if (error) throw error;

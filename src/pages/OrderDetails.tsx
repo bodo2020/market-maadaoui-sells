@@ -11,9 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Pencil, Mail, Phone, MapPin } from "lucide-react";
+import { Pencil, Mail, Phone, MapPin, Bike } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -21,8 +22,9 @@ export default function OrderDetails() {
   const [order, setOrder] = useState<Order | null>(null);
   const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
+  const [assignDeliveryOpen, setAssignDeliveryOpen] = useState(false);
   const [isUpdatingShipping, setIsUpdatingShipping] = useState(false);
-  const [shippingStatus, setShippingStatus] = useState<'pending' | 'shipped' | 'delivered'>('pending');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchOrder();
@@ -30,12 +32,13 @@ export default function OrderDetails() {
 
   const fetchOrder = async () => {
     try {
+      setIsLoading(true);
       // Get order data with customer details if available
       const { data, error } = await supabase
         .from('online_orders')
         .select(`
           *,
-          customers:customer_id (
+          customers(
             name,
             email,
             phone
@@ -66,20 +69,33 @@ export default function OrderDetails() {
         // Transform items from Json to OrderItem[]
         const transformItems = (items: any): OrderItem[] => {
           if (!Array.isArray(items)) {
-            return [];
+            try {
+              // If it's a JSON string, parse it
+              if (typeof items === 'string') {
+                items = JSON.parse(items);
+              }
+              
+              // If it's an object but not an array, wrap it in an array
+              if (!Array.isArray(items)) {
+                items = [items];
+              }
+            } catch (e) {
+              console.error("Error parsing items:", e);
+              return [];
+            }
           }
           
-          return items.map(item => ({
+          return items.map((item: any) => ({
             product_id: item.product_id || '',
             product_name: item.product_name || '',
             quantity: item.quantity || 0,
             price: item.price || 0,
-            total: item.total || 0,
-            image_url: item.image_url
+            total: item.total || (item.price * item.quantity) || 0,
+            image_url: item.image_url || null
           }));
         };
         
-        // Get customer information
+        // Get customer information from customer table
         const customerName = data.customers?.name || 'غير معروف';
         const customerEmail = data.customers?.email || '';
         const customerPhone = data.customers?.phone || '';
@@ -97,11 +113,15 @@ export default function OrderDetails() {
           customer_email: customerEmail,
           customer_phone: customerPhone,
           notes: data.notes || '',
+          tracking_number: data.tracking_number || null,
+          delivery_person: data.delivery_person || null
         });
       }
     } catch (error) {
       console.error('Error fetching order:', error);
       toast.error("حدث خطأ أثناء تحميل الطلب");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -113,12 +133,14 @@ export default function OrderDetails() {
       
       const { error } = await supabase
         .from('online_orders')
-        .update({ status })
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', order.id);
       
       if (error) throw error;
       
-      setShippingStatus(status);
       toast.success(`تم تحديث حالة الشحن إلى ${status === 'shipped' ? 'خرج للتوصيل' : 'تم التوصيل'}`);
       fetchOrder();
     } catch (error) {
@@ -129,11 +151,25 @@ export default function OrderDetails() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="container mx-auto p-6">
+          <div className="flex justify-center items-center h-[70vh]">
+            جاري التحميل...
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   if (!order) {
     return (
       <MainLayout>
         <div className="container mx-auto p-6">
-          جاري التحميل...
+          <div className="flex justify-center items-center h-[70vh]">
+            لم يتم العثور على الطلب
+          </div>
         </div>
       </MainLayout>
     );
@@ -153,7 +189,7 @@ export default function OrderDetails() {
     <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">تجهيز المنتجات #{order.id.slice(0, 8)}</h1>
+          <h1 className="text-2xl font-bold">تجهيز الطلب #{order.id.slice(0, 8)}</h1>
           <Button variant="outline" onClick={() => navigate('/online-orders')}>
             عودة
           </Button>
@@ -174,27 +210,39 @@ export default function OrderDetails() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {order.items.map((item: OrderItem, index: number) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-3">
-                            {item.image_url && (
-                              <div className="w-10 h-10 rounded-md overflow-hidden">
-                                <img 
-                                  src={item.image_url} 
-                                  alt={item.product_name} 
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            <span>{item.product_name}</span>
-                          </div>
+                    {order.items.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-4">
+                          لا توجد منتجات في هذا الطلب
                         </TableCell>
-                        <TableCell className="text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-center">{item.price} ج.م</TableCell>
-                        <TableCell className="text-center">{item.total || (item.price * item.quantity)} ج.م</TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      order.items.map((item: OrderItem, index: number) => (
+                        <TableRow key={index}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-3">
+                              {item.image_url ? (
+                                <div className="w-12 h-12 rounded-md overflow-hidden">
+                                  <img 
+                                    src={item.image_url} 
+                                    alt={item.product_name} 
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="w-12 h-12 rounded-md bg-gray-200 flex items-center justify-center">
+                                  <span className="text-gray-500 text-xs">بدون صورة</span>
+                                </div>
+                              )}
+                              <span>{item.product_name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">{item.quantity}</TableCell>
+                          <TableCell className="text-center">{item.price} ج.م</TableCell>
+                          <TableCell className="text-center">{item.total || (item.price * item.quantity)} ج.م</TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </ScrollArea>
@@ -207,7 +255,7 @@ export default function OrderDetails() {
                   className="w-full" 
                   onClick={() => setUpdateStatusOpen(true)}
                 >
-                  تجهيز المنتجات
+                  تحديث حالة الطلب
                 </Button>
               </div>
               
@@ -218,7 +266,7 @@ export default function OrderDetails() {
                     className="w-full"
                     onClick={() => setPaymentConfirmOpen(true)}
                   >
-                    بانتظار الدفع
+                    بانتظار الدفع - اضغط لتأكيد الدفع
                   </Button>
                 ) : (
                   <Badge 
@@ -252,6 +300,26 @@ export default function OrderDetails() {
                 </div>
               </div>
 
+              <div className="mt-6 space-y-3">
+                <h3 className="font-medium text-lg">تعيين مندوب توصيل</h3>
+                <Button 
+                  variant="outline"
+                  className="w-full flex gap-2 items-center"
+                  onClick={() => setAssignDeliveryOpen(true)}
+                >
+                  <Bike className="w-4 h-4" />
+                  {order.delivery_person ? 'تغيير مندوب التوصيل' : 'تعيين مندوب التوصيل'}
+                </Button>
+                {order.delivery_person && (
+                  <div className="p-2 bg-muted rounded-md mt-2">
+                    <p className="text-sm">المندوب: {order.delivery_person}</p>
+                    {order.tracking_number && (
+                      <p className="text-sm">رقم التتبع: {order.tracking_number}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="mt-4">
                 <div className="space-y-1">
                   <div className="flex justify-between">
@@ -277,11 +345,11 @@ export default function OrderDetails() {
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>المدفوع:</span>
-                    <span>0 ج.م</span>
+                    <span>{order.payment_status === 'paid' ? order.total : 0} ج.م</span>
                   </div>
                   <div className="flex justify-between font-bold">
                     <span>المتبقي:</span>
-                    <span>{order.total} ج.م</span>
+                    <span>{order.payment_status === 'paid' ? 0 : order.total} ج.م</span>
                   </div>
                 </div>
               </div>
@@ -315,7 +383,7 @@ export default function OrderDetails() {
                   </div>
                   <div>
                     <h4 className="font-medium text-primary">{order.customer_name}</h4>
-                    <p className="text-sm text-muted-foreground">لا طلبات</p>
+                    <p className="text-sm text-muted-foreground">عميل</p>
                   </div>
                 </div>
               </CardContent>
@@ -380,6 +448,13 @@ export default function OrderDetails() {
         <PaymentConfirmationDialog
           open={paymentConfirmOpen}
           onOpenChange={setPaymentConfirmOpen}
+          orderId={order.id}
+          onConfirm={fetchOrder}
+        />
+
+        <AssignDeliveryPersonDialog
+          open={assignDeliveryOpen}
+          onOpenChange={setAssignDeliveryOpen}
           orderId={order.id}
           onConfirm={fetchOrder}
         />

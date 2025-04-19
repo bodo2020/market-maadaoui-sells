@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -26,9 +26,11 @@ export function UpdateOrderStatusDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset status when order changes
-  if (order && status !== order.status) {
-    setStatus(order.status);
-  }
+  useEffect(() => {
+    if (order) {
+      setStatus(order.status);
+    }
+  }, [order]);
 
   const updateOrderStatus = async () => {
     if (!order) return;
@@ -38,7 +40,10 @@ export function UpdateOrderStatusDialog({
       
       const { error } = await supabase
         .from('online_orders')
-        .update({ status })
+        .update({ 
+          status,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', order.id);
       
       if (error) throw error;
@@ -100,7 +105,7 @@ export function UpdateOrderStatusDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">تجهيز المنتجات</DialogTitle>
+          <DialogTitle className="text-xl font-bold">تحديث حالة الطلب</DialogTitle>
         </DialogHeader>
         
         {order && (
@@ -118,7 +123,7 @@ export function UpdateOrderStatusDialog({
               {statusOptions.map((item) => (
                 <div 
                   key={item.value}
-                  className={`flex items-center space-x-2 space-x-reverse rounded-lg border-2 p-3 transition-colors ${getStatusClass(item.value)}`}
+                  className={`flex items-center space-x-2 space-x-reverse rounded-lg border-2 p-3 transition-colors ${getStatusClass(item.value)} ${status === item.value ? 'border-primary' : ''}`}
                 >
                   <RadioGroupItem value={item.value} id={item.value} />
                   <Label 
