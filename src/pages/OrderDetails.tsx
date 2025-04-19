@@ -1,3 +1,4 @@
+
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
@@ -45,8 +46,8 @@ export default function OrderDetails() {
       if (error) throw error;
       if (data) {
         const validateOrderStatus = (status: string): Order['status'] => {
-          const validStatuses: Order['status'][] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
-          return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
+          const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
+          return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
         };
         const validatePaymentStatus = (status: string): Order['payment_status'] => {
           const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
@@ -102,7 +103,7 @@ export default function OrderDetails() {
       setIsLoading(false);
     }
   };
-  const updateShippingStatus = async (status: 'shipped' | 'delivered') => {
+  const updateShippingStatus = async (status: 'shipped' | 'done') => {
     if (!order) return;
     try {
       setIsUpdatingShipping(true);
@@ -219,7 +220,7 @@ export default function OrderDetails() {
                   تم تأكيد الدفع
                 </Badge>}
               <div className="flex justify-between items-center">
-                <Button variant={order.status === 'processing' ? 'default' : 'outline'} className="w-full" onClick={() => setUpdateStatusOpen(true)}>
+                <Button variant={order.status === 'ready' ? 'default' : 'outline'} className="w-full" onClick={() => setUpdateStatusOpen(true)}>
                   تحديث حالة الطلب
                 </Button>
               </div>
