@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OrderActionsMenu } from "@/components/orders/OrderActionsMenu";
 import { OrderItemsDialog } from "@/components/orders/OrderItemsDialog";
+import { useNavigate } from "react-router-dom";
 
 type OrderFromDB = {
   id: string;
@@ -45,6 +46,7 @@ export default function OnlineOrders() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const { markOrdersAsRead } = useNotificationStore();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchOrders();
@@ -276,7 +278,7 @@ export default function OnlineOrders() {
   };
 
   const handleProcess = (order: Order) => {
-    setSelectedOrder(order);
+    navigate(`/online-orders/${order.id}`);
   };
 
   const handleComplete = async (order: Order) => {
@@ -326,7 +328,7 @@ export default function OnlineOrders() {
             <TabsTrigger value="processing" className="font-semibold">قيد المعالجة</TabsTrigger>
             <TabsTrigger value="shipped" className="font-semibold">تم الشحن</TabsTrigger>
             <TabsTrigger value="delivered" className="font-semibold">تم التسليم</TabsTrigger>
-            <TabsTrigger value="cancelled" className="font-semibold">ملغي</TabsTrigger>
+            <TabsTrigger value="cancelled" className="font-semibold">��لغي</TabsTrigger>
             <TabsTrigger value="unpaid" className="relative font-semibold">
               غير مدفوع
               <Badge className="mr-2 bg-primary">{getUnpaidOrdersCount()}</Badge>
@@ -382,7 +384,11 @@ export default function OnlineOrders() {
                           </TableRow>
                         ) : (
                           filteredOrders.map((order, index) => (
-                            <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedOrder(order)}>
+                            <TableRow 
+                              key={order.id} 
+                              className="cursor-pointer hover:bg-muted/50" 
+                              onClick={() => navigate(`/online-orders/${order.id}`)}
+                            >
                               <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                                 <Checkbox />
                               </TableCell>

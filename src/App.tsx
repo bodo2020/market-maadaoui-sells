@@ -32,6 +32,7 @@ import CategoriesPage from "./pages/CategoriesPage";
 import AddBanner from "./pages/AddBanner";
 import CompanyDetails from "./pages/CompanyDetails";
 import DeliveryLocations from "./pages/DeliveryLocations";
+import OrderDetails from "./pages/OrderDetails";
 
 const queryClient = new QueryClient();
 
@@ -175,6 +176,12 @@ function App() {
               <Route path="/online-orders" element={
                 <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
                   <OnlineOrders />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/online-orders/:id" element={
+                <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+                  <OrderDetails />
                 </ProtectedRoute>
               } />
               
