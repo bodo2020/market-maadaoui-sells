@@ -17,11 +17,12 @@ import {
   deleteDeliveryLocation
 } from "@/services/supabase/deliveryService";
 import DeliveryLocationDialog from "./DeliveryLocationDialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 export default function HierarchicalLocations() {
-  const [governorates, setGovernorates] = useState<{ governorate: string }[]>([]);
-  const [citiesByGovernorate, setCitiesByGovernorate] = useState<{ [key: string]: { city: string }[] }>({});
-  const [areasByCity, setAreasByCity] = useState<{ [key: string]: { area: string }[] }>({});
+  const [governorates, setGovernorates] = useState<{ id: string; governorate: string }[]>([]);
+  const [citiesByGovernorate, setCitiesByGovernorate] = useState<{ [key: string]: { id: string; city: string }[] }>({});
+  const [areasByCity, setAreasByCity] = useState<{ [key: string]: { id: string; area: string }[] }>({});
   const [neighborhoodsByArea, setNeighborhoodsByArea] = useState<{ [key: string]: { id: string; neighborhood: string, price: number, estimated_time?: string }[] }>({});
   
   const [showDialog, setShowDialog] = useState(false);
@@ -126,7 +127,7 @@ export default function HierarchicalLocations() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" dir="rtl">
       <div className="flex justify-end mb-4">
         <Button onClick={() => handleAddClick('governorate')}>
           <Plus className="ml-2 h-4 w-4" />
@@ -135,8 +136,8 @@ export default function HierarchicalLocations() {
       </div>
       
       <Accordion type="multiple" className="w-full">
-        {governorates.map(({ governorate }) => (
-          <AccordionItem key={governorate} value={governorate}>
+        {governorates.map(({ id, governorate }) => (
+          <AccordionItem key={id} value={governorate}>
             <AccordionTrigger
               onClick={() => {
                 if (!citiesByGovernorate[governorate]) {
@@ -146,6 +147,7 @@ export default function HierarchicalLocations() {
               className="text-right"
             >
               <div className="flex items-center justify-between w-full">
+                <span>{governorate}</span>
                 <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
@@ -158,27 +160,44 @@ export default function HierarchicalLocations() {
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-red-500"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Need to get the ID for the governorate to delete it
-                      // For now, we'll reload all governorates after this operation
-                      handleDelete(governorate, 'governorate');
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-500"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          هل أنت متأكد من حذف المحافظة "{governorate}"؟
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={() => handleDelete(id, 'governorate')}
+                          className="bg-red-500 hover:bg-red-600"
+                        >
+                          حذف
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
-                <span>{governorate}</span>
               </div>
             </AccordionTrigger>
             <AccordionContent>
               <div className="pr-4 space-y-2">
-                {citiesByGovernorate[governorate]?.map(({ city }) => (
-                  <AccordionItem key={city} value={`${governorate}-${city}`}>
+                {citiesByGovernorate[governorate]?.map(({ id: cityId, city }) => (
+                  <AccordionItem key={cityId} value={`${governorate}-${city}`}>
                     <AccordionTrigger
                       onClick={() => {
                         if (!areasByCity[`${governorate}-${city}`]) {
@@ -188,6 +207,7 @@ export default function HierarchicalLocations() {
                       className="text-right"
                     >
                       <div className="flex items-center justify-between w-full">
+                        <span>{city}</span>
                         <div className="flex items-center gap-2">
                           <Button
                             variant="ghost"
@@ -200,26 +220,44 @@ export default function HierarchicalLocations() {
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-500"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // For cities, we'll reload the cities for this governorate
-                              handleDelete(city, 'city', { governorate });
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-500"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  هل أنت متأكد من حذف المدينة "{city}"؟
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => handleDelete(cityId, 'city', { governorate })}
+                                  className="bg-red-500 hover:bg-red-600"
+                                >
+                                  حذف
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
-                        <span>{city}</span>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="pr-4 space-y-2">
-                        {areasByCity[`${governorate}-${city}`]?.map(({ area }) => (
-                          <AccordionItem key={area} value={`${governorate}-${city}-${area}`}>
+                        {areasByCity[`${governorate}-${city}`]?.map(({ id: areaId, area }) => (
+                          <AccordionItem key={areaId} value={`${governorate}-${city}-${area}`}>
                             <AccordionTrigger
                               onClick={() => {
                                 if (!neighborhoodsByArea[`${governorate}-${city}-${area}`]) {
@@ -229,6 +267,7 @@ export default function HierarchicalLocations() {
                               className="text-right"
                             >
                               <div className="flex items-center justify-between w-full">
+                                <span>{area}</span>
                                 <div className="flex items-center gap-2">
                                   <Button
                                     variant="ghost"
@@ -241,20 +280,38 @@ export default function HierarchicalLocations() {
                                   >
                                     <Plus className="h-4 w-4" />
                                   </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-red-500"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      // For areas, we'll reload the areas for this city
-                                      handleDelete(area, 'area', { governorate, city });
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-red-500"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          هل أنت متأكد من حذف المنطقة "{area}"؟
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction 
+                                          onClick={() => handleDelete(areaId, 'area', { governorate, city })}
+                                          className="bg-red-500 hover:bg-red-600"
+                                        >
+                                          حذف
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
                                 </div>
-                                <span>{area}</span>
                               </div>
                             </AccordionTrigger>
                             <AccordionContent>
@@ -264,16 +321,6 @@ export default function HierarchicalLocations() {
                                     key={neighborhood.id}
                                     className="flex items-center justify-between p-2 border rounded-lg"
                                   >
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-red-500"
-                                        onClick={() => handleDelete(neighborhood.id, 'neighborhood', { governorate, city, area })}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
                                     <div className="text-right">
                                       <div className="font-medium">{neighborhood.neighborhood}</div>
                                       <div className="text-sm text-muted-foreground">
@@ -285,6 +332,34 @@ export default function HierarchicalLocations() {
                                         </div>
                                       )}
                                     </div>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-8 w-8 text-red-500"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            هل أنت متأكد من حذف الحي "{neighborhood.neighborhood}"؟
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                                          <AlertDialogAction 
+                                            onClick={() => handleDelete(neighborhood.id, 'neighborhood', { governorate, city, area })}
+                                            className="bg-red-500 hover:bg-red-600"
+                                          >
+                                            حذف
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
                                   </div>
                                 ))}
                               </div>

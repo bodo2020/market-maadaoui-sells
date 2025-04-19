@@ -35,20 +35,20 @@ export async function createShippingProvider(data: Omit<ShippingProvider, 'id' |
 export async function fetchGovernorates() {
   const { data, error } = await supabase
     .from('delivery_locations')
-    .select('governorate')
+    .select('id, governorate')
     .is('city', null)
     .is('area', null)
     .is('neighborhood', null)
     .order('governorate');
     
   if (error) throw error;
-  return data as { governorate: string }[];
+  return data as { id: string, governorate: string }[];
 }
 
 export async function fetchCities(governorate: string) {
   const { data, error } = await supabase
     .from('delivery_locations')
-    .select('city')
+    .select('id, city')
     .eq('governorate', governorate)
     .is('area', null)
     .is('neighborhood', null)
@@ -56,13 +56,13 @@ export async function fetchCities(governorate: string) {
     .order('city');
     
   if (error) throw error;
-  return data as { city: string }[];
+  return data as { id: string, city: string }[];
 }
 
 export async function fetchAreas(governorate: string, city: string) {
   const { data, error } = await supabase
     .from('delivery_locations')
-    .select('area')
+    .select('id, area')
     .eq('governorate', governorate)
     .eq('city', city)
     .is('neighborhood', null)
@@ -70,7 +70,7 @@ export async function fetchAreas(governorate: string, city: string) {
     .order('area');
     
   if (error) throw error;
-  return data as { area: string }[];
+  return data as { id: string, area: string }[];
 }
 
 export async function fetchNeighborhoods(governorate: string, city: string, area: string) {

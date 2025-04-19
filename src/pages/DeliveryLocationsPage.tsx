@@ -18,7 +18,7 @@ export default function DeliveryLocationsPage() {
 
   return (
     <MainLayout>
-      <div className="container py-6">
+      <div className="container py-6" dir="rtl">
         <h1 className="text-2xl font-bold mb-6">إدارة مناطق التوصيل</h1>
         
         <div className="mb-6">
@@ -26,12 +26,12 @@ export default function DeliveryLocationsPage() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center">
-                  <MapPin className="mr-2 h-5 w-5 text-primary" />
+                  <MapPin className="ml-2 h-5 w-5 text-primary" />
                   <h2 className="text-lg font-semibold">المحافظات والمناطق</h2>
                 </div>
                 
                 <Button onClick={handleAddLocation}>
-                  <Plus className="mr-2 h-4 w-4" />
+                  <Plus className="ml-2 h-4 w-4" />
                   إضافة محافظة
                 </Button>
               </div>
