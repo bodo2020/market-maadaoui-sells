@@ -7,6 +7,7 @@ import { OrderItemsList } from "@/components/orders/OrderItemsList";
 import { CustomerInfoCards } from "@/components/orders/CustomerInfoCards";
 import { OrderStatusSelection } from "@/components/orders/OrderStatusSelection";
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
+import { PaymentStatusBadge } from "@/components/orders/PaymentStatusBadge";
 import { useOrderDetails } from "@/hooks/orders/useOrderDetails";
 import { useState } from "react";
 
@@ -63,7 +64,10 @@ export default function OrderDetails() {
       <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold">تجهيز الطلب #{order?.id.slice(0, 8)}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">تجهيز الطلب #{order?.id.slice(0, 8)}</h1>
+              {order && <PaymentStatusBadge status={order.payment_status} />}
+            </div>
             <OrderStatusSelection
               selectedStatus={selectedStatus}
               onStatusSelect={setSelectedStatus}
