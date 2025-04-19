@@ -1,12 +1,18 @@
+
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotificationStore } from "@/stores/notificationStore";
-import { BarChart4, Store, ShoppingCart, PackageOpen, Users, Settings, LogOut, FileText, Receipt, Home, UserPlus, Banknote, Truck, CircleDollarSign, Building2, ImageIcon, ShoppingBag, FolderOpen, MapPin } from "lucide-react";
+import { 
+  BarChart4, Store, ShoppingCart, PackageOpen, Users, Settings, LogOut, FileText, 
+  Receipt, Home, UserPlus, Banknote, Truck, CircleDollarSign, Building2, ImageIcon, 
+  ShoppingBag, FolderOpen, MapPin, TrendingUp 
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SidebarLogo } from "./sidebar/SidebarLogo";
 import { SidebarItem } from "./sidebar/SidebarItem";
 import { Button } from "@/components/ui/button";
+
 export default function Sidebar() {
   const {
     user,
@@ -20,21 +26,27 @@ export default function Sidebar() {
     unreadOrders,
     markOrdersAsRead
   } = useNotificationStore();
+  
   useEffect(() => {
     if (currentPath === "/online-orders") {
       markOrdersAsRead();
     }
   }, [currentPath, markOrdersAsRead]);
+  
   const isAdmin = user?.role === 'admin';
   const isCashier = user?.role === 'cashier';
+  
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+  
   const toggleSidebar = () => {
     setCollapsed(!collapsed);
   };
-  return <div className={cn("border-l bg-white h-screen overflow-y-auto flex flex-col transition-all duration-300", collapsed ? "w-20" : "w-64")}>
+  
+  return (
+    <div className={cn("border-l bg-white h-screen overflow-y-auto flex flex-col transition-all duration-300", collapsed ? "w-20" : "w-64")}>
       <SidebarLogo collapsed={collapsed} toggleSidebar={toggleSidebar} />
       
       <div className="flex-1 space-y-1 px-0">
@@ -43,6 +55,15 @@ export default function Sidebar() {
         <SidebarItem icon={ShoppingCart} label="نقطة البيع" href="/pos" active={currentPath === "/pos"} collapsed={collapsed} />
         
         <SidebarItem icon={FolderOpen} label="الاقسام" href="/categories" active={currentPath.startsWith("/categories")} collapsed={collapsed} />
+        
+        {/* New Sales Dashboard Item at the top */}
+        <SidebarItem 
+          icon={TrendingUp} 
+          label="لوحة المبيعات والخزينة" 
+          href="/sales-dashboard" 
+          active={currentPath === "/sales-dashboard"} 
+          collapsed={collapsed} 
+        />
         
         {isAdmin && <>
             <SidebarItem icon={CircleDollarSign} label="متابعة النقدية" href="/cash-tracking" active={currentPath === "/cash-tracking"} collapsed={collapsed} />
@@ -79,5 +100,6 @@ export default function Sidebar() {
         <LogOut size={20} />
         {!collapsed && <span>تسجيل الخروج</span>}
       </Button>
-    </div>;
+    </div>
+  );
 }

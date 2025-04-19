@@ -17,10 +17,10 @@ export function SidebarLogo({ collapsed, toggleSidebar }: SidebarLogoProps) {
             <img 
               src={siteConfig.logoUrl} 
               alt={siteConfig.name} 
-              className="h-8 object-contain"
+              className="h-12 object-contain" // Increased height from 8 to 12
             />
           ) : (
-            <h1 className="text-xl font-bold text-primary">{siteConfig.name}</h1>
+            <h1 className="text-2xl font-bold text-primary">{siteConfig.name}</h1> // Increased text size
           )}
         </>
       )}
