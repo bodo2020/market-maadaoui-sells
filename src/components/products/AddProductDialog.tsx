@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,8 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createProduct } from "@/services/supabase/productService";
 import { Textarea } from "@/components/ui/textarea";
+import { useNavigate } from "react-router-dom";
 
-// Product schema for simple product creation
 const productSchema = z.object({
   name: z.string().min(2, { message: "يجب أن يحتوي اسم المنتج على حرفين على الأقل" }),
   description: z.string().optional(),
@@ -74,6 +73,7 @@ export function AddProductDialog({
   onSubsubcategoryChange
 }: AddProductDialogProps) {
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -101,7 +101,6 @@ export function AddProductDialog({
     try {
       setLoading(true);
       
-      // Include all required properties from the Product type
       const productData = {
         name: values.name,
         description: values.description,
@@ -116,11 +115,9 @@ export function AddProductDialog({
         subcategory_id: values.subcategory_id,
         subsubcategory_id: values.subsubcategory_id,
         unit_of_measure: values.unit_of_measure,
-        // Add the missing required properties
         is_offer: false,
         bulk_enabled: false,
         is_bulk: false,
-        // Add optional properties with default values
         offer_price: null,
         bulk_quantity: null,
         bulk_price: null,
