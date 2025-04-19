@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -11,6 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import BarcodeScanner from "@/components/POS/BarcodeScanner";
+import StatusFilter from "@/components/inventory/StatusFilter";
+import { Search, ScanLine } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -22,7 +24,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
@@ -49,6 +50,8 @@ export default function InventoryManagement() {
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [sortField, setSortField] = useState<string>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -209,30 +212,95 @@ export default function InventoryManagement() {
     }
   };
 
+  const handleBarcodeScanned = (barcode: string) => {
+    setSearchQuery(barcode);
+    setIsScannerOpen(false);
+  };
+
+  const getFilteredProducts = () => {
+    let filtered = products.filter(product => 
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (product.barcode && product.barcode.includes(searchQuery))
+    );
+
+    if (selectedCompany) {
+      filtered = filtered.filter(product => product.company_id === selectedCompany);
+    }
+
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(product => {
+        const quantity = product.quantity || 0;
+        switch (statusFilter) {
+          case "available":
+            return quantity > 10;
+          case "low":
+            return quantity > 0 && quantity <= 10;
+          case "out":
+            return quantity === 0;
+          default:
+            return true;
+        }
+      });
+    }
+
+    return filtered;
+  };
+
   return (
     <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
         <h1 className="text-2xl font-bold mb-4">إدارة المخزون</h1>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle>قائمة المنتجات</CardTitle>
             <CardDescription>عرض وتعديل المنتجات في المخزون</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div className="relative">
-                <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="ابحث عن منتج..."
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+            <div className="flex flex-wrap gap-4 mb-6">
+              <div className="flex-1 flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="ابحث بالاسم أو الباركود" 
+                    value={searchQuery} 
+                    onChange={e => setSearchQuery(e.target.value)} 
+                    className="pl-10" 
+                  />
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => setIsScannerOpen(true)}
+                  className="shrink-0"
+                >
+                  <ScanLine className="h-4 w-4" />
+                </Button>
               </div>
-
-              <div className="flex gap-2">
+              
+              <div className="flex gap-2 flex-wrap">
+                <StatusFilter 
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                />
+                
+                <Select 
+                  value={selectedCompany || ""} 
+                  onValueChange={(value) => setSelectedCompany(value === "" ? null : value)}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="الشركة المصنعة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">الكل</SelectItem>
+                    {companies.map((company) => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
                 <Select onValueChange={(value) => setSelectedCategory(value === "all" ? null : value)}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="اختر فئة" />
@@ -288,20 +356,6 @@ export default function InventoryManagement() {
                     ))}
                   </SelectContent>
                 </Select>
-
-                <Select onValueChange={(value) => setSelectedCompany(value === "all" ? null : value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر شركة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">الكل</SelectItem>
-                    {companies.map((company) => (
-                      <SelectItem key={company.id} value={company.id}>
-                        {company.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
@@ -340,58 +394,66 @@ export default function InventoryManagement() {
               </div>
             </div>
 
-            <ScrollArea>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>اسم المنتج</TableHead>
-                    <TableHead>السعر</TableHead>
-                    <TableHead>الكمية</TableHead>
-                    <TableHead>الفئة</TableHead>
-                    <TableHead>تاريخ الإنشاء</TableHead>
-                    <TableHead>تاريخ التعديل</TableHead>
-                    <TableHead className="text-center">الإجراءات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center">
+                  تحميل...
+                </TableCell>
+              </TableRow>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center">
-                        تحميل...
-                      </TableCell>
+                      <TableHead>اسم المنتج</TableHead>
+                      <TableHead>السعر</TableHead>
+                      <TableHead>الكمية</TableHead>
+                      <TableHead>الفئة</TableHead>
+                      <TableHead>تاريخ الإنشاء</TableHead>
+                      <TableHead>تاريخ التعديل</TableHead>
+                      <TableHead className="text-center">الإجراءات</TableHead>
                     </TableRow>
-                  ) : products.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center">
-                        لا توجد منتجات مسجلة.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    products.map((product) => (
-                      <TableRow key={product.id}>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>{product.price}</TableCell>
-                        <TableCell>
-                          {product.quantity !== null && product.quantity !== undefined
-                            ? product.quantity
-                            : "غير محدد"}
-                        </TableCell>
-                        <TableCell>
-                          {categories.find((cat) => cat.id === product.category_id)?.name || "غير مصنف"}
-                        </TableCell>
-                        <TableCell>{formatDate(product.created_at)}</TableCell>
-                        <TableCell>{formatDate(product.updated_at)}</TableCell>
-                        <TableCell className="text-center">
-                          <MoreDropdown product={product} />
+                  </TableHeader>
+                  <TableBody>
+                    {getFilteredProducts().length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          لا توجد منتجات مطابقة للبحث
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+                    ) : (
+                      getFilteredProducts().map((product) => (
+                        <TableRow key={product.id}>
+                          <TableCell className="font-medium">{product.name}</TableCell>
+                          <TableCell>{product.price}</TableCell>
+                          <TableCell>
+                            {product.quantity !== null && product.quantity !== undefined
+                              ? product.quantity
+                              : "غير محدد"}
+                          </TableCell>
+                          <TableCell>
+                            {categories.find((cat) => cat.id === product.category_id)?.name || "غير مصنف"}
+                          </TableCell>
+                          <TableCell>{formatDate(product.created_at)}</TableCell>
+                          <TableCell>{formatDate(product.updated_at)}</TableCell>
+                          <TableCell className="text-center">
+                            <MoreDropdown product={product} />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        <BarcodeScanner 
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScan={handleBarcodeScanned}
+        />
       </div>
     </MainLayout>
   );
