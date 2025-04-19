@@ -104,7 +104,7 @@ export default function SalesDashboard() {
     queryKey: ['cashRecords', RegisterType.STORE, dateRange],
     queryFn: async () => {
       try {
-        const data = await fetchCashRecords(RegisterType.STORE);
+        const data = await fetchCashRecords(RegisterType.STORE, dateRange);
         console.log("Store cash records:", data);
         return data;
       } catch (error) {
@@ -118,7 +118,7 @@ export default function SalesDashboard() {
     queryKey: ['cashRecords', RegisterType.ONLINE, dateRange],
     queryFn: async () => {
       try {
-        const data = await fetchCashRecords(RegisterType.ONLINE);
+        const data = await fetchCashRecords(RegisterType.ONLINE, dateRange);
         console.log("Online cash records:", data);
         return data;
       } catch (error) {
@@ -131,15 +131,14 @@ export default function SalesDashboard() {
   const { data: transfers = [], isLoading: isTransfersLoading, refetch: refetchTransfers } = useQuery({
     queryKey: ['registerTransfers', dateRange],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('register_transfers')
-        .select('*')
-        .gte('date', dateRange.from.toISOString().split('T')[0])
-        .lte('date', dateRange.to.toISOString().split('T')[0])
-        .order('date', { ascending: false });
-        
-      if (error) throw error;
-      return data;
+      try {
+        const data = await fetchTransfers(dateRange);
+        console.log("Register transfers:", data);
+        return data;
+      } catch (error) {
+        console.error("Error fetching register transfers:", error);
+        throw error;
+      }
     }
   });
 

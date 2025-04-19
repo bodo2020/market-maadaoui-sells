@@ -43,7 +43,7 @@ export interface CashTransaction {
   created_at?: string;
 }
 
-export async function fetchCashRecords(registerType?: RegisterType) {
+export async function fetchCashRecords(registerType?: RegisterType, dateRange?: { from: Date, to: Date }) {
   let query = supabase
     .from('cash_tracking')
     .select('*')
@@ -51,6 +51,12 @@ export async function fetchCashRecords(registerType?: RegisterType) {
     
   if (registerType) {
     query = query.eq('register_type', registerType);
+  }
+  
+  if (dateRange?.from && dateRange?.to) {
+    const fromDate = dateRange.from.toISOString().split('T')[0];
+    const toDate = dateRange.to.toISOString().split('T')[0];
+    query = query.gte('date', fromDate).lte('date', toDate);
   }
   
   const { data, error } = await query;
@@ -207,17 +213,25 @@ export async function transferBetweenRegisters(
   return true;
 }
 
-export async function fetchTransfers() {
-  const { data, error } = await supabase
+export async function fetchTransfers(dateRange?: { from: Date, to: Date }) {
+  let query = supabase
     .from('register_transfers')
     .select('*')
     .order('date', { ascending: false });
+    
+  if (dateRange?.from && dateRange?.to) {
+    const fromDate = dateRange.from.toISOString().split('T')[0];
+    const toDate = dateRange.to.toISOString().split('T')[0];
+    query = query.gte('date', fromDate).lte('date', toDate);
+  }
+  
+  const { data, error } = await query;
     
   if (error) throw error;
   return data as TransferRecord[];
 }
 
-export async function fetchCashTransactions(registerType?: RegisterType) {
+export async function fetchCashTransactions(registerType?: RegisterType, dateRange?: { from: Date, to: Date }) {
   let query = supabase
     .from('cash_transactions')
     .select('*')
@@ -225,6 +239,12 @@ export async function fetchCashTransactions(registerType?: RegisterType) {
     
   if (registerType) {
     query = query.eq('register_type', registerType);
+  }
+  
+  if (dateRange?.from && dateRange?.to) {
+    const fromDate = dateRange.from.toISOString();
+    const toDate = dateRange.to.toISOString();
+    query = query.gte('transaction_date', fromDate).lte('transaction_date', toDate);
   }
   
   const { data, error } = await query;
