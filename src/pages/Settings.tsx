@@ -5,6 +5,7 @@ import { Store, Users, PackageOpen, CreditCard, Truck, Receipt, FileText } from 
 import StoreSettings from "@/components/settings/StoreSettings";
 import UsersManagement from "@/components/settings/UsersManagement";
 import ExpenseSettings from "@/components/settings/ExpenseSettings";
+import PaymentSettings from "@/components/settings/PaymentSettings";
 import InvoiceSettings from "@/components/settings/InvoiceSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/types";
@@ -69,9 +70,7 @@ export default function Settings() {
           </TabsContent>
           
           <TabsContent value="payment">
-            <div className="text-center py-12 text-muted-foreground">
-              إعدادات الدفع ستكون متاحة قريباً
-            </div>
+            <PaymentSettings />
           </TabsContent>
           
           <TabsContent value="shipping">

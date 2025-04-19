@@ -1,31 +1,54 @@
 
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import MainLayout from "@/components/layout/MainLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import MainLayout from "@/components/layout/MainLayout";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useQuery } from "@tanstack/react-query";
+import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
+import { Sale, CartItem } from "@/types";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Banknote, TrendingUp, ShoppingCart, ShoppingBag, ArrowDown, ArrowUp, ArrowLeftRight } from "lucide-react";
+import { RegisterType, fetchCashRecords, getLatestCashBalance, transferBetweenRegisters } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
-import { toast } from "sonner";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Sale, CartItem } from "@/types";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Banknote, TrendingUp, ShoppingCart, ShoppingBag, ArrowDown, ArrowUp } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
 
 export default function SalesDashboard() {
+  const { user } = useAuth();
   const [dateRange, setDateRange] = useState({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   });
   const [withdrawalAmount, setWithdrawalAmount] = useState<string>("");
   const [withdrawalNote, setWithdrawalNote] = useState<string>("");
+  const [withdrawalRegister, setWithdrawalRegister] = useState<RegisterType>(RegisterType.STORE);
   const [isWithdrawalDialogOpen, setIsWithdrawalDialogOpen] = useState(false);
+  
+  const [depositAmount, setDepositAmount] = useState<string>("");
+  const [depositNote, setDepositNote] = useState<string>("");
+  const [depositRegister, setDepositRegister] = useState<RegisterType>(RegisterType.STORE);
+  const [isDepositDialogOpen, setIsDepositDialogOpen] = useState(false);
+  
+  const [transferAmount, setTransferAmount] = useState<string>("");
+  const [transferNote, setTransferNote] = useState<string>("");
+  const [fromRegister, setFromRegister] = useState<RegisterType>(RegisterType.STORE);
+  const [toRegister, setToRegister] = useState<RegisterType>(RegisterType.ONLINE);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   
   // Fetch store sales
   const { data: storeSales = [], isLoading: isStoreSalesLoading } = useQuery({
@@ -73,12 +96,46 @@ export default function SalesDashboard() {
     }
   });
   
-  // Fetch cash tracking
-  const { data: cashRecords = [], isLoading: isCashRecordsLoading, refetch: refetchCashRecords } = useQuery({
-    queryKey: ['cashRecords', dateRange],
+  // Fetch cash tracking for store register
+  const { data: storeRecords = [], isLoading: isStoreRecordsLoading, refetch: refetchStoreRecords } = useQuery({
+    queryKey: ['cashRecords', RegisterType.STORE, dateRange],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('cash_tracking')
+        .select('*')
+        .eq('register_type', RegisterType.STORE)
+        .gte('date', dateRange.from.toISOString().split('T')[0])
+        .lte('date', dateRange.to.toISOString().split('T')[0])
+        .order('date', { ascending: false });
+        
+      if (error) throw error;
+      return data;
+    }
+  });
+  
+  // Fetch cash tracking for online register
+  const { data: onlineRecords = [], isLoading: isOnlineRecordsLoading, refetch: refetchOnlineRecords } = useQuery({
+    queryKey: ['cashRecords', RegisterType.ONLINE, dateRange],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cash_tracking')
+        .select('*')
+        .eq('register_type', RegisterType.ONLINE)
+        .gte('date', dateRange.from.toISOString().split('T')[0])
+        .lte('date', dateRange.to.toISOString().split('T')[0])
+        .order('date', { ascending: false });
+        
+      if (error) throw error;
+      return data;
+    }
+  });
+  
+  // Fetch transfers between registers
+  const { data: transfers = [], isLoading: isTransfersLoading, refetch: refetchTransfers } = useQuery({
+    queryKey: ['registerTransfers', dateRange],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('register_transfers')
         .select('*')
         .gte('date', dateRange.from.toISOString().split('T')[0])
         .lte('date', dateRange.to.toISOString().split('T')[0])
@@ -94,9 +151,14 @@ export default function SalesDashboard() {
   const onlineOrdersTotal = onlineOrders.reduce((sum, order) => sum + Number(order.total), 0);
   const totalSales = storeSalesTotal + onlineOrdersTotal;
   
-  // Calculate total cash in hand
-  const latestCashRecord = cashRecords[0];
-  const cashInHand = latestCashRecord ? Number(latestCashRecord.closing_balance) || Number(latestCashRecord.opening_balance) : 0;
+  // Calculate total cash in each register
+  const storeBalance = storeRecords.length > 0 
+    ? Number(storeRecords[0].closing_balance) || Number(storeRecords[0].opening_balance) 
+    : 0;
+    
+  const onlineBalance = onlineRecords.length > 0 
+    ? Number(onlineRecords[0].closing_balance) || Number(onlineRecords[0].opening_balance) 
+    : 0;
   
   // Prepare chart data
   const last7Days = Array.from({ length: 7 }, (_, i) => {
@@ -119,36 +181,124 @@ export default function SalesDashboard() {
       return;
     }
     
-    if (Number(withdrawalAmount) > cashInHand) {
+    const currentBalance = withdrawalRegister === RegisterType.STORE ? storeBalance : onlineBalance;
+    
+    if (Number(withdrawalAmount) > currentBalance) {
       toast.error("المبلغ المطلوب سحبه أكبر من المبلغ المتوفر");
       return;
     }
     
     try {
-      const newBalance = cashInHand - Number(withdrawalAmount);
+      const newBalance = currentBalance - Number(withdrawalAmount);
       
       // Create a new cash tracking record for the withdrawal
       const { error } = await supabase
         .from('cash_tracking')
         .insert([{
           date: new Date().toISOString().split('T')[0],
-          opening_balance: cashInHand,
+          opening_balance: currentBalance,
           closing_balance: newBalance,
           difference: -Number(withdrawalAmount),
           notes: `سحب نقدي: ${withdrawalNote}`,
-          created_by: (await supabase.auth.getUser()).data.user?.id
+          created_by: user?.id,
+          register_type: withdrawalRegister
         }]);
         
       if (error) throw error;
       
-      toast.success(`تم سحب ${withdrawalAmount} بنجاح`);
+      toast.success(`تم سحب ${withdrawalAmount} بنجاح من خزنة ${withdrawalRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
       setWithdrawalAmount("");
       setWithdrawalNote("");
       setIsWithdrawalDialogOpen(false);
-      refetchCashRecords();
+      
+      // Refetch data
+      if (withdrawalRegister === RegisterType.STORE) {
+        refetchStoreRecords();
+      } else {
+        refetchOnlineRecords();
+      }
     } catch (error) {
       console.error("Error processing withdrawal:", error);
       toast.error("حدث خطأ أثناء عملية السحب");
+    }
+  };
+  
+  // Handle cash deposit
+  const handleDeposit = async () => {
+    if (!depositAmount || isNaN(Number(depositAmount)) || Number(depositAmount) <= 0) {
+      toast.error("الرجاء إدخال مبلغ صحيح");
+      return;
+    }
+    
+    try {
+      const currentBalance = depositRegister === RegisterType.STORE ? storeBalance : onlineBalance;
+      const newBalance = currentBalance + Number(depositAmount);
+      
+      // Create a new cash tracking record for the deposit
+      const { error } = await supabase
+        .from('cash_tracking')
+        .insert([{
+          date: new Date().toISOString().split('T')[0],
+          opening_balance: currentBalance,
+          closing_balance: newBalance,
+          difference: Number(depositAmount),
+          notes: `إيداع نقدي: ${depositNote}`,
+          created_by: user?.id,
+          register_type: depositRegister
+        }]);
+        
+      if (error) throw error;
+      
+      toast.success(`تم إيداع ${depositAmount} بنجاح إلى خزنة ${depositRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
+      setDepositAmount("");
+      setDepositNote("");
+      setIsDepositDialogOpen(false);
+      
+      // Refetch data
+      if (depositRegister === RegisterType.STORE) {
+        refetchStoreRecords();
+      } else {
+        refetchOnlineRecords();
+      }
+    } catch (error) {
+      console.error("Error processing deposit:", error);
+      toast.error("حدث خطأ أثناء عملية الإيداع");
+    }
+  };
+  
+  // Handle transfer between registers
+  const handleTransfer = async () => {
+    if (!transferAmount || isNaN(Number(transferAmount)) || Number(transferAmount) <= 0) {
+      toast.error("الرجاء إدخال مبلغ صحيح");
+      return;
+    }
+    
+    if (fromRegister === toRegister) {
+      toast.error("لا يمكن التحويل إلى نفس الخزنة");
+      return;
+    }
+    
+    try {
+      await transferBetweenRegisters(
+        Number(transferAmount),
+        fromRegister,
+        toRegister,
+        transferNote,
+        user?.id || ''
+      );
+      
+      toast.success(`تم تحويل ${transferAmount} بنجاح من خزنة ${fromRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'} إلى خزنة ${toRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
+      setTransferAmount("");
+      setTransferNote("");
+      setIsTransferDialogOpen(false);
+      
+      // Refetch all data
+      refetchStoreRecords();
+      refetchOnlineRecords();
+      refetchTransfers();
+    } catch (error: any) {
+      console.error("Error processing transfer:", error);
+      toast.error(error.message || "حدث خطأ أثناء عملية التحويل");
     }
   };
 
@@ -169,7 +319,7 @@ export default function SalesDashboard() {
         </div>
         
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">إجمالي المبيعات</CardTitle>
@@ -211,21 +361,103 @@ export default function SalesDashboard() {
           
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">النقد في الخزينة</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">عمليات بين الخزنات</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center">
-                <Banknote className="h-5 w-5 text-amber-500 mr-2" />
-                <div className="text-2xl font-bold">{cashInHand.toLocaleString('ar-EG')} ج.م</div>
+                <ArrowLeftRight className="h-5 w-5 text-amber-500 mr-2" />
+                <div className="text-2xl font-bold">{transfers.length}</div>
               </div>
               <div className="mt-2">
-                <Dialog open={isWithdrawalDialogOpen} onOpenChange={setIsWithdrawalDialogOpen}>
+                <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-full">سحب نقدي</Button>
+                    <Button variant="outline" size="sm" className="w-full">تحويل بين الخزنات</Button>
                   </DialogTrigger>
                   <DialogContent className="dir-rtl">
                     <DialogHeader>
-                      <DialogTitle>سحب نقدي من الخزينة</DialogTitle>
+                      <DialogTitle>تحويل مبلغ بين الخزنات</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="fromRegister">من خزنة</Label>
+                        <Select 
+                          value={fromRegister} 
+                          onValueChange={(value) => setFromRegister(value as RegisterType)}
+                        >
+                          <SelectTrigger id="fromRegister">
+                            <SelectValue placeholder="اختر الخزنة" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={RegisterType.STORE}>خزنة المحل ({storeBalance.toLocaleString('ar-EG')} ج.م)</SelectItem>
+                            <SelectItem value={RegisterType.ONLINE}>خزنة الأونلاين ({onlineBalance.toLocaleString('ar-EG')} ج.م)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="toRegister">إلى خزنة</Label>
+                        <Select 
+                          value={toRegister} 
+                          onValueChange={(value) => setToRegister(value as RegisterType)}
+                        >
+                          <SelectTrigger id="toRegister">
+                            <SelectValue placeholder="اختر الخزنة" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={RegisterType.STORE}>خزنة المحل ({storeBalance.toLocaleString('ar-EG')} ج.م)</SelectItem>
+                            <SelectItem value={RegisterType.ONLINE}>خزنة الأونلاين ({onlineBalance.toLocaleString('ar-EG')} ج.م)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="amount">المبلغ</Label>
+                        <Input
+                          id="amount"
+                          type="number"
+                          value={transferAmount}
+                          onChange={(e) => setTransferAmount(e.target.value)}
+                          placeholder="أدخل المبلغ"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="note">ملاحظات</Label>
+                        <Textarea
+                          id="note"
+                          value={transferNote}
+                          onChange={(e) => setTransferNote(e.target.value)}
+                          placeholder="سبب التحويل أو ملاحظات إضافية"
+                        />
+                      </div>
+                      <Button onClick={handleTransfer} className="w-full">تأكيد التحويل</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Cash Register Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex justify-between items-center">
+                <span>خزنة المحل</span>
+                <span className="text-xl">{storeBalance.toLocaleString('ar-EG')} ج.م</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-2">
+                <Dialog open={isWithdrawalDialogOpen && withdrawalRegister === RegisterType.STORE} 
+                        onOpenChange={(open) => {
+                          setIsWithdrawalDialogOpen(open);
+                          if (open) setWithdrawalRegister(RegisterType.STORE);
+                        }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-1">سحب نقدي</Button>
+                  </DialogTrigger>
+                  <DialogContent className="dir-rtl">
+                    <DialogHeader>
+                      <DialogTitle>سحب نقدي من خزنة المحل</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
@@ -248,6 +480,129 @@ export default function SalesDashboard() {
                         />
                       </div>
                       <Button onClick={handleWithdrawal} className="w-full">تأكيد السحب</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                
+                <Dialog open={isDepositDialogOpen && depositRegister === RegisterType.STORE} 
+                        onOpenChange={(open) => {
+                          setIsDepositDialogOpen(open);
+                          if (open) setDepositRegister(RegisterType.STORE);
+                        }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-1">إيداع نقدي</Button>
+                  </DialogTrigger>
+                  <DialogContent className="dir-rtl">
+                    <DialogHeader>
+                      <DialogTitle>إيداع نقدي في خزنة المحل</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="amount">المبلغ</Label>
+                        <Input
+                          id="amount"
+                          type="number"
+                          value={depositAmount}
+                          onChange={(e) => setDepositAmount(e.target.value)}
+                          placeholder="أدخل المبلغ"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="note">ملاحظات</Label>
+                        <Textarea
+                          id="note"
+                          value={depositNote}
+                          onChange={(e) => setDepositNote(e.target.value)}
+                          placeholder="مصدر الإيداع أو ملاحظات إضافية"
+                        />
+                      </div>
+                      <Button onClick={handleDeposit} className="w-full">تأكيد الإيداع</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex justify-between items-center">
+                <span>خزنة الأونلاين</span>
+                <span className="text-xl">{onlineBalance.toLocaleString('ar-EG')} ج.م</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-2">
+                <Dialog open={isWithdrawalDialogOpen && withdrawalRegister === RegisterType.ONLINE} 
+                        onOpenChange={(open) => {
+                          setIsWithdrawalDialogOpen(open);
+                          if (open) setWithdrawalRegister(RegisterType.ONLINE);
+                        }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-1">سحب نقدي</Button>
+                  </DialogTrigger>
+                  <DialogContent className="dir-rtl">
+                    <DialogHeader>
+                      <DialogTitle>سحب نقدي من خزنة الأونلاين</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="amount">المبلغ</Label>
+                        <Input
+                          id="amount"
+                          type="number"
+                          value={withdrawalAmount}
+                          onChange={(e) => setWithdrawalAmount(e.target.value)}
+                          placeholder="أدخل المبلغ"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="note">ملاحظات</Label>
+                        <Textarea
+                          id="note"
+                          value={withdrawalNote}
+                          onChange={(e) => setWithdrawalNote(e.target.value)}
+                          placeholder="سبب السحب أو ملاحظات إضافية"
+                        />
+                      </div>
+                      <Button onClick={handleWithdrawal} className="w-full">تأكيد السحب</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                
+                <Dialog open={isDepositDialogOpen && depositRegister === RegisterType.ONLINE} 
+                        onOpenChange={(open) => {
+                          setIsDepositDialogOpen(open);
+                          if (open) setDepositRegister(RegisterType.ONLINE);
+                        }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-1">إيداع نقدي</Button>
+                  </DialogTrigger>
+                  <DialogContent className="dir-rtl">
+                    <DialogHeader>
+                      <DialogTitle>إيداع نقدي في خزنة الأونلاين</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="amount">المبلغ</Label>
+                        <Input
+                          id="amount"
+                          type="number"
+                          value={depositAmount}
+                          onChange={(e) => setDepositAmount(e.target.value)}
+                          placeholder="أدخل المبلغ"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="note">ملاحظات</Label>
+                        <Textarea
+                          id="note"
+                          value={depositNote}
+                          onChange={(e) => setDepositNote(e.target.value)}
+                          placeholder="مصدر الإيداع أو ملاحظات إضافية"
+                        />
+                      </div>
+                      <Button onClick={handleDeposit} className="w-full">تأكيد الإيداع</Button>
                     </div>
                   </DialogContent>
                 </Dialog>
@@ -287,10 +642,11 @@ export default function SalesDashboard() {
         
         {/* Sales and Cash Tracking Tabs */}
         <Tabs defaultValue="storeSales" className="w-full">
-          <TabsList className="grid grid-cols-3 mb-4">
+          <TabsList className="grid grid-cols-4 mb-4">
             <TabsTrigger value="storeSales">مبيعات المتجر</TabsTrigger>
             <TabsTrigger value="onlineSales">المبيعات عبر الإنترنت</TabsTrigger>
-            <TabsTrigger value="cashTracking">متابعة النقدية</TabsTrigger>
+            <TabsTrigger value="storeRegister">خزنة المحل</TabsTrigger>
+            <TabsTrigger value="onlineRegister">خزنة الأونلاين</TabsTrigger>
           </TabsList>
           
           {/* Store Sales Tab */}
@@ -386,17 +742,17 @@ export default function SalesDashboard() {
             </Card>
           </TabsContent>
           
-          {/* Cash Tracking Tab */}
-          <TabsContent value="cashTracking">
+          {/* Store Register Tab */}
+          <TabsContent value="storeRegister">
             <Card>
               <CardHeader>
-                <CardTitle>متابعة النقدية</CardTitle>
-                <CardDescription>سجل حركات النقدية خلال الفترة المحددة</CardDescription>
+                <CardTitle>خزنة المحل</CardTitle>
+                <CardDescription>سجل حركات النقدية لخزنة المحل خلال الفترة المحددة</CardDescription>
               </CardHeader>
               <CardContent>
-                {isCashRecordsLoading ? (
+                {isStoreRecordsLoading ? (
                   <div className="text-center p-4">جاري التحميل...</div>
-                ) : cashRecords.length === 0 ? (
+                ) : storeRecords.length === 0 ? (
                   <div className="text-center p-4">لا توجد حركات نقدية في هذه الفترة</div>
                 ) : (
                   <Table>
@@ -410,7 +766,58 @@ export default function SalesDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {cashRecords.map((record) => {
+                      {storeRecords.map((record) => {
+                        const difference = record.difference || 0;
+                        return (
+                          <TableRow key={record.id}>
+                            <TableCell>{new Date(record.date).toLocaleDateString('ar-EG')}</TableCell>
+                            <TableCell>{Number(record.opening_balance).toLocaleString('ar-EG')} ج.م</TableCell>
+                            <TableCell>{record.closing_balance ? 
+                              Number(record.closing_balance).toLocaleString('ar-EG') + ' ج.م' : '-'}</TableCell>
+                            <TableCell>
+                              <div className={`flex items-center ${difference > 0 ? 'text-green-600' : difference < 0 ? 'text-red-600' : ''}`}>
+                                {difference !== 0 && (difference > 0 ? 
+                                  <ArrowUp className="w-4 h-4 mr-1" /> : 
+                                  <ArrowDown className="w-4 h-4 mr-1" />)}
+                                {Math.abs(Number(difference)).toLocaleString('ar-EG')} ج.م
+                              </div>
+                            </TableCell>
+                            <TableCell>{record.notes || '-'}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Online Register Tab */}
+          <TabsContent value="onlineRegister">
+            <Card>
+              <CardHeader>
+                <CardTitle>خزنة الأونلاين</CardTitle>
+                <CardDescription>سجل حركات النقدية لخزنة الأونلاين خلال الفترة المحددة</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isOnlineRecordsLoading ? (
+                  <div className="text-center p-4">جاري التحميل...</div>
+                ) : onlineRecords.length === 0 ? (
+                  <div className="text-center p-4">لا توجد حركات نقدية في هذه الفترة</div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>التاريخ</TableHead>
+                        <TableHead>الرصيد الافتتاحي</TableHead>
+                        <TableHead>الرصيد الختامي</TableHead>
+                        <TableHead>الفرق</TableHead>
+                        <TableHead>ملاحظات</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {onlineRecords.map((record) => {
                         const difference = record.difference || 0;
                         return (
                           <TableRow key={record.id}>

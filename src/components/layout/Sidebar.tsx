@@ -56,7 +56,7 @@ export default function Sidebar() {
         
         <SidebarItem icon={FolderOpen} label="الاقسام" href="/categories" active={currentPath.startsWith("/categories")} collapsed={collapsed} />
         
-        {/* New Sales Dashboard Item at the top */}
+        {/* Sales Dashboard Item at the top */}
         <SidebarItem 
           icon={TrendingUp} 
           label="لوحة المبيعات والخزينة" 
@@ -66,8 +66,6 @@ export default function Sidebar() {
         />
         
         {isAdmin && <>
-            <SidebarItem icon={CircleDollarSign} label="متابعة النقدية" href="/cash-tracking" active={currentPath === "/cash-tracking"} collapsed={collapsed} />
-            
             <SidebarItem icon={Building2} label="الشركات" href="/companies" active={currentPath === "/companies"} collapsed={collapsed} />
             
             <SidebarItem icon={ImageIcon} label="البانرات" href="/banners" active={currentPath === "/banners"} collapsed={collapsed} />
