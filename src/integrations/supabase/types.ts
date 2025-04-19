@@ -174,6 +174,42 @@ export type Database = {
           },
         ]
       }
+      cash_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          register_type: string
+          transaction_date: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          register_type: string
+          transaction_date?: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          register_type?: string
+          transaction_date?: string
+          transaction_type?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           address: string | null
@@ -988,6 +1024,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      special_offers: {
+        Row: {
+          active: boolean | null
+          code: string | null
+          created_at: string | null
+          description: string | null
+          discount_type: string | null
+          discount_value: number | null
+          expiry_date: string | null
+          id: string
+          max_discount: number | null
+          min_order_amount: number | null
+          name: string
+          offer_type: string
+          updated_at: string | null
+          usage_limit: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          code?: string | null
+          created_at?: string | null
+          description?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
+          expiry_date?: string | null
+          id?: string
+          max_discount?: number | null
+          min_order_amount?: number | null
+          name: string
+          offer_type: string
+          updated_at?: string | null
+          usage_limit?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          code?: string | null
+          created_at?: string | null
+          description?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
+          expiry_date?: string | null
+          id?: string
+          max_discount?: number | null
+          min_order_amount?: number | null
+          name?: string
+          offer_type?: string
+          updated_at?: string | null
+          usage_limit?: number | null
+        }
+        Relationships: []
       }
       store_settings: {
         Row: {
