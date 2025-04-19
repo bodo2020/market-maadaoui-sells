@@ -122,6 +122,15 @@ export default function OrderDetails() {
       setIsUpdatingShipping(false);
     }
   };
+  const getStatusBadgeColor = (status: Order['status']) => {
+    const colors = {
+      waiting: "bg-amber-100 text-amber-800 hover:bg-amber-200",
+      ready: "bg-green-100 text-green-800 hover:bg-green-200",
+      shipped: "bg-blue-100 text-blue-800 hover:bg-blue-200",
+      done: "bg-gray-100 text-gray-800 hover:bg-gray-200"
+    };
+    return colors[status] || "bg-gray-100 text-gray-800";
+  };
   if (isLoading) {
     return <MainLayout>
         <div className="container mx-auto p-6">
@@ -152,7 +161,15 @@ export default function OrderDetails() {
   return <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">تجهيز الطلب #{order.id.slice(0, 8)}</h1>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold">تجهيز الطلب #{order.id.slice(0, 8)}</h1>
+            <button onClick={() => setUpdateStatusOpen(true)} className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${getStatusBadgeColor(order.status)}`}>
+              {order.status === 'waiting' && 'في الانتظار'}
+              {order.status === 'ready' && 'جاهز للشحن'}
+              {order.status === 'shipped' && 'تم الشحن'}
+              {order.status === 'done' && 'تم التسليم'}
+            </button>
+          </div>
           <Button variant="outline" onClick={() => navigate('/online-orders')}>
             عودة
           </Button>
@@ -196,6 +213,11 @@ export default function OrderDetails() {
             </div>
 
             <div className="space-y-3">
+              {order.payment_status === 'pending' ? <Button variant="outline" className="w-full" onClick={() => setPaymentConfirmOpen(true)}>
+                  تأكيد الدفع
+                </Button> : <Badge variant="default" className="w-full px-4 py-2 text-base flex justify-center items-center">
+                  تم تأكيد الدفع
+                </Badge>}
               <div className="flex justify-between items-center">
                 <Button variant={order.status === 'processing' ? 'default' : 'outline'} className="w-full" onClick={() => setUpdateStatusOpen(true)}>
                   تحديث حالة الطلب
