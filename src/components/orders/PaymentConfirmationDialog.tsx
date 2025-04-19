@@ -16,7 +16,6 @@ export function PaymentConfirmationDialog({
   orderId,
   onConfirm
 }: PaymentConfirmationDialogProps) {
-
   const handleConfirm = async () => {
     try {
       const { error } = await supabase
@@ -52,9 +51,9 @@ export function PaymentConfirmationDialog({
             onClick={handleConfirm}
             className="bg-primary hover:bg-primary/90"
           >
-            مدفوع بالكامل
+            تأكيد الدفع
           </AlertDialogAction>
-          <AlertDialogCancel className="mt-0">تجاهل</AlertDialogCancel>
+          <AlertDialogCancel className="mt-0">إلغاء</AlertDialogCancel>
         </div>
       </AlertDialogContent>
     </AlertDialog>

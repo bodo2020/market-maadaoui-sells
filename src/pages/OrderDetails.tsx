@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
@@ -11,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Pencil, Mail, Phone, MapPin, Bike } from "lucide-react";
+import { Pencil, Mail, Phone, MapPin, Bike, RotateCcw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
@@ -49,7 +48,6 @@ export default function OrderDetails() {
       if (error) throw error;
       
       if (data) {
-        // Validate status to ensure it's one of the allowed values
         const validateOrderStatus = (status: string): Order['status'] => {
           const validStatuses: Order['status'][] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
           return validStatuses.includes(status as Order['status']) 
@@ -57,7 +55,6 @@ export default function OrderDetails() {
             : 'pending';
         };
         
-        // Validate payment status
         const validatePaymentStatus = (status: string): Order['payment_status'] => {
           const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
           return validStatuses.includes(status as Order['payment_status']) 
@@ -65,16 +62,13 @@ export default function OrderDetails() {
             : 'pending';
         };
         
-        // Transform items from Json to OrderItem[]
         const transformItems = (items: any): OrderItem[] => {
           if (!Array.isArray(items)) {
             try {
-              // If it's a JSON string, parse it
               if (typeof items === 'string') {
                 items = JSON.parse(items);
               }
               
-              // If it's an object but not an array, wrap it in an array
               if (!Array.isArray(items)) {
                 items = [items];
               }
@@ -94,7 +88,6 @@ export default function OrderDetails() {
           }));
         };
         
-        // Get customer information from customer table
         const customerName = data.customers?.name || 'غير معروف';
         const customerEmail = data.customers?.email || '';
         const customerPhone = data.customers?.phone || '';
@@ -140,7 +133,7 @@ export default function OrderDetails() {
       
       if (error) throw error;
       
-      setOrder(prev => prev ? { ...prev, status } : null);
+      await fetchOrder();
       toast.success(`تم تحديث حالة الشحن إلى ${status === 'shipped' ? 'خرج للتوصيل' : 'تم التوصيل'}`);
     } catch (error) {
       console.error('Error updating shipping status:', error);
@@ -220,17 +213,13 @@ export default function OrderDetails() {
                         <TableRow key={index}>
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-3">
-                              {item.image_url ? (
+                              {item.image_url && (
                                 <div className="w-12 h-12 rounded-md overflow-hidden">
                                   <img 
                                     src={item.image_url} 
                                     alt={item.product_name} 
                                     className="w-full h-full object-cover"
                                   />
-                                </div>
-                              ) : (
-                                <div className="w-12 h-12 rounded-md bg-gray-200 flex items-center justify-center">
-                                  <span className="text-gray-500 text-xs">بدون صورة</span>
                                 </div>
                               )}
                               <span>{item.product_name}</span>
@@ -265,15 +254,41 @@ export default function OrderDetails() {
                     className="w-full"
                     onClick={() => setPaymentConfirmOpen(true)}
                   >
-                    بانتظار الدفع - اضغط لتأكيد الدفع
+                    تأكيد الدفع
                   </Button>
                 ) : (
-                  <Badge 
-                    variant="default"
-                    className="px-4 py-2 text-base w-full flex justify-center items-center"
-                  >
-                    مدفوع بالكامل
-                  </Badge>
+                  <div className="w-full flex gap-3">
+                    <Badge 
+                      variant="default"
+                      className="px-4 py-2 text-base w-3/4 flex justify-center items-center"
+                    >
+                      تم تأكيد الدفع
+                    </Badge>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="w-1/4 flex items-center gap-2"
+                      onClick={async () => {
+                        try {
+                          const { error } = await supabase
+                            .from('online_orders')
+                            .update({ payment_status: 'pending' })
+                            .eq('id', order.id);
+                          
+                          if (error) throw error;
+                          
+                          await fetchOrder();
+                          toast.success('تم التراجع عن تأكيد الدفع');
+                        } catch (error) {
+                          console.error('Error reverting payment status:', error);
+                          toast.error('حدث خطأ أثناء التراجع عن تأكيد الدفع');
+                        }
+                      }}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      تراجع
+                    </Button>
+                  </div>
                 )}
               </div>
 
@@ -303,11 +318,11 @@ export default function OrderDetails() {
                 <h3 className="font-medium text-lg">تعيين مندوب توصيل</h3>
                 <Button 
                   variant="outline"
-                  className="w-full flex gap-2 items-center"
+                  className="w-full flex gap-2 items-center justify-center"
                   onClick={() => setAssignDeliveryOpen(true)}
                 >
                   <Bike className="w-4 h-4" />
-                  {order.delivery_person ? 'تغيير مندوب التوصيل' : 'تعيين مندوب التوصيل'}
+                  {order.delivery_person ? 'تغيير مندوب التوصيل' : 'اختيار مندوب التوصيل'}
                 </Button>
                 {order.delivery_person && (
                   <div className="p-2 bg-muted rounded-md mt-2">
