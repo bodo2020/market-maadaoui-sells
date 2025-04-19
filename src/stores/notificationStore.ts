@@ -6,6 +6,7 @@ interface NotificationStore {
   unreadOrders: number;
   incrementUnreadOrders: () => void;
   markOrdersAsRead: () => void;
+  setUnreadOrders: (count: number) => void;
 }
 
 export const useNotificationStore = create<NotificationStore>()(
@@ -14,6 +15,7 @@ export const useNotificationStore = create<NotificationStore>()(
       unreadOrders: 0,
       incrementUnreadOrders: () => set((state) => ({ unreadOrders: state.unreadOrders + 1 })),
       markOrdersAsRead: () => set({ unreadOrders: 0 }),
+      setUnreadOrders: (count: number) => set({ unreadOrders: count }),
     }),
     {
       name: 'notification-store',

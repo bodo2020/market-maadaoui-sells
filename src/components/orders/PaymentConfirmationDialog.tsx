@@ -36,17 +36,18 @@ export function PaymentConfirmationDialog({
       if (fetchError) throw fetchError;
       
       // Update payment status and order status if needed
-      let updates = { 
+      let updates: { 
+        payment_status: string; 
+        updated_at: string;
+        status?: string;  // Make this property optional
+      } = { 
         payment_status: 'paid',
         updated_at: new Date().toISOString()
       };
       
       // If order is still pending, automatically move it to processing state
       if (orderData.status === 'pending') {
-        updates = {
-          ...updates,
-          status: 'processing'
-        };
+        updates.status = 'processing';
       }
       
       const { error } = await supabase
