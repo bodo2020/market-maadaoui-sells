@@ -1,4 +1,3 @@
-
 export interface ShippingProvider {
   id: string;
   name: string;
@@ -23,7 +22,25 @@ export interface DeliveryLocation {
   updated_at?: string;
 }
 
-// Types for the hierarchical structure
+export interface DeliveryType {
+  id: string;
+  name: string;
+  description?: string;
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DeliveryTypePrice {
+  id: string;
+  delivery_location_id: string;
+  delivery_type_id: string;
+  price: number;
+  estimated_time?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export type DeliveryGovernorate = {
   name: string;
   cities: DeliveryCity[];

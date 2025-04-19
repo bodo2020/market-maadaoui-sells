@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +51,7 @@ export default function HierarchicalLocations({
 }: HierarchicalLocationsProps) {
   const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deliveryPricing, setDeliveryPricing] = useState<{[key: string]: any}>({});
 
   const groupLocationsByHierarchy = (locations: DeliveryLocation[]) => {
     const grouped: GroupedLocations = {};
@@ -82,6 +82,27 @@ export default function HierarchicalLocations({
   };
 
   const groupedLocations = groupLocationsByHierarchy(locations);
+
+  useEffect(() => {
+    const loadPricingForLocations = async () => {
+      const pricingData: {[key: string]: any} = {};
+      
+      for (const location of locations) {
+        try {
+          const pricing = await fetchDeliveryTypePricing(location.id);
+          pricingData[location.id] = pricing;
+        } catch (error) {
+          console.error(`Error loading pricing for location ${location.id}:`, error);
+        }
+      }
+      
+      setDeliveryPricing(pricingData);
+    };
+    
+    if (locations.length > 0) {
+      loadPricingForLocations();
+    }
+  }, [locations]);
 
   const handleDeleteLocation = async () => {
     if (!locationToDelete) return;
@@ -181,7 +202,14 @@ export default function HierarchicalLocations({
                                             {location.neighborhood && (
                                               <div className="text-sm font-medium">{location.neighborhood}</div>
                                             )}
-                                            <div className="font-medium text-primary">{location.price} ج.م</div>
+                                            <div className="space-y-1">
+                                              {deliveryPricing[location.id]?.map((pricing: any) => (
+                                                <div key={pricing.delivery_type_id} className="flex justify-between items-center text-sm">
+                                                  <span className="text-gray-600">{pricing.delivery_types.name}:</span>
+                                                  <span className="font-medium text-primary">{pricing.price} ج.م</span>
+                                                </div>
+                                              ))}
+                                            </div>
                                             {location.estimated_time && (
                                               <div className="text-sm text-gray-600">{location.estimated_time}</div>
                                             )}

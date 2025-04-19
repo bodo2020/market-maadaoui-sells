@@ -6,33 +6,35 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { createDeliveryLocation } from "@/services/supabase/deliveryService";
+import { createDeliveryLocation, fetchDeliveryTypes, createDeliveryTypePrice } from "@/services/supabase/deliveryService";
+import { DeliveryType } from "@/types/shipping";
 
 interface DeliveryLocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  providerId: string;
   onSuccess?: () => void;
 }
 
 export default function DeliveryLocationDialog({
   open,
   onOpenChange,
-  providerId,
   onSuccess
 }: DeliveryLocationDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [deliveryTypes, setDeliveryTypes] = useState<DeliveryType[]>([]);
   const [governorate, setGovernorate] = useState("");
   const [city, setCity] = useState("");
   const [area, setArea] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [name, setName] = useState("");
-  const [price, setPrice] = useState(0);
-  const [estimatedTime, setEstimatedTime] = useState("");
   const [active, setActive] = useState(true);
   const [notes, setNotes] = useState("");
+  const [prices, setPrices] = useState<{ [key: string]: { price: number; estimatedTime: string } }>({});
 
-  // Generate name based on location data
+  useEffect(() => {
+    loadDeliveryTypes();
+  }, []);
+
   useEffect(() => {
     if (governorate && city) {
       const generatedName = `${governorate} - ${city}${area ? ` - ${area}` : ''}${neighborhood ? ` - ${neighborhood}` : ''}`;
@@ -40,22 +42,51 @@ export default function DeliveryLocationDialog({
     }
   }, [governorate, city, area, neighborhood]);
 
+  const loadDeliveryTypes = async () => {
+    try {
+      const data = await fetchDeliveryTypes();
+      setDeliveryTypes(data);
+      // Initialize prices state with empty values for each delivery type
+      const initialPrices = data.reduce((acc, type) => ({
+        ...acc,
+        [type.id]: { price: 0, estimatedTime: '' }
+      }), {});
+      setPrices(initialPrices);
+    } catch (error) {
+      console.error('Error loading delivery types:', error);
+      toast.error("حدث خطأ أثناء تحميل أنواع التوصيل");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setLoading(true);
-      await createDeliveryLocation({
-        provider_id: providerId,
-        name, // include the name field
+      
+      // Create the delivery location first
+      const location = await createDeliveryLocation({
+        name,
         governorate,
         city,
         area,
         neighborhood,
-        price,
-        estimated_time: estimatedTime,
+        price: 0, // Default price will be 0 since we're using delivery_type_pricing
         active,
         notes
       });
+
+      // Create pricing entries for each delivery type
+      await Promise.all(
+        Object.entries(prices).map(([typeId, { price, estimatedTime }]) =>
+          createDeliveryTypePrice({
+            delivery_location_id: location.id,
+            delivery_type_id: typeId,
+            price,
+            estimated_time: estimatedTime
+          })
+        )
+      );
+
       toast.success("تم إضافة منطقة التوصيل بنجاح");
       onSuccess?.();
       resetForm();
@@ -73,10 +104,9 @@ export default function DeliveryLocationDialog({
     setArea("");
     setNeighborhood("");
     setName("");
-    setPrice(0);
-    setEstimatedTime("");
     setActive(true);
     setNotes("");
+    setPrices({});
   };
 
   return (
@@ -145,28 +175,43 @@ export default function DeliveryLocationDialog({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="price">سعر التوصيل</Label>
-            <Input
-              id="price"
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(Number(e.target.value))}
-              placeholder="أدخل سعر التوصيل"
-              className="text-right"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="estimatedTime">الوقت المتوقع للتوصيل</Label>
-            <Input
-              id="estimatedTime"
-              value={estimatedTime}
-              onChange={(e) => setEstimatedTime(e.target.value)}
-              placeholder="مثال: 30-45 دقيقة"
-              className="text-right"
-            />
+          <div className="space-y-4">
+            <Label>أسعار التوصيل</Label>
+            {deliveryTypes.map((type) => (
+              <div key={type.id} className="space-y-2 border rounded-lg p-4">
+                <Label>{type.name}</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Label htmlFor={`price-${type.id}`}>السعر</Label>
+                    <Input
+                      id={`price-${type.id}`}
+                      type="number"
+                      value={prices[type.id]?.price || 0}
+                      onChange={(e) => setPrices(prev => ({
+                        ...prev,
+                        [type.id]: { ...prev[type.id], price: Number(e.target.value) }
+                      }))}
+                      placeholder="أدخل السعر"
+                      className="text-right"
+                      required
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor={`time-${type.id}`}>الوقت المتوقع</Label>
+                    <Input
+                      id={`time-${type.id}`}
+                      value={prices[type.id]?.estimatedTime || ''}
+                      onChange={(e) => setPrices(prev => ({
+                        ...prev,
+                        [type.id]: { ...prev[type.id], estimatedTime: e.target.value }
+                      }))}
+                      placeholder="مثال: 30-45 دقيقة"
+                      className="text-right"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="space-y-2">

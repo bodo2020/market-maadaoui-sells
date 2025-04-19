@@ -1,6 +1,5 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { DeliveryLocation, ShippingProvider } from "@/types/shipping";
+import { DeliveryLocation, ShippingProvider, DeliveryType, DeliveryTypePrice } from "@/types/shipping";
 
 export async function fetchDeliveryLocations() {
   const { data, error } = await supabase
@@ -202,4 +201,39 @@ export async function deleteDeliveryLocation(id: string) {
     .eq('id', id);
     
   if (error) throw error;
+}
+
+export async function fetchDeliveryTypes() {
+  const { data, error } = await supabase
+    .from('delivery_types')
+    .select('*')
+    .eq('active', true)
+    .order('name');
+    
+  if (error) throw error;
+  return data as DeliveryType[];
+}
+
+export async function fetchDeliveryTypePricing(locationId: string) {
+  const { data, error } = await supabase
+    .from('delivery_type_pricing')
+    .select(`
+      *,
+      delivery_types(*)
+    `)
+    .eq('delivery_location_id', locationId);
+    
+  if (error) throw error;
+  return data;
+}
+
+export async function createDeliveryTypePrice(data: Omit<DeliveryTypePrice, 'id' | 'created_at' | 'updated_at'>) {
+  const { data: result, error } = await supabase
+    .from('delivery_type_pricing')
+    .insert([data])
+    .select()
+    .single();
+    
+  if (error) throw error;
+  return result as DeliveryTypePrice;
 }
