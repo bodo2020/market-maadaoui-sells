@@ -41,7 +41,7 @@ export default function DeliveryLocations() {
           <DeliveryLocationDialog
             open={showAddLocationDialog}
             onOpenChange={setShowAddLocationDialog}
-            providerId={selectedProvider}
+            mode="governorate"
             onSuccess={() => {
               toast.success("تم إضافة منطقة التوصيل بنجاح");
               setShowAddLocationDialog(false);
