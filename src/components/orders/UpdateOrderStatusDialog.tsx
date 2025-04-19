@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -105,12 +104,21 @@ export function UpdateOrderStatusDialog({
   };
 
   const statusOptions: {value: Order['status'], label: string, icon: JSX.Element}[] = [
-    { value: 'pending', label: 'قيد الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
-    { value: 'processing', label: 'قيد المعالجة', icon: <Package className="h-4 w-4 text-blue-500" /> },
-    { value: 'shipped', label: 'تم الشحن', icon: <Truck className="h-4 w-4 text-indigo-500" /> },
-    { value: 'delivered', label: 'تم التسليم', icon: <Check className="h-4 w-4 text-green-500" /> },
-    { value: 'cancelled', label: 'ملغي', icon: <X className="h-4 w-4 text-red-500" /> }
+    { value: 'waiting', label: 'في الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
+    { value: 'ready', label: 'جاهز', icon: <Package className="h-4 w-4 text-green-500" /> },
+    { value: 'shipped', label: 'تم الشحن', icon: <Truck className="h-4 w-4 text-blue-500" /> },
+    { value: 'done', label: 'مكتمل', icon: <Check className="h-4 w-4 text-gray-500" /> }
   ];
+
+  const getStatusClass = (statusValue: Order['status']) => {
+    const classes = {
+      waiting: 'border-amber-500 hover:bg-amber-50',
+      ready: 'border-green-500 hover:bg-green-50',
+      shipped: 'border-blue-500 hover:bg-blue-50',
+      done: 'border-gray-500 hover:bg-gray-50'
+    };
+    return classes[statusValue] || '';
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

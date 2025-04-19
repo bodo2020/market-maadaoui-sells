@@ -432,7 +432,7 @@ export type Database = {
           payment_status: string | null
           shipping_address: string | null
           shipping_cost: number | null
-          status: string
+          status: Database["public"]["Enums"]["order_status"]
           total: number
           tracking_number: string | null
           updated_at: string | null
@@ -449,7 +449,7 @@ export type Database = {
           payment_status?: string | null
           shipping_address?: string | null
           shipping_cost?: number | null
-          status?: string
+          status?: Database["public"]["Enums"]["order_status"]
           total: number
           tracking_number?: string | null
           updated_at?: string | null
@@ -466,7 +466,7 @@ export type Database = {
           payment_status?: string | null
           shipping_address?: string | null
           shipping_cost?: number | null
-          status?: string
+          status?: Database["public"]["Enums"]["order_status"]
           total?: number
           tracking_number?: string | null
           updated_at?: string | null
@@ -1030,7 +1030,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      order_status: "waiting" | "ready" | "shipped" | "done"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1145,6 +1145,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      order_status: ["waiting", "ready", "shipped", "done"],
+    },
   },
 } as const

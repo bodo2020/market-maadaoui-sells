@@ -218,7 +218,7 @@ export interface Order {
   id: string;
   created_at: string;
   total: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'waiting' | 'ready' | 'shipped' | 'done';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   payment_method: string | null;
   shipping_address: string | null;

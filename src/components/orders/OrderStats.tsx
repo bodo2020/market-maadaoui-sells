@@ -9,16 +9,12 @@ interface OrderStatsProps {
 }
 
 export function OrderStats({ orders, activeTab, onTabChange }: OrderStatsProps) {
-  const getPendingOrdersCount = () => {
-    return orders.filter(order => order.status === 'pending' || order.status === 'processing').length;
-  };
-
-  const getUnpaidOrdersCount = () => {
-    return orders.filter(order => order.payment_status === 'pending').length;
+  const getOrdersCount = (status: string) => {
+    return orders.filter(order => order.status === status).length;
   };
 
   return (
-    <div className="grid grid-cols-7 mb-4">
+    <div className="grid grid-cols-4 mb-4">
       <button
         onClick={() => onTabChange("all")}
         className={`relative font-semibold p-2 ${activeTab === "all" ? "bg-primary text-white" : ""}`}
@@ -27,42 +23,25 @@ export function OrderStats({ orders, activeTab, onTabChange }: OrderStatsProps) 
         <Badge className="mr-2 bg-primary">{orders.length}</Badge>
       </button>
       <button
-        onClick={() => onTabChange("pending")}
-        className={`relative font-semibold p-2 ${activeTab === "pending" ? "bg-primary text-white" : ""}`}
+        onClick={() => onTabChange("waiting")}
+        className={`relative font-semibold p-2 ${activeTab === "waiting" ? "bg-amber-500 text-white" : ""}`}
       >
-        بإنتظار التجهيز
-        <Badge className="mr-2 bg-primary">{getPendingOrdersCount()}</Badge>
+        في الانتظار
+        <Badge className="mr-2 bg-amber-500">{getOrdersCount('waiting')}</Badge>
       </button>
       <button
-        onClick={() => onTabChange("processing")}
-        className={`font-semibold p-2 ${activeTab === "processing" ? "bg-primary text-white" : ""}`}
+        onClick={() => onTabChange("ready")}
+        className={`font-semibold p-2 ${activeTab === "ready" ? "bg-green-500 text-white" : ""}`}
       >
-        قيد المعالجة
+        جاهز
+        <Badge className="mr-2 bg-green-500">{getOrdersCount('ready')}</Badge>
       </button>
       <button
         onClick={() => onTabChange("shipped")}
-        className={`font-semibold p-2 ${activeTab === "shipped" ? "bg-primary text-white" : ""}`}
+        className={`font-semibold p-2 ${activeTab === "shipped" ? "bg-blue-500 text-white" : ""}`}
       >
         تم الشحن
-      </button>
-      <button
-        onClick={() => onTabChange("delivered")}
-        className={`font-semibold p-2 ${activeTab === "delivered" ? "bg-primary text-white" : ""}`}
-      >
-        تم التسليم
-      </button>
-      <button
-        onClick={() => onTabChange("cancelled")}
-        className={`font-semibold p-2 ${activeTab === "cancelled" ? "bg-primary text-white" : ""}`}
-      >
-        ملغي
-      </button>
-      <button
-        onClick={() => onTabChange("unpaid")}
-        className={`relative font-semibold p-2 ${activeTab === "unpaid" ? "bg-primary text-white" : ""}`}
-      >
-        غير مدفوع
-        <Badge className="mr-2 bg-primary">{getUnpaidOrdersCount()}</Badge>
+        <Badge className="mr-2 bg-blue-500">{getOrdersCount('shipped')}</Badge>
       </button>
     </div>
   );
