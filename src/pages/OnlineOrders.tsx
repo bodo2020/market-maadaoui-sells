@@ -118,26 +118,27 @@ export default function OnlineOrders() {
 
       if (error) throw error;
       
-      const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => ({
-        id: item.id,
-        created_at: item.created_at,
-        updated_at: item.updated_at || item.created_at,
-        date: item.created_at,
-        total: item.total,
-        subtotal: item.total,
+      const transformedOrders: Order[] = (data || []).map(order => ({
+        id: order.id,
+        customer_id: order.customer_id,
+        customer_name: order.customer_name,
+        customer_phone: order.customer_phone,
+        customer_email: order.customer_email,
+        date: order.created_at,
+        items: order.items,
+        subtotal: order.total,
         discount: 0,
-        status: validateOrderStatus(item.status),
-        payment_status: validatePaymentStatus(item.payment_status),
-        payment_method: (item.payment_method as 'cash' | 'card' | 'online') || 'cash',
-        shipping_address: item.shipping_address,
-        items: Array.isArray(item.items) ? item.items : [],
-        customer_name: item.customer_name || 'غير معروف',
-        customer_email: item.customer_email || '',
-        customer_phone: item.customer_phone || '',
-        notes: item.notes || '',
-        delivery_location_id: item.delivery_location_id,
-        shipping_cost: item.shipping_cost,
-        tracking_number: item.tracking_number
+        total: order.total,
+        payment_method: order.payment_method,
+        payment_status: order.payment_status,
+        shipping_address: order.shipping_address,
+        status: order.status,
+        notes: order.notes,
+        created_at: order.created_at,
+        updated_at: order.updated_at,
+        delivery_location_id: order.delivery_location_id,
+        shipping_cost: order.shipping_cost,
+        tracking_number: order.tracking_number
       }));
       
       setOrders(transformedOrders);

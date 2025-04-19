@@ -9,7 +9,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/data/mockData";
-import { useCart } from "@/hooks/use-cart";
 import { useToast } from "@/hooks/use-toast";
 import { Search, ShoppingCart, X, Plus, Minus, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon } from "@radix-ui/react-icons";
+import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { enUS } from 'date-fns/locale';
 import { DateRange } from "react-day-picker";
@@ -28,7 +27,7 @@ import { addDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { createSale, generateInvoiceNumber, printInvoice } from "@/services/supabase/saleService";
 import { useStore } from "@/stores/store";
-import { StoreSettingsDialog } from "@/components/settings/StoreSettingsDialog";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -154,14 +153,12 @@ export default function POS() {
   const handleAddToCart = (product: Product) => {
     if (!product) return;
 
-    // For bulk items with bulk_enabled, give the option to add as normal or bulk
     if (product.bulk_enabled) {
       setSelectedProduct(product);
       setBulkSelectModalOpen(true);
       return;
     }
 
-    // Default add as regular item
     addRegularItemToCart(product);
   };
 
@@ -171,20 +168,18 @@ export default function POS() {
     );
 
     if (existingItemIndex >= 0) {
-      // Update quantity of existing item
       const newCart = [...cart];
       newCart[existingItemIndex].quantity += 1;
       newCart[existingItemIndex].total = newCart[existingItemIndex].quantity * newCart[existingItemIndex].price;
       setCart(newCart);
     } else {
-      // Add new item to cart
       const newItem: CartItem = {
         product,
         quantity: 1,
         price: product.is_offer && product.offer_price ? product.offer_price : product.price,
         discount: product.is_offer && product.offer_price ? product.price - product.offer_price : 0,
         total: product.is_offer && product.offer_price ? product.offer_price : product.price,
-        weight: null, // Add the required weight property
+        weight: null,
         isBulk: false
       };
       setCart([...cart, newItem]);
@@ -195,7 +190,6 @@ export default function POS() {
   };
 
   const addBulkItemToCart = (product: Product, isBulk: boolean) => {
-    // Add the item to the cart based on whether it's bulk or regular
     const price = isBulk && product.bulk_price ? product.bulk_price : (product.is_offer && product.offer_price ? product.offer_price : product.price);
     const quantity = isBulk && product.bulk_quantity ? product.bulk_quantity : 1;
     const total = price * quantity;
@@ -207,7 +201,7 @@ export default function POS() {
       price,
       discount,
       total,
-      weight: null, // Add the required weight property
+      weight: null,
       isBulk
     };
 
@@ -290,7 +284,7 @@ export default function POS() {
       setIsSubmitting(true);
 
       const saleData = {
-        date: date || new Date(),
+        date: date ? date.toISOString() : new Date().toISOString(),
         items: cart,
         subtotal: cart.reduce((acc, item) => acc + item.total, 0),
         discount: discount,
@@ -371,10 +365,9 @@ export default function POS() {
     
     setIsPrinting(true);
     
-    // Prepare sale data for invoice generation
     const saleData = {
-      id: 'temp', // Temporary ID
-      date: date?.toISOString() || new Date().toISOString(),
+      id: 'temp',
+      date: date ? date.toISOString() : new Date().toISOString(),
       items: cart,
       subtotal: cart.reduce((acc, item) => acc + item.total, 0),
       discount: discount,
@@ -461,7 +454,6 @@ export default function POS() {
         <h1 className="text-2xl font-bold mb-4">نظام نقاط البيع</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Product Selection */}
           <div className="md:col-span-2">
             <div className="mb-4 flex items-center">
               <div className="relative w-full">
@@ -533,7 +525,6 @@ export default function POS() {
             </ScrollArea>
           </div>
 
-          {/* Cart and Payment */}
           <div>
             <Card>
               <CardContent className="p-4">
@@ -735,7 +726,6 @@ export default function POS() {
         </div>
       </div>
 
-      {/* Bulk Select Modal */}
       <Dialog open={bulkSelectModalOpen} onOpenChange={setBulkSelectModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -773,7 +763,6 @@ export default function POS() {
         </DialogContent>
       </Dialog>
 
-      {/* Barcode Modal */}
       <Dialog open={isBarcodeModalOpen} onOpenChange={setIsBarcodeModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -796,7 +785,6 @@ export default function POS() {
         </DialogContent>
       </Dialog>
 
-      {/* Weight Modal */}
       <Dialog open={isWeightModalOpen} onOpenChange={setIsWeightModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

@@ -107,10 +107,10 @@ export interface Company {
   name: string;
   description?: string;
   image_url?: string;
-  logo_url?: string; // Added as used in CompanyDetails
-  address?: string; // Added as used in CompanyDetails
-  contact_email?: string; // Added as used in CompanyDetails
-  contact_phone?: string; // Added as used in CompanyDetails
+  logo_url?: string; 
+  address?: string; 
+  contact_email?: string; 
+  contact_phone?: string; 
   created_at?: string;
   updated_at?: string;
 }
@@ -141,7 +141,7 @@ export interface Supplier {
 
 export interface Sale {
   id: string;
-  date: string;
+  date: string; // Changed from Date to string to match required type
   items: CartItem[];
   subtotal: number;
   discount: number;
@@ -182,7 +182,7 @@ export interface Purchase {
   created_at: string;
   updated_at: string;
   invoice_number?: string;
-  invoice_file_url?: string; // Added as used in Purchases
+  invoice_file_url?: string;
   paid?: number;
   description?: string;
   suppliers?: { name: string };
@@ -205,7 +205,7 @@ export interface Expense {
   date: string;
   description: string;
   amount: number;
-  category: string; // Made required as it's used in ExpenseSettings
+  category: string;
   type: string;
   receipt_url?: string;
   created_at: string;
@@ -257,6 +257,27 @@ export interface Order {
   items: any[];
   subtotal: number;
   discount: number;
+  total: number;
+  payment_method: 'cash' | 'card' | 'online';
+  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  shipping_address?: string;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  delivery_location_id?: string;
+  shipping_cost?: number;
+  tracking_number?: string;
+}
+
+// Add this OrderFromDB interface to match data structure returned from the database
+export interface OrderFromDB {
+  id: string;
+  customer_id?: string;
+  customer_name: string;
+  customer_phone?: string;
+  customer_email?: string;
+  items: any[];
   total: number;
   payment_method: 'cash' | 'card' | 'online';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';

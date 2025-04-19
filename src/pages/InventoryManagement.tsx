@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -380,8 +379,8 @@ export default function InventoryManagement() {
                         <TableCell>
                           {typeof product.updated_at === 'string' 
                             ? new Date(product.updated_at).toLocaleDateString('ar-EG')
-                            : product.updated_at
-                              ? product.updated_at.toLocaleDateString('ar-EG')
+                            : product.updated_at 
+                              ? new Date(product.updated_at.toString()).toLocaleDateString('ar-EG')
                               : '-'}
                         </TableCell>
                         <TableCell>
