@@ -10,9 +10,11 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 import { createSale, generateInvoiceNumber } from "@/services/supabase/saleService";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
+import { RegisterType } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
 
@@ -89,10 +91,8 @@ export default function POS() {
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
         } else if (product.is_bulk_scan) {
-          // Product was scanned with its bulk barcode
           handleAddBulkToCart(product);
         } else {
-          // Product was scanned with its regular barcode
           handleAddToCart(product);
         }
         toast({
@@ -149,7 +149,6 @@ export default function POS() {
   const handleSearch = async () => {
     if (!search) return;
 
-    // Check if this is a bulk barcode first
     try {
       const product = await fetchProductByBarcode(search);
       if (product) {
@@ -158,12 +157,10 @@ export default function POS() {
           setSearch("");
           return;
         } else if (product.is_bulk_scan) {
-          // Product was found with its bulk barcode
           handleAddBulkToCart(product);
           setSearch("");
           return;
         } else {
-          // Product was found with its regular barcode
           handleAddToCart(product);
           setSearch("");
           return;
@@ -173,7 +170,6 @@ export default function POS() {
       console.error("Error fetching product by barcode:", error);
     }
 
-    // If we get here, handle scale barcode as before
     if (search.startsWith("2") && search.length === 13) {
       try {
         const product = await fetchProductByBarcode(search);
@@ -198,11 +194,9 @@ export default function POS() {
       }
     }
 
-    // If nothing found by barcode, search by name as before
     const results = products.filter(product => product.barcode === search || product.name.includes(search));
     setSearchResults(results);
 
-    // Handle exact match cases
     const exactMatch = products.find(p => p.barcode === search && p.barcode_type === "normal" && !p.bulk_enabled);
     if (exactMatch) {
       handleAddToCart(exactMatch);
@@ -215,7 +209,6 @@ export default function POS() {
   };
 
   const handleAddToCart = (product: Product) => {
-    // Remove quantity check that was blocking zero-quantity products
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
       setCartItems(cartItems.map(item => item.product.id === product.id ? {
@@ -238,7 +231,6 @@ export default function POS() {
   };
 
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
-    // Check if product has zero or negative quantity
     if ((product.quantity || 0) <= 0) {
       toast({
         title: "المنتج غير متوفر",
@@ -269,7 +261,6 @@ export default function POS() {
   };
 
   const handleAddBulkToCart = (product: Product) => {
-    // Check if product has zero or negative quantity
     if ((product.quantity || 0) <= 0) {
       toast({
         title: "المنتج غير متوفر",
@@ -328,7 +319,6 @@ export default function POS() {
         
         const newQuantity = Math.max(1, item.quantity + change);
         
-        // Check if increasing quantity would exceed available stock
         if (change > 0 && newQuantity > (item.product.quantity || 0)) {
           toast({
             title: "الكمية غير متوفرة",
@@ -391,6 +381,30 @@ export default function POS() {
     }
   };
 
+  const recordSaleToCashRegister = async (amount: number, paymentMethod: string) => {
+    if (paymentMethod !== 'cash' && paymentMethod !== 'mixed') return;
+    
+    const cashAmount = paymentMethod === 'cash' 
+      ? amount 
+      : parseFloat(cashAmount || "0");
+      
+    if (cashAmount <= 0) return;
+    
+    try {
+      const response = await supabase.rpc('add_cash_transaction', {
+        p_amount: cashAmount,
+        p_transaction_type: 'deposit',
+        p_register_type: RegisterType.STORE,
+        p_notes: 'مبيعات نقطة البيع'
+      });
+      
+      if (response.error) throw response.error;
+      console.log('Sale recorded to cash register:', response.data);
+    } catch (error) {
+      console.error('Error recording sale to cash register:', error);
+    }
+  };
+
   const completeSale = async () => {
     if (!validatePayment()) {
       toast({
@@ -402,7 +416,6 @@ export default function POS() {
     }
     setIsProcessing(true);
     try {
-      // First, if customer information is provided, find or create the customer
       let customerData = null;
       if (customerName || customerPhone) {
         customerData = await findOrCreateCustomer({
@@ -435,6 +448,14 @@ export default function POS() {
       };
       const sale = await createSale(saleData);
       setCurrentSale(sale);
+      
+      if (paymentMethod === 'cash' || paymentMethod === 'mixed') {
+        await recordSaleToCashRegister(
+          paymentMethod === 'cash' ? total : parseFloat(cashAmount || "0"),
+          paymentMethod
+        );
+      }
+      
       toast({
         title: "تم إتمام البيع بنجاح",
         description: `رقم الفاتورة: ${sale.invoice_number}`

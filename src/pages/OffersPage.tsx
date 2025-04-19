@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -49,7 +48,6 @@ export default function OffersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<SpecialOffer | null>(null);
   
-  // Form state
   const [offerFormData, setOfferFormData] = useState({
     name: '',
     minOrderAmount: '',
@@ -63,19 +61,16 @@ export default function OffersPage() {
     description: ''
   });
 
-  // Fetch free delivery offers
   const { data: freeDeliveryOffers = [], isLoading: isFreeDeliveryLoading } = useQuery({
     queryKey: ['specialOffers', OfferType.FREE_DELIVERY],
     queryFn: () => fetchSpecialOffers(OfferType.FREE_DELIVERY)
   });
 
-  // Fetch coupons
   const { data: coupons = [], isLoading: isCouponsLoading } = useQuery({
     queryKey: ['specialOffers', OfferType.COUPON],
     queryFn: () => fetchSpecialOffers(OfferType.COUPON)
   });
 
-  // Create special offer mutation
   const createOfferMutation = useMutation({
     mutationFn: (offer: Omit<SpecialOffer, 'id' | 'created_at' | 'updated_at'>) => 
       createSpecialOffer(offer),
@@ -91,7 +86,6 @@ export default function OffersPage() {
     }
   });
 
-  // Update special offer mutation
   const updateOfferMutation = useMutation({
     mutationFn: ({ id, data }: { id: string, data: Partial<SpecialOffer> }) => 
       updateSpecialOffer(id, data),
@@ -108,7 +102,6 @@ export default function OffersPage() {
     }
   });
 
-  // Delete special offer mutation
   const deleteOfferMutation = useMutation({
     mutationFn: (id: string) => deleteSpecialOffer(id),
     onSuccess: () => {
@@ -121,7 +114,6 @@ export default function OffersPage() {
     }
   });
 
-  // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
     setOfferFormData({
@@ -130,7 +122,6 @@ export default function OffersPage() {
     });
   };
 
-  // Handle radio input change
   const handleRadioChange = (name: string, value: string) => {
     setOfferFormData({
       ...offerFormData,
@@ -138,7 +129,6 @@ export default function OffersPage() {
     });
   };
 
-  // Handle switch change
   const handleSwitchChange = (name: string, checked: boolean) => {
     setOfferFormData({
       ...offerFormData,
@@ -146,7 +136,6 @@ export default function OffersPage() {
     });
   };
 
-  // Clear form data
   const clearFormData = () => {
     setOfferFormData({
       name: '',
@@ -162,13 +151,11 @@ export default function OffersPage() {
     });
   };
 
-  // Open add dialog
   const handleOpenAddDialog = () => {
     clearFormData();
     setIsAddDialogOpen(true);
   };
 
-  // Open edit dialog
   const handleOpenEditDialog = (offer: SpecialOffer) => {
     setSelectedOffer(offer);
     setOfferFormData({
@@ -186,11 +173,9 @@ export default function OffersPage() {
     setIsEditDialogOpen(true);
   };
 
-  // Handle form submission for adding
   const handleAddOffer = () => {
     const offerType = activeTab === 'free-delivery' ? OfferType.FREE_DELIVERY : OfferType.COUPON;
     
-    // Validate form
     if (!offerFormData.name) {
       toast.error('يرجى إدخال اسم العرض');
       return;
@@ -201,7 +186,6 @@ export default function OffersPage() {
       return;
     }
 
-    // Prepare offer data
     const offerData: Omit<SpecialOffer, 'id' | 'created_at' | 'updated_at'> = {
       offer_type: offerType,
       name: offerFormData.name,
@@ -210,7 +194,6 @@ export default function OffersPage() {
       min_order_amount: offerFormData.minOrderAmount ? parseFloat(offerFormData.minOrderAmount) : undefined,
     };
 
-    // Add coupon-specific fields
     if (offerType === OfferType.COUPON) {
       offerData.code = offerFormData.code;
       offerData.discount_type = offerFormData.discountType as DiscountType;
@@ -223,7 +206,6 @@ export default function OffersPage() {
     createOfferMutation.mutate(offerData);
   };
 
-  // Handle form submission for editing
   const handleUpdateOffer = () => {
     if (!selectedOffer) return;
 
@@ -234,7 +216,6 @@ export default function OffersPage() {
       min_order_amount: offerFormData.minOrderAmount ? parseFloat(offerFormData.minOrderAmount) : undefined,
     };
 
-    // Add coupon-specific fields
     if (selectedOffer.offer_type === OfferType.COUPON) {
       updates.code = offerFormData.code;
       updates.discount_type = offerFormData.discountType as DiscountType;
@@ -247,7 +228,6 @@ export default function OffersPage() {
     updateOfferMutation.mutate({ id: selectedOffer.id, data: updates });
   };
 
-  // Toggle offer active status
   const toggleOfferStatus = (offer: SpecialOffer) => {
     updateOfferMutation.mutate({
       id: offer.id,
@@ -431,7 +411,6 @@ export default function OffersPage() {
           </TabsContent>
         </Tabs>
         
-        {/* Add Dialog - Changes based on active tab */}
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogContent className="sm:max-w-[500px]" dir="rtl">
             <DialogHeader>
@@ -675,7 +654,6 @@ export default function OffersPage() {
           </DialogContent>
         </Dialog>
         
-        {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="sm:max-w-[500px]" dir="rtl">
             <DialogHeader>
