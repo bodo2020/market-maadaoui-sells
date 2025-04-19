@@ -161,22 +161,25 @@ export const updateProduct = async (id: string, updates: Partial<Omit<Product, '
 
     if (error) throw error;
 
+    // Cast the product to include notify_quantity
+    const productWithNotify = product as Product;
+
     // Check if quantity is below notify_quantity
     if (
-      product.quantity !== undefined && 
-      product.quantity !== null &&
-      product.notify_quantity !== undefined && 
-      product.notify_quantity !== null &&
-      product.quantity <= product.notify_quantity
+      productWithNotify.quantity !== undefined && 
+      productWithNotify.quantity !== null &&
+      productWithNotify.notify_quantity !== undefined && 
+      productWithNotify.notify_quantity !== null &&
+      productWithNotify.quantity <= productWithNotify.notify_quantity
     ) {
       useNotificationStore.getState().addLowStockProduct({
-        id: product.id,
-        name: product.name,
-        quantity: product.quantity,
-        notifyQuantity: product.notify_quantity
+        id: productWithNotify.id,
+        name: productWithNotify.name,
+        quantity: productWithNotify.quantity,
+        notifyQuantity: productWithNotify.notify_quantity
       });
     } else {
-      useNotificationStore.getState().removeLowStockProduct(product.id);
+      useNotificationStore.getState().removeLowStockProduct(productWithNotify.id);
     }
 
     return product;

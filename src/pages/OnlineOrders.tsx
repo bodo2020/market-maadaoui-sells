@@ -118,19 +118,20 @@ export default function OnlineOrders() {
 
       if (error) throw error;
       
+      // Loop through data and add any missing properties
       const transformedOrders: Order[] = (data || []).map(order => ({
         id: order.id,
         customer_id: order.customer_id,
-        customer_name: order.customer_name,
-        customer_phone: order.customer_phone,
-        customer_email: order.customer_email,
+        customer_name: order.customer_name || 'Unknown Customer',
+        customer_phone: order.customer_phone || '',
+        customer_email: order.customer_email || '',
         date: order.created_at,
-        items: order.items,
+        items: Array.isArray(order.items) ? order.items : [],
         subtotal: order.total,
         discount: 0,
         total: order.total,
-        payment_method: order.payment_method,
-        payment_status: order.payment_status,
+        payment_method: order.payment_method || 'cash',
+        payment_status: order.payment_status || 'pending',
         shipping_address: order.shipping_address,
         status: order.status,
         notes: order.notes,

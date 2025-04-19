@@ -124,7 +124,7 @@ export default function InventoryManagement() {
         console.error("Error updating stock:", error);
         toast({
           title: "خطأ",
-          description: "حدث خطأ أثناء تحديث المخزون",
+          description: "حدث خطاأ أثناء تحديث المخزون",
           variant: "destructive"
         });
       } finally {

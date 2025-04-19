@@ -91,8 +91,16 @@ export default function Invoices() {
         return null;
       }
 
-      setPurchase(data as unknown as Purchase);
-      return data as Purchase;
+      // Convert the data to match the Purchase interface
+      const purchaseData = {
+        ...data,
+        subtotal: data.total, // Assuming total can be used as subtotal if not available
+        discount: 0, // Default value if not available
+        payment_method: 'cash' as 'cash' | 'card' | 'mixed', // Default value
+      } as Purchase;
+      
+      setPurchase(purchaseData);
+      return purchaseData;
     } catch (error) {
       console.error("Unexpected error fetching purchase details:", error);
       toast({

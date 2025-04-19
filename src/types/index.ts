@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = 'admin',
   EMPLOYEE = 'employee',
@@ -270,14 +269,13 @@ export interface Order {
   tracking_number?: string;
 }
 
-// Add this OrderFromDB interface to match data structure returned from the database
 export interface OrderFromDB {
   id: string;
   customer_id?: string;
-  customer_name: string;
+  customer_name?: string;
   customer_phone?: string;
   customer_email?: string;
-  items: any[];
+  items: any;
   total: number;
   payment_method: 'cash' | 'card' | 'online';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
@@ -326,3 +324,5 @@ export interface DeliveryLocation {
   created_at: string;
   updated_at: string;
 }
+
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
