@@ -110,6 +110,7 @@ export default function OrderDetails() {
     
     try {
       setIsUpdatingStatus(true);
+      console.log("Updating order status to:", status, "for order ID:", id);
       
       const { error } = await supabase
         .from('online_orders')
@@ -119,7 +120,12 @@ export default function OrderDetails() {
         })
         .eq('id', id);
       
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase update error:", error);
+        throw error;
+      }
+      
+      console.log("Status updated successfully in Supabase");
       
       // Update the local state
       setOrder(prev => prev ? { ...prev, status } : null);
@@ -220,6 +226,7 @@ export default function OrderDetails() {
 
         <div className="flex justify-between items-start flex-wrap md:flex-nowrap gap-6">
           <div className="w-full md:w-3/5 space-y-6">
+            {/* Products section */}
             <div>
               <h3 className="font-medium text-lg mb-3">المنتجات</h3>
               <ScrollArea className="h-[350px] rounded-md border">
@@ -312,6 +319,7 @@ export default function OrderDetails() {
           </div>
 
           <div className="w-full md:w-2/5 space-y-6">
+            {/* Customer notes card */}
             <Card>
               <CardContent className="p-4 space-y-2">
                 <div className="flex justify-between items-center">
@@ -323,6 +331,7 @@ export default function OrderDetails() {
               </CardContent>
             </Card>
 
+            {/* Customer info card */}
             <Card>
               <CardContent className="p-4 space-y-3">
                 <div className="flex justify-between items-center">
@@ -341,6 +350,7 @@ export default function OrderDetails() {
               </CardContent>
             </Card>
 
+            {/* Contact info card */}
             <Card>
               <CardContent className="p-4 space-y-3">
                 <h3 className="font-medium text-lg">بيانات التواصل</h3>
@@ -361,6 +371,7 @@ export default function OrderDetails() {
               </CardContent>
             </Card>
 
+            {/* Shipping address card */}
             {order?.shipping_address && <Card>
                 <CardContent className="p-4 space-y-3">
                   <h3 className="font-medium text-lg">عنوان الشحن</h3>
