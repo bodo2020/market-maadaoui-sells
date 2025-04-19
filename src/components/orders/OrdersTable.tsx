@@ -17,6 +17,7 @@ interface OrdersTableProps {
   onComplete: (order: Order) => void;
   onPaymentConfirm: (order: Order) => void;
   onAssignDelivery: (order: Order) => void;
+  onOrderUpdate?: () => void;
 }
 
 export function OrdersTable({
@@ -27,7 +28,8 @@ export function OrdersTable({
   onProcess,
   onComplete,
   onPaymentConfirm,
-  onAssignDelivery
+  onAssignDelivery,
+  onOrderUpdate
 }: OrdersTableProps) {
   const navigate = useNavigate();
 
@@ -103,7 +105,7 @@ export function OrdersTable({
             <TableCell className="text-center">
               <OrderStatusDropdown 
                 order={order} 
-                onStatusChange={() => window.location.reload()}
+                onStatusChange={onOrderUpdate}
               />
             </TableCell>
             <TableCell className="text-center">

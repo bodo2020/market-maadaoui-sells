@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -57,8 +56,6 @@ export default function OnlineOrders() {
 
   const handleCancel = async (order: Order) => {
     try {
-      // Since we don't have 'cancelled' status in our enum anymore, we need to handle this differently
-      // We'll move the order to 'done' and add a note that it was cancelled
       const notes = `${order.notes ? order.notes + ' - ' : ''}تم إلغاء هذا الطلب`;
       
       const { error } = await supabase.from('online_orders')
@@ -159,6 +156,7 @@ export default function OnlineOrders() {
                   onComplete={handleComplete}
                   onPaymentConfirm={handlePaymentConfirm}
                   onAssignDelivery={handleAssignDelivery}
+                  onOrderUpdate={handleOrderUpdate}
                 />
               </div>
             )}

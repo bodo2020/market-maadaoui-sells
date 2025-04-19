@@ -19,6 +19,7 @@ interface OrderStatusDropdownProps {
 
 export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdownProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<Order['status']>(order.status);
 
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<string, { bg: string, text: string, label: string }> = {
@@ -37,7 +38,7 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
   };
 
   const handleStatusChange = async (newStatus: Order['status']) => {
-    if (newStatus === order.status || isUpdating) return;
+    if (newStatus === currentStatus || isUpdating) return;
     
     try {
       setIsUpdating(true);
@@ -57,6 +58,8 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
       }
       
       console.log("Status updated successfully in Supabase");
+      setCurrentStatus(newStatus);
+      
       toast.success(`تم تحديث حالة الطلب إلى ${
         newStatus === 'waiting' ? 'في الانتظار' : 
         newStatus === 'ready' ? 'جاهز للشحن' : 
@@ -78,40 +81,40 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <div className="cursor-pointer" onClick={(e) => e.stopPropagation()}>
-          {getStatusBadge(order.status)}
+          {getStatusBadge(currentStatus)}
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[200px]">
         <DropdownMenuItem
           className="gap-2"
           onClick={() => handleStatusChange('waiting')}
-          disabled={order.status === 'waiting' || isUpdating}
+          disabled={currentStatus === 'waiting' || isUpdating}
         >
-          {order.status === 'waiting' && <Check className="h-4 w-4" />}
+          {currentStatus === 'waiting' && <Check className="h-4 w-4" />}
           في الانتظار
         </DropdownMenuItem>
         <DropdownMenuItem
           className="gap-2"
           onClick={() => handleStatusChange('ready')}
-          disabled={order.status === 'ready' || isUpdating}
+          disabled={currentStatus === 'ready' || isUpdating}
         >
-          {order.status === 'ready' && <Check className="h-4 w-4" />}
+          {currentStatus === 'ready' && <Check className="h-4 w-4" />}
           جاهز للشحن
         </DropdownMenuItem>
         <DropdownMenuItem
           className="gap-2"
           onClick={() => handleStatusChange('shipped')}
-          disabled={order.status === 'shipped' || isUpdating}
+          disabled={currentStatus === 'shipped' || isUpdating}
         >
-          {order.status === 'shipped' && <Check className="h-4 w-4" />}
+          {currentStatus === 'shipped' && <Check className="h-4 w-4" />}
           تم الشحن
         </DropdownMenuItem>
         <DropdownMenuItem
           className="gap-2"
           onClick={() => handleStatusChange('done')}
-          disabled={order.status === 'done' || isUpdating}
+          disabled={currentStatus === 'done' || isUpdating}
         >
-          {order.status === 'done' && <Check className="h-4 w-4" />}
+          {currentStatus === 'done' && <Check className="h-4 w-4" />}
           مكتمل
         </DropdownMenuItem>
       </DropdownMenuContent>
