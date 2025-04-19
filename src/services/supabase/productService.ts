@@ -1,150 +1,111 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
+import { useNotificationStore } from '@/stores/notificationStore';
 
-export async function fetchProducts() {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("name");
+export const fetchProducts = async (): Promise<Product[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) {
+    if (error) {
+      throw error;
+    }
+
+    return data as Product[];
+  } catch (error) {
     console.error("Error fetching products:", error);
     throw error;
   }
+};
 
-  return data as Product[];
-}
+export const fetchProductById = async (id: string): Promise<Product> => {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-export async function fetchProductById(id: string) {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", id)
-    .single();
+    if (error) {
+      throw error;
+    }
 
-  if (error) {
-    console.error("Error fetching product:", error);
+    return data as Product;
+  } catch (error) {
+    console.error("Error fetching product by ID:", error);
     throw error;
   }
+};
 
-  return data as Product;
-}
+export const createProduct = async (product: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Promise<Product> => {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .insert([product])
+      .select()
+      .single();
 
-export async function fetchProductByBarcode(barcode: string) {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("barcode", barcode)
-    .maybeSingle();
+    if (error) {
+      throw error;
+    }
 
-  if (error) {
-    console.error("Error fetching product by barcode:", error);
-    throw error;
-  }
-
-  return data as Product | null;
-}
-
-export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
-  const { data, error } = await supabase
-    .from("products")
-    .insert([product])
-    .select();
-
-  if (error) {
+    return data as Product;
+  } catch (error) {
     console.error("Error creating product:", error);
     throw error;
   }
+};
 
-  return data[0] as Product;
-}
+export const updateProduct = async (id: string, updates: Partial<Product>) => {
+  try {
+    const { data: product, error } = await supabase
+      .from('products')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
 
-export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
-  const { data, error } = await supabase
-    .from("products")
-    .update(product)
-    .eq("id", id)
-    .select();
+    if (error) throw error;
 
-  if (error) {
-    console.error("Error updating product:", error);
+    // Check if quantity is below notify_quantity
+    if (
+      product.quantity !== undefined && 
+      product.quantity !== null &&
+      product.notify_quantity !== undefined && 
+      product.notify_quantity !== null &&
+      product.quantity <= product.notify_quantity
+    ) {
+      useNotificationStore.getState().addLowStockProduct({
+        id: product.id,
+        name: product.name,
+        quantity: product.quantity,
+        notifyQuantity: product.notify_quantity
+      });
+    } else {
+      useNotificationStore.getState().removeLowStockProduct(product.id);
+    }
+
+    return product;
+  } catch (error) {
+    console.error('Error updating product:', error);
     throw error;
   }
+};
 
-  return data[0] as Product;
-}
+export const deleteProduct = async (id: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', id);
 
-export async function deleteProduct(id: string) {
-  const { error } = await supabase
-    .from("products")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
     console.error("Error deleting product:", error);
     throw error;
   }
-
-  return true;
-}
-
-export async function fetchProductsByCategory(categoryId: string) {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("category_id", categoryId)
-    .order("name");
-
-  if (error) {
-    console.error("Error fetching products by category:", error);
-    throw error;
-  }
-
-  return data as Product[];
-}
-
-export async function fetchProductsBySubcategory(subcategoryId: string) {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("subcategory_id", subcategoryId)
-    .order("name");
-
-  if (error) {
-    console.error("Error fetching products by subcategory:", error);
-    throw error;
-  }
-
-  return data as Product[];
-}
-
-export async function fetchProductsBySubsubcategory(subsubcategoryId: string) {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("subsubcategory_id", subsubcategoryId)
-    .order("name");
-
-  if (error) {
-    console.error("Error fetching products by subsubcategory:", error);
-    throw error;
-  }
-
-  return data as Product[];
-}
-
-export async function fetchProductsByCompany(companyId: string) {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("company_id", companyId)
-    .order("name");
-
-  if (error) {
-    console.error("Error fetching products by company:", error);
-    throw error;
-  }
-
-  return data as Product[];
-}
+};

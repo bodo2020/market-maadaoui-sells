@@ -12,11 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { createProduct, updateProduct, fetchProductById } from "@/services/supabase/productService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Image, Loader2, ScanLine, Upload, Bell } from "lucide-react";
+import { Image, Loader2, ScanLine, Upload, Bell, Trash2, ImageIcon } from "lucide-react";
 import { CustomSwitch } from "@/components/ui/custom-switch";
 import { fetchCompanies } from "@/services/supabase/companyService";
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface CategoryType {
   id: string;
@@ -133,7 +134,9 @@ export default function AddProduct() {
   const [notifyQuantity, setNotifyQuantity] = useState<number>(5);
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(false);
-  
+  const [deleteImageDialogOpen, setDeleteImageDialogOpen] = useState(false);
+  const [currentImage, setCurrentImage] = useState<string | null>(null);
+
   const [categories, setCategories] = useState<CategoryType[]>([]);
   const [subcategories, setSubcategories] = useState<SubcategoryType[]>([]);
   const [subsubcategories, setSubsubcategories] = useState<SubsubcategoryType[]>([]);
@@ -446,21 +449,39 @@ export default function AddProduct() {
 
                   <div className="space-y-2">
                     <FormLabel>صورة المنتج</FormLabel>
-                    <div 
-                      className={`h-32 w-full border rounded-md overflow-hidden flex items-center justify-center bg-gray-50 cursor-pointer ${!imagePreview ? 'border-dashed' : ''}`} 
-                      onDragOver={handleDragOver} 
-                      onDrop={handleDrop} 
-                      onClick={openFileDialog}
-                    >
-                      {imagePreview ? (
-                        <img src={imagePreview} alt="Product preview" className="h-full w-full object-contain" />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center text-gray-400 p-2">
-                          <Image className="h-10 w-10 mb-1" />
-                          <span className="text-xs text-center">اسحب صورة هنا</span>
-                          <input id="product-image" type="file" accept="image/*" className="hidden" onChange={handleImageChange} ref={fileInputRef} />
-                        </div>
-                      )}
+                    <div className="flex items-center gap-4">
+                      <div 
+                        className={`h-32 w-32 border rounded-md overflow-hidden relative flex items-center justify-center bg-gray-50 cursor-pointer ${!imagePreview ? 'border-dashed' : ''}`} 
+                        onDragOver={handleDragOver} 
+                        onDrop={handleDrop} 
+                        onClick={openFileDialog}
+                      >
+                        {imagePreview ? (
+                          <>
+                            <img src={imagePreview} alt="Product preview" className="h-full w-full object-contain" />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteImageDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-gray-400 p-2">
+                            <ImageIcon className="h-10 w-10 mb-1" />
+                            <span className="text-xs text-center">اسحب صورة هنا</span>
+                          </div>
+                        )}
+                        <input id="product-image" type="file" accept="image/*" className="hidden" onChange={handleImageChange} ref={fileInputRef} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -795,6 +816,29 @@ export default function AddProduct() {
       </Card>
       
       <BarcodeScanner isOpen={showScanner} onClose={() => setShowScanner(false)} onScan={handleBarcodeResult} />
+
+      <AlertDialog open={deleteImageDialogOpen} onOpenChange={setDeleteImageDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف الصورة</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف صورة المنتج؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setImagePreview(null);
+                setProductImage(null);
+                setDeleteImageDialogOpen(false);
+              }}
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
