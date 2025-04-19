@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -27,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { MoreDropdown } from "@/components/products/MoreDropdown";
-import { useQuery } from "@tanstack/react-query";
+import { fetchCategories } from "@/services/supabase/categoryService";
 
 export default function InventoryManagement() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -48,7 +49,7 @@ export default function InventoryManagement() {
 
   useEffect(() => {
     fetchProducts();
-    fetchCategories();
+    fetchCategoriesData();
     fetchSubcategories();
     fetchSubsubcategories();
     fetchMainCategories();
@@ -89,27 +90,19 @@ export default function InventoryManagement() {
 
       if (error) {
         console.error("Error fetching products:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch products.",
-          variant: "destructive",
-        });
+        toast.error("فشل في جلب المنتجات.");
       }
 
       setProducts(data || []);
     } catch (error) {
       console.error("Unexpected error fetching products:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while fetching products.",
-        variant: "destructive",
-      });
+      toast.error("حدث خطأ غير متوقع أثناء جلب المنتجات.");
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCategories = async () => {
+  const fetchCategoriesData = async () => {
     try {
       const { data, error } = await supabase
         .from("categories")
@@ -118,21 +111,13 @@ export default function InventoryManagement() {
 
       if (error) {
         console.error("Error fetching categories:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch categories.",
-          variant: "destructive",
-        });
+        toast.error("فشل في جلب الفئات.");
+      } else {
+        setCategories(data || []);
       }
-
-      setCategories(data || []);
     } catch (error) {
       console.error("Unexpected error fetching categories:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while fetching categories.",
-        variant: "destructive",
-      });
+      toast.error("حدث خطأ غير متوقع أثناء جلب الفئات.");
     }
   };
 
@@ -145,21 +130,13 @@ export default function InventoryManagement() {
 
       if (error) {
         console.error("Error fetching subcategories:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch subcategories.",
-          variant: "destructive",
-        });
+        toast.error("فشل في جلب الفئات الفرعية.");
+      } else {
+        setSubcategories(data || []);
       }
-
-      setSubcategories(data || []);
     } catch (error) {
       console.error("Unexpected error fetching subcategories:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while fetching subcategories.",
-        variant: "destructive",
-      });
+      toast.error("حدث خطأ غير متوقع أثناء جلب الفئات الفرعية.");
     }
   };
 
@@ -172,21 +149,13 @@ export default function InventoryManagement() {
 
       if (error) {
         console.error("Error fetching subsubcategories:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch subsubcategories.",
-          variant: "destructive",
-        });
+        toast.error("فشل في جلب الفئات الفرعية الفرعية.");
+      } else {
+        setSubsubcategories(data || []);
       }
-
-      setSubsubcategories(data || []);
     } catch (error) {
       console.error("Unexpected error fetching subsubcategories:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while fetching subsubcategories.",
-        variant: "destructive",
-      });
+      toast.error("حدث خطأ غير متوقع أثناء جلب الفئات الفرعية الفرعية.");
     }
   };
 
@@ -199,21 +168,13 @@ export default function InventoryManagement() {
 
       if (error) {
         console.error("Error fetching main categories:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch main categories.",
-          variant: "destructive",
-        });
+        toast.error("فشل في جلب الفئات الرئيسية.");
+      } else {
+        setMainCategories(data || []);
       }
-
-      setMainCategories(data || []);
     } catch (error) {
       console.error("Unexpected error fetching main categories:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while fetching main categories.",
-        variant: "destructive",
-      });
+      toast.error("حدث خطأ غير متوقع أثناء جلب الفئات الرئيسية.");
     }
   };
 
@@ -226,21 +187,13 @@ export default function InventoryManagement() {
 
       if (error) {
         console.error("Error fetching companies:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch companies.",
-          variant: "destructive",
-        });
+        toast.error("فشل في جلب الشركات.");
+      } else {
+        setCompanies(data || []);
       }
-
-      setCompanies(data || []);
     } catch (error) {
       console.error("Unexpected error fetching companies:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while fetching companies.",
-        variant: "destructive",
-      });
+      toast.error("حدث خطأ غير متوقع أثناء جلب الشركات.");
     }
   };
 
@@ -379,7 +332,10 @@ export default function InventoryManagement() {
                   </SelectContent>
                 </Select>
 
-                <Select value={sortOrder} onValueChange={setSortOrder}>
+                <Select 
+                  value={sortOrder} 
+                  onValueChange={(value: "asc" | "desc") => setSortOrder(value)}
+                >
                   <SelectTrigger id="order">
                     <SelectValue placeholder="تصاعدي" />
                   </SelectTrigger>
