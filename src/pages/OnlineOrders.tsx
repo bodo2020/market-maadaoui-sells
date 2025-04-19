@@ -17,7 +17,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { OrderActionsMenu } from "@/components/orders/OrderActionsMenu";
 import { OrderItemsDialog } from "@/components/orders/OrderItemsDialog";
 import { useNavigate } from "react-router-dom";
-
 type OrderFromDB = {
   id: string;
   created_at: string;
@@ -36,7 +35,6 @@ type OrderFromDB = {
   notes?: string | null;
   updated_at?: string | null;
 };
-
 export default function OnlineOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,63 +43,45 @@ export default function OnlineOrders() {
   const [selectedItems, setSelectedItems] = useState<any[] | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
-  const { markOrdersAsRead } = useNotificationStore();
+  const {
+    markOrdersAsRead
+  } = useNotificationStore();
   const navigate = useNavigate();
-
   useEffect(() => {
     fetchOrders();
     const channel = subscribeToOrders();
-    
     markOrdersAsRead();
-    
     return () => {
       if (channel) {
         supabase.removeChannel(channel);
       }
     };
   }, [activeTab]);
-
   const subscribeToOrders = () => {
-    const channel = supabase
-      .channel('online-orders')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'online_orders'
-        },
-        (payload) => {
-          toast.info("طلب جديد!", {
-            description: "تم استلام طلب جديد"
-          });
-          fetchOrders();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'online_orders'
-        },
-        (payload) => {
-          fetchOrders();
-        }
-      )
-      .subscribe();
-
+    const channel = supabase.channel('online-orders').on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'online_orders'
+    }, payload => {
+      toast.info("طلب جديد!", {
+        description: "تم استلام طلب جديد"
+      });
+      fetchOrders();
+    }).on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'online_orders'
+    }, payload => {
+      fetchOrders();
+    }).subscribe();
     return channel;
   };
-
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      let query = supabase
-        .from('online_orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
+      let query = supabase.from('online_orders').select('*').order('created_at', {
+        ascending: false
+      });
       if (activeTab === "pending") {
         query = query.eq('status', 'pending');
       } else if (activeTab === "processing") {
@@ -115,11 +95,11 @@ export default function OnlineOrders() {
       } else if (activeTab === "unpaid") {
         query = query.eq('payment_status', 'pending');
       }
-
-      const { data, error } = await query;
-
+      const {
+        data,
+        error
+      } = await query;
       if (error) throw error;
-      
       const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => ({
         id: item.id,
         created_at: item.created_at,
@@ -132,9 +112,8 @@ export default function OnlineOrders() {
         customer_name: item.customer_name || 'غير معروف',
         customer_email: item.customer_email || '',
         customer_phone: item.customer_phone || '',
-        notes: item.notes || '',
+        notes: item.notes || ''
       }));
-      
       setOrders(transformedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -143,21 +122,14 @@ export default function OnlineOrders() {
       setLoading(false);
     }
   };
-
   const validateOrderStatus = (status: string): Order['status'] => {
     const validStatuses: Order['status'][] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
-    return validStatuses.includes(status as Order['status']) 
-      ? (status as Order['status']) 
-      : 'pending';
+    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
   };
-
   const validatePaymentStatus = (status: string): Order['payment_status'] => {
     const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
-    return validStatuses.includes(status as Order['payment_status']) 
-      ? (status as Order['payment_status']) 
-      : 'pending';
+    return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
   };
-
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<Order['status'], "default" | "destructive" | "outline" | "secondary"> = {
       pending: "outline",
@@ -166,7 +138,6 @@ export default function OnlineOrders() {
       delivered: "default",
       cancelled: "destructive"
     };
-    
     const labels: Record<Order['status'], string> = {
       pending: "بانتظار التجهيز",
       processing: "قيد المعالجة",
@@ -174,14 +145,10 @@ export default function OnlineOrders() {
       delivered: "تم التسليم",
       cancelled: "ملغي"
     };
-    
-    return (
-      <Badge variant={variants[status]} className="mx-auto whitespace-nowrap">
+    return <Badge variant={variants[status]} className="mx-auto whitespace-nowrap">
         {labels[status]}
-      </Badge>
-    );
+      </Badge>;
   };
-
   const getPaymentStatusBadge = (status: Order['payment_status']) => {
     const variants: Record<Order['payment_status'], "default" | "destructive" | "outline" | "secondary"> = {
       pending: "outline",
@@ -189,44 +156,30 @@ export default function OnlineOrders() {
       failed: "destructive",
       refunded: "secondary"
     };
-    
     const labels: Record<Order['payment_status'], string> = {
       pending: "بانتظار الدفع",
       paid: "مدفوع",
       failed: "فشل الدفع",
       refunded: "تم الاسترجاع"
     };
-    
-    return (
-      <Badge variant={variants[status]} className="mx-auto whitespace-nowrap">
+    return <Badge variant={variants[status]} className="mx-auto whitespace-nowrap">
         {labels[status]}
-      </Badge>
-    );
+      </Badge>;
   };
-
   const getOrderItemsCount = (order: Order) => {
     return order.items ? order.items.length : 0;
   };
-
   const getPendingOrdersCount = () => {
     return orders.filter(order => order.status === 'pending' || order.status === 'processing').length;
   };
-
   const getUnpaidOrdersCount = () => {
     return orders.filter(order => order.payment_status === 'pending').length;
   };
-
   const filteredOrders = orders.filter(order => {
     if (!searchQuery) return true;
-    
     const searchLower = searchQuery.toLowerCase();
-    return (
-      order.id.toLowerCase().includes(searchLower) ||
-      (order.customer_name && order.customer_name.toLowerCase().includes(searchLower)) ||
-      (order.customer_phone && order.customer_phone.toLowerCase().includes(searchLower))
-    );
+    return order.id.toLowerCase().includes(searchLower) || order.customer_name && order.customer_name.toLowerCase().includes(searchLower) || order.customer_phone && order.customer_phone.toLowerCase().includes(searchLower);
   });
-
   const showCustomerProfile = (order: Order) => {
     setSelectedCustomer({
       name: order.customer_name,
@@ -236,7 +189,6 @@ export default function OnlineOrders() {
       order: order
     });
   };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('ar-EG', {
@@ -247,28 +199,23 @@ export default function OnlineOrders() {
       minute: '2-digit'
     }).format(date);
   };
-
   const downloadOrders = () => {
     toast.info("جاري تحميل الطلبات...");
   };
-
   const createNewOrder = () => {
     toast.info("إنشاء طلب جديد");
   };
-
   const handleArchive = (order: Order) => {
     toast.success("تم أرشفة الطلب");
   };
-
   const handleCancel = async (order: Order) => {
     try {
-      const { error } = await supabase
-        .from('online_orders')
-        .update({ status: 'cancelled' })
-        .eq('id', order.id);
-      
+      const {
+        error
+      } = await supabase.from('online_orders').update({
+        status: 'cancelled'
+      }).eq('id', order.id);
       if (error) throw error;
-      
       fetchOrders();
       toast.success("تم إلغاء الطلب");
     } catch (error) {
@@ -276,20 +223,17 @@ export default function OnlineOrders() {
       toast.error("حدث خطأ أثناء إلغاء الطلب");
     }
   };
-
   const handleProcess = (order: Order) => {
     navigate(`/online-orders/${order.id}`);
   };
-
   const handleComplete = async (order: Order) => {
     try {
-      const { error } = await supabase
-        .from('online_orders')
-        .update({ status: 'delivered' })
-        .eq('id', order.id);
-      
+      const {
+        error
+      } = await supabase.from('online_orders').update({
+        status: 'delivered'
+      }).eq('id', order.id);
       if (error) throw error;
-      
       fetchOrders();
       toast.success("تم اكتمال الطلب");
     } catch (error) {
@@ -297,9 +241,7 @@ export default function OnlineOrders() {
       toast.error("حدث خطأ أثناء اكتمال الطلب");
     }
   };
-
-  return (
-    <MainLayout>
+  return <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">الطلبات</h1>
@@ -328,7 +270,7 @@ export default function OnlineOrders() {
             <TabsTrigger value="processing" className="font-semibold">قيد المعالجة</TabsTrigger>
             <TabsTrigger value="shipped" className="font-semibold">تم الشحن</TabsTrigger>
             <TabsTrigger value="delivered" className="font-semibold">تم التسليم</TabsTrigger>
-            <TabsTrigger value="cancelled" className="font-semibold">��لغي</TabsTrigger>
+            <TabsTrigger value="cancelled" className="font-semibold">ملغي</TabsTrigger>
             <TabsTrigger value="unpaid" className="relative font-semibold">
               غير مدفوع
               <Badge className="mr-2 bg-primary">{getUnpaidOrdersCount()}</Badge>
@@ -338,12 +280,7 @@ export default function OnlineOrders() {
           <div className="mb-4 flex">
             <div className="relative w-full max-w-sm">
               <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="البحث والتصنيفات"
-                className="pl-10 pr-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+              <Input placeholder="البحث والتصنيفات" className="pl-10 pr-10" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
             </div>
           </div>
 
@@ -355,10 +292,7 @@ export default function OnlineOrders() {
                 </div>
               </CardHeader>
               <CardContent>
-                {loading ? (
-                  <p className="text-center py-4">جاري التحميل...</p>
-                ) : (
-                  <div className="overflow-x-auto">
+                {loading ? <p className="text-center py-4">جاري التحميل...</p> : <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -376,20 +310,12 @@ export default function OnlineOrders() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredOrders.length === 0 ? (
-                          <TableRow>
+                        {filteredOrders.length === 0 ? <TableRow>
                             <TableCell colSpan={9} className="text-center">
                               لا توجد طلبات مسجلة
                             </TableCell>
-                          </TableRow>
-                        ) : (
-                          filteredOrders.map((order, index) => (
-                            <TableRow 
-                              key={order.id} 
-                              className="cursor-pointer hover:bg-muted/50" 
-                              onClick={() => navigate(`/online-orders/${order.id}`)}
-                            >
-                              <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                          </TableRow> : filteredOrders.map((order, index) => <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/online-orders/${order.id}`)}>
+                              <TableCell className="text-center" onClick={e => e.stopPropagation()}>
                                 <Checkbox />
                               </TableCell>
                               <TableCell className="font-medium">#{order.id.slice(0, 8)}</TableCell>
@@ -397,14 +323,10 @@ export default function OnlineOrders() {
                                 {formatDate(order.created_at)}
                               </TableCell>
                               <TableCell>
-                                <Button 
-                                  variant="link" 
-                                  className="p-0 h-auto text-right underline"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    showCustomerProfile(order);
-                                  }}
-                                >
+                                <Button variant="link" className="p-0 h-auto text-right underline" onClick={e => {
+                          e.stopPropagation();
+                          showCustomerProfile(order);
+                        }}>
                                   {order.customer_name || 'غير معروف'}
                                 </Button>
                               </TableCell>
@@ -415,54 +337,29 @@ export default function OnlineOrders() {
                               <TableCell className="text-center">
                                 {getStatusBadge(order.status)}
                               </TableCell>
-                              <TableCell 
-                                className="text-center cursor-pointer hover:text-primary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedItems(order.items);
-                                }}
-                              >
+                              <TableCell className="text-center cursor-pointer hover:text-primary" onClick={e => {
+                        e.stopPropagation();
+                        setSelectedItems(order.items);
+                      }}>
                                 {getOrderItemsCount(order)}
                               </TableCell>
-                              <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                                <OrderActionsMenu
-                                  onArchive={() => handleArchive(order)}
-                                  onCancel={() => handleCancel(order)}
-                                  onProcess={() => handleProcess(order)}
-                                  onComplete={() => handleComplete(order)}
-                                />
+                              <TableCell className="text-center" onClick={e => e.stopPropagation()}>
+                                <OrderActionsMenu onArchive={() => handleArchive(order)} onCancel={() => handleCancel(order)} onProcess={() => handleProcess(order)} onComplete={() => handleComplete(order)} />
                               </TableCell>
-                            </TableRow>
-                          ))
-                        )}
+                            </TableRow>)}
                       </TableBody>
                     </Table>
-                  </div>
-                )}
+                  </div>}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
 
-        <OrderDetailsDialog
-          order={selectedOrder}
-          open={!!selectedOrder}
-          onOpenChange={(open) => !open && setSelectedOrder(null)}
-          onStatusUpdated={fetchOrders}
-        />
+        <OrderDetailsDialog order={selectedOrder} open={!!selectedOrder} onOpenChange={open => !open && setSelectedOrder(null)} onStatusUpdated={fetchOrders} />
         
-        <OrderItemsDialog
-          items={selectedItems || []}
-          open={!!selectedItems}
-          onClose={() => setSelectedItems(null)}
-        />
+        <OrderItemsDialog items={selectedItems || []} open={!!selectedItems} onClose={() => setSelectedItems(null)} />
         
-        <CustomerProfileDialog
-          customer={selectedCustomer}
-          open={!!selectedCustomer}
-          onOpenChange={(open) => !open && setSelectedCustomer(null)}
-        />
+        <CustomerProfileDialog customer={selectedCustomer} open={!!selectedCustomer} onOpenChange={open => !open && setSelectedCustomer(null)} />
       </div>
-    </MainLayout>
-  );
+    </MainLayout>;
 }
