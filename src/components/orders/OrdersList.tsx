@@ -19,6 +19,7 @@ interface OrdersListProps {
   onConfirmPayment: (order: Order) => void;
   onCancelOrder: (order: Order) => void;
   onChangeFilters: (filters: Partial<OrderFilters>) => void;
+  onRestoreOrder: (order: Order) => void;
 }
 
 export function OrdersList({
@@ -30,7 +31,8 @@ export function OrdersList({
   onAssignDelivery,
   onConfirmPayment,
   onCancelOrder,
-  onChangeFilters
+  onChangeFilters,
+  onRestoreOrder
 }: OrdersListProps) {
   
   const getStatusBadge = (status: Order['status']) => {
@@ -103,7 +105,7 @@ export function OrdersList({
         </TableHeader>
         <TableBody>
           {orders.map((order) => (
-            <TableRow key={order.id}>
+            <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onViewDetails(order)}>
               <TableCell className="text-center">
                 <Checkbox />
               </TableCell>
@@ -113,7 +115,6 @@ export function OrdersList({
                 <Button
                   variant="link"
                   className="p-0 h-auto flex items-center gap-1 text-primary"
-                  onClick={() => onViewDetails(order)}
                 >
                   <User className="h-4 w-4" />
                   {order.customer_name || 'غير معروف'}
@@ -126,21 +127,15 @@ export function OrdersList({
               <TableCell className="text-center">
                 {getStatusBadge(order.status)}
               </TableCell>
-              <TableCell className="text-center">
+              <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-center gap-1">
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => onViewDetails(order)}
-                    title="عرض التفاصيل"
-                  >
-                    <Package className="h-4 w-4" />
-                  </Button>
-                  
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onPrintInvoice(order)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPrintInvoice(order);
+                    }}
                     title="طباعة الفاتورة"
                   >
                     <Printer className="h-4 w-4" />
@@ -150,7 +145,10 @@ export function OrdersList({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => onMarkAsReady(order)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMarkAsReady(order);
+                      }}
                       title="تحديث حالة الطلب إلى جاهز للتوصيل"
                     >
                       <CheckCircle className="h-4 w-4" />
@@ -161,7 +159,10 @@ export function OrdersList({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => onAssignDelivery(order)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAssignDelivery(order);
+                      }}
                       title="تعيين مندوب توصيل"
                     >
                       <Truck className="h-4 w-4" />
@@ -172,23 +173,44 @@ export function OrdersList({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => onConfirmPayment(order)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onConfirmPayment(order);
+                      }}
                       title="تأكيد الدفع"
                     >
                       <CreditCard className="h-4 w-4" />
                     </Button>
                   )}
                   
-                  {(order.status === 'pending' || order.status === 'processing') && (
+                  {order.status === 'cancelled' ? (
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => onCancelOrder(order)}
-                      title="إلغاء الطلب"
+                      className="text-primary hover:text-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRestoreOrder(order);
+                      }}
+                      title="استعادة الطلب"
                     >
-                      <XCircle className="h-4 w-4" />
+                      <RotateCcw className="h-4 w-4" />
                     </Button>
+                  ) : (
+                    (order.status === 'pending' || order.status === 'processing') && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCancelOrder(order);
+                        }}
+                        title="إلغاء الطلب"
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
+                    )
                   )}
                 </div>
               </TableCell>

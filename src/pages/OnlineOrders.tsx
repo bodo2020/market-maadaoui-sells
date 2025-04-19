@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -28,15 +29,10 @@ export default function OnlineOrders() {
     confirmPayment,
     assignDeliveryPerson,
     cancelOrder,
-    refreshOrders
   } = useOrdersData({
     ...filters,
     searchQuery
   });
-
-  useEffect(() => {
-    refreshOrders();
-  }, [filters, searchQuery]);
   
   const handleTabChange = (value: string) => {
     setFilters(prev => {
@@ -80,6 +76,12 @@ export default function OnlineOrders() {
   const handlePrintInvoice = (order: Order) => {
     printOrderInvoice(order);
   };
+
+  const handleRestoreOrder = (order: Order) => {
+    if (order.status === 'cancelled') {
+      updateOrderStatus(order.id, 'pending');
+    }
+  };
   
   return (
     <MainLayout>
@@ -89,7 +91,7 @@ export default function OnlineOrders() {
           onTabChange={handleTabChange}
           onSearchChange={setSearchQuery}
           searchQuery={searchQuery}
-          onRefresh={refreshOrders}
+          onRefresh={() => {}}
           isLoading={loading}
         />
         
@@ -119,6 +121,7 @@ export default function OnlineOrders() {
               onConfirmPayment={handleConfirmPayment}
               onCancelOrder={handleCancelOrder}
               onChangeFilters={setFilters}
+              onRestoreOrder={handleRestoreOrder}
             />
           )}
         </div>
@@ -143,6 +146,7 @@ export default function OnlineOrders() {
             onConfirm={(order) => {
               cancelOrder(order.id);
               setCancelDialogOpen(false);
+              setFilters(prev => ({ ...prev, status: 'cancelled' }));
             }}
           />
         )}
