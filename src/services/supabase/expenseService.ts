@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Expense } from "@/types";
 
@@ -32,28 +31,51 @@ export async function fetchExpenseById(id: string) {
 }
 
 export async function createExpense(expense: Omit<Expense, "id" | "created_at" | "updated_at">) {
-  // Ensure date is always a string format for Supabase
-  const formattedDate = typeof expense.date === 'string' 
+  try {
+    // First deduct from cash register
+    const { error: deductionError } = await supabase.functions.invoke(
+      'add-cash-transaction',
+      {
+        body: {
+          amount: expense.amount,
+          transaction_type: 'withdrawal',
+          register_type: 'store',
+          notes: `مصروف: ${expense.type} - ${expense.description}`
+        }
+      }
+    );
+
+    if (deductionError) {
+      console.error("Error deducting expense from cash register:", deductionError);
+      throw new Error("فشل في خصم المبلغ من الخزنة");
+    }
+
+    // Ensure date is always a string format for Supabase
+    const formattedDate = typeof expense.date === 'string' 
     ? expense.date 
     : (expense.date as Date).toISOString();
 
-  const { data, error } = await supabase
-    .from("expenses")
-    .insert([{
-      type: expense.type,
-      amount: expense.amount,
-      description: expense.description,
-      date: formattedDate,
-      receipt_url: expense.receipt_url || null,
-    }])
-    .select();
+    const { data, error } = await supabase
+      .from("expenses")
+      .insert([{
+        type: expense.type,
+        amount: expense.amount,
+        description: expense.description,
+        date: formattedDate,
+        receipt_url: expense.receipt_url || null,
+      }])
+      .select();
 
-  if (error) {
-    console.error("Error creating expense:", error);
+    if (error) {
+      console.error("Error creating expense:", error);
+      throw error;
+    }
+
+    return data[0] as Expense;
+  } catch (error) {
+    console.error("Error in createExpense:", error);
     throw error;
   }
-
-  return data[0] as Expense;
 }
 
 export async function updateExpense(id: string, expense: Partial<Expense>) {
@@ -88,6 +110,36 @@ export async function updateExpense(id: string, expense: Partial<Expense>) {
 }
 
 export async function deleteExpense(id: string) {
+  // Get the expense details first
+  const { data: expense, error: fetchError } = await supabase
+    .from("expenses")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (fetchError) {
+    console.error("Error fetching expense for deletion:", fetchError);
+    throw fetchError;
+  }
+
+  // Refund the amount to the cash register
+  const { error: refundError } = await supabase.functions.invoke(
+    'add-cash-transaction',
+    {
+      body: {
+        amount: expense.amount,
+        transaction_type: 'deposit',
+        register_type: 'store',
+        notes: `إلغاء مصروف: ${expense.type} - ${expense.description}`
+      }
+    }
+  );
+
+  if (refundError) {
+    console.error("Error refunding to cash register:", refundError);
+    throw new Error("فشل في إعادة المبلغ للخزنة");
+  }
+
   const { error } = await supabase
     .from("expenses")
     .delete()

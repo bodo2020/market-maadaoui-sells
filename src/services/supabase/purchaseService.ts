@@ -35,6 +35,27 @@ export async function createPurchase(purchaseData: any) {
       purchaseData.invoice_number = `P-${year}${month}${day}-${randomPart}`;
     }
 
+    // First, deduct the paid amount from the store cash register
+    if (purchaseData.paid > 0) {
+      const { data: deductionResult, error: deductionError } = await supabase.functions.invoke(
+        'add-cash-transaction',
+        {
+          body: {
+            amount: purchaseData.paid,
+            transaction_type: 'withdrawal',
+            register_type: 'store',
+            notes: `دفع مستحقات المورد - فاتورة رقم: ${purchaseData.invoice_number}`
+          }
+        }
+      );
+
+      if (deductionError) {
+        console.error("Error deducting from cash register:", deductionError);
+        toast.error("فشل في خصم المبلغ من الخزنة");
+        return null;
+      }
+    }
+
     // First, create the purchase record
     const { data: purchase, error: purchaseError } = await supabase
       .from("purchases")
