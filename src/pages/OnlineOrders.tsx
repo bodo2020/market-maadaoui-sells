@@ -11,6 +11,7 @@ import { Order } from "@/types";
 import { printOrderInvoice } from "@/services/orders/printOrderService";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function OnlineOrders() {
   // State for filters and dialogs
@@ -123,8 +124,14 @@ export default function OnlineOrders() {
         
         <div className="mt-6">
           {loading ? (
-            <div className="p-6 bg-white rounded-lg shadow text-center">
-              <p className="text-muted-foreground">جاري تحميل الطلبات...</p>
+            <div className="p-6 bg-white rounded-lg shadow">
+              <div className="space-y-3">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <div className="text-center mt-4 text-muted-foreground">جاري تحميل الطلبات...</div>
+              </div>
             </div>
           ) : orders.length === 0 ? (
             <div className="p-6 bg-white rounded-lg shadow text-center">

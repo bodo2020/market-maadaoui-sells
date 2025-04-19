@@ -128,7 +128,6 @@ export function useOrdersData(filters: OrderFilters = {}) {
     } catch (error) {
       console.error('Error in fetchOrders:', error);
       toast.error("حدث خطأ أثناء تحميل الطلبات");
-      throw error;
     } finally {
       setLoading(false);
       console.log("Orders loading finished");
@@ -272,6 +271,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
   };
 
   const refreshOrders = () => {
+    setLoading(true); // Ensure loading state is set
     fetchOrders();
   };
 
