@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -17,56 +16,41 @@ export interface OrderFilters {
 export function useOrdersData(filters: OrderFilters = {}) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { setUnreadOrders } = useNotificationStore();
 
-  // Load orders from Supabase
   useEffect(() => {
-    let isMounted = true;
-    
-    fetchOrders().then(() => {
-      if (isMounted) {
-        setupRealtimeSubscription();
-      }
-    }).catch((error) => {
-      console.error("Error fetching orders:", error);
-      if (isMounted) {
-        toast.error("حدث خطأ أثناء تحميل الطلبات");
-        setLoading(false); // Ensure loading is set to false even on error
-      }
-    });
+    fetchOrders();
+    setupRealtimeSubscription();
     
     return () => {
-      isMounted = false;
       cleanupRealtimeSubscription();
     };
-  }, [filters, refreshTrigger]);
+  }, [filters]);
 
-  // Setup realtime subscription for new orders
   const setupRealtimeSubscription = () => {
     const channel = supabase.channel('online-orders-changes')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'online_orders' }, 
         (payload) => {
           console.log('Order change detected:', payload);
-          fetchOrders();
+          toast.info('تم تحديث الطلبات', {
+            description: 'اضغط على زر التحديث لتحميل التغييرات'
+          });
         })
       .subscribe();
       
     return channel;
   };
-  
+
   const cleanupRealtimeSubscription = () => {
     supabase.removeChannel(supabase.channel('online-orders-changes'));
   };
 
-  // Fetch orders from Supabase with filtering
   const fetchOrders = async () => {
     try {
       setLoading(true);
       console.log("Fetching orders with filters:", filters);
       
-      // Build query with filters
       let query = supabase.from('online_orders')
         .select(`
           *,
@@ -79,17 +63,14 @@ export function useOrdersData(filters: OrderFilters = {}) {
         `)
         .order('created_at', { ascending: false });
       
-      // Apply status filter if provided
       if (filters.status && filters.status !== 'all') {
         query = query.eq('status', filters.status);
       }
       
-      // Apply payment status filter if provided
       if (filters.paymentStatus && filters.paymentStatus !== 'all') {
         query = query.eq('payment_status', filters.paymentStatus);
       }
       
-      // Apply search query if provided
       if (filters.searchQuery) {
         const searchTerm = `%${filters.searchQuery}%`;
         query = query.or(`id.ilike.${searchTerm},shipping_address.ilike.${searchTerm}`);
@@ -104,9 +85,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
       
       console.log("Orders data from Supabase:", data);
       
-      // Transform data into Order objects
       const transformedOrders: Order[] = (data || []).map(item => {
-        // Parse items to ensure they match OrderItem type
         let parsedItems: OrderItem[] = [];
         
         if (Array.isArray(item.items)) {
@@ -141,7 +120,6 @@ export function useOrdersData(filters: OrderFilters = {}) {
       console.log("Transformed orders:", transformedOrders);
       setOrders(transformedOrders);
       
-      // Count pending orders for notification badge
       const pendingCount = data?.filter(order => order.status === 'pending').length || 0;
       setUnreadOrders(pendingCount);
       
@@ -154,20 +132,17 @@ export function useOrdersData(filters: OrderFilters = {}) {
       console.log("Orders loading finished");
     }
   };
-  
-  // Helper function to ensure status is valid
+
   const transformStatus = (status: string): Order['status'] => {
     const validStatuses: Order['status'][] = ['pending', 'processing', 'ready', 'shipped', 'delivered', 'cancelled'];
     return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
   };
-  
-  // Helper function to ensure payment status is valid
+
   const transformPaymentStatus = (status: string): Order['payment_status'] => {
     const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
     return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
   };
-  
-  // Order management functions
+
   const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
     try {
       const updates = {
@@ -189,10 +164,9 @@ export function useOrdersData(filters: OrderFilters = {}) {
       toast.error("حدث خطأ أثناء تحديث حالة الطلب");
     }
   };
-  
+
   const confirmPayment = async (orderId: string) => {
     try {
-      // First, check the current order status
       const { data: orderData, error: fetchError } = await supabase
         .from('online_orders')
         .select('status')
@@ -201,7 +175,6 @@ export function useOrdersData(filters: OrderFilters = {}) {
       
       if (fetchError) throw fetchError;
       
-      // Update payment status and order status if needed
       let updates: { 
         payment_status: string; 
         updated_at: string;
@@ -211,7 +184,6 @@ export function useOrdersData(filters: OrderFilters = {}) {
         updated_at: new Date().toISOString()
       };
       
-      // If order is still pending, automatically move it to processing state
       if (orderData.status === 'pending') {
         updates.status = 'processing';
       }
@@ -234,7 +206,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
       toast.error('حدث خطأ أثناء تأكيد الدفع');
     }
   };
-  
+
   const assignDeliveryPerson = async (orderId: string, deliveryPerson: string, trackingNumber?: string) => {
     try {
       const updates: {
@@ -264,7 +236,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
       toast.error('حدث خطأ أثناء تعيين مندوب التوصيل');
     }
   };
-  
+
   const cancelOrder = async (orderId: string) => {
     try {
       const { error } = await supabase
@@ -284,8 +256,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
       toast.error('حدث خطأ أثناء إلغاء الطلب');
     }
   };
-  
-  // Helper function to get order status text
+
   const getOrderStatusText = (status: string): string => {
     switch(status) {
       case 'pending': return 'قيد الانتظار';
@@ -297,12 +268,11 @@ export function useOrdersData(filters: OrderFilters = {}) {
       default: return 'غير معروف';
     }
   };
-  
-  // Force refresh orders
+
   const refreshOrders = () => {
-    setRefreshTrigger(prev => prev + 1);
+    fetchOrders();
   };
-  
+
   return {
     orders,
     loading,
