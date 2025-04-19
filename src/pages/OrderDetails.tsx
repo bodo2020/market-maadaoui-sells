@@ -1,3 +1,4 @@
+
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
@@ -136,6 +137,9 @@ export default function OrderDetails() {
         selectedStatus === 'ready' ? 'جاهز للشحن' : 
         selectedStatus === 'shipped' ? 'تم الشحن' : 'تم التسليم'
       }`);
+      
+      // Refetch the order to ensure we have the latest data from Supabase
+      fetchOrder();
     } catch (error) {
       console.error('Error updating order status:', error);
       toast.error('حدث خطأ أثناء تحديث حالة الطلب');
@@ -193,28 +197,40 @@ export default function OrderDetails() {
               <div className="flex gap-2">
                 <button 
                   onClick={() => setSelectedStatus('waiting')} 
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'waiting' ? getStatusBadgeColor('waiting') : order?.status === 'waiting' ? getStatusBadgeColor('waiting') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    selectedStatus === 'waiting' ? 'ring-2 ring-amber-500 ' + getStatusBadgeColor('waiting') : 
+                    order?.status === 'waiting' ? getStatusBadgeColor('waiting') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  }`}
                   disabled={isUpdatingStatus || order.status === 'waiting'}
                 >
                   في الانتظار
                 </button>
                 <button 
                   onClick={() => setSelectedStatus('ready')} 
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'ready' ? getStatusBadgeColor('ready') : order?.status === 'ready' ? getStatusBadgeColor('ready') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    selectedStatus === 'ready' ? 'ring-2 ring-green-500 ' + getStatusBadgeColor('ready') : 
+                    order?.status === 'ready' ? getStatusBadgeColor('ready') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  }`}
                   disabled={isUpdatingStatus || order.status === 'ready'}
                 >
                   جاهز للشحن
                 </button>
                 <button 
                   onClick={() => setSelectedStatus('shipped')} 
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'shipped' ? getStatusBadgeColor('shipped') : order?.status === 'shipped' ? getStatusBadgeColor('shipped') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    selectedStatus === 'shipped' ? 'ring-2 ring-blue-500 ' + getStatusBadgeColor('shipped') : 
+                    order?.status === 'shipped' ? getStatusBadgeColor('shipped') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  }`}
                   disabled={isUpdatingStatus || order.status === 'shipped'}
                 >
                   تم الشحن
                 </button>
                 <button 
                   onClick={() => setSelectedStatus('done')} 
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${selectedStatus === 'done' ? getStatusBadgeColor('done') : order?.status === 'done' ? getStatusBadgeColor('done') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    selectedStatus === 'done' ? 'ring-2 ring-gray-500 ' + getStatusBadgeColor('done') : 
+                    order?.status === 'done' ? getStatusBadgeColor('done') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  }`}
                   disabled={isUpdatingStatus || order.status === 'done'}
                 >
                   تم التسليم
@@ -224,7 +240,7 @@ export default function OrderDetails() {
                 <Button
                   onClick={handleStatusChange}
                   disabled={isUpdatingStatus}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 bg-primary hover:bg-primary/90"
                 >
                   <Check className="h-4 w-4" />
                   تأكيد تحديث الحالة
