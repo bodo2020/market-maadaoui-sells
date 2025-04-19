@@ -5,15 +5,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Save, Trash2 } from "lucide-react";
-import { fetchDeliveryTypes, fetchDeliveryTypePricing, createDeliveryTypePrice } from "@/services/supabase/deliveryService";
-import { DeliveryTypePricingData } from "@/types/shipping";
+import { fetchDeliveryTypes, fetchDeliveryTypePricing, createDeliveryTypePrice, deleteDeliveryTypePrice } from "@/services/supabase/deliveryService";
+import { DeliveryTypePrice } from "@/types/shipping";
 import { Badge } from "@/components/ui/badge";
 
 interface DeliveryTypePricingProps {
   locationId: string;
+  onSuccess?: () => void;
 }
 
-export default function DeliveryTypePricing({ locationId }: DeliveryTypePricingProps) {
+export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryTypePricingProps) {
   const queryClient = useQueryClient();
   const [isAddingPrice, setIsAddingPrice] = useState(false);
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -53,10 +54,23 @@ export default function DeliveryTypePricing({ locationId }: DeliveryTypePricingP
       setSelectedType(null);
       setPriceInput("");
       setEstimatedTimeInput("");
+      onSuccess?.();
     },
     onError: (error) => {
       console.error("Error creating delivery type price:", error);
       toast.error("حدث خطأ أثناء إضافة السعر");
+    }
+  });
+
+  const deletePriceMutation = useMutation({
+    mutationFn: (id: string) => deleteDeliveryTypePrice(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deliveryTypePricing", locationId] });
+      toast.success("تم حذف السعر بنجاح");
+    },
+    onError: (error) => {
+      console.error("Error deleting delivery type price:", error);
+      toast.error("حدث خطأ أثناء حذف السعر");
     }
   });
 
@@ -114,7 +128,7 @@ export default function DeliveryTypePricing({ locationId }: DeliveryTypePricingP
         <p className="text-xs text-muted-foreground">لا توجد خيارات توصيل مضافة بعد</p>
       ) : (
         <div className="space-y-2">
-          {pricingData.map((pricing: DeliveryTypePricingData) => (
+          {pricingData.map((pricing: DeliveryTypePrice) => (
             <div key={pricing.id} className="flex justify-between items-center bg-muted/40 p-1.5 rounded">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="h-5 px-1.5 bg-background text-xs">
@@ -130,7 +144,12 @@ export default function DeliveryTypePricing({ locationId }: DeliveryTypePricingP
                 <span className="text-xs font-medium">
                   {pricing.price} ج.م
                 </span>
-                <Button variant="ghost" size="icon" className="h-6 w-6">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6"
+                  onClick={() => deletePriceMutation.mutate(pricing.id)}
+                >
                   <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>
               </div>

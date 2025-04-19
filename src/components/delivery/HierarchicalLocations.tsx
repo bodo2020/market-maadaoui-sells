@@ -399,6 +399,13 @@ export default function HierarchicalLocations() {
           open={openDialog}
           onOpenChange={setOpenDialog}
           mode={dialogMode}
+          parentData={
+            dialogMode === 'city' 
+              ? { governorate: selectedGovernorate! }
+              : dialogMode === 'area'
+                ? { governorate: selectedGovernorate!, city: selectedCity! }
+                : { governorate: selectedGovernorate!, city: selectedCity!, area: selectedArea! }
+          }
           onSuccess={(data) => createLocationMutation.mutate(data)}
         />
       )}

@@ -16,8 +16,8 @@ interface DeliveryLocationDialogProps {
     city?: string;
     area?: string;
   };
-  providerId?: string;
-  onSuccess?: () => void;
+  providerId?: string | null;
+  onSuccess?: (data?: any) => void;
 }
 
 export default function DeliveryLocationDialog({
@@ -43,6 +43,7 @@ export default function DeliveryLocationDialog({
         case 'governorate':
           result = await createGovernorate({ 
             governorate: name,
+            name: name,
             provider_id: providerId 
           });
           setNewLocationId(result.id);
@@ -52,6 +53,7 @@ export default function DeliveryLocationDialog({
             result = await createCity({
               governorate: parentData.governorate,
               city: name,
+              name: `${parentData.governorate} - ${name}`,
               provider_id: providerId
             });
             setNewLocationId(result.id);
@@ -63,6 +65,7 @@ export default function DeliveryLocationDialog({
               governorate: parentData.governorate,
               city: parentData.city,
               area: name,
+              name: `${parentData.governorate} - ${parentData.city} - ${name}`,
               provider_id: providerId
             });
             setNewLocationId(result.id);
@@ -76,6 +79,7 @@ export default function DeliveryLocationDialog({
               area: parentData.area,
               neighborhood: name,
               price: 0, // Add default price to fix the TypeScript error
+              name: `${parentData.governorate} - ${parentData.city} - ${parentData.area} - ${name}`,
               provider_id: providerId
             });
             setNewLocationId(result.id);
@@ -92,7 +96,7 @@ export default function DeliveryLocationDialog({
   };
 
   const handleFinish = () => {
-    onSuccess?.();
+    onSuccess?.({name});
     setName("");
     setShowPricing(false);
     setNewLocationId(null);
@@ -148,10 +152,17 @@ export default function DeliveryLocationDialog({
             </div>
           </form>
         ) : (
-          <DeliveryTypePricing 
-            locationId={newLocationId!}
-            onSuccess={handleFinish}
-          />
+          <div>
+            <DeliveryTypePricing 
+              locationId={newLocationId!}
+              onSuccess={handleFinish}
+            />
+            <div className="mt-4 flex justify-end">
+              <Button onClick={handleFinish}>
+                إنهاء
+              </Button>
+            </div>
+          </div>
         )}
       </DialogContent>
     </Dialog>

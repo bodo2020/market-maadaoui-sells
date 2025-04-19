@@ -220,6 +220,16 @@ export async function deleteDeliveryLocation(id: string) {
   }
 }
 
+export async function deleteDeliveryTypePrice(id: string) {
+  const { error } = await supabase
+    .from('delivery_type_pricing')
+    .delete()
+    .eq('id', id);
+    
+  if (error) throw error;
+  return true;
+}
+
 export async function fetchDeliveryTypes() {
   console.log('Fetching delivery types');
   
