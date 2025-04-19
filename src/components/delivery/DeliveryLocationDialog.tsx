@@ -1,10 +1,10 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { createGovernorate, createCity, createArea, createNeighborhood } from "@/services/supabase/deliveryService";
+import DeliveryTypePricing from "./DeliveryTypePricing";
 
 interface DeliveryLocationDialogProps {
   open: boolean;
@@ -29,59 +29,72 @@ export default function DeliveryLocationDialog({
 }: DeliveryLocationDialogProps) {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [newLocationId, setNewLocationId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      let result;
       switch (mode) {
         case 'governorate':
-          await createGovernorate({ 
+          result = await createGovernorate({ 
             governorate: name,
             provider_id: providerId 
           });
+          setNewLocationId(result.id);
           break;
         case 'city':
           if (parentData?.governorate) {
-            await createCity({
+            result = await createCity({
               governorate: parentData.governorate,
               city: name,
               provider_id: providerId
             });
+            setNewLocationId(result.id);
           }
           break;
         case 'area':
           if (parentData?.governorate && parentData?.city) {
-            await createArea({
+            result = await createArea({
               governorate: parentData.governorate,
               city: parentData.city,
               area: name,
               provider_id: providerId
             });
+            setNewLocationId(result.id);
           }
           break;
         case 'neighborhood':
           if (parentData?.governorate && parentData?.city && parentData?.area) {
-            await createNeighborhood({
+            result = await createNeighborhood({
               governorate: parentData.governorate,
               city: parentData.city,
               area: parentData.area,
               neighborhood: name,
-              price: 0,
               provider_id: providerId
             });
+            setNewLocationId(result.id);
           }
           break;
       }
       
-      onSuccess?.();
-      setName("");
+      setShowPricing(true);
     } catch (error) {
       console.error('Error creating location:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFinish = () => {
+    onSuccess?.();
+    setName("");
+    setShowPricing(false);
+    setNewLocationId(null);
+    onOpenChange(false);
   };
 
   const titles = {
@@ -102,35 +115,42 @@ export default function DeliveryLocationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] rtl">
         <DialogHeader>
-          <DialogTitle>{titles[mode]}</DialogTitle>
+          <DialogTitle>{showPricing ? "أسعار التوصيل" : titles[mode]}</DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">{labels[mode]}</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={`أدخل ${labels[mode]}`}
-              className="text-right"
-              required
-            />
-          </div>
+        {!showPricing ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">{labels[mode]}</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={`أدخل ${labels[mode]}`}
+                className="text-right"
+                required
+              />
+            </div>
 
-          <div className="flex justify-end gap-2">
-            <Button type="submit" disabled={loading}>
-              {loading ? "جاري الحفظ..." : "إضافة"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              إلغاء
-            </Button>
-          </div>
-        </form>
+            <div className="flex justify-end gap-2">
+              <Button type="submit" disabled={loading}>
+                {loading ? "جاري الحفظ..." : "التالي"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                إلغاء
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <DeliveryTypePricing 
+            locationId={newLocationId!}
+            onSuccess={handleFinish}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -120,9 +119,10 @@ export default function HierarchicalLocations() {
                   variant="outline"
                   size="sm"
                   onClick={() => handleAddClick('city', { governorate })}
+                  className="flex items-center gap-1"
                 >
-                  <Plus className="h-4 w-4 ml-2" />
-                  إضافة مدينة
+                  <Plus className="h-3 w-3" />
+                  مدينة
                 </Button>
                 
                 {citiesByGovernorate[governorate]?.map(({ city }) => (
