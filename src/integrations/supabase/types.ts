@@ -429,7 +429,7 @@ export type Database = {
           items: Json
           notes: string | null
           payment_method: string | null
-          payment_status: string | null
+          payment_status: Database["public"]["Enums"]["order_payment_status"]
           shipping_address: string | null
           shipping_cost: number | null
           status: Database["public"]["Enums"]["order_status"]
@@ -446,7 +446,7 @@ export type Database = {
           items: Json
           notes?: string | null
           payment_method?: string | null
-          payment_status?: string | null
+          payment_status?: Database["public"]["Enums"]["order_payment_status"]
           shipping_address?: string | null
           shipping_cost?: number | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -463,7 +463,7 @@ export type Database = {
           items?: Json
           notes?: string | null
           payment_method?: string | null
-          payment_status?: string | null
+          payment_status?: Database["public"]["Enums"]["order_payment_status"]
           shipping_address?: string | null
           shipping_cost?: number | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -1030,6 +1030,7 @@ export type Database = {
       }
     }
     Enums: {
+      order_payment_status: "pending" | "paid" | "failed" | "refunded"
       order_status: "waiting" | "ready" | "shipped" | "done"
     }
     CompositeTypes: {
@@ -1146,6 +1147,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      order_payment_status: ["pending", "paid", "failed", "refunded"],
       order_status: ["waiting", "ready", "shipped", "done"],
     },
   },
