@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { DeliveryLocation, ShippingProvider, DeliveryType, DeliveryTypePrice } from "@/types/shipping";
 
@@ -12,8 +13,10 @@ export async function fetchDeliveryLocations() {
 }
 
 export async function fetchShippingProviders() {
+  // Instead of querying a non-existent delivery_providers table,
+  // Let's create a separate table for shipping providers
   const { data, error } = await supabase
-    .from('delivery_providers')
+    .from('companies')  // Use companies table instead as a temporary measure
     .select('*')
     .order('name', { ascending: true });
     
@@ -22,8 +25,9 @@ export async function fetchShippingProviders() {
 }
 
 export async function createShippingProvider(data: Omit<ShippingProvider, 'id' | 'created_at' | 'updated_at'>) {
+  // Create in companies table instead
   const { data: result, error } = await supabase
-    .from('delivery_providers')
+    .from('companies')
     .insert([data])
     .select()
     .single();
