@@ -249,6 +249,39 @@ export default function OrderDetails() {
     }
   };
 
+  const confirmStatusUpdate = async () => {
+    if (!order || !statusToUpdate) return;
+    
+    try {
+      setIsUpdatingStatus(true);
+      
+      const { error } = await supabase
+        .from('online_orders')
+        .update({ 
+          status: statusToUpdate,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      await fetchOrder();
+      
+      toast.success(`تم تحديث حالة الطلب إلى ${
+        statusToUpdate === 'waiting' ? 'في الانتظار' : 
+        statusToUpdate === 'ready' ? 'جاهز للشحن' : 
+        statusToUpdate === 'shipped' ? 'تم الشحن' : 'تم التسليم'
+      }`);
+      
+      setConfirmStatusDialog(false);
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast.error('حدث خطأ أثناء تحديث حالة الطلب');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const getStatusBadgeColor = (status: Order['status']) => {
     const colors = {
       waiting: "bg-amber-100 text-amber-800 hover:bg-amber-200",
