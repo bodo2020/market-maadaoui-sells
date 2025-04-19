@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export enum RegisterType {
@@ -107,11 +108,14 @@ export async function recordCashTransaction(
   userId: string
 ) {
   try {
-    const { data, error } = await supabase.rpc('add_cash_transaction', {
-      p_amount: amount,
-      p_transaction_type: transactionType,
-      p_register_type: registerType,
-      p_notes: notes
+    // Use a more generic approach to call the RPC function to avoid TypeScript errors
+    const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
+      body: {
+        amount,
+        transaction_type: transactionType,
+        register_type: registerType,
+        notes
+      }
     });
       
     if (error) throw error;

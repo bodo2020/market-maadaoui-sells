@@ -391,11 +391,13 @@ export default function POS() {
     if (amountToRecord <= 0) return;
     
     try {
-      const { data, error } = await supabase.rpc('add_cash_transaction', {
-        p_amount: amountToRecord,
-        p_transaction_type: 'deposit',
-        p_register_type: RegisterType.STORE,
-        p_notes: 'مبيعات نقطة البيع'
+      const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
+        body: {
+          amount: amountToRecord,
+          transaction_type: 'deposit',
+          register_type: RegisterType.STORE,
+          notes: 'مبيعات نقطة البيع'
+        }
       });
       
       if (error) throw error;
@@ -537,7 +539,7 @@ export default function POS() {
       <div className="relative mb-4 bg-muted/30 p-3 rounded-lg border border-muted flex items-center">
         <ScanLine className="h-5 w-5 text-primary ml-3" />
         <div>
-          <h3 className="font-medium">وضع مسح الباركود نشط</h3>
+          <h3 className="font-medium">و��ع مسح الباركود نشط</h3>
           <p className="text-sm text-muted-foreground">
             قم بتوصيل قارئ الباركود واستخدامه لمسح المنتجات مباشرة، أو اضغط على زر "مسح" لاستخدام الكاميرا
           </p>

@@ -93,12 +93,14 @@ export default function CashTracking() {
     try {
       setProcessingTransaction(true);
       
-      // Use the RPC function directly
-      const { data, error } = await supabase.rpc('add_cash_transaction', {
-        p_amount: parseFloat(amount),
-        p_transaction_type: 'deposit',
-        p_register_type: RegisterType.STORE,
-        p_notes: notes || "إيداع نقدي"
+      // Use the Edge Function instead of direct RPC call
+      const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
+        body: {
+          amount: parseFloat(amount),
+          transaction_type: 'deposit',
+          register_type: RegisterType.STORE,
+          notes: notes || "إيداع نقدي"
+        }
       });
 
       if (error) throw error;
@@ -130,12 +132,14 @@ export default function CashTracking() {
     try {
       setProcessingTransaction(true);
       
-      // Use the RPC function directly
-      const { data, error } = await supabase.rpc('add_cash_transaction', {
-        p_amount: parseFloat(amount),
-        p_transaction_type: 'withdrawal',
-        p_register_type: RegisterType.STORE,
-        p_notes: notes || "سحب نقدي"
+      // Use the Edge Function instead of direct RPC call
+      const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
+        body: {
+          amount: parseFloat(amount),
+          transaction_type: 'withdrawal',
+          register_type: RegisterType.STORE,
+          notes: notes || "سحب نقدي"
+        }
       });
 
       if (error) throw error;
