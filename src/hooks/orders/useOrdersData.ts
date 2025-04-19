@@ -22,10 +22,22 @@ export function useOrdersData(filters: OrderFilters = {}) {
 
   // Load orders from Supabase
   useEffect(() => {
-    fetchOrders();
-    setupRealtimeSubscription();
+    let isMounted = true;
+    
+    fetchOrders().then(() => {
+      if (isMounted) {
+        setupRealtimeSubscription();
+      }
+    }).catch((error) => {
+      console.error("Error fetching orders:", error);
+      if (isMounted) {
+        toast.error("حدث خطأ أثناء تحميل الطلبات");
+        setLoading(false); // Ensure loading is set to false even on error
+      }
+    });
     
     return () => {
+      isMounted = false;
       cleanupRealtimeSubscription();
     };
   }, [filters, refreshTrigger]);
@@ -52,6 +64,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
   const fetchOrders = async () => {
     try {
       setLoading(true);
+      console.log("Fetching orders with filters:", filters);
       
       // Build query with filters
       let query = supabase.from('online_orders')
@@ -84,7 +97,12 @@ export function useOrdersData(filters: OrderFilters = {}) {
       
       const { data, error } = await query;
       
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
+      
+      console.log("Orders data from Supabase:", data);
       
       // Transform data into Order objects
       const transformedOrders: Order[] = (data || []).map(item => {
@@ -92,13 +110,13 @@ export function useOrdersData(filters: OrderFilters = {}) {
         let parsedItems: OrderItem[] = [];
         
         if (Array.isArray(item.items)) {
-          parsedItems = item.items.map((item: any) => ({
-            product_id: item.product_id || '',
-            product_name: item.product_name || '',
-            quantity: item.quantity || 0,
-            price: item.price || 0,
-            total: item.total || 0,
-            image_url: item.image_url
+          parsedItems = item.items.map((itemData: any) => ({
+            product_id: itemData.product_id || '',
+            product_name: itemData.product_name || '',
+            quantity: itemData.quantity || 0,
+            price: itemData.price || 0,
+            total: itemData.total || 0,
+            image_url: itemData.image_url
           }));
         }
         
@@ -120,6 +138,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
         };
       });
       
+      console.log("Transformed orders:", transformedOrders);
       setOrders(transformedOrders);
       
       // Count pending orders for notification badge
@@ -127,10 +146,12 @@ export function useOrdersData(filters: OrderFilters = {}) {
       setUnreadOrders(pendingCount);
       
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('Error in fetchOrders:', error);
       toast.error("حدث خطأ أثناء تحميل الطلبات");
+      throw error;
     } finally {
       setLoading(false);
+      console.log("Orders loading finished");
     }
   };
   

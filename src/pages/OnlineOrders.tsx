@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useOrdersData, OrderFilters } from "@/hooks/orders/useOrdersData";
 import { OrdersHeader } from "@/components/orders/OrdersHeader";
@@ -10,6 +10,7 @@ import { CancelOrderDialog } from "@/components/orders/CancelOrderDialog";
 import { Order } from "@/types";
 import { printOrderInvoice } from "@/services/orders/printOrderService";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { toast } from "sonner";
 
 export default function OnlineOrders() {
   // State for filters and dialogs
@@ -36,6 +37,12 @@ export default function OnlineOrders() {
     ...filters,
     searchQuery
   });
+  
+  // Debug loading state
+  useEffect(() => {
+    console.log("Orders loading state:", loading);
+    console.log("Orders count:", orders.length);
+  }, [loading, orders]);
   
   // Update filters when tab changes
   const handleTabChange = (value: string) => {
@@ -115,17 +122,27 @@ export default function OnlineOrders() {
         />
         
         <div className="mt-6">
-          <OrdersList
-            orders={orders}
-            loading={loading}
-            onViewDetails={handleViewDetails}
-            onPrintInvoice={handlePrintInvoice}
-            onMarkAsReady={handleMarkAsReady}
-            onAssignDelivery={handleViewDetails}
-            onConfirmPayment={handleConfirmPayment}
-            onCancelOrder={handleCancelOrder}
-            onChangeFilters={setFilters}
-          />
+          {loading ? (
+            <div className="p-6 bg-white rounded-lg shadow text-center">
+              <p className="text-muted-foreground">جاري تحميل الطلبات...</p>
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="p-6 bg-white rounded-lg shadow text-center">
+              <p className="text-muted-foreground">لا توجد طلبات متاحة</p>
+            </div>
+          ) : (
+            <OrdersList
+              orders={orders}
+              loading={loading}
+              onViewDetails={handleViewDetails}
+              onPrintInvoice={handlePrintInvoice}
+              onMarkAsReady={handleMarkAsReady}
+              onAssignDelivery={handleViewDetails}
+              onConfirmPayment={handleConfirmPayment}
+              onCancelOrder={handleCancelOrder}
+              onChangeFilters={setFilters}
+            />
+          )}
         </div>
         
         {/* Order details dialog */}

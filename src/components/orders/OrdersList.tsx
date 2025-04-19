@@ -81,21 +81,8 @@ export function OrdersList({
     );
   };
 
-  if (loading) {
-    return (
-      <Card className="p-6 text-center">
-        <p className="text-muted-foreground">جاري تحميل الطلبات...</p>
-      </Card>
-    );
-  }
-
-  if (orders.length === 0) {
-    return (
-      <Card className="p-6 text-center">
-        <p className="text-muted-foreground">لا توجد طلبات متاحة</p>
-      </Card>
-    );
-  }
+  // If loading or no orders are available, we don't show this component at all 
+  // since the parent component handles these states
 
   return (
     <div className="overflow-x-auto">
