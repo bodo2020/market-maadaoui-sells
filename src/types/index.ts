@@ -1,82 +1,42 @@
+
 export enum UserRole {
-  ADMIN = 'admin',
-  EMPLOYEE = 'employee',
-  CASHIER = 'cashier',
-  DELIVERY = 'delivery',
+  ADMIN = "admin",
+  CASHIER = "cashier",
+  EMPLOYEE = "employee",
+  DELIVERY = "delivery"
 }
 
 export interface User {
   id: string;
-  email: string; // Required property
-  role: UserRole;
-  created_at: string;
-  updated_at: string; // Required property
   name: string;
-  phone?: string;
   username: string;
-  active?: boolean;
+  role: UserRole;
+  phone?: string;
+  email?: string;
   password?: string;
+  created_at: string;
+  active?: boolean;
   shifts?: Shift[];
   salary?: number;
   salary_type?: string;
 }
 
-export interface Shift {
-  id: string;
-  employee_id: string;
-  start_time: string;
-  end_time?: string;
-  total_hours?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Product {
+export interface MainCategory {
   id: string;
   name: string;
-  description?: string;
-  price: number;
-  purchase_price: number;
-  quantity?: number;
-  notify_quantity?: number;  // Added this field to support low stock notifications
-  category_id?: string;
-  subcategory_id?: string;
-  subsubcategory_id?: string;
-  main_category_id?: string;
-  company_id?: string;
-  barcode?: string;
-  barcode_type?: string;
-  bulk_barcode?: string;
-  image_urls?: string[];
+  description?: string | null;
+  image_url?: string | null;
   created_at?: string;
   updated_at?: string;
-  is_offer?: boolean;
-  offer_price?: number;
-  is_bulk?: boolean;
-  bulk_enabled?: boolean;
-  bulk_quantity?: number;
-  bulk_price?: number;
-  manufacturer_name?: string;
-  unit_of_measure?: string;
-  calculated_weight?: number;
-  is_bulk_scan?: boolean;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  description?: string;
-  image_url?: string;
-  created_at?: string;
-  updated_at?: string;
+  product_count?: number;
 }
 
 export interface Subcategory {
   id: string;
   name: string;
+  description?: string | null;
+  image_url?: string | null;
   category_id: string;
-  description?: string;
-  image_url?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -84,34 +44,129 @@ export interface Subcategory {
 export interface Subsubcategory {
   id: string;
   name: string;
+  description?: string | null;
+  image_url?: string | null;
   subcategory_id: string;
-  description?: string;
-  image_url?: string;
   created_at?: string;
   updated_at?: string;
 }
 
-export interface MainCategory {
+export interface Category {
   id: string;
   name: string;
-  description?: string;
-  image_url?: string;
+  description?: string | null;
+  image_url?: string | null;
   created_at?: string;
   updated_at?: string;
-  product_count?: number; // Added as used in code
+  level?: 'category' | 'subcategory' | 'subsubcategory';
+  parent_id?: string | null;
 }
 
 export interface Company {
   id: string;
   name: string;
+  logo_url?: string | null;
+  description?: string | null;
+  address?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  created_at?: Date | string;
+  updated_at?: Date | string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  barcode?: string;
   description?: string;
-  image_url?: string;
-  logo_url?: string; 
-  address?: string; 
-  contact_email?: string; 
-  contact_phone?: string; 
-  created_at?: string;
+  image_urls: string[];
+  quantity: number;
+  price: number;
+  purchase_price: number; 
+  offer_price?: number;
+  is_offer: boolean;
+  category_id?: string;
+  subcategory_id?: string;
+  subsubcategory_id?: string;
+  company_id?: string;
+  barcode_type?: string;
+  bulk_enabled: boolean;
+  bulk_quantity?: number;
+  bulk_price?: number;
+  bulk_barcode?: string;
+  created_at: Date | string;
+  updated_at?: Date | string;
+  manufacturer_name?: string;
+  is_bulk: boolean;
+  unit_of_measure?: string;
+  is_weight_based?: boolean;
+  calculated_weight?: number;
+  calculated_price?: number;
+  is_bulk_scan?: boolean;
+  track_inventory?: boolean;
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+  price: number;
+  discount: number;
+  total: number;
+  weight?: number | null;
+  isBulk?: boolean;
+}
+
+export interface Sale {
+  id: string;
+  date: string;
+  items: CartItem[];
+  cashier_id?: string;
+  subtotal: number;
+  discount: number;
+  total: number;
+  profit: number;
+  payment_method: 'cash' | 'card' | 'mixed';
+  card_amount?: number;
+  cash_amount?: number;
+  customer_name?: string;
+  customer_phone?: string;
+  invoice_number: string;
+  created_at: string;
   updated_at?: string;
+}
+
+export interface Expense {
+  id: string;
+  type: string;
+  amount: number;
+  description: string;
+  date: string;
+  receipt_url?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Shift {
+  id: string;
+  employee_id?: string;
+  start_time: string;
+  end_time?: string;
+  total_hours?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  contact_person?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
+  balance?: number;
 }
 
 export interface Customer {
@@ -121,205 +176,55 @@ export interface Customer {
   email?: string;
   address?: string;
   notes?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface Supplier {
-  id: string;
-  name: string;
-  phone?: string;
-  address?: string;
-  email?: string;
-  contact_person?: string;
-  notes?: string;
-  balance?: number;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface Sale {
-  id: string;
-  date: string; // Changed from Date to string to match required type
-  items: CartItem[];
-  subtotal: number;
-  discount: number;
-  total: number;
-  profit: number;
-  payment_method: 'cash' | 'card' | 'mixed';
-  cash_amount?: number;
-  card_amount?: number;
-  customer_name?: string;
-  customer_phone?: string;
-  invoice_number: string;
   created_at: string;
-  updated_at: string;
-  cashier_id?: string;
-}
-
-export interface CartItem {
-  product: Product;
-  quantity: number;
-  price: number;
-  discount: number;
-  total: number;
-  weight: number | null;
-  isBulk?: boolean;
+  updated_at?: string;
+  balance?: number;
 }
 
 export interface Purchase {
   id: string;
-  date: string;
   supplier_id: string;
-  items: PurchaseItem[];
-  subtotal: number;
-  discount: number;
+  invoice_number: string;
+  date: string;
   total: number;
-  payment_method: 'cash' | 'card' | 'mixed';
-  cash_amount?: number;
-  card_amount?: number;
-  created_at: string;
-  updated_at: string;
-  invoice_number?: string;
-  invoice_file_url?: string;
-  paid?: number;
+  paid: number;
   description?: string;
+  invoice_file_url?: string;
+  created_at: string;
+  updated_at?: string;
   suppliers?: { name: string };
+  items?: PurchaseItem[];
 }
 
 export interface PurchaseItem {
-  product: Product;
+  id: string;
+  purchase_id: string;
+  product_id: string;
   quantity: number;
   price: number;
   total: number;
-  id?: string;
-  purchase_id?: string;
-  product_id?: string;
-  created_at?: string;
-  updated_at?: string;
+  products?: { name: string };
 }
 
-export interface Expense {
-  id: string;
-  date: string;
-  description: string;
-  amount: number;
-  category: string;
-  type: string;
-  receipt_url?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Employee {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  address?: string;
-  role: UserRole;
-  salary: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CashTransaction {
-  id: string;
-  date: string;
-  description: string;
-  amount: number;
-  type: 'income' | 'expense';
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Banner {
-  id: string;
-  title: string;
-  description?: string;
-  image_url: string;
-  link?: string;
-  start_date?: string;
-  end_date?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+export interface OrderItem {
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  price: number;
+  total: number;
 }
 
 export interface Order {
   id: string;
-  customer_id?: string;
-  customer_name: string;
-  customer_phone?: string;
-  customer_email?: string;
-  date: string;
-  items: any[];
-  subtotal: number;
-  discount: number;
+  created_at: string;
   total: number;
-  payment_method: 'cash' | 'card' | 'online';
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
-  shipping_address?: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  payment_method: string | null;
+  shipping_address: string | null;
+  items: OrderItem[];
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
   notes?: string;
-  created_at: string;
-  updated_at: string;
-  delivery_location_id?: string;
-  shipping_cost?: number;
-  tracking_number?: string;
 }
-
-export interface OrderFromDB {
-  id: string;
-  customer_id?: string;
-  items: Json; // This field can be a string or object from the database
-  total: number;
-  payment_method?: string;
-  payment_status?: string;
-  shipping_address?: string;
-  status: string;
-  notes?: string;
-  created_at: string;
-  updated_at?: string;
-  delivery_location_id?: string;
-  shipping_cost?: number;
-  tracking_number?: string;
-}
-
-export interface OrderItem {
-  product: Product;
-  quantity: number;
-  price: number;
-  total: number;
-  product_name?: string;
-  image_url?: string;
-  product_id?: string;
-}
-
-export interface OnlineOrder {
-  id: string;
-  customer_id: string;
-  date: string;
-  items: CartItem[];
-  subtotal: number;
-  discount: number;
-  total: number;
-  payment_method: 'cash' | 'card' | 'online';
-  shipping_address: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DeliveryLocation {
-  id: string;
-  name: string;
-  city_id: string;
-  area_id: string;
-  address: string;
-  delivery_fee: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];

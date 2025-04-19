@@ -1,278 +1,467 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import MainLayout from "@/components/layout/MainLayout";
-import { Purchase, PurchaseItem, Product } from "@/types";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatCurrency } from "@/data/mockData";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Edit, File, Trash2 } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 
-interface PurchaseWithSupplier extends Purchase {
-  suppliers: { name: string };
-}
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { fetchSales } from '@/services/supabase/saleService';
+import { fetchPurchases, getPurchaseWithItems } from '@/services/supabase/purchaseService';
+import { Sale, Purchase } from '@/types';
+import { FileText, Edit, Printer, CalendarRange, FileDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import MainLayout from '@/components/layout/MainLayout';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import InvoiceEditDialog from '@/components/Invoice/InvoiceEditDialog';
+import InvoicePreviewDialog from '@/components/POS/InvoiceDialog';
+import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-export default function Invoices() {
-  const [purchases, setPurchases] = useState<PurchaseWithSupplier[]>([]);
-  const [purchase, setPurchase] = useState<Purchase | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
-  const { toast } = useToast();
+const Invoices = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
+  const [isPurchaseDetailsOpen, setIsPurchaseDetailsOpen] = useState(false);
+  const [invoiceType, setInvoiceType] = useState<'sales' | 'purchases'>('sales');
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  useEffect(() => {
-    fetchPurchases();
-  }, []);
+  // Fetch all sales
+  const { 
+    data: sales, 
+    isLoading: salesLoading, 
+    isError: salesError, 
+    refetch: refetchSales 
+  } = useQuery({
+    queryKey: ['sales'],
+    queryFn: () => fetchSales()
+  });
 
-  const fetchPurchases = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("purchases")
-        .select("*, suppliers(name)")
-        .order("date", { ascending: false });
+  // Fetch all purchases
+  const { 
+    data: purchases, 
+    isLoading: purchasesLoading, 
+    isError: purchasesError 
+  } = useQuery({
+    queryKey: ['purchases'],
+    queryFn: fetchPurchases
+  });
 
-      if (error) {
-        console.error("Error fetching purchases:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch purchases.",
-          variant: "destructive",
-        });
-      }
+  // Filter by search query and date
+  const filteredSales = React.useMemo(() => {
+    if (!sales) return [];
 
-      setPurchases(data as PurchaseWithSupplier[]);
-    } catch (error) {
-      console.error("Unexpected error fetching purchases:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while fetching purchases.",
-        variant: "destructive",
+    // First filter by search query
+    let filtered = sales.filter(sale => 
+      sale.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (sale.customer_name && sale.customer_name.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+    // Then filter by selected date if any
+    if (selectedDate) {
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      filtered = filtered.filter(sale => {
+        const saleDate = new Date(sale.date).toISOString().split('T')[0];
+        return saleDate === dateStr;
       });
-    } finally {
-      setLoading(false);
+    }
+
+    return filtered;
+  }, [sales, searchQuery, selectedDate]);
+
+  // Filter purchases by search query and date
+  const filteredPurchases = React.useMemo(() => {
+    if (!purchases) return [];
+
+    // First filter by search query
+    let filtered = purchases.filter(purchase => 
+      purchase.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (purchase.suppliers?.name && purchase.suppliers.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+    // Then filter by selected date if any
+    if (selectedDate) {
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      filtered = filtered.filter(purchase => {
+        const purchaseDate = new Date(purchase.date).toISOString().split('T')[0];
+        return purchaseDate === dateStr;
+      });
+    }
+
+    return filtered;
+  }, [purchases, searchQuery, selectedDate]);
+
+  const handleEdit = (sale: Sale) => {
+    setSelectedSale(sale);
+    setIsEditDialogOpen(true);
+  };
+
+  const handlePreview = (sale: Sale) => {
+    setSelectedSale(sale);
+    setIsPreviewDialogOpen(true);
+  };
+
+  const handleViewPurchase = async (purchase: Purchase) => {
+    try {
+      const purchaseWithItems = await getPurchaseWithItems(purchase.id);
+      if (purchaseWithItems) {
+        setSelectedPurchase(purchaseWithItems);
+        setIsPurchaseDetailsOpen(true);
+      }
+    } catch (error) {
+      console.error("Error fetching purchase details:", error);
     }
   };
 
-  const fetchPurchaseDetails = async (id: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("purchases")
-        .select("*, suppliers(name), items:purchase_items(*, products(name))")
-        .eq("id", id)
-        .single();
-
-      if (error) {
-        console.error("Error fetching purchase details:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch purchase details.",
-          variant: "destructive",
-        });
-        return null;
-      }
-
-      const purchaseItems = Array.isArray(data.items) 
-        ? data.items.map((item: any) => ({
-            product: item.products || { name: "Unknown Product", id: item.product_id },
-            quantity: item.quantity,
-            price: item.price,
-            total: item.total,
-            id: item.id,
-            purchase_id: item.purchase_id,
-            product_id: item.product_id,
-            created_at: item.created_at,
-            updated_at: item.updated_at
-          }))
-        : [];
-
-      const purchaseData = {
-        ...data,
-        items: purchaseItems,
-        subtotal: data.total,
-        discount: 0,
-        payment_method: 'cash' as 'cash' | 'card' | 'mixed',
-      } as Purchase;
-      
-      setPurchase(purchaseData);
-      return purchaseData;
-    } catch (error) {
-      console.error("Unexpected error fetching purchase details:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while fetching purchase details.",
-        variant: "destructive",
-      });
-      return null;
-    }
+  const handleEditClose = () => {
+    setIsEditDialogOpen(false);
+    refetchSales(); // Refresh data after edit
   };
 
-  const handleOpenDialog = async (id: string) => {
-    setSelectedPurchaseId(id);
-    await fetchPurchaseDetails(id);
-    setIsDialogOpen(true);
+  const handlePreviewClose = () => {
+    setIsPreviewDialogOpen(false);
   };
 
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setSelectedPurchaseId(null);
+  const handlePurchaseDetailsClose = () => {
+    setIsPurchaseDetailsOpen(false);
   };
+
+  const handleInvoiceTypeChange = (value: 'sales' | 'purchases') => {
+    setInvoiceType(value);
+  };
+
+  const handleCalendarToggle = () => {
+    setIsCalendarOpen(!isCalendarOpen);
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date);
+    setIsCalendarOpen(false);
+  };
+
+  const handleClearDate = () => {
+    setSelectedDate(undefined);
+  };
+
+  const isLoading = invoiceType === 'sales' ? salesLoading : purchasesLoading;
+  const isError = invoiceType === 'sales' ? salesError : purchasesError;
 
   return (
     <MainLayout>
-      <div className="container mx-auto p-6 dir-rtl">
-        <h1 className="text-2xl font-bold mb-4">الفواتير</h1>
+      <div className="container mx-auto py-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">إدارة الفواتير</h1>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>قائمة الفواتير</CardTitle>
-            <CardDescription>عرض وتفاصيل الفواتير المسجلة</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>رقم الفاتورة</TableHead>
-                    <TableHead>المورد</TableHead>
-                    <TableHead>التاريخ</TableHead>
-                    <TableHead>المبلغ الإجمالي</TableHead>
-                    <TableHead className="text-center">الإجراءات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center">
-                        تحميل...
-                      </TableCell>
-                    </TableRow>
-                  ) : purchases.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center">
-                        لا توجد فواتير مسجلة.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    purchases.map((purchase) => (
-                      <TableRow key={purchase.id}>
-                        <TableCell>{purchase.invoice_number}</TableCell>
-                        <TableCell>{purchase.suppliers.name}</TableCell>
-                        <TableCell>
-                          {new Date(purchase.date).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>{formatCurrency(purchase.total)}</TableCell>
-                        <TableCell className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenDialog(purchase.id)}
-                          >
-                            <File className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="sales" value={invoiceType} onValueChange={(value) => handleInvoiceTypeChange(value as 'sales' | 'purchases')} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="sales">فواتير المبيعات</TabsTrigger>
+            <TabsTrigger value="purchases">فواتير المشتريات</TabsTrigger>
+          </TabsList>
 
-        <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>تفاصيل الفاتورة</DialogTitle>
-              <DialogDescription>
-                معلومات تفصيلية حول الفاتورة المحددة
-              </DialogDescription>
-            </DialogHeader>
-            <Separator className="my-4" />
-            {purchase ? (
-              <div className="grid gap-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>معلومات الفاتورة</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <p>
-                          <strong>رقم الفاتورة:</strong> {purchase.invoice_number}
-                        </p>
-                        <p>
-                          <strong>المورد:</strong> {purchase.suppliers.name}
-                        </p>
-                        <p>
-                          <strong>التاريخ:</strong>{" "}
-                          {new Date(purchase.date).toLocaleDateString()}
-                        </p>
-                        <p>
-                          <strong>طريقة الدفع:</strong> {purchase.payment_method}
-                        </p>
-                        <p>
-                          <strong>المبلغ الإجمالي:</strong> {formatCurrency(purchase.total)}
-                        </p>
+          <Card>
+            <CardHeader>
+              <CardTitle>بحث الفواتير</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <Input
+                  placeholder={invoiceType === 'sales' ? "ابحث عن رقم الفاتورة أو اسم العميل..." : "ابحث عن رقم الفاتورة أو اسم المورد..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="max-w-md"
+                />
+                
+                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="flex items-center gap-2"
+                      onClick={handleCalendarToggle}
+                    >
+                      <CalendarRange className="h-5 w-5" />
+                      {selectedDate ? format(selectedDate, 'yyyy/MM/dd') : 'اختر تاريخ'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={handleDateSelect}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                    {selectedDate && (
+                      <div className="p-2 border-t flex justify-center">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={handleClearDate}
+                        >
+                          إلغاء التاريخ
+                        </Button>
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>تفاصيل الأصناف</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ScrollArea>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>المنتج</TableHead>
-                            <TableHead>الكمية</TableHead>
-                            <TableHead>السعر</TableHead>
-                            <TableHead>المجموع</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {purchase.items.map((item) => (
-                            <TableRow key={item.id}>
-                              <TableCell>{item.product.name}</TableCell>
-                              <TableCell>{item.quantity}</TableCell>
-                              <TableCell>{formatCurrency(item.price)}</TableCell>
-                              <TableCell>{formatCurrency(item.total)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
+                    )}
+                  </PopoverContent>
+                </Popover>
               </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            {isLoading ? (
+              <div className="text-center py-8">جاري التحميل...</div>
+            ) : isError ? (
+              <div className="text-center py-8 text-red-500">حدث خطأ أثناء تحميل الفواتير</div>
             ) : (
-              <div className="text-center py-4">تحميل تفاصيل الفاتورة...</div>
+              <div className="overflow-x-auto">
+                {invoiceType === 'sales' ? (
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 text-right">
+                        <th className="p-3 border">رقم الفاتورة</th>
+                        <th className="p-3 border">التاريخ</th>
+                        <th className="p-3 border">العميل</th>
+                        <th className="p-3 border">المبلغ</th>
+                        <th className="p-3 border">طريقة الدفع</th>
+                        <th className="p-3 border">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSales && filteredSales.length > 0 ? (
+                        filteredSales.map((sale) => {
+                          const saleDate = new Date(sale.date);
+                          const formattedDate = saleDate.toLocaleDateString('ar-EG', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          });
+                          
+                          const paymentMethodText = 
+                            sale.payment_method === 'cash' ? 'نقدي' : 
+                            sale.payment_method === 'card' ? 'بطاقة' : 'مختلط';
+
+                          return (
+                            <tr key={sale.id} className="border-b hover:bg-gray-50">
+                              <td className="p-3 border">{sale.invoice_number}</td>
+                              <td className="p-3 border">{formattedDate}</td>
+                              <td className="p-3 border">{sale.customer_name || 'عميل عام'}</td>
+                              <td className="p-3 border">{sale.total.toFixed(2)}</td>
+                              <td className="p-3 border">{paymentMethodText}</td>
+                              <td className="p-3 border">
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => handleEdit(sale)}
+                                  >
+                                    <Edit className="h-4 w-4 ml-1" />
+                                    تعديل
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => handlePreview(sale)}
+                                  >
+                                    <FileText className="h-4 w-4 ml-1" />
+                                    عرض
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="p-3 text-center">
+                            لا توجد فواتير متطابقة مع معايير البحث
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 text-right">
+                        <th className="p-3 border">رقم الفاتورة</th>
+                        <th className="p-3 border">التاريخ</th>
+                        <th className="p-3 border">المورد</th>
+                        <th className="p-3 border">المبلغ الكلي</th>
+                        <th className="p-3 border">المبلغ المدفوع</th>
+                        <th className="p-3 border">الحالة</th>
+                        <th className="p-3 border">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPurchases && filteredPurchases.length > 0 ? (
+                        filteredPurchases.map((purchase) => {
+                          const purchaseDate = new Date(purchase.date);
+                          const formattedDate = purchaseDate.toLocaleDateString('ar-EG', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          });
+                          
+                          const remaining = purchase.total - purchase.paid;
+                          const isPaid = remaining <= 0;
+
+                          return (
+                            <tr key={purchase.id} className="border-b hover:bg-gray-50">
+                              <td className="p-3 border">{purchase.invoice_number}</td>
+                              <td className="p-3 border">{formattedDate}</td>
+                              <td className="p-3 border">{purchase.suppliers?.name || 'غير محدد'}</td>
+                              <td className="p-3 border">{purchase.total.toFixed(2)}</td>
+                              <td className="p-3 border">{purchase.paid.toFixed(2)}</td>
+                              <td className="p-3 border">
+                                {isPaid ? (
+                                  <Badge className="bg-green-100 text-green-800 hover:bg-green-200">مدفوعة</Badge>
+                                ) : (
+                                  <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+                                    متبقي {remaining.toFixed(2)}
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="p-3 border">
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => handleViewPurchase(purchase)}
+                                  >
+                                    <FileText className="h-4 w-4 ml-1" />
+                                    عرض
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="p-3 text-center">
+                            لا توجد فواتير متطابقة مع معايير البحث
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             )}
-          </DialogContent>
-        </Dialog>
+          </div>
+        </Tabs>
       </div>
+
+      {/* Invoice Edit Dialog */}
+      {selectedSale && (
+        <InvoiceEditDialog
+          isOpen={isEditDialogOpen}
+          onClose={handleEditClose}
+          sale={selectedSale}
+        />
+      )}
+
+      {/* Invoice Preview Dialog */}
+      {selectedSale && (
+        <InvoicePreviewDialog
+          isOpen={isPreviewDialogOpen}
+          onClose={handlePreviewClose}
+          sale={selectedSale}
+        />
+      )}
+
+      {/* Purchase Details Dialog (You can create a separate component for this) */}
+      {selectedPurchase && (
+        <div className={`fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center ${isPurchaseDetailsOpen ? 'block' : 'hidden'}`}>
+          <div className="bg-white rounded-lg p-6 m-4 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">تفاصيل فاتورة المشتريات</h2>
+              <Button variant="ghost" onClick={handlePurchaseDetailsClose}>إغلاق</Button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div>
+                <p className="text-sm text-gray-500">رقم الفاتورة</p>
+                <p className="font-medium">{selectedPurchase.invoice_number}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">التاريخ</p>
+                <p className="font-medium">{new Date(selectedPurchase.date).toLocaleDateString('ar-EG')}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">المورد</p>
+                <p className="font-medium">{selectedPurchase.suppliers?.name || 'غير محدد'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">الحالة</p>
+                <p className="font-medium">
+                  {selectedPurchase.total <= selectedPurchase.paid ? (
+                    <Badge className="bg-green-100 text-green-800">مدفوعة بالكامل</Badge>
+                  ) : (
+                    <Badge className="bg-yellow-100 text-yellow-800">
+                      متبقي {(selectedPurchase.total - selectedPurchase.paid).toFixed(2)}
+                    </Badge>
+                  )}
+                </p>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <h3 className="font-semibold mb-2">المنتجات</h3>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="p-2 border text-right">المنتج</th>
+                    <th className="p-2 border text-right">الكمية</th>
+                    <th className="p-2 border text-right">السعر</th>
+                    <th className="p-2 border text-right">الإجمالي</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedPurchase.items?.map((item, index) => (
+                    <tr key={index} className="border-b">
+                      <td className="p-2 border">{item.products?.name || 'منتج غير معروف'}</td>
+                      <td className="p-2 border">{item.quantity}</td>
+                      <td className="p-2 border">{item.price.toFixed(2)}</td>
+                      <td className="p-2 border">{item.total.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div></div>
+              <div className="space-y-2">
+                <div className="flex justify-between border-b pb-2">
+                  <span>الإجمالي:</span>
+                  <span className="font-semibold">{selectedPurchase.total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between border-b pb-2">
+                  <span>المدفوع:</span>
+                  <span className="font-semibold">{selectedPurchase.paid.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <span>المتبقي:</span>
+                  <span>{(selectedPurchase.total - selectedPurchase.paid).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {selectedPurchase.description && (
+              <div className="mt-4">
+                <h3 className="font-semibold mb-2">ملاحظات</h3>
+                <p className="bg-gray-50 p-3 rounded">{selectedPurchase.description}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
-}
+};
+
+export default Invoices;

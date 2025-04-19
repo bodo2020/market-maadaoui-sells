@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import { useNotificationStore } from "@/stores/notificationStore";
-import { Order, OrderItem, Json } from "@/types/index";
+import { Order, OrderItem } from "@/types/index";
 import { Input } from "@/components/ui/input";
 import { Search, Download, Plus, ChevronDown, Check, Package } from "lucide-react";
 import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog";
@@ -118,52 +118,20 @@ export default function OnlineOrders() {
 
       if (error) throw error;
       
-      const transformedOrders: Order[] = (data || []).map(order => {
-        let orderItems: any[] = [];
-        if (typeof order.items === 'string') {
-          try {
-            orderItems = JSON.parse(order.items);
-          } catch (e) {
-            console.error('Error parsing items JSON:', e);
-            orderItems = [];
-          }
-        } else if (Array.isArray(order.items)) {
-          orderItems = order.items;
-        }
-
-        let paymentMethod: 'cash' | 'card' | 'online' = 'cash';
-        if (order.payment_method === 'card' || order.payment_method === 'online') {
-          paymentMethod = order.payment_method as 'card' | 'online';
-        }
-
-        let paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded' = 'pending';
-        if (order.payment_status === 'paid' || order.payment_status === 'failed' || order.payment_status === 'refunded') {
-          paymentStatus = order.payment_status as 'paid' | 'failed' | 'refunded';
-        }
-
-        return {
-          id: order.id,
-          customer_id: order.customer_id,
-          customer_name: 'Unknown Customer',
-          customer_phone: '',
-          customer_email: '',
-          date: order.created_at,
-          items: orderItems,
-          subtotal: order.total,
-          discount: 0,
-          total: order.total,
-          payment_method: paymentMethod,
-          payment_status: paymentStatus,
-          shipping_address: order.shipping_address,
-          status: validateOrderStatus(order.status || 'pending'),
-          notes: order.notes,
-          created_at: order.created_at,
-          updated_at: order.updated_at || order.created_at,
-          delivery_location_id: order.delivery_location_id,
-          shipping_cost: order.shipping_cost,
-          tracking_number: order.tracking_number
-        };
-      });
+      const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => ({
+        id: item.id,
+        created_at: item.created_at,
+        total: item.total,
+        status: validateOrderStatus(item.status),
+        payment_status: validatePaymentStatus(item.payment_status),
+        payment_method: item.payment_method,
+        shipping_address: item.shipping_address,
+        items: Array.isArray(item.items) ? item.items : [],
+        customer_name: item.customer_name || 'غير معروف',
+        customer_email: item.customer_email || '',
+        customer_phone: item.customer_phone || '',
+        notes: item.notes || '',
+      }));
       
       setOrders(transformedOrders);
     } catch (error) {

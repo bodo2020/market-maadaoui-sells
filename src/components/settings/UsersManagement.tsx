@@ -43,7 +43,6 @@ export default function UsersManagement() {
     phone: "",
     username: "",
     password: "",
-    email: "",
     role: UserRole.EMPLOYEE,
     active: true
   });
@@ -97,7 +96,6 @@ export default function UsersManagement() {
       phone: "",
       username: "",
       password: "",
-      email: "",
       role: UserRole.EMPLOYEE,
       active: true
     });
@@ -110,7 +108,6 @@ export default function UsersManagement() {
       phone: user.phone || "",
       username: user.username,
       password: "", // Don't set password when editing
-      email: user.email, // Initialize email field
       role: user.role,
       active: user.active !== false // Default to true if undefined
     });
@@ -119,7 +116,7 @@ export default function UsersManagement() {
 
   const handleAddUser = async () => {
     try {
-      if (!formData.name || !formData.username || !formData.password || !formData.email) {
+      if (!formData.name || !formData.username || !formData.password) {
         toast({
           title: "خطأ",
           description: "يرجى ملء جميع الحقول المطلوبة",
@@ -133,7 +130,6 @@ export default function UsersManagement() {
         phone: formData.phone,
         username: formData.username,
         password: formData.password,
-        email: formData.email,
         role: formData.role,
         active: formData.active
       });
@@ -164,8 +160,7 @@ export default function UsersManagement() {
         name: formData.name,
         phone: formData.phone,
         role: formData.role,
-        active: formData.active,
-        email: formData.email
+        active: formData.active
       };
 
       if (formData.password) {
@@ -295,18 +290,6 @@ export default function UsersManagement() {
                     value={formData.password}
                     onChange={handleInputChange}
                     placeholder="كلمة المرور"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">البريد الإلكتروني</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder="البريد الإلكتروني"
                   />
                 </div>
               </div>
@@ -446,17 +429,6 @@ export default function UsersManagement() {
                   value={formData.password}
                   onChange={handleInputChange}
                   placeholder="كلمة المرور الجديدة"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-email">البريد الإلكتروني</Label>
-                <Input
-                  id="edit-email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
                 />
               </div>
             </div>
