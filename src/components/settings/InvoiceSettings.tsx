@@ -1,481 +1,372 @@
-
 import { useState, useEffect } from "react";
-import { Input } from "@/components/ui/input";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { siteConfig, updateSiteConfig } from "@/config/site";
-import { File, Eye, Upload, Image as ImageIcon } from "lucide-react";
-import { Sale } from "@/types";
-import InvoiceDialog from "@/components/POS/InvoiceDialog";
-import { supabase } from "@/integrations/supabase/client";
+import { FilePenLine, Printer, Settings } from "lucide-react";
+
+const invoiceSettingsSchema = z.object({
+  invoicePrefix: z.string().min(1, { message: "الرجاء إدخال بادئة الفاتورة" }),
+  nextInvoiceNumber: z.coerce.number().min(1, { message: "الرجاء إدخال رقم الفاتورة التالي" }),
+  showLogo: z.boolean().default(true),
+  showContact: z.boolean().default(true),
+  showTaxId: z.boolean().default(false),
+  taxId: z.string().optional(),
+  footerText: z.string().optional(),
+  termsAndConditions: z.string().optional(),
+  autoSendEmail: z.boolean().default(false),
+  autoPrint: z.boolean().default(false),
+});
+
+type InvoiceSettingsValues = z.infer<typeof invoiceSettingsSchema>;
+
+// Create a sample receipt for demonstration
+const sampleReceipt = {
+  id: '1',
+  date: new Date().toISOString(),
+  invoice_number: 'INV-1001',
+  items: [
+    {
+      product: {
+        id: '1',
+        name: 'منتج تجريبي',
+        price: 50,
+        purchase_price: 40,
+        quantity: 100,
+        image_urls: [],
+        is_offer: false,
+        bulk_enabled: false,
+        is_bulk: false,
+        created_at: new Date().toISOString(),
+      },
+      quantity: 2,
+      price: 50,
+      discount: 0,
+      total: 100,
+    }
+  ],
+  subtotal: 100,
+  discount: 0,
+  total: 100,
+  payment_method: 'cash' as 'cash' | 'card' | 'mixed',
+  customer_name: 'عميل تجريبي',
+  customer_phone: '01012345678',
+  cashier_id: '1',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  profit: 20,
+};
 
 export default function InvoiceSettings() {
-  const { toast } = useToast();
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [settings, setSettings] = useState({
-    footer: siteConfig.invoice?.footer || "شكراً لزيارتكم!",
-    website: siteConfig.invoice?.website || "",
-    fontSize: siteConfig.invoice?.fontSize || "normal",
-    showVat: siteConfig.invoice?.showVat || true,
-    template: siteConfig.invoice?.template || "default",
-    notes: siteConfig.invoice?.notes || "",
-    paymentInstructions: siteConfig.invoice?.paymentInstructions || "",
-    logoChoice: siteConfig.invoice?.logoChoice || "store",
-    customLogoUrl: siteConfig.invoice?.customLogoUrl || null,
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const form = useForm<InvoiceSettingsValues>({
+    resolver: zodResolver(invoiceSettingsSchema),
+    defaultValues: {
+      invoicePrefix: "",
+      nextInvoiceNumber: 1,
+      showLogo: true,
+      showContact: true,
+      showTaxId: false,
+      taxId: "",
+      footerText: "",
+      termsAndConditions: "",
+      autoSendEmail: false,
+      autoPrint: false,
+    },
   });
 
-  // Load settings from siteConfig when component mounts
-  useEffect(() => {
-    console.log("Loading invoice settings from siteConfig:", siteConfig.invoice);
-    console.log("Store logo URL:", siteConfig.logoUrl);
-    
-    setSettings({
-      footer: siteConfig.invoice?.footer || "شكراً لزيارتكم!",
-      website: siteConfig.invoice?.website || "",
-      fontSize: siteConfig.invoice?.fontSize || "normal",
-      showVat: siteConfig.invoice?.showVat || true,
-      template: siteConfig.invoice?.template || "default",
-      notes: siteConfig.invoice?.notes || "",
-      paymentInstructions: siteConfig.invoice?.paymentInstructions || "",
-      logoChoice: siteConfig.invoice?.logoChoice || "store",
-      customLogoUrl: siteConfig.invoice?.customLogoUrl || null,
-    });
-  }, []);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setSettings({ ...settings, [name]: value });
-  };
-
-  const handleSwitchChange = (name: string, checked: boolean) => {
-    setSettings({ ...settings, [name]: checked });
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setSettings({ ...settings, [name]: value });
-  };
-
-  const handleCustomLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onSubmit = async (data: InvoiceSettingsValues) => {
     try {
-      setUploading(true);
+      setIsLoading(true);
       
-      if (!e.target.files || e.target.files.length === 0) {
-        return;
-      }
-      
-      const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `invoice_logo_${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('store')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
+      const { error } = await supabase
+        .from('invoice_settings')
+        .upsert({
+          invoice_prefix: data.invoicePrefix,
+          next_invoice_number: data.nextInvoiceNumber,
+          show_logo: data.showLogo,
+          show_contact: data.showContact,
+          show_tax_id: data.showTaxId,
+          tax_id: data.taxId,
+          footer_text: data.footerText,
+          terms_and_conditions: data.termsAndConditions,
+          auto_send_email: data.autoSendEmail,
+          auto_print: data.autoPrint,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'id'
         });
         
-      if (uploadError) {
-        console.error("Upload error:", uploadError);
-        throw uploadError;
-      }
+      if (error) throw error;
       
-      const { data } = supabase.storage.from('store').getPublicUrl(filePath);
-      
-      if (data) {
-        setSettings({ ...settings, customLogoUrl: data.publicUrl });
-        
-        toast({
-          title: "تم",
-          description: "تم رفع الشعار بنجاح",
-        });
-      }
-    } catch (error) {
-      console.error("Error uploading logo:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء رفع الشعار",
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleSaveSettings = () => {
-    try {
-      setSaving(true);
-      
-      updateSiteConfig({
-        vatNumber: (document.getElementById('vatNumber') as HTMLInputElement)?.value || "",
-        invoice: {
-          footer: settings.footer,
-          website: settings.website,
-          fontSize: settings.fontSize,
-          showVat: settings.showVat,
-          template: settings.template,
-          notes: settings.notes,
-          paymentInstructions: settings.paymentInstructions,
-          logoChoice: settings.logoChoice,
-          customLogoUrl: settings.customLogoUrl,
-        }
-      });
-      
-      toast({
-        title: "تم",
-        description: "تم حفظ إعدادات الفواتير بنجاح",
-      });
+      toast.success("تم حفظ إعدادات الفاتورة بنجاح");
     } catch (error) {
       console.error("Error saving invoice settings:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء حفظ الإعدادات",
-        variant: "destructive",
-      });
+      toast.error("حدث خطأ أثناء حفظ إعدادات الفاتورة");
     } finally {
-      setSaving(false);
+      setIsLoading(false);
     }
   };
 
-  const sampleSale: Sale = {
-    id: "preview-invoice",
-    date: new Date().toISOString(),
-    invoice_number: "PREVIEW-001",
-    items: [
-      {
-        product: {
-          id: "1",
-          name: "منتج تجريبي 1",
-          price: 125,
-          purchase_price: 100,
-          quantity: 50,
-          image_urls: [],
-          is_offer: false,
-          bulk_enabled: false,
-          is_bulk: false,
-          created_at: new Date().toISOString(),
-        },
-        quantity: 2,
-        price: 125,
-        discount: 0,
-        total: 250,
-      },
-      {
-        product: {
-          id: "2",
-          name: "منتج تجريبي 2",
-          price: 75,
-          purchase_price: 50,
-          quantity: 30,
-          image_urls: [],
-          is_offer: false,
-          bulk_enabled: false,
-          is_bulk: false,
-          created_at: new Date().toISOString(),
-        },
-        quantity: 1,
-        price: 75,
-        discount: 0,
-        total: 75,
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('invoice_settings')
+          .select('*')
+          .single();
+          
+        if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
+        
+        if (data) {
+          form.reset({
+            invoicePrefix: data.invoice_prefix || "",
+            nextInvoiceNumber: data.next_invoice_number || 1,
+            showLogo: data.show_logo,
+            showContact: data.show_contact,
+            showTaxId: data.show_tax_id,
+            taxId: data.tax_id || "",
+            footerText: data.footer_text || "",
+            termsAndConditions: data.terms_and_conditions || "",
+            autoSendEmail: data.auto_send_email,
+            autoPrint: data.auto_print,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching invoice settings:", error);
       }
-    ],
-    subtotal: 325,
-    discount: 25,
-    total: 300,
-    payment_method: "cash",
-    cash_amount: 300,
-    profit: 100,
-    customer_name: "عميل تجريبي",
-    customer_phone: "01234567890",
-    created_at: new Date().toISOString(),
-  };
+    };
+    
+    fetchSettings();
+  }, [form]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">إعدادات الفواتير</h2>
-        <Button 
-          variant="outline" 
-          onClick={() => setIsPreviewOpen(true)}
-          className="flex items-center gap-2"
-        >
-          <Eye className="h-4 w-4" />
-          معاينة الفاتورة
-        </Button>
-      </div>
-
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="general">معلومات عامة</TabsTrigger>
-          <TabsTrigger value="design">تصميم الفاتورة</TabsTrigger>
-          <TabsTrigger value="content">محتوى إضافي</TabsTrigger>
-          <TabsTrigger value="logo">شعار الفاتورة</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="general" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>معلومات المتجر</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="website">الموقع الإلكتروني</Label>
-                  <Input
-                    id="website"
-                    name="website"
-                    value={settings.website}
-                    onChange={handleInputChange}
-                    placeholder="www.example.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vatNumber">الرقم الضريبي</Label>
-                  <div className="flex space-x-2 items-center">
-                    <Input
-                      id="vatNumber"
-                      placeholder="أدخل الرقم الضريبي"
-                      defaultValue={siteConfig.vatNumber}
-                    />
-                    <div className="ms-2 flex items-center space-x-2">
-                      <Switch
-                        id="showVat"
-                        checked={settings.showVat}
-                        onCheckedChange={(checked) => handleSwitchChange("showVat", checked)}
+    <Card>
+      <CardHeader>
+        <CardTitle>إعدادات الفاتورة</CardTitle>
+        <CardDescription>تكوين إعدادات الفواتير مثل البادئة والرقم التسلسلي والشعار</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="invoicePrefix"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>بادئة الفاتورة</FormLabel>
+                    <FormControl>
+                      <Input placeholder="INV" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nextInvoiceNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>رقم الفاتورة التالي</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={1} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+              <FormField
+                control={form.control}
+                name="showLogo"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
                       />
-                      <Label htmlFor="showVat" className="me-2">إظهار في الفاتورة</Label>
+                    </FormControl>
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">إظهار الشعار</FormLabel>
+                      <FormDescription>
+                        عرض شعار الشركة في الفاتورة
+                      </FormDescription>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="design" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>تصميم الفاتورة</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="template">نموذج الفاتورة</Label>
-                  <Select 
-                    defaultValue={settings.template} 
-                    onValueChange={(value) => handleSelectChange("template", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر نموذج الفاتورة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="default">النموذج الافتراضي</SelectItem>
-                      <SelectItem value="compact">نموذج مدمج</SelectItem>
-                      <SelectItem value="detailed">نموذج مفصل</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fontSize">حجم الخط</Label>
-                  <Select 
-                    defaultValue={settings.fontSize} 
-                    onValueChange={(value) => handleSelectChange("fontSize", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر حجم الخط" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="small">صغير</SelectItem>
-                      <SelectItem value="normal">متوسط</SelectItem>
-                      <SelectItem value="large">كبير</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="footer">نص التذييل</Label>
-                <Input
-                  id="footer"
-                  name="footer"
-                  value={settings.footer}
-                  onChange={handleInputChange}
-                  placeholder="نص يظهر في نهاية الفاتورة"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="content" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>محتوى إضافي</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="notes">ملاحظات</Label>
-                <Textarea
-                  id="notes"
-                  name="notes"
-                  value={settings.notes}
-                  onChange={handleInputChange}
-                  placeholder="ملاحظات تظهر في الفاتورة"
-                  rows={3}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="paymentInstructions">تعليمات الدفع</Label>
-                <Textarea
-                  id="paymentInstructions"
-                  name="paymentInstructions"
-                  value={settings.paymentInstructions}
-                  onChange={handleInputChange}
-                  placeholder="تعليمات إضافية للدفع"
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="logo" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>شعار الفاتورة</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="logoChoice">اختيار الشعار</Label>
-                <Select 
-                  defaultValue={settings.logoChoice} 
-                  onValueChange={(value) => handleSelectChange("logoChoice", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر مصدر الشعار" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="store">استخدام شعار المتجر</SelectItem>
-                    <SelectItem value="custom">استخدام شعار مخصص</SelectItem>
-                    <SelectItem value="none">بدون شعار</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {settings.logoChoice === 'custom' && (
-                <div className="space-y-2 mt-4">
-                  <Label>شعار مخصص للفاتورة</Label>
-                  
-                  <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 h-48">
-                    {settings.customLogoUrl ? (
-                      <div className="relative w-full h-full">
-                        <img
-                          src={settings.customLogoUrl}
-                          alt="شعار مخصص للفاتورة"
-                          className="w-full h-full object-contain"
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="absolute top-0 right-0 m-2"
-                          onClick={() => setSettings({ ...settings, customLogoUrl: null })}
-                        >
-                          إزالة
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-muted-foreground">
-                        <ImageIcon className="w-16 h-16 mb-4" />
-                        <p className="text-sm text-center mb-2">اسحب الشعار هنا أو انقر للتحميل</p>
-                        <p className="text-xs text-center">PNG, JPG أو WEBP (الحد الأقصى: 5MB)</p>
-                      </div>
-                    )}
-                    
-                    <Input
-                      id="custom-logo-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleCustomLogoUpload}
-                      disabled={uploading}
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+              <FormField
+                control={form.control}
+                name="showContact"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">إظهار معلومات الاتصال</FormLabel>
+                      <FormDescription>
+                        عرض معلومات الاتصال الخاصة بالشركة في الفاتورة
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+              <FormField
+                control={form.control}
+                name="showTaxId"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">إظهار الرقم الضريبي</FormLabel>
+                      <FormDescription>
+                        عرض الرقم الضريبي للشركة في الفاتورة
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            {form.watch("showTaxId") && (
+              <FormField
+                control={form.control}
+                name="taxId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>الرقم الضريبي</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            
+            <FormField
+              control={form.control}
+              name="footerText"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>نص التذييل</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="شكراً لتعاملكم"
+                      className="resize-none"
+                      {...field}
                     />
-                  </div>
-                  
-                  <Button
-                    variant="outline"
-                    className="w-full mt-2"
-                    onClick={() => document.getElementById('custom-logo-upload')?.click()}
-                    disabled={uploading}
-                  >
-                    {uploading ? (
-                      <span className="flex items-center">
-                        <span className="animate-spin mr-2">⏳</span> جاري الرفع...
-                      </span>
-                    ) : (
-                      <span className="flex items-center">
-                        <Upload className="ml-2 h-4 w-4" /> تحميل شعار جديد
-                      </span>
-                    )}
-                  </Button>
-                </div>
+                  </FormControl>
+                  <FormDescription>
+                    نص يظهر في أسفل الفاتورة
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
               )}
-
-              {settings.logoChoice === 'store' && siteConfig.logoUrl && (
-                <div className="flex justify-center mt-4 border rounded p-4">
-                  <div className="text-center">
-                    <p className="mb-2 text-sm text-muted-foreground">سيتم استخدام شعار المتجر الحالي:</p>
-                    <img
-                      src={siteConfig.logoUrl}
-                      alt="شعار المتجر"
-                      className="h-32 object-contain mx-auto"
+            />
+            
+            <FormField
+              control={form.control}
+              name="termsAndConditions"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>الشروط والأحكام</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="الشروط والأحكام الخاصة بالشركة"
+                      className="resize-none"
+                      {...field}
                     />
-                  </div>
-                </div>
+                  </FormControl>
+                  <FormDescription>
+                    الشروط والأحكام التي تظهر في الفاتورة
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
               )}
-
-              {settings.logoChoice === 'store' && !siteConfig.logoUrl && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mt-4">
-                  <p className="text-amber-800 text-sm">
-                    لم يتم تعيين شعار للمتجر. قم بتعيين شعار المتجر من إعدادات المتجر أولاً.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      <Button 
-        onClick={handleSaveSettings} 
-        className="w-full"
-        disabled={saving}
-      >
-        {saving ? 'جاري الحفظ...' : 'حفظ إعدادات الفواتير'}
-      </Button>
-
-      <InvoiceDialog
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        sale={sampleSale}
-        previewMode={true}
-        settings={{
-          ...settings,
-          logoChoice: settings.logoChoice,
-          customLogoUrl: settings.customLogoUrl,
-          logo: settings.logoChoice === 'store' 
-            ? siteConfig.logoUrl 
-            : settings.logoChoice === 'custom' 
-              ? settings.customLogoUrl 
-              : null
-        }}
-      />
-    </div>
+            />
+            
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+              <FormField
+                control={form.control}
+                name="autoSendEmail"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">إرسال الفاتورة تلقائياً عبر البريد الإلكتروني</FormLabel>
+                      <FormDescription>
+                        إرسال نسخة من الفاتورة تلقائياً إلى العميل عبر البريد الإلكتروني
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+              <FormField
+                control={form.control}
+                name="autoPrint"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">طباعة الفاتورة تلقائياً</FormLabel>
+                      <FormDescription>
+                        طباعة الفاتورة تلقائياً بعد إتمام عملية البيع
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            </div>
+            
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "جاري الحفظ..." : "حفظ إعدادات الفاتورة"}
+            </Button>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
 }
