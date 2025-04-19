@@ -1,12 +1,12 @@
 
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface AssignDeliveryPersonDialogProps {
   open: boolean;
@@ -15,58 +15,48 @@ interface AssignDeliveryPersonDialogProps {
   onConfirm: () => void;
 }
 
-export function AssignDeliveryPersonDialog({
-  open,
-  onOpenChange,
+export function AssignDeliveryPersonDialog({ 
+  open, 
+  onOpenChange, 
   orderId,
   onConfirm
 }: AssignDeliveryPersonDialogProps) {
-  const [deliveryPersons, setDeliveryPersons] = useState<any[]>([]);
-  const [selectedPerson, setSelectedPerson] = useState<string>('');
-  const [trackingNumber, setTrackingNumber] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [deliveryPerson, setDeliveryPerson] = useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // List of delivery persons (could be fetched from the database in a real app)
+  const deliveryPersons = [
+    "أحمد محمد",
+    "محمود علي",
+    "محمد أحمد",
+    "عمر خالد",
+    "خالد عمر"
+  ];
 
-  useEffect(() => {
-    fetchDeliveryPersons();
-  }, []);
-
-  const fetchDeliveryPersons = async () => {
+  const assignDeliveryPerson = async () => {
+    if (!orderId || !deliveryPerson) return;
+    
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, name')
-        .eq('role', 'delivery')
-        .eq('active', true);
-
-      if (error) throw error;
-      setDeliveryPersons(data || []);
-    } catch (error) {
-      console.error('Error fetching delivery persons:', error);
-      toast.error('حدث خطأ أثناء تحميل قائمة مندوبي التوصيل');
-    }
-  };
-
-  const handleAssign = async () => {
-    if (!selectedPerson) {
-      toast.error('يرجى اختيار مندوب التوصيل');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
+      setIsSubmitting(true);
+      
+      const updateData: any = { 
+        delivery_person: deliveryPerson,
+        status: 'shipped',
+        updated_at: new Date().toISOString()
+      };
+      
+      if (trackingNumber) {
+        updateData.tracking_number = trackingNumber;
+      }
+      
       const { error } = await supabase
         .from('online_orders')
-        .update({
-          delivery_person: selectedPerson,
-          tracking_number: trackingNumber || null,
-          status: 'shipped',
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', orderId);
-
+      
       if (error) throw error;
-
+      
       toast.success('تم تعيين مندوب التوصيل بنجاح');
       onConfirm();
       onOpenChange(false);
@@ -74,54 +64,60 @@ export function AssignDeliveryPersonDialog({
       console.error('Error assigning delivery person:', error);
       toast.error('حدث خطأ أثناء تعيين مندوب التوصيل');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="dir-rtl">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>تعيين مندوب توصيل</DialogTitle>
+          <DialogTitle className="text-center">تعيين مندوب توصيل</DialogTitle>
         </DialogHeader>
-
-        <div className="space-y-4">
+        
+        <div className="space-y-4 py-4 dir-rtl">
           <div className="space-y-2">
-            <Label>اختر مندوب التوصيل</Label>
-            <Select value={selectedPerson} onValueChange={setSelectedPerson}>
+            <Label htmlFor="delivery-person">اختر مندوب التوصيل</Label>
+            <Select
+              value={deliveryPerson}
+              onValueChange={setDeliveryPerson}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="اختر مندوب التوصيل" />
               </SelectTrigger>
               <SelectContent>
-                {deliveryPersons.map(person => (
-                  <SelectItem key={person.id} value={person.name}>
-                    {person.name}
+                {deliveryPersons.map((person) => (
+                  <SelectItem key={person} value={person}>
+                    {person}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-
+          
           <div className="space-y-2">
-            <Label>رقم التتبع (اختياري)</Label>
-            <Input 
+            <Label htmlFor="tracking-number">رقم التتبع (اختياري)</Label>
+            <Input
+              id="tracking-number"
               value={trackingNumber}
               onChange={(e) => setTrackingNumber(e.target.value)}
               placeholder="أدخل رقم التتبع"
             />
           </div>
         </div>
-
-        <DialogFooter className="gap-2 sm:gap-0">
+        
+        <DialogFooter className="flex flex-row gap-2 sm:justify-center">
           <Button
+            type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
           >
             إلغاء
           </Button>
-          <Button 
-            onClick={handleAssign}
-            disabled={!selectedPerson || isLoading}
+          <Button
+            type="button"
+            disabled={isSubmitting || !deliveryPerson}
+            onClick={assignDeliveryPerson}
           >
             تعيين
           </Button>

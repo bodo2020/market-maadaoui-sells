@@ -68,22 +68,26 @@ export default function OnlineOrders() {
   }, [activeTab, ordersRefreshKey]);
 
   const subscribeToOrders = () => {
-    const channel = supabase.channel('online-orders').on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'online_orders'
-    }, payload => {
-      toast.info("طلب جديد!", {
-        description: "تم استلام طلب جديد"
-      });
-      fetchOrders();
-    }).on('postgres_changes', {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'online_orders'
-    }, payload => {
-      fetchOrders();
-    }).subscribe();
+    const channel = supabase.channel('online-orders')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'online_orders'
+      }, payload => {
+        toast.info("طلب جديد!", {
+          description: "تم استلام طلب جديد"
+        });
+        fetchOrders();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'online_orders'
+      }, payload => {
+        console.log("Order updated:", payload);
+        fetchOrders();
+      })
+      .subscribe();
     return channel;
   };
 
@@ -93,6 +97,7 @@ export default function OnlineOrders() {
       let query = supabase.from('online_orders').select('*').order('created_at', {
         ascending: false
       });
+      
       if (activeTab === "pending") {
         query = query.eq('status', 'pending');
       } else if (activeTab === "processing") {
@@ -106,11 +111,10 @@ export default function OnlineOrders() {
       } else if (activeTab === "unpaid") {
         query = query.eq('payment_status', 'pending');
       }
-      const {
-        data,
-        error
-      } = await query;
+      
+      const { data, error } = await query;
       if (error) throw error;
+      
       const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => ({
         id: item.id,
         created_at: item.created_at,
@@ -123,8 +127,11 @@ export default function OnlineOrders() {
         customer_name: item.customer_name || 'غير معروف',
         customer_email: item.customer_email || '',
         customer_phone: item.customer_phone || '',
-        notes: item.notes || ''
+        notes: item.notes || '',
+        tracking_number: item.tracking_number || null,
+        delivery_person: item.delivery_person || null
       }));
+      
       setOrders(transformedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -233,39 +240,45 @@ export default function OnlineOrders() {
     toast.success("تم أرشفة الطلب");
   };
 
-  const handleCancel = async (order: Order) => {
-    try {
-      const {
-        error
-      } = await supabase.from('online_orders').update({
-        status: 'cancelled'
-      }).eq('id', order.id);
-      if (error) throw error;
-      fetchOrders();
-      toast.success("تم إلغاء الطلب");
-    } catch (error) {
-      console.error('Error cancelling order:', error);
-      toast.error("حدث خطأ أثناء إلغاء الطلب");
-    }
-  };
-
   const handleProcess = (order: Order) => {
     navigate(`/online-orders/${order.id}`);
   };
 
   const handleComplete = async (order: Order) => {
     try {
-      const {
-        error
-      } = await supabase.from('online_orders').update({
-        status: 'delivered'
-      }).eq('id', order.id);
+      const { error } = await supabase.from('online_orders')
+        .update({
+          status: 'delivered',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+        
       if (error) throw error;
+      
       fetchOrders();
       toast.success("تم اكتمال الطلب");
     } catch (error) {
       console.error('Error completing order:', error);
       toast.error("حدث خطأ أثناء اكتمال الطلب");
+    }
+  };
+
+  const handleCancel = async (order: Order) => {
+    try {
+      const { error } = await supabase.from('online_orders')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+        
+      if (error) throw error;
+      
+      fetchOrders();
+      toast.success("تم إلغاء الطلب");
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      toast.error("حدث خطأ أثناء إلغاء الطلب");
     }
   };
 

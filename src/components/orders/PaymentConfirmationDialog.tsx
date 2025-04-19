@@ -1,7 +1,10 @@
 
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface PaymentConfirmationDialogProps {
   open: boolean;
@@ -10,22 +13,28 @@ interface PaymentConfirmationDialogProps {
   onConfirm: () => void;
 }
 
-export function PaymentConfirmationDialog({
-  open,
-  onOpenChange,
+export function PaymentConfirmationDialog({ 
+  open, 
+  onOpenChange, 
   orderId,
   onConfirm
 }: PaymentConfirmationDialogProps) {
-  const handleConfirm = async () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const confirmPayment = async () => {
+    if (!orderId) return;
+    
     try {
+      setIsSubmitting(true);
+      
       const { error } = await supabase
         .from('online_orders')
-        .update({
+        .update({ 
           payment_status: 'paid',
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
-
+      
       if (error) throw error;
       
       toast.success('تم تأكيد الدفع بنجاح');
@@ -34,28 +43,40 @@ export function PaymentConfirmationDialog({
     } catch (error) {
       console.error('Error confirming payment:', error);
       toast.error('حدث خطأ أثناء تأكيد الدفع');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="dir-rtl">
-        <AlertDialogHeader>
-          <AlertDialogTitle>تأكيد اكتمال الدفع</AlertDialogTitle>
-        </AlertDialogHeader>
-        <div className="text-right py-4">
-          <p>هل أنت متأكد من رغبتك في حفظ هذا الطلب كمدفوع بالكامل؟</p>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-center">تأكيد الدفع</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4 text-center dir-rtl">
+          <div>
+            <p>هل أنت متأكد من تأكيد استلام هذا الدفع؟</p>
+            <p className="text-sm text-muted-foreground mt-2">سيتم تحديث حالة الدفع إلى "مدفوع".</p>
+          </div>
         </div>
-        <div className="flex justify-start gap-3">
-          <AlertDialogAction 
-            onClick={handleConfirm}
-            className="bg-primary hover:bg-primary/90"
+        <DialogFooter className="flex flex-row gap-2 sm:justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            إلغاء
+          </Button>
+          <Button
+            type="button"
+            disabled={isSubmitting}
+            onClick={confirmPayment}
           >
             تأكيد الدفع
-          </AlertDialogAction>
-          <AlertDialogCancel className="mt-0">إلغاء</AlertDialogCancel>
-        </div>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
