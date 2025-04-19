@@ -1,13 +1,31 @@
+
 export enum UserRole {
   ADMIN = 'admin',
   EMPLOYEE = 'employee',
   CASHIER = 'cashier',
+  DELIVERY = 'delivery',
 }
 
 export interface User {
   id: string;
   email: string;
   role: UserRole;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  phone?: string;
+  username: string;
+  active?: boolean;
+  password?: string;
+  shifts?: Shift[];
+}
+
+export interface Shift {
+  id: string;
+  employee_id: string;
+  start_time: string;
+  end_time?: string;
+  total_hours?: number;
   created_at: string;
   updated_at: string;
 }
@@ -79,6 +97,7 @@ export interface MainCategory {
   image_url?: string;
   created_at?: string;
   updated_at?: string;
+  product_count?: number;
 }
 
 export interface Company {
@@ -94,6 +113,9 @@ export interface Customer {
   id: string;
   name: string;
   phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -103,6 +125,10 @@ export interface Supplier {
   name: string;
   phone?: string;
   address?: string;
+  email?: string;
+  contact_person?: string;
+  notes?: string;
+  balance?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -163,6 +189,8 @@ export interface Expense {
   description: string;
   amount: number;
   category: string;
+  type: string;
+  receipt_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -198,6 +226,26 @@ export interface Banner {
   start_date?: string;
   end_date?: string;
   is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Order {
+  id: string;
+  customer_id?: string;
+  customer_name: string;
+  customer_phone?: string;
+  customer_email?: string;
+  date: string;
+  items: any[];
+  subtotal: number;
+  discount: number;
+  total: number;
+  payment_method: 'cash' | 'card' | 'online';
+  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  shipping_address?: string;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  notes?: string;
   created_at: string;
   updated_at: string;
 }
