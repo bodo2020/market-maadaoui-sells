@@ -121,16 +121,23 @@ export default function OnlineOrders() {
       const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => ({
         id: item.id,
         created_at: item.created_at,
+        updated_at: item.updated_at || item.created_at,
+        date: item.created_at,
         total: item.total,
+        subtotal: item.total,
+        discount: 0,
         status: validateOrderStatus(item.status),
         payment_status: validatePaymentStatus(item.payment_status),
-        payment_method: item.payment_method,
+        payment_method: (item.payment_method as 'cash' | 'card' | 'online') || 'cash',
         shipping_address: item.shipping_address,
         items: Array.isArray(item.items) ? item.items : [],
         customer_name: item.customer_name || 'غير معروف',
         customer_email: item.customer_email || '',
         customer_phone: item.customer_phone || '',
         notes: item.notes || '',
+        delivery_location_id: item.delivery_location_id,
+        shipping_cost: item.shipping_cost,
+        tracking_number: item.tracking_number
       }));
       
       setOrders(transformedOrders);

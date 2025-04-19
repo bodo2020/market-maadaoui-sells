@@ -1,536 +1,302 @@
-import React, { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import MainLayout from "@/components/layout/MainLayout";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Plus, Trash2, Save, ShoppingCart, FileText, BadgeDollarSign } from "lucide-react";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { fetchSuppliers } from "@/services/supabase/supplierService";
-import { fetchProducts } from "@/services/supabase/productService";
-import { createPurchase } from "@/services/supabase/purchaseService";
-import { Product, Supplier, CartItem } from "@/types";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import React, { useState, useEffect } from 'react';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Product, CartItem } from '@/types';
+import { toast } from 'sonner';
+import { Search } from 'lucide-react';
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 export default function SupplierPurchases() {
-  const queryClient = useQueryClient();
-  
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
-  const [selectedSupplierName, setSelectedSupplierName] = useState<string>("");
-  const [selectedSupplierBalance, setSelectedSupplierBalance] = useState<number | null>(null);
-  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [subtotal, setSubtotal] = useState<number>(0);
-  const [paid, setPaid] = useState<number>(0);
-  
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [description, setDescription] = useState("");
-  
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-  
-  const { data: suppliers = [] } = useQuery({
-    queryKey: ["suppliers"],
-    queryFn: fetchSuppliers
+  const [supplier, setSupplier] = useState({
+    id: "1",
+    name: "Sample Supplier",
+    phone: "123-456-7890",
+    address: "123 Main St",
+    email: "supplier@example.com",
+    contact_person: "John Doe",
+    notes: "Reliable supplier",
+    balance: 1000,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   });
-  
-  const { data: products = [] } = useQuery({
-    queryKey: ["products"],
-    queryFn: fetchProducts
-  });
-  
-  const createPurchaseMutation = useMutation({
-    mutationFn: createPurchase,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchases"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-      toast.success("تم إضافة فاتورة الشراء بنجاح");
-      resetPurchase();
-    },
-    onError: (error) => {
-      toast.error("حدث خطأ أثناء إضافة فاتورة الشراء");
-      console.error("Error creating purchase:", error);
-    }
-  });
-  
+
   useEffect(() => {
-    if (searchTerm.trim() === "") {
-      setFilteredProducts([]);
-      return;
+    // Mock products data
+    const mockProducts = [
+      {
+        id: "1",
+        name: "Sample Product 1",
+        price: 100,
+        purchase_price: 80,
+        quantity: 50,
+        image_urls: [],
+        is_offer: false,
+        bulk_enabled: false,
+        is_bulk: false,
+        created_at: new Date().toISOString()
+      },
+      {
+        id: "2",
+        name: "Sample Product 2",
+        price: 150,
+        purchase_price: 120,
+        quantity: 30,
+        image_urls: [],
+        is_offer: true,
+        offer_price: 130,
+        bulk_enabled: true,
+        bulk_price: 110,
+        bulk_quantity: 10,
+        is_bulk: false,
+        created_at: new Date().toISOString()
+      },
+      {
+        id: "3",
+        name: "Sample Product 3",
+        price: 200,
+        purchase_price: 160,
+        quantity: 40,
+        image_urls: [],
+        is_offer: false,
+        bulk_enabled: false,
+        is_bulk: true,
+        created_at: new Date().toISOString()
+      }
+    ];
+    setProducts(mockProducts);
+  }, []);
+
+  // Update the sample cartItems to include weight property
+  const cartItems = [
+    {
+      product: {
+        id: "1",
+        name: "Sample Product 1",
+        price: 100,
+        purchase_price: 80,
+        quantity: 50,
+        image_urls: [],
+        is_offer: false,
+        bulk_enabled: false,
+        is_bulk: false,
+        created_at: new Date().toISOString()
+      },
+      quantity: 5,
+      price: 100,
+      discount: 0,
+      total: 500,
+      weight: null
     }
-    
-    const filtered = products.filter(product => 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    
-    setFilteredProducts(filtered);
-  }, [searchTerm, products]);
-  
-  useEffect(() => {
-    const total = cart.reduce((sum, item) => sum + item.total, 0);
-    setSubtotal(total);
-  }, [cart]);
-  
-  const handleSupplierSelect = (supplierId: string) => {
-    setSelectedSupplierId(supplierId);
-    const supplier = suppliers.find(s => s.id === supplierId);
-    setSelectedSupplierName(supplier?.name || "");
-    setSelectedSupplierBalance(supplier?.balance || null);
+  ];
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
   };
-  
-  const addProductToCart = (product: Product) => {
+
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleAddToCart = (product: Product) => {
     const existingItemIndex = cart.findIndex(item => item.product.id === product.id);
-    
+
     if (existingItemIndex >= 0) {
-      const updatedCart = [...cart];
-      const item = updatedCart[existingItemIndex];
-      item.quantity += 1;
-      item.total = item.price * item.quantity;
-      setCart(updatedCart);
+      const newCart = [...cart];
+      newCart[existingItemIndex].quantity += 1;
+      newCart[existingItemIndex].total = newCart[existingItemIndex].quantity * newCart[existingItemIndex].price;
+      setCart(newCart);
     } else {
       const newItem: CartItem = {
-        product: product,
+        product,
         quantity: 1,
-        price: product.purchase_price,
-        discount: 0,
-        total: product.purchase_price
+        price: product.is_offer && product.offer_price ? product.offer_price : product.price,
+        discount: product.is_offer && product.offer_price ? product.price - product.offer_price : 0,
+        total: product.is_offer && product.offer_price ? product.offer_price : product.price,
+        weight: null
       };
-      
       setCart([...cart, newItem]);
     }
-    
-    setSearchTerm("");
-    setFilteredProducts([]);
-  };
-  
-  const updateItemQuantity = (index: number, quantity: number) => {
-    if (quantity <= 0) return;
-    
-    const updatedCart = [...cart];
-    updatedCart[index].quantity = quantity;
-    updatedCart[index].total = updatedCart[index].price * quantity;
-    setCart(updatedCart);
-  };
-  
-  const updateItemPrice = (index: number, price: number) => {
-    if (price < 0) return;
-    
-    const updatedCart = [...cart];
-    updatedCart[index].price = price;
-    updatedCart[index].total = price * updatedCart[index].quantity;
-    setCart(updatedCart);
-  };
-  
-  const removeFromCart = (index: number) => {
-    const updatedCart = [...cart];
-    updatedCart.splice(index, 1);
-    setCart(updatedCart);
-  };
-  
-  const savePurchase = () => {
-    if (!selectedSupplierId) {
-      toast.error("الرجاء اختيار مورد");
-      return;
-    }
-    
-    if (cart.length === 0) {
-      toast.error("لا يوجد منتجات في السلة");
-      return;
-    }
-    
-    setIsConfirmDialogOpen(true);
-  };
-  
-  const confirmPurchase = () => {
-    const purchaseData = {
-      supplier_id: selectedSupplierId,
-      invoice_number: invoiceNumber,
-      date: invoiceDate,
-      total: subtotal,
-      paid: paid,
-      description: description,
-      items: cart.map(item => ({
-        product_id: item.product.id,
-        quantity: item.quantity,
-        price: item.price,
-        total: item.total
-      }))
-    };
-    
-    createPurchaseMutation.mutate(purchaseData);
-    setIsConfirmDialogOpen(false);
-  };
-  
-  const resetPurchase = () => {
-    setCart([]);
-    setSubtotal(0);
-    setPaid(0);
-    setSelectedSupplierId("");
-    setSelectedSupplierName("");
-    setSelectedSupplierBalance(null);
-    setInvoiceNumber("");
-    setInvoiceDate(new Date().toISOString().split('T')[0]);
-    setDescription("");
+
+    toast.success(`${product.name} added to cart`);
   };
 
-  const formatBalance = (balance: number | null) => {
-    if (balance === null) return "0.00";
-    return balance.toFixed(2);
+  const handleRemoveFromCart = (productId: string) => {
+    const newCart = cart.filter(item => item.product.id !== productId);
+    setCart(newCart);
+    toast.info(`Product removed from cart`);
   };
 
-  const getBalanceStatus = (balance: number | null) => {
-    if (!balance) return "neutral";
-    if (balance > 0) return "negative"; // Business owes money to supplier
-    if (balance < 0) return "positive"; // Supplier owes money to business
-    return "neutral";
+  const handleQuantityChange = (productId: string, quantity: number) => {
+    if (quantity < 0) return;
+
+    const newCart = cart.map(item => {
+      if (item.product.id === productId) {
+        item.quantity = quantity;
+        item.total = item.quantity * item.price;
+      }
+      return item;
+    });
+
+    setCart(newCart);
   };
-  
+
+  const calculateSubtotal = () => {
+    return cart.reduce((total, item) => total + item.total, 0);
+  };
+
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal();
+    return subtotal;
+  };
+
   return (
-    <MainLayout>
-      <div className="flex flex-col space-y-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">شراء منتجات من موردين</h1>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>اختيار المورد</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <Select 
-                    value={selectedSupplierId} 
-                    onValueChange={handleSupplierSelect}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر المورد" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map((supplier) => (
-                        <SelectItem key={supplier.id} value={supplier.id}>
-                          {supplier.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {selectedSupplierId && selectedSupplierBalance !== null && (
-                    <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
-                      <BadgeDollarSign className="h-5 w-5 text-primary" />
-                      <span className="font-semibold">الرصيد:</span>
-                      
-                      {getBalanceStatus(selectedSupplierBalance) === "negative" && (
-                        <Badge variant="destructive" className="mr-auto">
-                          مدين بـ {formatBalance(selectedSupplierBalance)}
-                        </Badge>
-                      )}
-                      
-                      {getBalanceStatus(selectedSupplierBalance) === "positive" && (
-                        <Badge variant="default" className="mr-auto bg-green-600">
-                          دائن بـ {formatBalance(Math.abs(selectedSupplierBalance || 0))}
-                        </Badge>
-                      )}
-                      
-                      {getBalanceStatus(selectedSupplierBalance) === "neutral" && (
-                        <Badge variant="outline" className="mr-auto">
-                          متعادل {formatBalance(selectedSupplierBalance)}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>بحث عن منتج</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="ابحث باسم المنتج أو الباركود"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                  <Button variant="outline">
-                    <Search className="ml-2 h-4 w-4" />
-                    بحث
-                  </Button>
-                </div>
-                
-                {filteredProducts.length > 0 && (
-                  <div className="mt-4 border rounded-md overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>المنتج</TableHead>
-                          <TableHead>السعر</TableHead>
-                          <TableHead>الإجراء</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredProducts.map((product) => (
-                          <TableRow key={product.id}>
-                            <TableCell>{product.name}</TableCell>
-                            <TableCell>{product.purchase_price}</TableCell>
-                            <TableCell>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => addProductToCart(product)}
-                              >
-                                <Plus className="h-4 w-4" />
-                                إضافة
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>تفاصيل الفاتورة</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="invoice-number" className="text-sm font-medium">
-                      رقم الفاتورة
-                    </label>
-                    <Input
-                      id="invoice-number"
-                      value={invoiceNumber}
-                      onChange={(e) => setInvoiceNumber(e.target.value)}
-                      placeholder="ترك فارغًا للتوليد التلقائي"
-                    />
-                    <div className="text-xs text-muted-foreground">
-                      اترك هذا الحقل فارغًا لتوليد رقم فاتورة تلقائيًا
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label htmlFor="invoice-date" className="text-sm font-medium">
-                      تاريخ الفاتورة
-                    </label>
-                    <Input
-                      id="invoice-date"
-                      type="date"
-                      value={invoiceDate}
-                      onChange={(e) => setInvoiceDate(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2 md:col-span-2">
-                    <label htmlFor="description" className="text-sm font-medium">
-                      الوصف
-                    </label>
-                    <Textarea
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="وصف الفاتورة (اختياري)"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+    <div className="container mx-auto p-4 dir-rtl">
+      <Card>
+        <CardHeader>
+          <CardTitle>فاتورة مشتريات من مورد</CardTitle>
+          <CardDescription>
+            إدارة مشترياتك من مورد معين
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="supplier">اسم المورد</Label>
+              <Input id="supplier" value={supplier.name} disabled />
+            </div>
+            <div>
+              <Label htmlFor="phone">رقم الهاتف</Label>
+              <Input id="phone" value={supplier.phone} disabled />
+            </div>
+            <div>
+              <Label htmlFor="email">البريد الإلكتروني</Label>
+              <Input id="email" value={supplier.email} disabled />
+            </div>
+            <div>
+              <Label htmlFor="address">العنوان</Label>
+              <Input id="address" value={supplier.address} disabled />
+            </div>
           </div>
-          
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex justify-between items-center">
-                  <span>سلة الشراء</span>
-                  {selectedSupplierName && (
-                    <span className="text-sm font-normal">
-                      المورد: {selectedSupplierName}
-                    </span>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {cart.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <ShoppingCart className="mx-auto h-12 w-12 opacity-20 mb-2" />
-                    <p>السلة فارغة</p>
-                    <p className="text-sm">قم بالبحث عن منتجات لإضافتها</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="border rounded-md overflow-hidden">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>المنتج</TableHead>
-                            <TableHead>الكمية</TableHead>
-                            <TableHead>السعر</TableHead>
-                            <TableHead>المجموع</TableHead>
-                            <TableHead></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {cart.map((item, index) => (
-                            <TableRow key={index}>
-                              <TableCell className="font-medium">
-                                {item.product.name}
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={item.quantity}
-                                  onChange={(e) => updateItemQuantity(index, parseInt(e.target.value))}
-                                  min="1"
-                                  className="w-16 h-8 p-1 text-center"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={item.price}
-                                  onChange={(e) => updateItemPrice(index, parseFloat(e.target.value))}
-                                  min="0"
-                                  className="w-20 h-8 p-1 text-center"
-                                />
-                              </TableCell>
-                              <TableCell>{item.total.toFixed(2)}</TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => removeFromCart(index)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                    
-                    <div className="space-y-2 border-t pt-4">
-                      <div className="flex justify-between items-center">
-                        <span>المجموع:</span>
-                        <span className="font-bold">{subtotal.toFixed(2)}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <span>المبلغ المدفوع:</span>
+        </CardContent>
+      </Card>
+
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>قائمة المنتجات</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative">
+              <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="ابحث عن منتج..."
+                className="pl-10 pr-10"
+                onChange={handleSearch}
+              />
+            </div>
+            <ScrollArea className="h-[400px] mt-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">اسم المنتج</TableHead>
+                    <TableHead className="text-center">السعر</TableHead>
+                    <TableHead className="text-center">الإجراءات</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredProducts.map(product => (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="text-center">{product.price}</TableCell>
+                      <TableCell className="text-center">
+                        <Button size="sm" onClick={() => handleAddToCart(product)}>
+                          إضافة إلى السلة
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>سلة المشتريات</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[400px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">اسم المنتج</TableHead>
+                    <TableHead className="text-center">الكمية</TableHead>
+                    <TableHead className="text-center">السعر</TableHead>
+                    <TableHead className="text-center">المجموع</TableHead>
+                    <TableHead className="text-center">الإجراءات</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {cart.map(item => (
+                    <TableRow key={item.product.id}>
+                      <TableCell className="font-medium">{item.product.name}</TableCell>
+                      <TableCell className="text-center">
                         <Input
                           type="number"
-                          value={paid}
-                          onChange={(e) => setPaid(parseFloat(e.target.value) || 0)}
-                          min="0"
-                          className="w-28 h-8 p-1 text-center"
+                          value={item.quantity}
+                          onChange={(e) => handleQuantityChange(item.product.id, Number(e.target.value))}
+                          className="w-20 mx-auto text-center"
                         />
-                      </div>
-                      
-                      <div className="flex justify-between items-center text-primary">
-                        <span>المبلغ المتبقي:</span>
-                        <span className="font-bold">{(subtotal - paid).toFixed(2)}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between pt-4">
-                      <Button variant="outline" onClick={resetPurchase}>
-                        مسح السلة
-                      </Button>
-                      <Button onClick={savePurchase}>
-                        <Save className="ml-2 h-4 w-4" />
-                        حفظ الفاتورة
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                      </TableCell>
+                      <TableCell className="text-center">{item.price}</TableCell>
+                      <TableCell className="text-center">{item.total}</TableCell>
+                      <TableCell className="text-center">
+                        <Button size="sm" variant="destructive" onClick={() => handleRemoveFromCart(item.product.id)}>
+                          حذف
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={3}>المجموع الفرعي</TableCell>
+                    <TableCell className="text-center">{calculateSubtotal()}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={3}>الإجمالي</TableCell>
+                    <TableCell className="text-center">{calculateTotal()}</TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </ScrollArea>
+            <Button className="w-full mt-4">تأكيد الشراء</Button>
+          </CardContent>
+        </Card>
       </div>
-      
-      <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>تأكيد الشراء</DialogTitle>
-            <DialogDescription>
-              سيتم إنشاء فاتورة شراء وتحديث رصيد المورد ومخزون المنتجات
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>المورد:</span>
-                <span>{selectedSupplierName}</span>
-              </div>
-              {invoiceNumber && (
-                <div className="flex justify-between">
-                  <span>رقم الفاتورة:</span>
-                  <span>{invoiceNumber}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span>المجموع:</span>
-                <span>{subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>المبلغ المدفوع:</span>
-                <span>{paid.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between font-bold">
-                <span>المبلغ المتبقي:</span>
-                <span>{(subtotal - paid).toFixed(2)}</span>
-              </div>
-            </div>
-            
-            {selectedSupplierBalance !== null && (subtotal - paid) !== 0 && (
-              <div className="p-3 bg-gray-50 rounded-md">
-                <div className="flex justify-between">
-                  <span>الرصيد الحالي:</span>
-                  <span>{formatBalance(selectedSupplierBalance)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>الرصيد بعد الشراء:</span>
-                  <span>{formatBalance((selectedSupplierBalance || 0) + (subtotal - paid))}</span>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>
-              إلغاء
-            </Button>
-            <Button onClick={confirmPurchase}>
-              <FileText className="ml-2 h-4 w-4" />
-              تأكيد
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </MainLayout>
+    </div>
   );
 }

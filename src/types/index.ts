@@ -8,10 +8,10 @@ export enum UserRole {
 
 export interface User {
   id: string;
-  email: string;
+  email: string; // Required property
   role: UserRole;
   created_at: string;
-  updated_at: string;
+  updated_at: string; // Required property
   name: string;
   phone?: string;
   username: string;
@@ -99,7 +99,7 @@ export interface MainCategory {
   image_url?: string;
   created_at?: string;
   updated_at?: string;
-  product_count?: number;
+  product_count?: number; // Added as used in code
 }
 
 export interface Company {
@@ -107,10 +107,10 @@ export interface Company {
   name: string;
   description?: string;
   image_url?: string;
-  logo_url?: string;
-  address?: string;
-  contact_email?: string;
-  contact_phone?: string;
+  logo_url?: string; // Added as used in CompanyDetails
+  address?: string; // Added as used in CompanyDetails
+  contact_email?: string; // Added as used in CompanyDetails
+  contact_phone?: string; // Added as used in CompanyDetails
   created_at?: string;
   updated_at?: string;
 }
@@ -155,6 +155,7 @@ export interface Sale {
   invoice_number: string;
   created_at: string;
   updated_at: string;
+  cashier_id?: string;
 }
 
 export interface CartItem {
@@ -181,6 +182,7 @@ export interface Purchase {
   created_at: string;
   updated_at: string;
   invoice_number?: string;
+  invoice_file_url?: string; // Added as used in Purchases
   paid?: number;
   description?: string;
   suppliers?: { name: string };
@@ -191,6 +193,11 @@ export interface PurchaseItem {
   quantity: number;
   price: number;
   total: number;
+  id?: string;
+  purchase_id?: string;
+  product_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Expense {
@@ -198,7 +205,7 @@ export interface Expense {
   date: string;
   description: string;
   amount: number;
-  category: string;
+  category: string; // Made required as it's used in ExpenseSettings
   type: string;
   receipt_url?: string;
   created_at: string;
@@ -258,6 +265,9 @@ export interface Order {
   notes?: string;
   created_at: string;
   updated_at: string;
+  delivery_location_id?: string;
+  shipping_cost?: number;
+  tracking_number?: string;
 }
 
 export interface OrderItem {
@@ -265,6 +275,9 @@ export interface OrderItem {
   quantity: number;
   price: number;
   total: number;
+  product_name?: string;
+  image_url?: string;
+  product_id?: string;
 }
 
 export interface OnlineOrder {

@@ -58,7 +58,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         phone: user.phone || "",
         password: "", // Don't store the actual password in state
         created_at: user.created_at,
-        username: user.username
+        username: user.username,
+        email: user.email || "", // Added required field
+        updated_at: user.updated_at || new Date().toISOString() // Added required field
       };
 
       setUser(loggedInUser);

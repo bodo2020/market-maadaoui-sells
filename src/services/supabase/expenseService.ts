@@ -45,7 +45,7 @@ export async function createExpense(expense: Omit<Expense, "id" | "created_at" |
       description: expense.description,
       date: formattedDate,
       receipt_url: expense.receipt_url || null,
-      category: expense.category, // Add the category field
+      category: expense.category, // Ensure category is included
     }])
     .select();
 

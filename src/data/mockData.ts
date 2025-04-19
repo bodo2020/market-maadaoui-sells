@@ -1,4 +1,5 @@
-import { User, UserRole, Product, Category, Sale, Expense, Shift, Purchase, MainCategory, Subcategory } from "@/types";
+
+import { User, UserRole, Product, Category, Sale, Expense, Purchase, MainCategory, Subcategory } from "@/types";
 import { siteConfig } from "@/config/site";
 
 // Categories
@@ -163,7 +164,9 @@ export const users: User[] = [
     password: "admin123",
     shifts: [],
     created_at: new Date().toISOString(),
-    username: "admin"
+    username: "admin",
+    email: "admin@example.com", // Added required field
+    updated_at: new Date().toISOString() // Added required field
   },
   {
     id: "2",
@@ -173,7 +176,9 @@ export const users: User[] = [
     password: "cashier123",
     shifts: [],
     created_at: new Date().toISOString(),
-    username: "cashier"
+    username: "cashier",
+    email: "cashier@example.com", // Added required field
+    updated_at: new Date().toISOString() // Added required field
   },
   {
     id: "3",
@@ -183,7 +188,9 @@ export const users: User[] = [
     password: "employee123",
     shifts: [],
     created_at: new Date().toISOString(),
-    username: "employee"
+    username: "employee",
+    email: "employee@example.com", // Added required field
+    updated_at: new Date().toISOString() // Added required field
   },
   {
     id: "4",
@@ -193,7 +200,9 @@ export const users: User[] = [
     password: "delivery123",
     shifts: [],
     created_at: new Date().toISOString(),
-    username: "delivery"
+    username: "delivery",
+    email: "delivery@example.com", // Added required field
+    updated_at: new Date().toISOString() // Added required field
   }
 ];
 
@@ -208,14 +217,16 @@ export const sales: Sale[] = [
         quantity: 2,
         price: products[0].price,
         discount: 0,
-        total: products[0].price * 2
+        total: products[0].price * 2,
+        weight: null // Added required field
       },
       {
         product: products[2],
         quantity: 1,
         price: products[2].price,
         discount: 0,
-        total: products[2].price
+        total: products[2].price,
+        weight: null // Added required field
       }
     ],
     cashier_id: "2",
@@ -237,7 +248,8 @@ export const sales: Sale[] = [
         quantity: 3,
         price: products[1].offer_price || products[1].price,
         discount: products[1].offer_price ? (products[1].price - products[1].offer_price) * 3 : 0,
-        total: (products[1].offer_price || products[1].price) * 3
+        total: (products[1].offer_price || products[1].price) * 3,
+        weight: null // Added required field
       }
     ],
     cashier_id: "2",
@@ -257,6 +269,7 @@ export const expenses: Expense[] = [
   {
     id: "1",
     type: "إيجار",
+    category: "تشغيلية", // Added required field
     amount: 3000,
     description: "إيجار المحل لشهر ابريل",
     date: new Date().toISOString(),
@@ -266,6 +279,7 @@ export const expenses: Expense[] = [
   {
     id: "2",
     type: "كهرباء",
+    category: "تشغيلية", // Added required field
     amount: 750,
     description: "فاتورة كهرباء شهر ابريل",
     date: new Date().toISOString(),
@@ -275,6 +289,7 @@ export const expenses: Expense[] = [
   {
     id: "3",
     type: "مرتبات",
+    category: "أجور", // Added required field
     amount: 5000,
     description: "مرتبات الموظفين لشهر ابريل",
     date: new Date().toISOString(),
