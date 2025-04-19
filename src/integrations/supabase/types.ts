@@ -127,6 +127,7 @@ export type Database = {
           id: string
           notes: string | null
           opening_balance: number | null
+          register_type: string
           updated_at: string | null
           verified_by: string | null
         }
@@ -139,6 +140,7 @@ export type Database = {
           id?: string
           notes?: string | null
           opening_balance?: number | null
+          register_type?: string
           updated_at?: string | null
           verified_by?: string | null
         }
@@ -151,6 +153,7 @@ export type Database = {
           id?: string
           notes?: string | null
           opening_balance?: number | null
+          register_type?: string
           updated_at?: string | null
           verified_by?: string | null
         }
@@ -488,6 +491,51 @@ export type Database = {
           },
         ]
       }
+      payment_settings: {
+        Row: {
+          account_number: string | null
+          auto_apply_fees: boolean
+          bank_name: string | null
+          card_processing_fee: number | null
+          created_at: string | null
+          e_wallet_name: string | null
+          e_wallet_processing_fee: number | null
+          enable_card: boolean
+          enable_cash: boolean
+          enable_e_wallet: boolean
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_number?: string | null
+          auto_apply_fees?: boolean
+          bank_name?: string | null
+          card_processing_fee?: number | null
+          created_at?: string | null
+          e_wallet_name?: string | null
+          e_wallet_processing_fee?: number | null
+          enable_card?: boolean
+          enable_cash?: boolean
+          enable_e_wallet?: boolean
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_number?: string | null
+          auto_apply_fees?: boolean
+          bank_name?: string | null
+          card_processing_fee?: number | null
+          created_at?: string | null
+          e_wallet_name?: string | null
+          e_wallet_processing_fee?: number | null
+          enable_card?: boolean
+          enable_cash?: boolean
+          enable_e_wallet?: boolean
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           barcode: string | null
@@ -705,6 +753,47 @@ export type Database = {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      register_transfers: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          date: string
+          from_register: string
+          id: string
+          notes: string | null
+          to_register: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          from_register: string
+          id?: string
+          notes?: string | null
+          to_register: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          from_register?: string
+          id?: string
+          notes?: string | null
+          to_register?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "register_transfers_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]

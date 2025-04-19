@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -11,7 +10,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Banknote, CreditCard, Wallet } from "lucide-react";
 
@@ -79,8 +77,7 @@ export default function PaymentSettings() {
     }
   };
 
-  // Fetch existing settings
-  useState(() => {
+  useEffect(() => {
     const fetchSettings = async () => {
       try {
         const { data, error } = await supabase
@@ -109,7 +106,7 @@ export default function PaymentSettings() {
     };
     
     fetchSettings();
-  }, []);
+  }, [form]);
 
   return (
     <Card>

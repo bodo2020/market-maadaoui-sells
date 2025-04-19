@@ -117,21 +117,35 @@ export interface CartItem {
 
 export interface Sale {
   id: string;
+  invoice_number: string;
   date: string;
-  items: CartItem[];
-  cashier_id?: string;
-  subtotal: number;
-  discount: number;
-  total: number;
-  profit: number;
-  payment_method: 'cash' | 'card' | 'mixed';
-  card_amount?: number;
-  cash_amount?: number;
   customer_name?: string;
   customer_phone?: string;
-  invoice_number: string;
+  payment_method: 'cash' | 'card' | 'mixed';
+  total: number;
+  subtotal: number;
+  discount: number;
+  items: CartItem[];
+  cashier_id?: string;
   created_at: string;
-  updated_at?: string;
+  updated_at: string;
+  cash_amount?: number;
+  card_amount?: number;
+  profit: number;
+}
+
+export interface OnlineOrder {
+  id: string;
+  created_at: string;
+  customer_id?: string;
+  total: number;
+  status: 'waiting' | 'ready' | 'shipped' | 'delivered';
+  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+  items: CartItem[];
+  payment_method?: string;
+  delivery_location_id?: string;
+  notes?: string;
+  updated_at: string;
 }
 
 export interface Expense {

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { SidebarLogo } from "./sidebar/SidebarLogo";
 import { SidebarItem } from "./sidebar/SidebarItem";
 import { Button } from "@/components/ui/button";
+import { siteConfig } from "@/config/site";
 
 export default function Sidebar() {
   const {
@@ -56,7 +57,6 @@ export default function Sidebar() {
         
         <SidebarItem icon={FolderOpen} label="الاقسام" href="/categories" active={currentPath.startsWith("/categories")} collapsed={collapsed} />
         
-        {/* Sales Dashboard Item at the top */}
         <SidebarItem 
           icon={TrendingUp} 
           label="لوحة المبيعات والخزينة" 
