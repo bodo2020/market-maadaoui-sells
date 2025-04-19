@@ -56,6 +56,7 @@ export async function fetchCashRecords(registerType?: RegisterType) {
   const { data, error } = await query;
     
   if (error) throw error;
+  console.log('Fetched cash records:', data);
   return data as CashRecord[];
 }
 
@@ -67,6 +68,7 @@ export async function createCashRecord(record: Omit<CashRecord, 'id' | 'created_
     .single();
     
   if (error) throw error;
+  console.log('Created cash record:', data);
   return data as CashRecord;
 }
 
@@ -79,25 +81,53 @@ export async function updateCashRecord(id: string, updates: Partial<CashRecord>)
     .single();
     
   if (error) throw error;
+  console.log('Updated cash record:', data);
   return data as CashRecord;
 }
 
 export async function getLatestCashBalance(registerType: RegisterType) {
-  const { data, error } = await supabase
-    .from('cash_tracking')
-    .select('*')
-    .eq('register_type', registerType)
-    .order('date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(1);
+  // First check the transactions table, which is more reliable
+  try {
+    console.log(`Fetching balance for register ${registerType} from transactions table`);
+    const { data: transactionData, error: transactionError } = await supabase
+      .from('cash_transactions')
+      .select('balance_after')
+      .eq('register_type', registerType)
+      .order('transaction_date', { ascending: false })
+      .limit(1);
+      
+    if (!transactionError && transactionData && transactionData.length > 0) {
+      console.log(`Found balance in transactions table: ${transactionData[0].balance_after}`);
+      return transactionData[0].balance_after || 0;
+    }
     
-  if (error) throw error;
-  
-  if (data && data.length > 0) {
-    return data[0].closing_balance || data[0].opening_balance || 0;
+    console.log('No transactions found or error, checking tracking table');
+    
+    // If no transactions found, check the tracking table
+    const { data, error } = await supabase
+      .from('cash_tracking')
+      .select('*')
+      .eq('register_type', registerType)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1);
+      
+    if (error) {
+      console.error('Error fetching cash tracking:', error);
+      throw error;
+    }
+    
+    if (data && data.length > 0) {
+      console.log(`Found balance in tracking table: ${data[0].closing_balance || data[0].opening_balance || 0}`);
+      return data[0].closing_balance || data[0].opening_balance || 0;
+    }
+    
+    console.log('No cash records found, returning 0');
+    return 0;
+  } catch (error) {
+    console.error(`Error getting latest cash balance for ${registerType}:`, error);
+    throw error;
   }
-  
-  return 0;
 }
 
 export async function recordCashTransaction(
@@ -108,6 +138,13 @@ export async function recordCashTransaction(
   userId: string
 ) {
   try {
+    console.log(`Recording ${transactionType} of ${amount} to ${registerType}:`, {
+      amount,
+      transaction_type: transactionType,
+      register_type: registerType,
+      notes
+    });
+    
     const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
       body: {
         amount,
@@ -117,8 +154,12 @@ export async function recordCashTransaction(
       }
     });
       
-    if (error) throw error;
+    if (error) {
+      console.error(`Error during ${transactionType}:`, error);
+      throw error;
+    }
     
+    console.log(`Successfully recorded ${transactionType}:`, data);
     return data;
   } catch (error) {
     console.error(`Error during ${transactionType}:`, error);
@@ -187,5 +228,6 @@ export async function fetchCashTransactions(registerType?: RegisterType) {
   const { data, error } = await query;
     
   if (error) throw error;
+  console.log('Fetched cash transactions:', data);
   return data as CashTransaction[];
 }

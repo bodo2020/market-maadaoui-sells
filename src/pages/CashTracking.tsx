@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -31,9 +32,22 @@ interface CashRecord {
   register_type: RegisterType;
 }
 
+interface CashTransaction {
+  id: string;
+  transaction_date: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: 'deposit' | 'withdrawal';
+  register_type: RegisterType;
+  notes?: string;
+  created_by?: string;
+  created_at?: string;
+}
+
 export default function CashTracking() {
   const { user } = useAuth();
   const [records, setRecords] = useState<CashRecord[]>([]);
+  const [transactions, setTransactions] = useState<CashTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [isAddCashOpen, setIsAddCashOpen] = useState(false);
@@ -47,6 +61,30 @@ export default function CashTracking() {
       setLoading(true);
       
       console.log("Fetching cash records for register:", RegisterType.STORE);
+      
+      // First fetch the transactions, as they're more reliable for balance information
+      const { data: transactionData, error: transactionError } = await supabase
+        .from('cash_transactions')
+        .select('*')
+        .eq('register_type', RegisterType.STORE)
+        .order('transaction_date', { ascending: false });
+      
+      if (transactionError) {
+        console.error('Error fetching cash transactions:', transactionError);
+        throw transactionError;
+      }
+      
+      console.log("Cash transactions fetched:", transactionData);
+      setTransactions(transactionData as CashTransaction[]);
+      
+      // Get the balance from the latest transaction
+      if (transactionData && transactionData.length > 0) {
+        const balance = transactionData[0].balance_after || 0;
+        console.log("Setting current balance from transactions to:", balance);
+        setCurrentBalance(balance);
+      }
+      
+      // Also fetch the cash tracking records
       const { data: cashData, error: cashError } = await supabase
         .from('cash_tracking')
         .select('*')
@@ -59,32 +97,34 @@ export default function CashTracking() {
       }
       
       console.log("Cash records fetched:", cashData);
-      
       setRecords(cashData as unknown as CashRecord[]);
       
-      console.log("Fetching current balance for register:", RegisterType.STORE);
-      const { data: balanceData, error: balanceError } = await supabase
-        .from('cash_tracking')
-        .select('closing_balance')
-        .eq('register_type', RegisterType.STORE)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (balanceError) {
-        console.error('Error fetching balance:', balanceError);
-        throw balanceError;
-      }
-      
-      console.log("Balance data fetched:", balanceData);
-      
-      if (balanceData && balanceData.length > 0) {
-        const balance = balanceData[0].closing_balance || 0;
-        console.log("Setting current balance to:", balance);
-        setCurrentBalance(balance);
-      } else {
-        console.log("No balance data found, setting to 0");
-        setCurrentBalance(0);
+      // Double-check against the tracking table if transactions table is empty
+      if (!transactionData || transactionData.length === 0) {
+        console.log("No transactions found, checking tracking table for balance");
+        const { data: balanceData, error: balanceError } = await supabase
+          .from('cash_tracking')
+          .select('closing_balance')
+          .eq('register_type', RegisterType.STORE)
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (balanceError) {
+          console.error('Error fetching balance:', balanceError);
+          throw balanceError;
+        }
+        
+        console.log("Balance data from tracking:", balanceData);
+        
+        if (balanceData && balanceData.length > 0) {
+          const balance = balanceData[0].closing_balance || 0;
+          console.log("Setting current balance from tracking to:", balance);
+          setCurrentBalance(balance);
+        } else {
+          console.log("No balance data found in tracking either, setting to 0");
+          setCurrentBalance(0);
+        }
       }
     } catch (error) {
       console.error('Error in fetchRecords:', error);

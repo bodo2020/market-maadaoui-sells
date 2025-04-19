@@ -18,6 +18,19 @@ BEGIN
   -- Get the current user ID
   v_user_id := auth.uid();
   
+  -- Input validation
+  IF p_amount <= 0 THEN
+    RAISE EXCEPTION 'Amount must be greater than zero';
+  END IF;
+  
+  IF p_transaction_type NOT IN ('deposit', 'withdrawal') THEN
+    RAISE EXCEPTION 'Invalid transaction type';
+  END IF;
+  
+  IF p_register_type NOT IN ('store', 'online') THEN
+    RAISE EXCEPTION 'Invalid register type';
+  END IF;
+  
   -- Get the current balance
   SELECT 
     COALESCE(
@@ -28,6 +41,8 @@ BEGIN
        LIMIT 1),
       0
     ) INTO current_balance;
+  
+  RAISE NOTICE 'Current balance for register % is %', p_register_type, current_balance;
   
   -- Calculate the new balance
   IF p_transaction_type = 'deposit' THEN
@@ -42,6 +57,8 @@ BEGIN
   ELSE
     RAISE EXCEPTION 'نوع العملية غير صالح';
   END IF;
+  
+  RAISE NOTICE 'New balance will be %', new_balance;
   
   -- Insert record into cash_transactions
   INSERT INTO cash_transactions (
@@ -62,6 +79,8 @@ BEGIN
     v_user_id
   );
   
+  RAISE NOTICE 'Transaction record inserted';
+  
   -- Insert record into cash_tracking
   INSERT INTO cash_tracking (
     date,
@@ -80,6 +99,8 @@ BEGIN
     v_user_id,
     p_register_type
   );
+  
+  RAISE NOTICE 'Tracking record inserted';
   
   RETURN new_balance;
 END;

@@ -40,6 +40,27 @@ serve(async (req) => {
 
     console.log('Processing transaction:', { amount, transaction_type, register_type, notes });
 
+    if (!amount || amount <= 0) {
+      return new Response(
+        JSON.stringify({ error: 'Amount must be greater than zero' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    if (!['deposit', 'withdrawal'].includes(transaction_type)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid transaction type' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    if (!['store', 'online'].includes(register_type)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid register type' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
     // Use the database function to handle transactions (this bypasses RLS)
     const { data: functionData, error: functionError } = await supabaseClient.rpc(
       'add_cash_transaction',
@@ -64,7 +85,9 @@ serve(async (req) => {
       );
     }
 
-    // Get the newly created records to return to the client
+    console.log('Transaction successfully recorded:', functionData);
+
+    // Get the newly created transaction to return to the client
     const { data: transactionData, error: transactionError } = await supabaseClient
       .from('cash_transactions')
       .select('*')
@@ -75,8 +98,11 @@ serve(async (req) => {
 
     if (transactionError) {
       console.error('Error retrieving transaction:', transactionError);
+    } else {
+      console.log('Retrieved transaction:', transactionData);
     }
 
+    // Get the latest tracking record
     const { data: trackingData, error: trackingError } = await supabaseClient
       .from('cash_tracking')
       .select('*')
@@ -88,11 +114,10 @@ serve(async (req) => {
 
     if (trackingError) {
       console.error('Error retrieving tracking record:', trackingError);
+    } else {
+      console.log('Retrieved tracking record:', trackingData);
     }
 
-    // Calculate the current balance for safety
-    let currentBalance = 0;
-    
     // Get the current balance from the database
     const { data: balanceData, error: balanceError } = await supabaseClient
       .from('cash_tracking')
@@ -102,8 +127,12 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(1);
     
+    let currentBalance = 0;
     if (!balanceError && balanceData && balanceData.length > 0) {
       currentBalance = balanceData[0].closing_balance || 0;
+      console.log('Current balance:', currentBalance);
+    } else {
+      console.error('Error retrieving balance or no balance data found');
     }
 
     return new Response(
