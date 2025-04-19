@@ -93,8 +93,8 @@ export default function CashTracking() {
     try {
       setProcessingTransaction(true);
       
-      // Direct database call to the RPC function
-      const { data, error } = await supabase.rest.rpc.call('add_cash_transaction', {
+      // Use the RPC function directly
+      const { data, error } = await supabase.rpc('add_cash_transaction', {
         p_amount: parseFloat(amount),
         p_transaction_type: 'deposit',
         p_register_type: RegisterType.STORE,
@@ -130,8 +130,8 @@ export default function CashTracking() {
     try {
       setProcessingTransaction(true);
       
-      // Direct database call to the RPC function
-      const { data, error } = await supabase.rest.rpc.call('add_cash_transaction', {
+      // Use the RPC function directly
+      const { data, error } = await supabase.rpc('add_cash_transaction', {
         p_amount: parseFloat(amount),
         p_transaction_type: 'withdrawal',
         p_register_type: RegisterType.STORE,

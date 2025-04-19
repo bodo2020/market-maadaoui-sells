@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export enum RegisterType {
@@ -108,17 +107,12 @@ export async function recordCashTransaction(
   userId: string
 ) {
   try {
-    // Use a POST request with the function name as part of the URL
-    const { data, error } = await supabase
-      .from('cash_transactions')
-      .select('*')
-      .limit(1)
-      .then(() => supabase.rest.rpc.call('add_cash_transaction', {
-        p_amount: amount,
-        p_transaction_type: transactionType,
-        p_register_type: registerType,
-        p_notes: notes
-      }));
+    const { data, error } = await supabase.rpc('add_cash_transaction', {
+      p_amount: amount,
+      p_transaction_type: transactionType,
+      p_register_type: registerType,
+      p_notes: notes
+    });
       
     if (error) throw error;
     
@@ -136,16 +130,13 @@ export async function transferBetweenRegisters(
   notes: string,
   userId: string
 ) {
-  // Get current balances
   const fromBalance = await getLatestCashBalance(fromRegister);
   const toBalance = await getLatestCashBalance(toRegister);
   
-  // Check if enough funds
   if (fromBalance < amount) {
     throw new Error('لا يوجد رصيد كافي في الخزنة المصدر');
   }
   
-  // Create transfer record
   const { error: transferError } = await supabase
     .from('register_transfers')
     .insert([{
@@ -159,7 +150,6 @@ export async function transferBetweenRegisters(
     
   if (transferError) throw transferError;
   
-  // Create transaction record
   const { error: transactionError } = await supabase
     .from('cash_transactions')
     .insert([{
@@ -174,7 +164,6 @@ export async function transferBetweenRegisters(
     
   if (transactionError) throw transactionError;
   
-  // Update source register
   const { error: sourceError } = await supabase
     .from('cash_tracking')
     .insert([{
@@ -189,7 +178,6 @@ export async function transferBetweenRegisters(
     
   if (sourceError) throw sourceError;
   
-  // Update destination register
   const { error: destError } = await supabase
     .from('cash_tracking')
     .insert([{

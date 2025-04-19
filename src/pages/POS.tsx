@@ -391,7 +391,7 @@ export default function POS() {
     if (amountToRecord <= 0) return;
     
     try {
-      const { data, error } = await supabase.rest.rpc.call('add_cash_transaction', {
+      const { data, error } = await supabase.rpc('add_cash_transaction', {
         p_amount: amountToRecord,
         p_transaction_type: 'deposit',
         p_register_type: RegisterType.STORE,
