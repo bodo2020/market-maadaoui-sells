@@ -1,42 +1,63 @@
-
 export enum UserRole {
-  ADMIN = "admin",
-  CASHIER = "cashier",
-  EMPLOYEE = "employee",
-  DELIVERY = "delivery"
+  ADMIN = 'admin',
+  EMPLOYEE = 'employee',
+  CASHIER = 'cashier',
 }
 
 export interface User {
   id: string;
-  name: string;
-  username: string;
+  email: string;
   role: UserRole;
-  phone?: string;
-  email?: string;
-  password?: string;
   created_at: string;
-  active?: boolean;
-  shifts?: Shift[];
-  salary?: number;
-  salary_type?: string;
+  updated_at: string;
 }
 
-export interface MainCategory {
+export interface Product {
   id: string;
   name: string;
-  description?: string | null;
-  image_url?: string | null;
+  description?: string;
+  price: number;
+  purchase_price: number;
+  quantity?: number;
+  notify_quantity?: number;  // Added this field to support low stock notifications
+  category_id?: string;
+  subcategory_id?: string;
+  subsubcategory_id?: string;
+  main_category_id?: string;
+  company_id?: string;
+  barcode?: string;
+  barcode_type?: string;
+  bulk_barcode?: string;
+  image_urls?: string[];
   created_at?: string;
   updated_at?: string;
-  product_count?: number;
+  is_offer?: boolean;
+  offer_price?: number;
+  is_bulk?: boolean;
+  bulk_enabled?: boolean;
+  bulk_quantity?: number;
+  bulk_price?: number;
+  manufacturer_name?: string;
+  unit_of_measure?: string;
+  calculated_weight?: number;
+  is_bulk_scan?: boolean;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  image_url?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Subcategory {
   id: string;
   name: string;
-  description?: string | null;
-  image_url?: string | null;
   category_id: string;
+  description?: string;
+  image_url?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -44,66 +65,64 @@ export interface Subcategory {
 export interface Subsubcategory {
   id: string;
   name: string;
-  description?: string | null;
-  image_url?: string | null;
   subcategory_id: string;
+  description?: string;
+  image_url?: string;
   created_at?: string;
   updated_at?: string;
 }
 
-export interface Category {
+export interface MainCategory {
   id: string;
   name: string;
-  description?: string | null;
-  image_url?: string | null;
+  description?: string;
+  image_url?: string;
   created_at?: string;
   updated_at?: string;
-  level?: 'category' | 'subcategory' | 'subsubcategory';
-  parent_id?: string | null;
 }
 
 export interface Company {
   id: string;
   name: string;
-  logo_url?: string | null;
-  description?: string | null;
-  address?: string | null;
-  contact_email?: string | null;
-  contact_phone?: string | null;
-  created_at?: Date | string;
-  updated_at?: Date | string;
+  description?: string;
+  image_url?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface Product {
+export interface Customer {
   id: string;
   name: string;
-  barcode?: string;
-  description?: string;
-  image_urls: string[];
-  quantity: number;
-  price: number;
-  purchase_price: number; 
-  offer_price?: number;
-  is_offer: boolean;
-  category_id?: string;
-  subcategory_id?: string;
-  subsubcategory_id?: string;
-  company_id?: string;
-  barcode_type?: string;
-  bulk_enabled: boolean;
-  bulk_quantity?: number;
-  bulk_price?: number;
-  bulk_barcode?: string;
-  created_at: Date | string;
-  updated_at?: Date | string;
-  manufacturer_name?: string;
-  is_bulk: boolean;
-  unit_of_measure?: string;
-  is_weight_based?: boolean;
-  calculated_weight?: number;
-  calculated_price?: number;
-  is_bulk_scan?: boolean;
-  track_inventory?: boolean;
+  phone?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone?: string;
+  address?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Sale {
+  id: string;
+  date: string;
+  items: CartItem[];
+  subtotal: number;
+  discount: number;
+  total: number;
+  profit: number;
+  payment_method: 'cash' | 'card' | 'mixed';
+  cash_amount?: number;
+  card_amount?: number;
+  customer_name?: string;
+  customer_phone?: string;
+  invoice_number: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CartItem {
@@ -112,119 +131,99 @@ export interface CartItem {
   price: number;
   discount: number;
   total: number;
-  weight?: number | null;
+  weight: number | null;
   isBulk?: boolean;
-}
-
-export interface Sale {
-  id: string;
-  date: string;
-  items: CartItem[];
-  cashier_id?: string;
-  subtotal: number;
-  discount: number;
-  total: number;
-  profit: number;
-  payment_method: 'cash' | 'card' | 'mixed';
-  card_amount?: number;
-  cash_amount?: number;
-  customer_name?: string;
-  customer_phone?: string;
-  invoice_number: string;
-  created_at: string;
-  updated_at?: string;
-}
-
-export interface Expense {
-  id: string;
-  type: string;
-  amount: number;
-  description: string;
-  date: string;
-  receipt_url?: string;
-  created_at: string;
-  updated_at?: string;
-}
-
-export interface Shift {
-  id: string;
-  employee_id?: string;
-  start_time: string;
-  end_time?: string;
-  total_hours?: number;
-  created_at: string;
-  updated_at?: string;
-}
-
-export interface Supplier {
-  id: string;
-  name: string;
-  contact_person?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  notes?: string;
-  created_at: string;
-  updated_at?: string;
-  balance?: number;
-}
-
-export interface Customer {
-  id: string;
-  name: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  notes?: string;
-  created_at: string;
-  updated_at?: string;
-  balance?: number;
 }
 
 export interface Purchase {
   id: string;
-  supplier_id: string;
-  invoice_number: string;
   date: string;
+  supplier_id: string;
+  items: PurchaseItem[];
+  subtotal: number;
+  discount: number;
   total: number;
-  paid: number;
-  description?: string;
-  invoice_file_url?: string;
+  payment_method: 'cash' | 'card' | 'mixed';
+  cash_amount?: number;
+  card_amount?: number;
   created_at: string;
-  updated_at?: string;
-  suppliers?: { name: string };
-  items?: PurchaseItem[];
+  updated_at: string;
 }
 
 export interface PurchaseItem {
-  id: string;
-  purchase_id: string;
-  product_id: string;
-  quantity: number;
-  price: number;
-  total: number;
-  products?: { name: string };
-}
-
-export interface OrderItem {
-  product_id: string;
-  product_name: string;
+  product: Product;
   quantity: number;
   price: number;
   total: number;
 }
 
-export interface Order {
+export interface Expense {
   id: string;
+  date: string;
+  description: string;
+  amount: number;
+  category: string;
   created_at: string;
+  updated_at: string;
+}
+
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  role: UserRole;
+  salary: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CashTransaction {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: 'income' | 'expense';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Banner {
+  id: string;
+  title: string;
+  description?: string;
+  image_url: string;
+  link?: string;
+  start_date?: string;
+  end_date?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OnlineOrder {
+  id: string;
+  customer_id: string;
+  date: string;
+  items: CartItem[];
+  subtotal: number;
+  discount: number;
   total: number;
+  payment_method: 'cash' | 'card' | 'online';
+  shipping_address: string;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
-  payment_method: string | null;
-  shipping_address: string | null;
-  items: OrderItem[];
-  customer_name?: string;
-  customer_email?: string;
-  customer_phone?: string;
-  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeliveryLocation {
+  id: string;
+  name: string;
+  city_id: string;
+  area_id: string;
+  address: string;
+  delivery_fee: number;
+  created_at: string;
+  updated_at: string;
 }
