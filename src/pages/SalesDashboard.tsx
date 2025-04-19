@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -23,7 +24,8 @@ import {
   fetchCashRecords, 
   getLatestCashBalance, 
   transferBetweenRegisters,
-  recordCashTransaction
+  recordCashTransaction,
+  fetchTransfers
 } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
