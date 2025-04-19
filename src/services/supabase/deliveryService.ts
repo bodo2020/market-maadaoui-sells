@@ -12,10 +12,8 @@ export async function fetchDeliveryLocations() {
 }
 
 export async function fetchShippingProviders() {
-  // Instead of querying a non-existent delivery_providers table,
-  // Let's create a separate table for shipping providers
   const { data, error } = await supabase
-    .from('companies')  // Use companies table instead as a temporary measure
+    .from('companies')
     .select('*')
     .order('name', { ascending: true });
     
@@ -24,7 +22,6 @@ export async function fetchShippingProviders() {
 }
 
 export async function createShippingProvider(data: Omit<ShippingProvider, 'id' | 'created_at' | 'updated_at'>) {
-  // Create in companies table instead
   const { data: result, error } = await supabase
     .from('companies')
     .insert([data])
@@ -218,7 +215,7 @@ export async function fetchDeliveryTypes() {
     .order('name');
     
   if (error) throw error;
-  return data as DeliveryType[];
+  return data;
 }
 
 export async function fetchDeliveryTypePricing(locationId: string) {
@@ -234,7 +231,11 @@ export async function fetchDeliveryTypePricing(locationId: string) {
   return data;
 }
 
-export async function createDeliveryTypePrice(data: Omit<DeliveryTypePrice, 'id' | 'created_at' | 'updated_at'>) {
+export async function createDeliveryTypePrice(data: {
+  delivery_location_id: string;
+  delivery_type_id: string;
+  price: number;
+}) {
   const { data: result, error } = await supabase
     .from('delivery_type_pricing')
     .insert([data])
@@ -242,5 +243,5 @@ export async function createDeliveryTypePrice(data: Omit<DeliveryTypePrice, 'id'
     .single();
     
   if (error) throw error;
-  return result as DeliveryTypePrice;
+  return result;
 }

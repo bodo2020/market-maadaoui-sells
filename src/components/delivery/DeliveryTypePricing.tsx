@@ -28,6 +28,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
   const loadDeliveryTypes = async () => {
     try {
       const types = await fetchDeliveryTypes();
+      console.log('Loaded delivery types:', types);
       setDeliveryTypes(types);
       const initialPrices = types.reduce((acc, type) => ({
         ...acc,
@@ -54,6 +55,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
           })
         )
       );
+      toast.success("تم حفظ الأسعار بنجاح");
       onSuccess();
     } catch (error) {
       console.error('Error saving prices:', error);
@@ -65,22 +67,26 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {deliveryTypes.map((type) => (
-        <div key={type.id} className="flex items-center gap-4">
-          <label className="flex-1 text-right">{type.name}</label>
-          <Input
-            type="number"
-            min="0"
-            step="0.01"
-            value={prices[type.id]}
-            onChange={(e) => setPrices(prev => ({
-              ...prev,
-              [type.id]: parseFloat(e.target.value) || 0
-            }))}
-            className="w-32 text-left"
-          />
-        </div>
-      ))}
+      {deliveryTypes.length === 0 ? (
+        <div className="text-center py-4">جاري تحميل أنواع التوصيل...</div>
+      ) : (
+        deliveryTypes.map((type) => (
+          <div key={type.id} className="flex items-center gap-4">
+            <label className="flex-1 text-right">{type.name}</label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={prices[type.id]}
+              onChange={(e) => setPrices(prev => ({
+                ...prev,
+                [type.id]: parseFloat(e.target.value) || 0
+              }))}
+              className="w-32 text-left"
+            />
+          </div>
+        ))
+      )}
 
       <div className="flex justify-end gap-2">
         <Button type="submit" disabled={loading}>

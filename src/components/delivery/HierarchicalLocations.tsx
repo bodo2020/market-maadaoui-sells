@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -12,7 +12,8 @@ import {
   fetchGovernorates,
   fetchCities,
   fetchAreas,
-  fetchNeighborhoods
+  fetchNeighborhoods,
+  deleteDeliveryLocation
 } from "@/services/supabase/deliveryService";
 import DeliveryLocationDialog from "./DeliveryLocationDialog";
 
@@ -98,6 +99,17 @@ export default function HierarchicalLocations() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDeliveryLocation(id);
+      loadGovernorates();
+      toast.success("تم حذف المنطقة بنجاح");
+    } catch (error) {
+      console.error('Error deleting location:', error);
+      toast.error("حدث خطأ أثناء حذف المنطقة");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Accordion type="multiple" className="w-full">
@@ -111,20 +123,25 @@ export default function HierarchicalLocations() {
               }}
               className="text-right"
             >
-              {governorate}
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddClick('city', { governorate });
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <span>{governorate}</span>
+              </div>
             </AccordionTrigger>
             <AccordionContent>
               <div className="pr-4 space-y-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleAddClick('city', { governorate })}
-                  className="flex items-center gap-1"
-                >
-                  <Plus className="h-3 w-3" />
-                  مدينة
-                </Button>
-                
                 {citiesByGovernorate[governorate]?.map(({ city }) => (
                   <AccordionItem key={city} value={`${governorate}-${city}`}>
                     <AccordionTrigger
@@ -135,19 +152,25 @@ export default function HierarchicalLocations() {
                       }}
                       className="text-right"
                     >
-                      {city}
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddClick('area', { governorate, city });
+                            }}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <span>{city}</span>
+                      </div>
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="pr-4 space-y-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAddClick('area', { governorate, city })}
-                        >
-                          <Plus className="h-4 w-4 ml-2" />
-                          إضافة منطقة
-                        </Button>
-
                         {areasByCity[`${governorate}-${city}`]?.map(({ area }) => (
                           <AccordionItem key={area} value={`${governorate}-${city}-${area}`}>
                             <AccordionTrigger
@@ -158,27 +181,47 @@ export default function HierarchicalLocations() {
                               }}
                               className="text-right"
                             >
-                              {area}
+                              <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAddClick('neighborhood', { governorate, city, area });
+                                    }}
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                <span>{area}</span>
+                              </div>
                             </AccordionTrigger>
                             <AccordionContent>
                               <div className="pr-4 space-y-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleAddClick('neighborhood', { governorate, city, area })}
-                                >
-                                  <Plus className="h-4 w-4 ml-2" />
-                                  إضافة حي
-                                </Button>
-
                                 {neighborhoodsByArea[`${governorate}-${city}-${area}`]?.map((neighborhood) => (
                                   <div
                                     key={neighborhood.id}
-                                    className="p-2 border rounded-lg mb-2 text-right"
+                                    className="flex items-center justify-between p-2 border rounded-lg"
                                   >
-                                    <div className="font-medium">{neighborhood.neighborhood}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                      السعر: {neighborhood.price} ج.م
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-red-500"
+                                        onClick={() => handleDelete(neighborhood.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="font-medium">{neighborhood.neighborhood}</div>
+                                      {neighborhood.price > 0 && (
+                                        <div className="text-sm text-muted-foreground">
+                                          السعر: {neighborhood.price} ج.م
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 ))}
