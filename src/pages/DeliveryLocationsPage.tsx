@@ -7,13 +7,33 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MapPin, Plus } from "lucide-react";
 import HierarchicalLocations from "@/components/delivery/HierarchicalLocations";
 import DeliveryLocationDialog from "@/components/delivery/DeliveryLocationDialog";
+import { createGovernorate } from "@/services/supabase/deliveryService";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function DeliveryLocationsPage() {
   const [showAddLocationDialog, setShowAddLocationDialog] = useState(false);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const handleAddLocation = () => {
     setShowAddLocationDialog(true);
+  };
+
+  const handleAddGovernorate = async (data: any) => {
+    try {
+      await createGovernorate({
+        governorate: data.name,
+        name: data.name,
+        provider_id: selectedProviderId || undefined
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["governorates"] });
+      toast.success("تم إضافة المحافظة بنجاح");
+      setShowAddLocationDialog(false);
+    } catch (error) {
+      console.error("Error creating governorate:", error);
+      toast.error("حدث خطأ أثناء إضافة المحافظة");
+    }
   };
 
   return (
@@ -46,10 +66,7 @@ export default function DeliveryLocationsPage() {
           onOpenChange={setShowAddLocationDialog}
           mode="governorate"
           providerId={selectedProviderId}
-          onSuccess={() => {
-            toast.success("تم إضافة المحافظة بنجاح");
-            setShowAddLocationDialog(false);
-          }}
+          onSuccess={handleAddGovernorate}
         />
       </div>
     </MainLayout>

@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Plus, Trash2, Save, ShoppingCart, FileText, BadgeDollarSign } from "lucide-react";
+import { Search, Plus, Trash2, Save, ShoppingCart, FileText, BadgeDollarSign, ScanLine } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { fetchSuppliers } from "@/services/supabase/supplierService";
-import { fetchProducts } from "@/services/supabase/productService";
+import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 import { createPurchase } from "@/services/supabase/purchaseService";
 import { Product, Supplier, CartItem } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function SupplierPurchases() {
   const queryClient = useQueryClient();
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
   
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
   const [selectedSupplierName, setSelectedSupplierName] = useState<string>("");
@@ -35,7 +37,9 @@ export default function SupplierPurchases() {
   const [paid, setPaid] = useState<number>(0);
   
   const [searchTerm, setSearchTerm] = useState("");
+  const [barcodeInput, setBarcodeInput] = useState("");
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [scannerMode, setScannerMode] = useState(false);
   
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
@@ -87,6 +91,13 @@ export default function SupplierPurchases() {
     const total = cart.reduce((sum, item) => sum + item.total, 0);
     setSubtotal(total);
   }, [cart]);
+
+  // Focus on barcode input when scanner mode is active
+  useEffect(() => {
+    if (scannerMode && barcodeInputRef.current) {
+      barcodeInputRef.current.focus();
+    }
+  }, [scannerMode]);
   
   const handleSupplierSelect = (supplierId: string) => {
     setSelectedSupplierId(supplierId);
@@ -117,7 +128,37 @@ export default function SupplierPurchases() {
     }
     
     setSearchTerm("");
+    setBarcodeInput("");
     setFilteredProducts([]);
+    
+    // Refocus barcode input if in scanner mode
+    if (scannerMode && barcodeInputRef.current) {
+      barcodeInputRef.current.focus();
+    }
+  };
+  
+  const handleBarcodeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setBarcodeInput(e.target.value);
+  };
+  
+  const handleBarcodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!barcodeInput.trim()) return;
+    
+    try {
+      const product = await fetchProductByBarcode(barcodeInput);
+      
+      if (product) {
+        addProductToCart(product);
+        toast.success(`تم إضافة ${product.name} إلى السلة`);
+      } else {
+        toast.error("لم يتم العثور على المنتج بهذا الباركود");
+      }
+    } catch (error) {
+      console.error("Error fetching product by barcode:", error);
+      toast.error("حدث خطأ أثناء البحث عن المنتج");
+    }
   };
   
   const updateItemQuantity = (index: number, quantity: number) => {
@@ -188,6 +229,8 @@ export default function SupplierPurchases() {
     setInvoiceNumber("");
     setInvoiceDate(new Date().toISOString().split('T')[0]);
     setDescription("");
+    setScannerMode(false);
+    setBarcodeInput("");
   };
 
   const formatBalance = (balance: number | null) => {
@@ -201,10 +244,22 @@ export default function SupplierPurchases() {
     if (balance < 0) return "positive"; // Supplier owes money to business
     return "neutral";
   };
+
+  const toggleScannerMode = () => {
+    setScannerMode(prev => !prev);
+    setBarcodeInput("");
+    
+    // Focus on input if turning on scanner mode
+    if (!scannerMode && barcodeInputRef.current) {
+      setTimeout(() => {
+        barcodeInputRef.current?.focus();
+      }, 100);
+    }
+  };
   
   return (
     <MainLayout>
-      <div className="flex flex-col space-y-4">
+      <div className="flex flex-col space-y-4" dir="rtl">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">شراء منتجات من موردين</h1>
         </div>
@@ -263,20 +318,51 @@ export default function SupplierPurchases() {
             
             <Card>
               <CardHeader>
-                <CardTitle>بحث عن منتج</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="ابحث باسم المنتج أو الباركود"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                  <Button variant="outline">
-                    <Search className="ml-2 h-4 w-4" />
-                    بحث
+                <div className="flex justify-between items-center">
+                  <CardTitle>بحث عن منتج</CardTitle>
+                  <Button 
+                    variant={scannerMode ? "default" : "outline"} 
+                    onClick={toggleScannerMode}
+                    className={`${scannerMode ? 'bg-primary text-white' : ''}`}
+                  >
+                    <ScanLine className="ml-2 h-4 w-4" />
+                    {scannerMode ? 'وضع الماسح نشط' : 'تفعيل الماسح الضوئي'}
                   </Button>
                 </div>
+              </CardHeader>
+              <CardContent>
+                {scannerMode ? (
+                  <form onSubmit={handleBarcodeSubmit} className="space-y-4">
+                    <div className="flex gap-2">
+                      <Input
+                        ref={barcodeInputRef}
+                        placeholder="قم بمسح الباركود أو أدخله يدوياً"
+                        value={barcodeInput}
+                        onChange={handleBarcodeInputChange}
+                        className="flex-1"
+                        autoFocus
+                      />
+                      <Button type="submit">
+                        إضافة
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      قم بتوجيه الماسح الضوئي نحو الباركود للإضافة التلقائية، أو أدخل الكود يدوياً واضغط على إضافة
+                    </p>
+                  </form>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="ابحث باسم المنتج أو الباركود"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <Button variant="outline">
+                      <Search className="ml-2 h-4 w-4" />
+                      بحث
+                    </Button>
+                  </div>
+                )}
                 
                 {filteredProducts.length > 0 && (
                   <div className="mt-4 border rounded-md overflow-hidden">
@@ -299,7 +385,7 @@ export default function SupplierPurchases() {
                                 size="sm" 
                                 onClick={() => addProductToCart(product)}
                               >
-                                <Plus className="h-4 w-4" />
+                                <Plus className="h-4 w-4 ml-1" />
                                 إضافة
                               </Button>
                             </TableCell>
@@ -474,7 +560,7 @@ export default function SupplierPurchases() {
       </div>
       
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-        <DialogContent>
+        <DialogContent dir="rtl">
           <DialogHeader>
             <DialogTitle>تأكيد الشراء</DialogTitle>
             <DialogDescription>
@@ -520,7 +606,7 @@ export default function SupplierPurchases() {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="sm:justify-start">
             <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>
               إلغاء
             </Button>

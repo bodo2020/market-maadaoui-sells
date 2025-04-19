@@ -2,7 +2,7 @@
 import {
   BarChart4, Store, ShoppingCart, PackageOpen, Users, Settings, FileText,
   Receipt, Home, UserPlus, Truck, Building2, ImageIcon,
-  ShoppingBag, FolderOpen, MapPin, TrendingUp
+  ShoppingBag, FolderOpen, MapPin, TrendingUp, Tag, Gift
 } from "lucide-react";
 import { SidebarGroupData } from "./types";
 
@@ -19,7 +19,8 @@ export const adminNavigation: SidebarGroupData = {
   items: [
     { icon: Building2, label: "الشركات", href: "/companies", adminOnly: true },
     { icon: ImageIcon, label: "البانرات", href: "/banners", adminOnly: true },
-    { icon: MapPin, label: "مناطق التوصيل", href: "/delivery-locations", adminOnly: true }
+    { icon: MapPin, label: "مناطق التوصيل", href: "/delivery-locations", adminOnly: true },
+    { icon: Tag, label: "العروض والكوبونات", href: "/offers", adminOnly: true }
   ]
 };
 
