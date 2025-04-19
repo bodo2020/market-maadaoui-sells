@@ -44,7 +44,14 @@ export function AssignDeliveryPersonDialog({
         .eq('active', true);
       
       if (error) throw error;
-      setDeliveryPersons(data || []);
+      
+      // Convert the string role to UserRole enum
+      const typedData = data?.map(user => ({
+        ...user,
+        role: user.role as UserRole
+      })) || [];
+      
+      setDeliveryPersons(typedData);
     } catch (error) {
       console.error('Error fetching delivery persons:', error);
       toast.error("حدث خطأ أثناء تحميل مندوبي التوصيل");
