@@ -72,7 +72,7 @@ export default function DeliveryLocationDialog({
         city,
         area,
         neighborhood,
-        provider_id: providerId, // Add the missing provider_id
+        provider_id: providerId, // This is important to include!
         price: 0, // Default price will be 0 since we're using delivery_type_pricing
         active,
         notes
