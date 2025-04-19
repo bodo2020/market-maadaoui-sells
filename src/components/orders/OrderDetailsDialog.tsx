@@ -56,7 +56,7 @@ export function OrderDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-full h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-[1400px] h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">تجهيز المنتجات #{order.id.slice(0, 8)}</DialogTitle>
         </DialogHeader>
