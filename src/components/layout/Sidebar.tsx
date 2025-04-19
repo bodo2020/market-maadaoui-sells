@@ -24,6 +24,7 @@ import {
   FolderOpen,
   MapPin
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { SidebarLogo } from "./sidebar/SidebarLogo";
 import { SidebarItem } from "./sidebar/SidebarItem";
 import { Button } from "@/components/ui/button";

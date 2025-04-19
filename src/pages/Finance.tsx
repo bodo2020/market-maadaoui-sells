@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
@@ -12,7 +11,7 @@ import {
   DollarSign, 
   TrendingUp,
   Receipt,
-  Calendar,
+  Calendar as CalendarIcon,
   CreditCard,
   LineChart,
   ShoppingCart,
@@ -20,8 +19,7 @@ import {
   Users,
   Percent,
   BarChart4,
-  Download,
-  CalendarIcon
+  Download
 } from "lucide-react";
 import { 
   BarChart,
@@ -38,6 +36,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ar } from "date-fns/locale";
 import { toast } from "sonner";
@@ -209,12 +208,14 @@ export default function Finance() {
                 <Calendar
                   mode="range"
                   selected={{
-                    from: startDate,
-                    to: endDate
+                    from: startDate!,
+                    to: endDate!
                   }}
                   onSelect={(range) => {
-                    setStartDate(range?.from);
-                    setEndDate(range?.to);
+                    if (range) {
+                      setStartDate(range.from);
+                      setEndDate(range.to);
+                    }
                   }}
                   locale={ar}
                   initialFocus
@@ -438,7 +439,9 @@ export default function Finance() {
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        <Tooltip 
+                          formatter={(value: number) => formatCurrency(value)} 
+                        />
                         <Legend />
                       </PieChart>
                     </ResponsiveContainer>
