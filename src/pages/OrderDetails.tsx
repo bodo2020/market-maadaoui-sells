@@ -37,6 +37,7 @@ export default function OrderDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [confirmStatusDialog, setConfirmStatusDialog] = useState(false);
   const [statusToUpdate, setStatusToUpdate] = useState<Order['status'] | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   useEffect(() => {
     fetchOrder();
@@ -158,6 +159,8 @@ export default function OrderDetails() {
     if (!statusToUpdate || !order) return;
     
     try {
+      setIsUpdatingStatus(true);
+      
       const { error } = await supabase
         .from('online_orders')
         .update({ 
@@ -180,8 +183,58 @@ export default function OrderDetails() {
       console.error('Error updating order status:', error);
       toast.error('حدث خطأ أثناء تحديث حالة الطلب');
     } finally {
+      setIsUpdatingStatus(false);
       setConfirmStatusDialog(false);
       setStatusToUpdate(null);
+    }
+  };
+
+  const handleDirectStatusUpdate = async () => {
+    if (!order) return;
+    
+    try {
+      setIsUpdatingStatus(true);
+      
+      // Check current status and decide next status
+      let newStatus: Order['status'];
+      
+      switch (order.status) {
+        case 'waiting':
+          newStatus = 'ready';
+          break;
+        case 'ready':
+          newStatus = 'shipped';
+          break;
+        case 'shipped':
+          newStatus = 'done';
+          break;
+        default:
+          newStatus = 'waiting'; // Reset to waiting if at the end of the cycle
+      }
+      
+      const { error } = await supabase
+        .from('online_orders')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      // Reload the order data
+      await fetchOrder();
+      
+      toast.success(`تم تحديث حالة الطلب إلى ${
+        newStatus === 'waiting' ? 'في الانتظار' : 
+        newStatus === 'ready' ? 'جاهز للشحن' : 
+        newStatus === 'shipped' ? 'تم الشحن' : 'تم التسليم'
+      }`);
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast.error('حدث خطأ أثناء تحديث حالة الطلب');
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
 
@@ -229,29 +282,29 @@ export default function OrderDetails() {
       <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold">تجهيز الطلب #{order.id.slice(0, 8)}</h1>
+            <h1 className="text-2xl font-bold">تجهيز الطلب #{order?.id.slice(0, 8)}</h1>
             <div className="flex gap-2">
               <button 
                 onClick={() => handleStatusClick('waiting')} 
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order.status === 'waiting' ? getStatusBadgeColor('waiting') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'waiting' ? getStatusBadgeColor('waiting') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
               >
                 في الانتظار
               </button>
               <button 
                 onClick={() => handleStatusClick('ready')} 
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order.status === 'ready' ? getStatusBadgeColor('ready') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'ready' ? getStatusBadgeColor('ready') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
               >
                 جاهز للشحن
               </button>
               <button 
                 onClick={() => handleStatusClick('shipped')} 
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order.status === 'shipped' ? getStatusBadgeColor('shipped') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'shipped' ? getStatusBadgeColor('shipped') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
               >
                 تم الشحن
               </button>
               <button 
                 onClick={() => handleStatusClick('done')} 
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order.status === 'done' ? getStatusBadgeColor('done') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${order?.status === 'done' ? getStatusBadgeColor('done') : 'bg-gray-100 text-gray-800 hover:bg-gray-200'}`}
               >
                 تم التسليم
               </button>
@@ -277,7 +330,7 @@ export default function OrderDetails() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {order.items.length === 0 ? <TableRow>
+                    {!order?.items || order.items.length === 0 ? <TableRow>
                         <TableCell colSpan={4} className="text-center py-4">
                           لا توجد منتجات في هذا الطلب
                         </TableCell>
@@ -301,7 +354,7 @@ export default function OrderDetails() {
 
             <div className="space-y-3">
               <div className="flex items-center gap-3 mt-4">
-                {order.payment_status === 'pending' ? <Button variant="outline" className="w-full" onClick={() => setPaymentConfirmOpen(true)}>
+                {order?.payment_status === 'pending' ? <Button variant="outline" className="w-full" onClick={() => setPaymentConfirmOpen(true)}>
                     تأكيد الدفع
                   </Button> : <div className="w-full flex gap-3">
                     <Badge variant="default" className="px-4 py-2 text-base w-3/4 flex justify-center items-center">
@@ -315,7 +368,7 @@ export default function OrderDetails() {
                         payment_status: 'pending',
                         updated_at: new Date().toISOString()
                       })
-                      .eq('id', order.id);
+                      .eq('id', order?.id);
                     
                     if (error) throw error;
                     
@@ -334,8 +387,13 @@ export default function OrderDetails() {
               </div>
 
               <div className="flex justify-between items-center">
-                <Button variant={order.status === 'ready' ? 'default' : 'outline'} className="w-full" onClick={() => setUpdateStatusOpen(true)}>
-                  تحديث حالة الطلب
+                <Button 
+                  variant={order?.status === 'ready' ? 'default' : 'outline'} 
+                  className="w-full"
+                  disabled={isUpdatingStatus}
+                  onClick={handleDirectStatusUpdate}
+                >
+                  {isUpdatingStatus ? 'جاري التحديث...' : 'تحديث حالة الطلب'}
                 </Button>
               </div>
               
@@ -343,9 +401,9 @@ export default function OrderDetails() {
                 <h3 className="font-medium text-lg">تعيين مندوب توصيل</h3>
                 <Button variant="outline" className="w-full flex gap-2 items-center justify-center" onClick={() => setAssignDeliveryOpen(true)}>
                   <Bike className="w-4 h-4" />
-                  {order.delivery_person ? 'تغيير مندوب التوصيل' : 'اختيار مندوب التوصيل'}
+                  {order?.delivery_person ? 'تغيير مندوب التوصيل' : 'اختيار مندوب التوصيل'}
                 </Button>
-                {order.delivery_person && <div className="p-2 bg-muted rounded-md mt-2">
+                {order?.delivery_person && <div className="p-2 bg-muted rounded-md mt-2">
                     <p className="text-sm">المندوب: {order.delivery_person}</p>
                     {order.tracking_number && <p className="text-sm">رقم التتبع: {order.tracking_number}</p>}
                   </div>}
@@ -355,7 +413,7 @@ export default function OrderDetails() {
                 <div className="space-y-1">
                   <div className="flex justify-between">
                     <span>المجموع الفرعي:</span>
-                    <span>{order.total} ج.م</span>
+                    <span>{order?.total} ج.م</span>
                   </div>
                   <div className="flex justify-between">
                     <span>الشحن:</span>
@@ -368,19 +426,19 @@ export default function OrderDetails() {
                   <Separator />
                   <div className="flex justify-between font-bold">
                     <span>المجموع:</span>
-                    <span>{order.total} ج.م</span>
+                    <span>{order?.total} ج.م</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>وسيلة الدفع:</span>
-                    <span>{order.payment_method || 'الدفع عند الاستلام'}</span>
+                    <span>{order?.payment_method || 'الدفع عند الاستلام'}</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>المدفوع:</span>
-                    <span>{order.payment_status === 'paid' ? order.total : 0} ج.م</span>
+                    <span>{order?.payment_status === 'paid' ? order.total : 0} ج.م</span>
                   </div>
                   <div className="flex justify-between font-bold">
                     <span>المتبقي:</span>
-                    <span>{order.payment_status === 'paid' ? 0 : order.total} ج.م</span>
+                    <span>{order?.payment_status === 'paid' ? 0 : order?.total} ج.م</span>
                   </div>
                 </div>
               </div>
@@ -397,7 +455,7 @@ export default function OrderDetails() {
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {order.notes || 'لا توجد ملاحظات من العميل'}
+                  {order?.notes || 'لا توجد ملاحظات من العميل'}
                 </p>
               </CardContent>
             </Card>
@@ -410,10 +468,10 @@ export default function OrderDetails() {
                 
                 <div className="flex items-start gap-3">
                   <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xl">
-                    {order.customer_name?.charAt(0) || 'غ'}
+                    {order?.customer_name?.charAt(0) || 'غ'}
                   </div>
                   <div>
-                    <h4 className="font-medium text-primary">{order.customer_name}</h4>
+                    <h4 className="font-medium text-primary">{order?.customer_name}</h4>
                     <p className="text-sm text-muted-foreground">عميل</p>
                   </div>
                 </div>
@@ -424,14 +482,14 @@ export default function OrderDetails() {
               <CardContent className="p-4 space-y-3">
                 <h3 className="font-medium text-lg">بيانات التواصل</h3>
                 
-                {order.customer_email && <div className="flex items-center gap-2">
+                {order?.customer_email && <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-muted-foreground" />
                     <a href={`mailto:${order.customer_email}`} className="text-primary hover:underline">
                       {order.customer_email}
                     </a>
                   </div>}
                 
-                {order.customer_phone && <div className="flex items-center gap-2">
+                {order?.customer_phone && <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-muted-foreground" />
                     <a href={`tel:${order.customer_phone}`} className="text-primary hover:underline">
                       {order.customer_phone}
@@ -440,7 +498,7 @@ export default function OrderDetails() {
               </CardContent>
             </Card>
 
-            {order.shipping_address && <Card>
+            {order?.shipping_address && <Card>
                 <CardContent className="p-4 space-y-3">
                   <h3 className="font-medium text-lg">عنوان الشحن</h3>
                   
@@ -467,14 +525,14 @@ export default function OrderDetails() {
         <PaymentConfirmationDialog 
           open={paymentConfirmOpen} 
           onOpenChange={setPaymentConfirmOpen} 
-          orderId={order.id} 
+          orderId={order?.id || ''} 
           onConfirm={fetchOrder} 
         />
 
         <AssignDeliveryPersonDialog 
           open={assignDeliveryOpen} 
           onOpenChange={setAssignDeliveryOpen} 
-          orderId={order.id} 
+          orderId={order?.id || ''} 
           onConfirm={fetchOrder} 
         />
 
@@ -491,7 +549,9 @@ export default function OrderDetails() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-row-reverse justify-center gap-2">
-              <AlertDialogAction onClick={confirmStatusUpdate}>تأكيد</AlertDialogAction>
+              <AlertDialogAction onClick={confirmStatusUpdate} disabled={isUpdatingStatus}>
+                {isUpdatingStatus ? 'جاري التحديث...' : 'تأكيد'}
+              </AlertDialogAction>
               <AlertDialogCancel>إلغاء</AlertDialogCancel>
             </AlertDialogFooter>
           </AlertDialogContent>
