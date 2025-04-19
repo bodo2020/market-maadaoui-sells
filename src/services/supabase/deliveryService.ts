@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { DeliveryLocation } from "@/types/shipping";
+import { DeliveryLocation, ShippingProvider } from "@/types/shipping";
 
 export async function fetchDeliveryLocations() {
   const { data, error } = await supabase
@@ -10,6 +10,27 @@ export async function fetchDeliveryLocations() {
     
   if (error) throw error;
   return data as DeliveryLocation[];
+}
+
+export async function fetchShippingProviders() {
+  const { data, error } = await supabase
+    .from('delivery_providers')
+    .select('*')
+    .order('name', { ascending: true });
+    
+  if (error) throw error;
+  return data as ShippingProvider[];
+}
+
+export async function createShippingProvider(data: Omit<ShippingProvider, 'id' | 'created_at' | 'updated_at'>) {
+  const { data: result, error } = await supabase
+    .from('delivery_providers')
+    .insert([data])
+    .select()
+    .single();
+    
+  if (error) throw error;
+  return result as ShippingProvider;
 }
 
 export async function fetchGovernorates() {

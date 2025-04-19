@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -62,7 +61,7 @@ export default function DeliveryLocationsTable({ onAddLocation }: DeliveryLocati
 
   useEffect(() => {
     if (selectedProvider) {
-      loadLocations(selectedProvider);
+      loadLocations();
     }
   }, [selectedProvider]);
 
@@ -79,11 +78,14 @@ export default function DeliveryLocationsTable({ onAddLocation }: DeliveryLocati
     }
   };
 
-  const loadLocations = async (providerId: string) => {
+  const loadLocations = async () => {
     try {
       setLoading(true);
-      const data = await fetchDeliveryLocations(providerId);
-      setLocations(data);
+      const data = await fetchDeliveryLocations();
+      const filteredData = selectedProvider
+        ? data.filter(loc => loc.provider_id === selectedProvider)
+        : data;
+      setLocations(filteredData);
     } catch (error) {
       console.error('Error loading delivery locations:', error);
       toast.error("حدث خطأ أثناء تحميل مناطق التوصيل");
@@ -127,9 +129,7 @@ export default function DeliveryLocationsTable({ onAddLocation }: DeliveryLocati
     try {
       await deleteDeliveryLocation(locationToDelete);
       toast.success("تم حذف منطقة التوصيل بنجاح");
-      if (selectedProvider) {
-        loadLocations(selectedProvider);
-      }
+      loadLocations();
     } catch (error) {
       console.error('Error deleting location:', error);
       toast.error("حدث خطأ أثناء حذف منطقة التوصيل");
