@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { DeliveryLocation } from "@/types/shipping";
-import { deleteDeliveryLocation } from "@/services/supabase/deliveryService";
+import { deleteDeliveryLocation, fetchDeliveryTypePricing } from "@/services/supabase/deliveryService";
 
 interface GroupedLocations {
   [governorate: string]: {

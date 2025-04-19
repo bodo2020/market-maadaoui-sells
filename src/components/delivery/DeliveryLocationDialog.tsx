@@ -12,12 +12,14 @@ import { DeliveryType } from "@/types/shipping";
 interface DeliveryLocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  providerId: string;
   onSuccess?: () => void;
 }
 
 export default function DeliveryLocationDialog({
   open,
   onOpenChange,
+  providerId,
   onSuccess
 }: DeliveryLocationDialogProps) {
   const [loading, setLoading] = useState(false);
@@ -70,6 +72,7 @@ export default function DeliveryLocationDialog({
         city,
         area,
         neighborhood,
+        provider_id: providerId, // Add the missing provider_id
         price: 0, // Default price will be 0 since we're using delivery_type_pricing
         active,
         notes

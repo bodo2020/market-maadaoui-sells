@@ -289,38 +289,6 @@ export type Database = {
           provider_id?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "delivery_locations_provider_id_fkey"
-            columns: ["provider_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_providers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      delivery_providers: {
-        Row: {
-          active: boolean | null
-          created_at: string | null
-          id: string
-          name: string
-          updated_at: string | null
-        }
-        Insert: {
-          active?: boolean | null
-          created_at?: string | null
-          id?: string
-          name: string
-          updated_at?: string | null
-        }
-        Update: {
-          active?: boolean | null
-          created_at?: string | null
-          id?: string
-          name?: string
-          updated_at?: string | null
-        }
         Relationships: []
       }
       delivery_type_pricing: {
