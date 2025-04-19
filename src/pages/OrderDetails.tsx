@@ -10,11 +10,14 @@ import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmati
 import { PaymentStatusBadge } from "@/components/orders/PaymentStatusBadge";
 import { useOrderDetails } from "@/hooks/orders/useOrderDetails";
 import { useState } from "react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function OrderDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
+  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
 
   const {
     order,
@@ -29,6 +32,37 @@ export default function OrderDetails() {
   const handlePaymentStatusUpdate = () => {
     if (!order || order.payment_status === 'paid') return;
     setPaymentConfirmOpen(true);
+  };
+
+  const handlePaymentStatusChange = async (newStatus: Order['payment_status']) => {
+    if (!order || isUpdatingPayment) return;
+    
+    try {
+      setIsUpdatingPayment(true);
+      
+      const { error } = await supabase
+        .from('online_orders')
+        .update({
+          payment_status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      toast.success(`تم تحديث حالة الدفع إلى ${
+        newStatus === 'paid' ? 'مدفوع' : 
+        newStatus === 'pending' ? 'في انتظار الدفع' : 
+        newStatus === 'failed' ? 'فشل الدفع' : 'تم الاسترجاع'
+      }`);
+      
+      fetchOrder();
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      toast.error('حدث خطأ أثناء تحديث حالة الدفع');
+    } finally {
+      setIsUpdatingPayment(false);
+    }
   };
 
   const onPaymentConfirmed = () => {
@@ -66,7 +100,13 @@ export default function OrderDetails() {
           <div className="space-y-2">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold">تجهيز الطلب #{order?.id.slice(0, 8)}</h1>
-              {order && <PaymentStatusBadge status={order.payment_status} />}
+              {order && (
+                <PaymentStatusBadge 
+                  status={order.payment_status} 
+                  onStatusChange={handlePaymentStatusChange} 
+                  editable 
+                />
+              )}
             </div>
             <OrderStatusSelection
               selectedStatus={selectedStatus}
