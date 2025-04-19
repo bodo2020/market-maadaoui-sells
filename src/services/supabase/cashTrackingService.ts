@@ -86,8 +86,8 @@ export async function updateCashRecord(id: string, updates: Partial<CashRecord>)
 }
 
 export async function getLatestCashBalance(registerType: RegisterType) {
-  // First check the transactions table, which is more reliable
   try {
+    // First check the transactions table, which is more reliable
     console.log(`Fetching balance for register ${registerType} from transactions table`);
     const { data: transactionData, error: transactionError } = await supabase
       .from('cash_transactions')
@@ -97,8 +97,9 @@ export async function getLatestCashBalance(registerType: RegisterType) {
       .limit(1);
       
     if (!transactionError && transactionData && transactionData.length > 0) {
-      console.log(`Found balance in transactions table: ${transactionData[0].balance_after}`);
-      return transactionData[0].balance_after || 0;
+      const balance = transactionData[0].balance_after || 0;
+      console.log(`Found balance in transactions table: ${balance}`);
+      return balance;
     }
     
     console.log('No transactions found or error, checking tracking table');
@@ -106,7 +107,7 @@ export async function getLatestCashBalance(registerType: RegisterType) {
     // If no transactions found, check the tracking table
     const { data, error } = await supabase
       .from('cash_tracking')
-      .select('*')
+      .select('closing_balance, opening_balance')
       .eq('register_type', registerType)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -118,8 +119,9 @@ export async function getLatestCashBalance(registerType: RegisterType) {
     }
     
     if (data && data.length > 0) {
-      console.log(`Found balance in tracking table: ${data[0].closing_balance || data[0].opening_balance || 0}`);
-      return data[0].closing_balance || data[0].opening_balance || 0;
+      const balance = data[0].closing_balance || data[0].opening_balance || 0;
+      console.log(`Found balance in tracking table: ${balance}`);
+      return balance;
     }
     
     console.log('No cash records found, returning 0');

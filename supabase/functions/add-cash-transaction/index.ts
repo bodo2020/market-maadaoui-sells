@@ -40,6 +40,7 @@ serve(async (req) => {
 
     console.log('Processing transaction:', { amount, transaction_type, register_type, notes });
 
+    // Validate inputs
     if (!amount || amount <= 0) {
       return new Response(
         JSON.stringify({ error: 'Amount must be greater than zero' }),
@@ -60,6 +61,51 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
+
+    // Get the current balance before the transaction
+    const { data: currentBalanceData, error: balanceError } = await supabaseClient
+      .from('cash_transactions')
+      .select('balance_after')
+      .eq('register_type', register_type)
+      .order('transaction_date', { ascending: false })
+      .limit(1);
+    
+    let currentBalance = 0;
+    if (!balanceError && currentBalanceData && currentBalanceData.length > 0) {
+      currentBalance = currentBalanceData[0].balance_after || 0;
+      console.log('Current balance from transactions:', currentBalance);
+    } else {
+      // If no transactions, check the tracking table
+      const { data: trackingBalanceData, error: trackingBalanceError } = await supabaseClient
+        .from('cash_tracking')
+        .select('closing_balance')
+        .eq('register_type', register_type)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (!trackingBalanceError && trackingBalanceData && trackingBalanceData.length > 0) {
+        currentBalance = trackingBalanceData[0].closing_balance || 0;
+        console.log('Current balance from tracking:', currentBalance);
+      }
+    }
+
+    // Calculate new balance
+    let newBalance = currentBalance;
+    if (transaction_type === 'deposit') {
+      newBalance = currentBalance + amount;
+    } else {
+      // Check if there's enough balance for withdrawal
+      if (amount > currentBalance) {
+        return new Response(
+          JSON.stringify({ error: 'لا يوجد رصيد كافي في الخزنة' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+      newBalance = currentBalance - amount;
+    }
+    
+    console.log('New balance will be:', newBalance);
 
     // Use the database function to handle transactions (this bypasses RLS)
     const { data: functionData, error: functionError } = await supabaseClient.rpc(
@@ -85,7 +131,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('Transaction successfully recorded:', functionData);
+    console.log('Transaction successfully recorded, new balance:', functionData);
 
     // Get the newly created transaction to return to the client
     const { data: transactionData, error: transactionError } = await supabaseClient
@@ -96,10 +142,13 @@ serve(async (req) => {
       .limit(1)
       .single();
 
+    let transaction = null;
     if (transactionError) {
       console.error('Error retrieving transaction:', transactionError);
     } else {
       console.log('Retrieved transaction:', transactionData);
+      transaction = transactionData;
+      newBalance = transactionData.balance_after; // Use the balance from the transaction
     }
 
     // Get the latest tracking record
@@ -112,36 +161,21 @@ serve(async (req) => {
       .limit(1)
       .single();
 
+    let tracking = null;
     if (trackingError) {
       console.error('Error retrieving tracking record:', trackingError);
     } else {
       console.log('Retrieved tracking record:', trackingData);
-    }
-
-    // Get the current balance from the database
-    const { data: balanceData, error: balanceError } = await supabaseClient
-      .from('cash_tracking')
-      .select('closing_balance')
-      .eq('register_type', register_type)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(1);
-    
-    let currentBalance = 0;
-    if (!balanceError && balanceData && balanceData.length > 0) {
-      currentBalance = balanceData[0].closing_balance || 0;
-      console.log('Current balance:', currentBalance);
-    } else {
-      console.error('Error retrieving balance or no balance data found');
+      tracking = trackingData;
     }
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        transaction: transactionData || null,
-        tracking: trackingData || null,
-        previous_balance: currentBalance - (transaction_type === 'deposit' ? amount : -amount),
-        new_balance: currentBalance
+        transaction: transaction,
+        tracking: tracking,
+        previous_balance: currentBalance,
+        new_balance: newBalance
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

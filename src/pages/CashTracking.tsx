@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -14,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RegisterType } from "@/services/supabase/cashTrackingService";
+import { RegisterType, getLatestCashBalance } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -61,8 +60,13 @@ export default function CashTracking() {
       setLoading(true);
       
       console.log("Fetching cash records for register:", RegisterType.STORE);
+
+      // Directly fetch the current balance using our improved function
+      const balance = await getLatestCashBalance(RegisterType.STORE);
+      console.log("Got current balance:", balance);
+      setCurrentBalance(balance);
       
-      // First fetch the transactions, as they're more reliable for balance information
+      // Fetch cash transactions
       const { data: transactionData, error: transactionError } = await supabase
         .from('cash_transactions')
         .select('*')
@@ -76,13 +80,6 @@ export default function CashTracking() {
       
       console.log("Cash transactions fetched:", transactionData);
       setTransactions(transactionData as CashTransaction[]);
-      
-      // Get the balance from the latest transaction
-      if (transactionData && transactionData.length > 0) {
-        const balance = transactionData[0].balance_after || 0;
-        console.log("Setting current balance from transactions to:", balance);
-        setCurrentBalance(balance);
-      }
       
       // Also fetch the cash tracking records
       const { data: cashData, error: cashError } = await supabase
@@ -98,34 +95,6 @@ export default function CashTracking() {
       
       console.log("Cash records fetched:", cashData);
       setRecords(cashData as unknown as CashRecord[]);
-      
-      // Double-check against the tracking table if transactions table is empty
-      if (!transactionData || transactionData.length === 0) {
-        console.log("No transactions found, checking tracking table for balance");
-        const { data: balanceData, error: balanceError } = await supabase
-          .from('cash_tracking')
-          .select('closing_balance')
-          .eq('register_type', RegisterType.STORE)
-          .order('date', { ascending: false })
-          .order('created_at', { ascending: false })
-          .limit(1);
-        
-        if (balanceError) {
-          console.error('Error fetching balance:', balanceError);
-          throw balanceError;
-        }
-        
-        console.log("Balance data from tracking:", balanceData);
-        
-        if (balanceData && balanceData.length > 0) {
-          const balance = balanceData[0].closing_balance || 0;
-          console.log("Setting current balance from tracking to:", balance);
-          setCurrentBalance(balance);
-        } else {
-          console.log("No balance data found in tracking either, setting to 0");
-          setCurrentBalance(0);
-        }
-      }
     } catch (error) {
       console.error('Error in fetchRecords:', error);
       toast.error("حدث خطأ أثناء تحميل سجلات النقدية");

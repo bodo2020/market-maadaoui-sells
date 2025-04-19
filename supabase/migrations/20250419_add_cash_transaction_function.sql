@@ -34,10 +34,10 @@ BEGIN
   -- Get the current balance
   SELECT 
     COALESCE(
-      (SELECT closing_balance 
-       FROM cash_tracking 
+      (SELECT balance_after 
+       FROM cash_transactions 
        WHERE register_type = p_register_type 
-       ORDER BY date DESC, created_at DESC 
+       ORDER BY transaction_date DESC
        LIMIT 1),
       0
     ) INTO current_balance;

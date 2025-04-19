@@ -39,6 +39,7 @@ export default function SalesDashboard() {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   });
+  
   const [withdrawalAmount, setWithdrawalAmount] = useState<string>("");
   const [withdrawalNote, setWithdrawalNote] = useState<string>("");
   const [withdrawalRegister, setWithdrawalRegister] = useState<RegisterType>(RegisterType.STORE);
@@ -55,6 +56,9 @@ export default function SalesDashboard() {
   const [toRegister, setToRegister] = useState<RegisterType>(RegisterType.ONLINE);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   
+  const [storeBalance, setStoreBalance] = useState(0);
+  const [onlineBalance, setOnlineBalance] = useState(0);
+  
   const { data: storeSales = [], isLoading: isStoreSalesLoading, refetch: refetchStoreSales } = useQuery({
     queryKey: ['sales', dateRange],
     queryFn: async () => {
@@ -67,18 +71,15 @@ export default function SalesDashboard() {
         
       if (error) throw error;
       
-      // Transform the data to match the Sale type
       return (data || []).map(sale => ({
         ...sale,
-        // Ensure payment_method is one of the allowed values in the Sale type
         payment_method: (sale.payment_method === 'cash' || 
                       sale.payment_method === 'card' || 
                       sale.payment_method === 'mixed') 
                       ? sale.payment_method as 'cash' | 'card' | 'mixed'
-                      : 'cash', // Default to 'cash' if invalid value
-        // Parse items properly
+                      : 'cash',
         items: Array.isArray(sale.items) 
-          ? sale.items as unknown as CartItem[]  // If already an array
+          ? sale.items as unknown as CartItem[] 
           : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
       })) as Sale[];
     }
@@ -146,6 +147,13 @@ export default function SalesDashboard() {
     try {
       const balance = await getLatestCashBalance(registerType);
       console.log(`${registerType} balance:`, balance);
+      
+      if (registerType === RegisterType.STORE) {
+        setStoreBalance(balance);
+      } else {
+        setOnlineBalance(balance);
+      }
+      
       return balance;
     } catch (error) {
       console.error(`Error fetching ${registerType} balance:`, error);
@@ -156,8 +164,8 @@ export default function SalesDashboard() {
   useEffect(() => {
     const loadBalances = async () => {
       try {
-        const storeBalance = await fetchCurrentBalance(RegisterType.STORE);
-        const onlineBalance = await fetchCurrentBalance(RegisterType.ONLINE);
+        await fetchCurrentBalance(RegisterType.STORE);
+        await fetchCurrentBalance(RegisterType.ONLINE);
         console.log("Fetched balances:", { storeBalance, onlineBalance });
       } catch (error) {
         console.error("Error loading balances:", error);
@@ -167,17 +175,9 @@ export default function SalesDashboard() {
     loadBalances();
   }, [dateRange]);
 
-  const storeSalesTotal = storeSales.reduce((sum, sale) => sum + Number(sale.total), 0);
-  const onlineOrdersTotal = onlineOrders.reduce((sum, order) => sum + Number(order.total), 0);
+  const storeSalesTotal = storeSales?.reduce((sum, sale) => sum + Number(sale.total), 0) || 0;
+  const onlineOrdersTotal = onlineOrders?.reduce((sum, order) => sum + Number(order.total), 0) || 0;
   const totalSales = storeSalesTotal + onlineOrdersTotal;
-  
-  const storeBalance = storeRecords.length > 0 
-    ? Number(storeRecords[0].closing_balance) || Number(storeRecords[0].opening_balance) 
-    : 0;
-    
-  const onlineBalance = onlineRecords.length > 0 
-    ? Number(onlineRecords[0].closing_balance) || Number(onlineRecords[0].opening_balance) 
-    : 0;
   
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = subDays(new Date(), i);
@@ -304,7 +304,6 @@ export default function SalesDashboard() {
           />
         </div>
         
-        {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardHeader className="pb-2">
@@ -422,7 +421,6 @@ export default function SalesDashboard() {
           </Card>
         </div>
         
-        {/* Cash Register Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <Card>
             <CardHeader className="pb-2">
@@ -597,7 +595,6 @@ export default function SalesDashboard() {
           </Card>
         </div>
         
-        {/* Sales Chart */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>تحليل المبيعات</CardTitle>
@@ -626,7 +623,6 @@ export default function SalesDashboard() {
           </CardContent>
         </Card>
         
-        {/* Sales and Cash Tracking Tabs */}
         <Tabs defaultValue="storeSales" className="w-full">
           <TabsList className="grid grid-cols-4 mb-4">
             <TabsTrigger value="storeSales">مبيعات المتجر</TabsTrigger>
@@ -635,7 +631,6 @@ export default function SalesDashboard() {
             <TabsTrigger value="onlineRegister">خزنة الأونلاين</TabsTrigger>
           </TabsList>
           
-          {/* Store Sales Tab */}
           <TabsContent value="storeSales">
             <Card>
               <CardHeader>
@@ -678,7 +673,6 @@ export default function SalesDashboard() {
             </Card>
           </TabsContent>
           
-          {/* Online Sales Tab */}
           <TabsContent value="onlineSales">
             <Card>
               <CardHeader>
@@ -728,7 +722,6 @@ export default function SalesDashboard() {
             </Card>
           </TabsContent>
           
-          {/* Store Register Tab */}
           <TabsContent value="storeRegister">
             <Card>
               <CardHeader>
@@ -779,7 +772,6 @@ export default function SalesDashboard() {
             </Card>
           </TabsContent>
           
-          {/* Online Register Tab */}
           <TabsContent value="onlineRegister">
             <Card>
               <CardHeader>
