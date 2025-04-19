@@ -47,6 +47,7 @@ export default function OnlineOrders() {
   
   // Update filters when tab changes
   const handleTabChange = (value: string) => {
+    console.log("Tab changed to:", value);
     if (value === 'all') {
       setFilters({ ...filters, status: 'all' });
     } else {
@@ -109,6 +110,11 @@ export default function OnlineOrders() {
   const handlePrintInvoice = (order: Order) => {
     printOrderInvoice(order);
   };
+  
+  // Load initial data
+  useEffect(() => {
+    refreshOrders();
+  }, []);
   
   return (
     <MainLayout>

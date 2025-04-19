@@ -21,6 +21,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
   const { setUnreadOrders } = useNotificationStore();
 
   useEffect(() => {
+    console.log("useEffect triggered with filters:", filters);
     fetchOrders();
     setupRealtimeSubscription();
     
@@ -271,7 +272,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
   };
 
   const refreshOrders = () => {
-    setLoading(true); // Ensure loading state is set
+    setLoading(true);
     fetchOrders();
   };
 
