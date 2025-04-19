@@ -9,11 +9,11 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   // If still loading authentication state, show nothing or a loader
-  if (loading) {
+  if (isLoading) {
     return <div className="flex items-center justify-center h-screen">جاري التحميل...</div>;
   }
 

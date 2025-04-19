@@ -1,27 +1,29 @@
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useOrdersData, OrderFilters } from "@/hooks/orders/useOrdersData";
 import { OrdersHeader } from "@/components/orders/OrdersHeader";
 import { OrdersList } from "@/components/orders/OrdersList";
+import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import { ConfirmPaymentDialog } from "@/components/orders/ConfirmPaymentDialog";
 import { CancelOrderDialog } from "@/components/orders/CancelOrderDialog";
 import { Order } from "@/types";
 import { printOrderInvoice } from "@/services/orders/printOrderService";
 import { useNotificationStore } from "@/stores/notificationStore";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export default function OnlineOrders() {
-  const navigate = useNavigate();
+  // State for filters and dialogs
   const [filters, setFilters] = useState<OrderFilters>({ status: 'all' });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   
+  // Notification store for marking orders as read
   const { markOrdersAsRead } = useNotificationStore();
   
+  // Hook for fetching and managing orders
   const { 
     orders, 
     loading, 
@@ -29,58 +31,75 @@ export default function OnlineOrders() {
     confirmPayment,
     assignDeliveryPerson,
     cancelOrder,
+    refreshOrders
   } = useOrdersData({
     ...filters,
     searchQuery
   });
   
+  // Update filters when tab changes
   const handleTabChange = (value: string) => {
-    setFilters(prev => {
-      const newFilters = { 
-        ...prev, 
-        status: value as OrderFilters['status'] 
-      };
+    if (value === 'all') {
+      setFilters({ ...filters, status: 'all' });
+    } else {
+      setFilters({ ...filters, status: value as OrderFilters['status'] });
       
+      // When viewing pending orders, mark them as read
       if (value === 'pending') {
         markOrdersAsRead();
       }
-      
-      return newFilters;
-    });
-  };
-  
-  const handleViewDetails = (order: Order) => {
-    navigate(`/orders/${order.id}`);
-    
-    if (order.status === 'pending') {
-      markOrdersAsRead();
     }
   };
   
+  // Handle action for marking order as ready
   const handleMarkAsReady = (order: Order) => {
     if (order.status === 'processing') {
       updateOrderStatus(order.id, 'ready');
     }
   };
   
+  // Open details dialog
+  const handleViewDetails = (order: Order) => {
+    setSelectedOrder(order);
+    setDetailsOpen(true);
+    
+    // Mark as read if viewing a pending order
+    if (order.status === 'pending') {
+      markOrdersAsRead();
+    }
+  };
+  
+  // Handle payment confirmation action
   const handleConfirmPayment = (order: Order) => {
     setSelectedOrder(order);
-    setPaymentDialogOpen(true);
+    
+    if (detailsOpen) {
+      setDetailsOpen(false);
+      setTimeout(() => {
+        setPaymentDialogOpen(true);
+      }, 300);
+    } else {
+      setPaymentDialogOpen(true);
+    }
   };
   
+  // Handle order cancellation action
   const handleCancelOrder = (order: Order) => {
     setSelectedOrder(order);
-    setCancelDialogOpen(true);
+    
+    if (detailsOpen) {
+      setDetailsOpen(false);
+      setTimeout(() => {
+        setCancelDialogOpen(true);
+      }, 300);
+    } else {
+      setCancelDialogOpen(true);
+    }
   };
   
+  // Handle print invoice action
   const handlePrintInvoice = (order: Order) => {
     printOrderInvoice(order);
-  };
-
-  const handleRestoreOrder = (order: Order) => {
-    if (order.status === 'cancelled') {
-      updateOrderStatus(order.id, 'pending');
-    }
   };
   
   return (
@@ -91,41 +110,38 @@ export default function OnlineOrders() {
           onTabChange={handleTabChange}
           onSearchChange={setSearchQuery}
           searchQuery={searchQuery}
-          onRefresh={() => {}}
+          onRefresh={refreshOrders}
           isLoading={loading}
         />
         
         <div className="mt-6">
-          {loading ? (
-            <div className="p-6 bg-white rounded-lg shadow">
-              <div className="space-y-3">
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <div className="text-center mt-4 text-muted-foreground">جاري تحميل الطلبات...</div>
-              </div>
-            </div>
-          ) : orders.length === 0 ? (
-            <div className="p-6 bg-white rounded-lg shadow text-center">
-              <p className="text-muted-foreground">لا توجد طلبات متاحة</p>
-            </div>
-          ) : (
-            <OrdersList
-              orders={orders}
-              loading={loading}
-              onViewDetails={handleViewDetails}
-              onPrintInvoice={handlePrintInvoice}
-              onMarkAsReady={handleMarkAsReady}
-              onAssignDelivery={handleViewDetails}
-              onConfirmPayment={handleConfirmPayment}
-              onCancelOrder={handleCancelOrder}
-              onChangeFilters={setFilters}
-              onRestoreOrder={handleRestoreOrder}
-            />
-          )}
+          <OrdersList
+            orders={orders}
+            loading={loading}
+            onViewDetails={handleViewDetails}
+            onPrintInvoice={handlePrintInvoice}
+            onMarkAsReady={handleMarkAsReady}
+            onAssignDelivery={handleViewDetails}
+            onConfirmPayment={handleConfirmPayment}
+            onCancelOrder={handleCancelOrder}
+            onChangeFilters={setFilters}
+          />
         </div>
         
+        {/* Order details dialog */}
+        {selectedOrder && (
+          <OrderDetailsDialog
+            order={selectedOrder}
+            open={detailsOpen}
+            onOpenChange={setDetailsOpen}
+            onPrintInvoice={handlePrintInvoice}
+            onMarkAsReady={handleMarkAsReady}
+            onAssignDelivery={refreshOrders}
+            onConfirmPayment={handleConfirmPayment}
+          />
+        )}
+        
+        {/* Payment confirmation dialog */}
         {selectedOrder && (
           <ConfirmPaymentDialog
             order={selectedOrder}
@@ -138,6 +154,7 @@ export default function OnlineOrders() {
           />
         )}
         
+        {/* Cancel order dialog */}
         {selectedOrder && (
           <CancelOrderDialog
             order={selectedOrder}
@@ -146,7 +163,6 @@ export default function OnlineOrders() {
             onConfirm={(order) => {
               cancelOrder(order.id);
               setCancelDialogOpen(false);
-              setFilters(prev => ({ ...prev, status: 'cancelled' }));
             }}
           />
         )}

@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Order, OrderItem } from "@/types";
+import { Order } from "@/types";
 import { useNotificationStore } from "@/stores/notificationStore";
 
 export type OrderStatus = 'pending' | 'processing' | 'ready' | 'shipped' | 'delivered' | 'cancelled';
@@ -16,23 +17,43 @@ export interface OrderFilters {
 export function useOrdersData(filters: OrderFilters = {}) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { setUnreadOrders } = useNotificationStore();
 
-  const transformStatus = (status: string): Order['status'] => {
-    const validStatuses: Order['status'][] = ['pending', 'processing', 'ready', 'shipped', 'delivered', 'cancelled'];
-    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
+  // Load orders from Supabase
+  useEffect(() => {
+    fetchOrders();
+    setupRealtimeSubscription();
+    
+    return () => {
+      cleanupRealtimeSubscription();
+    };
+  }, [filters, refreshTrigger]);
+
+  // Setup realtime subscription for new orders
+  const setupRealtimeSubscription = () => {
+    const channel = supabase.channel('online-orders-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'online_orders' }, 
+        (payload) => {
+          console.log('Order change detected:', payload);
+          fetchOrders();
+        })
+      .subscribe();
+      
+    return channel;
+  };
+  
+  const cleanupRealtimeSubscription = () => {
+    supabase.removeChannel(supabase.channel('online-orders-changes'));
   };
 
-  const transformPaymentStatus = (status: string): Order['payment_status'] => {
-    const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
-    return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
-  };
-
+  // Fetch orders from Supabase with filtering
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      console.log("Fetching orders with filters:", filters);
       
+      // Build query with filters
       let query = supabase.from('online_orders')
         .select(`
           *,
@@ -45,14 +66,17 @@ export function useOrdersData(filters: OrderFilters = {}) {
         `)
         .order('created_at', { ascending: false });
       
+      // Apply status filter if provided
       if (filters.status && filters.status !== 'all') {
         query = query.eq('status', filters.status);
       }
       
+      // Apply payment status filter if provided
       if (filters.paymentStatus && filters.paymentStatus !== 'all') {
         query = query.eq('payment_status', filters.paymentStatus);
       }
       
+      // Apply search query if provided
       if (filters.searchQuery) {
         const searchTerm = `%${filters.searchQuery}%`;
         query = query.or(`id.ilike.${searchTerm},shipping_address.ilike.${searchTerm}`);
@@ -60,82 +84,78 @@ export function useOrdersData(filters: OrderFilters = {}) {
       
       const { data, error } = await query;
       
-      if (error) {
-        console.error("Supabase error:", error);
-        throw error;
-      }
+      if (error) throw error;
       
-      console.log("Orders data from Supabase:", data);
+      // Transform data into Order objects
+      const transformedOrders: Order[] = (data || []).map(item => ({
+        id: item.id,
+        created_at: item.created_at,
+        total: item.total,
+        status: transformStatus(item.status),
+        payment_status: transformPaymentStatus(item.payment_status),
+        payment_method: item.payment_method,
+        shipping_address: item.shipping_address,
+        items: Array.isArray(item.items) ? item.items : [],
+        customer_name: item.customers?.name || 'غير معروف',
+        customer_email: item.customers?.email || '',
+        customer_phone: item.customers?.phone || '',
+        notes: item.notes || '',
+        tracking_number: item.tracking_number || null,
+        delivery_person: item.delivery_person || null
+      }));
       
-      const transformedOrders: Order[] = (data || []).map(item => {
-        let parsedItems: OrderItem[] = [];
-        
-        if (Array.isArray(item.items)) {
-          parsedItems = item.items.map((itemData: any) => ({
-            product_id: itemData.product_id || '',
-            product_name: itemData.product_name || '',
-            quantity: itemData.quantity || 0,
-            price: itemData.price || 0,
-            total: itemData.total || 0,
-            image_url: itemData.image_url
-          }));
-        }
-        
-        return {
-          id: item.id,
-          created_at: item.created_at,
-          total: item.total,
-          status: transformStatus(item.status),
-          payment_status: transformPaymentStatus(item.payment_status),
-          payment_method: item.payment_method,
-          shipping_address: item.shipping_address,
-          items: parsedItems,
-          customer_name: item.customers?.name || 'غير معروف',
-          customer_email: item.customers?.email || '',
-          customer_phone: item.customers?.phone || '',
-          notes: item.notes || '',
-          tracking_number: item.tracking_number || null,
-          delivery_person: item.delivery_person || null
-        };
-      });
-      
-      console.log("Transformed orders:", transformedOrders);
       setOrders(transformedOrders);
       
+      // Count pending orders for notification badge
       const pendingCount = data?.filter(order => order.status === 'pending').length || 0;
       setUnreadOrders(pendingCount);
       
     } catch (error) {
-      console.error('Error in fetchOrders:', error);
+      console.error('Error fetching orders:', error);
       toast.error("حدث خطأ أثناء تحميل الطلبات");
     } finally {
       setLoading(false);
-      console.log("Orders loading finished");
     }
   };
-
+  
+  // Helper function to ensure status is valid
+  const transformStatus = (status: string): Order['status'] => {
+    const validStatuses: Order['status'][] = ['pending', 'processing', 'ready', 'shipped', 'delivered', 'cancelled'];
+    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
+  };
+  
+  // Helper function to ensure payment status is valid
+  const transformPaymentStatus = (status: string): Order['payment_status'] => {
+    const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
+    return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
+  };
+  
+  // Order management functions
   const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
     try {
+      const updates = {
+        status,
+        updated_at: new Date().toISOString()
+      };
+      
       const { error } = await supabase
         .from('online_orders')
-        .update({ 
-          status,
-          updated_at: new Date().toISOString()
-        })
+        .update(updates)
         .eq('id', orderId);
       
       if (error) throw error;
       
       toast.success(`تم تحديث حالة الطلب إلى ${getOrderStatusText(status)}`);
-      await fetchOrders();
+      setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Error updating order status:', error);
       toast.error("حدث خطأ أثناء تحديث حالة الطلب");
     }
   };
-
+  
   const confirmPayment = async (orderId: string) => {
     try {
+      // First, check the current order status
       const { data: orderData, error: fetchError } = await supabase
         .from('online_orders')
         .select('status')
@@ -144,6 +164,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
       
       if (fetchError) throw fetchError;
       
+      // Update payment status and order status if needed
       let updates: { 
         payment_status: string; 
         updated_at: string;
@@ -153,6 +174,7 @@ export function useOrdersData(filters: OrderFilters = {}) {
         updated_at: new Date().toISOString()
       };
       
+      // If order is still pending, automatically move it to processing state
       if (orderData.status === 'pending') {
         updates.status = 'processing';
       }
@@ -169,13 +191,13 @@ export function useOrdersData(filters: OrderFilters = {}) {
         toast.info('تم تحديث حالة الطلب إلى "قيد المعالجة"');
       }
       
-      await fetchOrders();
+      setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Error confirming payment:', error);
       toast.error('حدث خطأ أثناء تأكيد الدفع');
     }
   };
-
+  
   const assignDeliveryPerson = async (orderId: string, deliveryPerson: string, trackingNumber?: string) => {
     try {
       const updates: {
@@ -199,13 +221,13 @@ export function useOrdersData(filters: OrderFilters = {}) {
       if (error) throw error;
       
       toast.success('تم تعيين مندوب التوصيل بنجاح');
-      await fetchOrders();
+      setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Error assigning delivery person:', error);
       toast.error('حدث خطأ أثناء تعيين مندوب التوصيل');
     }
   };
-
+  
   const cancelOrder = async (orderId: string) => {
     try {
       const { error } = await supabase
@@ -219,13 +241,14 @@ export function useOrdersData(filters: OrderFilters = {}) {
       if (error) throw error;
       
       toast.success('تم إلغاء الطلب بنجاح');
-      await fetchOrders();
+      setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Error cancelling order:', error);
       toast.error('حدث خطأ أثناء إلغاء الطلب');
     }
   };
-
+  
+  // Helper function to get order status text
   const getOrderStatusText = (status: string): string => {
     switch(status) {
       case 'pending': return 'قيد الانتظار';
@@ -237,7 +260,12 @@ export function useOrdersData(filters: OrderFilters = {}) {
       default: return 'غير معروف';
     }
   };
-
+  
+  // Force refresh orders
+  const refreshOrders = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+  
   return {
     orders,
     loading,
@@ -245,6 +273,6 @@ export function useOrdersData(filters: OrderFilters = {}) {
     confirmPayment,
     assignDeliveryPerson,
     cancelOrder,
-    refreshOrders: fetchOrders
+    refreshOrders
   };
 }

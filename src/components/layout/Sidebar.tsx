@@ -1,9 +1,34 @@
-
-import { useState, useEffect } from "react";
-import { Home, LayoutDashboard, Settings, ShoppingBag, Users, Package as CategoryIcon, Truck, Percent, Coins, FileText, Archive, LogOut, LogIn, UserPlus, ListChecks, BarChart, Store, Package, Calendar, Wallet, MessageSquare, CircleUserRound, ClipboardList, Receipt, KanbanSquare } from "lucide-react";
+import {
+  Home,
+  LayoutDashboard,
+  Settings,
+  ShoppingBag,
+  Users,
+  Category as CategoryIcon,
+  Truck,
+  Percent,
+  Coins,
+  FileText,
+  Archive,
+  LogOut,
+  LogIn,
+  UserPlus,
+  ListChecks,
+  BarChart,
+  Store,
+  Package,
+  Calendar,
+  Wallet,
+  MessageSquare,
+  CircleUserRound,
+  ClipboardList,
+  Receipt,
+  KanbanSquare,
+} from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNotificationStore } from "@/stores/notificationStore";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -14,13 +39,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { useUser } from "@/contexts/UserContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useNotificationStore } from "@/stores/notificationStore";
 
 const Sidebar = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout, isAuthenticated, user, loading } = useAuth();
+  const { logout, isAuthenticated } = useAuth();
+  const { user, loading } = useUser();
   const [isClosing, setIsClosing] = useState(false);
   const { unreadOrders, markOrdersAsRead } = useNotificationStore();
 
@@ -162,7 +189,7 @@ const Sidebar = () => {
   ];
 
   const renderSidebarItems = () => {
-    const userRole = user?.role || "employee";
+    const userRole = user?.role || "employee"; // Default to 'employee' if user or role is undefined
 
     return sidebarItems.map((item, index) => {
       if (!item.roles.includes(userRole)) {
