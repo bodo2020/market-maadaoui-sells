@@ -2,7 +2,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { Order } from "@/types";
+import { Order, OrderItem } from "@/types";
 import MainLayout from "@/components/layout/MainLayout";
 import { UpdateOrderStatusDialog } from "@/components/orders/UpdateOrderStatusDialog";
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
@@ -39,15 +39,46 @@ export default function OrderDetails() {
       if (error) throw error;
       
       if (data) {
+        // Validate status to ensure it's one of the allowed values
+        const validateOrderStatus = (status: string): Order['status'] => {
+          const validStatuses: Order['status'][] = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+          return validStatuses.includes(status as Order['status']) 
+            ? (status as Order['status']) 
+            : 'pending';
+        };
+        
+        // Validate payment status
+        const validatePaymentStatus = (status: string): Order['payment_status'] => {
+          const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
+          return validStatuses.includes(status as Order['payment_status']) 
+            ? (status as Order['payment_status']) 
+            : 'pending';
+        };
+        
+        // Transform items from Json to OrderItem[]
+        const transformItems = (items: any): OrderItem[] => {
+          if (!Array.isArray(items)) {
+            return [];
+          }
+          
+          return items.map(item => ({
+            product_id: item.product_id || '',
+            product_name: item.product_name || '',
+            quantity: item.quantity || 0,
+            price: item.price || 0,
+            total: item.total || 0
+          }));
+        };
+        
         setOrder({
           id: data.id,
           created_at: data.created_at,
           total: data.total,
-          status: data.status,
-          payment_status: data.payment_status,
+          status: validateOrderStatus(data.status),
+          payment_status: validatePaymentStatus(data.payment_status),
           payment_method: data.payment_method,
           shipping_address: data.shipping_address,
-          items: Array.isArray(data.items) ? data.items : [],
+          items: transformItems(data.items),
           customer_name: data.customer_name || 'غير معروف',
           customer_email: data.customer_email || '',
           customer_phone: data.customer_phone || '',
@@ -129,7 +160,7 @@ export default function OrderDetails() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {order.items.map((item: any, index: number) => (
+                    {order.items.map((item: OrderItem, index: number) => (
                       <TableRow key={index}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-3">

@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -212,6 +211,7 @@ export interface OrderItem {
   quantity: number;
   price: number;
   total: number;
+  image_url?: string;
 }
 
 export interface Order {
