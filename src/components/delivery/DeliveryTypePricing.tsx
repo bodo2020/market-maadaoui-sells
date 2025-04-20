@@ -87,7 +87,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
     }
 
     createPriceMutation.mutate({
-      neighborhood_id: locationId,  // Use this for backward compatibility
+      delivery_location_id: locationId, // Use delivery_location_id instead of neighborhood_id
       delivery_type_id: selectedType,
       price: Number(priceInput),
       estimated_time: estimatedTimeInput || undefined

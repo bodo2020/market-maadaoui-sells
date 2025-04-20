@@ -127,9 +127,9 @@ export async function createDeliveryTypePrice(data: {
   price: number;
   estimated_time?: string;
 }) {
-  // Create a simple plain object to avoid excessive type recursion
+  // Create a plain object for insertion to avoid type recursion issues
   const dataToInsert = {
-    neighborhood_id: data.neighborhood_id || data.delivery_location_id,
+    delivery_location_id: data.neighborhood_id || data.delivery_location_id,
     delivery_type_id: data.delivery_type_id,
     price: data.price,
     estimated_time: data.estimated_time
