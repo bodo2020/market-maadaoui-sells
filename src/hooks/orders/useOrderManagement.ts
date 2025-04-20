@@ -23,6 +23,8 @@ export type OrderFromDB = {
   notes?: string | null;
   updated_at?: string | null;
   delivery_person?: string | null;
+  is_returned?: boolean;
+  is_cancelled?: boolean;
 };
 
 export const useOrderManagement = (activeTab: string) => {
@@ -84,7 +86,7 @@ export const useOrderManagement = (activeTab: string) => {
   };
 
   const validateOrderStatus = (status: string): Order['status'] => {
-    const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
+    const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done', 'cancelled', 'returned'];
     return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
   };
 
@@ -110,6 +112,10 @@ export const useOrderManagement = (activeTab: string) => {
         query = query.eq('status', 'done');
       } else if (activeTab === "unpaid") {
         query = query.eq('payment_status', 'pending');
+      } else if (activeTab === "cancelled") {
+        query = query.eq('is_cancelled', true);
+      } else if (activeTab === "returned") {
+        query = query.eq('is_returned', true);
       }
       
       const { data, error } = await query;
@@ -129,7 +135,9 @@ export const useOrderManagement = (activeTab: string) => {
         customer_phone: item.customer_phone || '',
         notes: item.notes || '',
         tracking_number: item.tracking_number || null,
-        delivery_person: item.delivery_person || null
+        delivery_person: item.delivery_person || null,
+        is_returned: item.is_returned || false,
+        is_cancelled: item.is_cancelled || false
       }));
       
       setOrders(transformedOrders);

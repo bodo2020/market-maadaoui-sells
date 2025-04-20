@@ -228,11 +228,11 @@ export interface OrderItem {
   image_url?: string;
 }
 
-export interface Order {
+export type Order = {
   id: string;
   created_at: string;
   total: number;
-  status: 'waiting' | 'ready' | 'shipped' | 'done';
+  status: 'waiting' | 'ready' | 'shipped' | 'done' | 'cancelled' | 'returned';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   payment_method: string | null;
   shipping_address: string | null;
@@ -243,4 +243,6 @@ export interface Order {
   notes?: string;
   tracking_number?: string | null;
   delivery_person?: string | null;
-}
+  is_returned?: boolean;
+  is_cancelled?: boolean;
+};
