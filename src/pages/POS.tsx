@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
+
 export default function POS() {
   const [search, setSearch] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -44,6 +45,7 @@ export default function POS() {
   const {
     toast
   } = useToast();
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -79,6 +81,7 @@ export default function POS() {
       }
     };
   }, [barcodeBuffer]);
+
   const processBarcode = async (barcode: string) => {
     if (barcode.length < 5) return;
     try {
@@ -122,6 +125,7 @@ export default function POS() {
       });
     }
   };
+
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -141,8 +145,10 @@ export default function POS() {
     };
     loadProducts();
   }, [toast]);
+
   const handleSearch = async () => {
     if (!search) return;
+
     try {
       const product = await fetchProductByBarcode(search);
       if (product) {
@@ -163,6 +169,7 @@ export default function POS() {
     } catch (error) {
       console.error("Error fetching product by barcode:", error);
     }
+
     if (search.startsWith("2") && search.length === 13) {
       try {
         const product = await fetchProductByBarcode(search);
@@ -186,8 +193,10 @@ export default function POS() {
         return;
       }
     }
+
     const results = products.filter(product => product.barcode === search || product.name.includes(search));
     setSearchResults(results);
+
     const exactMatch = products.find(p => p.barcode === search && p.barcode_type === "normal" && !p.bulk_enabled);
     if (exactMatch) {
       handleAddToCart(exactMatch);
@@ -198,6 +207,7 @@ export default function POS() {
       setSearch("");
     }
   };
+
   const handleAddToCart = (product: Product) => {
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
@@ -219,6 +229,7 @@ export default function POS() {
     }
     setSearchResults([]);
   };
+
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
     if ((product.quantity || 0) <= 0) {
       toast({
@@ -228,6 +239,7 @@ export default function POS() {
       });
       return;
     }
+    
     const itemPrice = product.price * weight;
     const discountPerKg = product.is_offer && product.offer_price ? product.price - product.offer_price : 0;
     setCartItems([...cartItems, {
@@ -247,6 +259,7 @@ export default function POS() {
     setCurrentScaleProduct(null);
     setWeightInput("");
   };
+
   const handleAddBulkToCart = (product: Product) => {
     if ((product.quantity || 0) <= 0) {
       toast({
@@ -256,6 +269,7 @@ export default function POS() {
       });
       return;
     }
+    
     if (!product.bulk_enabled || !product.bulk_quantity || !product.bulk_price) {
       toast({
         title: "خطأ",
@@ -264,6 +278,7 @@ export default function POS() {
       });
       return;
     }
+    
     setCartItems([...cartItems, {
       product,
       quantity: product.bulk_quantity,
@@ -278,6 +293,7 @@ export default function POS() {
     });
     setSearchResults([]);
   };
+
   const handleWeightSubmit = () => {
     if (!currentScaleProduct || !weightInput) return;
     const weight = parseFloat(weightInput);
@@ -291,14 +307,18 @@ export default function POS() {
     }
     handleAddScaleProductToCart(currentScaleProduct, weight);
   };
+
   const handleRemoveFromCart = (index: number) => {
     setCartItems(cartItems.filter((_, i) => i !== index));
   };
+
   const handleQuantityChange = (index: number, change: number) => {
     setCartItems(cartItems.map((item, i) => {
       if (i === index) {
         if (item.weight !== null && change > 0) return item;
+        
         const newQuantity = Math.max(1, item.quantity + change);
+        
         if (change > 0 && newQuantity > (item.product.quantity || 0)) {
           toast({
             title: "الكمية غير متوفرة",
@@ -307,6 +327,7 @@ export default function POS() {
           });
           return item;
         }
+        
         let price = item.price;
         let total = item.weight !== null ? item.price : newQuantity * price;
         return {
@@ -318,12 +339,14 @@ export default function POS() {
       return item;
     }));
   };
+
   const openCheckout = () => {
     if (cartItems.length === 0) return;
     setIsCheckoutOpen(true);
     setCashAmount(total.toFixed(2));
     setCardAmount("");
   };
+
   const handlePaymentMethodChange = (value: 'cash' | 'card' | 'mixed') => {
     setPaymentMethod(value);
     if (value === 'cash') {
@@ -337,11 +360,13 @@ export default function POS() {
       setCardAmount("");
     }
   };
+
   const calculateChange = () => {
     if (paymentMethod === 'card') return 0;
     const cashAmountNum = parseFloat(cashAmount || "0");
     return Math.max(0, cashAmountNum - total);
   };
+
   const validatePayment = () => {
     if (paymentMethod === 'cash') {
       const cashAmountNum = parseFloat(cashAmount || "0");
@@ -355,15 +380,18 @@ export default function POS() {
       return cashAmountNum + cardAmountNum === total;
     }
   };
+
   const recordSaleToCashRegister = async (amount: number, paymentMethod: string) => {
     if (paymentMethod !== 'cash' && paymentMethod !== 'mixed') return;
-    const amountToRecord = paymentMethod === 'cash' ? amount : parseFloat(cashAmount || "0");
+    
+    const amountToRecord = paymentMethod === 'cash' 
+      ? amount 
+      : parseFloat(cashAmount || "0");
+      
     if (amountToRecord <= 0) return;
+    
     try {
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('add-cash-transaction', {
+      const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
         body: {
           amount: amountToRecord,
           transaction_type: 'deposit',
@@ -371,12 +399,14 @@ export default function POS() {
           notes: 'مبيعات نقطة البيع'
         }
       });
+      
       if (error) throw error;
       console.log('Sale recorded to cash register:', data);
     } catch (error) {
       console.error('Error recording sale to cash register:', error);
     }
   };
+
   const completeSale = async () => {
     if (!validatePayment()) {
       toast({
@@ -420,9 +450,14 @@ export default function POS() {
       };
       const sale = await createSale(saleData);
       setCurrentSale(sale);
+      
       if (paymentMethod === 'cash' || paymentMethod === 'mixed') {
-        await recordSaleToCashRegister(paymentMethod === 'cash' ? total : parseFloat(cashAmount || "0"), paymentMethod);
+        await recordSaleToCashRegister(
+          paymentMethod === 'cash' ? total : parseFloat(cashAmount || "0"),
+          paymentMethod
+        );
       }
+      
       toast({
         title: "تم إتمام البيع بنجاح",
         description: `رقم الفاتورة: ${sale.invoice_number}`
@@ -438,6 +473,7 @@ export default function POS() {
       setIsProcessing(false);
     }
   };
+
   const resetSale = () => {
     setCartItems([]);
     setIsCheckoutOpen(false);
@@ -451,11 +487,13 @@ export default function POS() {
     setCurrentInvoiceNumber("");
     setCurrentSale(null);
   };
+
   const handleViewInvoice = () => {
     if (currentSale) {
       setShowInvoice(true);
     }
   };
+
   const handlePreviewInvoice = () => {
     if (cartItems.length === 0) return;
     const tempSale: Sale = {
@@ -476,12 +514,15 @@ export default function POS() {
     setCurrentSale(tempSale);
     setShowInvoice(true);
   };
+
   const handleBarcodeScan = async (barcode: string) => {
     processBarcode(barcode);
   };
+
   const subtotal = cartItems.reduce((sum, item) => sum + item.total, 0);
   const discount = cartItems.reduce((sum, item) => sum + item.discount * item.quantity, 0);
   const total = subtotal;
+
   return <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">نقطة البيع</h1>
@@ -498,7 +539,7 @@ export default function POS() {
       <div className="relative mb-4 bg-muted/30 p-3 rounded-lg border border-muted flex items-center">
         <ScanLine className="h-5 w-5 text-primary ml-3" />
         <div>
-          <h3 className="font-medium">مسح الباركود نشط</h3>
+          <h3 className="font-medium">و��ع مسح الباركود نشط</h3>
           <p className="text-sm text-muted-foreground">
             قم بتوصيل قارئ الباركود واستخدامه لمسح المنتجات مباشرة، أو اضغط على زر "مسح" لاستخدام الكاميرا
           </p>
