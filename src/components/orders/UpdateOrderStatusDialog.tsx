@@ -1,137 +1,78 @@
-
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
-import { Order } from "@/types";
 
 interface UpdateOrderStatusDialogProps {
+  orderId: string;
+  currentStatus: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  orderId: string;
-  currentStatus: Order['status'];
-  onStatusUpdated?: () => void;
+  onStatusUpdated: (status: string) => void;
 }
 
-export function UpdateOrderStatusDialog({
-  open,
-  onOpenChange,
-  orderId,
-  currentStatus,
-  onStatusUpdated
-}: UpdateOrderStatusDialogProps) {
-  const [status, setStatus] = useState<Order['status']>(currentStatus);
-  const [isUpdating, setIsUpdating] = useState(false);
+// Update the component to handle all possible status values
+export function UpdateOrderStatusDialog({ orderId, currentStatus, open, onOpenChange, onStatusUpdated }: UpdateOrderStatusDialogProps) {
+  const [newStatus, setNewStatus] = useState<string>(currentStatus);
   
-  const handleUpdateStatus = async () => {
-    if (!orderId || status === currentStatus || isUpdating) return;
-    
+  // Make sure to include all possible statuses
+  const statusOptions = [
+    { value: "waiting", label: "في الانتظار" },
+    { value: "ready", label: "جاهز" },
+    { value: "shipped", label: "تم الشحن" },
+    { value: "done", label: "مكتمل" },
+    { value: "cancelled", label: "ملغي" },
+    { value: "returned", label: "مرتجع" }
+  ];
+
+  const handleStatusChange = async () => {
     try {
-      setIsUpdating(true);
-      
-      const { error } = await supabase
-        .from('online_orders')
-        .update({
-          status: status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
-      
-      if (error) throw error;
-      
-      toast.success(`تم تحديث حالة الطلب إلى ${
-        status === 'waiting' ? 'في الانتظار' : 
-        status === 'ready' ? 'جاهز للشحن' : 
-        status === 'shipped' ? 'تم الشحن' : 
-        status === 'done' ? 'تم التسليم' :
-        status === 'cancelled' ? 'ملغي' : 'مرتجع'
-      }`);
-      
-      if (onStatusUpdated) onStatusUpdated();
+      onStatusUpdated(newStatus);
+      toast.success("تم تحديث حالة الطلب بنجاح");
       onOpenChange(false);
     } catch (error) {
-      console.error('Error updating order status:', error);
-      toast.error("حدث خطأ أثناء تحديث حالة الطلب");
-    } finally {
-      setIsUpdating(false);
+      console.error("Error updating order status:", error);
+      toast.error("فشل في تحديث حالة الطلب");
     }
   };
-  
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>تحديث حالة الطلب</DialogTitle>
+          <DialogDescription>
+            تغيير حالة الطلب رقم {orderId}
+          </DialogDescription>
         </DialogHeader>
-        
-        <div className="space-y-4 py-4">
-          <div className="text-sm text-muted-foreground">
-            يرجى تحديد الحالة الجديدة للطلب:
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="status" className="text-right">
+              الحالة
+            </Label>
+            <Select value={newStatus} onValueChange={setNewStatus}>
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="اختر حالة" />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((status) => (
+                  <SelectItem key={status.value} value={status.value}>
+                    {status.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          
-          <RadioGroup 
-            value={status} 
-            onValueChange={(value) => setStatus(value as Order['status'])} 
-            className="space-y-2"
-          >
-            <div className="flex items-center space-x-2 space-x-reverse">
-              <RadioGroupItem value="waiting" id="waiting" />
-              <Label htmlFor="waiting">في الانتظار</Label>
-            </div>
-            
-            <div className="flex items-center space-x-2 space-x-reverse">
-              <RadioGroupItem value="ready" id="ready" />
-              <Label htmlFor="ready">جاهز للشحن</Label>
-            </div>
-            
-            <div className="flex items-center space-x-2 space-x-reverse">
-              <RadioGroupItem value="shipped" id="shipped" />
-              <Label htmlFor="shipped">تم الشحن</Label>
-            </div>
-            
-            <div className="flex items-center space-x-2 space-x-reverse">
-              <RadioGroupItem value="done" id="done" />
-              <Label htmlFor="done">تم التسليم</Label>
-            </div>
-            
-            <div className="flex items-center space-x-2 space-x-reverse">
-              <RadioGroupItem value="cancelled" id="cancelled" />
-              <Label htmlFor="cancelled">ملغي</Label>
-            </div>
-            
-            <div className="flex items-center space-x-2 space-x-reverse">
-              <RadioGroupItem value="returned" id="returned" />
-              <Label htmlFor="returned">مرتجع</Label>
-            </div>
-          </RadioGroup>
         </div>
-        
-        <DialogFooter className="space-x-2 space-x-reverse">
-          <Button 
-            onClick={handleUpdateStatus} 
-            disabled={isUpdating || status === currentStatus}
-          >
-            {isUpdating ? (
-              <>
-                <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                جاري التحديث...
-              </>
-            ) : (
-              'تحديث الحالة'
-            )}
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => onOpenChange(false)} 
-            disabled={isUpdating}
-          >
-            إلغاء
-          </Button>
-        </DialogFooter>
+        <Button onClick={handleStatusChange}>تحديث الحالة</Button>
       </DialogContent>
     </Dialog>
   );

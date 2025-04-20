@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,14 +11,13 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-// Remove the incorrect import for date-picker
 import { Calendar } from "@/components/ui/calendar";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchPurchases, deletePurchase, addPurchase } from "@/services/supabase/purchaseService";
 import { fetchSuppliers } from "@/services/supabase/supplierService";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, ChevronDown, Download, Edit, Eye, FilePlus, Plus, Search, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronDown, Download, Edit, Eye, FilePlus, Plus, Search, Trash2, MoreVertical } from "lucide-react";
 import { Supplier, Purchase } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";

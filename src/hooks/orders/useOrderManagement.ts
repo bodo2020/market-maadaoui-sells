@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -93,6 +92,31 @@ export const useOrderManagement = (activeTab: string) => {
   const validatePaymentStatus = (status: string): Order['payment_status'] => {
     const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
     return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
+  };
+
+  const updateOrderStatus = async (orderId: string, status: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('online_orders')
+        .update({ status })
+        .eq('id', orderId);
+      
+      if (error) throw error;
+      
+      if (status === "cancelled") {
+        // Handle cancelled orders
+      } else if (status === "returned") {
+        // Handle returned orders
+      } else {
+        // Handle other statuses
+      }
+      
+      fetchOrders();
+      fetchPendingOrdersCount();
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      throw error;
+    }
   };
 
   const fetchOrders = async () => {

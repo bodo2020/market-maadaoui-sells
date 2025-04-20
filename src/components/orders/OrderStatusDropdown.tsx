@@ -1,140 +1,64 @@
-
-import { Check } from "lucide-react";
-import { Order } from "@/types";
-import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface OrderStatusDropdownProps {
-  order: Order;
-  onStatusChange?: () => void;
+  orderId: string;
+  currentStatus: string;
+  onStatusUpdated: (newStatus: string) => void;
 }
 
-export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdownProps) {
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState<Order['status']>(order.status);
+// Update the component to handle all possible status values
+export function OrderStatusDropdown({ orderId, currentStatus, onStatusUpdated }: OrderStatusDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const [newStatus, setNewStatus] = useState<string>(currentStatus);
+  
+  // Make sure to include all possible statuses
+  const statusOptions = [
+    { value: "waiting", label: "في الانتظار" },
+    { value: "ready", label: "جاهز" },
+    { value: "shipped", label: "تم الشحن" },
+    { value: "done", label: "مكتمل" },
+    { value: "cancelled", label: "ملغي" },
+    { value: "returned", label: "مرتجع" }
+  ];
 
-  const getStatusBadge = (status: Order['status']) => {
-    const variants: Record<string, { bg: string, text: string, label: string }> = {
-      waiting: { bg: "bg-amber-100", text: "text-amber-700", label: "في الانتظار" },
-      ready: { bg: "bg-green-100", text: "text-green-700", label: "جاهز" },
-      shipped: { bg: "bg-blue-100", text: "text-blue-700", label: "تم الشحن" },
-      done: { bg: "bg-gray-100", text: "text-gray-700", label: "مكتمل" },
-      cancelled: { bg: "bg-red-100", text: "text-red-700", label: "ملغي" },
-      returned: { bg: "bg-purple-100", text: "text-purple-700", label: "مرتجع" }
-    };
-
-    const style = variants[status] || variants.waiting;
-    return (
-      <Badge className={`${style.bg} ${style.text} border-none`}>
-        {style.label}
-      </Badge>
-    );
-  };
-
-  const handleStatusChange = async (newStatus: Order['status']) => {
-    if (newStatus === currentStatus || isUpdating) return;
-    
-    try {
-      setIsUpdating(true);
-      
-      const { error } = await supabase
-        .from('online_orders')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', order.id);
-      
-      if (error) {
-        console.error("Supabase update error:", error);
-        throw error;
-      }
-      
-      setCurrentStatus(newStatus);
-      
-      toast.success(`تم تحديث حالة الطلب إلى ${
-        newStatus === 'waiting' ? 'في الانتظار' : 
-        newStatus === 'ready' ? 'جاهز للشحن' : 
-        newStatus === 'shipped' ? 'تم الشحن' : 
-        newStatus === 'done' ? 'تم التسليم' :
-        newStatus === 'cancelled' ? 'ملغي' : 'مرتجع'
-      }`);
-      
-      if (onStatusChange) {
-        onStatusChange();
-      }
-    } catch (error) {
-      console.error('Error updating order status:', error);
-      toast.error('حدث خطأ أثناء تحديث حالة الطلب');
-    } finally {
-      setIsUpdating(false);
-    }
+  const handleStatusChange = async (status: string) => {
+    setNewStatus(status);
+    onStatusUpdated(status);
+    setOpen(false);
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <div className="cursor-pointer" onClick={(e) => e.stopPropagation()}>
-          {getStatusBadge(currentStatus)}
-        </div>
+        <Button variant="outline" className="w-[150px] justify-start">
+          <ChevronsUpDown className="mr-2 h-4 w-4" />
+          {statusOptions.find((option) => option.value === currentStatus)?.label}
+        </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[200px]">
-        <DropdownMenuItem
-          className="gap-2"
-          onClick={() => handleStatusChange('waiting')}
-          disabled={currentStatus === 'waiting' || isUpdating}
-        >
-          {currentStatus === 'waiting' && <Check className="h-4 w-4" />}
-          في الانتظار
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="gap-2"
-          onClick={() => handleStatusChange('ready')}
-          disabled={currentStatus === 'ready' || isUpdating}
-        >
-          {currentStatus === 'ready' && <Check className="h-4 w-4" />}
-          جاهز للشحن
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="gap-2"
-          onClick={() => handleStatusChange('shipped')}
-          disabled={currentStatus === 'shipped' || isUpdating}
-        >
-          {currentStatus === 'shipped' && <Check className="h-4 w-4" />}
-          تم الشحن
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="gap-2"
-          onClick={() => handleStatusChange('done')}
-          disabled={currentStatus === 'done' || isUpdating}
-        >
-          {currentStatus === 'done' && <Check className="h-4 w-4" />}
-          تم التسليم
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="gap-2"
-          onClick={() => handleStatusChange('cancelled')}
-          disabled={currentStatus === 'cancelled' || isUpdating}
-        >
-          {currentStatus === 'cancelled' && <Check className="h-4 w-4" />}
-          ملغي
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="gap-2"
-          onClick={() => handleStatusChange('returned')}
-          disabled={currentStatus === 'returned' || isUpdating}
-        >
-          {currentStatus === 'returned' && <Check className="h-4 w-4" />}
-          مرتجع
-        </DropdownMenuItem>
+      <DropdownMenuContent className="w-[150px]">
+        {statusOptions.map((status) => (
+          <DropdownMenuItem
+            key={status.value}
+            onClick={() => handleStatusChange(status.value)}
+          >
+            <Check
+              className={cn(
+                "mr-2 h-4 w-4",
+                newStatus === status.value ? "opacity-100" : "opacity-0"
+              )}
+            />
+            {status.label}
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
