@@ -2,7 +2,7 @@
 import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import SuppliersList from "@/components/suppliers/SuppliersList";
+import { SuppliersList } from "@/components/suppliers/SuppliersList";
 import CustomersList from "@/components/customers/CustomersList";
 import { Briefcase, User, Download, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";

@@ -55,7 +55,7 @@ export function PaymentConfirmationDialog({
         await supabase
           .from('online_orders')
           .update({
-            status: 'ready' as Order['status'],
+            status: 'ready',
             updated_at: new Date().toISOString()
           })
           .eq('id', orderId);

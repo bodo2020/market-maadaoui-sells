@@ -1,283 +1,199 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Plus, File, Edit, Trash2, Calendar } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { format } from 'date-fns';
-import { DatePicker } from "@/components/ui/date-picker"
-import { arEG } from 'date-fns/locale';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { Purchase, Supplier } from "@/types";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+// Remove the incorrect import for date-picker
+import { Calendar } from "@/components/ui/calendar";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchPurchases, deletePurchase, addPurchase } from "@/services/supabase/purchaseService";
+import { fetchSuppliers } from "@/services/supabase/supplierService";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon, ChevronDown, Download, Edit, Eye, FilePlus, Plus, Search, Trash2 } from "lucide-react";
+import { Supplier, Purchase } from "@/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Purchases() {
   const [open, setOpen] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  const [openDelete, setOpenDelete] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [supplierId, setSupplierId] = useState<string | undefined>(undefined);
   const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [total, setTotal] = useState(0);
-  const [paid, setPaid] = useState(0);
+  const [total, setTotal] = useState<number | undefined>(undefined);
+  const [paid, setPaid] = useState<number | undefined>(undefined);
   const [description, setDescription] = useState("");
-  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
-  const [selectedSupplierId, setSelectedSupplierId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const queryClient = useQueryClient();
 
   const { data: purchases, isLoading } = useQuery({
-    queryKey: ['purchases'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('purchases')
-        .select('*, suppliers(name)')
-        .order('date', { ascending: false });
-      if (error) {
-        throw error;
-      }
-      return data as Purchase[];
-    },
+    queryKey: ["purchases"],
+    queryFn: fetchPurchases,
   });
 
   const { data: suppliers } = useQuery({
-    queryKey: ['suppliers'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .order('name', { ascending: true });
-      if (error) {
-        throw error;
-      }
-      return data as Supplier[];
-    },
+    queryKey: ["suppliers"],
+    queryFn: fetchSuppliers,
   });
 
-  const addPurchaseMutation = useMutation({
-    mutationFn: async (newPurchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at'>) => {
-      const { error } = await supabase
-        .from('purchases')
-        .insert(newPurchase);
-      if (error) {
-        throw error;
-      }
-      return true;
-    },
+  const addPurchaseMutation = useMutation(addPurchase, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ["purchases"] });
       setOpen(false);
-      clearForm();
-      toast.success('تمت إضافة عملية الشراء بنجاح');
+      toast.success("تمت إضافة عملية الشراء بنجاح");
     },
-    onError: (error: any) => {
-      toast.error(`حدث خطأ أثناء إضافة عملية الشراء: ${error.message}`);
+    onError: (error) => {
+      toast.error("حدث خطأ أثناء إضافة عملية الشراء");
+      console.error("Error adding purchase:", error);
     },
   });
 
-  const updatePurchaseMutation = useMutation({
-    mutationFn: async ({ id, purchase }: { id: string, purchase: Partial<Purchase> }) => {
-      const { error } = await supabase
-        .from('purchases')
-        .update(purchase)
-        .eq('id', id);
-      if (error) {
-        throw error;
-      }
-      return true;
-    },
+  const deletePurchaseMutation = useMutation(deletePurchase, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchases'] });
-      setEditOpen(false);
-      clearForm();
-      toast.success('تم تحديث عملية الشراء بنجاح');
+      queryClient.invalidateQueries({ queryKey: ["purchases"] });
+      setOpenDelete(false);
+      toast.success("تم حذف عملية الشراء بنجاح");
     },
-    onError: (error: any) => {
-      toast.error(`حدث خطأ أثناء تحديث عملية الشراء: ${error.message}`);
-    },
-  });
-
-  const deletePurchaseMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('purchases')
-        .delete()
-        .eq('id', id);
-      if (error) {
-        throw error;
-      }
-      return true;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchases'] });
-      toast.success('تم حذف عملية الشراء بنجاح');
-    },
-    onError: (error: any) => {
-      toast.error(`حدث خطأ أثناء حذف عملية الشراء: ${error.message}`);
+    onError: (error) => {
+      toast.error("حدث خطأ أثناء حذف عملية الشراء");
+      console.error("Error deleting purchase:", error);
     },
   });
 
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-
-    if (!date || !invoiceNumber || !total || !paid || !selectedSupplierId) {
-      toast.error('الرجاء ملء جميع الحقول المطلوبة.');
-      return;
-    }
-
-    const newPurchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at'> = {
-      supplier_id: selectedSupplierId,
-      date: date.toISOString(),
-      invoice_number: invoiceNumber,
-      total: parseFloat(total.toString()),
-      paid: parseFloat(paid.toString()),
-      description: description,
-      invoice_file_url: invoiceFile ? 'url' : null,
-    };
-
-    addPurchaseMutation.mutate(newPurchase);
-  };
-
-  const handleEditSubmit = async (e: any) => {
-    e.preventDefault();
-
-    if (!selectedPurchase) {
-      toast.error('لم يتم تحديد عملية الشراء للتعديل.');
-      return;
-    }
-
-    if (!date || !invoiceNumber || !total || !paid || !selectedSupplierId) {
-      toast.error('الرجاء ملء جميع الحقول المطلوبة.');
-      return;
-    }
-
-    const updatedPurchase: Partial<Purchase> = {
-      supplier_id: selectedSupplierId,
-      date: date.toISOString(),
-      invoice_number: invoiceNumber,
-      total: parseFloat(total.toString()),
-      paid: parseFloat(paid.toString()),
-      description: description,
-      invoice_file_url: invoiceFile ? 'url' : null,
-    };
-
-    updatePurchaseMutation.mutate({ id: selectedPurchase.id, purchase: updatedPurchase });
-  };
-
-  const handleDelete = (id: string) => {
-    deletePurchaseMutation.mutate(id);
-  };
-
-  const handleEdit = (purchase: Purchase) => {
-    setSelectedPurchase(purchase);
-    setEditOpen(true);
-    setDate(new Date(purchase.date));
-    setInvoiceNumber(purchase.invoice_number);
-    setTotal(purchase.total);
-    setPaid(purchase.paid);
-    setDescription(purchase.description || "");
-    setSelectedSupplierId(purchase.supplier_id);
-  };
-
-  const clearForm = () => {
-    setDate(new Date());
-    setInvoiceNumber("");
-    setTotal(0);
-    setPaid(0);
-    setDescription("");
-    setInvoiceFile(null);
-    setSelectedSupplierId("");
-  };
-
-  const filteredPurchases = purchases?.filter(purchase => {
-    const searchTerm = searchQuery.toLowerCase();
+  const filteredPurchases = purchases?.filter((purchase) => {
+    const searchLower = searchQuery.toLowerCase();
     return (
-      purchase.invoice_number.toLowerCase().includes(searchTerm) ||
-      purchase.suppliers?.name.toLowerCase().includes(searchTerm)
+      purchase.invoice_number.toLowerCase().includes(searchLower) ||
+      purchase.suppliers?.name.toLowerCase().includes(searchLower)
     );
   });
 
+  const handleDelete = (purchase: Purchase) => {
+    setSelectedPurchase(purchase);
+    setOpenDelete(true);
+  };
+
+  const confirmDelete = async () => {
+    if (selectedPurchase) {
+      await deletePurchaseMutation.mutateAsync(selectedPurchase.id);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!date || !supplierId || !invoiceNumber || !total || !paid) {
+      toast.error("الرجاء ملء جميع الحقول");
+      return;
+    }
+
+    const newPurchase = {
+      date: format(date, "yyyy-MM-dd"),
+      supplier_id: supplierId,
+      invoice_number: invoiceNumber,
+      total: total,
+      paid: paid,
+      description: description,
+    };
+
+    await addPurchaseMutation.mutateAsync(newPurchase);
+  };
+
   return (
     <MainLayout>
-      <div className="container mx-auto p-6 dir-rtl">
+      <div className="container mx-auto p-4">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">إدارة المشتريات</h1>
-          <Button onClick={() => setOpen(true)}>
-            <Plus className="w-4 h-4 ml-2" />
-            إضافة عملية شراء
-          </Button>
+          <h1 className="text-2xl font-bold">المشتريات</h1>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => console.log("تصدير")}>
+              <Download className="ml-2 h-4 w-4" />
+              تصدير
+            </Button>
+            <Button variant="default" onClick={() => setOpen(true)}>
+              <Plus className="ml-2 h-4 w-4" />
+              إضافة عملية شراء
+            </Button>
+          </div>
         </div>
 
-        <div className="relative w-full max-w-sm mb-4">
-          <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="البحث عن طريق رقم الفاتورة أو اسم المورد..."
-            className="pl-10 pr-10"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
+        <div className="mb-4 flex">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="البحث عن طريق رقم الفاتورة أو اسم المورد..."
+              className="pl-10 pr-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle>قائمة المشتريات</CardTitle>
+            <CardTitle>سجل المشتريات</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="flex justify-center items-center h-64">
-                جاري التحميل...
-              </div>
+              <p>Loading...</p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>التاريخ</TableHead>
-                    <TableHead>رقم الفاتورة</TableHead>
                     <TableHead>المورد</TableHead>
+                    <TableHead>رقم الفاتورة</TableHead>
                     <TableHead>المبلغ الإجمالي</TableHead>
                     <TableHead>المدفوع</TableHead>
-                    <TableHead>الإجراءات</TableHead>
+                    <TableHead className="text-center">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPurchases?.map(purchase => (
+                  {filteredPurchases?.map((purchase) => (
                     <TableRow key={purchase.id}>
                       <TableCell>
-                        {format(new Date(purchase.date), 'yyyy-MM-dd', { locale: arEG })}
+                        {new Date(purchase.date).toLocaleDateString("ar-SA")}
                       </TableCell>
-                      <TableCell>{purchase.invoice_number}</TableCell>
                       <TableCell>{purchase.suppliers?.name}</TableCell>
+                      <TableCell>{purchase.invoice_number}</TableCell>
                       <TableCell>{purchase.total}</TableCell>
                       <TableCell>{purchase.paid}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2 space-x-reverse">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleEdit(purchase)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            disabled={deletePurchaseMutation.isLoading}
-                            onClick={() => handleDelete(purchase.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                      <TableCell className="text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" /> <span>عرض</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="mr-2 h-4 w-4" /> <span>تعديل</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(purchase)}
+                              disabled={deletePurchaseMutation.isLoading}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> <span>حذف</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -287,183 +203,137 @@ export default function Purchases() {
           </CardContent>
         </Card>
 
-        {/* Add Purchase Dialog */}
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="sm:max-w-[525px] rtl">
             <DialogHeader>
               <DialogTitle>إضافة عملية شراء جديدة</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="date">التاريخ</Label>
-                <DatePicker
-                  locale={arEG}
-                  id="date"
-                  value={date}
-                  onValueChange={setDate}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="date">التاريخ</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {date ? format(date, "PPP") : <span>اختر تاريخ</span>}
+                        <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="center" side="bottom">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={setDate}
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("2020-01-01")
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <Label htmlFor="supplier">المورد</Label>
+                  <Select onValueChange={setSupplierId}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="اختر مورد" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers?.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="supplier">المورد</Label>
-                <Select onValueChange={(value) => setSelectedSupplierId(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر المورد" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers?.map(supplier => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="invoiceNumber">رقم الفاتورة</Label>
-                <Input
-                  type="text"
-                  id="invoiceNumber"
-                  value={invoiceNumber}
-                  onChange={e => setInvoiceNumber(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="total">المبلغ الإجمالي</Label>
-                <Input
-                  type="number"
-                  id="total"
-                  value={total}
-                  onChange={e => setTotal(Number(e.target.value))}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="invoiceNumber">رقم الفاتورة</Label>
+                  <Input
+                    id="invoiceNumber"
+                    type="text"
+                    placeholder="أدخل رقم الفاتورة"
+                    className="text-right"
+                    onChange={(e) => setInvoiceNumber(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="total">المبلغ الإجمالي</Label>
+                  <Input
+                    id="total"
+                    type="number"
+                    placeholder="أدخل المبلغ الإجمالي"
+                    className="text-right"
+                    onChange={(e) => setTotal(Number(e.target.value))}
+                  />
+                </div>
               </div>
               <div>
                 <Label htmlFor="paid">المدفوع</Label>
                 <Input
-                  type="number"
                   id="paid"
-                  value={paid}
-                  onChange={e => setPaid(Number(e.target.value))}
+                  type="number"
+                  placeholder="أدخل المبلغ المدفوع"
+                  className="text-right"
+                  onChange={(e) => setPaid(Number(e.target.value))}
                 />
               </div>
               <div>
                 <Label htmlFor="description">الوصف</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="invoiceFile">ملف الفاتورة</Label>
                 <Input
-                  type="file"
-                  id="invoiceFile"
-                  onChange={e => setInvoiceFile(e.target.files?.[0] || null)}
+                  id="description"
+                  placeholder="أدخل وصفًا (اختياري)"
+                  className="text-right"
+                  onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
-              <DialogFooter>
+              <div className="flex justify-end gap-2">
                 <Button type="submit" disabled={addPurchaseMutation.isLoading}>
-                  {addPurchaseMutation.isLoading ? (
-                    <>
-                      جاري الإضافة...
-                    </>
-                  ) : (
-                    'إضافة'
-                  )}
+                  {addPurchaseMutation.isLoading ? "جاري الإضافة..." : "إضافة"}
                 </Button>
-              </DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                >
+                  إلغاء
+                </Button>
+              </div>
             </form>
           </DialogContent>
         </Dialog>
 
-        {/* Edit Purchase Dialog */}
-        <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>تعديل عملية الشراء</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="date">التاريخ</Label>
-                <DatePicker
-                  locale={arEG}
-                  id="date"
-                  value={date}
-                  onValueChange={setDate}
-                />
-              </div>
-              <div>
-                <Label htmlFor="supplier">المورد</Label>
-                <Select value={selectedSupplierId} onValueChange={(value) => setSelectedSupplierId(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر المورد" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers?.map(supplier => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="invoiceNumber">رقم الفاتورة</Label>
-                <Input
-                  type="text"
-                  id="invoiceNumber"
-                  value={invoiceNumber}
-                  onChange={e => setInvoiceNumber(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="total">المبلغ الإجمالي</Label>
-                <Input
-                  type="number"
-                  id="total"
-                  value={total}
-                  onChange={e => setTotal(Number(e.target.value))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="paid">المدفوع</Label>
-                <Input
-                  type="number"
-                  id="paid"
-                  value={paid}
-                  onChange={e => setPaid(Number(e.target.value))}
-                />
-              </div>
-              <div>
-                <Label htmlFor="description">الوصف</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="invoiceFile">ملف الفاتورة</Label>
-                <Input
-                  type="file"
-                  id="invoiceFile"
-                  onChange={e => setInvoiceFile(e.target.files?.[0] || null)}
-                />
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={updatePurchaseMutation.isLoading}>
-                  {updatePurchaseMutation.isLoading ? (
-                    <>
-                      جاري التحديث...
-                    </>
-                  ) : (
-                    'تحديث'
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <AlertDialog open={openDelete} onOpenChange={setOpenDelete}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+              <AlertDialogDescription>
+                سيؤدي هذا الإجراء إلى حذف عملية الشراء بشكل دائم.
+                هل أنت متأكد؟
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-row-reverse">
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={deletePurchaseMutation.isLoading}
+              >
+                {deletePurchaseMutation.isLoading ? "جاري الحذف..." : "حذف"}
+              </AlertDialogAction>
+              <AlertDialogCancel onClick={() => setOpenDelete(false)}>
+                إلغاء
+              </AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );

@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import {
   Table,
@@ -42,7 +43,8 @@ export function SuppliersList({ suppliers }: SuppliersListProps) {
   );
   const queryClient = useQueryClient();
 
-  const deleteSupplierMutation = useMutation(deleteSupplier, {
+  const deleteSupplierMutation = useMutation({
+    mutationFn: deleteSupplier,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       toast.success("تم حذف المورد بنجاح");
@@ -50,7 +52,7 @@ export function SuppliersList({ suppliers }: SuppliersListProps) {
     onError: (error) => {
       toast.error("حدث خطأ أثناء حذف المورد");
       console.error("Error deleting supplier:", error);
-    },
+    }
   });
 
   const filteredSuppliers = suppliers.filter((supplier) => {
