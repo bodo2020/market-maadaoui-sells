@@ -1,5 +1,11 @@
 
 import { supabase } from "@/integrations/supabase/client";
+import { 
+  ShippingProvider, 
+  DeliveryLocation,
+  DeliveryType, 
+  DeliveryTypePrice 
+} from "@/types/shipping";
 
 // Governorates functions
 export async function fetchGovernorates() {
@@ -111,14 +117,32 @@ export async function createNeighborhood(data: {
 }
 
 export async function createDeliveryTypePrice(data: {
-  neighborhood_id: string;
+  neighborhood_id?: string;
+  delivery_location_id?: string;
   delivery_type_id: string;
   price: number;
   estimated_time?: string;
 }) {
+  let insertData = data;
+  
+  // Use a simplified type to avoid excessive type recursion
+  type TypePriceData = {
+    neighborhood_id?: string;
+    delivery_type_id: string;
+    price: number;
+    estimated_time?: string;
+  };
+  
+  const dataToInsert: TypePriceData = {
+    neighborhood_id: data.neighborhood_id || data.delivery_location_id,
+    delivery_type_id: data.delivery_type_id,
+    price: data.price,
+    estimated_time: data.estimated_time
+  };
+  
   const { data: result, error } = await supabase
     .from('delivery_type_pricing')
-    .insert([data])
+    .insert([dataToInsert])
     .select()
     .single();
     
@@ -178,7 +202,7 @@ export async function deleteDeliveryTypePrice(id: string) {
 }
 
 // Added missing functions
-export async function fetchDeliveryTypes() {
+export async function fetchDeliveryTypes(): Promise<DeliveryType[]> {
   const { data, error } = await supabase
     .from('delivery_types')
     .select('*')
@@ -221,7 +245,7 @@ export async function createShippingProvider(data: {
   return result;
 }
 
-export async function fetchShippingProviders() {
+export async function fetchShippingProviders(): Promise<ShippingProvider[]> {
   // Temporarily use companies table
   const { data, error } = await supabase
     .from('companies')
@@ -230,7 +254,15 @@ export async function fetchShippingProviders() {
     .order('name');
     
   if (error) throw error;
-  return data || [];
+  
+  // Convert companies to ShippingProvider format
+  return (data || []).map(company => ({
+    id: company.id,
+    name: company.name,
+    active: true,
+    created_at: company.created_at,
+    updated_at: company.updated_at
+  }));
 }
 
 // Temporary function to fulfill the DeliveryLocationsTable component needs

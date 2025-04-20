@@ -32,9 +32,11 @@ export interface DeliveryType {
   updated_at?: string;
 }
 
+// Updated to match database structure
 export interface DeliveryTypePrice {
   id: string;
-  neighborhood_id: string;
+  delivery_location_id?: string; // Added as alternative to neighborhood_id
+  neighborhood_id?: string;      // Made optional
   delivery_type_id: string;
   price: number;
   estimated_time?: string;

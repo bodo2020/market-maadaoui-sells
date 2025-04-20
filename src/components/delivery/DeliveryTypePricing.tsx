@@ -42,7 +42,8 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
 
   const createPriceMutation = useMutation({
     mutationFn: (data: {
-      neighborhood_id: string;
+      neighborhood_id?: string;
+      delivery_location_id?: string;
       delivery_type_id: string;
       price: number;
       estimated_time?: string;
@@ -86,7 +87,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
     }
 
     createPriceMutation.mutate({
-      neighborhood_id: locationId,
+      neighborhood_id: locationId,  // Use this for backward compatibility
       delivery_type_id: selectedType,
       price: Number(priceInput),
       estimated_time: estimatedTimeInput || undefined
@@ -95,7 +96,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
 
   // Find already priced delivery types to exclude from selection
   const existingTypesIds = Array.isArray(pricingData)
-    ? pricingData.map((p: DeliveryTypePrice) => p.delivery_type_id)
+    ? pricingData.map((p: any) => p.delivery_type_id)
     : [];
     
   const availableTypes = Array.isArray(deliveryTypes)
@@ -135,7 +136,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
         <p className="text-xs text-muted-foreground">لا توجد خيارات توصيل مضافة بعد</p>
       ) : (
         <div className="space-y-2">
-          {Array.isArray(pricingData) && pricingData.map((pricing: DeliveryTypePrice) => (
+          {Array.isArray(pricingData) && pricingData.map((pricing: any) => (
             <div key={pricing.id} className="flex justify-between items-center bg-muted/40 p-1.5 rounded">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="h-5 px-1.5 bg-background text-xs">
