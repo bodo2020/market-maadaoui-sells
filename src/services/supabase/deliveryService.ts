@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { DeliveryLocation, ShippingProvider, DeliveryType, DeliveryTypePrice } from "@/types/shipping";
 
@@ -93,14 +92,15 @@ export async function createGovernorate(data: {
   name?: string,
   provider_id?: string
 }) {
-  const locationWithName = {
-    ...data,
-    name: data.name || data.governorate
+  const locationData = {
+    governorate: data.governorate,
+    name: data.name || data.governorate,
+    provider_id: data.provider_id
   };
 
   const { data: result, error } = await supabase
     .from('delivery_locations')
-    .insert([locationWithName])
+    .insert([locationData])
     .select()
     .single();
     
@@ -114,14 +114,16 @@ export async function createCity(data: {
   name?: string,
   provider_id?: string
 }) {
-  const locationWithName = {
-    ...data,
-    name: data.name || `${data.governorate} - ${data.city}`
+  const locationData = {
+    governorate: data.governorate,
+    city: data.city,
+    name: `${data.governorate} - ${data.city}`,
+    provider_id: data.provider_id
   };
 
   const { data: result, error } = await supabase
     .from('delivery_locations')
-    .insert([locationWithName])
+    .insert([locationData])
     .select()
     .single();
     
@@ -136,14 +138,17 @@ export async function createArea(data: {
   name?: string,
   provider_id?: string
 }) {
-  const locationWithName = {
-    ...data,
-    name: data.name || `${data.governorate} - ${data.city} - ${data.area}`
+  const locationData = {
+    governorate: data.governorate,
+    city: data.city,
+    area: data.area,
+    name: `${data.governorate} - ${data.city} - ${data.area}`,
+    provider_id: data.provider_id
   };
 
   const { data: result, error } = await supabase
     .from('delivery_locations')
-    .insert([locationWithName])
+    .insert([locationData])
     .select()
     .single();
     
@@ -161,14 +166,20 @@ export async function createNeighborhood(data: {
   name?: string,
   provider_id?: string
 }) {
-  const locationWithName = {
-    ...data,
-    name: data.name || `${data.governorate} - ${data.city} - ${data.area} - ${data.neighborhood}`
+  const locationData = {
+    governorate: data.governorate,
+    city: data.city,
+    area: data.area,
+    neighborhood: data.neighborhood,
+    price: data.price,
+    estimated_time: data.estimated_time,
+    name: `${data.governorate} - ${data.city} - ${data.area} - ${data.neighborhood}`,
+    provider_id: data.provider_id
   };
 
   const { data: result, error } = await supabase
     .from('delivery_locations')
-    .insert([locationWithName])
+    .insert([locationData])
     .select()
     .single();
     

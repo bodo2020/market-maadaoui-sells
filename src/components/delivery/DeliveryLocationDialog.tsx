@@ -4,7 +4,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { 
+  createGovernorate,
+  createCity,
+  createArea,
+  createNeighborhood
+} from "@/services/supabase/deliveryService";
 import DeliveryTypePricing from "./DeliveryTypePricing";
+import { toast } from "sonner";
 
 interface DeliveryLocationDialogProps {
   open: boolean;
@@ -37,13 +44,62 @@ export default function DeliveryLocationDialog({
     setLoading(true);
 
     try {
-      onSuccess?.({name});
+      let result;
+
+      switch (mode) {
+        case 'governorate':
+          result = await createGovernorate({
+            governorate: name,
+            provider_id: providerId || undefined
+          });
+          break;
+
+        case 'city':
+          if (!parentData?.governorate) throw new Error("Governorate is required");
+          result = await createCity({
+            governorate: parentData.governorate,
+            city: name,
+            provider_id: providerId || undefined
+          });
+          break;
+
+        case 'area':
+          if (!parentData?.governorate || !parentData?.city) 
+            throw new Error("Governorate and city are required");
+          result = await createArea({
+            governorate: parentData.governorate,
+            city: parentData.city,
+            area: name,
+            provider_id: providerId || undefined
+          });
+          break;
+
+        case 'neighborhood':
+          if (!parentData?.governorate || !parentData?.city || !parentData?.area) 
+            throw new Error("Governorate, city and area are required");
+          result = await createNeighborhood({
+            governorate: parentData.governorate,
+            city: parentData.city,
+            area: parentData.area,
+            neighborhood: name,
+            price: 0,
+            provider_id: providerId || undefined
+          });
+          
+          if (result?.id) {
+            setNewLocationId(result.id);
+            setShowPricing(true);
+            return;
+          }
+          break;
+      }
+
+      onSuccess?.(result);
       setName("");
-      setShowPricing(false);
-      setNewLocationId(null);
       onOpenChange(false);
     } catch (error) {
       console.error('Error creating location:', error);
+      toast.error("حدث خطأ أثناء حفظ المنطقة");
     } finally {
       setLoading(false);
     }
@@ -86,7 +142,7 @@ export default function DeliveryLocationDialog({
 
             <div className="flex justify-end gap-2">
               <Button type="submit" disabled={loading}>
-                {loading ? "جاري الحفظ..." : "التالي"}
+                {loading ? "جاري الحفظ..." : mode === 'neighborhood' ? "التالي" : "حفظ"}
               </Button>
               <Button
                 type="button"
@@ -105,6 +161,7 @@ export default function DeliveryLocationDialog({
                 onOpenChange(false);
                 setShowPricing(false);
                 setNewLocationId(null);
+                onSuccess?.();
               }}
             />
           </div>
