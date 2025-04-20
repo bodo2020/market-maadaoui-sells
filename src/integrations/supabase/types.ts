@@ -349,62 +349,6 @@ export type Database = {
         }
         Relationships: []
       }
-      delivery_locations: {
-        Row: {
-          active: boolean | null
-          area: string | null
-          city: string | null
-          created_at: string | null
-          estimated_time: string | null
-          governorate: string | null
-          id: string
-          name: string
-          neighborhood: string | null
-          notes: string | null
-          price: number | null
-          provider_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          active?: boolean | null
-          area?: string | null
-          city?: string | null
-          created_at?: string | null
-          estimated_time?: string | null
-          governorate?: string | null
-          id?: string
-          name: string
-          neighborhood?: string | null
-          notes?: string | null
-          price?: number | null
-          provider_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          active?: boolean | null
-          area?: string | null
-          city?: string | null
-          created_at?: string | null
-          estimated_time?: string | null
-          governorate?: string | null
-          id?: string
-          name?: string
-          neighborhood?: string | null
-          notes?: string | null
-          price?: number | null
-          provider_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "delivery_locations_provider_id_fkey"
-            columns: ["provider_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       delivery_type_pricing: {
         Row: {
           created_at: string | null
