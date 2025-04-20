@@ -1,70 +1,78 @@
 
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import React from "react";
+import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { useNotificationStore } from "@/stores/notificationStore";
 
 interface SidebarItemProps {
-  icon: LucideIcon;
-  label: string;
+  title: string;
   href: string;
-  active?: boolean;
-  onClick?: () => void;
-  badge?: number;
+  icon: LucideIcon;
+  disabled?: boolean;
+  label?: string;
   collapsed?: boolean;
 }
 
 export function SidebarItem({ 
-  icon: Icon,
-  label, 
+  title, 
   href, 
-  active, 
-  onClick, 
-  badge,
-  collapsed 
+  icon: Icon, 
+  disabled, 
+  label,
+  collapsed
 }: SidebarItemProps) {
-  const button = (
-    <Link to={href} onClick={onClick}>
-      <Button
-        variant={active ? "default" : "ghost"}
-        className={cn(
-          "w-full justify-start gap-2 mb-1",
-          active ? "bg-primary text-primary-foreground" : ""
-        )}
-      >
-        <Icon size={20} />
-        {!collapsed && <span>{label}</span>}
-        {!collapsed && badge !== undefined && badge > 0 && (
-          <span className="mr-auto w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-white text-xs">
-            {badge}
-          </span>
-        )}
-      </Button>
+  const location = useLocation();
+  const { unreadOrders } = useNotificationStore();
+  
+  const isActive = location.pathname === href || 
+                  (href !== '/' && location.pathname.startsWith(href));
+
+  const showOrdersBadge = href === '/online-orders' && unreadOrders > 0;
+
+  return (
+    <Link
+      to={disabled ? '#' : href}
+      className={cn(
+        "flex items-center group rounded-md px-3 py-2 text-sm transition-colors",
+        isActive ? "bg-primary/10 text-primary font-medium" : "text-gray-600 hover:bg-muted",
+        disabled && "opacity-50 cursor-not-allowed",
+        "mx-2"
+      )}
+      onClick={(e) => {
+        if (disabled) e.preventDefault();
+      }}
+    >
+      <Icon className={cn("h-5 w-5 ml-1", collapsed ? "mx-auto" : "")} />
+      
+      {!collapsed && (
+        <>
+          <span className="flex-1 text-right">{title}</span>
+          
+          {showOrdersBadge && (
+            <Badge 
+              variant="destructive" 
+              className="ml-auto"
+            >
+              {unreadOrders}
+            </Badge>
+          )}
+          
+          {label && (
+            <Badge className="ml-auto">{label}</Badge>
+          )}
+        </>
+      )}
+      
+      {collapsed && (showOrdersBadge || label) && (
+        <Badge 
+          variant={showOrdersBadge ? "destructive" : "default"} 
+          className="absolute right-2 top-1 scale-75"
+        >
+          {showOrdersBadge ? unreadOrders : label}
+        </Badge>
+      )}
     </Link>
   );
-
-  if (collapsed) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          {button}
-        </TooltipTrigger>
-        <TooltipContent side="right">
-          <p>{label}</p>
-          {badge !== undefined && badge > 0 && (
-            <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-destructive text-white">
-              {badge}
-            </span>
-          )}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return button;
 }

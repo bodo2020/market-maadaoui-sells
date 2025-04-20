@@ -113,9 +113,9 @@ export const useOrderManagement = (activeTab: string) => {
       } else if (activeTab === "unpaid") {
         query = query.eq('payment_status', 'pending');
       } else if (activeTab === "cancelled") {
-        query = query.eq('is_cancelled', true);
+        query = query.eq('status', 'cancelled');
       } else if (activeTab === "returned") {
-        query = query.eq('is_returned', true);
+        query = query.eq('status', 'returned');
       }
       
       const { data, error } = await query;

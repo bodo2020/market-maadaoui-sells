@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Receipt, Calendar, Package } from "lucide-react";
-import { Sale } from "@/types";
+import { Sale, CartItem } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
-import ReturnOrderDialog from "@/components/orders/ReturnOrderDialog";
+import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
 
 interface SaleHistoryDialogProps {
   open: boolean;
@@ -46,8 +46,35 @@ export default function SaleHistoryDialog({ open, onOpenChange, storeInfo }: Sal
         throw error;
       }
 
-      setSales(data as Sale[]);
-      setFilteredSales(data as Sale[]);
+      // Process the data to ensure it conforms to the Sale type
+      const processedSales = (data || []).map(sale => {
+        let parsedItems: CartItem[] = [];
+        
+        try {
+          // Try to parse items if they're a string
+          const items = typeof sale.items === 'string' 
+            ? JSON.parse(sale.items) 
+            : sale.items;
+            
+          // Ensure items is treated as CartItem[]
+          parsedItems = Array.isArray(items) ? items as unknown as CartItem[] : [];
+        } catch (e) {
+          console.error("Error parsing items:", e);
+        }
+        
+        return {
+          ...sale,
+          items: parsedItems,
+          payment_method: (sale.payment_method === 'cash' || 
+                         sale.payment_method === 'card' || 
+                         sale.payment_method === 'mixed') 
+            ? sale.payment_method as 'cash' | 'card' | 'mixed'
+            : 'cash' // Default if invalid
+        } as Sale;
+      });
+
+      setSales(processedSales);
+      setFilteredSales(processedSales);
     } catch (error) {
       console.error("Error fetching sales:", error);
     } finally {

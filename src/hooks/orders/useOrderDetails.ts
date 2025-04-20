@@ -28,7 +28,7 @@ export function useOrderDetails(orderId: string) {
       
       if (data) {
         const validateOrderStatus = (status: string): Order['status'] => {
-          const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
+          const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done', 'cancelled', 'returned'];
           return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
         };
         
@@ -66,7 +66,7 @@ export function useOrderDetails(orderId: string) {
         const customerEmail = data.customers?.email || '';
         const customerPhone = data.customers?.phone || '';
         
-        const orderObj = {
+        const orderObj: Order = {
           id: data.id,
           created_at: data.created_at,
           total: data.total,
@@ -80,7 +80,9 @@ export function useOrderDetails(orderId: string) {
           customer_phone: customerPhone,
           notes: data.notes || '',
           tracking_number: data.tracking_number || null,
-          delivery_person: data.delivery_person || null
+          delivery_person: data.delivery_person || null,
+          is_returned: data.is_returned || false,
+          is_cancelled: data.is_cancelled || false
         };
         
         console.log("Parsed order:", orderObj);
@@ -128,7 +130,9 @@ export function useOrderDetails(orderId: string) {
       toast.success(`تم تحديث حالة الطلب إلى ${
         selectedStatus === 'waiting' ? 'في الانتظار' : 
         selectedStatus === 'ready' ? 'جاهز للشحن' : 
-        selectedStatus === 'shipped' ? 'تم الشحن' : 'تم التسليم'
+        selectedStatus === 'shipped' ? 'تم الشحن' : 
+        selectedStatus === 'done' ? 'تم التسليم' :
+        selectedStatus === 'cancelled' ? 'ملغي' : 'مرتجع'
       }`);
       
       setSelectedStatus(null);

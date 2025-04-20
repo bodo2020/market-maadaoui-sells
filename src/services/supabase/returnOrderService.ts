@@ -41,12 +41,13 @@ export const createReturnOrder = async (
         ...returnOrder,
         status: 'pending'
       }])
-      .select()
-      .single();
+      .select();
 
     if (error) throw error;
     
-    return data as ReturnOrder;
+    if (!data || data.length === 0) return null;
+    
+    return data[0] as unknown as ReturnOrder;
   } catch (error) {
     console.error("Error creating return order:", error);
     toast.error("حدث خطأ أثناء إنشاء طلب المرتجع");
@@ -60,8 +61,7 @@ export const fetchReturnOrders = async (
   try {
     let query = supabase
       .from('return_orders')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*');
     
     if (filter?.status) {
       query = query.eq('status', filter.status);
@@ -71,11 +71,13 @@ export const fetchReturnOrders = async (
       query = query.eq('order_type', filter.order_type);
     }
     
+    query = query.order('created_at', { ascending: false });
+    
     const { data, error } = await query;
     
     if (error) throw error;
     
-    return data as ReturnOrder[];
+    return (data || []) as unknown as ReturnOrder[];
   } catch (error) {
     console.error("Error fetching return orders:", error);
     toast.error("حدث خطأ أثناء تحميل طلبات المرتجع");
@@ -109,8 +111,10 @@ export const approveReturnOrder = async (
       
     if (fetchError) throw fetchError;
     
+    const typedReturnOrder = returnOrder as unknown as ReturnOrder;
+    
     // 3. Adjust inventory for returned items
-    for (const item of returnOrder.items) {
+    for (const item of typedReturnOrder.items) {
       // Get current product quantity
       const { data: product, error: productError } = await supabase
         .from('products')
@@ -137,18 +141,18 @@ export const approveReturnOrder = async (
     }
     
     // 4. Record a negative transaction to adjust sales records
-    if (returnOrder.order_type === 'pos' && returnOrder.sale_id) {
+    if (typedReturnOrder.order_type === 'pos' && typedReturnOrder.sale_id) {
       // Create a negative sale transaction to record the return
       const negativeTransaction = {
         date: new Date().toISOString(),
-        items: returnOrder.items,
-        subtotal: -returnOrder.total,
+        items: typedReturnOrder.items,
+        subtotal: -typedReturnOrder.total,
         discount: 0,
-        total: -returnOrder.total,
+        total: -typedReturnOrder.total,
         profit: 0, // Actual profit calculation would need cost data
         payment_method: 'cash', // Default to cash for returns
-        invoice_number: `RET-${returnOrder.invoice_number || returnOrder.id.slice(0, 8)}`,
-        notes: `مرتجع للفاتورة ${returnOrder.invoice_number || ''} - ${returnOrder.reason}`
+        invoice_number: `RET-${typedReturnOrder.invoice_number || typedReturnOrder.id.slice(0, 8)}`,
+        notes: `مرتجع للفاتورة ${typedReturnOrder.invoice_number || ''} - ${typedReturnOrder.reason}`
       };
       
       await supabase.from('sales').insert([negativeTransaction]);
@@ -156,10 +160,10 @@ export const approveReturnOrder = async (
       // Add the returned amount back to the store cash register
       await supabase.functions.invoke('add-cash-transaction', {
         body: {
-          amount: returnOrder.total,
+          amount: typedReturnOrder.total,
           transaction_type: 'deposit',
           register_type: 'store',
-          notes: `مبلغ مرتجع - ${returnOrder.invoice_number || returnOrder.id.slice(0, 8)}`
+          notes: `مبلغ مرتجع - ${typedReturnOrder.invoice_number || typedReturnOrder.id.slice(0, 8)}`
         }
       });
     }
@@ -206,7 +210,7 @@ export const fetchReturnOrderById = async (id: string): Promise<ReturnOrder | nu
       
     if (error) throw error;
     
-    return data as ReturnOrder;
+    return data as unknown as ReturnOrder;
   } catch (error) {
     console.error("Error fetching return order:", error);
     return null;

@@ -1,11 +1,15 @@
 
 import React from "react";
-import SidebarItem from "./SidebarItem";
+import { SidebarItem } from "./SidebarItem";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/types";
 import { sidebarNavigation } from "./sidebarNavigation";
 
-export const SidebarContent = () => {
+interface SidebarContentProps {
+  collapsed?: boolean;
+}
+
+export const SidebarContent = ({ collapsed }: SidebarContentProps) => {
   const { user } = useAuth();
   
   // Filter navigation items based on user role if needed
@@ -21,10 +25,9 @@ export const SidebarContent = () => {
           icon={item.icon}
           disabled={item.disabled}
           label={item.label}
+          collapsed={collapsed}
         />
       ))}
     </div>
   );
 };
-
-export default SidebarContent;
