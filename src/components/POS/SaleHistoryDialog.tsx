@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search, Receipt, Calendar, Package } from "lucide-react";
 import { Sale, CartItem } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
-import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
+import { ReturnOrderDialog } from "../orders/ReturnOrderDialog";
 
 interface SaleHistoryDialogProps {
   open: boolean;

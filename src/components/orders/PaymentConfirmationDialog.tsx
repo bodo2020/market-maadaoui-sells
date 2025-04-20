@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { Order } from "@/types";
 
 interface PaymentConfirmationDialogProps {
   open: boolean;
@@ -54,7 +55,7 @@ export function PaymentConfirmationDialog({
         await supabase
           .from('online_orders')
           .update({
-            status: 'ready',
+            status: 'ready' as Order['status'],
             updated_at: new Date().toISOString()
           })
           .eq('id', orderId);

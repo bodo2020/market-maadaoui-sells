@@ -1,257 +1,279 @@
-
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Search, Plus, File, Edit, Trash2, Calendar } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, Eye, Trash2, FileText, Upload, Download, Filter } from "lucide-react";
-import { fetchPurchases, createPurchase, deletePurchase } from "@/services/supabase/purchaseService";
-import { fetchSuppliers } from "@/services/supabase/supplierService";
+import { Label } from "@/components/ui/label";
+import { format } from 'date-fns';
+import { DatePicker } from "@/components/ui/date-picker"
+import { arEG } from 'date-fns/locale';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea";
-import { Purchase } from "@/types";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Purchase, Supplier } from "@/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export default function Purchases() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
-  const [formData, setFormData] = useState({
-    supplier_id: "",
-    invoice_number: "",
-    date: new Date().toISOString().split('T')[0],
-    total: 0,
-    paid: 0,
-    description: "",
-    items: []
-  });
+  const [searchQuery, setSearchQuery] = useState("");
+  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [total, setTotal] = useState(0);
+  const [paid, setPaid] = useState(0);
+  const [description, setDescription] = useState("");
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
-  
+  const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const queryClient = useQueryClient();
-  
-  const { data: purchases = [], isLoading } = useQuery({
-    queryKey: ["purchases"],
-    queryFn: fetchPurchases
-  });
-  
-  const { data: suppliers = [] } = useQuery({
-    queryKey: ["suppliers"],
-    queryFn: fetchSuppliers
-  });
-  
-  const createPurchaseMutation = useMutation({
-    mutationFn: createPurchase,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchases"] });
-      toast.success("تم إضافة فاتورة الشراء بنجاح");
-      setIsAddDialogOpen(false);
-      resetForm();
+
+  const { data: purchases, isLoading } = useQuery({
+    queryKey: ['purchases'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('purchases')
+        .select('*, suppliers(name)')
+        .order('date', { ascending: false });
+      if (error) {
+        throw error;
+      }
+      return data as Purchase[];
     },
-    onError: (error) => {
-      toast.error("حدث خطأ أثناء إضافة فاتورة الشراء");
-      console.error("Error creating purchase:", error);
-    }
   });
-  
+
+  const { data: suppliers } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) {
+        throw error;
+      }
+      return data as Supplier[];
+    },
+  });
+
+  const addPurchaseMutation = useMutation({
+    mutationFn: async (newPurchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at'>) => {
+      const { error } = await supabase
+        .from('purchases')
+        .insert(newPurchase);
+      if (error) {
+        throw error;
+      }
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      setOpen(false);
+      clearForm();
+      toast.success('تمت إضافة عملية الشراء بنجاح');
+    },
+    onError: (error: any) => {
+      toast.error(`حدث خطأ أثناء إضافة عملية الشراء: ${error.message}`);
+    },
+  });
+
+  const updatePurchaseMutation = useMutation({
+    mutationFn: async ({ id, purchase }: { id: string, purchase: Partial<Purchase> }) => {
+      const { error } = await supabase
+        .from('purchases')
+        .update(purchase)
+        .eq('id', id);
+      if (error) {
+        throw error;
+      }
+      return true;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      setEditOpen(false);
+      clearForm();
+      toast.success('تم تحديث عملية الشراء بنجاح');
+    },
+    onError: (error: any) => {
+      toast.error(`حدث خطأ أثناء تحديث عملية الشراء: ${error.message}`);
+    },
+  });
+
   const deletePurchaseMutation = useMutation({
-    mutationFn: deletePurchase,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["purchases"] });
-      toast.success("تم حذف فاتورة الشراء بنجاح");
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('purchases')
+        .delete()
+        .eq('id', id);
+      if (error) {
+        throw error;
+      }
+      return true;
     },
-    onError: (error) => {
-      toast.error("حدث خطأ أثناء حذف فاتورة الشراء");
-      console.error("Error deleting purchase:", error);
-    }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      toast.success('تم حذف عملية الشراء بنجاح');
+    },
+    onError: (error: any) => {
+      toast.error(`حدث خطأ أثناء حذف عملية الشراء: ${error.message}`);
+    },
   });
-  
-  const resetForm = () => {
-    setFormData({
-      supplier_id: "",
-      invoice_number: "",
-      date: new Date().toISOString().split('T')[0],
-      total: 0,
-      paid: 0,
-      description: "",
-      items: []
-    });
-    setInvoiceFile(null);
-  };
-  
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
-    setFormData({
-      ...formData,
-      [id]: id === "total" || id === "paid" ? Number(value) : value
-    });
-  };
-  
-  const handleSelectChange = (value: string, field: string) => {
-    setFormData({
-      ...formData,
-      [field]: value
-    });
-  };
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setInvoiceFile(e.target.files[0]);
-    }
-  };
-  
-  const handleAddPurchase = () => {
-    if (!formData.supplier_id || !formData.invoice_number || !formData.date || formData.total <= 0) {
-      toast.error("يرجى ملء جميع الحقول المطلوبة");
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+
+    if (!date || !invoiceNumber || !total || !paid || !selectedSupplierId) {
+      toast.error('الرجاء ملء جميع الحقول المطلوبة.');
       return;
     }
-    
-    createPurchaseMutation.mutate({
-      ...formData,
-      invoice_file: invoiceFile
-    });
+
+    const newPurchase: Omit<Purchase, 'id' | 'created_at' | 'updated_at'> = {
+      supplier_id: selectedSupplierId,
+      date: date.toISOString(),
+      invoice_number: invoiceNumber,
+      total: parseFloat(total.toString()),
+      paid: parseFloat(paid.toString()),
+      description: description,
+      invoice_file_url: invoiceFile ? 'url' : null,
+    };
+
+    addPurchaseMutation.mutate(newPurchase);
   };
-  
-  const handleDeletePurchase = (id: string) => {
-    if (confirm("هل أنت متأكد من رغبتك في حذف هذه الفاتورة؟")) {
-      deletePurchaseMutation.mutate(id);
+
+  const handleEditSubmit = async (e: any) => {
+    e.preventDefault();
+
+    if (!selectedPurchase) {
+      toast.error('لم يتم تحديد عملية الشراء للتعديل.');
+      return;
     }
+
+    if (!date || !invoiceNumber || !total || !paid || !selectedSupplierId) {
+      toast.error('الرجاء ملء جميع الحقول المطلوبة.');
+      return;
+    }
+
+    const updatedPurchase: Partial<Purchase> = {
+      supplier_id: selectedSupplierId,
+      date: date.toISOString(),
+      invoice_number: invoiceNumber,
+      total: parseFloat(total.toString()),
+      paid: parseFloat(paid.toString()),
+      description: description,
+      invoice_file_url: invoiceFile ? 'url' : null,
+    };
+
+    updatePurchaseMutation.mutate({ id: selectedPurchase.id, purchase: updatedPurchase });
   };
-  
-  const handleViewPurchase = (purchase: Purchase) => {
+
+  const handleDelete = (id: string) => {
+    deletePurchaseMutation.mutate(id);
+  };
+
+  const handleEdit = (purchase: Purchase) => {
     setSelectedPurchase(purchase);
-    setIsViewDialogOpen(true);
+    setEditOpen(true);
+    setDate(new Date(purchase.date));
+    setInvoiceNumber(purchase.invoice_number);
+    setTotal(purchase.total);
+    setPaid(purchase.paid);
+    setDescription(purchase.description || "");
+    setSelectedSupplierId(purchase.supplier_id);
   };
-  
-  const handleExportPurchases = () => {
-    // TODO: Implement export functionality
-    toast.info("سيتم إضافة ميزة التصدير قريباً");
+
+  const clearForm = () => {
+    setDate(new Date());
+    setInvoiceNumber("");
+    setTotal(0);
+    setPaid(0);
+    setDescription("");
+    setInvoiceFile(null);
+    setSelectedSupplierId("");
   };
-  
-  const handleFilterPurchases = () => {
-    // TODO: Implement filter functionality
-    toast.info("سيتم إضافة ميزة التصفية قريباً");
-  };
-  
-  const filteredPurchases = purchases.filter(purchase => {
-    const searchTermLower = searchTerm.toLowerCase();
-    const supplierName = suppliers.find(s => s.id === purchase.supplier_id)?.name || "";
-    
+
+  const filteredPurchases = purchases?.filter(purchase => {
+    const searchTerm = searchQuery.toLowerCase();
     return (
-      supplierName.toLowerCase().includes(searchTermLower) ||
-      purchase.invoice_number.toLowerCase().includes(searchTermLower) ||
-      purchase.description?.toLowerCase().includes(searchTermLower)
+      purchase.invoice_number.toLowerCase().includes(searchTerm) ||
+      purchase.suppliers?.name.toLowerCase().includes(searchTerm)
     );
   });
-  
-  const getSupplierName = (supplierId: string) => {
-    return suppliers.find(s => s.id === supplierId)?.name || "غير معروف";
-  };
-  
-  const getRemainingAmount = (purchase: Purchase) => {
-    return purchase.total - purchase.paid;
-  };
-  
+
   return (
     <MainLayout>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">إدارة المشتريات</h1>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
-          <Plus className="ml-2 h-4 w-4" />
-          إضافة فاتورة شراء جديدة
-        </Button>
-      </div>
-      
-      <div className="flex gap-2 mb-6">
-        <Button variant="outline" onClick={handleFilterPurchases}>
-          <Filter className="ml-2 h-4 w-4" />
-          تصفية
-        </Button>
-        <Button variant="outline" onClick={handleExportPurchases}>
-          <Download className="ml-2 h-4 w-4" />
-          تصدير
-        </Button>
-      </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">قائمة فواتير الشراء</CardTitle>
-          <div className="flex w-full max-w-sm items-center space-x-2 mt-2">
-            <Input
-              type="search"
-              placeholder="بحث..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full"
-            />
-            <Button variant="ghost">
-              <Search />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center p-4">جاري التحميل...</div>
-          ) : filteredPurchases.length === 0 ? (
-            <div className="text-center text-muted-foreground p-4">
-              {searchTerm ? "لا توجد نتائج مطابقة للبحث" : "لا يوجد فواتير شراء، أضف فواتير جديدة"}
-            </div>
-          ) : (
-            <div className="rounded-md border">
+      <div className="container mx-auto p-6 dir-rtl">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">إدارة المشتريات</h1>
+          <Button onClick={() => setOpen(true)}>
+            <Plus className="w-4 h-4 ml-2" />
+            إضافة عملية شراء
+          </Button>
+        </div>
+
+        <div className="relative w-full max-w-sm mb-4">
+          <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="البحث عن طريق رقم الفاتورة أو اسم المورد..."
+            className="pl-10 pr-10"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>قائمة المشتريات</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-64">
+                جاري التحميل...
+              </div>
+            ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>التاريخ</TableHead>
                     <TableHead>رقم الفاتورة</TableHead>
                     <TableHead>المورد</TableHead>
-                    <TableHead>التاريخ</TableHead>
-                    <TableHead>إجمالي الفاتورة</TableHead>
-                    <TableHead>المبلغ المدفوع</TableHead>
-                    <TableHead>المبلغ المتبقي</TableHead>
-                    <TableHead>ملف الفاتورة</TableHead>
-                    <TableHead className="text-left">الإجراءات</TableHead>
+                    <TableHead>المبلغ الإجمالي</TableHead>
+                    <TableHead>المدفوع</TableHead>
+                    <TableHead>الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPurchases.map((purchase) => (
+                  {filteredPurchases?.map(purchase => (
                     <TableRow key={purchase.id}>
-                      <TableCell className="font-medium">{purchase.invoice_number}</TableCell>
-                      <TableCell>{getSupplierName(purchase.supplier_id)}</TableCell>
-                      <TableCell>{new Date(purchase.date).toLocaleDateString('ar-EG')}</TableCell>
+                      <TableCell>
+                        {format(new Date(purchase.date), 'yyyy-MM-dd', { locale: arEG })}
+                      </TableCell>
+                      <TableCell>{purchase.invoice_number}</TableCell>
+                      <TableCell>{purchase.suppliers?.name}</TableCell>
                       <TableCell>{purchase.total}</TableCell>
                       <TableCell>{purchase.paid}</TableCell>
-                      <TableCell>{getRemainingAmount(purchase)}</TableCell>
                       <TableCell>
-                        {purchase.invoice_file_url ? (
-                          <a 
-                            href={purchase.invoice_file_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center text-blue-600"
-                          >
-                            <FileText className="h-4 w-4 mr-1" />
-                            عرض
-                          </a>
-                        ) : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-2 space-x-reverse">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="icon"
-                            onClick={() => handleViewPurchase(purchase)}
+                            onClick={() => handleEdit(purchase)}
                           >
-                            <Eye className="h-4 w-4" />
+                            <Edit className="h-4 w-4" />
                           </Button>
                           <Button
-                            variant="ghost"
+                            variant="destructive"
                             size="icon"
-                            className="text-destructive"
-                            onClick={() => handleDeletePurchase(purchase.id)}
-                            disabled={deletePurchaseMutation.isPending}
+                            disabled={deletePurchaseMutation.isLoading}
+                            onClick={() => handleDelete(purchase.id)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -261,30 +283,34 @@ export default function Purchases() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* Add Purchase Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]">
-          <DialogHeader>
-            <DialogTitle>إضافة فاتورة شراء جديدة</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="supplier_id">المورد</Label>
-                <Select 
-                  onValueChange={(value) => handleSelectChange(value, "supplier_id")}
-                  value={formData.supplier_id}
-                >
-                  <SelectTrigger id="supplier_id">
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Add Purchase Dialog */}
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>إضافة عملية شراء جديدة</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="date">التاريخ</Label>
+                <DatePicker
+                  locale={arEG}
+                  id="date"
+                  value={date}
+                  onValueChange={setDate}
+                />
+              </div>
+              <div>
+                <Label htmlFor="supplier">المورد</Label>
+                <Select onValueChange={(value) => setSelectedSupplierId(value)}>
+                  <SelectTrigger>
                     <SelectValue placeholder="اختر المورد" />
                   </SelectTrigger>
                   <SelectContent>
-                    {suppliers.map((supplier) => (
+                    {suppliers?.map(supplier => (
                       <SelectItem key={supplier.id} value={supplier.id}>
                         {supplier.name}
                       </SelectItem>
@@ -292,175 +318,153 @@ export default function Purchases() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="invoice_number">رقم الفاتورة</Label>
-                <Input 
-                  id="invoice_number" 
-                  placeholder="رقم الفاتورة" 
-                  value={formData.invoice_number}
-                  onChange={handleInputChange}
+              <div>
+                <Label htmlFor="invoiceNumber">رقم الفاتورة</Label>
+                <Input
+                  type="text"
+                  id="invoiceNumber"
+                  value={invoiceNumber}
+                  onChange={e => setInvoiceNumber(e.target.value)}
                 />
               </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="date">التاريخ</Label>
-                <Input 
-                  id="date" 
-                  type="date" 
-                  value={formData.date}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="total">إجمالي الفاتورة</Label>
-                <Input 
-                  id="total" 
-                  type="number" 
-                  placeholder="0.00" 
-                  value={formData.total}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="paid">المبلغ المدفوع</Label>
-                <Input 
-                  id="paid" 
-                  type="number" 
-                  placeholder="0.00" 
-                  value={formData.paid}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>المبلغ المتبقي</Label>
-                <Input 
+              <div>
+                <Label htmlFor="total">المبلغ الإجمالي</Label>
+                <Input
                   type="number"
-                  readOnly
-                  value={(formData.total - formData.paid).toFixed(2)}
-                  className="bg-muted"
+                  id="total"
+                  value={total}
+                  onChange={e => setTotal(Number(e.target.value))}
                 />
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">وصف</Label>
-              <Textarea 
-                id="description" 
-                placeholder="وصف الفاتورة (اختياري)" 
-                value={formData.description}
-                onChange={handleInputChange}
-                rows={3}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="invoice_file">صورة الفاتورة</Label>
-              <div className="flex items-center gap-2">
-                <Input 
-                  id="invoice_file" 
-                  type="file" 
-                  accept="image/*,.pdf"
-                  onChange={handleFileChange}
-                  className="max-w-xs"
+              <div>
+                <Label htmlFor="paid">المدفوع</Label>
+                <Input
+                  type="number"
+                  id="paid"
+                  value={paid}
+                  onChange={e => setPaid(Number(e.target.value))}
                 />
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  className="flex items-center"
-                  disabled={!invoiceFile}
-                  onClick={() => setInvoiceFile(null)}
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  {invoiceFile ? invoiceFile.name : "اختر ملف"}
+              </div>
+              <div>
+                <Label htmlFor="description">الوصف</Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="invoiceFile">ملف الفاتورة</Label>
+                <Input
+                  type="file"
+                  id="invoiceFile"
+                  onChange={e => setInvoiceFile(e.target.files?.[0] || null)}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={addPurchaseMutation.isLoading}>
+                  {addPurchaseMutation.isLoading ? (
+                    <>
+                      جاري الإضافة...
+                    </>
+                  ) : (
+                    'إضافة'
+                  )}
                 </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Purchase Dialog */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>تعديل عملية الشراء</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="date">التاريخ</Label>
+                <DatePicker
+                  locale={arEG}
+                  id="date"
+                  value={date}
+                  onValueChange={setDate}
+                />
               </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              type="submit" 
-              onClick={handleAddPurchase}
-              disabled={createPurchaseMutation.isPending}
-            >
-              {createPurchaseMutation.isPending ? "جارِ الحفظ..." : "حفظ الفاتورة"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* View Purchase Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]">
-          <DialogHeader>
-            <DialogTitle>عرض تفاصيل فاتورة الشراء</DialogTitle>
-          </DialogHeader>
-          {selectedPurchase && (
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground">المورد</Label>
-                  <p>{getSupplierName(selectedPurchase.supplier_id)}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground">رقم الفاتورة</Label>
-                  <p>{selectedPurchase.invoice_number}</p>
-                </div>
+              <div>
+                <Label htmlFor="supplier">المورد</Label>
+                <Select value={selectedSupplierId} onValueChange={(value) => setSelectedSupplierId(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر المورد" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers?.map(supplier => (
+                      <SelectItem key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground">التاريخ</Label>
-                  <p>{new Date(selectedPurchase.date).toLocaleDateString('ar-EG')}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground">إجمالي الفاتورة</Label>
-                  <p>{selectedPurchase.total}</p>
-                </div>
+              <div>
+                <Label htmlFor="invoiceNumber">رقم الفاتورة</Label>
+                <Input
+                  type="text"
+                  id="invoiceNumber"
+                  value={invoiceNumber}
+                  onChange={e => setInvoiceNumber(e.target.value)}
+                />
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground">المبلغ المدفوع</Label>
-                  <p>{selectedPurchase.paid}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground">المبلغ المتبقي</Label>
-                  <p>{getRemainingAmount(selectedPurchase)}</p>
-                </div>
+              <div>
+                <Label htmlFor="total">المبلغ الإجمالي</Label>
+                <Input
+                  type="number"
+                  id="total"
+                  value={total}
+                  onChange={e => setTotal(Number(e.target.value))}
+                />
               </div>
-              
-              {selectedPurchase.description && (
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground">وصف</Label>
-                  <p>{selectedPurchase.description}</p>
-                </div>
-              )}
-              
-              {selectedPurchase.invoice_file_url && (
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground">ملف الفاتورة</Label>
-                  <div className="mt-1">
-                    <a 
-                      href={selectedPurchase.invoice_file_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      عرض الفاتورة
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+              <div>
+                <Label htmlFor="paid">المدفوع</Label>
+                <Input
+                  type="number"
+                  id="paid"
+                  value={paid}
+                  onChange={e => setPaid(Number(e.target.value))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="description">الوصف</Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="invoiceFile">ملف الفاتورة</Label>
+                <Input
+                  type="file"
+                  id="invoiceFile"
+                  onChange={e => setInvoiceFile(e.target.files?.[0] || null)}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={updatePurchaseMutation.isLoading}>
+                  {updatePurchaseMutation.isLoading ? (
+                    <>
+                      جاري التحديث...
+                    </>
+                  ) : (
+                    'تحديث'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
     </MainLayout>
   );
 }

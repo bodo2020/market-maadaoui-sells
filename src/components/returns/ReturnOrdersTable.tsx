@@ -4,11 +4,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Eye, Calendar } from "lucide-react";
+import { CheckCircle, XCircle, Eye, Calendar, Loader2 } from "lucide-react";
 import { ReturnOrder, approveReturnOrder, rejectReturnOrder } from "@/services/supabase/returnOrderService";
 import { formatDistanceToNow } from "date-fns";
 import { arEG } from "date-fns/locale";
+import { toast } from "sonner";
 
 interface ReturnOrdersTableProps {
   returnOrders: ReturnOrder[];
