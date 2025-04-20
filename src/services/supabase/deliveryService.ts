@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   ShippingProvider, 
@@ -42,13 +43,7 @@ export async function fetchAreas(cityId: string) {
 export async function fetchNeighborhoods(areaId: string) {
   const { data, error } = await supabase
     .from('neighborhoods')
-    .select(`
-      *,
-      delivery_type_pricing (
-        *,
-        delivery_types (*)
-      )
-    `)
+    .select('*')
     .eq('area_id', areaId)
     .order('name');
     
@@ -120,6 +115,7 @@ export async function createNeighborhood(data: {
   return result;
 }
 
+// Fixed type recursion issue here
 export async function createDeliveryTypePrice(data: {
   neighborhood_id?: string;
   delivery_location_id?: string;
@@ -127,16 +123,15 @@ export async function createDeliveryTypePrice(data: {
   price: number;
   estimated_time?: string;
 }) {
-  const insertData = {
-    delivery_location_id: data.delivery_location_id || data.neighborhood_id,
-    delivery_type_id: data.delivery_type_id,
-    price: data.price,
-    estimated_time: data.estimated_time
-  };
-  
+  // Using a simple object literal instead of a variable to avoid type recursion
   const { data: result, error } = await supabase
     .from('delivery_type_pricing')
-    .insert([insertData])
+    .insert([{
+      delivery_location_id: data.delivery_location_id || data.neighborhood_id,
+      delivery_type_id: data.delivery_type_id,
+      price: data.price,
+      estimated_time: data.estimated_time
+    }])
     .select()
     .single();
     
@@ -213,7 +208,7 @@ export async function fetchDeliveryTypePricing(neighborhoodId: string) {
       *,
       delivery_types (*)
     `)
-    .eq('neighborhood_id', neighborhoodId);
+    .eq('delivery_location_id', neighborhoodId);
     
   if (error) throw error;
   return data || [];
