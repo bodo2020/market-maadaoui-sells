@@ -29,6 +29,7 @@ export interface ReturnOrder {
   order_type: 'online' | 'pos';
   customer_name?: string;
   customer_phone?: string;
+  invoice_number?: string;
 }
 
 // This function creates a table for return orders if it doesn't exist
@@ -64,7 +65,8 @@ export const setupReturnOrdersTable = async () => {
           rejection_reason TEXT,
           order_type TEXT NOT NULL,
           customer_name TEXT,
-          customer_phone TEXT
+          customer_phone TEXT,
+          invoice_number TEXT
         );
       `;
       
@@ -74,6 +76,25 @@ export const setupReturnOrdersTable = async () => {
     }
   } catch (error) {
     console.error('Error checking/creating return_orders table:', error);
+  }
+};
+
+// Check if there is already a pending return for this order
+export const checkExistingReturn = async (orderId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('return_orders')
+      .select('id')
+      .eq('order_id', orderId)
+      .eq('status', 'pending')
+      .maybeSingle();
+    
+    if (error) throw error;
+    
+    return !!data;
+  } catch (error) {
+    console.error('Error checking existing return:', error);
+    return false;
   }
 };
 
@@ -99,12 +120,16 @@ export const createReturnOrder = async (returnOrder: Omit<ReturnOrder, 'id' | 'c
   }
 };
 
-export const getReturnOrders = async (status?: ReturnOrderStatus) => {
+export const getReturnOrders = async (filter?: { status?: ReturnOrderStatus, order_type?: 'online' | 'pos' }) => {
   try {
     let query = supabase.from('return_orders').select('*');
     
-    if (status) {
-      query = query.eq('status', status);
+    if (filter?.status) {
+      query = query.eq('status', filter.status);
+    }
+    
+    if (filter?.order_type) {
+      query = query.eq('order_type', filter.order_type);
     }
     
     const { data, error } = await query.order('created_at', { ascending: false });
@@ -128,7 +153,8 @@ export const getReturnOrders = async (status?: ReturnOrderStatus) => {
       rejection_reason: item.rejection_reason,
       order_type: item.order_type,
       customer_name: item.customer_name,
-      customer_phone: item.customer_phone
+      customer_phone: item.customer_phone,
+      invoice_number: item.invoice_number
     })) as ReturnOrder[];
   } catch (error) {
     console.error('Error fetching return orders:', error);

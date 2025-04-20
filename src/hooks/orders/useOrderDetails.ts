@@ -81,8 +81,8 @@ export function useOrderDetails(orderId: string) {
           notes: data.notes || '',
           tracking_number: data.tracking_number || null,
           delivery_person: data.delivery_person || null,
-          is_returned: Boolean(data.status === 'returned'),
-          is_cancelled: Boolean(data.status === 'cancelled')
+          is_returned: data.status === 'returned',
+          is_cancelled: data.status === 'cancelled'
         };
         
         console.log("Parsed order:", orderObj);

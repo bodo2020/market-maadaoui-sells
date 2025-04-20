@@ -1,15 +1,13 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, PackageCheck, AlertCircle } from "lucide-react";
-import { createReturnOrder, checkExistingReturn } from "@/services/supabase/returnOrderService";
+import { Loader2, PackageCheck } from "lucide-react";
+import { createReturnOrder, checkExistingReturn, ReturnOrderItem } from "@/services/supabase/returnOrderService";
 import { toast } from "sonner";
-import { ReturnOrderItem } from "@/services/supabase/returnOrderService";
-import { Order, CartItem } from "@/types";
+import { Order } from "@/types";
 
 interface ReturnOrderDialogProps {
   open: boolean;
@@ -120,7 +118,6 @@ export function ReturnOrderDialog({
       [itemId]: quantity
     });
     
-    // Update the selected items list
     const existingItemIndex = selectedItems.findIndex(i => i.product_id === itemId);
     
     if (existingItemIndex > -1) {
@@ -163,7 +160,6 @@ export function ReturnOrderDialog({
   const handleToggleReturnAll = () => {
     setReturnAll(!returnAll);
     if (!returnAll) {
-      // Convert to ReturnOrderItem format
       const allItems = items.map(item => {
         const quantity = customQuantities[orderType === 'online' ? item.product_id : item.product.id] 
           || (orderType === 'online' ? item.quantity : item.quantity);
@@ -241,7 +237,6 @@ export function ReturnOrderDialog({
     try {
       setIsProcessing(true);
       
-      // Check if there's already a pending return for this order
       if (orderId) {
         const existingReturn = await checkExistingReturn(orderId);
         if (existingReturn) {
@@ -260,7 +255,7 @@ export function ReturnOrderDialog({
         items: returnItems,
         reason,
         total: returnTotal,
-        requested_by: "current-user", // This should be replaced with the actual user ID
+        requested_by: "current-user",
         order_type: orderType,
         customer_name: customerName,
         customer_phone: customerPhone,

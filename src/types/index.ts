@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -237,13 +236,20 @@ export type Order = {
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   payment_method: string | null;
   shipping_address: string | null;
-  items: OrderItem[];
-  customer_name?: string;
-  customer_email?: string;
-  customer_phone?: string;
-  notes?: string;
-  tracking_number?: string | null;
-  delivery_person?: string | null;
-  is_returned?: boolean;
-  is_cancelled?: boolean;
+  items: {
+    product_id: string;
+    product_name: string;
+    quantity: number;
+    price: number;
+    total: number;
+    image_url?: string | null;
+  }[];
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  notes: string;
+  tracking_number: string | null;
+  delivery_person: string | null;
+  is_returned: boolean;
+  is_cancelled: boolean;
 };

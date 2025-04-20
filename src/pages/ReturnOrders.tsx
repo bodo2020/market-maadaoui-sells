@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, RefreshCw } from "lucide-react";
-import { fetchReturnOrders, ReturnOrder } from "@/services/supabase/returnOrderService";
+import { getReturnOrders, ReturnOrder } from "@/services/supabase/returnOrderService";
 import ReturnOrdersTable from "@/components/returns/ReturnOrdersTable";
 
 export default function ReturnOrders() {
@@ -35,7 +35,7 @@ export default function ReturnOrders() {
           filter.order_type = "pos";
         }
         
-        const orders = await fetchReturnOrders(filter);
+        const orders = await getReturnOrders(filter);
         setReturnOrders(orders);
       } catch (error) {
         console.error("Error loading return orders:", error);
