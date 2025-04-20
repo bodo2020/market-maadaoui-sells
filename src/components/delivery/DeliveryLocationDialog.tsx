@@ -17,12 +17,8 @@ interface DeliveryLocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: 'governorate' | 'city' | 'area' | 'neighborhood';
-  parentData?: {
-    governorate?: string;
-    city?: string;
-    area?: string;
-  };
-  providerId?: string | null;
+  parentId?: string;
+  providerId?: string;
   onSuccess?: (data?: any) => void;
 }
 
@@ -30,7 +26,7 @@ export default function DeliveryLocationDialog({
   open,
   onOpenChange,
   mode,
-  parentData,
+  parentId,
   providerId,
   onSuccess
 }: DeliveryLocationDialogProps) {
@@ -49,41 +45,33 @@ export default function DeliveryLocationDialog({
       switch (mode) {
         case 'governorate':
           result = await createGovernorate({
-            governorate: name,
-            provider_id: providerId || undefined
+            name,
+            provider_id: providerId
           });
           break;
 
         case 'city':
-          if (!parentData?.governorate) throw new Error("Governorate is required");
+          if (!parentId) throw new Error("Governorate ID is required");
           result = await createCity({
-            governorate: parentData.governorate,
-            city: name,
-            provider_id: providerId || undefined
+            name,
+            governorate_id: parentId
           });
           break;
 
         case 'area':
-          if (!parentData?.governorate || !parentData?.city) 
-            throw new Error("Governorate and city are required");
+          if (!parentId) throw new Error("City ID is required");
           result = await createArea({
-            governorate: parentData.governorate,
-            city: parentData.city,
-            area: name,
-            provider_id: providerId || undefined
+            name,
+            city_id: parentId
           });
           break;
 
         case 'neighborhood':
-          if (!parentData?.governorate || !parentData?.city || !parentData?.area) 
-            throw new Error("Governorate, city and area are required");
+          if (!parentId) throw new Error("Area ID is required");
           result = await createNeighborhood({
-            governorate: parentData.governorate,
-            city: parentData.city,
-            area: parentData.area,
-            neighborhood: name,
-            price: 0,
-            provider_id: providerId || undefined
+            name,
+            area_id: parentId,
+            price: 0
           });
           
           if (result?.id) {

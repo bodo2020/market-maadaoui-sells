@@ -9,6 +9,41 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      areas: {
+        Row: {
+          active: boolean | null
+          city_id: string
+          created_at: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          city_id: string
+          created_at?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          city_id?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "areas_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       banners: {
         Row: {
           active: boolean | null
@@ -209,6 +244,41 @@ export type Database = {
           transaction_type?: string
         }
         Relationships: []
+      }
+      cities: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          governorate_id: string
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          governorate_id: string
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          governorate_id?: string
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cities_governorate_id_fkey"
+            columns: ["governorate_id"]
+            isOneToOne: false
+            referencedRelation: "governorates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       companies: {
         Row: {
@@ -469,6 +539,41 @@ export type Database = {
           },
         ]
       }
+      governorates: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string
+          name: string
+          provider_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          name: string
+          provider_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          provider_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "governorates_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_settings: {
         Row: {
           auto_print: boolean | null
@@ -546,6 +651,47 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      neighborhoods: {
+        Row: {
+          active: boolean | null
+          area_id: string
+          created_at: string | null
+          estimated_time: string | null
+          id: string
+          name: string
+          price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          area_id: string
+          created_at?: string | null
+          estimated_time?: string | null
+          id?: string
+          name: string
+          price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          area_id?: string
+          created_at?: string | null
+          estimated_time?: string | null
+          id?: string
+          name?: string
+          price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "neighborhoods_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       online_orders: {
         Row: {
