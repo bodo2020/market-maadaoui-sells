@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { createShippingProvider } from "@/services/supabase/deliveryService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ShippingProviderDialogProps {
   open: boolean;
@@ -22,6 +22,20 @@ export default function ShippingProviderDialog({
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [active, setActive] = useState(true);
+
+  const createShippingProvider = async (data: {
+    name: string;
+    active?: boolean;
+  }) => {
+    const { data: result, error } = await supabase
+      .from('shipping_providers')
+      .insert([data])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return result;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

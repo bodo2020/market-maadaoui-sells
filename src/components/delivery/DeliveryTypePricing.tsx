@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { fetchDeliveryTypes, fetchDeliveryTypePricing, createDeliveryTypePrice, deleteDeliveryTypePrice } from "@/services/supabase/deliveryService";
-import { DeliveryTypePrice } from "@/types/shipping";
 import { Badge } from "@/components/ui/badge";
+import { DeliveryType, DeliveryTypePrice } from "@/types/shipping";
 
 interface DeliveryTypePricingProps {
   locationId: string;
@@ -42,7 +42,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
 
   const createPriceMutation = useMutation({
     mutationFn: (data: {
-      delivery_location_id: string;
+      neighborhood_id: string;
       delivery_type_id: string;
       price: number;
       estimated_time?: string;
@@ -86,7 +86,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
     }
 
     createPriceMutation.mutate({
-      delivery_location_id: locationId,
+      neighborhood_id: locationId,
       delivery_type_id: selectedType,
       price: Number(priceInput),
       estimated_time: estimatedTimeInput || undefined
@@ -94,12 +94,12 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
   };
 
   // Find already priced delivery types to exclude from selection
-  const existingTypesIds = pricingData.map(p => p.delivery_type_id);
-  const availableTypes = deliveryTypes.filter(type => !existingTypesIds.includes(type.id));
+  const existingTypesIds = (pricingData as DeliveryTypePrice[]).map(p => p.delivery_type_id);
+  const availableTypes = (deliveryTypes as DeliveryType[]).filter(type => !existingTypesIds.includes(type.id));
 
   // Get delivery type name by ID
   const getDeliveryTypeName = (typeId: string) => {
-    const type = deliveryTypes.find(t => t.id === typeId);
+    const type = (deliveryTypes as DeliveryType[]).find(t => t.id === typeId);
     return type ? type.name : "غير معروف";
   };
 
@@ -128,7 +128,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
         <p className="text-xs text-muted-foreground">لا توجد خيارات توصيل مضافة بعد</p>
       ) : (
         <div className="space-y-2">
-          {pricingData.map((pricing: DeliveryTypePrice) => (
+          {(pricingData as DeliveryTypePrice[]).map((pricing: DeliveryTypePrice) => (
             <div key={pricing.id} className="flex justify-between items-center bg-muted/40 p-1.5 rounded">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="h-5 px-1.5 bg-background text-xs">

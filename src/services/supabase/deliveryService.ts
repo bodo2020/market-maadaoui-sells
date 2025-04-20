@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+// Governorates functions
 export async function fetchGovernorates() {
   const { data, error } = await supabase
     .from('governorates')
@@ -50,6 +51,7 @@ export async function fetchNeighborhoods(areaId: string) {
   return data;
 }
 
+// Create functions
 export async function createGovernorate(data: { 
   name: string;
   provider_id?: string;
@@ -124,6 +126,7 @@ export async function createDeliveryTypePrice(data: {
   return result;
 }
 
+// Delete functions
 export async function deleteGovernorate(id: string) {
   const { error } = await supabase
     .from('governorates')
@@ -167,6 +170,74 @@ export async function deleteNeighborhood(id: string) {
 export async function deleteDeliveryTypePrice(id: string) {
   const { error } = await supabase
     .from('delivery_type_pricing')
+    .delete()
+    .eq('id', id);
+    
+  if (error) throw error;
+  return true;
+}
+
+// Added missing functions
+export async function fetchDeliveryTypes() {
+  const { data, error } = await supabase
+    .from('delivery_types')
+    .select('*')
+    .order('name');
+    
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchDeliveryTypePricing(neighborhoodId: string) {
+  const { data, error } = await supabase
+    .from('delivery_type_pricing')
+    .select(`
+      *,
+      delivery_types (*)
+    `)
+    .eq('neighborhood_id', neighborhoodId);
+    
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createShippingProvider(data: {
+  name: string;
+  active?: boolean;
+}) {
+  const { data: result, error } = await supabase
+    .from('shipping_providers')
+    .insert([data])
+    .select()
+    .single();
+    
+  if (error) throw error;
+  return result;
+}
+
+export async function fetchShippingProviders() {
+  const { data, error } = await supabase
+    .from('shipping_providers')
+    .select('*')
+    .order('name');
+    
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchDeliveryLocations() {
+  const { data, error } = await supabase
+    .from('delivery_locations')
+    .select('*')
+    .order('name');
+    
+  if (error) throw error;
+  return data || [];
+}
+
+export async function deleteDeliveryLocation(id: string) {
+  const { error } = await supabase
+    .from('delivery_locations')
     .delete()
     .eq('id', id);
     

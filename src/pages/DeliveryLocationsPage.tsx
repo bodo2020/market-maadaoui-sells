@@ -22,7 +22,6 @@ export default function DeliveryLocationsPage() {
   const handleAddGovernorate = async (data: any) => {
     try {
       await createGovernorate({
-        governorate: data.name,
         name: data.name,
         provider_id: selectedProviderId || undefined
       });

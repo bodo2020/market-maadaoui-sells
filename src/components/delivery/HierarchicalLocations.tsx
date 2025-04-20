@@ -1,11 +1,11 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2, Edit, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
   fetchGovernorates, 
@@ -15,8 +15,10 @@ import {
   createCity,
   createArea,
   createNeighborhood,
-  deleteDeliveryLocation,
-  fetchDeliveryTypePricing
+  deleteGovernorate,
+  deleteCity,
+  deleteArea,
+  deleteNeighborhood
 } from "@/services/supabase/deliveryService";
 import DeliveryLocationDialog from "./DeliveryLocationDialog";
 import DeliveryTypePricing from "./DeliveryTypePricing";
@@ -56,20 +58,16 @@ export default function HierarchicalLocations() {
 
   // Fetch areas for selected city
   const { data: areas = [], isLoading: areasLoading } = useQuery({
-    queryKey: ["areas", selectedGovernorate, selectedCity],
-    queryFn: () => (selectedGovernorate && selectedCity) 
-      ? fetchAreas(selectedGovernorate, selectedCity) 
-      : Promise.resolve([]),
-    enabled: !!(selectedGovernorate && selectedCity)
+    queryKey: ["areas", selectedCity],
+    queryFn: () => selectedCity ? fetchAreas(selectedCity) : Promise.resolve([]),
+    enabled: !!selectedCity
   });
 
   // Fetch neighborhoods for selected area
   const { data: neighborhoods = [], isLoading: neighborhoodsLoading } = useQuery({
-    queryKey: ["neighborhoods", selectedGovernorate, selectedCity, selectedArea],
-    queryFn: () => (selectedGovernorate && selectedCity && selectedArea) 
-      ? fetchNeighborhoods(selectedGovernorate, selectedCity, selectedArea) 
-      : Promise.resolve([]),
-    enabled: !!(selectedGovernorate && selectedCity && selectedArea)
+    queryKey: ["neighborhoods", selectedArea],
+    queryFn: () => selectedArea ? fetchNeighborhoods(selectedArea) : Promise.resolve([]),
+    enabled: !!selectedArea
   });
 
   // Create location mutation
@@ -77,26 +75,20 @@ export default function HierarchicalLocations() {
     mutationFn: async (data: any) => {
       if (dialogMode === 'city') {
         return createCity({
-          governorate: selectedGovernorate!,
-          city: data.name,
-          name: `${selectedGovernorate} - ${data.name}`
+          name: data.name,
+          governorate_id: selectedGovernorate!
         });
       } else if (dialogMode === 'area') {
         return createArea({
-          governorate: selectedGovernorate!,
-          city: selectedCity!,
-          area: data.name,
-          name: `${selectedGovernorate} - ${selectedCity} - ${data.name}`
+          name: data.name,
+          city_id: selectedCity!
         });
       } else {
         return createNeighborhood({
-          governorate: selectedGovernorate!,
-          city: selectedCity!,
-          area: selectedArea!,
-          neighborhood: data.name,
+          name: data.name,
+          area_id: selectedArea!,
           price: data.price || 0,
-          estimated_time: data.estimated_time,
-          name: `${selectedGovernorate} - ${selectedCity} - ${selectedArea} - ${data.name}`
+          estimated_time: data.estimated_time
         });
       }
     },
@@ -106,10 +98,10 @@ export default function HierarchicalLocations() {
       if (dialogMode === 'city') {
         queryClient.invalidateQueries({ queryKey: ["cities", selectedGovernorate] });
       } else if (dialogMode === 'area') {
-        queryClient.invalidateQueries({ queryKey: ["areas", selectedGovernorate, selectedCity] });
+        queryClient.invalidateQueries({ queryKey: ["areas", selectedCity] });
       } else {
         queryClient.invalidateQueries({ 
-          queryKey: ["neighborhoods", selectedGovernorate, selectedCity, selectedArea] 
+          queryKey: ["neighborhoods", selectedArea] 
         });
       }
       
@@ -124,7 +116,18 @@ export default function HierarchicalLocations() {
 
   // Delete location mutation
   const deleteLocationMutation = useMutation({
-    mutationFn: (id: string) => deleteDeliveryLocation(id),
+    mutationFn: (params: {id: string, type: string}) => {
+      const { id, type } = params;
+      if (type === 'governorate') {
+        return deleteGovernorate(id);
+      } else if (type === 'city') {
+        return deleteCity(id);
+      } else if (type === 'area') {
+        return deleteArea(id);
+      } else {
+        return deleteNeighborhood(id);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["governorates"] });
       
@@ -134,11 +137,11 @@ export default function HierarchicalLocations() {
         queryClient.invalidateQueries({ queryKey: ["cities", selectedGovernorate] });
         setSelectedCity(null);
       } else if (locationToDelete?.type === 'area') {
-        queryClient.invalidateQueries({ queryKey: ["areas", selectedGovernorate, selectedCity] });
+        queryClient.invalidateQueries({ queryKey: ["areas", selectedCity] });
         setSelectedArea(null);
       } else if (locationToDelete?.type === 'neighborhood') {
         queryClient.invalidateQueries({ 
-          queryKey: ["neighborhoods", selectedGovernorate, selectedCity, selectedArea] 
+          queryKey: ["neighborhoods", selectedArea] 
         });
       }
       
@@ -163,7 +166,7 @@ export default function HierarchicalLocations() {
 
   const confirmDelete = () => {
     if (locationToDelete) {
-      deleteLocationMutation.mutate(locationToDelete.id);
+      deleteLocationMutation.mutate(locationToDelete);
     }
     setDeleteConfirmOpen(false);
   };
@@ -183,16 +186,16 @@ export default function HierarchicalLocations() {
             ) : governorates.length === 0 ? (
               <div className="text-center py-4">لا توجد محافظات. قم بإضافة محافظة جديدة.</div>
             ) : (
-              governorates.map((gov) => (
+              governorates.map((gov: any) => (
                 <AccordionItem key={gov.id} value={gov.id}>
                   <AccordionTrigger 
-                    onClick={() => setSelectedGovernorate(gov.governorate)}
+                    onClick={() => setSelectedGovernorate(gov.id)}
                     className="py-3 hover:bg-muted/50 px-4 rounded-md"
                   >
                     <div className="flex items-center justify-between w-full pl-4">
                       <div className="flex items-center gap-2">
                         <Badge className="bg-primary/20 text-primary border border-primary/20">محافظة</Badge>
-                        <span>{gov.governorate}</span>
+                        <span>{gov.name}</span>
                       </div>
                       <div className="flex items-center">
                         <Button
@@ -231,18 +234,18 @@ export default function HierarchicalLocations() {
                       </div>
                     ) : (
                       <div className="space-y-1 mr-4">
-                        {cities.map((city) => (
+                        {cities.map((city: any) => (
                           <div key={city.id} className="border-r pr-4 mb-4 border-r-primary/20">
                             <div 
                               className="cursor-pointer hover:bg-muted/50 p-2 rounded flex justify-between items-center"
                               onClick={() => {
-                                setSelectedCity(city.city);
+                                setSelectedCity(city.id);
                                 setSelectedArea(null);
                               }}
                             >
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline">مدينة</Badge>
-                                <span className="text-sm">{city.city}</span>
+                                <span className="text-sm">{city.name}</span>
                               </div>
                               <div className="flex items-center">
                                 <Button
@@ -258,13 +261,13 @@ export default function HierarchicalLocations() {
                                 </Button>
                                 <ChevronDown 
                                   className={`h-4 w-4 transition-transform mr-1 ${
-                                    selectedCity === city.city ? 'transform rotate-180' : ''
+                                    selectedCity === city.id ? 'transform rotate-180' : ''
                                   }`} 
                                 />
                               </div>
                             </div>
                             
-                            {selectedCity === city.city && (
+                            {selectedCity === city.id && (
                               <div className="mr-6 mt-2">
                                 <div className="flex justify-between mb-2">
                                   <h4 className="text-sm font-medium">المناطق</h4>
@@ -287,15 +290,15 @@ export default function HierarchicalLocations() {
                                   </div>
                                 ) : (
                                   <div className="space-y-1 border-r pr-4 border-r-primary/10">
-                                    {areas.map((area) => (
+                                    {areas.map((area: any) => (
                                       <div key={area.id} className="mb-4">
                                         <div 
                                           className="cursor-pointer hover:bg-muted/50 p-2 rounded flex justify-between items-center"
-                                          onClick={() => setSelectedArea(area.area)}
+                                          onClick={() => setSelectedArea(area.id)}
                                         >
                                           <div className="flex items-center gap-2">
                                             <Badge variant="secondary">منطقة</Badge>
-                                            <span className="text-sm">{area.area}</span>
+                                            <span className="text-sm">{area.name}</span>
                                           </div>
                                           <div className="flex items-center">
                                             <Button
@@ -311,13 +314,13 @@ export default function HierarchicalLocations() {
                                             </Button>
                                             <ChevronDown 
                                               className={`h-4 w-4 transition-transform mr-1 ${
-                                                selectedArea === area.area ? 'transform rotate-180' : ''
+                                                selectedArea === area.id ? 'transform rotate-180' : ''
                                               }`} 
                                             />
                                           </div>
                                         </div>
                                         
-                                        {selectedArea === area.area && (
+                                        {selectedArea === area.id && (
                                           <div className="mr-6 mt-2">
                                             <div className="flex justify-between mb-2">
                                               <h5 className="text-sm font-medium">الأحياء</h5>
@@ -340,7 +343,7 @@ export default function HierarchicalLocations() {
                                               </div>
                                             ) : (
                                               <div className="space-y-1 border-r pr-4 border-r-primary/10">
-                                                {neighborhoods.map((neighborhood) => (
+                                                {neighborhoods.map((neighborhood: any) => (
                                                   <div 
                                                     key={neighborhood.id} 
                                                     className="hover:bg-muted/50 p-2 rounded mb-1"
@@ -348,7 +351,7 @@ export default function HierarchicalLocations() {
                                                     <div className="flex justify-between items-center">
                                                       <div className="flex items-center gap-2">
                                                         <Badge variant="secondary" className="bg-primary/10">حي</Badge>
-                                                        <span className="text-sm">{neighborhood.neighborhood}</span>
+                                                        <span className="text-sm">{neighborhood.name}</span>
                                                       </div>
                                                       <div className="flex items-center gap-2">
                                                         <span className="text-xs text-muted-foreground">
@@ -399,12 +402,12 @@ export default function HierarchicalLocations() {
           open={openDialog}
           onOpenChange={setOpenDialog}
           mode={dialogMode}
-          parentData={
+          parentId={
             dialogMode === 'city' 
-              ? { governorate: selectedGovernorate! }
+              ? selectedGovernorate!
               : dialogMode === 'area'
-                ? { governorate: selectedGovernorate!, city: selectedCity! }
-                : { governorate: selectedGovernorate!, city: selectedCity!, area: selectedArea! }
+                ? selectedCity!
+                : selectedArea!
           }
           onSuccess={(data) => createLocationMutation.mutate(data)}
         />
