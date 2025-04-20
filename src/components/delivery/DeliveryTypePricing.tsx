@@ -94,12 +94,19 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
   };
 
   // Find already priced delivery types to exclude from selection
-  const existingTypesIds = (pricingData as DeliveryTypePrice[]).map(p => p.delivery_type_id);
-  const availableTypes = (deliveryTypes as DeliveryType[]).filter(type => !existingTypesIds.includes(type.id));
+  const existingTypesIds = Array.isArray(pricingData)
+    ? pricingData.map((p: DeliveryTypePrice) => p.delivery_type_id)
+    : [];
+    
+  const availableTypes = Array.isArray(deliveryTypes)
+    ? deliveryTypes.filter((type: DeliveryType) => !existingTypesIds.includes(type.id))
+    : [];
 
   // Get delivery type name by ID
   const getDeliveryTypeName = (typeId: string) => {
-    const type = (deliveryTypes as DeliveryType[]).find(t => t.id === typeId);
+    const type = Array.isArray(deliveryTypes)
+      ? deliveryTypes.find((t: DeliveryType) => t.id === typeId)
+      : null;
     return type ? type.name : "غير معروف";
   };
 
@@ -128,7 +135,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
         <p className="text-xs text-muted-foreground">لا توجد خيارات توصيل مضافة بعد</p>
       ) : (
         <div className="space-y-2">
-          {(pricingData as DeliveryTypePrice[]).map((pricing: DeliveryTypePrice) => (
+          {Array.isArray(pricingData) && pricingData.map((pricing: DeliveryTypePrice) => (
             <div key={pricing.id} className="flex justify-between items-center bg-muted/40 p-1.5 rounded">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="h-5 px-1.5 bg-background text-xs">
@@ -162,7 +169,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
         <div className="border-t pt-2 mt-2">
           <div className="space-y-2">
             <div className="flex flex-wrap gap-1">
-              {availableTypes.map(type => (
+              {availableTypes.map((type: DeliveryType) => (
                 <Badge 
                   key={type.id} 
                   variant={selectedType === type.id ? "default" : "outline"}

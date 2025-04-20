@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -68,9 +69,18 @@ export default function DeliveryLocationsTable({ onAddLocation }: DeliveryLocati
   const loadProviders = async () => {
     try {
       const data = await fetchShippingProviders();
-      setProviders(data);
-      if (data.length > 0 && !selectedProvider) {
-        setSelectedProvider(data[0].id);
+      // Ensure data conforms to ShippingProvider type
+      const typedProviders = (data || []).map(provider => ({
+        id: provider.id,
+        name: provider.name,
+        active: true,
+        created_at: provider.created_at,
+        updated_at: provider.updated_at,
+      }));
+
+      setProviders(typedProviders);
+      if (typedProviders.length > 0 && !selectedProvider) {
+        setSelectedProvider(typedProviders[0].id);
       }
     } catch (error) {
       console.error('Error loading shipping providers:', error);
@@ -102,17 +112,17 @@ export default function DeliveryLocationsTable({ onAddLocation }: DeliveryLocati
         grouped[location.governorate] = {};
       }
       
-      if (!grouped[location.governorate][location.city]) {
-        grouped[location.governorate][location.city] = {};
+      if (!grouped[location.governorate][location.city || 'عام']) {
+        grouped[location.governorate][location.city || 'عام'] = {};
       }
       
       const area = location.area || 'عام';
       
-      if (!grouped[location.governorate][location.city][area]) {
-        grouped[location.governorate][location.city][area] = [];
+      if (!grouped[location.governorate][location.city || 'عام'][area]) {
+        grouped[location.governorate][location.city || 'عام'][area] = [];
       }
       
-      grouped[location.governorate][location.city][area].push(location);
+      grouped[location.governorate][location.city || 'عام'][area].push(location);
     });
     
     return grouped;

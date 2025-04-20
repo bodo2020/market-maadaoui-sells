@@ -34,32 +34,49 @@ export interface DeliveryType {
 
 export interface DeliveryTypePrice {
   id: string;
-  delivery_location_id: string;
+  neighborhood_id: string;
   delivery_type_id: string;
   price: number;
   estimated_time?: string;
   created_at?: string;
   updated_at?: string;
+  delivery_types?: DeliveryType;
 }
 
 export type DeliveryGovernorate = {
+  id: string;
   name: string;
-  cities: DeliveryCity[];
+  provider_id?: string;
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type DeliveryCity = {
+  id: string;
   name: string;
-  areas: DeliveryArea[];
+  governorate_id: string;
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type DeliveryArea = {
+  id: string;
   name: string;
-  neighborhoods: DeliveryNeighborhood[];
+  city_id: string;
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type DeliveryNeighborhood = {
   id: string;
   name: string;
+  area_id: string;
   price: number;
   estimated_time?: string;
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 };

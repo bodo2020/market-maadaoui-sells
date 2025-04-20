@@ -201,13 +201,19 @@ export async function fetchDeliveryTypePricing(neighborhoodId: string) {
   return data || [];
 }
 
+// Create a custom function for shipping providers since it's not in the database schema
 export async function createShippingProvider(data: {
   name: string;
   active?: boolean;
 }) {
+  // Since the shipping_providers table doesn't exist yet in the schema,
+  // we'll use companies table as a temporary alternative
   const { data: result, error } = await supabase
-    .from('shipping_providers')
-    .insert([data])
+    .from('companies')
+    .insert([{
+      name: data.name,
+      description: 'Shipping Provider'
+    }])
     .select()
     .single();
     
@@ -216,31 +222,58 @@ export async function createShippingProvider(data: {
 }
 
 export async function fetchShippingProviders() {
+  // Temporarily use companies table
   const { data, error } = await supabase
-    .from('shipping_providers')
+    .from('companies')
     .select('*')
+    .eq('description', 'Shipping Provider')
     .order('name');
     
   if (error) throw error;
   return data || [];
 }
 
+// Temporary function to fulfill the DeliveryLocationsTable component needs
 export async function fetchDeliveryLocations() {
-  const { data, error } = await supabase
-    .from('delivery_locations')
-    .select('*')
-    .order('name');
+  // Create a simplified structure matching what the component expects
+  const { data: neighborhoods, error } = await supabase
+    .from('neighborhoods')
+    .select(`
+      *,
+      areas!inner(
+        *,
+        cities!inner(
+          *,
+          governorates!inner(*)
+        )
+      )
+    `);
     
   if (error) throw error;
-  return data || [];
+  
+  // Transform the data to match the expected structure
+  const result = (neighborhoods || []).map((neighborhood: any) => {
+    const area = neighborhood.areas;
+    const city = area.cities;
+    const governorate = city.governorates;
+    
+    return {
+      id: neighborhood.id,
+      name: neighborhood.name,
+      price: neighborhood.price,
+      estimated_time: neighborhood.estimated_time,
+      provider_id: governorate.provider_id,
+      governorate: governorate.name,
+      city: city.name,
+      area: area.name,
+      neighborhood: neighborhood.name
+    };
+  });
+  
+  return result;
 }
 
 export async function deleteDeliveryLocation(id: string) {
-  const { error } = await supabase
-    .from('delivery_locations')
-    .delete()
-    .eq('id', id);
-    
-  if (error) throw error;
-  return true;
+  // Since this is now referring to a neighborhood, we'll call that function
+  return deleteNeighborhood(id);
 }

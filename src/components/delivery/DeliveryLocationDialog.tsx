@@ -18,7 +18,7 @@ interface DeliveryLocationDialogProps {
   onOpenChange: (open: boolean) => void;
   mode: 'governorate' | 'city' | 'area' | 'neighborhood';
   parentId?: string;
-  providerId?: string;
+  providerId?: string | null;
   onSuccess?: (data?: any) => void;
 }
 
@@ -46,7 +46,7 @@ export default function DeliveryLocationDialog({
         case 'governorate':
           result = await createGovernorate({
             name,
-            provider_id: providerId
+            provider_id: providerId || undefined
           });
           break;
 
