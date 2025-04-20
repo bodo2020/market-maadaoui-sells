@@ -127,9 +127,8 @@ export async function createDeliveryTypePrice(data: {
   price: number;
   estimated_time?: string;
 }) {
-  // Create a plain object for insertion to avoid type recursion issues
-  const insertData = {
-    delivery_location_id: data.neighborhood_id || data.delivery_location_id,
+  const insertObj = {
+    delivery_location_id: data.delivery_location_id || data.neighborhood_id,
     delivery_type_id: data.delivery_type_id,
     price: data.price,
     estimated_time: data.estimated_time
@@ -137,7 +136,7 @@ export async function createDeliveryTypePrice(data: {
   
   const { data: result, error } = await supabase
     .from('delivery_type_pricing')
-    .insert([insertData])
+    .insert([insertObj])
     .select()
     .single();
     
@@ -225,8 +224,6 @@ export async function createShippingProvider(data: {
   name: string;
   active?: boolean;
 }) {
-  // Since the shipping_providers table doesn't exist yet in the schema,
-  // we'll use companies table as a temporary alternative
   const { data: result, error } = await supabase
     .from('companies')
     .insert([{
@@ -241,7 +238,6 @@ export async function createShippingProvider(data: {
 }
 
 export async function fetchShippingProviders(): Promise<ShippingProvider[]> {
-  // Temporarily use companies table
   const { data, error } = await supabase
     .from('companies')
     .select('*')
@@ -250,7 +246,6 @@ export async function fetchShippingProviders(): Promise<ShippingProvider[]> {
     
   if (error) throw error;
   
-  // Convert companies to ShippingProvider format
   return (data || []).map(company => ({
     id: company.id,
     name: company.name,
@@ -262,7 +257,6 @@ export async function fetchShippingProviders(): Promise<ShippingProvider[]> {
 
 // Temporary function to fulfill the DeliveryLocationsTable component needs
 export async function fetchDeliveryLocations() {
-  // Create a simplified structure matching what the component expects
   const { data: neighborhoods, error } = await supabase
     .from('neighborhoods')
     .select(`
@@ -278,7 +272,6 @@ export async function fetchDeliveryLocations() {
     
   if (error) throw error;
   
-  // Transform the data to match the expected structure
   const result = (neighborhoods || []).map((neighborhood: any) => {
     const area = neighborhood.areas;
     const city = area.cities;
@@ -301,6 +294,5 @@ export async function fetchDeliveryLocations() {
 }
 
 export async function deleteDeliveryLocation(id: string) {
-  // Since this is now referring to a neighborhood, we'll call that function
   return deleteNeighborhood(id);
 }
