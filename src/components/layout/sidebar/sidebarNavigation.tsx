@@ -1,153 +1,41 @@
 
 import {
-  BarChart3,
-  Boxes,
-  Calendar,
-  ClipboardList,
-  CircleDollarSign,
-  ClipboardCheck,
-  Coins,
-  CreditCard,
-  FileText,
-  Gauge,
-  LayoutDashboard,
-  ListChecks,
-  LucideIcon,
-  PackageX,
-  Percent,
-  Receipt,
-  Settings,
-  ShieldAlert,
-  ShoppingBag,
-  Store,
-  Truck,
-  User2,
-  Users,
-  Tags,
+  BarChart4, Store, ShoppingCart, PackageOpen, Users, Settings, FileText,
+  Receipt, Home, UserPlus, Truck, Building2, ImageIcon,
+  ShoppingBag, FolderOpen, MapPin, TrendingUp, Tag, Gift, Coins
 } from "lucide-react";
+import { SidebarGroupData } from "./types";
 
-interface SidebarItem {
-  title: string;
-  href: string;
-  icon: LucideIcon;
-  disabled?: boolean;
-  label?: string;
-}
+export const mainNavigation: SidebarGroupData = {
+  items: [
+    { icon: Home, label: "الرئيسية", href: "/" },
+    { icon: ShoppingCart, label: "نقطة البيع", href: "/pos" },
+    { icon: FolderOpen, label: "الاقسام", href: "/categories" },
+    { icon: TrendingUp, label: "لوحة المبيعات والخزينة", href: "/sales-dashboard" },
+    { icon: Coins, label: "متابعة النقدية", href: "/cash-tracking" }
+  ]
+};
 
-export const sidebarNavigation: SidebarItem[] = [
-  {
-    title: "لوحة التحكم",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "نقطة البيع",
-    href: "/pos",
-    icon: Store,
-  },
-  {
-    title: "المبيعات",
-    href: "/sales-dashboard",
-    icon: BarChart3,
-  },
-  {
-    title: "الطلبات",
-    icon: ShoppingBag,
-    href: "/online-orders"
-  },
-  {
-    title: "طلبات المرتجعات",
-    icon: PackageX,
-    href: "/return-orders"
-  },
-  {
-    title: "المالية",
-    href: "/finances",
-    icon: CircleDollarSign,
-  },
-  {
-    title: "المخزون",
-    href: "/inventory",
-    icon: Boxes,
-  },
-  {
-    title: "المنتجات",
-    href: "/products",
-    icon: Boxes,
-  },
-  {
-    title: "التصنيفات",
-    href: "/categories",
-    icon: Tags,
-  },
-  {
-    title: "الشركات",
-    href: "/companies",
-    icon: Store,
-  },
-  {
-    title: "العملاء",
-    href: "/customers",
-    icon: Users,
-  },
-  {
-    title: "عربات العملاء",
-    href: "/customer-carts",
-    icon: ShoppingBag,
-  },
-  {
-    title: "البانرات",
-    href: "/banners",
-    icon: ShieldAlert,
-  },
-  {
-    title: "العروض",
-    href: "/offers",
-    icon: Percent,
-  },
-  {
-    title: "المصروفات",
-    href: "/expenses",
-    icon: Coins,
-  },
-  {
-    title: "تتبع الصندوق",
-    href: "/cash-tracking",
-    icon: CreditCard,
-  },
-  {
-    title: "الموظفين",
-    href: "/employees",
-    icon: User2,
-  },
-  {
-    title: "مواقع التوصيل",
-    href: "/delivery-locations",
-    icon: Truck,
-  },
-  {
-    title: "التقارير",
-    href: "/reports",
-    icon: FileText,
-  },
-  {
-    title: "الموردين",
-    href: "/suppliers",
-    icon: Users,
-  },
-  {
-    title: "المشتريات",
-    href: "/purchases",
-    icon: ShoppingBag,
-  },
-  {
-    title: "الفواتير",
-    href: "/invoices",
-    icon: Receipt,
-  },
-  {
-    title: "الإعدادات",
-    href: "/settings",
-    icon: Settings,
-  },
-];
+export const adminNavigation: SidebarGroupData = {
+  items: [
+    { icon: Building2, label: "الشركات", href: "/companies", adminOnly: true },
+    { icon: ImageIcon, label: "البانرات", href: "/banners", adminOnly: true },
+    { icon: MapPin, label: "مناطق التوصيل", href: "/delivery-locations", adminOnly: true },
+    { icon: Tag, label: "العروض والكوبونات", href: "/offers", adminOnly: true }
+  ]
+};
+
+export const generalNavigation: SidebarGroupData = {
+  items: [
+    { icon: Truck, label: "مشتريات الموردين", href: "/supplier-purchases" },
+    { icon: PackageOpen, label: "المنتجات", href: "/products" },
+    { icon: ShoppingBag, label: "الطلبات الإلكترونية", href: "/online-orders" },
+    { icon: Receipt, label: "الفواتير", href: "/invoices" },
+    { icon: BarChart4, label: "التقارير والمالية", href: "/reports" },
+    { icon: Store, label: "المخزون", href: "/inventory" },
+    { icon: UserPlus, label: "العملاء والموردين", href: "/suppliers-customers" },
+    { icon: FileText, label: "المصروفات", href: "/expenses" },
+    { icon: Users, label: "الموظفين", href: "/employees", adminOnly: true },
+    { icon: Settings, label: "الإعدادات", href: "/settings" }
+  ]
+};

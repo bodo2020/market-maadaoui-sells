@@ -53,7 +53,7 @@ export default function SupplierForm({ supplier, onClose }: SupplierFormProps) {
     }
   };
   
-  const isLoading = addMutation.isLoading || updateMutation.isLoading;
+  const isPending = addMutation.isPending || updateMutation.isPending;
   
   return (
     <Form {...form}>
@@ -161,11 +161,11 @@ export default function SupplierForm({ supplier, onClose }: SupplierFormProps) {
         />
         
         <div className="flex justify-end space-x-2 pt-4">
-          <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
             إلغاء
           </Button>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "جاري الحفظ..." : supplier ? "تحديث" : "إضافة"}
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "جاري الحفظ..." : supplier ? "تحديث" : "إضافة"}
           </Button>
         </div>
       </form>

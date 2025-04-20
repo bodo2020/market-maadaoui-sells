@@ -23,8 +23,6 @@ export type OrderFromDB = {
   notes?: string | null;
   updated_at?: string | null;
   delivery_person?: string | null;
-  is_returned?: boolean;
-  is_cancelled?: boolean;
 };
 
 export const useOrderManagement = (activeTab: string) => {
@@ -86,36 +84,13 @@ export const useOrderManagement = (activeTab: string) => {
   };
 
   const validateOrderStatus = (status: string): Order['status'] => {
-    const validStatuses = ['waiting', 'ready', 'shipped', 'done', 'cancelled', 'returned'] as const;
-    return validStatuses.includes(status as any) ? status as Order['status'] : 'waiting';
+    const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
+    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
   };
 
   const validatePaymentStatus = (status: string): Order['payment_status'] => {
     const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
     return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
-  };
-
-  const updateOrderStatus = async (orderId: string, status: string) => {
-    try {
-      const validStatus = validateOrderStatus(status);
-      
-      const { data, error } = await supabase
-        .from('online_orders')
-        .update({ 
-          status: validStatus,
-          is_cancelled: validStatus === 'cancelled',
-          is_returned: validStatus === 'returned'
-        })
-        .eq('id', orderId);
-      
-      if (error) throw error;
-      
-      fetchOrders();
-      fetchPendingOrdersCount();
-    } catch (error) {
-      console.error("Error updating order status:", error);
-      throw error;
-    }
   };
 
   const fetchOrders = async () => {
@@ -135,47 +110,27 @@ export const useOrderManagement = (activeTab: string) => {
         query = query.eq('status', 'done');
       } else if (activeTab === "unpaid") {
         query = query.eq('payment_status', 'pending');
-      } else if (activeTab === "cancelled") {
-        query = query.eq('status', 'cancelled');
-      } else if (activeTab === "returned") {
-        query = query.eq('status', 'returned');
       }
       
       const { data, error } = await query;
       if (error) throw error;
       
-      const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => {
-        // Convert items to expected format
-        const orderItems = Array.isArray(item.items) 
-          ? item.items 
-          : (typeof item.items === 'object' ? [item.items] : []);
-        
-        return {
-          id: item.id,
-          created_at: item.created_at,
-          total: item.total,
-          status: validateOrderStatus(item.status),
-          payment_status: validatePaymentStatus(item.payment_status),
-          payment_method: item.payment_method,
-          shipping_address: item.shipping_address,
-          items: orderItems.map(item => ({
-            product_id: item.product_id || "",
-            product_name: item.product_name || "",
-            quantity: Number(item.quantity) || 0,
-            price: Number(item.price) || 0,
-            total: Number(item.total) || 0,
-            image_url: item.image_url || null
-          })),
-          customer_name: item.customer_name || 'غير معروف',
-          customer_email: item.customer_email || '',
-          customer_phone: item.customer_phone || '',
-          notes: item.notes || '',
-          tracking_number: item.tracking_number || null,
-          delivery_person: item.delivery_person || null,
-          is_returned: item.is_returned || false,
-          is_cancelled: item.is_cancelled || false
-        };
-      });
+      const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => ({
+        id: item.id,
+        created_at: item.created_at,
+        total: item.total,
+        status: validateOrderStatus(item.status),
+        payment_status: validatePaymentStatus(item.payment_status),
+        payment_method: item.payment_method,
+        shipping_address: item.shipping_address,
+        items: Array.isArray(item.items) ? item.items : [],
+        customer_name: item.customer_name || 'غير معروف',
+        customer_email: item.customer_email || '',
+        customer_phone: item.customer_phone || '',
+        notes: item.notes || '',
+        tracking_number: item.tracking_number || null,
+        delivery_person: item.delivery_person || null
+      }));
       
       setOrders(transformedOrders);
     } catch (error) {

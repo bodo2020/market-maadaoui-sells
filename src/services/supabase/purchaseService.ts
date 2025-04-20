@@ -162,8 +162,6 @@ export async function createPurchase(purchaseData: any) {
   }
 }
 
-export const addPurchase = createPurchase;
-
 export async function deletePurchase(id: string) {
   try {
     // Get purchase details to update supplier balance

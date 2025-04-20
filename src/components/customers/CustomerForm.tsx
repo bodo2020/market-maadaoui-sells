@@ -52,7 +52,7 @@ export default function CustomerForm({ customer, onClose }: CustomerFormProps) {
     }
   };
   
-  const isLoading = addMutation.isLoading || updateMutation.isLoading;
+  const isPending = addMutation.isPending || updateMutation.isPending;
   
   return (
     <Form {...form}>
@@ -143,11 +143,11 @@ export default function CustomerForm({ customer, onClose }: CustomerFormProps) {
         />
         
         <div className="flex justify-end space-x-2 pt-4">
-          <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
             إلغاء
           </Button>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "جاري الحفظ..." : customer ? "تحديث" : "إضافة"}
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "جاري الحفظ..." : customer ? "تحديث" : "إضافة"}
           </Button>
         </div>
       </form>

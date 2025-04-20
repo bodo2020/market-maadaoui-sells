@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -94,12 +95,14 @@ export default function ExpenseManagement() {
   
   const queryClient = useQueryClient();
   
+  // Fetch expenses
   const { data: expenses, isLoading, error } = useQuery({
     queryKey: ['expenses'],
     queryFn: fetchExpenses
   });
   
-  const addExpenseMutation = useMutation({
+  // Create expense mutation
+  const createExpenseMutation = useMutation({
     mutationFn: createExpense,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
@@ -113,6 +116,7 @@ export default function ExpenseManagement() {
     }
   });
   
+  // Update expense mutation
   const updateExpenseMutation = useMutation({
     mutationFn: ({ id, expense }: { id: string; expense: Partial<Expense> }) => 
       updateExpense(id, expense),
@@ -128,6 +132,7 @@ export default function ExpenseManagement() {
     }
   });
   
+  // Delete expense mutation
   const deleteExpenseMutation = useMutation({
     mutationFn: (id: string) => deleteExpense(id),
     onSuccess: () => {
@@ -166,7 +171,7 @@ export default function ExpenseManagement() {
       return;
     }
     
-    addExpenseMutation.mutate({
+    createExpenseMutation.mutate({
       type: formData.type,
       amount: formData.amount,
       description: formData.description,
@@ -661,9 +666,9 @@ export default function ExpenseManagement() {
             <Button 
               type="submit" 
               onClick={handleAddExpense}
-              disabled={addExpenseMutation.isLoading}
+              disabled={createExpenseMutation.isPending}
             >
-              {addExpenseMutation.isLoading ? (
+              {createExpenseMutation.isPending ? (
                 <>
                   <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                   جارِ الحفظ...
@@ -756,9 +761,9 @@ export default function ExpenseManagement() {
             <Button 
               type="submit" 
               onClick={handleEditExpense}
-              disabled={updateExpenseMutation.isLoading}
+              disabled={updateExpenseMutation.isPending}
             >
-              {updateExpenseMutation.isLoading ? (
+              {updateExpenseMutation.isPending ? (
                 <>
                   <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                   جارِ التحديث...
@@ -788,9 +793,9 @@ export default function ExpenseManagement() {
             <Button 
               variant="destructive" 
               onClick={handleDeleteExpense}
-              disabled={deleteExpenseMutation.isLoading}
+              disabled={deleteExpenseMutation.isPending}
             >
-              {deleteExpenseMutation.isLoading ? (
+              {deleteExpenseMutation.isPending ? (
                 <>
                   <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                   جارِ الحذف...

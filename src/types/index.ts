@@ -139,21 +139,13 @@ export interface OnlineOrder {
   created_at: string;
   customer_id?: string;
   total: number;
-  status: 'waiting' | 'ready' | 'shipped' | 'done' | 'cancelled' | 'returned';
+  status: 'waiting' | 'ready' | 'shipped' | 'delivered';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   items: CartItem[];
   payment_method?: string;
   delivery_location_id?: string;
   notes?: string;
   updated_at: string;
-  customer_name?: string;
-  customer_email?: string;
-  customer_phone?: string;
-  shipping_address?: string;
-  tracking_number?: string;
-  delivery_person?: string;
-  is_returned?: boolean;
-  is_cancelled?: boolean;
 }
 
 export interface Expense {
@@ -236,28 +228,19 @@ export interface OrderItem {
   image_url?: string;
 }
 
-export type Order = {
+export interface Order {
   id: string;
   created_at: string;
   total: number;
-  status: 'waiting' | 'ready' | 'shipped' | 'done' | 'cancelled' | 'returned';
+  status: 'waiting' | 'ready' | 'shipped' | 'done';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   payment_method: string | null;
   shipping_address: string | null;
-  items: {
-    product_id: string;
-    product_name: string;
-    quantity: number;
-    price: number;
-    total: number;
-    image_url?: string | null;
-  }[];
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string;
-  notes: string;
-  tracking_number: string | null;
-  delivery_person: string | null;
-  is_returned: boolean;
-  is_cancelled: boolean;
-};
+  items: OrderItem[];
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  notes?: string;
+  tracking_number?: string | null;
+  delivery_person?: string | null;
+}

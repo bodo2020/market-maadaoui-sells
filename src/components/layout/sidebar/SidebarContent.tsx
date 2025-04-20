@@ -1,33 +1,45 @@
 
-import React from "react";
-import { SidebarItem } from "./SidebarItem";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { UserRole } from "@/types";
-import { sidebarNavigation } from "./sidebarNavigation";
+import { useNotificationStore } from "@/stores/notificationStore";
+import { SidebarItem } from "./SidebarItem";
+import { mainNavigation, adminNavigation, generalNavigation } from "./sidebarNavigation";
+import { SidebarItemData } from "./types";
 
 interface SidebarContentProps {
-  collapsed?: boolean;
+  collapsed: boolean;
 }
 
-export const SidebarContent = ({ collapsed }: SidebarContentProps) => {
+export function SidebarContent({ collapsed }: SidebarContentProps) {
+  const location = useLocation();
+  const currentPath = location.pathname;
   const { user } = useAuth();
-  
-  // Filter navigation items based on user role if needed
-  const items = sidebarNavigation;
+  const { unreadOrders } = useNotificationStore();
+  const isAdmin = user?.role === 'admin';
 
-  return (
-    <div className="space-y-2 py-4">
-      {items.map((item) => (
+  const renderItems = (items: SidebarItemData[]) => {
+    return items.map(item => {
+      if (item.adminOnly && !isAdmin) return null;
+      
+      return (
         <SidebarItem
           key={item.href}
-          title={item.title}
-          href={item.href}
           icon={item.icon}
-          disabled={item.disabled}
           label={item.label}
+          href={item.href}
+          active={currentPath === item.href}
           collapsed={collapsed}
+          badge={item.href === "/online-orders" ? unreadOrders : undefined}
         />
-      ))}
+      );
+    });
+  };
+
+  return (
+    <div className="flex-1 space-y-1 px-0">
+      {renderItems(mainNavigation.items)}
+      {isAdmin && renderItems(adminNavigation.items)}
+      {renderItems(generalNavigation.items)}
     </div>
   );
-};
+}

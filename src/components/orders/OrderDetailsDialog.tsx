@@ -119,8 +119,7 @@ export function OrderDetailsDialog({
         </div>
 
         <UpdateOrderStatusDialog 
-          orderId={order.id}
-          currentStatus={order.status}
+          order={order}
           open={updateStatusOpen}
           onOpenChange={setUpdateStatusOpen}
           onStatusUpdated={onStatusUpdated}

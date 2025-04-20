@@ -1,4 +1,3 @@
-
 import { Order } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -104,12 +103,9 @@ export function OrdersTable({
               {getPaymentStatusBadge(order.payment_status)}
             </TableCell>
             <TableCell className="text-center">
-              <OrderStatusDropdown
-                orderId={order.id}
-                currentStatus={order.status}
-                onStatusUpdated={() => {
-                  if (onOrderUpdate) onOrderUpdate();
-                }}
+              <OrderStatusDropdown 
+                order={order} 
+                onStatusChange={onOrderUpdate}
               />
             </TableCell>
             <TableCell className="text-center">

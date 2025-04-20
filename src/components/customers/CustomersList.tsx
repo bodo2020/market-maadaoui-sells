@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Customer } from "@/types";
@@ -183,7 +184,7 @@ export default function CustomersList() {
                               size="icon"
                               className="text-destructive"
                               onClick={() => handleDeleteClick(customer.id)}
-                              disabled={deleteMutation.isLoading}
+                              disabled={deleteMutation.isPending}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

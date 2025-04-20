@@ -12,14 +12,11 @@ import { useOrderDetails } from "@/hooks/orders/useOrderDetails";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
-import { PackageX } from "lucide-react";
 
 export default function OrderDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
-  const [returnOrderOpen, setReturnOrderOpen] = useState(false);
   const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
 
   const {
@@ -66,11 +63,6 @@ export default function OrderDetails() {
     } finally {
       setIsUpdatingPayment(false);
     }
-  };
-
-  const handleReturnOrder = () => {
-    if (!order) return;
-    setReturnOrderOpen(true);
   };
 
   const onPaymentConfirmed = () => {
@@ -146,15 +138,6 @@ export default function OrderDetails() {
                 >
                   {order?.payment_status === 'pending' ? 'تأكيد الدفع' : 'تم الدفع'}
                 </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full flex items-center"
-                  onClick={handleReturnOrder}
-                >
-                  <PackageX className="ml-2 h-4 w-4" />
-                  إنشاء طلب إرجاع
-                </Button>
               </div>
             </div>
           </div>
@@ -175,18 +158,6 @@ export default function OrderDetails() {
           onOpenChange={setPaymentConfirmOpen}
           orderId={order.id}
           onConfirm={onPaymentConfirmed}
-        />
-        
-        <ReturnOrderDialog
-          open={returnOrderOpen}
-          onOpenChange={setReturnOrderOpen}
-          onComplete={fetchOrder}
-          items={order.items}
-          orderId={order.id}
-          orderType="online"
-          customerName={order.customer_name}
-          customerPhone={order.customer_phone}
-          total={order.total}
         />
       </div>
     </MainLayout>

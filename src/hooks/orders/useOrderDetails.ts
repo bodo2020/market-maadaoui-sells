@@ -1,102 +1,149 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { Order } from "@/types";
+import { toast } from "sonner";
 
-export const useOrderDetails = (orderId: string) => {
+export function useOrderDetails(orderId: string) {
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<Order['status']>("waiting");
+  const [selectedStatus, setSelectedStatus] = useState<Order['status'] | null>(null);
 
   const fetchOrder = async () => {
     try {
       setIsLoading(true);
+      console.log("Fetching order details for ID:", orderId);
       
-      const { data, error } = await supabase
-        .from('online_orders')
-        .select('*')
-        .eq('id', orderId)
-        .single();
+      const { data, error } = await supabase.from('online_orders').select(`
+          *,
+          customers(
+            name,
+            email,
+            phone
+          )
+        `).eq('id', orderId).single();
       
       if (error) throw error;
       
-      // Convert the JSON items array to the expected format
-      const orderItems = Array.isArray(data.items) 
-        ? data.items 
-        : (typeof data.items === 'object' ? [data.items] : []);
-      
-      // Create the order with properly typed fields
-      const orderData: Order = {
-        id: data.id,
-        created_at: data.created_at,
-        total: data.total,
-        status: data.status,
-        payment_status: data.payment_status,
-        payment_method: data.payment_method,
-        shipping_address: data.shipping_address,
-        items: orderItems.map(item => ({
-          product_id: item.product_id || "",
-          product_name: item.product_name || "",
-          quantity: Number(item.quantity) || 0,
-          price: Number(item.price) || 0,
-          total: Number(item.total) || 0,
-          image_url: item.image_url || null
-        })),
-        customer_name: data.customer_name || 'غير معروف',
-        customer_email: data.customer_email || '',
-        customer_phone: data.customer_phone || '',
-        notes: data.notes || '',
-        tracking_number: data.tracking_number || null,
-        delivery_person: data.delivery_person || null,
-        is_returned: data.is_returned || false,
-        is_cancelled: data.is_cancelled || false
-      };
-      
-      setOrder(orderData);
-      setSelectedStatus(orderData.status);
+      if (data) {
+        const validateOrderStatus = (status: string): Order['status'] => {
+          const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
+          return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
+        };
+        
+        const validatePaymentStatus = (status: string): Order['payment_status'] => {
+          const validStatuses: Order['payment_status'][] = ['pending', 'paid', 'failed', 'refunded'];
+          return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
+        };
+        
+        const transformItems = (items: any): any[] => {
+          if (!Array.isArray(items)) {
+            try {
+              if (typeof items === 'string') {
+                items = JSON.parse(items);
+              }
+              if (!Array.isArray(items)) {
+                items = [items];
+              }
+            } catch (e) {
+              console.error("Error parsing items:", e);
+              return [];
+            }
+          }
+          
+          return items.map((item: any) => ({
+            product_id: item.product_id || '',
+            product_name: item.product_name || item.name || '',
+            quantity: item.quantity || 0,
+            price: item.price || 0,
+            total: item.total || item.price * item.quantity || 0,
+            image_url: item.image_url || null
+          }));
+        };
+        
+        const customerName = data.customers?.name || 'غير معروف';
+        const customerEmail = data.customers?.email || '';
+        const customerPhone = data.customers?.phone || '';
+        
+        const orderObj = {
+          id: data.id,
+          created_at: data.created_at,
+          total: data.total,
+          status: validateOrderStatus(data.status),
+          payment_status: validatePaymentStatus(data.payment_status),
+          payment_method: data.payment_method,
+          shipping_address: data.shipping_address,
+          items: transformItems(data.items),
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
+          notes: data.notes || '',
+          tracking_number: data.tracking_number || null,
+          delivery_person: data.delivery_person || null
+        };
+        
+        console.log("Parsed order:", orderObj);
+        setOrder(orderObj);
+        if (selectedStatus === orderObj.status) {
+          setSelectedStatus(null);
+        }
+      }
     } catch (error) {
       console.error('Error fetching order:', error);
-      toast.error("حدث خطأ أثناء تحميل بيانات الطلب");
+      toast.error("حدث خطأ أثناء تحميل الطلب");
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (orderId) {
-      fetchOrder();
-    }
-  }, [orderId]);
-
   const handleStatusChange = async () => {
-    if (!order || selectedStatus === order.status || isUpdatingStatus) return;
+    if (!order || !selectedStatus || order.status === selectedStatus || isUpdatingStatus) return;
     
     try {
       setIsUpdatingStatus(true);
+      console.log("Updating order status to:", selectedStatus, "for order ID:", orderId);
       
-      const { error } = await supabase
+      const currentTime = new Date().toISOString();
+      
+      const { error, data } = await supabase
         .from('online_orders')
-        .update({
+        .update({ 
           status: selectedStatus,
-          updated_at: new Date().toISOString(),
-          is_returned: selectedStatus === "returned",
-          is_cancelled: selectedStatus === "cancelled"
+          updated_at: currentTime 
         })
-        .eq('id', order.id);
+        .eq('id', orderId)
+        .select();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase update error:", error);
+        throw error;
+      }
       
-      fetchOrder();
-      toast.success(`تم تحديث حالة الطلب إلى ${selectedStatus}`);
+      console.log("Status update response:", data);
+      console.log("Status updated successfully in Supabase");
+      
+      setOrder(prev => prev ? { ...prev, status: selectedStatus } : null);
+      
+      toast.success(`تم تحديث حالة الطلب إلى ${
+        selectedStatus === 'waiting' ? 'في الانتظار' : 
+        selectedStatus === 'ready' ? 'جاهز للشحن' : 
+        selectedStatus === 'shipped' ? 'تم الشحن' : 'تم التسليم'
+      }`);
+      
+      setSelectedStatus(null);
+      await fetchOrder();
     } catch (error) {
       console.error('Error updating order status:', error);
-      toast.error("حدث خطأ أثناء تحديث حالة الطلب");
+      toast.error('حدث خطأ أثناء تحديث حالة الطلب');
     } finally {
       setIsUpdatingStatus(false);
     }
   };
+
+  useEffect(() => {
+    fetchOrder();
+  }, [orderId]);
 
   return {
     order,
@@ -107,4 +154,4 @@ export const useOrderDetails = (orderId: string) => {
     handleStatusChange,
     fetchOrder
   };
-};
+}
