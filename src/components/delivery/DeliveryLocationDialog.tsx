@@ -4,7 +4,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { createGovernorate, createCity, createArea, createNeighborhood } from "@/services/supabase/deliveryService";
 import DeliveryTypePricing from "./DeliveryTypePricing";
 
 interface DeliveryLocationDialogProps {
@@ -38,69 +37,16 @@ export default function DeliveryLocationDialog({
     setLoading(true);
 
     try {
-      let result;
-      switch (mode) {
-        case 'governorate':
-          result = await createGovernorate({ 
-            governorate: name,
-            name: name,
-            provider_id: providerId 
-          });
-          setNewLocationId(result.id);
-          break;
-        case 'city':
-          if (parentData?.governorate) {
-            result = await createCity({
-              governorate: parentData.governorate,
-              city: name,
-              name: `${parentData.governorate} - ${name}`,
-              provider_id: providerId
-            });
-            setNewLocationId(result.id);
-          }
-          break;
-        case 'area':
-          if (parentData?.governorate && parentData?.city) {
-            result = await createArea({
-              governorate: parentData.governorate,
-              city: parentData.city,
-              area: name,
-              name: `${parentData.governorate} - ${parentData.city} - ${name}`,
-              provider_id: providerId
-            });
-            setNewLocationId(result.id);
-          }
-          break;
-        case 'neighborhood':
-          if (parentData?.governorate && parentData?.city && parentData?.area) {
-            result = await createNeighborhood({
-              governorate: parentData.governorate,
-              city: parentData.city,
-              area: parentData.area,
-              neighborhood: name,
-              price: 0, // Add default price to fix the TypeScript error
-              name: `${parentData.governorate} - ${parentData.city} - ${parentData.area} - ${name}`,
-              provider_id: providerId
-            });
-            setNewLocationId(result.id);
-          }
-          break;
-      }
-      
-      setShowPricing(true);
+      onSuccess?.({name});
+      setName("");
+      setShowPricing(false);
+      setNewLocationId(null);
+      onOpenChange(false);
     } catch (error) {
       console.error('Error creating location:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleFinish = () => {
-    onSuccess?.({name});
-    setName("");
-    setShowPricing(false);
-    setNewLocationId(null);
-    onOpenChange(false);
   };
 
   const titles = {
@@ -155,13 +101,12 @@ export default function DeliveryLocationDialog({
           <div>
             <DeliveryTypePricing 
               locationId={newLocationId!}
-              onSuccess={handleFinish}
+              onSuccess={() => {
+                onOpenChange(false);
+                setShowPricing(false);
+                setNewLocationId(null);
+              }}
             />
-            <div className="mt-4 flex justify-end">
-              <Button onClick={handleFinish}>
-                إنهاء
-              </Button>
-            </div>
           </div>
         )}
       </DialogContent>
