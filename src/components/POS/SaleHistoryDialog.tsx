@@ -57,7 +57,7 @@ export default function SaleHistoryDialog({ open, onOpenChange, storeInfo }: Sal
             : sale.items;
             
           // Ensure items is treated as CartItem[]
-          parsedItems = Array.isArray(items) ? items as unknown as CartItem[] : [];
+          parsedItems = Array.isArray(items) ? items as CartItem[] : [];
         } catch (e) {
           console.error("Error parsing items:", e);
         }

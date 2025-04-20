@@ -124,7 +124,7 @@ export default function EmployeeManagement() {
         handleSelectChange={handleSelectChange}
         handleSubmit={handleAddEmployee}
         isEdit={false}
-        isMutating={createUserMutation.isPending}
+        isMutating={createUserMutation.isLoading}
       />
       
       <EmployeeFormDialog 
@@ -135,14 +135,14 @@ export default function EmployeeManagement() {
         handleSelectChange={handleSelectChange}
         handleSubmit={handleEditEmployee}
         isEdit={true}
-        isMutating={updateUserMutation.isPending}
+        isMutating={updateUserMutation.isLoading}
       />
       
       <DeleteEmployeeDialog 
         isOpen={isDeleteDialogOpen}
         setIsOpen={setIsDeleteDialogOpen}
         handleDelete={handleDeleteEmployee}
-        isDeleting={deleteUserMutation.isPending}
+        isDeleting={deleteUserMutation.isLoading}
       />
       
       <ShiftHistoryDialog 
