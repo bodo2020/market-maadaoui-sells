@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { 
   ShippingProvider, 
@@ -128,7 +127,7 @@ export async function createDeliveryTypePrice(data: {
   price: number;
   estimated_time?: string;
 }) {
-  // Use a simple type definition to avoid excessive type recursion
+  // Create a simple plain object to avoid excessive type recursion
   const dataToInsert = {
     neighborhood_id: data.neighborhood_id || data.delivery_location_id,
     delivery_type_id: data.delivery_type_id,
