@@ -1,11 +1,11 @@
+
 import {
   BarChart3,
   Boxes,
   Calendar,
-  Category,
-  CheckCircle2,
-  CircleDollarSign,
   ClipboardList,
+  CircleDollarSign,
+  ClipboardCheck,
   Coins,
   CreditCard,
   FileText,
@@ -23,6 +23,7 @@ import {
   Truck,
   User2,
   Users,
+  Tags,
 } from "lucide-react";
 
 interface SidebarItem {
@@ -77,7 +78,7 @@ export const sidebarNavigation: SidebarItem[] = [
   {
     title: "التصنيفات",
     href: "/categories",
-    icon: Category,
+    icon: Tags,
   },
   {
     title: "الشركات",

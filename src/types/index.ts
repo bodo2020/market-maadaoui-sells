@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -139,7 +140,7 @@ export interface OnlineOrder {
   created_at: string;
   customer_id?: string;
   total: number;
-  status: 'waiting' | 'ready' | 'shipped' | 'delivered';
+  status: 'waiting' | 'ready' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   items: CartItem[];
   payment_method?: string;

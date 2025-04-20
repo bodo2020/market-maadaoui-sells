@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
@@ -23,7 +24,6 @@ import CashTracking from './pages/CashTracking';
 import EmployeeManagement from './pages/EmployeeManagement';
 import DeliveryLocationsPage from './pages/DeliveryLocationsPage';
 import Reports from './pages/Reports';
-import Suppliers from './pages/SuppliersCustomers';
 import Purchases from './pages/Purchases';
 import SupplierPurchases from './pages/SupplierPurchases';
 import Settings from './pages/Settings';
@@ -32,16 +32,15 @@ import NotFound from './pages/NotFound';
 import POS from './pages/POS';
 import ReturnOrders from './pages/ReturnOrders';
 import { useAuth } from './contexts/AuthContext';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
 
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn } = useAuth();
+  const { isAuthenticated } = useAuth();
 
-  if (!isLoggedIn) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
 
@@ -49,7 +48,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
-  const { isLoggedIn } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   return (
     <BrowserRouter>
@@ -92,6 +91,7 @@ function App() {
           <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <Toaster />
       </QueryClientProvider>
     </BrowserRouter>
   );

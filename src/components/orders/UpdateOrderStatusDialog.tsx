@@ -1,164 +1,112 @@
 
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useState } from "react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Check, Clock, Package, Truck } from "lucide-react";
-import { Order } from "@/types/index";
-import { toast } from "sonner";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Order } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface UpdateOrderStatusDialogProps {
   order: Order | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onStatusUpdated: () => void;
+  onStatusUpdated?: () => void;
 }
 
-export function UpdateOrderStatusDialog({ 
-  order, 
-  open, 
+export function UpdateOrderStatusDialog({
+  order,
+  open,
   onOpenChange,
   onStatusUpdated
 }: UpdateOrderStatusDialogProps) {
   const [status, setStatus] = useState<Order['status']>(order?.status || 'waiting');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Reset status when order changes
-  useEffect(() => {
-    if (order) {
-      setStatus(order.status);
-    }
-  }, [order]);
-
-  const updateOrderStatus = async () => {
+  const handleUpdateStatus = async () => {
     if (!order) return;
     
     try {
-      setIsSubmitting(true);
+      setIsUpdating(true);
       
-      const updates = { 
-        status,
-        updated_at: new Date().toISOString()
-      };
+      const { error } = await supabase
+        .from('online_orders')
+        .update({
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
       
-      // If order is done, also mark payment as completed if payment is pending
-      if (status === 'done' && order.payment_status === 'pending') {
-        await supabase
-          .from('online_orders')
-          .update({ 
-            status,
-            payment_status: 'paid',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', order.id);
-          
-        toast.success('تم تحديث حالة الطلب بنجاح');
-        toast.info('تم تحديث حالة الدفع إلى "مدفوع"');
-      } else {
-        const { error } = await supabase
-          .from('online_orders')
-          .update(updates)
-          .eq('id', order.id);
-        
-        if (error) throw error;
-        
-        toast.success('تم تحديث حالة الطلب بنجاح');
+      if (error) throw error;
+      
+      toast.success("تم تحديث حالة الطلب بنجاح");
+      
+      if (onStatusUpdated) {
+        onStatusUpdated();
       }
       
-      onStatusUpdated();
       onOpenChange(false);
     } catch (error) {
       console.error('Error updating order status:', error);
-      toast.error('حدث خطأ أثناء تحديث حالة الطلب');
+      toast.error("حدث خطأ أثناء تحديث حالة الطلب");
     } finally {
-      setIsSubmitting(false);
+      setIsUpdating(false);
     }
   };
 
-  const statusOptions: {value: Order['status'], label: string, icon: JSX.Element}[] = [
-    { value: 'waiting', label: 'في الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
-    { value: 'ready', label: 'جاهز', icon: <Package className="h-4 w-4 text-green-500" /> },
-    { value: 'shipped', label: 'تم الشحن', icon: <Truck className="h-4 w-4 text-blue-500" /> },
-    { value: 'done', label: 'مكتمل', icon: <Check className="h-4 w-4 text-gray-500" /> }
-  ];
-
-  const getStatusClass = (statusValue: Order['status']) => {
-    const classes: Record<Order['status'], string> = {
-      waiting: 'border-amber-500 hover:bg-amber-50',
-      ready: 'border-green-500 hover:bg-green-50',
-      shipped: 'border-blue-500 hover:bg-blue-50',
-      done: 'border-gray-500 hover:bg-gray-50'
-    };
-    return classes[statusValue] || '';
+  const statusLabels: Record<Order['status'], string> = {
+    waiting: 'في الانتظار',
+    ready: 'جاهز للشحن',
+    shipped: 'تم الشحن',
+    done: 'تم التسليم',
+    cancelled: 'ملغي',
+    returned: 'مرتجع'
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">تحديث حالة الطلب</DialogTitle>
+          <DialogTitle>تحديث حالة الطلب</DialogTitle>
         </DialogHeader>
-        
-        {order && (
-          <div className="space-y-6 dir-rtl">
-            <div className="text-center space-y-2">
-              <p className="text-muted-foreground">#{order.id.slice(0, 8)}</p>
-              <p className="text-sm font-medium">اختر حالة الطلب الجديدة</p>
-            </div>
-            
-            <RadioGroup 
-              value={status} 
+        <div className="grid gap-4 py-4">
+          <div className="space-y-2">
+            <Select
+              value={status}
               onValueChange={(value) => setStatus(value as Order['status'])}
-              className="grid gap-3"
             >
-              {statusOptions.map((item) => (
-                <div 
-                  key={item.value}
-                  className={`flex items-center space-x-2 space-x-reverse rounded-lg border-2 p-3 transition-colors ${getStatusClass(item.value)} ${status === item.value ? 'border-primary' : ''}`}
-                >
-                  <RadioGroupItem value={item.value} id={item.value} />
-                  <Label 
-                    htmlFor={item.value} 
-                    className="flex flex-1 items-center justify-between cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2">
-                      {item.icon}
-                      {item.label}
-                    </span>
-                    {status === item.value && (
-                      <Check className="h-4 w-4 text-primary" />
-                    )}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-            
-            {status === 'done' && order.payment_status === 'pending' && (
-              <div className="text-sm bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-2">
-                <p className="text-yellow-800">
-                  سيتم تحديث حالة الدفع تلقائيًا إلى "مدفوع" عند تحديث الحالة إلى "مكتمل".
-                </p>
-              </div>
-            )}
+              <SelectTrigger>
+                <SelectValue placeholder="اختر الحالة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="waiting">{statusLabels.waiting}</SelectItem>
+                <SelectItem value="ready">{statusLabels.ready}</SelectItem>
+                <SelectItem value="shipped">{statusLabels.shipped}</SelectItem>
+                <SelectItem value="done">{statusLabels.done}</SelectItem>
+                <SelectItem value="cancelled">{statusLabels.cancelled}</SelectItem>
+                <SelectItem value="returned">{statusLabels.returned}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        )}
-        
-        <DialogFooter className="gap-2 sm:gap-0 dir-rtl">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="w-full sm:w-auto"
-          >
-            إلغاء
-          </Button>
+        </div>
+        <DialogFooter>
           <Button 
-            onClick={updateOrderStatus} 
-            disabled={isSubmitting || !order || status === order.status}
-            className="w-full sm:w-auto gap-2"
+            onClick={handleUpdateStatus} 
+            disabled={isUpdating || status === order?.status}
           >
-            تحديث
+            {isUpdating ? "جاري التحديث..." : "تحديث الحالة"}
           </Button>
         </DialogFooter>
       </DialogContent>

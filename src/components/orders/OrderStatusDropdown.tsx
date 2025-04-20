@@ -26,7 +26,9 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
       waiting: { bg: "bg-amber-100", text: "text-amber-700", label: "في الانتظار" },
       ready: { bg: "bg-green-100", text: "text-green-700", label: "جاهز" },
       shipped: { bg: "bg-blue-100", text: "text-blue-700", label: "تم الشحن" },
-      done: { bg: "bg-gray-100", text: "text-gray-700", label: "مكتمل" }
+      done: { bg: "bg-gray-100", text: "text-gray-700", label: "مكتمل" },
+      cancelled: { bg: "bg-red-100", text: "text-red-700", label: "ملغي" },
+      returned: { bg: "bg-purple-100", text: "text-purple-700", label: "مرتجع" }
     };
 
     const style = variants[status] || variants.waiting;
@@ -42,7 +44,6 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
     
     try {
       setIsUpdating(true);
-      console.log("Updating order status to:", newStatus, "for order ID:", order.id);
       
       const { error } = await supabase
         .from('online_orders')
@@ -57,13 +58,14 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
         throw error;
       }
       
-      console.log("Status updated successfully in Supabase");
       setCurrentStatus(newStatus);
       
       toast.success(`تم تحديث حالة الطلب إلى ${
         newStatus === 'waiting' ? 'في الانتظار' : 
         newStatus === 'ready' ? 'جاهز للشحن' : 
-        newStatus === 'shipped' ? 'تم الشحن' : 'تم التسليم'
+        newStatus === 'shipped' ? 'تم الشحن' : 
+        newStatus === 'done' ? 'تم التسليم' :
+        newStatus === 'cancelled' ? 'ملغي' : 'مرتجع'
       }`);
       
       if (onStatusChange) {
@@ -115,7 +117,23 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
           disabled={currentStatus === 'done' || isUpdating}
         >
           {currentStatus === 'done' && <Check className="h-4 w-4" />}
-          مكتمل
+          تم التسليم
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="gap-2"
+          onClick={() => handleStatusChange('cancelled')}
+          disabled={currentStatus === 'cancelled' || isUpdating}
+        >
+          {currentStatus === 'cancelled' && <Check className="h-4 w-4" />}
+          ملغي
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="gap-2"
+          onClick={() => handleStatusChange('returned')}
+          disabled={currentStatus === 'returned' || isUpdating}
+        >
+          {currentStatus === 'returned' && <Check className="h-4 w-4" />}
+          مرتجع
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
