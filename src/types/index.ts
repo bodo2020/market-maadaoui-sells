@@ -139,13 +139,21 @@ export interface OnlineOrder {
   created_at: string;
   customer_id?: string;
   total: number;
-  status: 'waiting' | 'ready' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
+  status: 'waiting' | 'ready' | 'shipped' | 'done' | 'cancelled' | 'returned';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   items: CartItem[];
   payment_method?: string;
   delivery_location_id?: string;
   notes?: string;
   updated_at: string;
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  shipping_address?: string;
+  tracking_number?: string;
+  delivery_person?: string;
+  is_returned?: boolean;
+  is_cancelled?: boolean;
 }
 
 export interface Expense {

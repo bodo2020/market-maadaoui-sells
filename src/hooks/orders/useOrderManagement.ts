@@ -144,24 +144,38 @@ export const useOrderManagement = (activeTab: string) => {
       const { data, error } = await query;
       if (error) throw error;
       
-      const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => ({
-        id: item.id,
-        created_at: item.created_at,
-        total: item.total,
-        status: validateOrderStatus(item.status),
-        payment_status: validatePaymentStatus(item.payment_status),
-        payment_method: item.payment_method,
-        shipping_address: item.shipping_address,
-        items: Array.isArray(item.items) ? item.items : [],
-        customer_name: item.customer_name || 'غير معروف',
-        customer_email: item.customer_email || '',
-        customer_phone: item.customer_phone || '',
-        notes: item.notes || '',
-        tracking_number: item.tracking_number || null,
-        delivery_person: item.delivery_person || null,
-        is_returned: item.is_returned || false,
-        is_cancelled: item.is_cancelled || false
-      }));
+      const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => {
+        // Convert items to expected format
+        const orderItems = Array.isArray(item.items) 
+          ? item.items 
+          : (typeof item.items === 'object' ? [item.items] : []);
+        
+        return {
+          id: item.id,
+          created_at: item.created_at,
+          total: item.total,
+          status: validateOrderStatus(item.status),
+          payment_status: validatePaymentStatus(item.payment_status),
+          payment_method: item.payment_method,
+          shipping_address: item.shipping_address,
+          items: orderItems.map(item => ({
+            product_id: item.product_id || "",
+            product_name: item.product_name || "",
+            quantity: Number(item.quantity) || 0,
+            price: Number(item.price) || 0,
+            total: Number(item.total) || 0,
+            image_url: item.image_url || null
+          })),
+          customer_name: item.customer_name || 'غير معروف',
+          customer_email: item.customer_email || '',
+          customer_phone: item.customer_phone || '',
+          notes: item.notes || '',
+          tracking_number: item.tracking_number || null,
+          delivery_person: item.delivery_person || null,
+          is_returned: item.is_returned || false,
+          is_cancelled: item.is_cancelled || false
+        };
+      });
       
       setOrders(transformedOrders);
     } catch (error) {

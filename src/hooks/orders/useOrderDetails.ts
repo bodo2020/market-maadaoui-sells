@@ -22,6 +22,12 @@ export const useOrderDetails = (orderId: string) => {
       
       if (error) throw error;
       
+      // Convert the JSON items array to the expected format
+      const orderItems = Array.isArray(data.items) 
+        ? data.items 
+        : (typeof data.items === 'object' ? [data.items] : []);
+      
+      // Create the order with properly typed fields
       const orderData: Order = {
         id: data.id,
         created_at: data.created_at,
@@ -30,7 +36,14 @@ export const useOrderDetails = (orderId: string) => {
         payment_status: data.payment_status,
         payment_method: data.payment_method,
         shipping_address: data.shipping_address,
-        items: Array.isArray(data.items) ? data.items : [],
+        items: orderItems.map(item => ({
+          product_id: item.product_id || "",
+          product_name: item.product_name || "",
+          quantity: Number(item.quantity) || 0,
+          price: Number(item.price) || 0,
+          total: Number(item.total) || 0,
+          image_url: item.image_url || null
+        })),
         customer_name: data.customer_name || 'غير معروف',
         customer_email: data.customer_email || '',
         customer_phone: data.customer_phone || '',
