@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -85,8 +86,8 @@ export const useOrderManagement = (activeTab: string) => {
   };
 
   const validateOrderStatus = (status: string): Order['status'] => {
-    const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done', 'cancelled', 'returned'];
-    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
+    const validStatuses = ['waiting', 'ready', 'shipped', 'done', 'cancelled', 'returned'] as const;
+    return validStatuses.includes(status as any) ? status as Order['status'] : 'waiting';
   };
 
   const validatePaymentStatus = (status: string): Order['payment_status'] => {
@@ -96,20 +97,18 @@ export const useOrderManagement = (activeTab: string) => {
 
   const updateOrderStatus = async (orderId: string, status: string) => {
     try {
+      const validStatus = validateOrderStatus(status);
+      
       const { data, error } = await supabase
         .from('online_orders')
-        .update({ status })
+        .update({ 
+          status: validStatus,
+          is_cancelled: validStatus === 'cancelled',
+          is_returned: validStatus === 'returned'
+        })
         .eq('id', orderId);
       
       if (error) throw error;
-      
-      if (status === "cancelled") {
-        // Handle cancelled orders
-      } else if (status === "returned") {
-        // Handle returned orders
-      } else {
-        // Handle other statuses
-      }
       
       fetchOrders();
       fetchPendingOrdersCount();

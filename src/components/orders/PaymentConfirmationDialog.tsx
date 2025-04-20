@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -70,11 +71,6 @@ export function PaymentConfirmationDialog({
     } finally {
       setIsUpdating(false);
     }
-  };
-  
-  const handleStatusChange = (newStatus: string) => {
-    // Make sure this function can handle all possible status values
-    // including "cancelled" and "returned"
   };
 
   return (

@@ -39,7 +39,7 @@ export default function SuppliersCustomers() {
           </TabsList>
           
           <TabsContent value="suppliers">
-            <SuppliersList />
+            <SuppliersList suppliers={[]} />
           </TabsContent>
           
           <TabsContent value="customers">
