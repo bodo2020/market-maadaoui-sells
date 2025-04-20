@@ -127,7 +127,7 @@ export async function createDeliveryTypePrice(data: {
   price: number;
   estimated_time?: string;
 }) {
-  const insertObj = {
+  const insertData = {
     delivery_location_id: data.delivery_location_id || data.neighborhood_id,
     delivery_type_id: data.delivery_type_id,
     price: data.price,
@@ -136,7 +136,7 @@ export async function createDeliveryTypePrice(data: {
   
   const { data: result, error } = await supabase
     .from('delivery_type_pricing')
-    .insert([insertObj])
+    .insert([insertData])
     .select()
     .single();
     
