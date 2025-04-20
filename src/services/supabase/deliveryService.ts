@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   ShippingProvider, 
@@ -75,14 +76,19 @@ export async function createCity(data: {
   name: string;
   governorate_id: string;
 }) {
-  const { data: result, error } = await supabase
-    .from('cities')
-    .insert([data])
-    .select()
-    .single();
-    
-  if (error) throw error;
-  return result;
+  try {
+    const { data: result, error } = await supabase
+      .from('cities')
+      .insert([data])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return result;
+  } catch (error) {
+    console.error("Error creating city:", error);
+    throw error;
+  }
 }
 
 export async function createArea(data: { 
@@ -122,14 +128,8 @@ export async function createDeliveryTypePrice(data: {
   price: number;
   estimated_time?: string;
 }) {
-  interface SimpleTypePrice {
-    neighborhood_id?: string;
-    delivery_type_id: string;
-    price: number;
-    estimated_time?: string;
-  }
-  
-  const dataToInsert: SimpleTypePrice = {
+  // Use a simple type definition to avoid excessive type recursion
+  const dataToInsert = {
     neighborhood_id: data.neighborhood_id || data.delivery_location_id,
     delivery_type_id: data.delivery_type_id,
     price: data.price,
