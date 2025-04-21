@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -356,7 +357,13 @@ export default function AddBanner() {
           <div className="flex items-center gap-4">
             <Button 
               variant="ghost" 
-              onClick={() => navigate('/banners')}
+              onClick={() => {
+                if (bannerId) {
+                  navigate(`/banners/edit?id=${bannerId}`);
+                } else {
+                  navigate('/banners/add');
+                }
+              }}
               className="gap-2"
             >
               <ArrowRight className="h-4 w-4" />
@@ -688,3 +695,4 @@ export default function AddBanner() {
     </MainLayout>
   );
 }
+
