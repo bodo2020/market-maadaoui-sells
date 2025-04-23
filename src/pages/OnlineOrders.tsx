@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -17,6 +16,7 @@ import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
+import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
 
 export default function OnlineOrders() {
   const [activeTab, setActiveTab] = useState("all");
@@ -25,7 +25,10 @@ export default function OnlineOrders() {
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
   const [assignDeliveryOpen, setAssignDeliveryOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
-  
+  const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
+  const [returnItems, setReturnItems] = useState<OrderItem[]>([]);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+
   const { orders, loading, handleOrderUpdate } = useOrderManagement(activeTab);
   const { markOrdersAsRead } = useNotificationStore();
   const navigate = useNavigate();
@@ -51,10 +54,8 @@ export default function OnlineOrders() {
       const orderItems = Array.isArray(orderDetails.items) ? orderDetails.items : [];
       
       for (const item of orderItems) {
-        // First convert to unknown then to OrderItem to avoid direct casting errors
         const orderItem = item as unknown as OrderItem;
         
-        // Verify we have the required properties 
         if (!orderItem.product_id) {
           console.error("Invalid order item missing product_id:", item);
           continue;
@@ -154,6 +155,12 @@ export default function OnlineOrders() {
     });
   };
 
+  const handleReturn = async (order: Order) => {
+    setReturnOrderId(order.id);
+    setReturnItems(order.items);
+    setReturnDialogOpen(true);
+  };
+
   const filteredOrders = orders.filter(order => {
     if (!searchQuery) return true;
     const searchLower = searchQuery.toLowerCase();
@@ -216,6 +223,7 @@ export default function OnlineOrders() {
                   onPaymentConfirm={handlePaymentConfirm}
                   onAssignDelivery={handleAssignDelivery}
                   onOrderUpdate={handleOrderUpdate}
+                  onReturn={handleReturn}
                 />
               </div>
             )}
@@ -244,6 +252,16 @@ export default function OnlineOrders() {
               onConfirm={handleOrderUpdate}
             />
           </>
+        )}
+
+        {returnOrderId && returnItems.length > 0 && (
+          <ReturnOrderDialog
+            orderId={returnOrderId}
+            items={returnItems}
+            open={returnDialogOpen}
+            onOpenChange={setReturnDialogOpen}
+            onConfirm={handleOrderUpdate}
+          />
         )}
       </div>
     </MainLayout>

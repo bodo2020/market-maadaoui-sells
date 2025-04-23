@@ -18,6 +18,7 @@ interface OrdersTableProps {
   onPaymentConfirm: (order: Order) => void;
   onAssignDelivery: (order: Order) => void;
   onOrderUpdate?: () => void;
+  onReturn?: (order: Order) => void;
 }
 
 export function OrdersTable({
@@ -29,7 +30,8 @@ export function OrdersTable({
   onComplete,
   onPaymentConfirm,
   onAssignDelivery,
-  onOrderUpdate
+  onOrderUpdate,
+  onReturn
 }: OrdersTableProps) {
   const navigate = useNavigate();
 
@@ -95,7 +97,7 @@ export function OrdersTable({
                   onShowCustomer(order);
                 }}
               >
-                {order.customer_name || 'غير معروف'}
+                {order.customer_name || order.customer_email || order.customer_phone || 'عميل'}
               </Button>
             </TableCell>
             <TableCell className="text-center">{order.total} ج.م</TableCell>
@@ -119,6 +121,7 @@ export function OrdersTable({
                 onComplete={() => onComplete(order)}
                 onPaymentConfirm={() => onPaymentConfirm(order)}
                 onAssignDelivery={() => onAssignDelivery(order)}
+                onReturn={onReturn ? () => onReturn(order) : undefined}
               />
             </TableCell>
           </TableRow>
