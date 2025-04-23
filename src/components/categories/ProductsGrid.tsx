@@ -3,7 +3,7 @@ import { Product } from "@/types";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit } from "lucide-react";
+import { Edit, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 
