@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Order } from "@/types";
@@ -62,7 +61,6 @@ export function useOrderDetails(orderId: string) {
           }));
         };
         
-        // Get actual customer name from the customers table, not a default value
         const customerName = data.customers?.name || '';
         const customerEmail = data.customers?.email || '';
         const customerPhone = data.customers?.phone || '';

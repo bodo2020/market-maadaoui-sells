@@ -135,7 +135,7 @@ export const useOrderManagement = (activeTab: string) => {
         shipping_address: item.shipping_address,
         items: Array.isArray(item.items) ? item.items : [],
         customer_id: item.customer_id,
-        customer_name: item.customers?.name || '', // Use actual customer name, not default
+        customer_name: item.customers?.name || '',
         customer_email: item.customers?.email || '',
         customer_phone: item.customers?.phone || '',
         notes: item.notes || '',
