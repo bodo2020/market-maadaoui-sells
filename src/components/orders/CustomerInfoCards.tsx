@@ -42,10 +42,10 @@ export function CustomerInfoCards({
           
           <div className="flex items-start gap-3">
             <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xl">
-              {customerName?.charAt(0) || 'غ'}
+              {customerName ? customerName.charAt(0) : 'غ'}
             </div>
             <div>
-              <h4 className="font-medium text-primary">{customerName}</h4>
+              <h4 className="font-medium text-primary">{customerName || 'غير معروف'}</h4>
               <p className="text-sm text-muted-foreground">عميل</p>
             </div>
           </div>
