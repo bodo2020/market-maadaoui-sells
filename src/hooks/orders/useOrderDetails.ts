@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Order } from "@/types";
@@ -17,6 +18,7 @@ export function useOrderDetails(orderId: string) {
       const { data, error } = await supabase.from('online_orders').select(`
           *,
           customers(
+            id,
             name,
             email,
             phone
@@ -74,6 +76,7 @@ export function useOrderDetails(orderId: string) {
           payment_method: data.payment_method,
           shipping_address: data.shipping_address,
           items: transformItems(data.items),
+          customer_id: data.customer_id,
           customer_name: customerName,
           customer_email: customerEmail,
           customer_phone: customerPhone,

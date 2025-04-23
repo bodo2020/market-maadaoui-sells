@@ -101,6 +101,7 @@ export const useOrderManagement = (activeTab: string) => {
         .select(`
           *,
           customers (
+            id,
             name,
             phone,
             email
