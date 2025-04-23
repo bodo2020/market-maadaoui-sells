@@ -153,13 +153,6 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "cart_items_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       cash_tracking: {
@@ -622,13 +615,6 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "favorites_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       governorates: {
@@ -990,44 +976,6 @@ export type Database = {
             columns: ["main_category_id"]
             isOneToOne: false
             referencedRelation: "main_categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profiles: {
-        Row: {
-          created_at: string | null
-          customer_id: string | null
-          full_name: string
-          id: string
-          location: string | null
-          phone_number: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          customer_id?: string | null
-          full_name: string
-          id: string
-          location?: string | null
-          phone_number: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          customer_id?: string | null
-          full_name?: string
-          id?: string
-          location?: string | null
-          phone_number?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]

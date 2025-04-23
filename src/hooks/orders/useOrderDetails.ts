@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Order } from "@/types";
@@ -15,7 +14,8 @@ export function useOrderDetails(orderId: string) {
       setIsLoading(true);
       console.log("Fetching order details for ID:", orderId);
       
-      const { data, error } = await supabase.from('online_orders').select(`
+      const { data, error } = await supabase.from('online_orders')
+        .select(`
           *,
           customers(
             id,
@@ -23,7 +23,9 @@ export function useOrderDetails(orderId: string) {
             email,
             phone
           )
-        `).eq('id', orderId).single();
+        `)
+        .eq('id', orderId)
+        .single();
       
       if (error) throw error;
       
