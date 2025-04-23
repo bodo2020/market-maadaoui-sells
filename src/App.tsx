@@ -61,6 +61,7 @@ function App() {
             <Route path="/products" element={<ProtectedRoute><ProductManagement /></ProtectedRoute>} />
             <Route path="/products/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
             <Route path="/products/edit/:id" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+            <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
             <Route path="/supplier-purchases" element={<ProtectedRoute><SupplierPurchases /></ProtectedRoute>} />
             <Route path="/companies" element={<ProtectedRoute><Companies /></ProtectedRoute>} />
