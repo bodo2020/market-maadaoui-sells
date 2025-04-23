@@ -51,8 +51,14 @@ export default function OnlineOrders() {
       const orderItems = Array.isArray(orderDetails.items) ? orderDetails.items : [];
       
       for (const item of orderItems) {
-        // Properly cast item to ensure TypeScript recognizes the properties
-        const orderItem = item as OrderItem;
+        // First convert to unknown then to OrderItem to avoid direct casting errors
+        const orderItem = item as unknown as OrderItem;
+        
+        // Verify we have the required properties 
+        if (!orderItem.product_id) {
+          console.error("Invalid order item missing product_id:", item);
+          continue;
+        }
         
         const { data: product, error: productError } = await supabase
           .from('products')
@@ -65,7 +71,7 @@ export default function OnlineOrders() {
           continue;
         }
         
-        const newQuantity = Math.max(0, (product.quantity || 0) - orderItem.quantity);
+        const newQuantity = Math.max(0, (product.quantity || 0) - (orderItem.quantity || 0));
         
         await supabase
           .from('products')
@@ -201,13 +207,7 @@ export default function OnlineOrders() {
             ) : (
               <div className="overflow-x-auto">
                 <OrdersTable
-                  orders={orders.filter(order => {
-                    if (!searchQuery) return true;
-                    const searchLower = searchQuery.toLowerCase();
-                    return order.id.toLowerCase().includes(searchLower) || 
-                           order.customer_name?.toLowerCase().includes(searchLower) || 
-                           order.customer_phone?.toLowerCase().includes(searchLower);
-                  })}
+                  orders={filteredOrders}
                   onShowCustomer={showCustomerProfile}
                   onArchive={handleArchive}
                   onCancel={handleCancel}
