@@ -96,9 +96,18 @@ export const useOrderManagement = (activeTab: string) => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      let query = supabase.from('online_orders').select('*').order('created_at', {
-        ascending: false
-      });
+      let query = supabase.from('online_orders')
+        .select(`
+          *,
+          customers (
+            name,
+            phone,
+            email
+          )
+        `)
+        .order('created_at', {
+          ascending: false
+        });
       
       if (activeTab === "waiting") {
         query = query.eq('status', 'waiting');
@@ -115,7 +124,7 @@ export const useOrderManagement = (activeTab: string) => {
       const { data, error } = await query;
       if (error) throw error;
       
-      const transformedOrders: Order[] = (data || []).map((item: OrderFromDB) => ({
+      const transformedOrders: Order[] = (data || []).map((item: any) => ({
         id: item.id,
         created_at: item.created_at,
         total: item.total,
@@ -125,9 +134,9 @@ export const useOrderManagement = (activeTab: string) => {
         shipping_address: item.shipping_address,
         items: Array.isArray(item.items) ? item.items : [],
         customer_id: item.customer_id,
-        customer_name: item.customer_name || 'غير معروف',
-        customer_email: item.customer_email || '',
-        customer_phone: item.customer_phone || '',
+        customer_name: item.customers?.name || 'عميل',
+        customer_email: item.customers?.email || '',
+        customer_phone: item.customers?.phone || '',
         notes: item.notes || '',
         tracking_number: item.tracking_number || null,
         delivery_person: item.delivery_person || null

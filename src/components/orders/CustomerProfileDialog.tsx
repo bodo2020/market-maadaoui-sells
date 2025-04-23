@@ -52,11 +52,11 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
                 <AvatarFallback className="text-lg bg-primary text-primary-foreground">
-                  {getInitials(customer.name || 'عميل')}
+                  {getInitials(customer.name)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="text-xl font-semibold">{customer.name || 'عميل'}</h3>
+                <h3 className="text-xl font-semibold">{customer.name}</h3>
                 <Badge variant="outline">عميل</Badge>
               </div>
             </div>
