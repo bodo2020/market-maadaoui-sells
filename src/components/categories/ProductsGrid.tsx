@@ -1,4 +1,3 @@
-
 import { Product } from "@/types";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -74,7 +73,7 @@ export default function ProductsGrid({ products, onRefresh }: ProductsGridProps)
             <Button 
               variant="outline" 
               className="w-full"
-              onClick={() => navigate(`/add-product?id=${product.id}`)}
+              onClick={() => navigate(`/products/edit/${product.id}`)}
             >
               <Edit className="ml-2 h-4 w-4" />
               تعديل المنتج
