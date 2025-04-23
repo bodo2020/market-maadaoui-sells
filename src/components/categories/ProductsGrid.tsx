@@ -1,8 +1,9 @@
+
 import { Product } from "@/types";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, Package } from "lucide-react";
+import { Edit } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 
@@ -27,7 +28,11 @@ export default function ProductsGrid({ products, onRefresh }: ProductsGridProps)
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {products.map((product) => (
-        <Card key={product.id} className="flex flex-col">
+        <Card 
+          key={product.id} 
+          className="flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => navigate(`/products/edit/${product.id}`)}
+        >
           <CardContent className="p-4">
             <div className="aspect-square rounded-lg bg-gray-100 mb-4 overflow-hidden">
               <img
@@ -73,7 +78,10 @@ export default function ProductsGrid({ products, onRefresh }: ProductsGridProps)
             <Button 
               variant="outline" 
               className="w-full"
-              onClick={() => navigate(`/products/edit/${product.id}`)}
+              onClick={(e) => {
+                e.stopPropagation(); // Prevent card click when clicking button
+                navigate(`/products/edit/${product.id}`);
+              }}
             >
               <Edit className="ml-2 h-4 w-4" />
               تعديل المنتج
