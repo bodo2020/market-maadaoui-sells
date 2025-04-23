@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Product } from "@/types";
 import { Package } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface ProductGridProps {
   products: Product[];
@@ -12,6 +13,8 @@ interface ProductGridProps {
 }
 
 export function ProductGrid({ products, onEditProduct }: ProductGridProps) {
+  const navigate = useNavigate();
+
   if (products.length === 0) {
     return (
       <div className="text-center py-12">
@@ -53,7 +56,7 @@ export function ProductGrid({ products, onEditProduct }: ProductGridProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onEditProduct(product)}
+                onClick={() => navigate(`/add-product?id=${product.id}`)}
               >
                 تعديل
               </Button>
