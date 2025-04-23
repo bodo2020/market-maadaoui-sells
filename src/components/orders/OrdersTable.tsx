@@ -1,3 +1,4 @@
+
 import { Order } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -97,7 +98,7 @@ export function OrdersTable({
                   onShowCustomer(order);
                 }}
               >
-                {order.customer_name || 'عميل'}
+                {order.customer_name}
               </Button>
             </TableCell>
             <TableCell className="text-center">{order.total} ج.م</TableCell>

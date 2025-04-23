@@ -62,7 +62,8 @@ export function useOrderDetails(orderId: string) {
           }));
         };
         
-        const customerName = data.customers?.name || 'غير معروف';
+        // Get customer name from the customers table or use a default value
+        const customerName = data.customers?.name || 'عميل';
         const customerEmail = data.customers?.email || '';
         const customerPhone = data.customers?.phone || '';
         
@@ -85,7 +86,7 @@ export function useOrderDetails(orderId: string) {
         
         console.log("Parsed order:", orderObj);
         setOrder(orderObj);
-        if (selectedStatus === orderObj.status) {
+        if (selectedStatus === null || selectedStatus === orderObj.status) {
           setSelectedStatus(null);
         }
       }
