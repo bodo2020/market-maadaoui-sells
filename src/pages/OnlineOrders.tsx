@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ import { OrdersTable } from "@/components/orders/OrdersTable";
 import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog";
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
+import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 
 export default function OnlineOrders() {
   const [activeTab, setActiveTab] = useState("all");
@@ -46,7 +48,7 @@ export default function OnlineOrders() {
         
       if (orderError) throw orderError;
       
-      const orderItems = orderDetails.items || [];
+      const orderItems = Array.isArray(orderDetails.items) ? orderDetails.items : [];
       
       for (const item of orderItems) {
         const { data: product, error: productError } = await supabase

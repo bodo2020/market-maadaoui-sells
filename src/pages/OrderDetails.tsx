@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { Order } from "@/types";
 import MainLayout from "@/components/layout/MainLayout";
@@ -39,16 +38,13 @@ export default function OrderDetails() {
     setPaymentConfirmOpen(true);
   };
 
-  // Enhanced status change handler that also processes inventory and financials
-  const handleStatusChange = async (newStatus: Order['status']) => {
-    if (!order || isProcessingOrder) return;
+  const handleStatusChange = async () => {
+    if (!order || isProcessingOrder || !selectedStatus) return;
     
     try {
       setIsProcessingOrder(true);
       
-      // If the status is being changed to 'done', we need to process inventory and add to cash register
-      if (newStatus === 'done' && order.status !== 'done') {
-        // First, make sure we have a valid customer record
+      if (selectedStatus === 'done' && order.status !== 'done') {
         if (order.customer_name || order.customer_phone) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
@@ -58,7 +54,6 @@ export default function OrderDetails() {
           const customer = await findOrCreateCustomer(customerInfo);
           if (customer) {
             console.log("Customer linked to order:", customer);
-            // Update the customer_id in the order if it was missing
             if (!order.customer_id) {
               await supabase
                 .from('online_orders')
@@ -68,12 +63,10 @@ export default function OrderDetails() {
           }
         }
         
-        // Process inventory reduction for each item in the order
         const orderItems = order.items || [];
         console.log("Processing inventory for items:", orderItems);
         
         for (const item of orderItems) {
-          // Get the current product
           const { data: product, error: productError } = await supabase
             .from('products')
             .select('*')
@@ -85,10 +78,8 @@ export default function OrderDetails() {
             continue;
           }
           
-          // Calculate new quantity
           const newQuantity = Math.max(0, (product.quantity || 0) - item.quantity);
           
-          // Update the product quantity
           await updateProduct(product.id, {
             quantity: newQuantity
           });
@@ -96,7 +87,6 @@ export default function OrderDetails() {
           console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
         }
         
-        // If the order is marked as paid, add the amount to the online cash register
         if (order.payment_status === 'paid') {
           try {
             await recordCashTransaction(
@@ -104,7 +94,7 @@ export default function OrderDetails() {
               'deposit', 
               RegisterType.ONLINE, 
               `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-              ''  // User ID can be empty here as the system will handle it
+              ''
             );
             console.log(`Added ${order.total} to online cash register`);
           } catch (cashError) {
@@ -114,8 +104,7 @@ export default function OrderDetails() {
         }
       }
       
-      // Call the original status change handler to update the order status
-      await originalHandleStatusChange(newStatus);
+      await originalHandleStatusChange();
       toast.success("تم تحديث حالة الطلب وتحديث المخزون بنجاح");
       
     } catch (error) {
@@ -148,7 +137,6 @@ export default function OrderDetails() {
         newStatus === 'failed' ? 'فشل الدفع' : 'تم الاسترجاع'
       }`);
       
-      // If payment is marked as paid and order is already completed, add to cash register
       if (newStatus === 'paid' && order.status === 'done') {
         try {
           await recordCashTransaction(
@@ -221,7 +209,7 @@ export default function OrderDetails() {
               selectedStatus={selectedStatus}
               onStatusSelect={setSelectedStatus}
               onStatusConfirm={handleStatusChange}
-              currentStatus={order.status}
+              currentStatus={order?.status}
               isUpdating={isUpdatingStatus || isProcessingOrder}
             />
           </div>
@@ -234,7 +222,7 @@ export default function OrderDetails() {
           <div className="w-full md:w-3/5 space-y-6">
             <div>
               <h3 className="font-medium text-lg mb-3">المنتجات</h3>
-              <OrderItemsList items={order.items} />
+              <OrderItemsList items={order?.items || []} />
             </div>
 
             <div className="space-y-3">
@@ -243,7 +231,7 @@ export default function OrderDetails() {
                   variant="outline" 
                   className="w-full" 
                   onClick={handlePaymentStatusUpdate}
-                  disabled={order.payment_status === 'paid' || isUpdatingStatus || isProcessingOrder}
+                  disabled={order?.payment_status === 'paid' || isUpdatingStatus || isProcessingOrder}
                 >
                   {order?.payment_status === 'pending' ? 'تأكيد الدفع' : 'تم الدفع'}
                 </Button>
@@ -253,11 +241,11 @@ export default function OrderDetails() {
 
           <div className="w-full md:w-2/5">
             <CustomerInfoCards
-              customerName={order.customer_name}
-              customerEmail={order.customer_email}
-              customerPhone={order.customer_phone}
-              shippingAddress={order.shipping_address}
-              notes={order.notes}
+              customerName={order?.customer_name}
+              customerEmail={order?.customer_email}
+              customerPhone={order?.customer_phone}
+              shippingAddress={order?.shipping_address}
+              notes={order?.notes}
             />
           </div>
         </div>
@@ -265,7 +253,7 @@ export default function OrderDetails() {
         <PaymentConfirmationDialog
           open={paymentConfirmOpen}
           onOpenChange={setPaymentConfirmOpen}
-          orderId={order.id}
+          orderId={order?.id || ''}
           onConfirm={onPaymentConfirmed}
         />
       </div>
