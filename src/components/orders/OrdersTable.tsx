@@ -98,7 +98,7 @@ export function OrdersTable({
                   onShowCustomer(order);
                 }}
               >
-                {order.customer_name}
+                {order.customer_name || 'عميل غير معروف'}
               </Button>
             </TableCell>
             <TableCell className="text-center">{order.total} ج.م</TableCell>
