@@ -9,7 +9,7 @@ import { Download, Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { useNotificationStore } from "@/stores/notificationStore";
-import { Order } from "@/types";
+import { Order, OrderItem } from "@/types";
 import { useOrderManagement } from "@/hooks/orders/useOrderManagement";
 import { OrderStats } from "@/components/orders/OrderStats";
 import { OrdersTable } from "@/components/orders/OrdersTable";
@@ -51,10 +51,13 @@ export default function OnlineOrders() {
       const orderItems = Array.isArray(orderDetails.items) ? orderDetails.items : [];
       
       for (const item of orderItems) {
+        // Properly cast item to ensure TypeScript recognizes the properties
+        const orderItem = item as OrderItem;
+        
         const { data: product, error: productError } = await supabase
           .from('products')
           .select('*')
-          .eq('id', item.product_id)
+          .eq('id', orderItem.product_id)
           .single();
           
         if (productError) {
@@ -62,7 +65,7 @@ export default function OnlineOrders() {
           continue;
         }
         
-        const newQuantity = Math.max(0, (product.quantity || 0) - item.quantity);
+        const newQuantity = Math.max(0, (product.quantity || 0) - orderItem.quantity);
         
         await supabase
           .from('products')
@@ -198,7 +201,13 @@ export default function OnlineOrders() {
             ) : (
               <div className="overflow-x-auto">
                 <OrdersTable
-                  orders={filteredOrders}
+                  orders={orders.filter(order => {
+                    if (!searchQuery) return true;
+                    const searchLower = searchQuery.toLowerCase();
+                    return order.id.toLowerCase().includes(searchLower) || 
+                           order.customer_name?.toLowerCase().includes(searchLower) || 
+                           order.customer_phone?.toLowerCase().includes(searchLower);
+                  })}
                   onShowCustomer={showCustomerProfile}
                   onArchive={handleArchive}
                   onCancel={handleCancel}
