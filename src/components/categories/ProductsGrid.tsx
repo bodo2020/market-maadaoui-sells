@@ -31,7 +31,7 @@ export default function ProductsGrid({ products, onRefresh }: ProductsGridProps)
         <Card 
           key={product.id} 
           className="flex flex-col cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => navigate(`/products/edit/${product.id}`)}
+          onClick={() => navigate(`/products/add?id=${product.id}`)}
         >
           <CardContent className="p-4">
             <div className="aspect-square rounded-lg bg-gray-100 mb-4 overflow-hidden">
@@ -80,7 +80,7 @@ export default function ProductsGrid({ products, onRefresh }: ProductsGridProps)
               className="w-full"
               onClick={(e) => {
                 e.stopPropagation(); // Prevent card click when clicking button
-                navigate(`/products/edit/${product.id}`);
+                navigate(`/products/add?id=${product.id}`);
               }}
             >
               <Edit className="ml-2 h-4 w-4" />
