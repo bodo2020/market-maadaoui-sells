@@ -1,4 +1,3 @@
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -49,17 +48,16 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
         </DialogHeader>
         
         <div className="flex flex-col md:flex-row gap-6">
-          {/* Customer Profile */}
           <div className="w-full md:w-1/2 space-y-6">
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16">
                 <AvatarFallback className="text-lg bg-primary text-primary-foreground">
-                  {getInitials(customer.name)}
+                  {getInitials(customer.name || 'عميل')}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="text-xl font-semibold">{customer.name}</h3>
-                <Badge variant="outline">عميل جديد</Badge>
+                <h3 className="text-xl font-semibold">{customer.name || 'عميل'}</h3>
+                <Badge variant="outline">عميل</Badge>
               </div>
             </div>
             
@@ -98,7 +96,6 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
             )}
           </div>
           
-          {/* Order Summary */}
           <div className="w-full md:w-1/2 space-y-6">
             <h4 className="text-lg font-medium">طلبات العميل</h4>
             
