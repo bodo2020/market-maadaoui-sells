@@ -62,8 +62,8 @@ export function useOrderDetails(orderId: string) {
           }));
         };
         
-        // Get customer name from the customers table or use a default value
-        const customerName = data.customers?.name || 'عميل';
+        // Get actual customer name from the customers table, not a default value
+        const customerName = data.customers?.name || '';
         const customerEmail = data.customers?.email || '';
         const customerPhone = data.customers?.phone || '';
         

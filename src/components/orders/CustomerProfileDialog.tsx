@@ -24,6 +24,7 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
   if (!customer) return null;
 
   const getInitials = (name: string) => {
+    if (!name) return 'غ'; // Default initial if no name
     return name
       .split(' ')
       .map(part => part[0])
@@ -57,7 +58,7 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="text-xl font-semibold">{customer.name}</h3>
+                <h3 className="text-xl font-semibold">{customer.name || 'غير معروف'}</h3>
                 <Badge variant="outline">عميل</Badge>
               </div>
             </div>
