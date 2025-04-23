@@ -12,12 +12,17 @@ import { useOrderDetails } from "@/hooks/orders/useOrderDetails";
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { findOrCreateCustomer } from "@/services/supabase/customerService";
+import { updateProduct } from "@/services/supabase/productService";
+import { RegisterType } from "@/services/supabase/cashTrackingService";
+import { recordCashTransaction } from "@/services/supabase/cashTrackingService";
 
 export default function OrderDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
   const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
+  const [isProcessingOrder, setIsProcessingOrder] = useState(false);
 
   const {
     order,
@@ -25,13 +30,100 @@ export default function OrderDetails() {
     isUpdatingStatus,
     selectedStatus,
     setSelectedStatus,
-    handleStatusChange,
+    handleStatusChange: originalHandleStatusChange,
     fetchOrder
   } = useOrderDetails(id as string);
 
   const handlePaymentStatusUpdate = () => {
     if (!order || order.payment_status === 'paid') return;
     setPaymentConfirmOpen(true);
+  };
+
+  // Enhanced status change handler that also processes inventory and financials
+  const handleStatusChange = async (newStatus: Order['status']) => {
+    if (!order || isProcessingOrder) return;
+    
+    try {
+      setIsProcessingOrder(true);
+      
+      // If the status is being changed to 'done', we need to process inventory and add to cash register
+      if (newStatus === 'done' && order.status !== 'done') {
+        // First, make sure we have a valid customer record
+        if (order.customer_name || order.customer_phone) {
+          const customerInfo = {
+            name: order.customer_name || 'عميل غير معروف',
+            phone: order.customer_phone || undefined
+          };
+          
+          const customer = await findOrCreateCustomer(customerInfo);
+          if (customer) {
+            console.log("Customer linked to order:", customer);
+            // Update the customer_id in the order if it was missing
+            if (!order.customer_id) {
+              await supabase
+                .from('online_orders')
+                .update({ customer_id: customer.id })
+                .eq('id', order.id);
+            }
+          }
+        }
+        
+        // Process inventory reduction for each item in the order
+        const orderItems = order.items || [];
+        console.log("Processing inventory for items:", orderItems);
+        
+        for (const item of orderItems) {
+          // Get the current product
+          const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', item.product_id)
+            .single();
+            
+          if (productError) {
+            console.error("Error fetching product:", productError);
+            continue;
+          }
+          
+          // Calculate new quantity
+          const newQuantity = Math.max(0, (product.quantity || 0) - item.quantity);
+          
+          // Update the product quantity
+          await updateProduct(product.id, {
+            quantity: newQuantity
+          });
+          
+          console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
+        }
+        
+        // If the order is marked as paid, add the amount to the online cash register
+        if (order.payment_status === 'paid') {
+          try {
+            await recordCashTransaction(
+              order.total, 
+              'deposit', 
+              RegisterType.ONLINE, 
+              `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
+              ''  // User ID can be empty here as the system will handle it
+            );
+            console.log(`Added ${order.total} to online cash register`);
+          } catch (cashError) {
+            console.error("Error recording cash transaction:", cashError);
+            toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
+          }
+        }
+      }
+      
+      // Call the original status change handler to update the order status
+      await originalHandleStatusChange(newStatus);
+      toast.success("تم تحديث حالة الطلب وتحديث المخزون بنجاح");
+      
+    } catch (error) {
+      console.error('Error processing order completion:', error);
+      toast.error("حدث خطأ أثناء معالجة الطلب");
+    } finally {
+      setIsProcessingOrder(false);
+    }
   };
 
   const handlePaymentStatusChange = async (newStatus: Order['payment_status']) => {
@@ -55,6 +147,23 @@ export default function OrderDetails() {
         newStatus === 'pending' ? 'في انتظار الدفع' : 
         newStatus === 'failed' ? 'فشل الدفع' : 'تم الاسترجاع'
       }`);
+      
+      // If payment is marked as paid and order is already completed, add to cash register
+      if (newStatus === 'paid' && order.status === 'done') {
+        try {
+          await recordCashTransaction(
+            order.total, 
+            'deposit', 
+            RegisterType.ONLINE, 
+            `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
+            ''
+          );
+          console.log(`Added ${order.total} to online cash register`);
+        } catch (cashError) {
+          console.error("Error recording cash transaction:", cashError);
+          toast.error("تم تحديث حالة الدفع لكن حدث خطأ في تسجيل المعاملة المالية");
+        }
+      }
       
       fetchOrder();
     } catch (error) {
@@ -113,7 +222,7 @@ export default function OrderDetails() {
               onStatusSelect={setSelectedStatus}
               onStatusConfirm={handleStatusChange}
               currentStatus={order.status}
-              isUpdating={isUpdatingStatus}
+              isUpdating={isUpdatingStatus || isProcessingOrder}
             />
           </div>
           <Button variant="outline" onClick={() => navigate('/online-orders')}>
@@ -134,7 +243,7 @@ export default function OrderDetails() {
                   variant="outline" 
                   className="w-full" 
                   onClick={handlePaymentStatusUpdate}
-                  disabled={order.payment_status === 'paid' || isUpdatingStatus}
+                  disabled={order.payment_status === 'paid' || isUpdatingStatus || isProcessingOrder}
                 >
                   {order?.payment_status === 'pending' ? 'تأكيد الدفع' : 'تم الدفع'}
                 </Button>

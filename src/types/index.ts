@@ -185,10 +185,10 @@ export interface Supplier {
 export interface Customer {
   id: string;
   name: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  notes?: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  notes?: string | null;
   created_at: string;
   updated_at?: string;
   balance?: number;
@@ -237,6 +237,7 @@ export interface Order {
   payment_method: string | null;
   shipping_address: string | null;
   items: OrderItem[];
+  customer_id?: string;
   customer_name?: string;
   customer_email?: string;
   customer_phone?: string;

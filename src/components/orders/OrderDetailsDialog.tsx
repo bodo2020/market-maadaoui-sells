@@ -10,6 +10,9 @@ import { OrderSummaryActions } from "./OrderSummaryActions";
 import { CustomerInfoCards } from "./CustomerInfoCards";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { findOrCreateCustomer } from "@/services/supabase/customerService";
+import { updateProduct } from "@/services/supabase/productService";
+import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 
 interface OrderDetailsDialogProps {
   order: Order | null;
@@ -37,6 +40,74 @@ export function OrderDetailsDialog({
     try {
       setIsUpdatingShipping(true);
       
+      // If marking as done, process inventory and financial updates
+      if (status === 'done' && order.status !== 'done') {
+        // Link to customer if possible
+        if (order.customer_name || order.customer_phone) {
+          const customerInfo = {
+            name: order.customer_name || 'عميل غير معروف',
+            phone: order.customer_phone || undefined
+          };
+          
+          const customer = await findOrCreateCustomer(customerInfo);
+          if (customer) {
+            console.log("Customer linked to order:", customer);
+            // Update the customer_id in the order if it was missing
+            if (!order.customer_id) {
+              await supabase
+                .from('online_orders')
+                .update({ customer_id: customer.id })
+                .eq('id', order.id);
+            }
+          }
+        }
+        
+        // Process inventory reduction for each item in the order
+        const orderItems = order.items || [];
+        console.log("Processing inventory for items:", orderItems);
+        
+        for (const item of orderItems) {
+          // Get the current product
+          const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', item.product_id)
+            .single();
+            
+          if (productError) {
+            console.error("Error fetching product:", productError);
+            continue;
+          }
+          
+          // Calculate new quantity
+          const newQuantity = Math.max(0, (product.quantity || 0) - item.quantity);
+          
+          // Update the product quantity
+          await updateProduct(product.id, {
+            quantity: newQuantity
+          });
+          
+          console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
+        }
+        
+        // If the order is marked as paid, add the amount to the online cash register
+        if (order.payment_status === 'paid' || status === 'done') {
+          try {
+            await recordCashTransaction(
+              order.total, 
+              'deposit', 
+              RegisterType.ONLINE, 
+              `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
+              ''
+            );
+            console.log(`Added ${order.total} to online cash register`);
+          } catch (cashError) {
+            console.error("Error recording cash transaction:", cashError);
+            toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
+          }
+        }
+      }
+
       const { error } = await supabase
         .from('online_orders')
         .update({ 

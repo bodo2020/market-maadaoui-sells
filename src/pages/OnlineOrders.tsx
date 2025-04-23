@@ -38,6 +38,54 @@ export default function OnlineOrders() {
 
   const handleComplete = async (order: Order) => {
     try {
+      const { data: orderDetails, error: orderError } = await supabase
+        .from('online_orders')
+        .select('*')
+        .eq('id', order.id)
+        .single();
+        
+      if (orderError) throw orderError;
+      
+      const orderItems = orderDetails.items || [];
+      
+      for (const item of orderItems) {
+        const { data: product, error: productError } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', item.product_id)
+          .single();
+          
+        if (productError) {
+          console.error("Error fetching product:", productError);
+          continue;
+        }
+        
+        const newQuantity = Math.max(0, (product.quantity || 0) - item.quantity);
+        
+        await supabase
+          .from('products')
+          .update({ quantity: newQuantity })
+          .eq('id', product.id);
+        
+        console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
+      }
+      
+      if (orderDetails.payment_status === 'paid') {
+        try {
+          await recordCashTransaction(
+            orderDetails.total, 
+            'deposit', 
+            RegisterType.ONLINE, 
+            `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
+            ''
+          );
+          console.log(`Added ${orderDetails.total} to online cash register`);
+        } catch (cashError) {
+          console.error("Error recording cash transaction:", cashError);
+          toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
+        }
+      }
+
       const { error } = await supabase.from('online_orders')
         .update({
           status: 'done',
@@ -47,7 +95,7 @@ export default function OnlineOrders() {
         
       if (error) throw error;
       handleOrderUpdate();
-      toast.success("تم اكتمال الطلب");
+      toast.success("تم اكتمال الطلب وتحديث المخزون");
     } catch (error) {
       console.error('Error completing order:', error);
       toast.error("حدث خطأ أثناء اكتمال الطلب");
