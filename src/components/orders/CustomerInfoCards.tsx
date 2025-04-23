@@ -1,7 +1,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Mail, MapPin, Pencil, Phone } from "lucide-react";
+import { Mail, MapPin, Pencil, Phone, User } from "lucide-react";
 
 interface CustomerInfoCardsProps {
   customerName: string;
@@ -18,6 +18,9 @@ export function CustomerInfoCards({
   shippingAddress,
   notes
 }: CustomerInfoCardsProps) {
+  // Remove any customer name or phone information from notes if they exist there
+  const cleanedNotes = notes?.replace(/Customer Name:.*Phone:.*Applied Offer/, '') || '';
+  
   return (
     <div className="space-y-6">
       <Card>
@@ -29,7 +32,7 @@ export function CustomerInfoCards({
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            {notes || 'لا توجد ملاحظات من العميل'}
+            {cleanedNotes || 'لا توجد ملاحظات من العميل'}
           </p>
         </CardContent>
       </Card>
@@ -46,7 +49,12 @@ export function CustomerInfoCards({
             </div>
             <div>
               <h4 className="font-medium text-primary">{customerName || 'غير معروف'}</h4>
-              <p className="text-sm text-muted-foreground">عميل</p>
+              {customerPhone && (
+                <div className="flex items-center gap-1 mt-1">
+                  <Phone className="h-3 w-3 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">{customerPhone}</p>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
