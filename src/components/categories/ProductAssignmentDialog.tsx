@@ -16,6 +16,7 @@ import { Loader2 } from "lucide-react";
 import { Product, MainCategory, Subcategory } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { updateProduct } from "@/services/supabase/productService";
 
 interface ProductAssignmentDialogProps {
   open: boolean;
@@ -38,6 +39,15 @@ const ProductAssignmentDialog = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryLevel, setSelectedCategoryLevel] = useState<'category' | 'subcategory'>('category');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      // إعادة تعيين الحالة عند إغلاق الديالوج
+      setSearchQuery("");
+      setSelectedId(null);
+    }
+  }, [open]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -53,21 +63,23 @@ const ProductAssignmentDialog = ({
         setCategories(mainCategories || []);
         
         if (product?.main_category_id) {
-          setSelectedId(product.main_category_id);
-          setSelectedCategoryLevel('category');
-          
-          const { data: subcategoriesData, error: subcategoriesError } = await supabase
-            .from('subcategories')
-            .select('*')
-            .eq('category_id', product.main_category_id)
-            .order('name');
-          
-          if (subcategoriesError) throw subcategoriesError;
-          setSubcategories(subcategoriesData || []);
+          setSelectedCategoryId(product.main_category_id);
           
           if (product?.subcategory_id) {
-            setSelectedId(product.subcategory_id);
             setSelectedCategoryLevel('subcategory');
+            setSelectedId(product.subcategory_id);
+            
+            const { data: subcategoriesData, error: subcategoriesError } = await supabase
+              .from('subcategories')
+              .select('*')
+              .eq('category_id', product.main_category_id)
+              .order('name');
+            
+            if (subcategoriesError) throw subcategoriesError;
+            setSubcategories(subcategoriesData || []);
+          } else {
+            setSelectedCategoryLevel('category');
+            setSelectedId(product.main_category_id);
           }
         }
       } catch (error) {
@@ -85,9 +97,14 @@ const ProductAssignmentDialog = ({
 
   const updateProductCategory = async () => {
     try {
+      if (!product || !selectedId) {
+        toast.error('يرجى تحديد ' + (type === 'category' ? 'قسم' : 'شركة'));
+        return;
+      }
+
       setLoading(true);
       
-      const updateData: any = {};
+      const updateData: Partial<Product> = {};
       
       if (type === 'category') {
         if (selectedCategoryLevel === 'category') {
@@ -98,6 +115,9 @@ const ProductAssignmentDialog = ({
           if (subcategory) {
             updateData.main_category_id = subcategory.category_id;
             updateData.subcategory_id = selectedId;
+          } else {
+            toast.error('القسم الفرعي المحدد غير متوفر');
+            return;
           }
         }
       } else if (type === 'company') {
@@ -106,14 +126,8 @@ const ProductAssignmentDialog = ({
       
       console.log("Updating product with data:", updateData);
       
-      const { error } = await supabase
-        .from('products')
-        .update(updateData)
-        .eq('id', product?.id);
-        
-      if (error) {
-        throw error;
-      }
+      // استخدام خدمة تحديث المنتج بدلاً من الاتصال المباشر بقاعدة البيانات
+      await updateProduct(product.id, updateData);
       
       toast.success(`تم تحديث ${type === 'category' ? 'قسم' : 'شركة'} المنتج بنجاح`);
       onSaved();
@@ -127,9 +141,10 @@ const ProductAssignmentDialog = ({
   };
 
   const handleCategorySelection = async (categoryId: string) => {
-    setSelectedId(categoryId);
-    
     if (selectedCategoryLevel === 'category') {
+      setSelectedId(categoryId);
+      setSelectedCategoryId(categoryId);
+      
       try {
         setLoading(true);
         const { data, error } = await supabase
@@ -146,6 +161,8 @@ const ProductAssignmentDialog = ({
       } finally {
         setLoading(false);
       }
+    } else {
+      setSelectedId(categoryId);
     }
   };
 
@@ -186,7 +203,12 @@ const ProductAssignmentDialog = ({
               value={selectedCategoryLevel} 
               onValueChange={(value: 'category' | 'subcategory') => {
                 setSelectedCategoryLevel(value);
-                setSelectedId(null); // Reset selection when changing level
+                setSelectedId(null); // إعادة تعيين التحديد عند تغيير المستوى
+                
+                // إذا رجعنا إلى اختيار القسم الرئيسي وكان هناك قسم رئيسي محدد مسبقا
+                if (value === 'category' && selectedCategoryId) {
+                  setSelectedId(selectedCategoryId);
+                }
               }} 
               className="pb-4"
             >

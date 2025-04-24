@@ -61,20 +61,43 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 }
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
-  // Create a product update object focusing only on product fields
+  // الخطوة 1: تأكد من أن main_category_id و subcategory_id ليسا undefined وإذا كانا، اجعلهما null
   const productUpdate = {
     ...product,
     updated_at: new Date().toISOString(),
-    // Explicitly handle foreign keys and convert undefined values to null
+    
+    // معالجة خاصة للمفاتيح الخارجية للتأكد من تحويل undefined إلى null
     main_category_id: product.main_category_id === undefined ? null : product.main_category_id,
     subcategory_id: product.subcategory_id === undefined ? null : product.subcategory_id,
     company_id: product.company_id === undefined ? null : product.company_id,
-    // Explicitly handle offer price and is_offer
+    
+    // معالجة خاصة لسعر العرض وحالة المنتج في العروض
     offer_price: product.offer_price ?? null,
     is_offer: product.is_offer ?? false
   };
   
   console.log("Sending update to Supabase:", productUpdate);
+  
+  // الخطوة 2: التأكد من أن subcategory_id يتوافق مع main_category_id
+  if (productUpdate.subcategory_id && productUpdate.main_category_id) {
+    try {
+      // التحقق من أن القسم الفرعي ينتمي للقسم الرئيسي
+      const { data, error } = await supabase
+        .from("subcategories")
+        .select("*")
+        .eq("id", productUpdate.subcategory_id)
+        .eq("category_id", productUpdate.main_category_id)
+        .single();
+      
+      if (error || !data) {
+        console.warn("Subcategory doesn't belong to specified main category. Resetting subcategory_id to null.");
+        productUpdate.subcategory_id = null;
+      }
+    } catch (error) {
+      console.error("Error checking subcategory relation:", error);
+      // في حالة وجود خطأ، نترك القيم كما هي ونستمر
+    }
+  }
   
   try {
     const { data, error } = await supabase
