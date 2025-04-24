@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -29,6 +28,7 @@ const productSchema = z.object({
   unit_of_measure: z.string().default("قطعة"),
   offer_price: z.coerce.number().nullable().optional(),
   is_offer: z.boolean().default(false),
+  company_id: z.string().optional(),
 });
 
 const units = [
@@ -55,6 +55,7 @@ interface AddProductDialogProps {
   selectedSubcategory: string | null;
   onCategoryChange: (categoryId: string | null) => void;
   onSubcategoryChange: (subcategoryId: string | null) => void;
+  companies: Array<{ id: string; name: string }>;
 }
 
 export function AddProductDialog({
@@ -67,7 +68,8 @@ export function AddProductDialog({
   selectedCategory,
   selectedSubcategory,
   onCategoryChange,
-  onSubcategoryChange
+  onSubcategoryChange,
+  companies
 }: AddProductDialogProps) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -87,6 +89,7 @@ export function AddProductDialog({
       unit_of_measure: "قطعة",
       offer_price: null,
       is_offer: false,
+      company_id: undefined,
     },
   });
 
@@ -117,7 +120,7 @@ export function AddProductDialog({
         purchase_price: values.purchase_price,
         quantity: values.quantity,
         image_urls: ["/placeholder.svg"],
-        company_id: companyId,
+        company_id: values.company_id || companyId,
         main_category_id: values.category_id, // تم تغييرها من category_id إلى main_category_id
         subcategory_id: values.subcategory_id,
         unit_of_measure: values.unit_of_measure,
@@ -385,6 +388,38 @@ export function AddProductDialog({
                 )}
               />
             )}
+
+            <FormField
+              control={form.control}
+              name="company_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>الشركة</FormLabel>
+                  <Select
+                    value={field.value || "none"}
+                    onValueChange={(value) => {
+                      const companyId = value === "none" ? undefined : value;
+                      field.onChange(companyId);
+                    }}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر الشركة" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">بدون شركة</SelectItem>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

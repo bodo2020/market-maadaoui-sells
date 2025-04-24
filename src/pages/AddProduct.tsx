@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
-import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -12,14 +11,16 @@ import { fetchProductById, updateProduct } from "@/services/supabase/productServ
 import { Product } from "@/types";
 import { Loader2 } from "lucide-react";
 import { fetchMainCategories } from "@/services/supabase/categoryService";
+import { fetchCompanies } from "@/services/supabase/companyService";
 import { fetchSubcategories } from "@/services/supabase/categoryService";
-import { MainCategory, Subcategory } from "@/types";
+import { MainCategory, Subcategory, Company } from "@/types";
 
 export default function AddProduct() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<MainCategory[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -27,6 +28,7 @@ export default function AddProduct() {
 
   useEffect(() => {
     loadCategories();
+    loadCompanies();
     if (productId) {
       loadProduct(productId);
     }
@@ -41,6 +43,20 @@ export default function AddProduct() {
       toast({
         title: "Error",
         description: "Failed to load categories",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadCompanies = async () => {
+    try {
+      const companiesData = await fetchCompanies();
+      setCompanies(companiesData);
+    } catch (error) {
+      console.error("Error loading companies:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load companies",
         variant: "destructive",
       });
     }
@@ -280,6 +296,29 @@ export default function AddProduct() {
                 value={product?.barcode || ''}
                 onChange={(e) => setProduct(prev => ({ ...prev, barcode: e.target.value }))}
               />
+            </div>
+
+            <div>
+              <Label htmlFor="company_id">الشركة</Label>
+              <Select
+                value={product?.company_id || "none"}
+                onValueChange={(value) => {
+                  const companyId = value === "none" ? undefined : value;
+                  setProduct(prev => ({ ...prev, company_id: companyId }));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر الشركة" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">بدون شركة</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
