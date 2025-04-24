@@ -1,196 +1,103 @@
 
 import { useState, useEffect } from "react";
-import { toast } from "sonner";
-import { Loader2, FolderPlus, Trash, Edit, Package, ArrowLeft } from "lucide-react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useNavigate } from "react-router-dom";
-import { fetchSubcategories, deleteSubcategory, fetchMainCategoryById } from "@/services/supabase/categoryService";
-import { Subcategory, MainCategory } from "@/types";
-import { fetchProductsBySubcategory } from "@/services/supabase/productService";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Plus } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import AddSubcategoryDialog from "./AddSubcategoryDialog";
+import { fetchSubcategories } from "@/services/supabase/categoryService";
+import { Subcategory } from "@/types";
+import { toast } from "sonner";
+import AddProductsToSubcategoryDialog from "./AddProductsToSubcategoryDialog";
 
-interface SubcategoryListProps {
-  categoryId: string;
-}
-
-export default function SubcategoryList({ categoryId }: SubcategoryListProps) {
-  const [subcategories, setSubcategories] = useState<(Subcategory & { product_count?: number })[]>([]);
+export default function SubcategoryList() {
+  const { id: categoryId } = useParams<{ id: string }>();
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [parentCategory, setParentCategory] = useState<MainCategory | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const navigate = useNavigate();
-  
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<Subcategory | null>(null);
+  const [isProductsDialogOpen, setIsProductsDialogOpen] = useState(false);
+
   useEffect(() => {
     if (categoryId) {
       loadSubcategories();
-      fetchParentCategory();
     }
   }, [categoryId]);
-
-  const fetchParentCategory = async () => {
-    try {
-      const category = await fetchMainCategoryById(categoryId);
-      setParentCategory(category);
-    } catch (error) {
-      console.error('Error fetching parent category:', error);
-      toast.error("حدث خطأ أثناء تحميل القسم الرئيسي");
-    }
-  };
 
   const loadSubcategories = async () => {
     try {
       setLoading(true);
       const data = await fetchSubcategories(categoryId);
-      
-      const subcategoriesWithCount = await Promise.all(
-        data.map(async (subcategory) => {
-          try {
-            const products = await fetchProductsBySubcategory(subcategory.id);
-            return {
-              ...subcategory,
-              product_count: products.length
-            };
-          } catch (error) {
-            console.error(`Error fetching products for subcategory ${subcategory.id}:`, error);
-            return {
-              ...subcategory,
-              product_count: 0
-            };
-          }
-        })
-      );
-      
-      setSubcategories(subcategoriesWithCount);
+      setSubcategories(data);
     } catch (error) {
-      console.error('Error fetching subcategories:', error);
+      console.error("Error loading subcategories:", error);
       toast.error("حدث خطأ أثناء تحميل الأقسام الفرعية");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (subcategoryId: string) => {
-    try {
-      await deleteSubcategory(subcategoryId);
-      toast.success("تم حذف القسم الفرعي بنجاح");
-      await loadSubcategories();
-    } catch (error) {
-      console.error('Error deleting subcategory:', error);
-      toast.error("حدث خطأ أثناء حذف القسم الفرعي");
-    }
+  const handleAddProducts = (subcategory: Subcategory) => {
+    setSelectedSubcategory(subcategory);
+    setIsProductsDialogOpen(true);
   };
-
-  const navigateToSubcategory = (subcategory: Subcategory) => {
-    navigate(`/categories/${categoryId}/${subcategory.id}`);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">
-            الأقسام الفرعية {parentCategory && `- ${parentCategory.name}`}
-          </h2>
-        </div>
-        <Button onClick={() => setShowAddDialog(true)}>
-          <FolderPlus className="h-4 w-4 ml-2" />
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">الأقسام الفرعية</h2>
+        <Button onClick={() => setIsAddDialogOpen(true)}>
+          <Plus className="h-4 w-4 ml-2" />
           إضافة قسم فرعي
         </Button>
       </div>
 
-      <Button 
-        variant="ghost" 
-        className="mb-4"
-        onClick={() => navigate('/categories')}
-      >
-        <ArrowLeft className="h-4 w-4 ml-1" />
-        العودة للأقسام الرئيسية
-      </Button>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-        {subcategories.map((subcategory) => (
-          <div 
-            key={subcategory.id} 
-            className="border rounded-lg overflow-hidden hover:border-primary transition-colors cursor-pointer"
-            onClick={() => navigateToSubcategory(subcategory)}
-          >
-            <div className="h-40 bg-gray-100 relative">
-              {subcategory.image_url ? (
-                <img 
-                  src={subcategory.image_url} 
-                  alt={subcategory.name} 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <FolderPlus className="h-16 w-16 text-gray-300" />
-                </div>
-              )}
-              <Badge variant="outline" className="absolute top-2 right-2 bg-white">
-                قسم فرعي
-              </Badge>
-              
-              <Badge variant="secondary" className="absolute top-2 left-2 flex items-center gap-1 bg-white">
-                <Package className="h-3 w-3" />
-                {subcategory.product_count || 0} منتج
-              </Badge>
-            </div>
-            <div className="p-4">
-              <h3 className="font-semibold text-lg mb-1">{subcategory.name}</h3>
-              {subcategory.description && (
-                <p className="text-gray-500 text-sm line-clamp-2">{subcategory.description}</p>
-              )}
-              <div className="flex justify-between items-center mt-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigateToSubcategory(subcategory);
-                  }}
-                >
-                  <Edit className="h-4 w-4 ml-1" />
-                  تعديل
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(subcategory.id);
-                  }}
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+      {loading ? (
+        <div className="text-center py-8">جاري التحميل...</div>
+      ) : (
+        <ScrollArea className="h-[500px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {subcategories.map((subcategory) => (
+              <Card key={subcategory.id}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-lg">{subcategory.name}</CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => handleAddProducts(subcategory)}
+                  >
+                    <Plus className="h-4 w-4 ml-2" />
+                    إضافة منتجات
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{subcategory.description}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        ))}
-      </div>
-
-      {subcategories.length === 0 && (
-        <div className="text-center p-8 bg-gray-50 rounded-lg border">
-          <FolderPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-lg font-medium">لا توجد أقسام فرعية</h3>
-          <p className="text-gray-500 mb-4">يمكنك إضافة أقسام فرعية جديدة من خلال الزر أعلاه</p>
-        </div>
+        </ScrollArea>
       )}
 
-      <AddSubcategoryDialog
-        open={showAddDialog}
-        onOpenChange={setShowAddDialog}
-        categoryId={categoryId}
-        onSuccess={loadSubcategories}
-      />
+      {categoryId && (
+        <AddSubcategoryDialog
+          open={isAddDialogOpen}
+          onOpenChange={setIsAddDialogOpen}
+          categoryId={categoryId}
+          onSuccess={loadSubcategories}
+        />
+      )}
+
+      {selectedSubcategory && (
+        <AddProductsToSubcategoryDialog
+          open={isProductsDialogOpen}
+          onOpenChange={setIsProductsDialogOpen}
+          categoryId={categoryId}
+          subcategoryId={selectedSubcategory.id}
+          onSuccess={loadSubcategories}
+        />
+      )}
     </div>
   );
 }

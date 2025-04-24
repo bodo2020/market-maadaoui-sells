@@ -3,65 +3,53 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Product } from "@/types";
 import { Search, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { updateProduct } from "@/services/supabase/productService";
+import { Product } from "@/types";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { updateProduct, fetchProducts } from "@/services/supabase/productService";
 
 interface AddProductsToSubcategoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categoryId: string;
+  subcategoryId: string;
   onSuccess?: () => void;
-  products: Product[];
-  parentCategories?: {
-    categoryId: string | null;
-    subcategoryId: string | null;
-  };
 }
 
 export default function AddProductsToSubcategoryDialog({
   open,
   onOpenChange,
   categoryId,
-  onSuccess,
-  products,
-  parentCategories
+  subcategoryId,
+  onSuccess
 }: AddProductsToSubcategoryDialogProps) {
   const [searchSelected, setSearchSelected] = useState("");
   const [searchAvailable, setSearchAvailable] = useState("");
-  const [selectedProducts, setSelectedProducts] = useState<Product[]>(
-    products.filter(p => p.subsubcategory_id === categoryId)
-  );
-  const [saving, setSaving] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
-      fetchAllProducts();
+      loadProducts();
     }
   }, [open]);
 
-  useEffect(() => {
-    // Update selected products when the products prop changes
-    setSelectedProducts(products.filter(p => p.subsubcategory_id === categoryId));
-  }, [products, categoryId]);
-
-  const fetchAllProducts = async () => {
+  const loadProducts = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*");
+      const products = await fetchProducts();
       
-      if (error) throw error;
-      setAllProducts(data || []);
+      // Filter products already in this subcategory
+      const selectedProducts = products.filter(p => p.subcategory_id === subcategoryId);
+      setSelectedProducts(selectedProducts);
+      
+      setAllProducts(products);
     } catch (error) {
-      console.error("Error fetching products:", error);
+      console.error("Error loading products:", error);
       toast.error("حدث خطأ أثناء تحميل المنتجات");
     } finally {
       setLoading(false);
@@ -88,25 +76,23 @@ export default function AddProductsToSubcategoryDialog({
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Update products with new category hierarchy
+      // Update products with new category association
       await Promise.all([
-        // Add products to selected subsubcategory and parent categories
+        // Add products to selected subcategory
         ...selectedProducts.map(product =>
           updateProduct(product.id, {
-            subsubcategory_id: categoryId,
-            subcategory_id: parentCategories?.subcategoryId || null,
-            category_id: parentCategories?.categoryId || null
+            subcategory_id: subcategoryId,
+            category_id: categoryId
           })
         ),
         // Remove category associations from unselected products
-        ...products
+        ...allProducts
           .filter(p => 
-            p.subsubcategory_id === categoryId && 
+            p.subcategory_id === subcategoryId && 
             !selectedProducts.find(sp => sp.id === p.id)
           )
           .map(product =>
             updateProduct(product.id, {
-              subsubcategory_id: null,
               subcategory_id: null,
               category_id: null
             })
@@ -128,7 +114,7 @@ export default function AddProductsToSubcategoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl">
         <DialogHeader>
-          <DialogTitle>حدد المنتجات</DialogTitle>
+          <DialogTitle>إدارة منتجات القسم الفرعي</DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-6">
@@ -189,7 +175,7 @@ export default function AddProductsToSubcategoryDialog({
 
           {/* Available Products */}
           <div>
-            <h3 className="font-medium mb-2">المنتجات المتبقية</h3>
+            <h3 className="font-medium mb-2">المنتجات المتاحة</h3>
             <div className="space-y-4">
               <div className="relative">
                 <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />

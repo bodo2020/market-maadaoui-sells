@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { MainCategory, Subcategory, Subsubcategory, Category } from "@/types";
 
@@ -79,8 +78,11 @@ export async function deleteMainCategory(id: string) {
 export async function fetchSubcategories(categoryId?: string) {
   let query = supabase
     .from("subcategories")
-    .select("*")
-    .order("name");
+    .select(`
+      *,
+      products (*)
+    `)
+    .order('name');
   
   if (categoryId) {
     query = query.eq("category_id", categoryId);
