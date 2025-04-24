@@ -4,12 +4,18 @@ import { Sale, CartItem } from "@/types";
 
 export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
   try {
+    // Get current user (cashier)
+    const { data: userData } = await supabase.auth.getUser();
+    const cashierId = userData.user?.id;
+
     // Ensure date is a string
     const saleData = {
       ...sale,
       date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date,
       // Convert CartItem[] to Json for Supabase
-      items: JSON.parse(JSON.stringify(sale.items))
+      items: JSON.parse(JSON.stringify(sale.items)),
+      // Add cashier ID to the sale record
+      cashier_id: cashierId
     };
     
     // Create the sale record
