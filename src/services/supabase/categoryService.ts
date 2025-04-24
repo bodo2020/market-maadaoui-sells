@@ -79,10 +79,7 @@ export async function deleteMainCategory(id: string) {
 export async function fetchSubcategories(categoryId?: string) {
   let query = supabase
     .from("subcategories")
-    .select(`
-      *,
-      products (*)
-    `)
+    .select("*")
     .order('name');
   
   if (categoryId) {
