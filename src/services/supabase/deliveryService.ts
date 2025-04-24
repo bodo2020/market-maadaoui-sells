@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { 
   ShippingProvider, 
@@ -200,17 +201,23 @@ export async function fetchDeliveryTypes(): Promise<DeliveryType[]> {
   return data || [];
 }
 
-export async function fetchDeliveryTypePricing(neighborhoodId: string) {
-  const { data, error } = await supabase
-    .from('delivery_type_pricing')
-    .select(`
-      *,
-      delivery_types (*)
-    `)
-    .eq('delivery_location_id', neighborhoodId);
-    
-  if (error) throw error;
-  return data || [];
+// Combined the two fetchDeliveryTypePricing functions into one that works for both use cases
+export async function fetchDeliveryTypePricing(locationId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('delivery_type_pricing')
+      .select(`
+        *,
+        delivery_types (*)
+      `)
+      .eq('delivery_location_id', locationId);
+      
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error("Error fetching delivery type pricing:", err);
+    throw err;
+  }
 }
 
 // Create a custom function for shipping providers since it's not in the database schema
@@ -350,25 +357,6 @@ export async function updateDeliveryTypePricing(data: {
     }
   } catch (err) {
     console.error("Error in updateDeliveryTypePricing:", err);
-    throw err;
-  }
-}
-
-// Added missing function to load existing delivery type prices for a location
-export async function fetchDeliveryTypePricing(locationId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('delivery_type_pricing')
-      .select(`
-        *,
-        delivery_types (*)
-      `)
-      .eq('delivery_location_id', locationId);
-      
-    if (error) throw error;
-    return data || [];
-  } catch (err) {
-    console.error("Error fetching delivery type pricing:", err);
     throw err;
   }
 }
