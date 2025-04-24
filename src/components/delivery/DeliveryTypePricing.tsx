@@ -15,6 +15,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
   const [deliveryTypes, setDeliveryTypes] = useState<Array<{ id: string; name: string }>>([]);
   const [prices, setPrices] = useState<Record<string, { price: string; estimatedTime: string }>>({});
   const [loading, setLoading] = useState(false);
+  const [isValid, setIsValid] = useState(false);
 
   useEffect(() => {
     const loadDeliveryTypes = async () => {
@@ -28,6 +29,9 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
           initialPrices[type.id] = { price: '0', estimatedTime: '' };
         });
         setPrices(initialPrices);
+        
+        // Check initial validity
+        validateForm(initialPrices);
       } catch (error) {
         console.error("Error loading delivery types:", error);
       }
@@ -36,18 +40,32 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
     loadDeliveryTypes();
   }, []);
 
+  const validateForm = (currentPrices: Record<string, { price: string; estimatedTime: string }>) => {
+    // Form is valid if we have at least one delivery type and all prices are valid numbers
+    const hasTypes = Object.keys(currentPrices).length > 0;
+    const allPricesValid = Object.values(currentPrices).every(
+      item => !isNaN(parseFloat(item.price)) && parseFloat(item.price) >= 0
+    );
+    
+    setIsValid(hasTypes && allPricesValid);
+  };
+
   const handlePriceChange = (typeId: string, value: string) => {
-    setPrices(prev => ({
-      ...prev,
-      [typeId]: { ...prev[typeId], price: value }
-    }));
+    const newPrices = {
+      ...prices,
+      [typeId]: { ...prices[typeId], price: value }
+    };
+    setPrices(newPrices);
+    validateForm(newPrices);
   };
 
   const handleTimeChange = (typeId: string, value: string) => {
-    setPrices(prev => ({
-      ...prev,
-      [typeId]: { ...prev[typeId], estimatedTime: value }
-    }));
+    const newPrices = {
+      ...prices,
+      [typeId]: { ...prices[typeId], estimatedTime: value }
+    };
+    setPrices(newPrices);
+    validateForm(newPrices);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -74,9 +92,6 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
       setLoading(false);
     }
   };
-
-  // Check if form has valid data to enable the save button
-  const isFormValid = Object.keys(prices).length > 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -116,7 +131,7 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
       <div className="flex justify-end gap-2">
         <Button 
           type="submit" 
-          disabled={loading || !isFormValid}
+          disabled={loading || !isValid}
         >
           {loading ? "جاري الحفظ..." : "حفظ"}
         </Button>
