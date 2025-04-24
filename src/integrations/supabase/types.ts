@@ -886,7 +886,6 @@ export type Database = {
           bulk_enabled: boolean | null
           bulk_price: number | null
           bulk_quantity: number | null
-          category_id: string | null
           company_id: string | null
           created_at: string | null
           description: string | null
@@ -901,7 +900,6 @@ export type Database = {
           price: number
           purchase_price: number
           quantity: number | null
-          subcategory_id: string | null
           unit_of_measure: string | null
           updated_at: string | null
         }
@@ -912,7 +910,6 @@ export type Database = {
           bulk_enabled?: boolean | null
           bulk_price?: number | null
           bulk_quantity?: number | null
-          category_id?: string | null
           company_id?: string | null
           created_at?: string | null
           description?: string | null
@@ -927,7 +924,6 @@ export type Database = {
           price: number
           purchase_price: number
           quantity?: number | null
-          subcategory_id?: string | null
           unit_of_measure?: string | null
           updated_at?: string | null
         }
@@ -938,7 +934,6 @@ export type Database = {
           bulk_enabled?: boolean | null
           bulk_price?: number | null
           bulk_quantity?: number | null
-          category_id?: string | null
           company_id?: string | null
           created_at?: string | null
           description?: string | null
@@ -953,7 +948,6 @@ export type Database = {
           price?: number
           purchase_price?: number
           quantity?: number | null
-          subcategory_id?: string | null
           unit_of_measure?: string | null
           updated_at?: string | null
         }
@@ -963,6 +957,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_product_main_category"
+            columns: ["main_category_id"]
+            isOneToOne: false
+            referencedRelation: "main_categories"
             referencedColumns: ["id"]
           },
           {

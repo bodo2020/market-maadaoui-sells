@@ -67,10 +67,7 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
     updated_at: new Date().toISOString(),
     // Explicitly handle foreign keys and convert undefined values to null
     main_category_id: product.main_category_id === undefined ? null : product.main_category_id,
-    subcategory_id: product.subcategory_id === undefined ? null : product.subcategory_id,
     company_id: product.company_id === undefined ? null : product.company_id,
-    // Handle category_id (legacy field) - set to null
-    category_id: null,
     // Explicitly handle offer price and is_offer
     offer_price: product.offer_price ?? null,
     is_offer: product.is_offer ?? false
@@ -114,21 +111,6 @@ export async function fetchProductsByCategory(categoryId: string) {
 
   if (error) {
     console.error("Error fetching products by category:", error);
-    throw error;
-  }
-
-  return data as Product[];
-}
-
-export async function fetchProductsBySubcategory(subcategoryId: string) {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("subcategory_id", subcategoryId)
-    .order("name");
-
-  if (error) {
-    console.error("Error fetching products by subcategory:", error);
     throw error;
   }
 
