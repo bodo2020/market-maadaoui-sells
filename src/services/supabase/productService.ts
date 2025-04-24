@@ -61,6 +61,8 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 }
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
+  // Create a product update object focusing only on product fields
+  // Remove any references to product_count since it doesn't exist in main_categories
   const productUpdate = {
     ...product,
     updated_at: new Date().toISOString(),
@@ -69,6 +71,7 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
     is_offer: product.is_offer ?? false
   };
   
+  // Update only the products table
   const { data, error } = await supabase
     .from("products")
     .update(productUpdate)

@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -76,10 +75,8 @@ export interface Product {
   offer_price?: number;
   is_offer: boolean;
   category_id?: string;
-  // Add main_category_id and update other category-related fields
   main_category_id?: string;
   subcategory_id?: string;
-  subsubcategory_id?: string;
   company_id?: string;
   barcode_type?: string;
   bulk_enabled: boolean;

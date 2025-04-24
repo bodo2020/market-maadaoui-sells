@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { fetchProductsBySubcategory } from "@/services/supabase/productService";
 import { Product } from "@/types";
