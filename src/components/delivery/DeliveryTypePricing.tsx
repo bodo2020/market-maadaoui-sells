@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { fetchDeliveryTypes, updateDeliveryTypePricing } from "@/services/supabase/deliveryService";
+import { fetchDeliveryTypes, updateDeliveryTypePricing, fetchDeliveryTypePricing } from "@/services/supabase/deliveryService";
 import { toast } from "sonner";
 
 interface DeliveryTypePricingProps {
@@ -15,30 +15,57 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
   const [deliveryTypes, setDeliveryTypes] = useState<Array<{ id: string; name: string }>>([]);
   const [prices, setPrices] = useState<Record<string, { price: string; estimatedTime: string }>>({});
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [isValid, setIsValid] = useState(false);
 
+  // Load delivery types and existing pricing data
   useEffect(() => {
-    const loadDeliveryTypes = async () => {
+    const loadData = async () => {
       try {
+        setLoadingData(true);
+        
+        // Load delivery types
         const types = await fetchDeliveryTypes();
         setDeliveryTypes(types);
         
         // Initialize prices object
         const initialPrices: Record<string, { price: string; estimatedTime: string }> = {};
-        types.forEach(type => {
-          initialPrices[type.id] = { price: '0', estimatedTime: '' };
-        });
-        setPrices(initialPrices);
         
-        // Check initial validity
+        // Load existing pricing data
+        if (locationId) {
+          const existingPricing = await fetchDeliveryTypePricing(locationId);
+          
+          // Populate the prices object with existing data
+          types.forEach(type => {
+            const pricing = existingPricing.find(p => p.delivery_type_id === type.id);
+            if (pricing) {
+              initialPrices[type.id] = { 
+                price: pricing.price.toString(), 
+                estimatedTime: pricing.estimated_time || '' 
+              };
+            } else {
+              initialPrices[type.id] = { price: '0', estimatedTime: '' };
+            }
+          });
+        } else {
+          // If no location ID, initialize empty prices
+          types.forEach(type => {
+            initialPrices[type.id] = { price: '0', estimatedTime: '' };
+          });
+        }
+        
+        setPrices(initialPrices);
         validateForm(initialPrices);
       } catch (error) {
-        console.error("Error loading delivery types:", error);
+        console.error("Error loading delivery data:", error);
+        toast.error("حدث خطأ أثناء تحميل بيانات التوصيل");
+      } finally {
+        setLoadingData(false);
       }
     };
     
-    loadDeliveryTypes();
-  }, []);
+    loadData();
+  }, [locationId]);
 
   const validateForm = (currentPrices: Record<string, { price: string; estimatedTime: string }>) => {
     // Form is valid if we have at least one delivery type and all prices are valid numbers
@@ -73,15 +100,22 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
     setLoading(true);
     
     try {
+      console.log("Saving prices for locationId:", locationId);
+      console.log("Prices to save:", prices);
+      
       // Process and save all delivery type prices
-      for (const typeId of Object.keys(prices)) {
-        await updateDeliveryTypePricing({
+      const savePromises = Object.keys(prices).map(typeId => {
+        const priceData = {
           delivery_location_id: locationId,
           delivery_type_id: typeId,
           price: parseFloat(prices[typeId].price) || 0,
           estimated_time: prices[typeId].estimatedTime
-        });
-      }
+        };
+        console.log("Saving price:", priceData);
+        return updateDeliveryTypePricing(priceData);
+      });
+      
+      await Promise.all(savePromises);
       
       toast.success("تم حفظ أسعار التوصيل بنجاح");
       if (onSuccess) onSuccess();
@@ -92,6 +126,10 @@ export default function DeliveryTypePricing({ locationId, onSuccess }: DeliveryT
       setLoading(false);
     }
   };
+
+  if (loadingData) {
+    return <div className="p-4 text-center">جاري تحميل بيانات التوصيل...</div>;
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">

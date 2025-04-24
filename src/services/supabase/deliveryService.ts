@@ -298,45 +298,77 @@ export async function updateDeliveryTypePricing(data: {
   price: number;
   estimated_time?: string;
 }): Promise<DeliveryTypePrice> {
-  // Check if pricing record already exists
-  const { data: existingPricing, error: fetchError } = await supabase
-    .from('delivery_type_pricing')
-    .select('*')
-    .eq('delivery_location_id', data.delivery_location_id)
-    .eq('delivery_type_id', data.delivery_type_id);
-    
-  if (fetchError) throw fetchError;
-  
-  // If pricing record exists, update it
-  if (existingPricing && existingPricing.length > 0) {
-    const { data: result, error } = await supabase
+  try {
+    // Check if pricing record already exists
+    const { data: existingPricing, error: fetchError } = await supabase
       .from('delivery_type_pricing')
-      .update({
-        price: data.price,
-        estimated_time: data.estimated_time,
-        updated_at: new Date().toISOString() // Convert Date to ISO string
-      })
+      .select('*')
       .eq('delivery_location_id', data.delivery_location_id)
-      .eq('delivery_type_id', data.delivery_type_id)
-      .select()
-      .single();
+      .eq('delivery_type_id', data.delivery_type_id);
       
-    if (error) throw error;
-    return result;
-  } else {
-    // If pricing record doesn't exist, create a new one
-    const { data: result, error } = await supabase
+    if (fetchError) throw fetchError;
+    
+    // If pricing record exists, update it
+    if (existingPricing && existingPricing.length > 0) {
+      const { data: result, error } = await supabase
+        .from('delivery_type_pricing')
+        .update({
+          price: data.price,
+          estimated_time: data.estimated_time,
+          updated_at: new Date().toISOString() // Convert Date to ISO string
+        })
+        .eq('delivery_location_id', data.delivery_location_id)
+        .eq('delivery_type_id', data.delivery_type_id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Error updating delivery type pricing:", error);
+        throw error;
+      }
+      
+      return result;
+    } else {
+      // If pricing record doesn't exist, create a new one
+      const { data: result, error } = await supabase
+        .from('delivery_type_pricing')
+        .insert([{
+          delivery_location_id: data.delivery_location_id,
+          delivery_type_id: data.delivery_type_id,
+          price: data.price,
+          estimated_time: data.estimated_time
+        }])
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Error creating delivery type pricing:", error);
+        throw error;
+      }
+      
+      return result;
+    }
+  } catch (err) {
+    console.error("Error in updateDeliveryTypePricing:", err);
+    throw err;
+  }
+}
+
+// Added missing function to load existing delivery type prices for a location
+export async function fetchDeliveryTypePricing(locationId: string) {
+  try {
+    const { data, error } = await supabase
       .from('delivery_type_pricing')
-      .insert([{
-        delivery_location_id: data.delivery_location_id,
-        delivery_type_id: data.delivery_type_id,
-        price: data.price,
-        estimated_time: data.estimated_time
-      }])
-      .select()
-      .single();
+      .select(`
+        *,
+        delivery_types (*)
+      `)
+      .eq('delivery_location_id', locationId);
       
     if (error) throw error;
-    return result;
+    return data || [];
+  } catch (err) {
+    console.error("Error fetching delivery type pricing:", err);
+    throw err;
   }
 }
