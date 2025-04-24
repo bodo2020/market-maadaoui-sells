@@ -11,14 +11,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { 
   fetchMainCategoryById,
   fetchSubcategoryById,
-  fetchSubsubcategoryById,
   updateMainCategory,
-  updateSubcategory,
-  updateSubsubcategory
+  updateSubcategory
 } from "@/services/supabase/categoryService";
 
 export default function CategoryDetail() {
-  const { id, subId } = useParams<{ id: string; subId: string }>();
+  const { id } = useParams<{ id: string }>();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -26,7 +24,7 @@ export default function CategoryDetail() {
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [categoryType, setCategoryType] = useState<'category' | 'subcategory' | 'subsubcategory' | null>(null);
+  const [categoryType, setCategoryType] = useState<'category' | 'subcategory' | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   
   useEffect(() => {
@@ -36,34 +34,17 @@ export default function CategoryDetail() {
       try {
         setLoading(true);
         
-        if (subId) {
-          // Try to fetch as subsubcategory first
-          try {
-            const subsubcategory = await fetchSubsubcategoryById(subId);
-            setName(subsubcategory.name);
-            setDescription(subsubcategory.description || "");
-            setImageUrl(subsubcategory.image_url);
-            setCategoryType('subsubcategory');
-            setCategoryId(subId);
-            return;
-          } catch (error) {
-            console.error('Error fetching subsubcategory:', error);
-          }
-        }
-        
         // Try to fetch as subcategory
-        if (id) {
-          try {
-            const subcategory = await fetchSubcategoryById(id);
-            setName(subcategory.name);
-            setDescription(subcategory.description || "");
-            setImageUrl(subcategory.image_url);
-            setCategoryType('subcategory');
-            setCategoryId(id);
-            return;
-          } catch (error) {
-            console.error('Error fetching subcategory:', error);
-          }
+        try {
+          const subcategory = await fetchSubcategoryById(id);
+          setName(subcategory.name);
+          setDescription(subcategory.description || "");
+          setImageUrl(subcategory.image_url);
+          setCategoryType('subcategory');
+          setCategoryId(id);
+          return;
+        } catch (error) {
+          console.error('Error fetching subcategory:', error);
         }
         
         // Lastly, try as main category
@@ -89,7 +70,7 @@ export default function CategoryDetail() {
     };
     
     fetchCategoryDetails();
-  }, [id, subId]);
+  }, [id]);
   
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -152,9 +133,7 @@ export default function CategoryDetail() {
         image_url: updatedImageUrl
       };
       
-      if (categoryType === 'subsubcategory') {
-        await updateSubsubcategory(categoryId, updatedData);
-      } else if (categoryType === 'subcategory') {
+      if (categoryType === 'subcategory') {
         await updateSubcategory(categoryId, updatedData);
       } else if (categoryType === 'category') {
         await updateMainCategory(categoryId, updatedData);

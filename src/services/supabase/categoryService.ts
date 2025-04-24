@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { MainCategory, Subcategory, Category } from "@/types";
+import { MainCategory, Subcategory } from "@/types";
 
 // Main Categories
 export async function fetchMainCategories() {
@@ -165,7 +165,7 @@ export async function getCategoryHierarchy() {
     const subcategories = await fetchSubcategories();
     
     // Create a mapped structure that matches the old format
-    const formattedCategories: Category[] = mainCategories.map(cat => ({
+    const formattedCategories = mainCategories.map(cat => ({
       id: cat.id,
       name: cat.name,
       description: cat.description,
