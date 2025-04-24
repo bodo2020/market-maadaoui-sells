@@ -26,10 +26,18 @@ export function ProductGrid({ products, onEditProduct }: ProductGridProps) {
     );
   }
 
+  const handleProductClick = (productId: string) => {
+    navigate(`/add-product?id=${productId}`);
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {products.map((product) => (
-        <Card key={product.id} className="overflow-hidden">
+        <Card 
+          key={product.id} 
+          className="overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer"
+          onClick={() => handleProductClick(product.id)}
+        >
           <div className="aspect-video w-full relative">
             <img
               src={product.image_urls?.[0] || "/placeholder.svg"}
@@ -44,22 +52,27 @@ export function ProductGrid({ products, onEditProduct }: ProductGridProps) {
                 {product.description}
               </p>
             )}
-            <div className="flex justify-between items-center mt-2">
-              <div className="space-y-1">
-                <div className="text-sm font-medium">
-                  {product.price} ج.م
+            <div className="space-y-2 mt-2">
+              <div className="flex justify-between items-center">
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">
+                    {product.price} ج.م
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    المخزون: {product.quantity || 0}
+                  </Badge>
                 </div>
+                {product.bulk_enabled && (
+                  <Badge variant="secondary" className="text-xs">
+                    متاح بالجملة
+                  </Badge>
+                )}
+              </div>
+              <div className="flex gap-2 text-xs text-gray-500">
                 <Badge variant="outline" className="text-xs">
-                  المخزون: {product.quantity || 0}
+                  {product.barcode_type === 'scale' ? 'باركود ميزان' : 'باركود عادي'}
                 </Badge>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate(`/add-product?id=${product.id}`)}
-              >
-                تعديل
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -67,3 +80,4 @@ export function ProductGrid({ products, onEditProduct }: ProductGridProps) {
     </div>
   );
 }
+

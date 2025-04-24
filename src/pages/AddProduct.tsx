@@ -1,418 +1,242 @@
-
 import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
-import { MainCategory, Subcategory } from "@/types";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ImagePlus, Plus, Trash } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { fetchProductById, updateProduct } from "@/services/supabase/productService";
+import { Product } from "@/types";
+import { Loader2 } from "lucide-react";
 
 export default function AddProduct() {
-  const navigate = useNavigate();
-  
-  // Product data
-  const [name, setName] = useState("");
-  const [barcode, setBarcode] = useState("");
-  const [description, setDescription] = useState("");
-  const [quantity, setQuantity] = useState(0);
-  const [price, setPrice] = useState<number | string>("");
-  const [purchasePrice, setPurchasePrice] = useState<number | string>("");
-  const [unitOfMeasure, setUnitOfMeasure] = useState("");
-  
-  // Category selection
-  const [mainCategoryId, setMainCategoryId] = useState("");
-  const [subcategoryId, setSubcategoryId] = useState("");
-  const [categories, setCategories] = useState<MainCategory[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  
-  // Image handling
-  const [images, setImages] = useState<File[]>([]);
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [uploadingImages, setUploadingImages] = useState(false);
+  const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
-  
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const productId = searchParams.get("id");
+
   useEffect(() => {
-    fetchCategories();
-  }, []);
-  
-  useEffect(() => {
-    if (mainCategoryId) {
-      fetchSubcategories(mainCategoryId);
-    } else {
-      setSubcategories([]);
-      setSubcategoryId("");
+    if (productId) {
+      loadProduct(productId);
     }
-  }, [mainCategoryId]);
-  
-  const fetchCategories = async () => {
+  }, [productId]);
+
+  const loadProduct = async (id: string) => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('main_categories')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      setCategories(data || []);
+      const data = await fetchProductById(id);
+      setProduct(data);
     } catch (error) {
-      console.error('Error fetching categories:', error);
-      toast.error('حدث خطأ أثناء تحميل التصنيفات');
-    }
-  };
-  
-  const fetchSubcategories = async (categoryId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('subcategories')
-        .select('*')
-        .eq('category_id', categoryId)
-        .order('name');
-      
-      if (error) throw error;
-      setSubcategories(data || []);
-    } catch (error) {
-      console.error('Error fetching subcategories:', error);
-      toast.error('حدث خطأ أثناء تحميل التصنيفات الفرعية');
-    }
-  };
-  
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const newImages = [...images];
-      const newImageUrls = [...imageUrls];
-      
-      Array.from(files).forEach(file => {
-        newImages.push(file);
-        newImageUrls.push(URL.createObjectURL(file));
+      console.error("Error loading product:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load product",
+        variant: "destructive",
       });
-      
-      setImages(newImages);
-      setImageUrls(newImageUrls);
-    }
-  };
-  
-  const removeImage = (index: number) => {
-    const newImages = [...images];
-    const newImageUrls = [...imageUrls];
-    
-    URL.revokeObjectURL(newImageUrls[index]);
-    newImages.splice(index, 1);
-    newImageUrls.splice(index, 1);
-    
-    setImages(newImages);
-    setImageUrls(newImageUrls);
-  };
-  
-  const uploadImages = async () => {
-    if (images.length === 0) return [];
-    
-    setUploadingImages(true);
-    const uploadedUrls: string[] = [];
-    
-    try {
-      for (const file of images) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-        const filePath = `products/${fileName}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('images')
-          .upload(filePath, file);
-          
-        if (uploadError) throw uploadError;
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('images')
-          .getPublicUrl(filePath);
-          
-        uploadedUrls.push(publicUrl);
-      }
-      
-      return uploadedUrls;
-    } catch (error) {
-      console.error('Error uploading images:', error);
-      toast.error('حدث خطأ أثناء رفع الصور');
-      throw error;
-    } finally {
-      setUploadingImages(false);
-    }
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!name || price === '') {
-      toast.error('يرجى ملء جميع الحقول المطلوبة');
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      
-      // Upload images
-      const imageUrls = await uploadImages();
-      
-      // Create product object
-      const productData = {
-        name,
-        barcode: barcode || null,
-        description: description || null,
-        quantity: quantity || 0,
-        price: Number(price),
-        purchase_price: Number(purchasePrice) || 0,
-        main_category_id: mainCategoryId || null,
-        subcategory_id: subcategoryId || null,
-        image_urls: imageUrls.length > 0 ? imageUrls : ['/placeholder.svg'],
-        unit_of_measure: unitOfMeasure || null,
-        is_offer: false,
-        bulk_enabled: false,
-        bulk_quantity: null,
-        bulk_price: null,
-        bulk_barcode: null,
-        is_bulk: false,
-        offer_price: null,
-        manufacturer_name: null
-      };
-      
-      // Insert product
-      const { error } = await supabase
-        .from('products')
-        .insert([productData]);
-      
-      if (error) throw error;
-      
-      toast.success('تم إضافة المنتج بنجاح');
-      navigate('/products');
-    } catch (error) {
-      console.error('Error adding product:', error);
-      toast.error('حدث خطأ أثناء إضافة المنتج');
     } finally {
       setLoading(false);
     }
   };
-  
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!product) return;
+
+    setLoading(true);
+    try {
+      await updateProduct(product.id, product);
+      toast({
+        title: "Success",
+        description: "Product updated successfully",
+      });
+      navigate("/product-management");
+    } catch (error) {
+      console.error("Error updating product:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update product",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <MainLayout>
-      <div className="container py-6">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">إضافة منتج جديد</h1>
-          <Button variant="outline" onClick={() => navigate('/products')}>
-            العودة للمنتجات
-          </Button>
+      <div className="container mx-auto p-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">
+            {productId ? "تعديل المنتج" : "إضافة منتج جديد"}
+          </h1>
+          <p className="text-muted-foreground">
+            {productId
+              ? "تعديل تفاصيل المنتج الحالي"
+              : "إضافة منتج جديد إلى المخزون"}
+          </p>
         </div>
-        
-        <form onSubmit={handleSubmit} className="space-y-8">
+
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Product basic info */}
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                <h2 className="text-xl font-semibold">بيانات المنتج</h2>
-                
-                <div>
-                  <Label htmlFor="name">اسم المنتج</Label>
-                  <Input 
-                    id="name"
-                    value={name} 
-                    onChange={e => setName(e.target.value)}
-                    placeholder="أدخل اسم المنتج" 
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="barcode">الباركود (اختياري)</Label>
-                  <Input 
-                    id="barcode"
-                    value={barcode} 
-                    onChange={e => setBarcode(e.target.value)}
-                    placeholder="أدخل الباركود" 
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="description">وصف المنتج (اختياري)</Label>
-                  <Textarea 
-                    id="description"
-                    value={description} 
-                    onChange={e => setDescription(e.target.value)}
-                    placeholder="أدخل وصف المنتج" 
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="unit">وحدة القياس (اختياري)</Label>
-                  <Select value={unitOfMeasure} onValueChange={setUnitOfMeasure}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر وحدة القياس" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="قطعة">قطعة</SelectItem>
-                      <SelectItem value="علبة">علبة</SelectItem>
-                      <SelectItem value="كيلو">كيلو</SelectItem>
-                      <SelectItem value="جرام">جرام</SelectItem>
-                      <SelectItem value="لتر">لتر</SelectItem>
-                      <SelectItem value="متر">متر</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Product prices */}
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                <h2 className="text-xl font-semibold">الأسعار والمخزون</h2>
-                
-                <div>
-                  <Label htmlFor="quantity">الكمية المتوفرة</Label>
-                  <Input 
-                    id="quantity"
-                    type="number"
-                    value={quantity}
-                    onChange={e => setQuantity(parseInt(e.target.value) || 0)}
-                    placeholder="أدخل الكمية" 
-                    className="mt-1"
-                    min="0"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="price">سعر البيع</Label>
-                  <Input 
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    value={price}
-                    onChange={e => setPrice(e.target.value)}
-                    placeholder="أدخل سعر البيع" 
-                    className="mt-1"
-                    min="0"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="purchasePrice">سعر الشراء</Label>
-                  <Input 
-                    id="purchasePrice"
-                    type="number"
-                    step="0.01"
-                    value={purchasePrice}
-                    onChange={e => setPurchasePrice(e.target.value)}
-                    placeholder="أدخل سعر الشراء" 
-                    className="mt-1"
-                    min="0"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Categories */}
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                <h2 className="text-xl font-semibold">التصنيفات</h2>
-                
-                <div>
-                  <Label htmlFor="category">التصنيف الرئيسي (اختياري)</Label>
-                  <Select value={mainCategoryId} onValueChange={setMainCategoryId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر التصنيف" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">بدون تصنيف</SelectItem>
-                      {categories.map(category => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {mainCategoryId && mainCategoryId !== "none" && (
-                  <div>
-                    <Label htmlFor="subcategory">التصنيف الفرعي (اختياري)</Label>
-                    <Select value={subcategoryId} onValueChange={setSubcategoryId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر التصنيف الفرعي" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">بدون تصنيف فرعي</SelectItem>
-                        {subcategories.map(subcategory => (
-                          <SelectItem key={subcategory.id} value={subcategory.id}>
-                            {subcategory.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Product Name */}
+            <div>
+              <Label htmlFor="name">اسم المنتج</Label>
+              <Input
+                id="name"
+                placeholder="اسم المنتج"
+                value={product?.name || ""}
+                onChange={(e) =>
+                  setProduct((prev) => ({ ...prev, name: e.target.value }))
+                }
+              />
+            </div>
+
+            {/* Price */}
+            <div>
+              <Label htmlFor="price">السعر</Label>
+              <Input
+                type="number"
+                id="price"
+                placeholder="السعر"
+                value={product?.price || ""}
+                onChange={(e) =>
+                  setProduct((prev) => ({ ...prev, price: Number(e.target.value) }))
+                }
+              />
+            </div>
+
+            {/* Purchase Price */}
+            <div>
+              <Label htmlFor="purchase_price">سعر الشراء</Label>
+              <Input
+                type="number"
+                id="purchase_price"
+                placeholder="سعر الشراء"
+                value={product?.purchase_price || ""}
+                onChange={(e) =>
+                  setProduct((prev) => ({ ...prev, purchase_price: Number(e.target.value) }))
+                }
+              />
+            </div>
+
+            {/* Quantity */}
+            <div>
+              <Label htmlFor="quantity">الكمية</Label>
+              <Input
+                type="number"
+                id="quantity"
+                placeholder="الكمية"
+                value={product?.quantity || ""}
+                onChange={(e) =>
+                  setProduct((prev) => ({ ...prev, quantity: Number(e.target.value) }))
+                }
+              />
+            </div>
           </div>
-          
-          {/* Images */}
-          <Card>
-            <CardContent className="pt-6 space-y-4">
-              <h2 className="text-xl font-semibold">صور المنتج</h2>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {imageUrls.map((url, index) => (
-                  <div key={index} className="relative h-32 border rounded-md overflow-hidden">
-                    <img 
-                      src={url} 
-                      alt={`Product ${index + 1}`} 
-                      className="h-full w-full object-cover"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => removeImage(index)}
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                
-                <label className="h-32 border border-dashed rounded-md flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors">
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    multiple 
-                    className="hidden"
-                    onChange={handleImageChange}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Barcode Type Selection */}
+            <div>
+              <Label htmlFor="barcode_type">نوع الباركود</Label>
+              <Select 
+                value={product?.barcode_type || 'normal'} 
+                onValueChange={(value) => setProduct(prev => ({ ...prev, barcode_type: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر نوع الباركود" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal">باركود عادي</SelectItem>
+                  <SelectItem value="scale">باركود ميزان</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Barcode Input */}
+            <div>
+              <Label htmlFor="barcode">الباركود</Label>
+              <Input
+                id="barcode"
+                placeholder="ادخل الباركود"
+                value={product?.barcode || ''}
+                onChange={(e) => setProduct(prev => ({ ...prev, barcode: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {/* Wholesale Section */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+              <Checkbox
+                id="bulk_enabled"
+                checked={product?.bulk_enabled || false}
+                onCheckedChange={(checked) => 
+                  setProduct(prev => ({ ...prev, bulk_enabled: checked as boolean }))
+                }
+              />
+              <Label htmlFor="bulk_enabled">تفعيل البيع بالجملة</Label>
+            </div>
+
+            {product?.bulk_enabled && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <Label htmlFor="bulk_quantity">الكمية للبيع بالجملة</Label>
+                  <Input
+                    id="bulk_quantity"
+                    type="number"
+                    placeholder="ادخل الكمية"
+                    value={product?.bulk_quantity || ''}
+                    onChange={(e) => setProduct(prev => ({ ...prev, bulk_quantity: parseInt(e.target.value) }))}
                   />
-                  <ImagePlus className="h-8 w-8 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground mt-2">إضافة صور</span>
-                </label>
+                </div>
+
+                <div>
+                  <Label htmlFor="bulk_price">سعر الجملة</Label>
+                  <Input
+                    id="bulk_price"
+                    type="number"
+                    step="0.01"
+                    placeholder="ادخل السعر"
+                    value={product?.bulk_price || ''}
+                    onChange={(e) => setProduct(prev => ({ ...prev, bulk_price: parseFloat(e.target.value) }))}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="bulk_barcode">باركود الجملة</Label>
+                  <Input
+                    id="bulk_barcode"
+                    placeholder="ادخل الباركود"
+                    value={product?.bulk_barcode || ''}
+                    onChange={(e) => setProduct(prev => ({ ...prev, bulk_barcode: e.target.value }))}
+                  />
+                </div>
               </div>
-            </CardContent>
-          </Card>
-          
-          <div className="flex justify-end">
-            <Button type="submit" disabled={loading || uploadingImages} size="lg">
-              {(loading || uploadingImages) ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  جاري الحفظ...
-                </>
-              ) : (
-                <>
-                  <Plus className="mr-2 h-4 w-4" />
-                  إضافة المنتج
-                </>
-              )}
-            </Button>
+            )}
           </div>
+
+          {/* Description */}
+          <div>
+            <Label htmlFor="description">الوصف</Label>
+            <Input
+              id="description"
+              placeholder="الوصف"
+              value={product?.description || ""}
+              onChange={(e) =>
+                setProduct((prev) => ({ ...prev, description: e.target.value }))
+              }
+            />
+          </div>
+
+          <Button disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {productId ? "تحديث المنتج" : "إضافة المنتج"}
+          </Button>
         </form>
       </div>
     </MainLayout>
