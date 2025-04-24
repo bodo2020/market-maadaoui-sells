@@ -37,7 +37,7 @@ const ProductAssignmentDialog = ({
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategoryLevel, setSelectedCategoryLevel] = useState<'category' | 'subcategory'>('category');
+  const [selectedCategoryLevel, setSelectedCategoryLevel] = useState<'category' | 'subcategory'>('subcategory'); // Default to subcategory
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -104,10 +104,14 @@ const ProductAssignmentDialog = ({
         updateData.company_id = selectedId;
       }
       
-      await supabase
+      const { error } = await supabase
         .from('products')
         .update(updateData)
         .eq('id', product?.id);
+        
+      if (error) {
+        throw error;
+      }
       
       toast.success(`تم تحديث ${type === 'category' ? 'قسم' : 'شركة'} المنتج بنجاح`);
       onSaved();
@@ -120,12 +124,145 @@ const ProductAssignmentDialog = ({
     }
   };
 
-  // ... بقية الكود كما هو (الدوال handleCategorySelection وغيرها)
+  const handleCategorySelection = async (categoryId: string) => {
+    setSelectedId(categoryId);
+    
+    if (selectedCategoryLevel === 'category') {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('subcategories')
+          .select('*')
+          .eq('category_id', categoryId)
+          .order('name');
+          
+        if (error) throw error;
+        setSubcategories(data || []);
+      } catch (error) {
+        console.error('Error fetching subcategories:', error);
+        toast.error('حدث خطأ أثناء تحميل الأقسام الفرعية');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const filteredCategories = categories.filter(category =>
+    category.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredSubcategories = subcategories.filter(subcategory =>
+    subcategory.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
-        {/* محتوى الحوار كما هو */}
+        <DialogHeader>
+          <DialogTitle>
+            تغيير {type === 'category' ? 'القسم' : 'الشركة'}
+          </DialogTitle>
+          <DialogDescription>
+            اختر {type === 'category' ? 'القسم' : 'الشركة'} الذي تريد تعيينه لهذا المنتج.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="search" className="text-right">
+              بحث
+            </Label>
+            <Input
+              id="search"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+          
+          {type === 'category' && (
+            <RadioGroup 
+              value={selectedCategoryLevel} 
+              onValueChange={(value: 'category' | 'subcategory') => setSelectedCategoryLevel(value)} 
+              className="pb-4"
+            >
+              <div className="flex items-center space-x-2 space-x-reverse justify-end">
+                <Label htmlFor="category">قسم رئيسي</Label>
+                <RadioGroupItem value="category" id="category" />
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse justify-end">
+                <Label htmlFor="subcategory">قسم فرعي</Label>
+                <RadioGroupItem value="subcategory" id="subcategory" />
+              </div>
+            </RadioGroup>
+          )}
+
+          {type === 'category' && selectedCategoryLevel === 'category' && (
+            <div className="space-y-2">
+              <Label>الأقسام الرئيسية</Label>
+              <div className="max-h-40 overflow-y-auto border rounded-md">
+                {loading ? (
+                  <div className="flex justify-center items-center p-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : filteredCategories.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">
+                    لا توجد أقسام رئيسية مطابقة للبحث
+                  </div>
+                ) : (
+                  <ul className="divide-y">
+                    {filteredCategories.map(category => (
+                      <li
+                        key={category.id}
+                        className={`p-2 cursor-pointer hover:bg-accent ${selectedId === category.id ? 'bg-accent text-accent-foreground' : ''}`}
+                        onClick={() => handleCategorySelection(category.id)}
+                      >
+                        {category.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+
+          {type === 'category' && selectedCategoryLevel === 'subcategory' && (
+            <div className="space-y-2">
+              <Label>الأقسام الفرعية</Label>
+              <div className="max-h-40 overflow-y-auto border rounded-md">
+                {loading ? (
+                  <div className="flex justify-center items-center p-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : filteredSubcategories.length === 0 ? (
+                  <div className="p-4 text-center text-muted-foreground">
+                    لا توجد أقسام فرعية مطابقة للبحث
+                  </div>
+                ) : (
+                  <ul className="divide-y">
+                    {filteredSubcategories.map(subcategory => (
+                      <li
+                        key={subcategory.id}
+                        className={`p-2 cursor-pointer hover:bg-accent ${selectedId === subcategory.id ? 'bg-accent text-accent-foreground' : ''}`}
+                        onClick={() => setSelectedId(subcategory.id)}
+                      >
+                        {subcategory.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            إلغاء
+          </Button>
+          <Button onClick={updateProductCategory} disabled={loading}>
+            {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+            حفظ
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
