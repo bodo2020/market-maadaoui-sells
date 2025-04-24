@@ -62,10 +62,13 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
   // Create a product update object focusing only on product fields
-  // Remove any references to product_count since it doesn't exist in main_categories
   const productUpdate = {
     ...product,
     updated_at: new Date().toISOString(),
+    // Explicitly handle foreign keys and convert undefined values to null
+    main_category_id: product.main_category_id === undefined ? null : product.main_category_id,
+    subcategory_id: product.subcategory_id === undefined ? null : product.subcategory_id,
+    company_id: product.company_id === undefined ? null : product.company_id,
     // Explicitly handle offer price and is_offer
     offer_price: product.offer_price ?? null,
     is_offer: product.is_offer ?? false

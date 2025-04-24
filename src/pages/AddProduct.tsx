@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -102,7 +103,15 @@ export default function AddProduct() {
 
     setLoading(true);
     try {
-      await updateProduct(product.id, product);
+      // Ensure values are properly set before sending to the API
+      const productToUpdate = {
+        ...product,
+        main_category_id: product.main_category_id || null,
+        subcategory_id: product.subcategory_id || null,
+        company_id: product.company_id || null
+      };
+      
+      await updateProduct(product.id, productToUpdate);
       toast({
         title: "Success",
         description: "Product updated successfully",
@@ -229,8 +238,8 @@ export default function AddProduct() {
               <Select
                 value={product?.main_category_id || "none"}
                 onValueChange={(value) => {
-                  const categoryId = value === "none" ? undefined : value;
-                  setProduct(prev => ({ ...prev, main_category_id: categoryId, subcategory_id: undefined }));
+                  const categoryId = value === "none" ? null : value;
+                  setProduct(prev => ({ ...prev, main_category_id: categoryId, subcategory_id: null }));
                 }}
               >
                 <SelectTrigger>
@@ -253,7 +262,7 @@ export default function AddProduct() {
                 <Select
                   value={product?.subcategory_id || "none"}
                   onValueChange={(value) => {
-                    const subcategoryId = value === "none" ? undefined : value;
+                    const subcategoryId = value === "none" ? null : value;
                     setProduct(prev => ({ ...prev, subcategory_id: subcategoryId }));
                   }}
                 >
@@ -303,7 +312,7 @@ export default function AddProduct() {
               <Select
                 value={product?.company_id || "none"}
                 onValueChange={(value) => {
-                  const companyId = value === "none" ? undefined : value;
+                  const companyId = value === "none" ? null : value;
                   setProduct(prev => ({ ...prev, company_id: companyId }));
                 }}
               >
