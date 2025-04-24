@@ -67,13 +67,13 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
     updated_at: new Date().toISOString(),
     // Explicitly handle foreign keys and convert undefined values to null
     main_category_id: product.main_category_id === undefined ? null : product.main_category_id,
+    subcategory_id: product.subcategory_id === undefined ? null : product.subcategory_id,
     company_id: product.company_id === undefined ? null : product.company_id,
     // Explicitly handle offer price and is_offer
     offer_price: product.offer_price ?? null,
     is_offer: product.is_offer ?? false
   };
   
-  // Update only the products table
   const { data, error } = await supabase
     .from("products")
     .update(productUpdate)

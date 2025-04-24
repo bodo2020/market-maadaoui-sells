@@ -102,7 +102,6 @@ export default function AddProduct() {
 
     setLoading(true);
     try {
-      // Ensure values are properly set before sending to the API
       const productToUpdate = {
         ...product,
         main_category_id: product.main_category_id || null,
@@ -134,6 +133,18 @@ export default function AddProduct() {
       setSubcategories([]);
     }
   }, [product?.main_category_id]);
+
+  const handleSelectChange = (value: string, field: string) => {
+    if (field === 'main_category_id') {
+      setProduct(prev => ({ 
+        ...prev, 
+        [field]: value,
+        subcategory_id: undefined // Clear subcategory when main category changes
+      }));
+    } else {
+      setProduct(prev => ({ ...prev, [field]: value }));
+    }
+  };
 
   return (
     <MainLayout>
@@ -235,10 +246,7 @@ export default function AddProduct() {
               <Label htmlFor="main_category_id">القسم الرئيسي</Label>
               <Select
                 value={product?.main_category_id || "none"}
-                onValueChange={(value) => {
-                  const categoryId = value === "none" ? null : value;
-                  setProduct(prev => ({ ...prev, main_category_id: categoryId, subcategory_id: null }));
-                }}
+                onValueChange={(value) => handleSelectChange(value, 'main_category_id')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="اختر القسم الرئيسي" />
@@ -259,10 +267,7 @@ export default function AddProduct() {
                 <Label htmlFor="subcategory_id">القسم الفرعي</Label>
                 <Select
                   value={product?.subcategory_id || "none"}
-                  onValueChange={(value) => {
-                    const subcategoryId = value === "none" ? null : value;
-                    setProduct(prev => ({ ...prev, subcategory_id: subcategoryId }));
-                  }}
+                  onValueChange={(value) => handleSelectChange(value, 'subcategory_id')}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر القسم الفرعي" />
@@ -309,10 +314,7 @@ export default function AddProduct() {
               <Label htmlFor="company_id">الشركة</Label>
               <Select
                 value={product?.company_id || "none"}
-                onValueChange={(value) => {
-                  const companyId = value === "none" ? null : value;
-                  setProduct(prev => ({ ...prev, company_id: companyId }));
-                }}
+                onValueChange={(value) => handleSelectChange(value, 'company_id')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="اختر الشركة" />

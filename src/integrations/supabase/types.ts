@@ -900,6 +900,7 @@ export type Database = {
           price: number
           purchase_price: number
           quantity: number | null
+          subcategory_id: string | null
           unit_of_measure: string | null
           updated_at: string | null
         }
@@ -924,6 +925,7 @@ export type Database = {
           price: number
           purchase_price: number
           quantity?: number | null
+          subcategory_id?: string | null
           unit_of_measure?: string | null
           updated_at?: string | null
         }
@@ -948,6 +950,7 @@ export type Database = {
           price?: number
           purchase_price?: number
           quantity?: number | null
+          subcategory_id?: string | null
           unit_of_measure?: string | null
           updated_at?: string | null
         }
@@ -964,6 +967,13 @@ export type Database = {
             columns: ["main_category_id"]
             isOneToOne: false
             referencedRelation: "main_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_product_subcategory"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
             referencedColumns: ["id"]
           },
           {
