@@ -40,16 +40,6 @@ export interface Subcategory {
   updated_at?: string;
 }
 
-export interface Subsubcategory {
-  id: string;
-  name: string;
-  description?: string | null;
-  image_url?: string | null;
-  subcategory_id: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
 export interface Category {
   id: string;
   name: string;
@@ -57,7 +47,7 @@ export interface Category {
   image_url?: string | null;
   created_at?: string;
   updated_at?: string;
-  level?: 'category' | 'subcategory' | 'subsubcategory';
+  level?: 'category' | 'subcategory';
   parent_id?: string | null;
 }
 

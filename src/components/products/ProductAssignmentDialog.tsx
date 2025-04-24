@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
-import { Product, MainCategory, Subcategory, Subsubcategory } from "@/types";
+import { Product, MainCategory, Subcategory } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
@@ -35,10 +35,9 @@ const ProductAssignmentDialog = ({
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<MainCategory[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [subsubcategories, setSubsubcategories] = useState<Subsubcategory[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategoryLevel, setSelectedCategoryLevel] = useState<'category' | 'subcategory' | 'subsubcategory'>('category');
+  const [selectedCategoryLevel, setSelectedCategoryLevel] = useState<'category' | 'subcategory'>('category');
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -73,28 +72,11 @@ const ProductAssignmentDialog = ({
           if (product?.subcategory_id) {
             setSelectedId(product.subcategory_id);
             setSelectedCategoryLevel('subcategory');
-            
-            // Fetch subsubcategories for the selected subcategory
-            const { data: subsubcategoriesData, error: subsubcategoriesError } = await supabase
-              .from('subsubcategories')
-              .select('*')
-              .eq('subcategory_id', product.subcategory_id)
-              .order('name');
-            
-            if (subsubcategoriesError) throw subsubcategoriesError;
-            setSubsubcategories(subsubcategoriesData || []);
-            
-            // If a subsubcategory is already assigned, select it
-            if (product?.subsubcategory_id) {
-              setSelectedId(product.subsubcategory_id);
-              setSelectedCategoryLevel('subsubcategory');
-            }
           } else {
-            setSubsubcategories([]);
+            setSubcategories([]);
           }
         } else {
           setSubcategories([]);
-          setSubsubcategories([]);
         }
       } catch (error) {
         console.error('Error fetching categories:', error);
@@ -121,10 +103,8 @@ const ProductAssignmentDialog = ({
         if (selectedCategoryLevel === 'category') {
           updateData.category_id = selectedId;
           updateData.subcategory_id = null;
-          updateData.subsubcategory_id = null;
         } else if (selectedCategoryLevel === 'subcategory') {
           updateData.subcategory_id = selectedId;
-          updateData.subsubcategory_id = null;
           // Find parent category
           const { data } = await supabase
             .from('subcategories')
@@ -132,26 +112,6 @@ const ProductAssignmentDialog = ({
             .eq('id', selectedId)
             .single();
           updateData.category_id = data?.category_id;
-        } else if (selectedCategoryLevel === 'subsubcategory') {
-          updateData.subsubcategory_id = selectedId;
-          // Find parent subcategory and its parent category
-          const { data: subsubData } = await supabase
-            .from('subsubcategories')
-            .select('subcategory_id')
-            .eq('id', selectedId)
-            .single();
-          
-          updateData.subcategory_id = subsubData?.subcategory_id;
-          
-          if (subsubData?.subcategory_id) {
-            const { data: subData } = await supabase
-              .from('subcategories')
-              .select('category_id')
-              .eq('id', subsubData.subcategory_id)
-              .single();
-            
-            updateData.category_id = subData?.category_id;
-          }
         }
       } else if (type === 'company') {
         updateData.company_id = selectedId;
@@ -182,10 +142,6 @@ const ProductAssignmentDialog = ({
     subcategory.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredSubsubcategories = subsubcategories.filter(subsubcategory =>
-    subsubcategory.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
@@ -213,7 +169,7 @@ const ProductAssignmentDialog = ({
           {type === 'category' && (
             <RadioGroup 
               defaultValue={selectedCategoryLevel} 
-              onValueChange={(value: 'category' | 'subcategory' | 'subsubcategory') => setSelectedCategoryLevel(value)} 
+              onValueChange={(value: 'category' | 'subcategory') => setSelectedCategoryLevel(value)} 
               className="pb-4"
             >
               <div className="flex items-center space-x-2">
@@ -223,10 +179,6 @@ const ProductAssignmentDialog = ({
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="subcategory" id="subcategory" />
                 <Label htmlFor="subcategory">قسم فرعي</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="subsubcategory" id="subsubcategory" />
-                <Label htmlFor="subsubcategory">فئة</Label>
               </div>
             </RadioGroup>
           )}
@@ -281,35 +233,6 @@ const ProductAssignmentDialog = ({
                         onClick={() => setSelectedId(subcategory.id)}
                       >
                         {subcategory.name}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          )}
-
-          {type === 'category' && selectedCategoryLevel === 'subsubcategory' && (
-            <div className="space-y-2">
-              <Label>الفئات</Label>
-              <div className="max-h-40 overflow-y-auto border rounded-md">
-                {loading ? (
-                  <div className="flex justify-center items-center p-4">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  </div>
-                ) : filteredSubsubcategories.length === 0 ? (
-                  <div className="p-4 text-center text-muted-foreground">
-                    لا توجد فئات مطابقة للبحث
-                  </div>
-                ) : (
-                  <ul className="divide-y">
-                    {filteredSubsubcategories.map(subsubcategory => (
-                      <li
-                        key={subsubcategory.id}
-                        className={`p-2 cursor-pointer hover:bg-accent ${selectedId === subsubcategory.id ? 'bg-accent text-accent-foreground' : ''}`}
-                        onClick={() => setSelectedId(subsubcategory.id)}
-                      >
-                        {subsubcategory.name}
                       </li>
                     ))}
                   </ul>

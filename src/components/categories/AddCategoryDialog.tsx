@@ -13,7 +13,7 @@ interface Category {
   id: string;
   name: string;
   description?: string | null;
-  level?: 'category' | 'subcategory' | 'subsubcategory';
+  level?: 'category' | 'subcategory';
   parent_id?: string | null;
   image_url?: string | null;
 }
@@ -39,8 +39,7 @@ const AddCategoryDialog = ({
 
   const getLevel = (): Category['level'] => {
     if (!parentCategory) return 'category';
-    if (parentCategory.level === 'category') return 'subcategory';
-    return 'subsubcategory';
+    return 'subcategory';
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,18 +113,6 @@ const AddCategoryDialog = ({
           }]);
           
         if (error) throw error;
-      } else if (level === 'subsubcategory' && parentCategory) {
-        // Add subsubcategory
-        const { error } = await supabase
-          .from('subsubcategories')
-          .insert([{
-            name,
-            description: description || null,
-            subcategory_id: parentCategory.id,
-            image_url
-          }]);
-          
-        if (error) throw error;
       }
 
       toast.success("تم إضافة التصنيف بنجاح");
@@ -146,8 +133,7 @@ const AddCategoryDialog = ({
   const getLevelLabel = (level: Category['level']) => {
     const labels = {
       category: 'قسم رئيسي',
-      subcategory: 'قسم فرعي',
-      subsubcategory: 'فئة'
+      subcategory: 'قسم فرعي'
     };
     return labels[level || 'category'];
   };
@@ -207,9 +193,7 @@ const AddCategoryDialog = ({
               value={
                 getLevel() === 'category'
                   ? 'قسم رئيسي'
-                  : getLevel() === 'subcategory'
-                  ? 'قسم فرعي'
-                  : 'فئة'
+                  : 'قسم فرعي'
               }
               disabled
               className="bg-muted"

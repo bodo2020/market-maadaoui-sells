@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate, useParams } from "react-router-dom";
 import AddCategoryDialog from "./AddCategoryDialog";
-import { MainCategory, Subcategory, Subsubcategory } from "@/types";
+import { MainCategory, Subcategory } from "@/types";
 
 interface Category {
   id: string;
@@ -36,55 +36,7 @@ export default function CategoriesList() {
       let parentCategory = null;
       
       if (parentId) {
-        // Check if it's a subcategory
-        try {
-          const { data: subcategory, error: subcategoryError } = await supabase
-            .from('subcategories')
-            .select('*')
-            .eq('id', parentId)
-            .single();
-            
-          if (!subcategoryError && subcategory) {
-            parentCategory = subcategory;
-            
-            // Fetch subsubcategories for this subcategory
-            const { data, error } = await supabase
-              .from('subsubcategories')
-              .select('*')
-              .eq('subcategory_id', parentId)
-              .order('name');
-              
-            if (error) throw error;
-            
-            const typedCategories: Category[] = (data || []).map(cat => ({
-              id: cat.id,
-              name: cat.name,
-              description: cat.description,
-              image_url: cat.image_url,
-              product_count: 0
-            }));
-            
-            // Get product counts
-            await Promise.all(typedCategories.map(async (category) => {
-              const { count, error } = await supabase
-                .from('products')
-                .select('*', { count: 'exact', head: true })
-                .eq('subsubcategory_id', category.id);
-                
-              if (!error) {
-                category.product_count = count || 0;
-              }
-            }));
-            
-            setCategories(typedCategories);
-            setLoading(false);
-            return;
-          }
-        } catch (error) {
-          console.error('Error checking if it is a subcategory:', error);
-        }
-        
-        // If not a subcategory, check if it's a main category
+        // Check if it's a main category
         try {
           const { data: mainCategory, error: mainCategoryError } = await supabase
             .from('main_categories')
@@ -152,31 +104,21 @@ export default function CategoriesList() {
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
-      toast.error("حدث خطأ أثناء تحم��ل التصنيفات");
+      toast.error("حدث خطأ أثناء تحميل التصنيفات");
     } finally {
       setLoading(false);
     }
   };
 
-  const getCategoryLevel = (): 'category' | 'subcategory' | 'subsubcategory' => {
+  const getCategoryLevel = (): 'category' | 'subcategory' => {
     if (!parentId) return 'category';
-    
-    // Check if parent is a main category
-    for (const category of categories) {
-      if (category.id === parentId) {
-        return 'subcategory';
-      }
-    }
-    
-    // If not a main category, it must be a subcategory
-    return 'subsubcategory';
+    return 'subcategory';
   };
 
-  const getLevelLabel = (level: 'category' | 'subcategory' | 'subsubcategory') => {
+  const getLevelLabel = (level: 'category' | 'subcategory') => {
     const labels = {
       category: 'قسم رئيسي',
-      subcategory: 'قسم فرعي',
-      subsubcategory: 'فئة'
+      subcategory: 'قسم فرعي'
     };
     return labels[level];
   };
@@ -195,13 +137,6 @@ export default function CategoriesList() {
       } else if (level === 'subcategory') {
         const { error } = await supabase
           .from('subcategories')
-          .delete()
-          .eq('id', categoryId);
-        
-        if (error) throw error;
-      } else if (level === 'subsubcategory') {
-        const { error } = await supabase
-          .from('subsubcategories')
           .delete()
           .eq('id', categoryId);
         
@@ -225,7 +160,6 @@ export default function CategoriesList() {
     
     if (level === 'category') return "الأقسام الرئيسية";
     if (level === 'subcategory') return "الأقسام الفرعية";
-    if (level === 'subsubcategory') return "الفئات";
     return "الأقسام";
   };
 
@@ -328,16 +262,27 @@ export default function CategoriesList() {
         </div>
       )}
 
-      <AddCategoryDialog
-        open={showAddDialog}
-        onOpenChange={setShowAddDialog}
-        parentCategory={parentId ? { 
-          id: parentId, 
-          name: "", 
-          level: getCategoryLevel() === 'category' ? 'category' : getCategoryLevel() === 'subcategory' ? 'subcategory' : 'subsubcategory'
-        } : null}
-        onSuccess={fetchCategories}
-      />
+      {parentId && (
+        <AddCategoryDialog
+          open={showAddDialog}
+          onOpenChange={setShowAddDialog}
+          parentCategory={parentId ? { 
+            id: parentId, 
+            name: "", 
+            level: getCategoryLevel() === 'category' ? 'category' : 'subcategory'
+          } : null}
+          onSuccess={fetchCategories}
+        />
+      )}
+      
+      {!parentId && (
+        <AddCategoryDialog
+          open={showAddDialog}
+          onOpenChange={setShowAddDialog}
+          parentCategory={null}
+          onSuccess={fetchCategories}
+        />
+      )}
     </div>
   );
 }

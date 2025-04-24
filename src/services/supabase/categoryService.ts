@@ -1,5 +1,6 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { MainCategory, Subcategory, Subsubcategory, Category } from "@/types";
+import { MainCategory, Subcategory, Category } from "@/types";
 
 // Main Categories
 export async function fetchMainCategories() {
@@ -156,92 +157,12 @@ export async function deleteSubcategory(id: string) {
   return true;
 }
 
-// Subsubcategories
-export async function fetchSubsubcategories(subcategoryId?: string) {
-  let query = supabase
-    .from("subsubcategories")
-    .select("*")
-    .order("name");
-  
-  if (subcategoryId) {
-    query = query.eq("subcategory_id", subcategoryId);
-  }
-  
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Error fetching subsubcategories:", error);
-    throw error;
-  }
-
-  return data as Subsubcategory[];
-}
-
-export async function fetchSubsubcategoryById(id: string) {
-  const { data, error } = await supabase
-    .from("subsubcategories")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error) {
-    console.error("Error fetching subsubcategory:", error);
-    throw error;
-  }
-
-  return data as Subsubcategory;
-}
-
-export async function createSubsubcategory(subsubcategory: Omit<Subsubcategory, "id" | "created_at" | "updated_at">) {
-  const { data, error } = await supabase
-    .from("subsubcategories")
-    .insert([subsubcategory])
-    .select();
-
-  if (error) {
-    console.error("Error creating subsubcategory:", error);
-    throw error;
-  }
-
-  return data[0] as Subsubcategory;
-}
-
-export async function updateSubsubcategory(id: string, subsubcategory: Partial<Omit<Subsubcategory, "id" | "created_at" | "updated_at">>) {
-  const { data, error } = await supabase
-    .from("subsubcategories")
-    .update(subsubcategory)
-    .eq("id", id)
-    .select();
-
-  if (error) {
-    console.error("Error updating subsubcategory:", error);
-    throw error;
-  }
-
-  return data[0] as Subsubcategory;
-}
-
-export async function deleteSubsubcategory(id: string) {
-  const { error } = await supabase
-    .from("subsubcategories")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Error deleting subsubcategory:", error);
-    throw error;
-  }
-
-  return true;
-}
-
 // For backwards compatibility - get category hierarchy
 export async function getCategoryHierarchy() {
   try {
     // Fetch all categories
     const mainCategories = await fetchMainCategories();
     const subcategories = await fetchSubcategories();
-    const subsubcategories = await fetchSubsubcategories();
     
     // Create a mapped structure that matches the old format
     const formattedCategories: Category[] = mainCategories.map(cat => ({
@@ -264,19 +185,7 @@ export async function getCategoryHierarchy() {
           parent_id: sub.category_id,
           created_at: sub.created_at,
           updated_at: sub.updated_at,
-          children: subsubcategories
-            .filter(subsub => subsub.subcategory_id === sub.id)
-            .map(subsub => ({
-              id: subsub.id,
-              name: subsub.name,
-              description: subsub.description,
-              image_url: subsub.image_url,
-              level: 'subsubcategory' as const,
-              parent_id: subsub.subcategory_id,
-              created_at: subsub.created_at,
-              updated_at: subsub.updated_at,
-              children: []
-            }))
+          children: []
         }))
     }));
     
