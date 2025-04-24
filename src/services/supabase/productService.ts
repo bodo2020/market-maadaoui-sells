@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -62,7 +63,10 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
   const productUpdate = {
     ...product,
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    // Explicitly handle offer price and is_offer
+    offer_price: product.offer_price ?? null,
+    is_offer: product.is_offer ?? false
   };
   
   const { data, error } = await supabase

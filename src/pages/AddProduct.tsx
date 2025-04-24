@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -66,7 +65,6 @@ export default function AddProduct() {
     try {
       const data = await fetchProductById(id);
       setProduct(data);
-      // إذا كان المنتج يحتوي على قسم رئيسي، قم بتحميل الأقسام الفرعية
       if (data.main_category_id) {
         await loadSubcategories(data.main_category_id);
       }
@@ -106,7 +104,6 @@ export default function AddProduct() {
     }
   };
 
-  // تحميل الأقسام الفرعية عندما يتغير القسم الرئيسي
   useEffect(() => {
     if (product?.main_category_id) {
       loadSubcategories(product.main_category_id);
@@ -131,7 +128,6 @@ export default function AddProduct() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Product Name */}
             <div>
               <Label htmlFor="name">اسم المنتج</Label>
               <Input
@@ -144,7 +140,6 @@ export default function AddProduct() {
               />
             </div>
 
-            {/* Price */}
             <div>
               <Label htmlFor="price">السعر</Label>
               <Input
@@ -158,7 +153,6 @@ export default function AddProduct() {
               />
             </div>
 
-            {/* Offer Price - NEW */}
             <div>
               <Label htmlFor="offer_price">سعر العرض</Label>
               <Input
@@ -167,12 +161,14 @@ export default function AddProduct() {
                 placeholder="سعر العرض"
                 value={product?.offer_price || ""}
                 onChange={(e) =>
-                  setProduct((prev) => ({ ...prev, offer_price: e.target.value ? Number(e.target.value) : null }))
+                  setProduct((prev) => ({ 
+                    ...prev, 
+                    offer_price: e.target.value ? Number(e.target.value) : null 
+                  }))
                 }
               />
             </div>
 
-            {/* Purchase Price */}
             <div>
               <Label htmlFor="purchase_price">سعر الشراء</Label>
               <Input
@@ -186,7 +182,6 @@ export default function AddProduct() {
               />
             </div>
 
-            {/* Quantity */}
             <div>
               <Label htmlFor="quantity">الكمية</Label>
               <Input
@@ -200,7 +195,6 @@ export default function AddProduct() {
               />
             </div>
 
-            {/* Is Offer Checkbox */}
             <div className="flex items-center space-x-2 rtl:space-x-reverse">
               <Checkbox
                 id="is_offer"
@@ -214,7 +208,6 @@ export default function AddProduct() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Categories Selection */}
             <div>
               <Label htmlFor="main_category_id">القسم الرئيسي</Label>
               <Select
@@ -238,7 +231,6 @@ export default function AddProduct() {
               </Select>
             </div>
 
-            {/* Subcategories Selection */}
             {product?.main_category_id && (
               <div>
                 <Label htmlFor="subcategory_id">القسم الفرعي</Label>
@@ -264,7 +256,6 @@ export default function AddProduct() {
               </div>
             )}
 
-            {/* Barcode Type Selection */}
             <div>
               <Label htmlFor="barcode_type">نوع الباركود</Label>
               <Select 
@@ -281,7 +272,6 @@ export default function AddProduct() {
               </Select>
             </div>
 
-            {/* Barcode Input */}
             <div>
               <Label htmlFor="barcode">الباركود</Label>
               <Input
@@ -293,7 +283,6 @@ export default function AddProduct() {
             </div>
           </div>
 
-          {/* Wholesale Section */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2 rtl:space-x-reverse">
               <Checkbox
@@ -344,7 +333,6 @@ export default function AddProduct() {
             )}
           </div>
 
-          {/* Description */}
           <div>
             <Label htmlFor="description">الوصف</Label>
             <Input
