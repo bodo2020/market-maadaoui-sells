@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { useNavigate } from "react-router-dom";
@@ -5,13 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { MainCategory, Subcategory } from "@/types";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ImagePlus, Plus, Trash } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function AddProduct() {
@@ -25,20 +24,9 @@ export default function AddProduct() {
   const [price, setPrice] = useState<number | string>("");
   const [purchasePrice, setPurchasePrice] = useState<number | string>("");
   const [unitOfMeasure, setUnitOfMeasure] = useState("");
-  const [manufacturerName, setManufacturerName] = useState("");
-
-  // Bulk options
-  const [bulkEnabled, setBulkEnabled] = useState(false);
-  const [bulkQuantity, setBulkQuantity] = useState<number | string>("");
-  const [bulkPrice, setBulkPrice] = useState<number | string>("");
-  const [bulkBarcode, setBulkBarcode] = useState("");
-  
-  // Special offer
-  const [isOffer, setIsOffer] = useState(false);
-  const [offerPrice, setOfferPrice] = useState<number | string>("");
   
   // Category selection
-  const [categoryId, setCategoryId] = useState("");
+  const [mainCategoryId, setMainCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
   const [categories, setCategories] = useState<MainCategory[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -49,23 +37,18 @@ export default function AddProduct() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // Company selection
-  const [companies, setCompanies] = useState<{id: string, name: string}[]>([]);
-  const [companyId, setCompanyId] = useState("");
-  
   useEffect(() => {
     fetchCategories();
-    fetchCompanies();
   }, []);
   
   useEffect(() => {
-    if (categoryId) {
-      fetchSubcategories(categoryId);
+    if (mainCategoryId) {
+      fetchSubcategories(mainCategoryId);
     } else {
       setSubcategories([]);
       setSubcategoryId("");
     }
-  }, [categoryId]);
+  }, [mainCategoryId]);
   
   const fetchCategories = async () => {
     try {
@@ -95,21 +78,6 @@ export default function AddProduct() {
     } catch (error) {
       console.error('Error fetching subcategories:', error);
       toast.error('حدث خطأ أثناء تحميل التصنيفات الفرعية');
-    }
-  };
-  
-  const fetchCompanies = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name')
-        .order('name');
-      
-      if (error) throw error;
-      setCompanies(data || []);
-    } catch (error) {
-      console.error('Error fetching companies:', error);
-      toast.error('حدث خطأ أثناء تحميل الشركات');
     }
   };
   
@@ -198,18 +166,18 @@ export default function AddProduct() {
         quantity: quantity || 0,
         price: Number(price),
         purchase_price: Number(purchasePrice) || 0,
-        is_offer: isOffer,
-        offer_price: isOffer ? Number(offerPrice) : null,
-        category_id: categoryId || null,
+        main_category_id: mainCategoryId || null,
         subcategory_id: subcategoryId || null,
-        company_id: companyId || null,
-        image_urls: imageUrls,
-        bulk_enabled: bulkEnabled,
-        bulk_quantity: bulkEnabled ? Number(bulkQuantity) : null,
-        bulk_price: bulkEnabled ? Number(bulkPrice) : null,
-        bulk_barcode: bulkEnabled ? bulkBarcode : null,
-        manufacturer_name: manufacturerName || null,
-        unit_of_measure: unitOfMeasure || null
+        image_urls: imageUrls.length > 0 ? imageUrls : ['/placeholder.svg'],
+        unit_of_measure: unitOfMeasure || null,
+        is_offer: false,
+        bulk_enabled: false,
+        bulk_quantity: null,
+        bulk_price: null,
+        bulk_barcode: null,
+        is_bulk: false,
+        offer_price: null,
+        manufacturer_name: null
       };
       
       // Insert product
@@ -280,17 +248,6 @@ export default function AddProduct() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="manufacturer">الشركة المصنعة (اختياري)</Label>
-                  <Input 
-                    id="manufacturer"
-                    value={manufacturerName} 
-                    onChange={e => setManufacturerName(e.target.value)}
-                    placeholder="أدخل اسم الشركة المصنعة" 
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div>
                   <Label htmlFor="unit">وحدة القياس (اختياري)</Label>
                   <Select value={unitOfMeasure} onValueChange={setUnitOfMeasure}>
                     <SelectTrigger>
@@ -354,115 +311,17 @@ export default function AddProduct() {
                     min="0"
                   />
                 </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="isOffer"
-                    checked={isOffer}
-                    onCheckedChange={setIsOffer}
-                  />
-                  <Label htmlFor="isOffer" className="mr-2">تفعيل العرض</Label>
-                </div>
-                
-                {isOffer && (
-                  <div>
-                    <Label htmlFor="offerPrice">سعر العرض</Label>
-                    <Input 
-                      id="offerPrice"
-                      type="number"
-                      step="0.01"
-                      value={offerPrice}
-                      onChange={e => setOfferPrice(e.target.value)}
-                      placeholder="أدخل سعر العرض" 
-                      className="mt-1"
-                      min="0"
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            
-            {/* Bulk options */}
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold">خيارات البيع بالجملة</h2>
-                  <Switch
-                    id="bulkEnabled"
-                    checked={bulkEnabled}
-                    onCheckedChange={setBulkEnabled}
-                  />
-                </div>
-                
-                {bulkEnabled && (
-                  <>
-                    <div>
-                      <Label htmlFor="bulkQuantity">كمية الجملة</Label>
-                      <Input 
-                        id="bulkQuantity"
-                        type="number"
-                        value={bulkQuantity}
-                        onChange={e => setBulkQuantity(e.target.value)}
-                        placeholder="أدخل كمية الجملة" 
-                        className="mt-1"
-                        min="0"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="bulkPrice">سعر الجملة</Label>
-                      <Input 
-                        id="bulkPrice"
-                        type="number"
-                        step="0.01"
-                        value={bulkPrice}
-                        onChange={e => setBulkPrice(e.target.value)}
-                        placeholder="أدخل سعر الجملة" 
-                        className="mt-1"
-                        min="0"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="bulkBarcode">باركود الجملة (اختياري)</Label>
-                      <Input 
-                        id="bulkBarcode"
-                        value={bulkBarcode}
-                        onChange={e => setBulkBarcode(e.target.value)}
-                        placeholder="أدخل باركود الجملة" 
-                        className="mt-1"
-                      />
-                    </div>
-                  </>
-                )}
               </CardContent>
             </Card>
             
             {/* Categories */}
             <Card>
               <CardContent className="pt-6 space-y-4">
-                <h2 className="text-xl font-semibold">التصنيفات والشركات</h2>
-                
-                <div>
-                  <Label htmlFor="company">الشركة (اختياري)</Label>
-                  <Select value={companyId} onValueChange={setCompanyId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر الشركة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">بدون شركة</SelectItem>
-                      {companies.map(company => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <h2 className="text-xl font-semibold">التصنيفات</h2>
                 
                 <div>
                   <Label htmlFor="category">التصنيف الرئيسي (اختياري)</Label>
-                  <Select value={categoryId} onValueChange={setCategoryId}>
+                  <Select value={mainCategoryId} onValueChange={setMainCategoryId}>
                     <SelectTrigger>
                       <SelectValue placeholder="اختر التصنيف" />
                     </SelectTrigger>
@@ -477,7 +336,7 @@ export default function AddProduct() {
                   </Select>
                 </div>
                 
-                {categoryId && (
+                {mainCategoryId && (
                   <div>
                     <Label htmlFor="subcategory">التصنيف الفرعي (اختياري)</Label>
                     <Select value={subcategoryId} onValueChange={setSubcategoryId}>

@@ -54,15 +54,15 @@ const ProductAssignmentDialog = ({
         setCategories(mainCategories || []);
         
         // If a category is already assigned, select it
-        if (product?.category_id) {
-          setSelectedId(product.category_id);
+        if (product?.main_category_id) {
+          setSelectedId(product.main_category_id);
           setSelectedCategoryLevel('category');
           
           // Fetch subcategories for the selected category
           const { data: subcategoriesData, error: subcategoriesError } = await supabase
             .from('subcategories')
             .select('*')
-            .eq('category_id', product.category_id)
+            .eq('category_id', product.main_category_id)
             .order('name');
           
           if (subcategoriesError) throw subcategoriesError;
@@ -101,7 +101,7 @@ const ProductAssignmentDialog = ({
       if (type === 'category') {
         // Determine category levels
         if (selectedCategoryLevel === 'category') {
-          updateData.category_id = selectedId;
+          updateData.main_category_id = selectedId;
           updateData.subcategory_id = null;
         } else if (selectedCategoryLevel === 'subcategory') {
           updateData.subcategory_id = selectedId;
@@ -111,7 +111,7 @@ const ProductAssignmentDialog = ({
             .select('category_id')
             .eq('id', selectedId)
             .single();
-          updateData.category_id = data?.category_id;
+          updateData.main_category_id = data?.category_id;
         }
       } else if (type === 'company') {
         updateData.company_id = selectedId;
@@ -131,6 +131,29 @@ const ProductAssignmentDialog = ({
       toast.error(`حدث خطأ أثناء تحديث ${type === 'category' ? 'قسم' : 'شركة'} المنتج`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCategorySelection = async (categoryId: string) => {
+    setSelectedId(categoryId);
+    
+    if (selectedCategoryLevel === 'category') {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('subcategories')
+          .select('*')
+          .eq('category_id', categoryId)
+          .order('name');
+          
+        if (error) throw error;
+        setSubcategories(data || []);
+      } catch (error) {
+        console.error('Error fetching subcategories:', error);
+        toast.error('حدث خطأ أثناء تحميل الأقسام الفرعية');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -172,13 +195,13 @@ const ProductAssignmentDialog = ({
               onValueChange={(value: 'category' | 'subcategory') => setSelectedCategoryLevel(value)} 
               className="pb-4"
             >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="category" id="category" />
+              <div className="flex items-center space-x-2 space-x-reverse justify-end">
                 <Label htmlFor="category">قسم رئيسي</Label>
+                <RadioGroupItem value="category" id="category" />
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="subcategory" id="subcategory" />
+              <div className="flex items-center space-x-2 space-x-reverse justify-end">
                 <Label htmlFor="subcategory">قسم فرعي</Label>
+                <RadioGroupItem value="subcategory" id="subcategory" />
               </div>
             </RadioGroup>
           )}
@@ -201,7 +224,7 @@ const ProductAssignmentDialog = ({
                       <li
                         key={category.id}
                         className={`p-2 cursor-pointer hover:bg-accent ${selectedId === category.id ? 'bg-accent text-accent-foreground' : ''}`}
-                        onClick={() => setSelectedId(category.id)}
+                        onClick={() => handleCategorySelection(category.id)}
                       >
                         {category.name}
                       </li>

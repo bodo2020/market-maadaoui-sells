@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,7 +25,6 @@ const productSchema = z.object({
   quantity: z.coerce.number().nonnegative({ message: "يجب أن تكون الكمية صفر أو أكثر" }),
   category_id: z.string().optional(),
   subcategory_id: z.string().optional(),
-  subsubcategory_id: z.string().optional(),
   unit_of_measure: z.string().default("قطعة"),
 });
 
@@ -48,13 +48,10 @@ interface AddProductDialogProps {
   companyId: string;
   categories: Array<{ id: string; name: string }>;
   subcategories: Array<{ id: string; name: string }>;
-  subsubcategories: Array<{ id: string; name: string }>;
   selectedCategory: string | null;
   selectedSubcategory: string | null;
-  selectedSubsubcategory: string | null;
   onCategoryChange: (categoryId: string | null) => void;
   onSubcategoryChange: (subcategoryId: string | null) => void;
-  onSubsubcategoryChange: (subsubcategoryId: string | null) => void;
 }
 
 export function AddProductDialog({
@@ -64,13 +61,10 @@ export function AddProductDialog({
   companyId,
   categories,
   subcategories,
-  subsubcategories,
   selectedCategory,
   selectedSubcategory,
-  selectedSubsubcategory,
   onCategoryChange,
-  onSubcategoryChange,
-  onSubsubcategoryChange
+  onSubcategoryChange
 }: AddProductDialogProps) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -87,7 +81,6 @@ export function AddProductDialog({
       quantity: 0,
       category_id: selectedCategory || undefined,
       subcategory_id: selectedSubcategory || undefined,
-      subsubcategory_id: selectedSubsubcategory || undefined,
       unit_of_measure: "قطعة",
     },
   });
@@ -111,9 +104,8 @@ export function AddProductDialog({
         quantity: values.quantity,
         image_urls: ["/placeholder.svg"],
         company_id: companyId,
-        category_id: values.category_id,
+        main_category_id: values.category_id, // تم تغييرها من category_id إلى main_category_id
         subcategory_id: values.subcategory_id,
-        subsubcategory_id: values.subsubcategory_id,
         unit_of_measure: values.unit_of_measure,
         is_offer: false,
         bulk_enabled: false,
@@ -322,39 +314,6 @@ export function AddProductDialog({
                         {subcategories.map((subcategory) => (
                           <SelectItem key={subcategory.id} value={subcategory.id}>
                             {subcategory.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {selectedSubcategory && (
-              <FormField
-                control={form.control}
-                name="subsubcategory_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>الفئة</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        onSubsubcategoryChange(value);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="اختر الفئة" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {subsubcategories.map((subsubcategory) => (
-                          <SelectItem key={subsubcategory.id} value={subsubcategory.id}>
-                            {subsubcategory.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
