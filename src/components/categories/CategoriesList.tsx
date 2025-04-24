@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, ChevronRight, FolderPlus, Trash, Edit, Package } from "lucide-react";
+import { Loader2, FolderPlus, Trash, Edit, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate, useParams } from "react-router-dom";
 import AddCategoryDialog from "./AddCategoryDialog";
-import { MainCategory, Subcategory } from "@/types";
+import { MainCategory } from "@/types";
 
 interface Category {
   id: string;
@@ -55,25 +55,34 @@ export default function CategoriesList() {
               
             if (error) throw error;
             
-            const typedCategories: Category[] = (data || []).map(cat => ({
-              id: cat.id,
-              name: cat.name,
-              description: cat.description,
-              image_url: cat.image_url,
-              product_count: 0
-            }));
+            // Convert to Category[] type without deep nesting
+            const typedCategories: Category[] = [];
+            
+            if (data && data.length > 0) {
+              data.forEach(cat => {
+                typedCategories.push({
+                  id: cat.id,
+                  name: cat.name,
+                  description: cat.description,
+                  image_url: cat.image_url,
+                  product_count: 0
+                });
+              });
+            }
             
             // Get product counts
-            await Promise.all(typedCategories.map(async (category) => {
-              const { count, error } = await supabase
-                .from('products')
-                .select('*', { count: 'exact', head: true })
-                .eq('subcategory_id', category.id);
-                
-              if (!error) {
-                category.product_count = count || 0;
+            if (typedCategories.length > 0) {
+              for (const category of typedCategories) {
+                const { count, error } = await supabase
+                  .from('products')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('main_category_id', category.id);
+                  
+                if (!error) {
+                  category.product_count = count || 0;
+                }
               }
-            }));
+            }
             
             setCategories(typedCategories);
             setLoading(false);
@@ -91,25 +100,34 @@ export default function CategoriesList() {
           
         if (error) throw error;
         
-        const typedCategories: Category[] = (data || []).map(cat => ({
-          id: cat.id,
-          name: cat.name,
-          description: cat.description,
-          image_url: cat.image_url,
-          product_count: 0
-        }));
+        // Convert to Category[] type without deep nesting
+        const typedCategories: Category[] = [];
+        
+        if (data && data.length > 0) {
+          data.forEach(cat => {
+            typedCategories.push({
+              id: cat.id,
+              name: cat.name,
+              description: cat.description,
+              image_url: cat.image_url,
+              product_count: 0
+            });
+          });
+        }
         
         // Get product counts for main categories
-        await Promise.all(typedCategories.map(async (category) => {
-          const { count, error } = await supabase
-            .from('products')
-            .select('*', { count: 'exact', head: true })
-            .eq('main_category_id', category.id);
-            
-          if (!error) {
-            category.product_count = count || 0;
+        if (typedCategories.length > 0) {
+          for (const category of typedCategories) {
+            const { count, error } = await supabase
+              .from('products')
+              .select('*', { count: 'exact', head: true })
+              .eq('main_category_id', category.id);
+              
+            if (!error) {
+              category.product_count = count || 0;
+            }
           }
-        }));
+        }
         
         setCategories(typedCategories);
       }

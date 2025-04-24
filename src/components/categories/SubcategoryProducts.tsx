@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { fetchProductsBySubcategory } from "@/services/supabase/productService";
+import { fetchProductsByCategory } from "@/services/supabase/productService";
 import { Product } from "@/types";
 import { ProductGrid } from "@/components/products/ProductGrid";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,9 @@ const SubcategoryProducts = ({ subcategoryId }: SubcategoryProductsProps) => {
     const loadProducts = async () => {
       try {
         setLoading(true);
-        const productsData = await fetchProductsBySubcategory(subcategoryId);
+        // Previously using fetchProductsBySubcategory which no longer exists
+        // Now using fetchProductsByCategory since subcategories are no longer in the schema
+        const productsData = await fetchProductsByCategory(subcategoryId);
         setProducts(productsData);
       } catch (error) {
         console.error("Error loading subcategory products:", error);
