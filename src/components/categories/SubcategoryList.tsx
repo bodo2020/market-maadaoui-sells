@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,6 @@ import { fetchSubcategories } from "@/services/supabase/categoryService";
 import { Subcategory } from "@/types";
 import { toast } from "sonner";
 import AddProductsToSubcategoryDialog from "./AddProductsToSubcategoryDialog";
-import { navigate } from "react-router-dom";
 
 export default function SubcategoryList() {
   const { id: categoryId } = useParams<{ id: string }>();
@@ -59,20 +59,13 @@ export default function SubcategoryList() {
         <ScrollArea className="h-[500px]">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {subcategories.map((subcategory) => (
-              <Card 
-                key={subcategory.id}
-                className="cursor-pointer hover:shadow-md transition-all"
-                onClick={() => navigate(`/subcategories/${subcategory.id}`)}
-              >
+              <Card key={subcategory.id}>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-lg">{subcategory.name}</CardTitle>
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAddProducts(subcategory);
-                    }}
+                    onClick={() => handleAddProducts(subcategory)}
                   >
                     <Plus className="h-4 w-4 ml-2" />
                     إضافة منتجات
