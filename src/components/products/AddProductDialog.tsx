@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,15 @@ export function AddProductDialog({
       unit_of_measure: "قطعة",
     },
   });
+
+  // تحديث نموذج الإدخال عند تغيير التصنيف
+  useEffect(() => {
+    form.setValue('category_id', selectedCategory || undefined);
+  }, [selectedCategory, form]);
+
+  useEffect(() => {
+    form.setValue('subcategory_id', selectedSubcategory || undefined);
+  }, [selectedSubcategory, form]);
 
   const handleClose = () => {
     form.reset();
@@ -367,4 +376,3 @@ export function AddProductDialog({
     </Dialog>
   );
 }
-

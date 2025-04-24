@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -65,6 +66,10 @@ export default function AddProduct() {
     try {
       const data = await fetchProductById(id);
       setProduct(data);
+      // إذا كان المنتج يحتوي على قسم رئيسي، قم بتحميل الأقسام الفرعية
+      if (data.main_category_id) {
+        await loadSubcategories(data.main_category_id);
+      }
     } catch (error) {
       console.error("Error loading product:", error);
       toast({
@@ -100,6 +105,15 @@ export default function AddProduct() {
       setLoading(false);
     }
   };
+
+  // تحميل الأقسام الفرعية عندما يتغير القسم الرئيسي
+  useEffect(() => {
+    if (product?.main_category_id) {
+      loadSubcategories(product.main_category_id);
+    } else {
+      setSubcategories([]);
+    }
+  }, [product?.main_category_id]);
 
   return (
     <MainLayout>
@@ -181,12 +195,7 @@ export default function AddProduct() {
                 value={product?.main_category_id || "none"}
                 onValueChange={(value) => {
                   const categoryId = value === "none" ? undefined : value;
-                  setProduct(prev => ({ ...prev, main_category_id: categoryId }));
-                  if (categoryId) {
-                    loadSubcategories(categoryId);
-                  } else {
-                    setSubcategories([]);
-                  }
+                  setProduct(prev => ({ ...prev, main_category_id: categoryId, subcategory_id: undefined }));
                 }}
               >
                 <SelectTrigger>
