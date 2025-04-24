@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Plus } from "lucide-react";
@@ -9,10 +10,10 @@ import { fetchSubcategories } from "@/services/supabase/categoryService";
 import { Subcategory } from "@/types";
 import { toast } from "sonner";
 import AddProductsToSubcategoryDialog from "./AddProductsToSubcategoryDialog";
-import { navigate } from "react-router-dom";
 
 export default function SubcategoryList() {
   const { id: categoryId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
