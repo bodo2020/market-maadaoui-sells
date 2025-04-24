@@ -326,7 +326,7 @@ export default function AddProduct() {
                       <SelectValue placeholder="اختر التصنيف" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">بدون تصنيف</SelectItem>
+                      <SelectItem value="none">بدون تصنيف</SelectItem>
                       {categories.map(category => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
@@ -336,7 +336,7 @@ export default function AddProduct() {
                   </Select>
                 </div>
                 
-                {mainCategoryId && (
+                {mainCategoryId && mainCategoryId !== "none" && (
                   <div>
                     <Label htmlFor="subcategory">التصنيف الفرعي (اختياري)</Label>
                     <Select value={subcategoryId} onValueChange={setSubcategoryId}>
@@ -344,7 +344,7 @@ export default function AddProduct() {
                         <SelectValue placeholder="اختر التصنيف الفرعي" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">بدون تصنيف فرعي</SelectItem>
+                        <SelectItem value="none">بدون تصنيف فرعي</SelectItem>
                         {subcategories.map(subcategory => (
                           <SelectItem key={subcategory.id} value={subcategory.id}>
                             {subcategory.name}

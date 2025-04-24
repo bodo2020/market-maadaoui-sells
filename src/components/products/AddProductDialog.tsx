@@ -130,7 +130,7 @@ export function AddProductDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>إضافة منتج جديد</DialogTitle>
@@ -267,10 +267,11 @@ export function AddProductDialog({
                 <FormItem>
                   <FormLabel>القسم الرئيسي</FormLabel>
                   <Select
-                    value={field.value}
+                    value={field.value || "none"}
                     onValueChange={(value) => {
-                      field.onChange(value);
-                      onCategoryChange(value);
+                      const categoryId = value === "none" ? undefined : value;
+                      field.onChange(categoryId);
+                      onCategoryChange(categoryId || null);
                     }}
                   >
                     <FormControl>
@@ -279,6 +280,7 @@ export function AddProductDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="none">بدون قسم</SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
@@ -299,10 +301,11 @@ export function AddProductDialog({
                   <FormItem>
                     <FormLabel>القسم الفرعي</FormLabel>
                     <Select
-                      value={field.value}
+                      value={field.value || "none"}
                       onValueChange={(value) => {
-                        field.onChange(value);
-                        onSubcategoryChange(value);
+                        const subcategoryId = value === "none" ? undefined : value;
+                        field.onChange(subcategoryId);
+                        onSubcategoryChange(subcategoryId || null);
                       }}
                     >
                       <FormControl>
@@ -311,6 +314,7 @@ export function AddProductDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value="none">بدون قسم فرعي</SelectItem>
                         {subcategories.map((subcategory) => (
                           <SelectItem key={subcategory.id} value={subcategory.id}>
                             {subcategory.name}
@@ -343,7 +347,7 @@ export function AddProductDialog({
             />
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={handleClose}>
+              <Button type="button" variant="outline" onClick={onClose}>
                 إلغاء
               </Button>
               <Button type="submit" disabled={loading}>
@@ -363,3 +367,4 @@ export function AddProductDialog({
     </Dialog>
   );
 }
+
