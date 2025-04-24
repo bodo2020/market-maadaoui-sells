@@ -4,7 +4,7 @@ import { fetchProductsBySubcategory } from "@/services/supabase/productService";
 import { Product } from "@/types";
 import { ProductGrid } from "@/components/products/ProductGrid";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, Plus } from "lucide-react";
 
 interface SubcategoryProductsProps {
@@ -37,7 +37,7 @@ const SubcategoryProducts = ({ subcategoryId }: SubcategoryProductsProps) => {
   }, [subcategoryId]);
 
   const handleAddProduct = () => {
-    // عند إضافة منتج جديد، نمرر القسم الفرعي المحدد كمعلمة استعلام
+    // Pass both the subcategory ID and category ID in the URL
     navigate(`/add-product?subcategory=${subcategoryId}`);
   };
 

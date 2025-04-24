@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -47,6 +46,25 @@ export async function fetchProductByBarcode(barcode: string) {
 }
 
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
+  console.log("Creating product with data:", product);
+
+  // If subcategory is provided, ensure we get the correct main category
+  if (product.subcategory_id) {
+    const { data: subcategory, error: subcategoryError } = await supabase
+      .from("subcategories")
+      .select("category_id")
+      .eq("id", product.subcategory_id)
+      .single();
+
+    if (subcategoryError) {
+      console.error("Error fetching subcategory:", subcategoryError);
+      throw subcategoryError;
+    }
+
+    // Set the main_category_id based on the subcategory's category_id
+    product.main_category_id = subcategory.category_id;
+  }
+
   const { data, error } = await supabase
     .from("products")
     .insert([product])
@@ -61,61 +79,45 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 }
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
-  // الخطوة 1: تأكد من أن main_category_id و subcategory_id ليسا undefined وإذا كانا، اجعلهما null
-  const productUpdate = {
-    ...product,
-    updated_at: new Date().toISOString(),
-    
-    // معالجة خاصة للمفاتيح الخارجية للتأكد من تحويل undefined إلى null
-    main_category_id: product.main_category_id === undefined ? null : product.main_category_id,
-    subcategory_id: product.subcategory_id === undefined ? null : product.subcategory_id,
-    company_id: product.company_id === undefined ? null : product.company_id,
-    
-    // معالجة خاصة لسعر العرض وحالة المنتج في العروض
-    offer_price: product.offer_price ?? null,
-    is_offer: product.is_offer ?? false
-  };
-  
-  console.log("Sending update to Supabase:", productUpdate);
-  
-  // الخطوة 2: التأكد من أن subcategory_id يتوافق مع main_category_id
-  if (productUpdate.subcategory_id && productUpdate.main_category_id) {
-    try {
-      // التحقق من أن القسم الفرعي ينتمي للقسم الرئيسي
-      const { data, error } = await supabase
+  // If changing subcategory, ensure we update main category accordingly
+  if (product.subcategory_id !== undefined) {
+    if (product.subcategory_id === null) {
+      // If clearing subcategory, also clear main category
+      product.main_category_id = null;
+    } else {
+      // Get the main category from the subcategory
+      const { data: subcategory, error: subcategoryError } = await supabase
         .from("subcategories")
-        .select("*")
-        .eq("id", productUpdate.subcategory_id)
-        .eq("category_id", productUpdate.main_category_id)
+        .select("category_id")
+        .eq("id", product.subcategory_id)
         .single();
-      
-      if (error || !data) {
-        console.warn("Subcategory doesn't belong to specified main category. Resetting subcategory_id to null.");
-        productUpdate.subcategory_id = null;
+
+      if (subcategoryError) {
+        console.error("Error fetching subcategory:", subcategoryError);
+        throw subcategoryError;
       }
-    } catch (error) {
-      console.error("Error checking subcategory relation:", error);
-      // في حالة وجود خطأ، نترك القيم كما هي ونستمر
+
+      product.main_category_id = subcategory.category_id;
     }
   }
-  
-  try {
-    const { data, error } = await supabase
-      .from("products")
-      .update(productUpdate)
-      .eq("id", id)
-      .select();
 
-    if (error) {
-      console.error("Error updating product:", error);
-      throw error;
-    }
+  console.log("Updating product with data:", product);
 
-    return data[0] as Product;
-  } catch (error) {
+  const { data, error } = await supabase
+    .from("products")
+    .update({
+      ...product,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select();
+
+  if (error) {
     console.error("Error updating product:", error);
     throw error;
   }
+
+  return data[0] as Product;
 }
 
 export async function deleteProduct(id: string) {
