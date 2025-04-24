@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -15,6 +16,7 @@ import { Loader2 } from "lucide-react";
 import { Product, MainCategory, Subcategory } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { updateProduct } from "@/services/supabase/productService";
 
 interface ProductAssignmentDialogProps {
   open: boolean;
@@ -37,6 +39,16 @@ const ProductAssignmentDialog = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryLevel, setSelectedCategoryLevel] = useState<'category' | 'subcategory'>('category');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      // إعادة تعيين الحالة عند إغلاق الديالوج
+      setSearchQuery("");
+      setSelectedId(null);
+      setSelectedCategoryId(null);
+    }
+  }, [open]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -52,26 +64,24 @@ const ProductAssignmentDialog = ({
         setCategories(mainCategories || []);
         
         if (product?.main_category_id) {
-          setSelectedId(product.main_category_id);
-          setSelectedCategoryLevel('category');
-          
-          const { data: subcategoriesData, error: subcategoriesError } = await supabase
-            .from('subcategories')
-            .select('*')
-            .eq('category_id', product.main_category_id)
-            .order('name');
-          
-          if (subcategoriesError) throw subcategoriesError;
-          setSubcategories(subcategoriesData || []);
+          setSelectedCategoryId(product.main_category_id);
           
           if (product?.subcategory_id) {
-            setSelectedId(product.subcategory_id);
             setSelectedCategoryLevel('subcategory');
+            setSelectedId(product.subcategory_id);
+            
+            const { data: subcategoriesData, error: subcategoriesError } = await supabase
+              .from('subcategories')
+              .select('*')
+              .eq('category_id', product.main_category_id)
+              .order('name');
+            
+            if (subcategoriesError) throw subcategoriesError;
+            setSubcategories(subcategoriesData || []);
           } else {
-            setSubcategories([]);
+            setSelectedCategoryLevel('category');
+            setSelectedId(product.main_category_id);
           }
-        } else {
-          setSubcategories([]);
         }
       } catch (error) {
         console.error('Error fetching categories:', error);
@@ -81,36 +91,50 @@ const ProductAssignmentDialog = ({
       }
     };
     
-    if (type === 'category') {
+    if (type === 'category' && open) {
       fetchCategories();
     }
   }, [open, product, type]);
 
   const updateProductCategory = async () => {
     try {
+      if (!product || !selectedId) {
+        toast.error('يرجى تحديد ' + (type === 'category' ? 'قسم' : 'شركة'));
+        return;
+      }
+
       setLoading(true);
       
-      const updateData: any = {};
+      const updateData: Partial<Product> = {};
       
       if (type === 'category') {
         if (selectedCategoryLevel === 'category') {
           updateData.main_category_id = selectedId;
           updateData.subcategory_id = null;
+          console.log("Updating to main category:", selectedId);
         } else if (selectedCategoryLevel === 'subcategory') {
+          // العثور على القسم الفرعي المحدد
           const subcategory = subcategories.find(sub => sub.id === selectedId);
           if (subcategory) {
+            // تعيين كل من القسم الرئيسي والفرعي
             updateData.main_category_id = subcategory.category_id;
             updateData.subcategory_id = selectedId;
+            console.log("Updating to subcategory:", selectedId, "with main category:", subcategory.category_id);
+          } else {
+            toast.error('القسم الفرعي المحدد غير متوفر');
+            setLoading(false);
+            return;
           }
         }
       } else if (type === 'company') {
         updateData.company_id = selectedId;
+        console.log("Updating company to:", selectedId);
       }
       
-      await supabase
-        .from('products')
-        .update(updateData)
-        .eq('id', product?.id);
+      console.log("Updating product with data:", updateData);
+      
+      // استخدام خدمة تحديث المنتج بدلاً من الاتصال المباشر بقاعدة البيانات
+      await updateProduct(product.id, updateData);
       
       toast.success(`تم تحديث ${type === 'category' ? 'قسم' : 'شركة'} المنتج بنجاح`);
       onSaved();
@@ -124,9 +148,10 @@ const ProductAssignmentDialog = ({
   };
 
   const handleCategorySelection = async (categoryId: string) => {
-    setSelectedId(categoryId);
-    
     if (selectedCategoryLevel === 'category') {
+      setSelectedId(categoryId);
+      setSelectedCategoryId(categoryId);
+      
       try {
         setLoading(true);
         const { data, error } = await supabase
@@ -143,6 +168,8 @@ const ProductAssignmentDialog = ({
       } finally {
         setLoading(false);
       }
+    } else {
+      setSelectedId(categoryId);
     }
   };
 
@@ -180,8 +207,16 @@ const ProductAssignmentDialog = ({
           
           {type === 'category' && (
             <RadioGroup 
-              defaultValue={selectedCategoryLevel} 
-              onValueChange={(value: 'category' | 'subcategory') => setSelectedCategoryLevel(value)} 
+              value={selectedCategoryLevel} 
+              onValueChange={(value: 'category' | 'subcategory') => {
+                setSelectedCategoryLevel(value);
+                setSelectedId(null); // إعادة تعيين التحديد عند تغيير المستوى
+                
+                // إذا رجعنا إلى اختيار القسم الرئيسي وكان هناك قسم رئيسي محدد مسبقا
+                if (value === 'category' && selectedCategoryId) {
+                  setSelectedId(selectedCategoryId);
+                }
+              }} 
               className="pb-4"
             >
               <div className="flex items-center space-x-2 space-x-reverse justify-end">
@@ -257,7 +292,7 @@ const ProductAssignmentDialog = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             إلغاء
           </Button>
-          <Button onClick={updateProductCategory} disabled={loading}>
+          <Button onClick={updateProductCategory} disabled={loading || !selectedId}>
             {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
             حفظ
           </Button>

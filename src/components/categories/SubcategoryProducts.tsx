@@ -20,7 +20,9 @@ const SubcategoryProducts = ({ subcategoryId }: SubcategoryProductsProps) => {
     const loadProducts = async () => {
       try {
         setLoading(true);
+        console.log("Loading products for subcategory:", subcategoryId);
         const productsData = await fetchProductsBySubcategory(subcategoryId);
+        console.log("Products loaded:", productsData);
         setProducts(productsData);
       } catch (error) {
         console.error("Error loading subcategory products:", error);
@@ -35,7 +37,8 @@ const SubcategoryProducts = ({ subcategoryId }: SubcategoryProductsProps) => {
   }, [subcategoryId]);
 
   const handleAddProduct = () => {
-    navigate("/products/add");
+    // عند إضافة منتج جديد، نمرر القسم الفرعي المحدد كمعلمة استعلام
+    navigate(`/add-product?subcategory=${subcategoryId}`);
   };
 
   if (loading) {
@@ -65,7 +68,7 @@ const SubcategoryProducts = ({ subcategoryId }: SubcategoryProductsProps) => {
           </Button>
         </div>
       ) : (
-        <ProductGrid products={products} onEditProduct={(product) => navigate(`/products/edit/${product.id}`)} />
+        <ProductGrid products={products} onEditProduct={(product) => navigate(`/add-product?id=${product.id}`)} />
       )}
     </div>
   );

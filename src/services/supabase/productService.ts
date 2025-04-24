@@ -133,6 +133,9 @@ export async function deleteProduct(id: string) {
 }
 
 export async function fetchProductsByCategory(categoryId: string) {
+  console.log("Fetching products for main category:", categoryId);
+  
+  // تعديل طريقة الاستعلام للتأكد من جلب المنتجات الصحيحة للقسم الرئيسي
   const { data, error } = await supabase
     .from("products")
     .select("*")
@@ -143,7 +146,8 @@ export async function fetchProductsByCategory(categoryId: string) {
     console.error("Error fetching products by category:", error);
     throw error;
   }
-
+  
+  console.log(`Found ${data?.length || 0} products for main category ${categoryId}`);
   return data as Product[];
 }
 
@@ -163,6 +167,9 @@ export async function fetchProductsByCompany(companyId: string) {
 }
 
 export async function fetchProductsBySubcategory(subcategoryId: string) {
+  console.log("Fetching products for subcategory:", subcategoryId);
+  
+  // تعديل طريقة الاستعلام للتأكد من جلب المنتجات الصحيحة للقسم الفرعي
   const { data, error } = await supabase
     .from("products")
     .select("*")
@@ -173,6 +180,7 @@ export async function fetchProductsBySubcategory(subcategoryId: string) {
     console.error("Error fetching products by subcategory:", error);
     throw error;
   }
-
+  
+  console.log(`Found ${data?.length || 0} products for subcategory ${subcategoryId}`);
   return data as Product[];
 }
