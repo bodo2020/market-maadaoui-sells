@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -97,7 +96,19 @@ export default function CategoriesList() {
           name: cat.name,
           description: cat.description,
           image_url: cat.image_url,
-          product_count: cat.product_count || 0
+          product_count: 0
+        }));
+        
+        // Get product counts for main categories
+        await Promise.all(typedCategories.map(async (category) => {
+          const { count, error } = await supabase
+            .from('products')
+            .select('*', { count: 'exact', head: true })
+            .eq('main_category_id', category.id);
+            
+          if (!error) {
+            category.product_count = count || 0;
+          }
         }));
         
         setCategories(typedCategories);
