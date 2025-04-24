@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { fetchProductsByCategory } from "@/services/supabase/productService";
+import { fetchProductsBySubcategory } from "@/services/supabase/productService";
 import { Product } from "@/types";
 import { ProductGrid } from "@/components/products/ProductGrid";
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,7 @@ const SubcategoryProducts = ({ subcategoryId }: SubcategoryProductsProps) => {
     const loadProducts = async () => {
       try {
         setLoading(true);
-        // Previously using fetchProductsBySubcategory which no longer exists
-        // Now using fetchProductsByCategory since subcategories are no longer in the schema
-        const productsData = await fetchProductsByCategory(subcategoryId);
+        const productsData = await fetchProductsBySubcategory(subcategoryId);
         setProducts(productsData);
       } catch (error) {
         console.error("Error loading subcategory products:", error);
@@ -52,7 +50,7 @@ const SubcategoryProducts = ({ subcategoryId }: SubcategoryProductsProps) => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">منتجات الفئة</h2>
+        <h2 className="text-xl font-semibold">منتجات القسم الفرعي</h2>
         <Button onClick={handleAddProduct}>
           <Plus className="h-4 w-4 ml-2" />
           إضافة منتج
@@ -61,7 +59,7 @@ const SubcategoryProducts = ({ subcategoryId }: SubcategoryProductsProps) => {
 
       {products.length === 0 ? (
         <div className="text-center py-10 bg-gray-50 rounded-md">
-          <p className="text-gray-500">لا توجد منتجات في هذه الفئة</p>
+          <p className="text-gray-500">لا توجد منتجات في هذا القسم الفرعي</p>
           <Button variant="outline" className="mt-4" onClick={handleAddProduct}>
             إضافة منتج الآن
           </Button>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -44,7 +43,6 @@ const ProductAssignmentDialog = ({
       try {
         setLoading(true);
         
-        // Fetch main categories
         const { data: mainCategories, error: mainError } = await supabase
           .from('main_categories')
           .select('*')
@@ -53,12 +51,10 @@ const ProductAssignmentDialog = ({
         if (mainError) throw mainError;
         setCategories(mainCategories || []);
         
-        // If a category is already assigned, select it
         if (product?.main_category_id) {
           setSelectedId(product.main_category_id);
           setSelectedCategoryLevel('category');
           
-          // Fetch subcategories for the selected category
           const { data: subcategoriesData, error: subcategoriesError } = await supabase
             .from('subcategories')
             .select('*')
@@ -68,7 +64,6 @@ const ProductAssignmentDialog = ({
           if (subcategoriesError) throw subcategoriesError;
           setSubcategories(subcategoriesData || []);
           
-          // If a subcategory is already assigned, select it
           if (product?.subcategory_id) {
             setSelectedId(product.subcategory_id);
             setSelectedCategoryLevel('subcategory');
@@ -95,29 +90,23 @@ const ProductAssignmentDialog = ({
     try {
       setLoading(true);
       
-      // Prepare update data
       const updateData: any = {};
       
       if (type === 'category') {
-        // Determine category levels
         if (selectedCategoryLevel === 'category') {
           updateData.main_category_id = selectedId;
           updateData.subcategory_id = null;
         } else if (selectedCategoryLevel === 'subcategory') {
-          updateData.subcategory_id = selectedId;
-          // Find parent category
-          const { data } = await supabase
-            .from('subcategories')
-            .select('category_id')
-            .eq('id', selectedId)
-            .single();
-          updateData.main_category_id = data?.category_id;
+          const subcategory = subcategories.find(sub => sub.id === selectedId);
+          if (subcategory) {
+            updateData.main_category_id = subcategory.category_id;
+            updateData.subcategory_id = selectedId;
+          }
         }
       } else if (type === 'company') {
         updateData.company_id = selectedId;
       }
       
-      // Update the product
       await supabase
         .from('products')
         .update(updateData)
