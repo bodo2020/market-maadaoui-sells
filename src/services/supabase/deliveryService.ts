@@ -314,7 +314,7 @@ export async function updateDeliveryTypePricing(data: {
       .update({
         price: data.price,
         estimated_time: data.estimated_time,
-        updated_at: new Date()
+        updated_at: new Date().toISOString() // Convert Date to ISO string
       })
       .eq('delivery_location_id', data.delivery_location_id)
       .eq('delivery_type_id', data.delivery_type_id)
