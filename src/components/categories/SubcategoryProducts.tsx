@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Plus } from "lucide-react";
 
-interface SubsubcategoryProductsProps {
-  subsubcategoryId: string;
+interface SubcategoryProductsProps {
+  subcategoryId: string;
 }
 
-const SubsubcategoryProducts = ({ subsubcategoryId }: SubsubcategoryProductsProps) => {
+const SubcategoryProducts = ({ subcategoryId }: SubcategoryProductsProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ const SubsubcategoryProducts = ({ subsubcategoryId }: SubsubcategoryProductsProp
     const loadProducts = async () => {
       try {
         setLoading(true);
-        const productsData = await fetchProductsBySubcategory(subsubcategoryId);
+        const productsData = await fetchProductsBySubcategory(subcategoryId);
         setProducts(productsData);
       } catch (error) {
         console.error("Error loading subcategory products:", error);
@@ -29,10 +29,10 @@ const SubsubcategoryProducts = ({ subsubcategoryId }: SubsubcategoryProductsProp
       }
     };
 
-    if (subsubcategoryId) {
+    if (subcategoryId) {
       loadProducts();
     }
-  }, [subsubcategoryId]);
+  }, [subcategoryId]);
 
   const handleAddProduct = () => {
     navigate("/products/add");
@@ -71,4 +71,4 @@ const SubsubcategoryProducts = ({ subsubcategoryId }: SubsubcategoryProductsProp
   );
 };
 
-export default SubsubcategoryProducts;
+export default SubcategoryProducts;
