@@ -74,18 +74,23 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
     is_offer: product.is_offer ?? false
   };
   
-  const { data, error } = await supabase
-    .from("products")
-    .update(productUpdate)
-    .eq("id", id)
-    .select();
+  try {
+    const { data, error } = await supabase
+      .from("products")
+      .update(productUpdate)
+      .eq("id", id)
+      .select();
 
-  if (error) {
+    if (error) {
+      console.error("Error updating product:", error);
+      throw error;
+    }
+
+    return data[0] as Product;
+  } catch (error) {
     console.error("Error updating product:", error);
     throw error;
   }
-
-  return data[0] as Product;
 }
 
 export async function deleteProduct(id: string) {
@@ -126,6 +131,21 @@ export async function fetchProductsByCompany(companyId: string) {
 
   if (error) {
     console.error("Error fetching products by company:", error);
+    throw error;
+  }
+
+  return data as Product[];
+}
+
+export async function fetchProductsBySubcategory(subcategoryId: string) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("subcategory_id", subcategoryId)
+    .order("name");
+
+  if (error) {
+    console.error("Error fetching products by subcategory:", error);
     throw error;
   }
 
