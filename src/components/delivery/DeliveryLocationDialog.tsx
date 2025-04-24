@@ -35,8 +35,12 @@ export default function DeliveryLocationDialog({
   const [showPricing, setShowPricing] = useState(false);
   const [newLocationId, setNewLocationId] = useState<string | null>(null);
 
+  const isFormValid = name.trim() !== "";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isFormValid) return;
+    
     setLoading(true);
 
     try {
@@ -129,7 +133,7 @@ export default function DeliveryLocationDialog({
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading || !isFormValid}>
                 {loading ? "جاري الحفظ..." : mode === 'neighborhood' ? "التالي" : "حفظ"}
               </Button>
               <Button

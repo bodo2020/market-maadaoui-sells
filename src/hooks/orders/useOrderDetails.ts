@@ -109,12 +109,15 @@ export function useOrderDetails(orderId: string) {
       console.log("Updating order status to:", selectedStatus, "for order ID:", orderId);
       
       const currentTime = new Date().toISOString();
+      const user = await supabase.auth.getUser();
+      const cashierId = user.data.user?.id;
       
       const { error, data } = await supabase
         .from('online_orders')
         .update({ 
           status: selectedStatus,
-          updated_at: currentTime 
+          updated_at: currentTime,
+          cashier_id: cashierId
         })
         .eq('id', orderId)
         .select();
