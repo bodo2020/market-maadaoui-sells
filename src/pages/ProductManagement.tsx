@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -162,7 +163,7 @@ export default function ProductManagement() {
         offer_price: newProduct.is_offer ? newProduct.offer_price : null,
         category_id: newProduct.category_id || null,
         subcategory_id: null,
-        subsubcategory_id: null,
+        main_category_id: newProduct.main_category_id || null,
         barcode_type: newProduct.barcode_type || "normal",
         bulk_enabled: newProduct.bulk_enabled || false,
         bulk_quantity: newProduct.bulk_enabled ? newProduct.bulk_quantity : null,
