@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createProduct } from "@/services/supabase/productService";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const productSchema = z.object({
   name: z.string().min(2, { message: "يجب أن يحتوي اسم المنتج على حرفين على الأقل" }),
@@ -26,6 +27,8 @@ const productSchema = z.object({
   category_id: z.string().optional(),
   subcategory_id: z.string().optional(),
   unit_of_measure: z.string().default("قطعة"),
+  offer_price: z.coerce.number().nullable().optional(),
+  is_offer: z.boolean().default(false),
 });
 
 const units = [
@@ -82,6 +85,8 @@ export function AddProductDialog({
       category_id: selectedCategory || undefined,
       subcategory_id: selectedSubcategory || undefined,
       unit_of_measure: "قطعة",
+      offer_price: null,
+      is_offer: false,
     },
   });
 
@@ -116,10 +121,10 @@ export function AddProductDialog({
         main_category_id: values.category_id, // تم تغييرها من category_id إلى main_category_id
         subcategory_id: values.subcategory_id,
         unit_of_measure: values.unit_of_measure,
-        is_offer: false,
+        is_offer: values.is_offer,
+        offer_price: values.offer_price,
         bulk_enabled: false,
         is_bulk: false,
-        offer_price: null,
         bulk_quantity: null,
         bulk_price: null,
         bulk_barcode: null,
@@ -184,6 +189,50 @@ export function AddProductDialog({
                     <FormControl>
                       <Input type="number" step="0.01" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Added offer price field */}
+              <FormField
+                control={form.control}
+                name="offer_price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>سعر العرض</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="سعر العرض"
+                        value={field.value === null ? '' : field.value}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? null : Number(e.target.value);
+                          field.onChange(value);
+                        }} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Added is_offer checkbox */}
+              <FormField
+                control={form.control}
+                name="is_offer"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center space-x-3 space-y-0 rtl:space-x-reverse">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormLabel className="font-normal">منتج في العروض</FormLabel>
                     <FormMessage />
                   </FormItem>
                 )}

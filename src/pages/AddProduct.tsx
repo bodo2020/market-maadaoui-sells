@@ -158,6 +158,20 @@ export default function AddProduct() {
               />
             </div>
 
+            {/* Offer Price - NEW */}
+            <div>
+              <Label htmlFor="offer_price">سعر العرض</Label>
+              <Input
+                type="number"
+                id="offer_price"
+                placeholder="سعر العرض"
+                value={product?.offer_price || ""}
+                onChange={(e) =>
+                  setProduct((prev) => ({ ...prev, offer_price: e.target.value ? Number(e.target.value) : null }))
+                }
+              />
+            </div>
+
             {/* Purchase Price */}
             <div>
               <Label htmlFor="purchase_price">سعر الشراء</Label>
@@ -184,6 +198,18 @@ export default function AddProduct() {
                   setProduct((prev) => ({ ...prev, quantity: Number(e.target.value) }))
                 }
               />
+            </div>
+
+            {/* Is Offer Checkbox */}
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+              <Checkbox
+                id="is_offer"
+                checked={product?.is_offer || false}
+                onCheckedChange={(checked) =>
+                  setProduct(prev => ({ ...prev, is_offer: checked as boolean }))
+                }
+              />
+              <Label htmlFor="is_offer">منتج في العروض</Label>
             </div>
           </div>
 

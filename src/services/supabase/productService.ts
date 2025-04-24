@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -61,10 +60,14 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 }
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
-  // We only update the product table, not trying to update main_categories
+  const productUpdate = {
+    ...product,
+    updated_at: new Date().toISOString()
+  };
+  
   const { data, error } = await supabase
     .from("products")
-    .update(product)
+    .update(productUpdate)
     .eq("id", id)
     .select();
 
