@@ -11,20 +11,54 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchProductById, updateProduct } from "@/services/supabase/productService";
 import { Product } from "@/types";
 import { Loader2 } from "lucide-react";
+import { fetchMainCategories } from "@/services/supabase/categoryService";
+import { fetchSubcategories } from "@/services/supabase/categoryService";
+import { MainCategory, Subcategory } from "@/types";
 
 export default function AddProduct() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<MainCategory[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const productId = searchParams.get("id");
 
   useEffect(() => {
+    loadCategories();
     if (productId) {
       loadProduct(productId);
     }
   }, [productId]);
+
+  const loadCategories = async () => {
+    try {
+      const mainCategories = await fetchMainCategories();
+      setCategories(mainCategories);
+    } catch (error) {
+      console.error("Error loading categories:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load categories",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadSubcategories = async (categoryId: string) => {
+    try {
+      const subs = await fetchSubcategories(categoryId);
+      setSubcategories(subs);
+    } catch (error) {
+      console.error("Error loading subcategories:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load subcategories",
+        variant: "destructive",
+      });
+    }
+  };
 
   const loadProduct = async (id: string) => {
     setLoading(true);
@@ -140,6 +174,61 @@ export default function AddProduct() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Categories Selection */}
+            <div>
+              <Label htmlFor="main_category_id">القسم الرئيسي</Label>
+              <Select
+                value={product?.main_category_id || "none"}
+                onValueChange={(value) => {
+                  const categoryId = value === "none" ? undefined : value;
+                  setProduct(prev => ({ ...prev, main_category_id: categoryId }));
+                  if (categoryId) {
+                    loadSubcategories(categoryId);
+                  } else {
+                    setSubcategories([]);
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="اختر القسم الرئيسي" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">بدون قسم</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Subcategories Selection */}
+            {product?.main_category_id && (
+              <div>
+                <Label htmlFor="subcategory_id">القسم الفرعي</Label>
+                <Select
+                  value={product?.subcategory_id || "none"}
+                  onValueChange={(value) => {
+                    const subcategoryId = value === "none" ? undefined : value;
+                    setProduct(prev => ({ ...prev, subcategory_id: subcategoryId }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر القسم الفرعي" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">بدون قسم فرعي</SelectItem>
+                    {subcategories.map((subcategory) => (
+                      <SelectItem key={subcategory.id} value={subcategory.id}>
+                        {subcategory.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             {/* Barcode Type Selection */}
             <div>
               <Label htmlFor="barcode_type">نوع الباركود</Label>
