@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -102,11 +103,15 @@ export default function AddProduct() {
 
     setLoading(true);
     try {
+      // Ensure we're properly handling the subcategory_id
       const productToUpdate = {
         ...product,
         main_category_id: product.main_category_id || null,
+        subcategory_id: product.subcategory_id || null,
         company_id: product.company_id || null,
       };
+      
+      console.log("Updating product with data:", productToUpdate);
       
       await updateProduct(product.id, productToUpdate);
       toast({
@@ -136,11 +141,43 @@ export default function AddProduct() {
 
   const handleSelectChange = (value: string, field: string) => {
     if (field === 'main_category_id') {
-      setProduct(prev => ({ 
-        ...prev, 
-        [field]: value,
-        subcategory_id: undefined // Clear subcategory when main category changes
-      }));
+      if (value === "none") {
+        setProduct(prev => ({ 
+          ...prev, 
+          main_category_id: null,
+          subcategory_id: null
+        }));
+      } else {
+        setProduct(prev => ({ 
+          ...prev, 
+          main_category_id: value,
+          subcategory_id: null // Clear subcategory when main category changes
+        }));
+      }
+    } else if (field === 'subcategory_id') {
+      if (value === "none") {
+        setProduct(prev => ({ 
+          ...prev, 
+          [field]: null
+        }));
+      } else {
+        setProduct(prev => ({ 
+          ...prev, 
+          [field]: value
+        }));
+      }
+    } else if (field === 'company_id') {
+      if (value === "none") {
+        setProduct(prev => ({ 
+          ...prev, 
+          [field]: null
+        }));
+      } else {
+        setProduct(prev => ({ 
+          ...prev, 
+          [field]: value
+        }));
+      }
     } else {
       setProduct(prev => ({ ...prev, [field]: value }));
     }

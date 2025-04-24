@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -72,6 +73,8 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
     offer_price: product.offer_price ?? null,
     is_offer: product.is_offer ?? false
   };
+  
+  console.log("Sending update to Supabase:", productUpdate);
   
   try {
     const { data, error } = await supabase

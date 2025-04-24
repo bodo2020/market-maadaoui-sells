@@ -37,7 +37,7 @@ const ProductAssignmentDialog = ({
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategoryLevel, setSelectedCategoryLevel] = useState<'category' | 'subcategory'>('subcategory'); // Default to subcategory
+  const [selectedCategoryLevel, setSelectedCategoryLevel] = useState<'category' | 'subcategory'>('category');
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -103,6 +103,8 @@ const ProductAssignmentDialog = ({
       } else if (type === 'company') {
         updateData.company_id = selectedId;
       }
+      
+      console.log("Updating product with data:", updateData);
       
       const { error } = await supabase
         .from('products')
@@ -182,7 +184,10 @@ const ProductAssignmentDialog = ({
           {type === 'category' && (
             <RadioGroup 
               value={selectedCategoryLevel} 
-              onValueChange={(value: 'category' | 'subcategory') => setSelectedCategoryLevel(value)} 
+              onValueChange={(value: 'category' | 'subcategory') => {
+                setSelectedCategoryLevel(value);
+                setSelectedId(null); // Reset selection when changing level
+              }} 
               className="pb-4"
             >
               <div className="flex items-center space-x-2 space-x-reverse justify-end">
@@ -258,7 +263,7 @@ const ProductAssignmentDialog = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             إلغاء
           </Button>
-          <Button onClick={updateProductCategory} disabled={loading}>
+          <Button onClick={updateProductCategory} disabled={loading || !selectedId}>
             {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
             حفظ
           </Button>
