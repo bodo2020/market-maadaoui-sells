@@ -81,9 +81,14 @@ export default function AddProduct() {
     setLoading(true);
     try {
       const data = await fetchProductById(id);
-      setProduct(data);
-      if (data.main_category_id) {
-        await loadSubcategories(data.main_category_id);
+      // Ensure we're working with the new schema, clear any old category_id values
+      const updatedProduct = {
+        ...data,
+        category_id: null // Ensure we're not using the old field
+      };
+      setProduct(updatedProduct);
+      if (updatedProduct.main_category_id) {
+        await loadSubcategories(updatedProduct.main_category_id);
       }
     } catch (error) {
       console.error("Error loading product:", error);
@@ -108,7 +113,8 @@ export default function AddProduct() {
         ...product,
         main_category_id: product.main_category_id || null,
         subcategory_id: product.subcategory_id || null,
-        company_id: product.company_id || null
+        company_id: product.company_id || null,
+        category_id: null // Ensure we're not using the old field
       };
       
       await updateProduct(product.id, productToUpdate);

@@ -69,6 +69,8 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
     main_category_id: product.main_category_id === undefined ? null : product.main_category_id,
     subcategory_id: product.subcategory_id === undefined ? null : product.subcategory_id,
     company_id: product.company_id === undefined ? null : product.company_id,
+    // Handle category_id (legacy field) - set to null
+    category_id: null,
     // Explicitly handle offer price and is_offer
     offer_price: product.offer_price ?? null,
     is_offer: product.is_offer ?? false
@@ -107,7 +109,7 @@ export async function fetchProductsByCategory(categoryId: string) {
   const { data, error } = await supabase
     .from("products")
     .select("*")
-    .eq("category_id", categoryId)
+    .eq("main_category_id", categoryId)
     .order("name");
 
   if (error) {
