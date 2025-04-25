@@ -135,24 +135,17 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
 }
 
 export async function deleteProduct(id: string) {
-  console.log("Deleting product with ID:", id);
-  try {
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", id);
+  const { error } = await supabase
+    .from("products")
+    .delete()
+    .eq("id", id);
 
-    if (error) {
-      console.error("Error deleting product:", error);
-      throw error;
-    }
-
-    console.log("Product deleted successfully");
-    return true;
-  } catch (error) {
-    console.error("Error in deleteProduct:", error);
+  if (error) {
+    console.error("Error deleting product:", error);
     throw error;
   }
+
+  return true;
 }
 
 export async function fetchProductsByCategory(categoryId: string) {
