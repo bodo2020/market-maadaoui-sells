@@ -1,20 +1,27 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { MainCategory, Subcategory } from "@/types";
 
 // Main Categories
 export async function fetchMainCategories() {
-  const { data, error } = await supabase
-    .from("main_categories")
-    .select("*")
-    .order("name");
+  console.log("Fetching main categories");
+  
+  try {
+    const { data, error } = await supabase
+      .from("main_categories")
+      .select("*")
+      .order("name");
 
-  if (error) {
-    console.error("Error fetching main categories:", error);
-    throw error;
+    if (error) {
+      console.error("Error fetching main categories:", error);
+      throw error;
+    }
+
+    console.log(`Successfully fetched ${data.length} main categories`);
+    return data as MainCategory[];
+  } catch (error) {
+    console.error("Error in fetchMainCategories:", error);
+    return [];
   }
-
-  return data as MainCategory[];
 }
 
 export async function fetchMainCategoryById(id: string) {
@@ -77,23 +84,31 @@ export async function deleteMainCategory(id: string) {
 
 // Subcategories
 export async function fetchSubcategories(categoryId?: string) {
-  let query = supabase
-    .from("subcategories")
-    .select("*")
-    .order('name');
+  console.log(`Fetching subcategories${categoryId ? ` for category ${categoryId}` : ''}`);
   
-  if (categoryId) {
-    query = query.eq("category_id", categoryId);
-  }
-  
-  const { data, error } = await query;
+  try {
+    let query = supabase
+      .from("subcategories")
+      .select("*")
+      .order('name');
+    
+    if (categoryId) {
+      query = query.eq("category_id", categoryId);
+    }
+    
+    const { data, error } = await query;
 
-  if (error) {
-    console.error("Error fetching subcategories:", error);
-    throw error;
-  }
+    if (error) {
+      console.error("Error fetching subcategories:", error);
+      throw error;
+    }
 
-  return data as Subcategory[];
+    console.log(`Successfully fetched ${data.length} subcategories`);
+    return data as Subcategory[];
+  } catch (error) {
+    console.error("Error in fetchSubcategories:", error);
+    return [];
+  }
 }
 
 export async function fetchSubcategoryById(id: string) {
@@ -161,6 +176,11 @@ export async function getCategoryHierarchy() {
     const mainCategories = await fetchMainCategories();
     const subcategories = await fetchSubcategories();
     
+    if (!mainCategories || !subcategories) {
+      console.error("Failed to fetch categories or subcategories");
+      return [];
+    }
+    
     // Create a mapped structure that matches the old format
     const formattedCategories = mainCategories.map(cat => ({
       id: cat.id,
@@ -189,6 +209,6 @@ export async function getCategoryHierarchy() {
     return formattedCategories;
   } catch (error) {
     console.error("Error building category hierarchy:", error);
-    throw error;
+    return [];
   }
 }
