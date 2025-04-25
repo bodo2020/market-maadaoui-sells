@@ -109,16 +109,49 @@ export default function AddProduct() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!product) return;
+    
+    // Validation for required fields
+    if (!product.name) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال اسم المنتج",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (product.price === undefined || product.price === null) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال سعر المنتج",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (product.purchase_price === undefined || product.purchase_price === null) {
+      toast({
+        title: "خطأ",
+        description: "يرجى إدخال سعر الشراء",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
     try {
       const productData = {
         ...product,
+        name: product.name, // Ensure name is included and not undefined
+        price: Number(product.price), // Ensure price is a number
+        purchase_price: Number(product.purchase_price), // Ensure purchase_price is a number
         main_category_id: product.main_category_id || null,
         subcategory_id: product.subcategory_id || null,
         company_id: product.company_id || null,
         image_urls: product.image_urls || [],
-      };
+        is_bulk: product.is_bulk || false,
+        bulk_enabled: product.bulk_enabled || false,
+      } as Omit<Product, "id" | "created_at" | "updated_at">;
       
       console.log("Submitting product data:", productData);
       
@@ -126,23 +159,23 @@ export default function AddProduct() {
         // Update existing product
         await updateProduct(productId, productData);
         toast({
-          title: "Success",
-          description: "Product updated successfully",
+          title: "تم بنجاح",
+          description: "تم تحديث المنتج بنجاح",
         });
       } else {
         // Create new product
         await createProduct(productData);
         toast({
-          title: "Success",
-          description: "Product created successfully",
+          title: "تم بنجاح",
+          description: "تم إضافة المنتج بنجاح",
         });
       }
       navigate("/products");
     } catch (error) {
       console.error("Error saving product:", error);
       toast({
-        title: "Error",
-        description: "Failed to save product",
+        title: "خطأ",
+        description: "فشل في حفظ المنتج",
         variant: "destructive",
       });
     } finally {

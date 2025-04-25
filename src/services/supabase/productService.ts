@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -57,6 +58,19 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
   console.log("Creating product with data:", product);
 
   try {
+    // Ensure product has all required fields
+    if (!product.name) {
+      throw new Error("Product name is required");
+    }
+
+    if (product.price === undefined || product.price === null) {
+      throw new Error("Product price is required");
+    }
+
+    if (product.purchase_price === undefined || product.purchase_price === null) {
+      throw new Error("Product purchase price is required");
+    }
+
     // If subcategory is provided, ensure we get the correct main category
     if (product.subcategory_id) {
       const { data: subcategory, error: subcategoryError } = await supabase
@@ -74,9 +88,33 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
       product.main_category_id = subcategory.category_id;
     }
 
+    // Ensure all required fields are present and properly formatted
+    const productData = {
+      name: product.name,
+      price: product.price,
+      purchase_price: product.purchase_price,
+      quantity: product.quantity || 0,
+      image_urls: product.image_urls || [],
+      main_category_id: product.main_category_id,
+      subcategory_id: product.subcategory_id,
+      company_id: product.company_id,
+      description: product.description,
+      barcode: product.barcode,
+      barcode_type: product.barcode_type,
+      is_offer: product.is_offer || false,
+      offer_price: product.offer_price,
+      bulk_enabled: product.bulk_enabled || false,
+      bulk_quantity: product.bulk_quantity,
+      bulk_price: product.bulk_price,
+      bulk_barcode: product.bulk_barcode,
+      is_bulk: product.is_bulk || false,
+      manufacturer_name: product.manufacturer_name,
+      unit_of_measure: product.unit_of_measure,
+    };
+
     const { data, error } = await supabase
       .from("products")
-      .insert([product])
+      .insert([productData])
       .select();
 
     if (error) {

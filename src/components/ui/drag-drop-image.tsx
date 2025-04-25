@@ -85,8 +85,21 @@ export function DragDropImage({ value, onChange, bucketName = "images" }: DragDr
       const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
       const filePath = fileName;
 
-      // Attempt to upload without trying to create the bucket again
-      // (We already tried to ensure it exists in the useEffect)
+      console.log(`Attempting to upload to bucket: ${bucketName}, file path: ${filePath}`);
+
+      // First, ensure the bucket exists again right before upload
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+      
+      if (!bucketExists) {
+        console.log(`Creating bucket before upload: ${bucketName}`);
+        await supabase.storage.createBucket(bucketName, {
+          public: true,
+          fileSizeLimit: 10485760, // 10MB
+        });
+      }
+
+      // Attempt to upload the file
       const { data, error } = await supabase.storage
         .from(bucketName)
         .upload(filePath, file);
@@ -97,10 +110,12 @@ export function DragDropImage({ value, onChange, bucketName = "images" }: DragDr
         return;
       }
 
+      // Get the public URL for the uploaded file
       const { data: { publicUrl } } = supabase.storage
         .from(bucketName)
         .getPublicUrl(data.path);
 
+      console.log(`File uploaded successfully. Public URL: ${publicUrl}`);
       onChange(publicUrl);
       toast.success('تم رفع الصورة بنجاح');
     } catch (error) {
