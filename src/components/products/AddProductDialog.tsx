@@ -116,7 +116,13 @@ export function AddProductDialog({
       setLoading(true);
       
       const productData = {
-        ...values,
+        name: values.name,
+        description: values.description,
+        barcode: values.barcode,
+        barcode_type: values.barcode_type,
+        price: values.price,
+        purchase_price: values.purchase_price,
+        quantity: values.quantity,
         image_urls: imageUrl ? [imageUrl] : ["/placeholder.svg"],
         company_id: values.company_id || companyId,
         main_category_id: values.category_id,
