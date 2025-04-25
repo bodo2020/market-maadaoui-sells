@@ -14,6 +14,7 @@ import { createProduct } from "@/services/supabase/productService";
 import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DragDropImage } from "@/components/ui/drag-drop-image";
 
 const productSchema = z.object({
   name: z.string().min(2, { message: "يجب أن يحتوي اسم المنتج على حرفين على الأقل" }),
@@ -29,6 +30,7 @@ const productSchema = z.object({
   offer_price: z.coerce.number().nullable().optional(),
   is_offer: z.boolean().default(false),
   company_id: z.string().optional(),
+  image_url: z.string().nullable().optional(),
 });
 
 const units = [
@@ -73,6 +75,7 @@ export function AddProductDialog({
 }: AddProductDialogProps) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -90,10 +93,10 @@ export function AddProductDialog({
       offer_price: null,
       is_offer: false,
       company_id: undefined,
+      image_url: null,
     },
   });
 
-  // تحديث نموذج الإدخال عند تغيير التصنيف
   useEffect(() => {
     form.setValue('category_id', selectedCategory || undefined);
   }, [selectedCategory, form]);
@@ -104,6 +107,7 @@ export function AddProductDialog({
 
   const handleClose = () => {
     form.reset();
+    setImageUrl(null);
     onClose();
   };
 
@@ -119,9 +123,9 @@ export function AddProductDialog({
         price: values.price,
         purchase_price: values.purchase_price,
         quantity: values.quantity,
-        image_urls: ["/placeholder.svg"],
+        image_urls: imageUrl ? [imageUrl] : ["/placeholder.svg"],
         company_id: values.company_id || companyId,
-        main_category_id: values.category_id, // تم تغييرها من category_id إلى main_category_id
+        main_category_id: values.category_id,
         subcategory_id: values.subcategory_id,
         unit_of_measure: values.unit_of_measure,
         is_offer: values.is_offer,
@@ -154,19 +158,32 @@ export function AddProductDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>اسم المنتج *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="اسم المنتج" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-1">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>اسم المنتج *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="اسم المنتج" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="col-span-1">
+                <FormLabel>صورة المنتج</FormLabel>
+                <DragDropImage
+                  value={imageUrl}
+                  onChange={setImageUrl}
+                  bucketName="products"
+                />
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -199,7 +216,6 @@ export function AddProductDialog({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              {/* Added offer price field */}
               <FormField
                 control={form.control}
                 name="offer_price"
@@ -223,7 +239,6 @@ export function AddProductDialog({
                 )}
               />
 
-              {/* Added is_offer checkbox */}
               <FormField
                 control={form.control}
                 name="is_offer"
