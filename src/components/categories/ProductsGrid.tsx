@@ -14,6 +14,9 @@ interface ProductsGridProps {
 
 export default function ProductsGrid({ products, onRefresh }: ProductsGridProps) {
   const navigate = useNavigate();
+  
+  // Add debug log
+  console.log("ProductsGrid received products:", products);
 
   if (products.length === 0) {
     return (
