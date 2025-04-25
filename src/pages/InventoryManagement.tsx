@@ -29,6 +29,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { 
   Search, 
@@ -41,12 +51,13 @@ import {
   Loader2,
   Bell,
   Edit,
-  PlusCircle
+  PlusCircle,
+  Trash2
 } from "lucide-react";
 import { Product } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useToast } from "@/hooks/use-toast";
-import { fetchProducts, updateProduct } from "@/services/supabase/productService";
+import { toast } from "sonner";
+import { fetchProducts, updateProduct, deleteProduct } from "@/services/supabase/productService";
 import { checkLowStockProducts, showLowStockToasts } from "@/services/notificationService";
 
 export default function InventoryManagement() {
@@ -56,7 +67,8 @@ export default function InventoryManagement() {
   const [isAddStockDialogOpen, setIsAddStockDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [stockToAdd, setStockToAdd] = useState(0);
-  const { toast } = useToast();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -78,11 +90,7 @@ export default function InventoryManagement() {
       setInventory(products);
     } catch (error) {
       console.error("Error loading products:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء تحميل المنتجات",
-        variant: "destructive"
-      });
+      toast.error("حدث خطأ أثناء تحميل المنتجات");
     } finally {
       setLoading(false);
     }
@@ -113,24 +121,35 @@ export default function InventoryManagement() {
             : product
         ));
         
-        toast({
-          title: "تم بنجاح",
-          description: `تم إضافة ${stockToAdd} وحدات إلى المخزون`,
-        });
+        toast.success(`تم إضافة ${stockToAdd} وحدات إلى المخزون`);
         
         setIsAddStockDialogOpen(false);
         setStockToAdd(0);
         setSelectedProduct(null);
       } catch (error) {
         console.error("Error updating stock:", error);
-        toast({
-          title: "خطأ",
-          description: "حدث خطأ أثناء تحديث المخزون",
-          variant: "destructive"
-        });
+        toast.error("حدث خطأ أثناء تحديث المخزون");
       } finally {
         setLoading(false);
       }
+    }
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    
+    setLoading(true);
+    try {
+      await deleteProduct(productToDelete.id);
+      toast.success("تم حذف المنتج بنجاح");
+      setIsDeleteDialogOpen(false);
+      setProductToDelete(null);
+      loadProducts();
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error("حدث خطأ أثناء حذف المنتج");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -407,6 +426,17 @@ export default function InventoryManagement() {
                               <Edit className="ml-2 h-4 w-4" />
                               تعديل
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setProductToDelete(product);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -515,6 +545,36 @@ export default function InventoryManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Product Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>تأكيد حذف المنتج</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من أنك تريد حذف منتج "{productToDelete?.name}"؟
+              <br />
+              هذا الإجراء لا يمكن التراجع عنه.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteProduct}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  جاري الحذف...
+                </>
+              ) : (
+                "حذف المنتج"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
