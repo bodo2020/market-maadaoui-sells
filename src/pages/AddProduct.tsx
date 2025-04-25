@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -15,6 +14,7 @@ import { fetchMainCategories } from "@/services/supabase/categoryService";
 import { fetchCompanies } from "@/services/supabase/companyService";
 import { fetchSubcategories } from "@/services/supabase/categoryService";
 import { MainCategory, Subcategory, Company } from "@/types";
+import { DragDropImage } from "@/components/ui/drag-drop-image";
 
 export default function AddProduct() {
   const [product, setProduct] = useState<Product | null>(null);
@@ -103,12 +103,12 @@ export default function AddProduct() {
 
     setLoading(true);
     try {
-      // Ensure we're properly handling the subcategory_id
       const productToUpdate = {
         ...product,
         main_category_id: product.main_category_id || null,
         subcategory_id: product.subcategory_id || null,
         company_id: product.company_id || null,
+        image_urls: product.image_urls || [],
       };
       
       console.log("Updating product with data:", productToUpdate);
@@ -151,7 +151,7 @@ export default function AddProduct() {
         setProduct(prev => ({ 
           ...prev, 
           main_category_id: value,
-          subcategory_id: null // Clear subcategory when main category changes
+          subcategory_id: null
         }));
       }
     } else if (field === 'subcategory_id') {
@@ -208,6 +208,20 @@ export default function AddProduct() {
                 onChange={(e) =>
                   setProduct((prev) => ({ ...prev, name: e.target.value }))
                 }
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="product-image">صورة المنتج</Label>
+              <DragDropImage
+                value={product?.image_urls?.[0] || null}
+                onChange={(url) =>
+                  setProduct((prev) => ({
+                    ...prev,
+                    image_urls: url ? [url] : [],
+                  }))
+                }
+                bucketName="products"
               />
             </div>
 
