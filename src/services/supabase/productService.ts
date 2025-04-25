@@ -53,10 +53,33 @@ export async function fetchProductByBarcode(barcode: string) {
   return data as Product | null;
 }
 
+async function ensureProductsBucketExists() {
+  try {
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const productsBucketExists = buckets?.some(bucket => bucket.name === 'products');
+    
+    if (!productsBucketExists) {
+      console.log("Creating products bucket");
+      const { error } = await supabase.storage.createBucket('products', {
+        public: true,
+        fileSizeLimit: 10485760, // 10MB
+      });
+      
+      if (error) {
+        console.error("Error creating products bucket:", error);
+      }
+    }
+  } catch (error) {
+    console.error("Error checking/creating products bucket:", error);
+  }
+}
+
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
   console.log("Creating product with data:", product);
 
   try {
+    await ensureProductsBucketExists();
+    
     // If subcategory is provided, ensure we get the correct main category
     if (product.subcategory_id) {
       const { data: subcategory, error: subcategoryError } = await supabase
@@ -93,45 +116,52 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 }
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
-  // If changing subcategory, ensure we update main category accordingly
-  if (product.subcategory_id !== undefined) {
-    if (product.subcategory_id === null) {
-      // If clearing subcategory, also clear main category
-      product.main_category_id = null;
-    } else {
-      // Get the main category from the subcategory
-      const { data: subcategory, error: subcategoryError } = await supabase
-        .from("subcategories")
-        .select("category_id")
-        .eq("id", product.subcategory_id)
-        .single();
+  try {
+    await ensureProductsBucketExists();
+    
+    // If changing subcategory, ensure we update main category accordingly
+    if (product.subcategory_id !== undefined) {
+      if (product.subcategory_id === null) {
+        // If clearing subcategory, also clear main category
+        product.main_category_id = null;
+      } else {
+        // Get the main category from the subcategory
+        const { data: subcategory, error: subcategoryError } = await supabase
+          .from("subcategories")
+          .select("category_id")
+          .eq("id", product.subcategory_id)
+          .single();
 
-      if (subcategoryError) {
-        console.error("Error fetching subcategory:", subcategoryError);
-        throw subcategoryError;
+        if (subcategoryError) {
+          console.error("Error fetching subcategory:", subcategoryError);
+          throw subcategoryError;
+        }
+
+        product.main_category_id = subcategory.category_id;
       }
-
-      product.main_category_id = subcategory.category_id;
     }
-  }
 
-  console.log("Updating product with data:", product);
+    console.log("Updating product with data:", product);
 
-  const { data, error } = await supabase
-    .from("products")
-    .update({
-      ...product,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select();
+    const { data, error } = await supabase
+      .from("products")
+      .update({
+        ...product,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select();
 
-  if (error) {
-    console.error("Error updating product:", error);
+    if (error) {
+      console.error("Error updating product:", error);
+      throw error;
+    }
+
+    return data[0] as Product;
+  } catch (error) {
+    console.error("Error in updateProduct:", error);
     throw error;
   }
-
-  return data[0] as Product;
 }
 
 export async function deleteProduct(id: string) {
@@ -157,7 +187,6 @@ export async function fetchProductsByCategory(categoryId: string) {
       return [];
     }
     
-    // تعديل طريقة الاستعلام للتأكد من جلب المنتجات الصحيحة للقسم الرئيسي
     const { data, error } = await supabase
       .from("products")
       .select("*")
@@ -201,7 +230,6 @@ export async function fetchProductsBySubcategory(subcategoryId: string) {
       return [];
     }
     
-    // تعديل طريقة الاستعلام للتأكد من جلب المنتجات الصحيحة للقسم الفرعي
     const { data, error } = await supabase
       .from("products")
       .select("*")
