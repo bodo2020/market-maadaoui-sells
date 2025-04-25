@@ -15,10 +15,7 @@ interface ProductGridProps {
 export function ProductGrid({ products, onEditProduct }: ProductGridProps) {
   const navigate = useNavigate();
 
-  // Add console logs to debug
-  console.log("ProductGrid received products:", products);
-
-  if (!products || products.length === 0) {
+  if (products.length === 0) {
     return (
       <div className="text-center py-12">
         <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -83,3 +80,4 @@ export function ProductGrid({ products, onEditProduct }: ProductGridProps) {
     </div>
   );
 }
+

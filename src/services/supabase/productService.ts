@@ -2,25 +2,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
 export async function fetchProducts() {
-  console.log("Fetching all products");
-  
-  try {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("name");
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .order("name");
 
-    if (error) {
-      console.error("Error fetching products:", error);
-      throw error;
-    }
-
-    console.log(`Successfully fetched ${data.length} products`);
-    return data as Product[];
-  } catch (error) {
-    console.error("Error in fetchProducts:", error);
-    return [];
+  if (error) {
+    console.error("Error fetching products:", error);
+    throw error;
   }
+
+  return data as Product[];
 }
 
 export async function fetchProductById(id: string) {
@@ -56,40 +48,34 @@ export async function fetchProductByBarcode(barcode: string) {
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
   console.log("Creating product with data:", product);
 
-  try {
-    // If subcategory is provided, ensure we get the correct main category
-    if (product.subcategory_id) {
-      const { data: subcategory, error: subcategoryError } = await supabase
-        .from("subcategories")
-        .select("category_id")
-        .eq("id", product.subcategory_id)
-        .single();
+  // If subcategory is provided, ensure we get the correct main category
+  if (product.subcategory_id) {
+    const { data: subcategory, error: subcategoryError } = await supabase
+      .from("subcategories")
+      .select("category_id")
+      .eq("id", product.subcategory_id)
+      .single();
 
-      if (subcategoryError) {
-        console.error("Error fetching subcategory:", subcategoryError);
-        throw subcategoryError;
-      }
-
-      // Set the main_category_id based on the subcategory's category_id
-      product.main_category_id = subcategory.category_id;
+    if (subcategoryError) {
+      console.error("Error fetching subcategory:", subcategoryError);
+      throw subcategoryError;
     }
 
-    const { data, error } = await supabase
-      .from("products")
-      .insert([product])
-      .select();
+    // Set the main_category_id based on the subcategory's category_id
+    product.main_category_id = subcategory.category_id;
+  }
 
-    if (error) {
-      console.error("Error creating product:", error);
-      throw error;
-    }
+  const { data, error } = await supabase
+    .from("products")
+    .insert([product])
+    .select();
 
-    console.log("Product created successfully:", data[0]);
-    return data[0] as Product;
-  } catch (error) {
-    console.error("Error in createProduct:", error);
+  if (error) {
+    console.error("Error creating product:", error);
     throw error;
   }
+
+  return data[0] as Product;
 }
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
@@ -151,30 +137,20 @@ export async function deleteProduct(id: string) {
 export async function fetchProductsByCategory(categoryId: string) {
   console.log("Fetching products for main category:", categoryId);
   
-  try {
-    if (!categoryId) {
-      console.error("No category ID provided");
-      return [];
-    }
-    
-    // تعديل طريقة الاستعلام للتأكد من جلب المنتجات الصحيحة للقسم الرئيسي
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .eq("main_category_id", categoryId)
-      .order("name");
+  // تعديل طريقة الاستعلام للتأكد من جلب المنتجات الصحيحة للقسم الرئيسي
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("main_category_id", categoryId)
+    .order("name");
 
-    if (error) {
-      console.error("Error fetching products by category:", error);
-      throw error;
-    }
-    
-    console.log(`Found ${data?.length || 0} products for main category ${categoryId}`);
-    return data as Product[];
-  } catch (error) {
-    console.error("Error in fetchProductsByCategory:", error);
-    return [];
+  if (error) {
+    console.error("Error fetching products by category:", error);
+    throw error;
   }
+  
+  console.log(`Found ${data?.length || 0} products for main category ${categoryId}`);
+  return data as Product[];
 }
 
 export async function fetchProductsByCompany(companyId: string) {
@@ -195,28 +171,18 @@ export async function fetchProductsByCompany(companyId: string) {
 export async function fetchProductsBySubcategory(subcategoryId: string) {
   console.log("Fetching products for subcategory:", subcategoryId);
   
-  try {
-    if (!subcategoryId) {
-      console.error("No subcategory ID provided");
-      return [];
-    }
-    
-    // تعديل طريقة الاستعلام للتأكد من جلب المنتجات الصحيحة للقسم الفرعي
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .eq("subcategory_id", subcategoryId)
-      .order("name");
+  // تعديل طريقة الاستعلام للتأكد من جلب المنتجات الصحيحة للقسم الفرعي
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("subcategory_id", subcategoryId)
+    .order("name");
 
-    if (error) {
-      console.error("Error fetching products by subcategory:", error);
-      throw error;
-    }
-    
-    console.log(`Found ${data?.length || 0} products for subcategory ${subcategoryId}`);
-    return data as Product[];
-  } catch (error) {
-    console.error("Error in fetchProductsBySubcategory:", error);
-    return [];
+  if (error) {
+    console.error("Error fetching products by subcategory:", error);
+    throw error;
   }
+  
+  console.log(`Found ${data?.length || 0} products for subcategory ${subcategoryId}`);
+  return data as Product[];
 }

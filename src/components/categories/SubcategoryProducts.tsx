@@ -4,7 +4,7 @@ import { fetchProductsBySubcategory } from "@/services/supabase/productService";
 import { Product } from "@/types";
 import { ProductGrid } from "@/components/products/ProductGrid";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, Plus } from "lucide-react";
 
 interface SubcategoryProductsProps {
@@ -23,10 +23,9 @@ const SubcategoryProducts = ({ subcategoryId }: SubcategoryProductsProps) => {
         console.log("Loading products for subcategory:", subcategoryId);
         const productsData = await fetchProductsBySubcategory(subcategoryId);
         console.log("Products loaded:", productsData);
-        setProducts(productsData || []);
+        setProducts(productsData);
       } catch (error) {
         console.error("Error loading subcategory products:", error);
-        setProducts([]);
       } finally {
         setLoading(false);
       }

@@ -27,20 +27,13 @@ export default function MainCategoryList() {
       const data = await fetchMainCategories();
       console.log("Main categories data:", data);
       
-      if (!data || data.length === 0) {
-        console.log("No categories found");
-        setCategories([]);
-        setLoading(false);
-        return;
-      }
-      
       const categoriesWithCount = await Promise.all(
         data.map(async (category) => {
           try {
             const products = await fetchProductsByCategory(category.id);
             return {
               ...category,
-              product_count: products ? products.length : 0
+              product_count: products.length
             };
           } catch (error) {
             console.error(`Error fetching products for category ${category.id}:`, error);
@@ -56,7 +49,6 @@ export default function MainCategoryList() {
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast.error("حدث خطأ أثناء تحميل الأقسام");
-      setCategories([]);
     } finally {
       setLoading(false);
     }
@@ -98,7 +90,7 @@ export default function MainCategoryList() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-        {categories && categories.length > 0 ? categories.map((category) => (
+        {categories.map((category) => (
           <div 
             key={category.id} 
             className="border rounded-lg overflow-hidden hover:border-primary transition-colors cursor-pointer"
@@ -155,13 +147,7 @@ export default function MainCategoryList() {
               </div>
             </div>
           </div>
-        )) : (
-          <div className="col-span-3 text-center p-8 bg-gray-50 rounded-lg border">
-            <FolderPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-lg font-medium">لا توجد أقسام رئيسية</h3>
-            <p className="text-gray-500 mb-4">يمكنك إضافة أقسام جديدة من خلال الزر أعلاه</p>
-          </div>
-        )}
+        ))}
       </div>
 
       {categories.length === 0 && (

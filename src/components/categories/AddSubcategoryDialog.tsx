@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import { createSubcategory } from "@/services/supabase/categoryService";
-import { DragDropImage } from "@/components/ui/drag-drop-image";
 
 interface AddSubcategoryDialogProps {
   open: boolean;
@@ -26,18 +26,60 @@ const AddSubcategoryDialog = ({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      // Create image preview
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadImage = async (file: File) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+    const filePath = `categories/${fileName}`;
+
+    try {
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setLoading(true);
 
+      let image_url = null;
+      if (imageFile) {
+        image_url = await uploadImage(imageFile);
+      }
+
       await createSubcategory({
         name,
         description: description || null,
         category_id: categoryId,
-        image_url: imageUrl
+        image_url
       });
 
       toast.success("تم إضافة القسم الفرعي بنجاح");
@@ -45,7 +87,8 @@ const AddSubcategoryDialog = ({
       onOpenChange(false);
       setName("");
       setDescription("");
-      setImageUrl(null);
+      setImageFile(null);
+      setImagePreview(null);
     } catch (error) {
       console.error('Error adding subcategory:', error);
       toast.error("حدث خطأ أثناء إضافة القسم الفرعي");
@@ -63,38 +106,46 @@ const AddSubcategoryDialog = ({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <Label htmlFor="image">الصورة</Label>
-              <DragDropImage
-                value={imageUrl}
-                onChange={setImageUrl}
-                bucketName="images"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="name">الاسم</Label>
+          <div>
+            <Label htmlFor="name">الاسم</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="أدخل الاسم"
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="description">الوصف (اختياري)</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="أدخل الوصف"
+            />
+          </div>
+          <div>
+            <Label htmlFor="image">الصورة (اختياري)</Label>
+            <div className="flex items-center gap-2">
               <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="أدخل الاسم"
-                required
+                id="image"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="flex-1"
               />
-            </div>
-
-            <div>
-              <Label htmlFor="description">الوصف (اختياري)</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="أدخل الوصف"
-              />
+              {imagePreview && (
+                <div className="w-12 h-12 rounded overflow-hidden border">
+                  <img 
+                    src={imagePreview} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
             </div>
           </div>
-
           <div className="flex justify-end gap-3">
             <Button
               type="button"
