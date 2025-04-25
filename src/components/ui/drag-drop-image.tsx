@@ -30,6 +30,8 @@ export function DragDropImage({ value, onChange, bucketName = "images" }: DragDr
           });
           
           if (error) {
+            // If there's an error creating the bucket, but it might already exist
+            // We'll proceed with the upload anyway
             console.error(`Error creating ${bucketName} bucket:`, error);
           } else {
             console.log(`${bucketName} bucket created successfully`);
@@ -37,6 +39,7 @@ export function DragDropImage({ value, onChange, bucketName = "images" }: DragDr
         }
       } catch (error) {
         console.error("Error checking/creating bucket:", error);
+        // Continue with upload - it might still work if bucket exists but we can't check
       }
     };
 
@@ -82,23 +85,8 @@ export function DragDropImage({ value, onChange, bucketName = "images" }: DragDr
       const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
       const filePath = fileName;
 
-      // Try to create the bucket if it doesn't exist
-      try {
-        const { data: buckets } = await supabase.storage.listBuckets();
-        const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
-        
-        if (!bucketExists) {
-          console.log(`Creating bucket: ${bucketName}`);
-          await supabase.storage.createBucket(bucketName, {
-            public: true,
-            fileSizeLimit: 10485760, // 10MB
-          });
-        }
-      } catch (bucketError) {
-        console.error("Error checking/creating bucket:", bucketError);
-        // Continue with upload - it might still work if bucket exists but we can't check
-      }
-
+      // Attempt to upload without trying to create the bucket again
+      // (We already tried to ensure it exists in the useEffect)
       const { data, error } = await supabase.storage
         .from(bucketName)
         .upload(filePath, file);

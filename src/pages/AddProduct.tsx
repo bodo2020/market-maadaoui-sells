@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { fetchProductById, updateProduct } from "@/services/supabase/productService";
+import { fetchProductById, updateProduct, createProduct } from "@/services/supabase/productService";
 import { Product } from "@/types";
 import { Loader2 } from "lucide-react";
 import { fetchMainCategories } from "@/services/supabase/categoryService";
@@ -18,7 +18,15 @@ import { MainCategory, Subcategory, Company } from "@/types";
 import { DragDropImage } from "@/components/ui/drag-drop-image";
 
 export default function AddProduct() {
-  const [product, setProduct] = useState<Product | null>(null);
+  const [product, setProduct] = useState<Partial<Product>>({
+    name: "",
+    price: 0,
+    purchase_price: 0,
+    quantity: 0,
+    image_urls: [],
+    is_offer: false,
+    barcode_type: "normal",
+  });
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<MainCategory[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -104,7 +112,7 @@ export default function AddProduct() {
 
     setLoading(true);
     try {
-      const productToUpdate = {
+      const productData = {
         ...product,
         main_category_id: product.main_category_id || null,
         subcategory_id: product.subcategory_id || null,
@@ -112,19 +120,29 @@ export default function AddProduct() {
         image_urls: product.image_urls || [],
       };
       
-      console.log("Updating product with data:", productToUpdate);
+      console.log("Submitting product data:", productData);
       
-      await updateProduct(product.id, productToUpdate);
-      toast({
-        title: "Success",
-        description: "Product updated successfully",
-      });
-      navigate("/products");  // Changed from "/product-management" to "/products"
+      if (productId) {
+        // Update existing product
+        await updateProduct(productId, productData);
+        toast({
+          title: "Success",
+          description: "Product updated successfully",
+        });
+      } else {
+        // Create new product
+        await createProduct(productData);
+        toast({
+          title: "Success",
+          description: "Product created successfully",
+        });
+      }
+      navigate("/products");
     } catch (error) {
-      console.error("Error updating product:", error);
+      console.error("Error saving product:", error);
       toast({
         title: "Error",
-        description: "Failed to update product",
+        description: "Failed to save product",
         variant: "destructive",
       });
     } finally {

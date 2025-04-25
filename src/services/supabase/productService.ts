@@ -53,33 +53,10 @@ export async function fetchProductByBarcode(barcode: string) {
   return data as Product | null;
 }
 
-async function ensureProductsBucketExists() {
-  try {
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const productsBucketExists = buckets?.some(bucket => bucket.name === 'products');
-    
-    if (!productsBucketExists) {
-      console.log("Creating products bucket");
-      const { error } = await supabase.storage.createBucket('products', {
-        public: true,
-        fileSizeLimit: 10485760, // 10MB
-      });
-      
-      if (error) {
-        console.error("Error creating products bucket:", error);
-      }
-    }
-  } catch (error) {
-    console.error("Error checking/creating products bucket:", error);
-  }
-}
-
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
   console.log("Creating product with data:", product);
 
   try {
-    await ensureProductsBucketExists();
-    
     // If subcategory is provided, ensure we get the correct main category
     if (product.subcategory_id) {
       const { data: subcategory, error: subcategoryError } = await supabase
@@ -117,8 +94,6 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
   try {
-    await ensureProductsBucketExists();
-    
     // If changing subcategory, ensure we update main category accordingly
     if (product.subcategory_id !== undefined) {
       if (product.subcategory_id === null) {
