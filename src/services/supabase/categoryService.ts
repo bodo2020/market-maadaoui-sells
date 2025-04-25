@@ -155,19 +155,14 @@ export async function updateSubcategory(id: string, subcategory: Partial<Omit<Su
   return data[0] as Subcategory;
 }
 
-export async function deleteSubcategory(id: string) {
+export const deleteSubcategory = async (id: string) => {
   const { error } = await supabase
-    .from("subcategories")
+    .from('subcategories')
     .delete()
-    .eq("id", id);
+    .eq('id', id);
 
-  if (error) {
-    console.error("Error deleting subcategory:", error);
-    throw error;
-  }
-
-  return true;
-}
+  if (error) throw error;
+};
 
 // For backwards compatibility - get category hierarchy
 export async function getCategoryHierarchy() {

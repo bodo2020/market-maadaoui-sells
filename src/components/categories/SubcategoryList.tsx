@@ -1,12 +1,11 @@
-
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AddSubcategoryDialog from "./AddSubcategoryDialog";
-import { fetchSubcategories } from "@/services/supabase/categoryService";
+import { fetchSubcategories, deleteSubcategory } from "@/services/supabase/categoryService";
 import { Subcategory } from "@/types";
 import { toast } from "sonner";
 import AddProductsToSubcategoryDialog from "./AddProductsToSubcategoryDialog";
@@ -43,6 +42,17 @@ export default function SubcategoryList() {
     setIsProductsDialogOpen(true);
   };
 
+  const handleDelete = async (subcategory: Subcategory) => {
+    try {
+      await deleteSubcategory(subcategory.id);
+      toast.success("تم حذف القسم الفرعي بنجاح");
+      loadSubcategories();
+    } catch (error) {
+      console.error("Error deleting subcategory:", error);
+      toast.error("حدث خطأ أثناء حذف القسم الفرعي");
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -62,14 +72,23 @@ export default function SubcategoryList() {
               <Card key={subcategory.id}>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-lg">{subcategory.name}</CardTitle>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => handleAddProducts(subcategory)}
-                  >
-                    <Plus className="h-4 w-4 ml-2" />
-                    إضافة منتجات
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => handleAddProducts(subcategory)}
+                    >
+                      <Plus className="h-4 w-4 ml-2" />
+                      إضافة منتجات
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(subcategory)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">{subcategory.description}</p>
