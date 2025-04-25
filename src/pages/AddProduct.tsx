@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -118,7 +119,7 @@ export default function AddProduct() {
         title: "Success",
         description: "Product updated successfully",
       });
-      navigate("/product-management");
+      navigate("/products");  // Changed from "/product-management" to "/products"
     } catch (error) {
       console.error("Error updating product:", error);
       toast({
