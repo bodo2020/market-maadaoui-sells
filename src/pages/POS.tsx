@@ -112,6 +112,7 @@ export default function POS() {
     try {
       setSearch(barcode);
       const product = await fetchProductByBarcode(barcode);
+      
       if (product) {
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
@@ -125,6 +126,17 @@ export default function POS() {
           description: `${barcode} - ${product.name}`
         });
       } else {
+        const bulkProduct = products.find(p => p.bulk_barcode === barcode && p.bulk_enabled);
+        
+        if (bulkProduct) {
+          handleAddBulkToCart(bulkProduct);
+          toast({
+            title: "تم المسح بنجاح",
+            description: `${barcode} - ${bulkProduct.name} (جملة)`
+          });
+          return;
+        }
+        
         if (barcode.startsWith("2") && barcode.length === 13) {
           const productCode = barcode.substring(1, 7);
           const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
@@ -135,6 +147,7 @@ export default function POS() {
             return;
           }
         }
+        
         toast({
           title: "لم يتم العثور على المنتج",
           description: `لم يتم العثور على منتج بالباركود ${barcode}`,
@@ -171,6 +184,17 @@ export default function POS() {
           setSearch("");
           return;
         }
+      }
+
+      const bulkProduct = products.find(p => p.bulk_barcode === search && p.bulk_enabled);
+      if (bulkProduct) {
+        handleAddBulkToCart(bulkProduct);
+        setSearch("");
+        toast({
+          title: "تم إضافة منتج جملة",
+          description: `${bulkProduct.name} - ${bulkProduct.bulk_quantity} وحدة`
+        });
+        return;
       }
 
       if (search.startsWith("2") && search.length === 13) {
@@ -284,6 +308,7 @@ export default function POS() {
       });
       return;
     }
+    
     setCartItems([...cartItems, {
       product,
       quantity: product.bulk_quantity,
@@ -532,7 +557,7 @@ export default function POS() {
       
       <div className="relative mb-4 bg-muted/30 p-3 rounded-lg border border-muted flex items-center">
         <ScanLine className="h-5 w-5 text-primary ml-3" />
-        <div>
+        <div className="flex-1">
           <h3 className="font-medium">وضع مسح الباركود {manualBarcodeMode ? "يدوي" : "تلقائي"}</h3>
           <p className="text-sm text-muted-foreground">
             {manualBarcodeMode 
@@ -540,6 +565,9 @@ export default function POS() {
               : "قم بتوصيل قارئ الباركود واستخدامه لمسح المنتجات مباشرة، أو اضغط على زر \"مسح\" لاستخدام الكاميرا"}
           </p>
         </div>
+        <Button variant="outline" onClick={() => setManualBarcodeMode(!manualBarcodeMode)} className="mr-2">
+          تبديل الوضع {manualBarcodeMode ? "تلقائي" : "يدوي"}
+        </Button>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
