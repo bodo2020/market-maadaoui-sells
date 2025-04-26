@@ -1,9 +1,12 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { useQuery } from "@tanstack/react-query";
+import { ProductGrid } from "@/components/products/ProductGrid";
+import { SubcategoryChips } from "@/components/categories/SubcategoryChips";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { 
   BarChart4, 
   ShoppingCart, 
@@ -14,6 +17,7 @@ import {
 } from "lucide-react";
 import { fetchSales } from "@/services/supabase/saleService";
 import { fetchProducts } from "@/services/supabase/productService";
+import { fetchSubcategories } from "@/services/supabase/categoryService";
 import { CartItem, Product, Sale } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -65,6 +69,9 @@ export default function Dashboard() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+
   const { data: sales, isLoading: salesLoading } = useQuery({
     queryKey: ['sales'],
     queryFn: () => fetchSales()
@@ -73,6 +80,11 @@ export default function Dashboard() {
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ['products'],
     queryFn: fetchProducts
+  });
+
+  const { data: subcategories, isLoading: subcategoriesLoading } = useQuery({
+    queryKey: ['subcategories'],
+    queryFn: () => fetchSubcategories()
   });
 
   const todaySales = sales?.filter(sale => {
@@ -124,7 +136,6 @@ export default function Dashboard() {
     .sort((a, b) => b.quantitySold - a.quantitySold)
     .slice(0, 5);
 
-  // Create different stats for admin and cashier
   const adminStats = [
     {
       title: "إجمالي المبيعات اليوم",
@@ -179,7 +190,10 @@ export default function Dashboard() {
     }
   ];
 
-  // Select which stats to display based on user role
+  const filteredProducts = products?.filter(product => 
+    selectedSubcategory ? product.subcategory_id === selectedSubcategory : true
+  ) || [];
+
   const stats = isAdmin ? adminStats : cashierStats;
 
   return (
@@ -211,6 +225,31 @@ export default function Dashboard() {
           <StatCard key={index} {...stat} />
         ))}
       </div>
+
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">المنتجات</h2>
+        <div className="flex items-center gap-2">
+          <span className="text-sm">وضع الجملة</span>
+          <Switch
+            checked={isBulkMode}
+            onCheckedChange={setIsBulkMode}
+          />
+        </div>
+      </div>
+
+      {!subcategoriesLoading && subcategories && (
+        <SubcategoryChips
+          subcategories={subcategories}
+          selectedSubcategory={selectedSubcategory}
+          onSelect={setSelectedSubcategory}
+        />
+      )}
+
+      <ProductGrid 
+        products={filteredProducts}
+        onEditProduct={() => {}}
+        isBulkMode={isBulkMode}
+      />
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
