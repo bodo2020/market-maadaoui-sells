@@ -40,6 +40,7 @@ export default function POS() {
   const [barcodeBuffer, setBarcodeBuffer] = useState<string>("");
   const [showInvoice, setShowInvoice] = useState(false);
   const [currentSale, setCurrentSale] = useState<Sale | null>(null);
+  const [manualBarcodeMode, setManualBarcodeMode] = useState(false);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const {
@@ -47,43 +48,67 @@ export default function POS() {
   } = useToast();
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-      const isSearchInput = target === searchInputRef.current;
-      if (isInput && !isSearchInput) return;
-      if (e.key === 'Enter' && barcodeBuffer) {
-        e.preventDefault();
-        console.log("External barcode scanned:", barcodeBuffer);
-        processBarcode(barcodeBuffer);
-        setBarcodeBuffer("");
-        return;
+    const loadProducts = async () => {
+      try {
+        setIsLoading(true);
+        const data = await fetchProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error("Error loading products:", error);
+        toast({
+          title: "خطأ في تحميل المنتجات",
+          description: "حدث خطأ أثناء تحميل المنتجات، يرجى المحاولة مرة أخرى.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
       }
-      if (/^[a-zA-Z0-9]$/.test(e.key)) {
+    };
+    loadProducts();
+  }, [toast]);
+
+  useEffect(() => {
+    if (!manualBarcodeMode) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        const target = e.target as HTMLElement;
+        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+        const isSearchInput = target === searchInputRef.current;
+        if (isInput && !isSearchInput) return;
+        if (e.key === 'Enter' && barcodeBuffer) {
+          e.preventDefault();
+          console.log("External barcode scanned:", barcodeBuffer);
+          processBarcode(barcodeBuffer);
+          setBarcodeBuffer("");
+          return;
+        }
+        if (/^[a-zA-Z0-9]$/.test(e.key)) {
+          if (barcodeTimeoutRef.current) {
+            clearTimeout(barcodeTimeoutRef.current);
+          }
+          setBarcodeBuffer(prev => prev + e.key);
+          barcodeTimeoutRef.current = setTimeout(() => {
+            if (barcodeBuffer.length < 5) {
+              if (!isInput) {
+                setBarcodeBuffer("");
+              }
+            }
+          }, 100);
+        }
+      };
+      
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
         if (barcodeTimeoutRef.current) {
           clearTimeout(barcodeTimeoutRef.current);
         }
-        setBarcodeBuffer(prev => prev + e.key);
-        barcodeTimeoutRef.current = setTimeout(() => {
-          if (barcodeBuffer.length < 5) {
-            if (!isInput) {
-              setBarcodeBuffer("");
-            }
-          }
-        }, 100);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      if (barcodeTimeoutRef.current) {
-        clearTimeout(barcodeTimeoutRef.current);
-      }
-    };
-  }, [barcodeBuffer]);
+      };
+    }
+  }, [barcodeBuffer, manualBarcodeMode]);
 
   const processBarcode = async (barcode: string) => {
     if (barcode.length < 5) return;
+    
     try {
       setSearch(barcode);
       const product = await fetchProductByBarcode(barcode);
@@ -125,26 +150,6 @@ export default function POS() {
       });
     }
   };
-
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        setIsLoading(true);
-        const data = await fetchProducts();
-        setProducts(data);
-      } catch (error) {
-        console.error("Error loading products:", error);
-        toast({
-          title: "خطأ في تحميل المنتجات",
-          description: "حدث خطأ أثناء تحميل المنتجات، يرجى المحاولة مرة أخرى.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadProducts();
-  }, [toast]);
 
   const handleSearch = async () => {
     if (!search) return;
@@ -528,9 +533,11 @@ export default function POS() {
       <div className="relative mb-4 bg-muted/30 p-3 rounded-lg border border-muted flex items-center">
         <ScanLine className="h-5 w-5 text-primary ml-3" />
         <div>
-          <h3 className="font-medium">مسح الباركود نشط</h3>
+          <h3 className="font-medium">وضع مسح الباركود {manualBarcodeMode ? "يدوي" : "تلقائي"}</h3>
           <p className="text-sm text-muted-foreground">
-            قم بتوصيل قارئ الباركود واستخدامه لمسح المنتجات مباشرة، أو اضغط على زر "مسح" لاستخدام الكاميرا
+            {manualBarcodeMode 
+              ? "اكتب الباركود يدوياً ثم اضغط على Enter أو زر البحث"
+              : "قم بتوصيل قارئ الباركود واستخدامه لمسح المنتجات مباشرة، أو اضغط على زر \"مسح\" لاستخدام الكاميرا"}
           </p>
         </div>
       </div>
