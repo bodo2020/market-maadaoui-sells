@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -71,6 +70,12 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
       throw new Error("Product purchase price is required");
     }
 
+    // Check if barcode starts with 2 and is 6 digits (scale product)
+    if (product.barcode?.startsWith('2') && /^\d{6}$/.test(product.barcode)) {
+      product.barcode_type = 'scale';
+      product.unit_of_measure = 'كجم';
+    }
+
     // If subcategory is provided, ensure we get the correct main category
     if (product.subcategory_id) {
       const { data: subcategory, error: subcategoryError } = await supabase
@@ -132,6 +137,14 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
   try {
+    // If changing barcode, check if it's a scale barcode
+    if (product.barcode !== undefined) {
+      if (product.barcode?.startsWith('2') && /^\d{6}$/.test(product.barcode)) {
+        product.barcode_type = 'scale';
+        product.unit_of_measure = 'كجم';
+      }
+    }
+
     // If changing subcategory, ensure we update main category accordingly
     if (product.subcategory_id !== undefined) {
       if (product.subcategory_id === null) {
