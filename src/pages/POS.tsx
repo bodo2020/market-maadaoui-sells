@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
+
 export default function POS() {
   const [search, setSearch] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -44,6 +45,7 @@ export default function POS() {
   const {
     toast
   } = useToast();
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -79,6 +81,7 @@ export default function POS() {
       }
     };
   }, [barcodeBuffer]);
+
   const processBarcode = async (barcode: string) => {
     if (barcode.length < 5) return;
     try {
@@ -122,6 +125,7 @@ export default function POS() {
       });
     }
   };
+
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -141,10 +145,13 @@ export default function POS() {
     };
     loadProducts();
   }, [toast]);
+
   const handleSearch = async () => {
     if (!search) return;
+    
     try {
       const product = await fetchProductByBarcode(search);
+      
       if (product) {
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
@@ -160,44 +167,50 @@ export default function POS() {
           return;
         }
       }
-    } catch (error) {
-      console.error("Error fetching product by barcode:", error);
-    }
-    if (search.startsWith("2") && search.length === 13) {
-      try {
-        const product = await fetchProductByBarcode(search);
-        if (product) {
-          if (product.calculated_weight) {
-            handleAddScaleProductToCart(product, product.calculated_weight);
-            setSearch("");
-            return;
-          }
+
+      if (search.startsWith("2") && search.length === 13) {
+        const productCode = search.substring(1, 7);
+        const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
+        
+        if (scaleProduct) {
+          const weightInGrams = parseInt(search.substring(7, 12));
+          const weightInKg = weightInGrams / 1000;
+          handleAddScaleProductToCart(scaleProduct, weightInKg);
+          setSearch("");
+          return;
         }
-      } catch (error) {
-        console.error("Error fetching product by scale barcode:", error);
       }
-      const productCode = search.substring(1, 7);
-      const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
-      if (scaleProduct) {
-        const weightInGrams = parseInt(search.substring(7, 12));
-        const weightInKg = weightInGrams / 1000;
-        handleAddScaleProductToCart(scaleProduct, weightInKg);
+
+      const results = products.filter(product => 
+        product.barcode === search || 
+        product.name.toLowerCase().includes(search.toLowerCase())
+      );
+      setSearchResults(results);
+
+      const exactMatch = products.find(p => 
+        p.barcode === search && 
+        p.barcode_type === "normal" && 
+        !p.bulk_enabled
+      );
+
+      if (exactMatch) {
+        handleAddToCart(exactMatch);
         setSearch("");
-        return;
+      } else if (results.length === 1 && results[0].barcode_type === "scale") {
+        setCurrentScaleProduct(results[0]);
+        setShowWeightDialog(true);
+        setSearch("");
       }
-    }
-    const results = products.filter(product => product.barcode === search || product.name.includes(search));
-    setSearchResults(results);
-    const exactMatch = products.find(p => p.barcode === search && p.barcode_type === "normal" && !p.bulk_enabled);
-    if (exactMatch) {
-      handleAddToCart(exactMatch);
-      setSearch("");
-    } else if (results.length === 1 && results[0].barcode_type === "scale") {
-      setCurrentScaleProduct(results[0]);
-      setShowWeightDialog(true);
-      setSearch("");
+    } catch (error) {
+      console.error("Error searching for product:", error);
+      toast({
+        title: "خطأ في البحث",
+        description: "حدث خطأ أثناء البحث عن المنتج",
+        variant: "destructive"
+      });
     }
   };
+
   const handleAddToCart = (product: Product) => {
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
@@ -219,6 +232,7 @@ export default function POS() {
     }
     setSearchResults([]);
   };
+
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
     if ((product.quantity || 0) <= 0) {
       toast({
@@ -247,6 +261,7 @@ export default function POS() {
     setCurrentScaleProduct(null);
     setWeightInput("");
   };
+
   const handleAddBulkToCart = (product: Product) => {
     if ((product.quantity || 0) <= 0) {
       toast({
@@ -278,6 +293,7 @@ export default function POS() {
     });
     setSearchResults([]);
   };
+
   const handleWeightSubmit = () => {
     if (!currentScaleProduct || !weightInput) return;
     const weight = parseFloat(weightInput);
@@ -291,9 +307,11 @@ export default function POS() {
     }
     handleAddScaleProductToCart(currentScaleProduct, weight);
   };
+
   const handleRemoveFromCart = (index: number) => {
     setCartItems(cartItems.filter((_, i) => i !== index));
   };
+
   const handleQuantityChange = (index: number, change: number) => {
     setCartItems(cartItems.map((item, i) => {
       if (i === index) {
@@ -318,12 +336,14 @@ export default function POS() {
       return item;
     }));
   };
+
   const openCheckout = () => {
     if (cartItems.length === 0) return;
     setIsCheckoutOpen(true);
     setCashAmount(total.toFixed(2));
     setCardAmount("");
   };
+
   const handlePaymentMethodChange = (value: 'cash' | 'card' | 'mixed') => {
     setPaymentMethod(value);
     if (value === 'cash') {
@@ -337,11 +357,13 @@ export default function POS() {
       setCardAmount("");
     }
   };
+
   const calculateChange = () => {
     if (paymentMethod === 'card') return 0;
     const cashAmountNum = parseFloat(cashAmount || "0");
     return Math.max(0, cashAmountNum - total);
   };
+
   const validatePayment = () => {
     if (paymentMethod === 'cash') {
       const cashAmountNum = parseFloat(cashAmount || "0");
@@ -355,6 +377,7 @@ export default function POS() {
       return cashAmountNum + cardAmountNum === total;
     }
   };
+
   const recordSaleToCashRegister = async (amount: number, paymentMethod: string) => {
     if (paymentMethod !== 'cash' && paymentMethod !== 'mixed') return;
     const amountToRecord = paymentMethod === 'cash' ? amount : parseFloat(cashAmount || "0");
@@ -377,6 +400,7 @@ export default function POS() {
       console.error('Error recording sale to cash register:', error);
     }
   };
+
   const completeSale = async () => {
     if (!validatePayment()) {
       toast({
@@ -438,6 +462,7 @@ export default function POS() {
       setIsProcessing(false);
     }
   };
+
   const resetSale = () => {
     setCartItems([]);
     setIsCheckoutOpen(false);
@@ -451,11 +476,13 @@ export default function POS() {
     setCurrentInvoiceNumber("");
     setCurrentSale(null);
   };
+
   const handleViewInvoice = () => {
     if (currentSale) {
       setShowInvoice(true);
     }
   };
+
   const handlePreviewInvoice = () => {
     if (cartItems.length === 0) return;
     const tempSale: Sale = {
@@ -476,12 +503,15 @@ export default function POS() {
     setCurrentSale(tempSale);
     setShowInvoice(true);
   };
+
   const handleBarcodeScan = async (barcode: string) => {
     processBarcode(barcode);
   };
+
   const subtotal = cartItems.reduce((sum, item) => sum + item.total, 0);
   const discount = cartItems.reduce((sum, item) => sum + item.discount * item.quantity, 0);
   const total = subtotal;
+
   return <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">نقطة البيع</h1>
