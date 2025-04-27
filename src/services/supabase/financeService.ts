@@ -98,6 +98,29 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
     let onlineSales = 0;
     let onlineProfits = 0;
 
+    // Get all product purchase prices first to avoid async calls in forEach
+    const productIds = onlineData.data?.flatMap(order => 
+      Array.isArray(order.items) 
+        ? order.items.map((item: any) => item.product_id).filter(Boolean) 
+        : []
+    ) || [];
+    
+    // Get unique product ids
+    const uniqueProductIds = [...new Set(productIds)];
+    
+    // Fetch all purchase prices in a single query
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, purchase_price')
+      .in('id', uniqueProductIds);
+    
+    // Create a lookup map for easier access
+    const purchasePriceMap = new Map();
+    products?.forEach(product => {
+      purchasePriceMap.set(product.id, product.purchase_price || 0);
+    });
+
+    // Now process the orders with the purchase price data
     onlineData.data?.forEach(order => {
       const orderTotalWithoutShipping = order.total - (order.shipping_cost || 0);
       onlineSales += orderTotalWithoutShipping;
@@ -105,23 +128,13 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       // Calculate profits for each item in the order
       if (Array.isArray(order.items)) {
         order.items.forEach((item: any) => {
-          // Get item details from the products table
-          const getProduct = async (productId: string) => {
-            const { data: product } = await supabase
-              .from('products')
-              .select('purchase_price')
-              .eq('id', productId)
-              .single();
-            return product?.purchase_price || 0;
-          };
-
           const sellingPrice = item.price;
-          const purchasePrice = item.product_id ? await getProduct(item.product_id) : 0;
+          const purchasePrice = purchasePriceMap.get(item.product_id) || 0;
           const quantity = item.quantity || 0;
 
           // Calculate profit based on bulk or regular pricing
           if (item.is_bulk && item.bulk_quantity) {
-            // For bulk items, calculate unit price and profit
+            // For bulk items, calculate profit
             const profit = (sellingPrice - purchasePrice) * quantity;
             onlineProfits += profit;
           } else {
