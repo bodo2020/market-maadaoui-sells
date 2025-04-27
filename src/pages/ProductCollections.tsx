@@ -33,7 +33,7 @@ export default function ProductCollections() {
   const loadCollections = async () => {
     try {
       const fetchedCollections = await fetchProductCollections();
-      setCollections(fetchedCollections);
+      setCollections(Array.isArray(fetchedCollections) ? fetchedCollections : []);
     } catch (error) {
       console.error("Error loading collections:", error);
       toast.error("حدث خطأ أثناء تحميل المجموعات");
@@ -43,7 +43,7 @@ export default function ProductCollections() {
   const loadProducts = async () => {
     try {
       const fetchedProducts = await fetchProducts();
-      setProducts(fetchedProducts);
+      setProducts(Array.isArray(fetchedProducts) ? fetchedProducts : []);
     } catch (error) {
       console.error("Error loading products:", error);
       toast.error("حدث خطأ أثناء تحميل المنتجات");
@@ -60,7 +60,7 @@ export default function ProductCollections() {
       const createdCollection = await createProductCollection({
         title: newCollection.title,
         description: newCollection.description || '',
-        products: newCollection.products || [],
+        products: Array.isArray(newCollection.products) ? newCollection.products : [],
         position: collections.length,
         active: true
       });
@@ -76,7 +76,13 @@ export default function ProductCollections() {
 
   const handleUpdateCollection = async (collection: ProductCollection) => {
     try {
-      const updatedCollection = await updateProductCollection(collection.id!, collection);
+      // Ensure products is an array
+      const collectionToUpdate = {
+        ...collection,
+        products: Array.isArray(collection.products) ? collection.products : []
+      };
+      
+      const updatedCollection = await updateProductCollection(collection.id!, collectionToUpdate);
       setCollections(collections.map(c => c.id === collection.id ? updatedCollection : c));
       toast.success("تم تحديث المجموعة بنجاح");
     } catch (error) {
@@ -119,7 +125,7 @@ export default function ProductCollections() {
               />
               <MultiSelect
                 options={products.map(p => ({ label: p.name, value: p.id }))}
-                value={newCollection.products || []}
+                value={Array.isArray(newCollection.products) ? newCollection.products : []}
                 onChange={(selected) => setNewCollection({...newCollection, products: selected})}
                 placeholder="اختر المنتجات"
               />
@@ -138,11 +144,14 @@ export default function ProductCollections() {
                 <p>{collection.description}</p>
                 <div className="mt-4">
                   <h3 className="font-semibold mb-2">المنتجات:</h3>
-                  <ul>
+                  <ul className="space-y-1">
                     {Array.isArray(collection.products) && collection.products.map(productId => {
                       const product = products.find(p => p.id === productId);
                       return product ? <li key={productId}>{product.name}</li> : null;
                     })}
+                    {(!Array.isArray(collection.products) || collection.products.length === 0) && (
+                      <li className="text-muted-foreground">لا توجد منتجات</li>
+                    )}
                   </ul>
                 </div>
                 <div className="flex gap-2 mt-4">
@@ -156,6 +165,11 @@ export default function ProductCollections() {
               </CardContent>
             </Card>
           ))}
+          {collections.length === 0 && (
+            <div className="col-span-full text-center py-12 text-muted-foreground">
+              لا توجد مجموعات منتجات. قم بإنشاء مجموعة جديدة.
+            </div>
+          )}
         </div>
       </div>
     </MainLayout>
