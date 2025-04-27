@@ -217,6 +217,9 @@ export interface OrderItem {
   total: number;
   image_url?: string;
   barcode?: string;
+  is_bulk?: boolean;
+  is_weight_based?: boolean;
+  bulk_quantity?: number;
 }
 
 export interface Order {

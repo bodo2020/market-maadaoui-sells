@@ -50,7 +50,6 @@ export function OrderDetailsDialog({
           const customer = await findOrCreateCustomer(customerInfo);
           if (customer) {
             console.log("Customer linked to order:", customer);
-            // Update the customer_id in the order if it was missing
             if (!order.customer_id) {
               await supabase
                 .from('online_orders')
@@ -98,7 +97,7 @@ export function OrderDetailsDialog({
         }
         
         // If the order is marked as paid, add the amount to the online cash register
-        if (order.payment_status === 'paid' || status === 'done') {
+        if (order.payment_status === 'paid') {
           try {
             await recordCashTransaction(
               order.total, 

@@ -40,7 +40,7 @@ export function useOrderDetails(orderId: string) {
           return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
         };
         
-        const transformItems = (items: any): any[] => {
+        const transformItems = async (items: any): Promise<any[]> => {
           if (!Array.isArray(items)) {
             try {
               if (typeof items === 'string') {
@@ -55,20 +55,36 @@ export function useOrderDetails(orderId: string) {
             }
           }
           
-          return items.map((item: any) => ({
-            product_id: item.product_id || '',
-            product_name: item.product_name || item.name || '',
-            quantity: item.quantity || 0,
-            price: item.price || 0,
-            total: item.total || item.price * item.quantity || 0,
-            image_url: item.image_url || null,
-            barcode: item.barcode || null
-          }));
+          const transformedItems = [];
+          for (const item of items) {
+            const { data: product } = await supabase
+              .from('products')
+              .select('*')
+              .eq('id', item.product_id)
+              .single();
+
+            transformedItems.push({
+              product_id: item.product_id || '',
+              product_name: product?.name || item.product_name || '',
+              quantity: item.quantity || 0,
+              price: item.price || 0,
+              total: item.total || item.price * item.quantity || 0,
+              image_url: product?.image_urls?.[0] || null,
+              barcode: item.barcode || product?.barcode || null,
+              is_bulk: product?.bulk_enabled && item.barcode === product?.bulk_barcode,
+              is_weight_based: product?.barcode_type === 'scale',
+              bulk_quantity: product?.bulk_quantity
+            });
+          }
+          
+          return transformedItems;
         };
         
         const customerName = data.customers?.name || '';
         const customerEmail = data.customers?.email || '';
         const customerPhone = data.customers?.phone || '';
+        
+        const transformedItems = await transformItems(data.items);
         
         const orderObj = {
           id: data.id,
@@ -78,7 +94,7 @@ export function useOrderDetails(orderId: string) {
           payment_status: validatePaymentStatus(data.payment_status),
           payment_method: data.payment_method,
           shipping_address: data.shipping_address,
-          items: transformItems(data.items),
+          items: transformedItems,
           customer_id: data.customer_id,
           customer_name: customerName,
           customer_email: customerEmail,
