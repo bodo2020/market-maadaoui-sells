@@ -641,7 +641,7 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
 
     let onlineQuery = supabase
       .from('online_orders')
-      .select('total, items, status')
+      .select('total, items, status, shipping_cost')
       .eq('status', 'done')
       .gte('created_at', queryStartDate.toISOString());
     
@@ -672,7 +672,8 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
     let onlineProfits = 0;
 
     onlineData.data?.forEach(order => {
-      onlineSales += order.total;
+      const orderTotalWithoutShipping = order.total - (order.shipping_cost || 0);
+      onlineSales += orderTotalWithoutShipping;
       
       // Calculate profits for each item in the order
       if (Array.isArray(order.items)) {
