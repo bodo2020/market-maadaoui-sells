@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Order } from "@/types/index";
@@ -76,18 +77,13 @@ export function OrderDetailsDialog({
             continue;
           }
           
-          // Calculate new quantity based on whether it's a bulk product or weight-based
+          // Calculate new quantity based on whether it's a bulk product
           let quantityToDeduct = item.quantity;
           
           // If the item's barcode matches the product's bulk_barcode, handle it as bulk
           if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
             quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
             console.log(`Bulk product detected. Deducting ${quantityToDeduct} units for ${item.quantity} bulk items of ${product.bulk_quantity} units each`);
-          }
-          // If it's a weight-based product, convert grams to kilograms (divide by 1000)
-          else if (product.barcode_type === 'scale' || item.is_weight_based) {
-            quantityToDeduct = item.quantity / 1000;
-            console.log(`Weight-based product detected. Converting ${item.quantity}g to ${quantityToDeduct}kg for deduction`);
           }
           
           // Calculate new quantity
