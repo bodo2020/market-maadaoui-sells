@@ -39,9 +39,11 @@ export function OrderItemsList({
       if (order.items) {
         try {
           if (typeof order.items === 'string') {
-            orderItems = JSON.parse(order.items);
+            // Parse the string and explicitly cast to OrderItem[]
+            orderItems = JSON.parse(order.items) as OrderItem[];
           } else if (Array.isArray(order.items)) {
-            orderItems = order.items as OrderItem[];
+            // Cast the array elements to OrderItem - first cast to unknown
+            orderItems = (order.items as unknown) as OrderItem[];
           } else {
             console.error('Unexpected items format:', order.items);
             throw new Error('Invalid items format');
@@ -66,7 +68,7 @@ export function OrderItemsList({
       const { error: updateError } = await supabase
         .from('online_orders')
         .update({ 
-          items: updatedItems as any, // Use 'any' type to bypass the Json type check
+          items: updatedItems as any, // Use 'any' type to bypass the type checking
           total: newTotal,
           updated_at: new Date().toISOString()
         })
