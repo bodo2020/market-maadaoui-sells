@@ -180,7 +180,11 @@ export function OrderDetailsDialog({
           <div className="w-full md:w-3/5 space-y-6">
             <div>
               <h3 className="font-medium text-lg mb-3">المنتجات</h3>
-              <OrderItemsList items={order.items} />
+              <OrderItemsList 
+                items={order.items} 
+                orderId={order.id}
+                onItemDeleted={onStatusUpdated}
+              />
             </div>
 
             <OrderSummaryActions
