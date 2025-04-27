@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -79,7 +78,6 @@ function formatCurrency(amount: number): string {
   return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}`;
 }
 
-// Utility function to calculate profit margin
 function calculateProfitMargin(sellingPrice: number, costPrice: number): number {
   if (sellingPrice <= 0) return 0;
   return ((sellingPrice - costPrice) / sellingPrice) * 100;
@@ -836,7 +834,7 @@ export default function Reports() {
                             <TableHead>هامش الربح</TableHead>
                             <TableHead>الكمية المباعة</TableHead>
                             <TableHead>إجمالي الربح</TableHead>
-                            <TableHead>نسبة من إجمالي الربح</TableHead>
+                            <TableHead>نسبة من إجم��لي الربح</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>

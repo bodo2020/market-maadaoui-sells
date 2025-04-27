@@ -136,6 +136,8 @@ export default function Finance() {
     }
   };
   
+  const transactionsArray = allTransactions || [];
+  
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -404,9 +406,9 @@ export default function Finance() {
               
               {isLoadingAllTransactions ? (
                 <p className="text-center py-4 text-muted-foreground">جاري تحميل البيانات...</p>
-              ) : allTransactions && allTransactions.length > 0 ? (
+              ) : transactionsArray.length > 0 ? (
                 <div className="space-y-2">
-                  {allTransactions
+                  {transactionsArray
                     .filter(transaction => transaction.type === "income")
                     .slice(0, 6)
                     .map(transaction => (

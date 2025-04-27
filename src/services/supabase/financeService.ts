@@ -1,4 +1,22 @@
 
+import { supabase } from "@/integrations/supabase/client";
+
+export interface ProfitData {
+  storeProfits: number;
+  onlineProfits: number;
+  storeSales: number;
+  onlineSales: number;
+}
+
+export interface CashierPerformance {
+  id: string;
+  name: string;
+  totalSales: number;
+  salesCount: number;
+  averageSale: number;
+  totalProfit: number;
+}
+
 export const fetchProfitsSummary = async (period: string, startDate?: Date, endDate?: Date): Promise<ProfitData> => {
   try {
     let queryStartDate;
@@ -108,4 +126,64 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       onlineSales: 0
     };
   }
+};
+
+// Now adding the other missing functions that are imported in Finance.tsx and Reports.tsx
+export const fetchFinancialSummary = async (period: string, startDate?: Date, endDate?: Date) => {
+  // Mock implementation for now
+  return {
+    totalRevenue: 5000,
+    totalExpenses: 2000,
+    netProfit: 3000,
+    profitMargin: 60,
+    cashBalance: 10000
+  };
+};
+
+export const fetchMonthlyRevenue = async (period: string, startDate?: Date, endDate?: Date) => {
+  // Mock implementation
+  return [
+    { name: 'Jan', amount: 1200 },
+    { name: 'Feb', amount: 1500 },
+    { name: 'Mar', amount: 1800 }
+  ];
+};
+
+export const fetchExpensesByCategory = async (period: string, startDate?: Date, endDate?: Date) => {
+  // Mock implementation
+  return [
+    { name: 'Rent', value: 2500, color: '#FF6B6B' },
+    { name: 'Utilities', value: 800, color: '#4ECDC4' },
+    { name: 'Payroll', value: 5000, color: '#FFD166' }
+  ];
+};
+
+export const fetchRecentTransactions = async (limit: number, period?: string, startDate?: Date, endDate?: Date) => {
+  // Mock implementation
+  return [
+    { id: '1', type: 'income', description: 'Sales Revenue', amount: 1200, date: new Date().toISOString() },
+    { id: '2', type: 'expense', description: 'Rent Payment', amount: 800, date: new Date().toISOString() }
+  ];
+};
+
+export const fetchAllTransactions = async () => {
+  // Mock implementation
+  return [
+    { id: '1', type: 'income', description: 'Sales Revenue', amount: 1200, date: new Date().toISOString() },
+    { id: '2', type: 'expense', description: 'Rent Payment', amount: 800, date: new Date().toISOString() }
+  ];
+};
+
+export const fetchCashierPerformance = async (period: string, startDate?: Date, endDate?: Date): Promise<CashierPerformance[]> => {
+  // Mock implementation
+  return [
+    { id: '1', name: 'Ahmed', totalSales: 5000, salesCount: 20, averageSale: 250, totalProfit: 1500 },
+    { id: '2', name: 'Sara', totalSales: 4500, salesCount: 18, averageSale: 250, totalProfit: 1350 }
+  ];
+};
+
+export const exportReportToExcel = async (period: string, reportType: string, startDate?: Date, endDate?: Date) => {
+  // Mock implementation
+  console.log(`Exporting ${reportType} report for period ${period}`);
+  return Promise.resolve();
 };
