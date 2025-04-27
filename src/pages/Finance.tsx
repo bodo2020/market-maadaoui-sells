@@ -47,14 +47,14 @@ import {
   fetchRecentTransactions,
   fetchAllTransactions,
   fetchCashierPerformance,
-  exportReportToExcel
+  exportReportToExcel,
+  fetchProfitsSummary
 } from "@/services/supabase/financeService";
 
 function formatCurrency(amount: number): string {
   return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', { maximumFractionDigits: 2 })}`;
 }
 
-// Utility function to calculate profit margin
 function calculateProfitMargin(sellingPrice: number, costPrice: number): number {
   if (sellingPrice <= 0) return 0;
   return ((sellingPrice - costPrice) / sellingPrice) * 100;
@@ -67,40 +67,39 @@ export default function Finance() {
   const [endDate, setEndDate] = useState<Date | undefined>(endOfMonth(new Date()));
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   
-  // Fetch financial summary data
   const { data: summaryData, isLoading: isLoadingSummary } = useQuery({
     queryKey: ['financialSummary', period, startDate, endDate],
     queryFn: () => fetchFinancialSummary(period, startDate, endDate)
   });
   
-  // Fetch revenue data
   const { data: revenueData, isLoading: isLoadingRevenue } = useQuery({
     queryKey: ['monthlyRevenue', period, startDate, endDate],
     queryFn: () => fetchMonthlyRevenue(period, startDate, endDate)
   });
   
-  // Fetch expense data
   const { data: expenseData, isLoading: isLoadingExpenses } = useQuery({
     queryKey: ['expensesByCategory', period, startDate, endDate],
     queryFn: () => fetchExpensesByCategory(period, startDate, endDate)
   });
   
-  // Fetch recent transactions
   const { data: recentTransactions, isLoading: isLoadingTransactions } = useQuery({
     queryKey: ['recentTransactions', period, startDate, endDate],
     queryFn: () => fetchRecentTransactions(6, period, startDate, endDate)
   });
   
-  // Fetch all transactions for the transactions tab
   const { data: allTransactions, isLoading: isLoadingAllTransactions } = useQuery({
     queryKey: ['allTransactions'],
     queryFn: fetchAllTransactions
   });
   
-  // Fetch cashier performance data
   const { data: cashierPerformance, isLoading: cashierLoading } = useQuery({
     queryKey: ['cashierPerformance', period, startDate, endDate],
     queryFn: () => fetchCashierPerformance(period, startDate, endDate)
+  });
+
+  const { data: profitsData, isLoading: isLoadingProfits } = useQuery({
+    queryKey: ['profitsSummary', period, startDate, endDate],
+    queryFn: () => fetchProfitsSummary(period, startDate, endDate)
   });
 
   const handleDateRangeChange = (value: "day" | "week" | "month" | "quarter" | "year" | "custom") => {
@@ -298,6 +297,44 @@ export default function Finance() {
                 <div className="flex items-center text-xs text-muted-foreground mt-1">
                   <CreditCard className="h-3 w-3 ml-1" />
                   <span>محدث {format(new Date(), "yyyy/MM/dd")}</span>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">أرباح المتجر</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingProfits ? (
+              <div className="text-2xl font-bold animate-pulse">تحميل...</div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{formatCurrency(profitsData?.storeProfits || 0)}</div>
+                <div className="flex items-center text-xs text-green-500 mt-1">
+                  <TrendingUp className="h-3 w-3 ml-1" />
+                  <span>من المبيعات المباشرة</span>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">أرباح الاونلاين</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingProfits ? (
+              <div className="text-2xl font-bold animate-pulse">تحميل...</div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{formatCurrency(profitsData?.onlineProfits || 0)}</div>
+                <div className="flex items-center text-xs text-green-500 mt-1">
+                  <TrendingUp className="h-3 w-3 ml-1" />
+                  <span>من المبيعات الاونلاين</span>
                 </div>
               </>
             )}
