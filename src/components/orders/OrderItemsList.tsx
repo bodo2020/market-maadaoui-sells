@@ -1,3 +1,4 @@
+
 import { OrderItem } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,14 +37,18 @@ export function OrderItemsList({
       let orderItems: OrderItem[] = [];
       
       if (order.items) {
-        if (typeof order.items === 'string') {
-          orderItems = JSON.parse(order.items) as OrderItem[];
-        } else if (Array.isArray(order.items)) {
-          // We need to properly cast the JSON array to OrderItem array
-          orderItems = order.items as unknown as OrderItem[];
-        } else {
-          console.error('Unexpected items format:', order.items);
-          throw new Error('Invalid items format');
+        try {
+          if (typeof order.items === 'string') {
+            orderItems = JSON.parse(order.items);
+          } else if (Array.isArray(order.items)) {
+            orderItems = order.items as OrderItem[];
+          } else {
+            console.error('Unexpected items format:', order.items);
+            throw new Error('Invalid items format');
+          }
+        } catch (parseError) {
+          console.error('Error parsing items:', parseError);
+          throw new Error('Failed to parse order items');
         }
       }
 
