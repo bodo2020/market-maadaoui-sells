@@ -54,21 +54,10 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       .select('total, profit, items')
       .gte('date', queryStartDate.toISOString());
 
+    // Fixed the online orders query - removing the nested items selection that was causing the error
     let onlineQuery = supabase
       .from('online_orders')
-      .select(`
-        total,
-        items,
-        status,
-        shipping_cost,
-        items(
-          product_id,
-          price,
-          quantity,
-          is_bulk,
-          bulk_quantity
-        )
-      `)
+      .select('total, items, status, shipping_cost')
       .eq('status', 'done')
       .gte('created_at', queryStartDate.toISOString());
     
@@ -98,53 +87,74 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
     let onlineSales = 0;
     let onlineProfits = 0;
 
-    // Get all product purchase prices first to avoid async calls in forEach
-    const productIds = onlineData.data?.flatMap(order => 
-      Array.isArray(order.items) 
-        ? order.items.map((item: any) => item.product_id).filter(Boolean) 
-        : []
-    ) || [];
+    // Extract product IDs from the orders' items
+    const productIds = onlineData.data?.flatMap(order => {
+      if (typeof order.items === 'string') {
+        try {
+          return JSON.parse(order.items)?.map((item: any) => item.product_id).filter(Boolean) || [];
+        } catch {
+          return [];
+        }
+      } else if (Array.isArray(order.items)) {
+        return order.items.map((item: any) => item.product_id).filter(Boolean);
+      }
+      return [];
+    }) || [];
     
     // Get unique product ids
-    const uniqueProductIds = [...new Set(productIds)];
+    const uniqueProductIds = [...new Set(productIds)].filter(Boolean);
     
-    // Fetch all purchase prices in a single query
-    const { data: products } = await supabase
-      .from('products')
-      .select('id, purchase_price')
-      .in('id', uniqueProductIds);
-    
-    // Create a lookup map for easier access
-    const purchasePriceMap = new Map();
-    products?.forEach(product => {
-      purchasePriceMap.set(product.id, product.purchase_price || 0);
-    });
-
-    // Now process the orders with the purchase price data
-    onlineData.data?.forEach(order => {
-      const orderTotalWithoutShipping = order.total - (order.shipping_cost || 0);
-      onlineSales += orderTotalWithoutShipping;
+    if (uniqueProductIds.length > 0) {
+      // Fetch all purchase prices in a single query
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, purchase_price')
+        .in('id', uniqueProductIds);
       
-      // Calculate profits for each item in the order
-      if (Array.isArray(order.items)) {
-        order.items.forEach((item: any) => {
-          const sellingPrice = item.price;
-          const purchasePrice = purchasePriceMap.get(item.product_id) || 0;
-          const quantity = item.quantity || 0;
+      // Create a lookup map for easier access
+      const purchasePriceMap = new Map();
+      products?.forEach(product => {
+        purchasePriceMap.set(product.id, product.purchase_price || 0);
+      });
 
-          // Calculate profit based on bulk or regular pricing
-          if (item.is_bulk && item.bulk_quantity) {
-            // For bulk items, calculate profit
-            const profit = (sellingPrice - purchasePrice) * quantity;
-            onlineProfits += profit;
-          } else {
-            // For regular items
-            const profit = (sellingPrice - purchasePrice) * quantity;
-            onlineProfits += profit;
+      // Now process the orders with the purchase price data
+      onlineData.data?.forEach(order => {
+        const orderTotalWithoutShipping = order.total - (order.shipping_cost || 0);
+        onlineSales += orderTotalWithoutShipping;
+        
+        // Parse items if they are stored as a JSON string
+        let items;
+        if (typeof order.items === 'string') {
+          try {
+            items = JSON.parse(order.items);
+          } catch {
+            items = [];
           }
-        });
-      }
-    });
+        } else {
+          items = order.items;
+        }
+        
+        // Calculate profits for each item in the order
+        if (Array.isArray(items)) {
+          items.forEach((item: any) => {
+            const sellingPrice = parseFloat(item.price) || 0;
+            const purchasePrice = purchasePriceMap.get(item.product_id) || 0;
+            const quantity = parseInt(item.quantity) || 0;
+
+            // Calculate profit based on bulk or regular pricing
+            if (item.is_bulk && item.bulk_quantity) {
+              // For bulk items, calculate profit
+              const profit = (sellingPrice - purchasePrice) * quantity;
+              onlineProfits += profit;
+            } else {
+              // For regular items
+              const profit = (sellingPrice - purchasePrice) * quantity;
+              onlineProfits += profit;
+            }
+          });
+        }
+      });
+    }
 
     return {
       storeProfits,
