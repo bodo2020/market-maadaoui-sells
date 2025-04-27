@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -25,7 +25,6 @@ export default function ProductCollections() {
     description: '',
     products: []
   });
-  // Add a state to control the MultiSelect visibility
   const [showMultiSelect, setShowMultiSelect] = useState(false);
 
   useEffect(() => {
@@ -33,7 +32,6 @@ export default function ProductCollections() {
     loadProducts();
   }, []);
 
-  // After products are loaded, we can safely show the MultiSelect
   useEffect(() => {
     if (products.length > 0) {
       setShowMultiSelect(true);
@@ -86,7 +84,6 @@ export default function ProductCollections() {
 
   const handleUpdateCollection = async (collection: ProductCollection) => {
     try {
-      // Ensure products is an array
       const collectionToUpdate = {
         ...collection,
         products: Array.isArray(collection.products) ? collection.products : []
@@ -112,7 +109,6 @@ export default function ProductCollections() {
     }
   };
 
-  // Create the product options safely
   const productOptions = React.useMemo(() => {
     return products && products.length > 0
       ? products.map(p => ({ label: p.name, value: p.id }))
@@ -124,43 +120,12 @@ export default function ProductCollections() {
       <div className="container mx-auto px-4 py-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">مجموعات المنتجات</h1>
-          <Button>
-            <Plus className="ml-2" /> إضافة مجموعة جديدة
-          </Button>
+          <Link to="/product-collections/create">
+            <Button>
+              <Plus className="ml-2" /> إنشاء مجموعة جديدة
+            </Button>
+          </Link>
         </div>
-
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>إنشاء مجموعة جديدة</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                placeholder="اسم المجموعة"
-                value={newCollection.title || ''}
-                onChange={(e) => setNewCollection({...newCollection, title: e.target.value})}
-              />
-              <Input
-                placeholder="وصف المجموعة (اختياري)"
-                value={newCollection.description || ''}
-                onChange={(e) => setNewCollection({...newCollection, description: e.target.value})}
-              />
-              {/* Only render MultiSelect when products are loaded */}
-              {showMultiSelect && productOptions.length > 0 && (
-                <MultiSelect
-                  options={productOptions}
-                  value={Array.isArray(newCollection.products) ? newCollection.products : []}
-                  onChange={(selected) => setNewCollection({...newCollection, products: selected})}
-                  placeholder="اختر المنتجات"
-                  className="md:col-span-2"
-                />
-              )}
-              <div className="md:col-span-2 flex justify-end">
-                <Button onClick={handleCreateCollection}>إضافة مجموعة</Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {collections.map((collection) => (
