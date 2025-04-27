@@ -10,12 +10,12 @@ import { useNavigate } from "react-router-dom";
 interface ProductGridProps {
   products: Product[];
   onEditProduct: (product: Product) => void;
-  isBulkMode?: boolean;
 }
 
-export function ProductGrid({ products, onEditProduct, isBulkMode = false }: ProductGridProps) {
+export function ProductGrid({ products, onEditProduct }: ProductGridProps) {
   const navigate = useNavigate();
 
+  // Add console logs to debug
   console.log("ProductGrid received products:", products);
 
   if (!products || products.length === 0) {
@@ -59,16 +59,7 @@ export function ProductGrid({ products, onEditProduct, isBulkMode = false }: Pro
               <div className="flex justify-between items-center">
                 <div className="space-y-1">
                   <div className="text-sm font-medium">
-                    {isBulkMode && product.bulk_enabled ? (
-                      <>
-                        {product.bulk_price} ج.م
-                        <span className="text-xs text-gray-500 mr-1">
-                          (جملة)
-                        </span>
-                      </>
-                    ) : (
-                      `${product.price} ج.م`
-                    )}
+                    {product.price} ج.م
                   </div>
                   <Badge variant="outline" className="text-xs">
                     المخزون: {product.quantity || 0}
@@ -81,11 +72,9 @@ export function ProductGrid({ products, onEditProduct, isBulkMode = false }: Pro
                 )}
               </div>
               <div className="flex gap-2 text-xs text-gray-500">
-                {product.barcode && (
-                  <Badge variant="outline" className="text-xs">
-                    {product.barcode_type === 'scale' ? 'باركود ميزان' : 'باركود عادي'}
-                  </Badge>
-                )}
+                <Badge variant="outline" className="text-xs">
+                  {product.barcode_type === 'scale' ? 'باركود ميزان' : 'باركود عادي'}
+                </Badge>
               </div>
             </div>
           </CardContent>

@@ -115,7 +115,6 @@ export type Database = {
           created_at: string | null
           customer_id: string | null
           id: string
-          metadata: Json | null
           product_id: string
           quantity: number
           updated_at: string | null
@@ -125,7 +124,6 @@ export type Database = {
           created_at?: string | null
           customer_id?: string | null
           id?: string
-          metadata?: Json | null
           product_id: string
           quantity?: number
           updated_at?: string | null
@@ -135,7 +133,6 @@ export type Database = {
           created_at?: string | null
           customer_id?: string | null
           id?: string
-          metadata?: Json | null
           product_id?: string
           quantity?: number
           updated_at?: string | null
