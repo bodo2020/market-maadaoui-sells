@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { fetchProducts } from "@/services/supabase/productService";
 import { createProductCollection } from "@/services/supabase/productCollectionsService";
 import { Product } from "@/types";
 import { Plus, X } from "lucide-react";
+import { siteConfig } from "@/config/site";
 
 export default function CreateProductCollection() {
   const navigate = useNavigate();
@@ -130,7 +130,7 @@ export default function CreateProductCollection() {
                         )}
                         <div>
                           <p className="font-medium">{product.name}</p>
-                          <p className="text-sm text-muted-foreground">{product.price} ر.س</p>
+                          <p className="text-sm text-muted-foreground">{product.price} {siteConfig.currency}</p>
                         </div>
                       </div>
                       <Button 
@@ -163,7 +163,7 @@ export default function CreateProductCollection() {
                           )}
                           <div>
                             <p className="font-medium">{product.name}</p>
-                            <p className="text-sm text-muted-foreground">{product.price} ر.س</p>
+                            <p className="text-sm text-muted-foreground">{product.price} {siteConfig.currency}</p>
                           </div>
                         </div>
                         <Button 

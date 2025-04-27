@@ -148,7 +148,11 @@ export default function ProductCollections() {
                     {Array.isArray(collection.products) && collection.products.length > 0 ? (
                       collection.products.map(productId => {
                         const product = products.find(p => p.id === productId);
-                        return product ? <li key={productId} className="text-muted-foreground">{product.name}</li> : null;
+                        return product ? (
+                          <li key={productId} className="text-muted-foreground">
+                            {product.name} - {product.price} {siteConfig.currency}
+                          </li>
+                        ) : null;
                       })
                     ) : (
                       <li className="text-muted-foreground italic">لا توجد منتجات</li>
