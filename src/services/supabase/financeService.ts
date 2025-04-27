@@ -56,7 +56,19 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
 
     let onlineQuery = supabase
       .from('online_orders')
-      .select('total, items, status, shipping_cost')
+      .select(`
+        total,
+        items,
+        status,
+        shipping_cost,
+        items(
+          product_id,
+          price,
+          quantity,
+          is_bulk,
+          bulk_quantity
+        )
+      `)
       .eq('status', 'done')
       .gte('created_at', queryStartDate.toISOString());
     
@@ -93,18 +105,29 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       // Calculate profits for each item in the order
       if (Array.isArray(order.items)) {
         order.items.forEach((item: any) => {
+          // Get item details from the products table
+          const getProduct = async (productId: string) => {
+            const { data: product } = await supabase
+              .from('products')
+              .select('purchase_price')
+              .eq('id', productId)
+              .single();
+            return product?.purchase_price || 0;
+          };
+
           const sellingPrice = item.price;
-          const purchasePrice = item.product?.purchase_price || 0;
+          const purchasePrice = item.product_id ? await getProduct(item.product_id) : 0;
           const quantity = item.quantity || 0;
 
           // Calculate profit based on bulk or regular pricing
           if (item.is_bulk && item.bulk_quantity) {
             // For bulk items, calculate unit price and profit
-            const bulkUnitPrice = item.price / item.bulk_quantity;
-            onlineProfits += (bulkUnitPrice - purchasePrice) * quantity * item.bulk_quantity;
+            const profit = (sellingPrice - purchasePrice) * quantity;
+            onlineProfits += profit;
           } else {
             // For regular items
-            onlineProfits += (sellingPrice - purchasePrice) * quantity;
+            const profit = (sellingPrice - purchasePrice) * quantity;
+            onlineProfits += profit;
           }
         });
       }
