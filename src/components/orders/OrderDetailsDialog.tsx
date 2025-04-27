@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Order } from "@/types/index";
@@ -83,10 +82,9 @@ export function OrderDetailsDialog({
           // If the item's barcode matches the product's bulk_barcode, handle it as bulk
           if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
             quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
-            console.log(`Bulk product detected. Deducting ${quantityToDeduct} units for ${item.quantity} bulk items of ${product.bulk_quantity} units each`);
           }
           
-          // Calculate new quantity
+          // Calculate new quantity - deduct directly without conversion
           const newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
           
           // Update the product quantity

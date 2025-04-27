@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,6 @@ export function UpdateOrderStatusDialog({
   const [status, setStatus] = useState<Order['status']>(order?.status || 'waiting');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset status when order changes
   useEffect(() => {
     if (order) {
       setStatus(order.status);
@@ -46,9 +44,7 @@ export function UpdateOrderStatusDialog({
         updated_at: new Date().toISOString()
       };
 
-      // If the status is changing to 'done', we need to process additional actions
       if (status === 'done' && order.status !== 'done') {
-        // Link the order to a customer if customer information is available
         if (order.customer_name || order.customer_phone) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
@@ -58,7 +54,6 @@ export function UpdateOrderStatusDialog({
           const customer = await findOrCreateCustomer(customerInfo);
           if (customer) {
             console.log("Customer linked to order:", customer);
-            // Update the customer_id in the order if it was missing
             if (!order.customer_id) {
               await supabase
                 .from('online_orders')
@@ -68,12 +63,10 @@ export function UpdateOrderStatusDialog({
           }
         }
         
-        // Process inventory reduction for each item in the order
         const orderItems = order.items || [];
         console.log("Processing inventory for items:", orderItems);
         
         for (const item of orderItems) {
-          // Get the current product
           const { data: product, error: productError } = await supabase
             .from('products')
             .select('*')
@@ -85,19 +78,14 @@ export function UpdateOrderStatusDialog({
             continue;
           }
           
-          // Calculate new quantity based on whether it's a bulk product
           let quantityToDeduct = item.quantity;
           
-          // If the item's barcode matches the product's bulk_barcode, handle it as bulk
           if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
             quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
-            console.log(`Bulk product detected. Deducting ${quantityToDeduct} units for ${item.quantity} bulk items of ${product.bulk_quantity} units each`);
           }
           
-          // Calculate new quantity
           const newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
           
-          // Update the product quantity
           await updateProduct(product.id, {
             quantity: newQuantity
           });
@@ -105,7 +93,6 @@ export function UpdateOrderStatusDialog({
           console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
         }
         
-        // If the order is already marked as paid, add the amount to the online cash register
         if (order.payment_status === 'paid' || status === 'done') {
           try {
             await recordCashTransaction(
@@ -123,7 +110,6 @@ export function UpdateOrderStatusDialog({
         }
       }
       
-      // If order is done, also mark payment as completed if payment is pending
       if (status === 'done' && order.payment_status === 'pending') {
         await supabase
           .from('online_orders')
