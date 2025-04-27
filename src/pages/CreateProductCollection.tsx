@@ -16,6 +16,7 @@ export default function CreateProductCollection() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [newCollection, setNewCollection] = useState({
     title: '',
     description: '',
@@ -43,6 +44,8 @@ export default function CreateProductCollection() {
         return;
       }
 
+      setIsSubmitting(true);
+      
       await createProductCollection({
         title: newCollection.title,
         description: newCollection.description || '',
@@ -56,6 +59,8 @@ export default function CreateProductCollection() {
     } catch (error) {
       console.error("Error creating collection:", error);
       toast.error("حدث خطأ أثناء إنشاء المجموعة");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -178,8 +183,12 @@ export default function CreateProductCollection() {
                 <Button onClick={() => navigate('/product-collections')}>
                   إلغاء
                 </Button>
-                <Button onClick={handleCreateCollection} className="mr-4">
-                  حفظ
+                <Button 
+                  onClick={handleCreateCollection} 
+                  className="mr-4"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'جاري الحفظ...' : 'حفظ'}
                 </Button>
               </div>
             </div>
