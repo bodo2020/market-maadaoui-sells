@@ -14,6 +14,7 @@ export function OrderItemsList({ items }: OrderItemsListProps) {
         <TableHeader>
           <TableRow>
             <TableHead className="text-right">المنتج</TableHead>
+            <TableHead className="text-center">الباركود</TableHead>
             <TableHead className="text-center">الكمية</TableHead>
             <TableHead className="text-center">السعر</TableHead>
             <TableHead className="text-center">المجموع</TableHead>
@@ -36,6 +37,7 @@ export function OrderItemsList({ items }: OrderItemsListProps) {
                   <span>{item.product_name}</span>
                 </div>
               </TableCell>
+              <TableCell className="text-center">{item.barcode || 'N/A'}</TableCell>
               <TableCell className="text-center">{item.quantity}</TableCell>
               <TableCell className="text-center">{item.price} ج.م</TableCell>
               <TableCell className="text-center">{item.total || (item.price * item.quantity)} ج.م</TableCell>

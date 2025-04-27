@@ -216,6 +216,7 @@ export interface OrderItem {
   price: number;
   total: number;
   image_url?: string;
+  barcode?: string;
 }
 
 export interface Order {

@@ -61,7 +61,8 @@ export function useOrderDetails(orderId: string) {
             quantity: item.quantity || 0,
             price: item.price || 0,
             total: item.total || item.price * item.quantity || 0,
-            image_url: item.image_url || null
+            image_url: item.image_url || null,
+            barcode: item.barcode || null
           }));
         };
         

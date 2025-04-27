@@ -30,6 +30,9 @@ export function OrderItemsDialog({ items, open, onClose }: OrderItemsDialogProps
                   <div className="flex-1">
                     <h4 className="font-medium">{item.product_name}</h4>
                     <p className="text-sm text-muted-foreground">
+                      باركود: {item.barcode || 'N/A'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
                       {item.quantity} × {item.price} ج.م
                     </p>
                   </div>
