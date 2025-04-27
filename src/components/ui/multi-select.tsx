@@ -39,7 +39,10 @@ export const MultiSelect = ({
   const safeOptions = Array.isArray(options) ? options : [];
   const safeValue = Array.isArray(value) ? value : [];
   
-  const selected = safeOptions.filter(option => safeValue.includes(option.value));
+  // Only calculate selected if we have both valid options and values
+  const selected = safeOptions.length > 0 
+    ? safeOptions.filter(option => safeValue.includes(option.value))
+    : [];
   
   const handleUnselect = (valueToRemove: string) => {
     onChange(safeValue.filter((item) => item !== valueToRemove));
@@ -53,11 +56,17 @@ export const MultiSelect = ({
     }
   };
   
-  const filteredOptions = search.length > 0
+  const filteredOptions = search.length > 0 && safeOptions.length > 0
     ? safeOptions.filter((option) =>
         option.label.toLowerCase().includes(search.toLowerCase())
       )
     : safeOptions;
+
+  // If we don't have valid options, don't render the component
+  if (!Array.isArray(options) || options.length === 0) {
+    console.warn('MultiSelect: options is not an array or is empty');
+    return null;
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

@@ -25,16 +25,25 @@ export default function ProductCollections() {
     description: '',
     products: []
   });
+  // Add a state to control the MultiSelect visibility
+  const [showMultiSelect, setShowMultiSelect] = useState(false);
 
   useEffect(() => {
     loadCollections();
     loadProducts();
   }, []);
 
+  // After products are loaded, we can safely show the MultiSelect
+  useEffect(() => {
+    if (products.length > 0) {
+      setShowMultiSelect(true);
+    }
+  }, [products]);
+
   const loadCollections = async () => {
     try {
       const fetchedCollections = await fetchProductCollections();
-      setCollections(Array.isArray(fetchedCollections) ? fetchedCollections : []);
+      setCollections(fetchedCollections || []);
     } catch (error) {
       console.error("Error loading collections:", error);
       toast.error("حدث خطأ أثناء تحميل المجموعات");
@@ -44,7 +53,7 @@ export default function ProductCollections() {
   const loadProducts = async () => {
     try {
       const fetchedProducts = await fetchProducts();
-      setProducts(Array.isArray(fetchedProducts) ? fetchedProducts : []);
+      setProducts(fetchedProducts || []);
     } catch (error) {
       console.error("Error loading products:", error);
       toast.error("حدث خطأ أثناء تحميل المنتجات");
@@ -103,6 +112,13 @@ export default function ProductCollections() {
     }
   };
 
+  // Create the product options safely
+  const productOptions = React.useMemo(() => {
+    return products && products.length > 0
+      ? products.map(p => ({ label: p.name, value: p.id }))
+      : [];
+  }, [products]);
+
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-6">
@@ -129,13 +145,16 @@ export default function ProductCollections() {
                 value={newCollection.description || ''}
                 onChange={(e) => setNewCollection({...newCollection, description: e.target.value})}
               />
-              <MultiSelect
-                options={products.map(p => ({ label: p.name, value: p.id }))}
-                value={Array.isArray(newCollection.products) ? newCollection.products : []}
-                onChange={(selected) => setNewCollection({...newCollection, products: selected})}
-                placeholder="اختر المنتجات"
-                className="md:col-span-2"
-              />
+              {/* Only render MultiSelect when products are loaded */}
+              {showMultiSelect && productOptions.length > 0 && (
+                <MultiSelect
+                  options={productOptions}
+                  value={Array.isArray(newCollection.products) ? newCollection.products : []}
+                  onChange={(selected) => setNewCollection({...newCollection, products: selected})}
+                  placeholder="اختر المنتجات"
+                  className="md:col-span-2"
+                />
+              )}
               <div className="md:col-span-2 flex justify-end">
                 <Button onClick={handleCreateCollection}>إضافة مجموعة</Button>
               </div>
@@ -161,11 +180,12 @@ export default function ProductCollections() {
                 <div>
                   <h3 className="font-semibold mb-2 text-sm">المنتجات:</h3>
                   <ul className="space-y-1 text-sm">
-                    {Array.isArray(collection.products) && collection.products.map(productId => {
-                      const product = products.find(p => p.id === productId);
-                      return product ? <li key={productId} className="text-muted-foreground">{product.name}</li> : null;
-                    })}
-                    {(!Array.isArray(collection.products) || collection.products.length === 0) && (
+                    {Array.isArray(collection.products) && collection.products.length > 0 ? (
+                      collection.products.map(productId => {
+                        const product = products.find(p => p.id === productId);
+                        return product ? <li key={productId} className="text-muted-foreground">{product.name}</li> : null;
+                      })
+                    ) : (
                       <li className="text-muted-foreground italic">لا توجد منتجات</li>
                     )}
                   </ul>
