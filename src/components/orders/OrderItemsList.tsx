@@ -34,18 +34,25 @@ export function OrderItemsList({
       if (fetchError) throw fetchError;
 
       // Ensure items is an array
-      let orderItems = order.items;
-      if (typeof orderItems === 'string') {
-        orderItems = JSON.parse(orderItems);
+      let orderItems: OrderItem[] = [];
+      
+      if (order.items) {
+        if (typeof order.items === 'string') {
+          orderItems = JSON.parse(order.items);
+        } else if (Array.isArray(order.items)) {
+          orderItems = order.items as OrderItem[];
+        } else {
+          console.error('Unexpected items format:', order.items);
+          throw new Error('Invalid items format');
+        }
       }
 
       // Filter out the deleted item and calculate new total
-      const updatedItems = Array.isArray(orderItems) ? 
-        orderItems.filter((item: OrderItem) => 
-          !(item.product_id === deletedItem.product_id && 
-            item.price === deletedItem.price && 
-            item.quantity === deletedItem.quantity)
-        ) : [];
+      const updatedItems = orderItems.filter((item: OrderItem) => 
+        !(item.product_id === deletedItem.product_id && 
+          item.price === deletedItem.price && 
+          item.quantity === deletedItem.quantity)
+      );
 
       // Calculate new total by subtracting the deleted item's total
       const newTotal = order.total - deletedItem.total;
