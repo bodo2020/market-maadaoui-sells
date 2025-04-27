@@ -26,7 +26,7 @@ export interface MultiSelectProps {
 }
 
 export const MultiSelect = ({
-  options,
+  options = [],
   value = [],
   onChange,
   placeholder = "Select items",
@@ -35,25 +35,29 @@ export const MultiSelect = ({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const selected = options.filter(option => value.includes(option.value));
+  // Ensure options and value are arrays to prevent "not iterable" errors
+  const safeOptions = Array.isArray(options) ? options : [];
+  const safeValue = Array.isArray(value) ? value : [];
+  
+  const selected = safeOptions.filter(option => safeValue.includes(option.value));
   
   const handleUnselect = (valueToRemove: string) => {
-    onChange(value.filter((item) => item !== valueToRemove));
+    onChange(safeValue.filter((item) => item !== valueToRemove));
   };
 
   const handleSelect = (valueToSelect: string) => {
-    if (value.includes(valueToSelect)) {
-      onChange(value.filter((v) => v !== valueToSelect));
+    if (safeValue.includes(valueToSelect)) {
+      onChange(safeValue.filter((v) => v !== valueToSelect));
     } else {
-      onChange([...value, valueToSelect]);
+      onChange([...safeValue, valueToSelect]);
     }
   };
   
   const filteredOptions = search.length > 0
-    ? options.filter((option) =>
+    ? safeOptions.filter((option) =>
         option.label.toLowerCase().includes(search.toLowerCase())
       )
-    : options;
+    : safeOptions;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -98,7 +102,7 @@ export const MultiSelect = ({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
-        <Command className="w-full" dir="rtl">
+        <Command className="w-full">
           <CommandInput placeholder={`${placeholder}...`} onValueChange={setSearch} />
           <CommandEmpty>لا توجد نتائج.</CommandEmpty>
           <CommandGroup className="max-h-64 overflow-y-auto">
@@ -109,7 +113,7 @@ export const MultiSelect = ({
                 className="cursor-pointer flex items-center justify-between"
               >
                 {option.label}
-                {value.includes(option.value) && <Check className="h-4 w-4" />}
+                {safeValue.includes(option.value) && <Check className="h-4 w-4" />}
               </CommandItem>
             ))}
           </CommandGroup>

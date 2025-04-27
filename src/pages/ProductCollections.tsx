@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { ProductCollection, 
+import { 
+  ProductCollection, 
   fetchProductCollections, 
   createProductCollection, 
   updateProductCollection, 
@@ -58,6 +59,7 @@ export default function ProductCollections() {
       setNewCollection({ title: '', description: '', products: [] });
       toast.success("تم إنشاء المجموعة بنجاح");
     } catch (error) {
+      console.error("Error creating collection:", error);
       toast.error("حدث خطأ أثناء إنشاء المجموعة");
     }
   };
@@ -68,6 +70,7 @@ export default function ProductCollections() {
       setCollections(collections.map(c => c.id === collection.id ? updatedCollection : c));
       toast.success("تم تحديث المجموعة بنجاح");
     } catch (error) {
+      console.error("Error updating collection:", error);
       toast.error("حدث خطأ أثناء تحديث المجموعة");
     }
   };
@@ -78,6 +81,7 @@ export default function ProductCollections() {
       setCollections(collections.filter(c => c.id !== id));
       toast.success("تم حذف المجموعة بنجاح");
     } catch (error) {
+      console.error("Error deleting collection:", error);
       toast.error("حدث خطأ أثناء حذف المجموعة");
     }
   };
@@ -125,7 +129,7 @@ export default function ProductCollections() {
                 <div className="mt-4">
                   <h3 className="font-semibold mb-2">المنتجات:</h3>
                   <ul>
-                    {collection.products.map(productId => {
+                    {Array.isArray(collection.products) && collection.products.map(productId => {
                       const product = products.find(p => p.id === productId);
                       return product ? <li key={productId}>{product.name}</li> : null;
                     })}
