@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -16,6 +17,7 @@ import { Product } from "@/types";
 import { MultiSelect } from "@/components/ui/multi-select";
 import MainLayout from "@/components/layout/MainLayout";
 import { Plus, Trash2 } from "lucide-react";
+import { siteConfig } from "@/config/site";
 
 export default function ProductCollections() {
   const [collections, setCollections] = useState<ProductCollection[]>([]);
