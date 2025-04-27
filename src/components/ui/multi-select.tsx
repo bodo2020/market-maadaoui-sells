@@ -103,7 +103,12 @@ export const MultiSelect = ({
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
         <Command className="w-full">
-          <CommandInput placeholder={`${placeholder}...`} onValueChange={setSearch} />
+          <CommandInput 
+            placeholder={`${placeholder}...`} 
+            onValueChange={setSearch} 
+            value={search}
+            className="py-3"
+          />
           <CommandEmpty>لا توجد نتائج.</CommandEmpty>
           <CommandGroup className="max-h-64 overflow-y-auto">
             {filteredOptions.map((option) => (

@@ -12,7 +12,6 @@ import {
   deleteProductCollection 
 } from "@/services/supabase/productCollectionsService";
 import { fetchProducts } from "@/services/supabase/productService";
-import { Product } from "@/types";
 import { MultiSelect } from "@/components/ui/multi-select";
 import MainLayout from "@/components/layout/MainLayout";
 
@@ -31,13 +30,23 @@ export default function ProductCollections() {
   }, []);
 
   const loadCollections = async () => {
-    const fetchedCollections = await fetchProductCollections();
-    setCollections(fetchedCollections);
+    try {
+      const fetchedCollections = await fetchProductCollections();
+      setCollections(fetchedCollections);
+    } catch (error) {
+      console.error("Error loading collections:", error);
+      toast.error("حدث خطأ أثناء تحميل المجموعات");
+    }
   };
 
   const loadProducts = async () => {
-    const fetchedProducts = await fetchProducts();
-    setProducts(fetchedProducts);
+    try {
+      const fetchedProducts = await fetchProducts();
+      setProducts(fetchedProducts);
+    } catch (error) {
+      console.error("Error loading products:", error);
+      toast.error("حدث خطأ أثناء تحميل المنتجات");
+    }
   };
 
   const handleCreateCollection = async () => {
