@@ -15,6 +15,7 @@ import { fetchProducts } from "@/services/supabase/productService";
 import { Product } from "@/types";
 import { MultiSelect } from "@/components/ui/multi-select";
 import MainLayout from "@/components/layout/MainLayout";
+import { Plus, Trash2 } from "lucide-react";
 
 export default function ProductCollections() {
   const [collections, setCollections] = useState<ProductCollection[]>([]);
@@ -104,15 +105,20 @@ export default function ProductCollections() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">مجموعات المنتجات</h1>
-        
-        <Card>
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">مجموعات المنتجات</h1>
+          <Button>
+            <Plus className="ml-2" /> إضافة مجموعة جديدة
+          </Button>
+        </div>
+
+        <Card className="mb-6">
           <CardHeader>
             <CardTitle>إنشاء مجموعة جديدة</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 placeholder="اسم المجموعة"
                 value={newCollection.title || ''}
@@ -128,43 +134,46 @@ export default function ProductCollections() {
                 value={Array.isArray(newCollection.products) ? newCollection.products : []}
                 onChange={(selected) => setNewCollection({...newCollection, products: selected})}
                 placeholder="اختر المنتجات"
+                className="md:col-span-2"
               />
-              <Button onClick={handleCreateCollection}>إضافة مجموعة</Button>
+              <div className="md:col-span-2 flex justify-end">
+                <Button onClick={handleCreateCollection}>إضافة مجموعة</Button>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {collections.map((collection) => (
-            <Card key={collection.id}>
-              <CardHeader>
+            <Card key={collection.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle>{collection.title}</CardTitle>
+                <Button 
+                  variant="destructive" 
+                  size="icon" 
+                  onClick={() => handleDeleteCollection(collection.id!)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </CardHeader>
               <CardContent>
-                <p>{collection.description}</p>
-                <div className="mt-4">
-                  <h3 className="font-semibold mb-2">المنتجات:</h3>
-                  <ul className="space-y-1">
+                <p className="text-sm text-muted-foreground mb-4">{collection.description || 'لا يوجد وصف'}</p>
+                <div>
+                  <h3 className="font-semibold mb-2 text-sm">المنتجات:</h3>
+                  <ul className="space-y-1 text-sm">
                     {Array.isArray(collection.products) && collection.products.map(productId => {
                       const product = products.find(p => p.id === productId);
-                      return product ? <li key={productId}>{product.name}</li> : null;
+                      return product ? <li key={productId} className="text-muted-foreground">{product.name}</li> : null;
                     })}
                     {(!Array.isArray(collection.products) || collection.products.length === 0) && (
-                      <li className="text-muted-foreground">لا توجد منتجات</li>
+                      <li className="text-muted-foreground italic">لا توجد منتجات</li>
                     )}
                   </ul>
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <Button 
-                    variant="destructive" 
-                    onClick={() => handleDeleteCollection(collection.id!)}
-                  >
-                    حذف
-                  </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
+          
           {collections.length === 0 && (
             <div className="col-span-full text-center py-12 text-muted-foreground">
               لا توجد مجموعات منتجات. قم بإنشاء مجموعة جديدة.
