@@ -85,8 +85,17 @@ export function UpdateOrderStatusDialog({
             continue;
           }
           
+          // Calculate new quantity based on whether it's a bulk product
+          let quantityToDeduct = item.quantity;
+          
+          // If the item's barcode matches the product's bulk_barcode, handle it as bulk
+          if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
+            quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
+            console.log(`Bulk product detected. Deducting ${quantityToDeduct} units for ${item.quantity} bulk items of ${product.bulk_quantity} units each`);
+          }
+          
           // Calculate new quantity
-          const newQuantity = Math.max(0, (product.quantity || 0) - item.quantity);
+          const newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
           
           // Update the product quantity
           await updateProduct(product.id, {

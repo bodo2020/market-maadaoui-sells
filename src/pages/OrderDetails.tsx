@@ -1,3 +1,4 @@
+
 import { useParams, useNavigate } from "react-router-dom";
 import { Order } from "@/types";
 import MainLayout from "@/components/layout/MainLayout";
@@ -78,7 +79,16 @@ export default function OrderDetails() {
             continue;
           }
           
-          const newQuantity = Math.max(0, (product.quantity || 0) - item.quantity);
+          // Calculate new quantity based on whether it's a bulk product
+          let quantityToDeduct = item.quantity;
+          
+          // If the item's barcode matches the product's bulk_barcode, handle it as bulk
+          if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
+            quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
+            console.log(`Bulk product detected. Deducting ${quantityToDeduct} units for ${item.quantity} bulk items of ${product.bulk_quantity} units each`);
+          }
+          
+          const newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
           
           await updateProduct(product.id, {
             quantity: newQuantity
