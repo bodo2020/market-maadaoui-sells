@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { Order } from "@/types";
 import MainLayout from "@/components/layout/MainLayout";
@@ -79,13 +78,18 @@ export default function OrderDetails() {
             continue;
           }
           
-          // Calculate new quantity based on whether it's a bulk product
+          // Calculate new quantity based on whether it's a bulk product or weight-based
           let quantityToDeduct = item.quantity;
           
           // If the item's barcode matches the product's bulk_barcode, handle it as bulk
           if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
             quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
             console.log(`Bulk product detected. Deducting ${quantityToDeduct} units for ${item.quantity} bulk items of ${product.bulk_quantity} units each`);
+          }
+          // If it's a weight-based product, convert grams to kilograms (divide by 1000)
+          else if (product.barcode_type === 'scale' || item.is_weight_based) {
+            quantityToDeduct = item.quantity / 1000;
+            console.log(`Weight-based product detected. Converting ${item.quantity}g to ${quantityToDeduct}kg for deduction`);
           }
           
           const newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
