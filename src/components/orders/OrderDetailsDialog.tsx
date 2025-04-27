@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Order } from "@/types/index";
@@ -40,9 +39,8 @@ export function OrderDetailsDialog({
     try {
       setIsUpdatingShipping(true);
       
-      // If marking as done, process inventory and financial updates
       if (status === 'done' && order.status !== 'done') {
-        // Link to customer if possible
+        // If marking as done, process inventory and financial updates
         if (order.customer_name || order.customer_phone) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
@@ -79,8 +77,17 @@ export function OrderDetailsDialog({
             continue;
           }
           
+          // Calculate new quantity based on whether it's a bulk product
+          let quantityToDeduct = item.quantity;
+          
+          // If the item's barcode matches the product's bulk_barcode, handle it as bulk
+          if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
+            quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
+            console.log(`Bulk product detected. Deducting ${quantityToDeduct} units for ${item.quantity} bulk items`);
+          }
+          
           // Calculate new quantity
-          const newQuantity = Math.max(0, (product.quantity || 0) - item.quantity);
+          const newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
           
           // Update the product quantity
           await updateProduct(product.id, {
