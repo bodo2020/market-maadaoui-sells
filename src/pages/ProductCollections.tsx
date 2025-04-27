@@ -12,6 +12,7 @@ import {
   deleteProductCollection 
 } from "@/services/supabase/productCollectionsService";
 import { fetchProducts } from "@/services/supabase/productService";
+import { Product } from "@/types";
 import { MultiSelect } from "@/components/ui/multi-select";
 import MainLayout from "@/components/layout/MainLayout";
 
