@@ -115,6 +115,7 @@ export type Database = {
           created_at: string | null
           customer_id: string | null
           id: string
+          metadata: Json | null
           product_id: string
           quantity: number
           updated_at: string | null
@@ -124,6 +125,7 @@ export type Database = {
           created_at?: string | null
           customer_id?: string | null
           id?: string
+          metadata?: Json | null
           product_id: string
           quantity?: number
           updated_at?: string | null
@@ -133,6 +135,7 @@ export type Database = {
           created_at?: string | null
           customer_id?: string | null
           id?: string
+          metadata?: Json | null
           product_id?: string
           quantity?: number
           updated_at?: string | null
@@ -874,6 +877,39 @@ export type Database = {
           enable_cash?: boolean
           enable_e_wallet?: boolean
           id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      product_collections: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          description: string | null
+          id: string
+          position: number | null
+          products: string[] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          position?: number | null
+          products?: string[] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          position?: number | null
+          products?: string[] | null
+          title?: string
           updated_at?: string | null
         }
         Relationships: []

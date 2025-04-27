@@ -1,4 +1,3 @@
-
 import {
   BarChart4, Store, ShoppingCart, PackageOpen, Users, Settings, FileText,
   Receipt, Home, UserPlus, Truck, Building2, ImageIcon,
@@ -29,6 +28,7 @@ export const generalNavigation: SidebarGroupData = {
   items: [
     { icon: Truck, label: "مشتريات الموردين", href: "/supplier-purchases" },
     { icon: PackageOpen, label: "المنتجات", href: "/products" },
+    { icon: ShoppingBag, label: "مجموعات المنتجات", href: "/product-collections" },
     { icon: ShoppingBag, label: "الطلبات الإلكترونية", href: "/online-orders" },
     { icon: Receipt, label: "الفواتير", href: "/invoices" },
     { icon: BarChart4, label: "التقارير والمالية", href: "/reports" },
