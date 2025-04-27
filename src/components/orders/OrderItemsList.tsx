@@ -1,4 +1,3 @@
-
 import { OrderItem } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -62,7 +61,7 @@ export function OrderItemsList({
       const { error: updateError } = await supabase
         .from('online_orders')
         .update({ 
-          items: updatedItems as unknown as object,
+          items: updatedItems as any, // Use 'any' type to bypass the Json type check
           total: newTotal,
           updated_at: new Date().toISOString()
         })
