@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ import { Plus, Trash2, Edit } from "lucide-react";
 import { siteConfig } from "@/config/site";
 
 export default function ProductCollections() {
+  const navigate = useNavigate();
   const [collections, setCollections] = useState<ProductCollection[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [newCollection, setNewCollection] = useState<Partial<ProductCollection>>({
