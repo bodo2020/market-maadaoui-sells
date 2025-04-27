@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
@@ -16,7 +15,7 @@ import { fetchProducts } from "@/services/supabase/productService";
 import { Product } from "@/types";
 import { MultiSelect } from "@/components/ui/multi-select";
 import MainLayout from "@/components/layout/MainLayout";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Edit } from "lucide-react";
 import { siteConfig } from "@/config/site";
 
 export default function ProductCollections() {
@@ -104,7 +103,7 @@ export default function ProductCollections() {
     try {
       await deleteProductCollection(id);
       setCollections(collections.filter(c => c.id !== id));
-      toast.success("تم حذف المجموعة بنجاح");
+      toast.success("تم ��ذف المجموعة بنجاح");
     } catch (error) {
       console.error("Error deleting collection:", error);
       toast.error("حدث خطأ أثناء حذف المجموعة");
@@ -134,13 +133,22 @@ export default function ProductCollections() {
             <Card key={collection.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle>{collection.title}</CardTitle>
-                <Button 
-                  variant="destructive" 
-                  size="icon" 
-                  onClick={() => handleDeleteCollection(collection.id!)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => navigate(`/product-collections/edit/${collection.id}`)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="icon" 
+                    onClick={() => handleDeleteCollection(collection.id!)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">{collection.description || 'لا يوجد وصف'}</p>
