@@ -84,8 +84,18 @@ export function OrderDetailsDialog({
             quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
           }
           
-          // Calculate new quantity - deduct directly without conversion
-          const newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
+          // Convert weight-based product quantities from decimal to integer if needed
+          let newQuantity: number;
+          
+          // Check if the product is weight-based and its quantity in the database is stored as integer
+          if (item.is_weight_based || product.barcode_type === 'scale') {
+            // For weight-based products, ensure quantity is stored as an integer
+            const currentQuantity = Math.floor(product.quantity || 0);
+            newQuantity = Math.max(0, currentQuantity - Math.floor(quantityToDeduct));
+          } else {
+            // For regular products, just subtract directly
+            newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
+          }
           
           // Update the product quantity
           await updateProduct(product.id, {

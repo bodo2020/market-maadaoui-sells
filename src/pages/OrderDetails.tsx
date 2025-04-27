@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { Order } from "@/types";
 import MainLayout from "@/components/layout/MainLayout";
@@ -87,8 +86,17 @@ export default function OrderDetails() {
             quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
           }
           
-          // Deduct quantity directly without conversion
-          const newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
+          // Handle weight-based products by ensuring integer storage
+          let newQuantity: number;
+          
+          if (item.is_weight_based || product.barcode_type === 'scale') {
+            // For weight-based products, ensure we're working with integers
+            const currentQuantity = Math.floor(product.quantity || 0);
+            newQuantity = Math.max(0, currentQuantity - Math.floor(quantityToDeduct));
+          } else {
+            // For regular products
+            newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
+          }
           
           await updateProduct(product.id, {
             quantity: newQuantity

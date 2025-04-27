@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Check, Clock, Package, Truck } from "lucide-react";
-import { Order } from "@/types/index";
+import { Order } from "@/types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
@@ -84,7 +84,14 @@ export function UpdateOrderStatusDialog({
             quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
           }
           
-          const newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
+          let newQuantity: number;
+          
+          if (item.is_weight_based || product.barcode_type === 'scale') {
+            const currentQuantity = Math.floor(product.quantity || 0);
+            newQuantity = Math.max(0, currentQuantity - Math.floor(quantityToDeduct));
+          } else {
+            newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
+          }
           
           await updateProduct(product.id, {
             quantity: newQuantity
