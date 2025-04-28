@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ProfitData {
@@ -100,7 +101,7 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
     if (uniqueProductIds.length > 0) {
       const { data: products } = await supabase
         .from('products')
-        .select('id, purchase_price, bulk_price, bulk_quantity')
+        .select('id, purchase_price, bulk_price, bulk_quantity, unit_of_measure')
         .in('id', uniqueProductIds);
       
       const purchasePriceMap = new Map();
@@ -108,7 +109,8 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
         purchasePriceMap.set(product.id, {
           purchase_price: product.purchase_price || 0,
           bulk_price: product.bulk_price,
-          bulk_quantity: product.bulk_quantity
+          bulk_quantity: product.bulk_quantity,
+          unit_of_measure: product.unit_of_measure
         });
       });
 
@@ -133,14 +135,20 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
             if (!productInfo) return;
 
             const sellingPrice = parseFloat(item.price) || 0;
-            const quantity = parseInt(item.quantity) || 0;
+            const quantity = parseFloat(item.quantity) || 0;
 
-            if (item.is_bulk && productInfo.bulk_quantity && productInfo.bulk_price) {
-              const pricePerUnit = productInfo.bulk_price / productInfo.bulk_quantity;
-              const profitPerUnit = (pricePerUnit - productInfo.purchase_price);
-              const totalProfit = profitPerUnit * productInfo.bulk_quantity;
-              onlineProfits += totalProfit * quantity;
-            } else {
+            // Handle weight-based products
+            if (productInfo.unit_of_measure === 'weight') {
+              const profit = (sellingPrice - productInfo.purchase_price) * quantity;
+              onlineProfits += profit;
+            }
+            // Handle bulk products
+            else if (item.is_bulk && productInfo.bulk_quantity && productInfo.bulk_price) {
+              const profitPerBulk = (productInfo.bulk_price / productInfo.bulk_quantity - productInfo.purchase_price) * productInfo.bulk_quantity;
+              onlineProfits += profitPerBulk * quantity;
+            } 
+            // Handle regular products
+            else {
               const profit = (sellingPrice - productInfo.purchase_price) * quantity;
               onlineProfits += profit;
             }
