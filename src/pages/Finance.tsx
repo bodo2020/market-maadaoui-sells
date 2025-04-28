@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
@@ -8,6 +9,8 @@ import {
   ArrowDownLeft, 
   TrendingUp,
   DollarSign,
+  Store,
+  ShoppingCart,
   Calendar as CalendarIcon
 } from "lucide-react";
 import { fetchFinancialSummary, fetchProfitsSummary } from "@/services/supabase/financeService";
@@ -181,41 +184,39 @@ export default function Finance() {
             )}
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">صافي الربح</CardTitle>
+            <CardTitle className="text-sm font-medium">أرباح المحل</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoadingSummary ? (
+            {isLoadingProfits ? (
               <div className="text-2xl font-bold animate-pulse">تحميل...</div>
             ) : (
               <>
-                <div className="text-2xl font-bold">{formatCurrency(summaryData?.netProfit || 0)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(profitsData?.storeProfits || 0)}</div>
                 <div className="flex items-center text-xs text-green-500 mt-1">
-                  <TrendingUp className="h-3 w-3 ml-1" />
-                  <span>بنسبة {(summaryData?.profitMargin || 0).toFixed(1)}%</span>
+                  <Store className="h-3 w-3 ml-1" />
+                  <span>أرباح المبيعات المباشرة</span>
                 </div>
               </>
             )}
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">صافي الربح بعد المصروفات</CardTitle>
+            <CardTitle className="text-sm font-medium">أرباح الأونلاين</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoadingProfits || isLoadingSummary ? (
+            {isLoadingProfits ? (
               <div className="text-2xl font-bold animate-pulse">تحميل...</div>
             ) : (
               <>
-                <div className="text-2xl font-bold">
-                  {formatCurrency((summaryData?.netProfit || 0) - (summaryData?.totalExpenses || 0))}
-                </div>
-                <div className="flex items-center text-xs text-muted-foreground mt-1">
-                  <DollarSign className="h-3 w-3 ml-1" />
-                  <span>الربح النهائي</span>
+                <div className="text-2xl font-bold">{formatCurrency(profitsData?.onlineProfits || 0)}</div>
+                <div className="flex items-center text-xs text-green-500 mt-1">
+                  <ShoppingCart className="h-3 w-3 ml-1" />
+                  <span>أرباح المبيعات الإلكترونية</span>
                 </div>
               </>
             )}
