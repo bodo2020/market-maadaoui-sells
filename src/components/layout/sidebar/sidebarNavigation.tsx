@@ -11,6 +11,7 @@ export const mainNavigation: SidebarGroupData = {
     { icon: ShoppingCart, label: "نقطة البيع", href: "/pos" },
     { icon: FolderOpen, label: "الاقسام", href: "/categories" },
     { icon: TrendingUp, label: "لوحة المبيعات والخزينة", href: "/sales-dashboard" },
+    { icon: BarChart4, label: "الإدارة المالية", href: "/finance" },
     { icon: Coins, label: "متابعة النقدية", href: "/cash-tracking" }
   ]
 };
