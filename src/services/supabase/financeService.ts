@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ProfitData {
@@ -174,16 +173,89 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
   }
 };
 
-// Now adding the other missing functions that are imported in Finance.tsx and Reports.tsx
 export const fetchFinancialSummary = async (period: string, startDate?: Date, endDate?: Date) => {
-  // Mock implementation for now
-  return {
-    totalRevenue: 5000,
-    totalExpenses: 2000,
-    netProfit: 3000,
-    profitMargin: 60,
-    cashBalance: 10000
-  };
+  try {
+    let queryStartDate;
+    const now = new Date();
+    
+    if (period === "custom" && startDate && endDate) {
+      queryStartDate = startDate;
+    } else {
+      switch (period) {
+        case "day":
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case "week":
+          const day = now.getDay();
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+          break;
+        case "month":
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case "quarter":
+          const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+          queryStartDate = new Date(now.getFullYear(), quarterMonth, 1);
+          break;
+        case "year":
+          queryStartDate = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+    }
+    
+    // Get profits data
+    const profitsData = await fetchProfitsSummary(period, startDate, endDate);
+    
+    // Get expenses data
+    const { data: expensesData, error: expensesError } = await supabase
+      .from('expenses')
+      .select('amount')
+      .gte('date', queryStartDate.toISOString());
+      
+    if (expensesError) throw expensesError;
+    
+    // Calculate total expenses
+    const totalExpenses = expensesData.reduce((sum, expense) => sum + expense.amount, 0);
+    
+    // Get cash tracking data for both registers
+    const { data: cashData, error: cashError } = await supabase
+      .from('cash_tracking')
+      .select('closing_balance, register_type')
+      .order('created_at', { ascending: false })
+      .limit(2);
+      
+    if (cashError) throw cashError;
+    
+    // Calculate total cash balance from both registers
+    const storeCash = cashData?.find(c => c.register_type === 'store')?.closing_balance || 0;
+    const onlineCash = cashData?.find(c => c.register_type === 'online')?.closing_balance || 0;
+    const totalCashBalance = storeCash + onlineCash;
+    
+    // Calculate total revenue and profit
+    const totalRevenue = profitsData.storeSales + profitsData.onlineSales;
+    const totalProfit = profitsData.storeProfits + profitsData.onlineProfits;
+    
+    // Calculate profit margin
+    const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+    
+    return {
+      totalRevenue,
+      totalExpenses,
+      netProfit: totalProfit,
+      profitMargin,
+      cashBalance: totalCashBalance
+    };
+  } catch (error) {
+    console.error('Error fetching financial summary:', error);
+    return {
+      totalRevenue: 0,
+      totalExpenses: 0,
+      netProfit: 0,
+      profitMargin: 0,
+      cashBalance: 0
+    };
+  }
 };
 
 export const fetchMonthlyRevenue = async (period: string, startDate?: Date, endDate?: Date) => {
