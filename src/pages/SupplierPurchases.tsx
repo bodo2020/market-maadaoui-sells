@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -74,7 +73,7 @@ export default function SupplierPurchases() {
   
   useEffect(() => {
     if (searchTerm.trim() === "") {
-      setFilteredProducts([]);
+      setFilteredProducts(products.slice(0, 10)); // Show first 10 products by default
       return;
     }
     
@@ -92,7 +91,6 @@ export default function SupplierPurchases() {
     setSubtotal(total);
   }, [cart]);
 
-  // Focus on barcode input when scanner mode is active
   useEffect(() => {
     if (scannerMode && barcodeInputRef.current) {
       barcodeInputRef.current.focus();
@@ -131,7 +129,6 @@ export default function SupplierPurchases() {
     setBarcodeInput("");
     setFilteredProducts([]);
     
-    // Refocus barcode input if in scanner mode
     if (scannerMode && barcodeInputRef.current) {
       barcodeInputRef.current.focus();
     }
@@ -249,7 +246,6 @@ export default function SupplierPurchases() {
     setScannerMode(prev => !prev);
     setBarcodeInput("");
     
-    // Focus on input if turning on scanner mode
     if (!scannerMode && barcodeInputRef.current) {
       setTimeout(() => {
         barcodeInputRef.current?.focus();
@@ -351,48 +347,55 @@ export default function SupplierPurchases() {
                     </p>
                   </form>
                 ) : (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="ابحث باسم المنتج أو الباركود"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <Button variant="outline">
-                      <Search className="ml-2 h-4 w-4" />
-                      بحث
-                    </Button>
-                  </div>
-                )}
-                
-                {filteredProducts.length > 0 && (
-                  <div className="mt-4 border rounded-md overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>المنتج</TableHead>
-                          <TableHead>السعر</TableHead>
-                          <TableHead>الإجراء</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredProducts.map((product) => (
-                          <TableRow key={product.id}>
-                            <TableCell>{product.name}</TableCell>
-                            <TableCell>{product.purchase_price}</TableCell>
-                            <TableCell>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => addProductToCart(product)}
-                              >
-                                <Plus className="h-4 w-4 ml-1" />
-                                إضافة
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                  <div className="space-y-4">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="ابحث باسم المنتج أو الباركود"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                      <Button variant="outline">
+                        <Search className="ml-2 h-4 w-4" />
+                        بحث
+                      </Button>
+                    </div>
+                    
+                    {filteredProducts.length > 0 && (
+                      <div className="mt-4 border rounded-md overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>المنتج</TableHead>
+                              <TableHead>الباركود</TableHead>
+                              <TableHead>الكمية الحالية</TableHead>
+                              <TableHead>سعر الشراء</TableHead>
+                              <TableHead>الإجراء</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredProducts.map((product) => (
+                              <TableRow key={product.id}>
+                                <TableCell>{product.name}</TableCell>
+                                <TableCell>{product.barcode || "—"}</TableCell>
+                                <TableCell>{product.quantity || 0}</TableCell>
+                                <TableCell>{product.purchase_price}</TableCell>
+                                <TableCell>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    onClick={() => addProductToCart(product)}
+                                    className="text-primary hover:text-primary/80"
+                                  >
+                                    <Plus className="h-4 w-4 ml-1" />
+                                    إضافة
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>

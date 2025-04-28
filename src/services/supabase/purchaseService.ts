@@ -35,7 +35,7 @@ export async function createPurchase(purchaseData: any) {
       purchaseData.invoice_number = `P-${year}${month}${day}-${randomPart}`;
     }
 
-    // First, deduct the paid amount from the store cash register
+    // First, check if there's enough cash in the store register
     if (purchaseData.paid > 0) {
       const { data: deductionResult, error: deductionError } = await supabase.functions.invoke(
         'add-cash-transaction',
@@ -44,14 +44,14 @@ export async function createPurchase(purchaseData: any) {
             amount: purchaseData.paid,
             transaction_type: 'withdrawal',
             register_type: 'store',
-            notes: `دفع مستحقات المورد - فاتورة رقم: ${purchaseData.invoice_number}`
+            notes: `دفع مستحقات المورد ${purchaseData.supplier_name || ''} - فاتورة رقم: ${purchaseData.invoice_number}`
           }
         }
       );
 
       if (deductionError) {
         console.error("Error deducting from cash register:", deductionError);
-        toast.error("فشل في خصم المبلغ من الخزنة");
+        toast.error("فشل في خصم المبلغ من الخزنة - تأكد من وجود رصيد كافي");
         return null;
       }
     }
