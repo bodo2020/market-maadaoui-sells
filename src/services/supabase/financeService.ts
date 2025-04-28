@@ -107,13 +107,17 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       // Fetch all purchase prices in a single query
       const { data: products } = await supabase
         .from('products')
-        .select('id, purchase_price')
+        .select('id, purchase_price, bulk_price, bulk_quantity')
         .in('id', uniqueProductIds);
       
       // Create a lookup map for easier access
       const purchasePriceMap = new Map();
       products?.forEach(product => {
-        purchasePriceMap.set(product.id, product.purchase_price || 0);
+        purchasePriceMap.set(product.id, {
+          purchase_price: product.purchase_price || 0,
+          bulk_price: product.bulk_price,
+          bulk_quantity: product.bulk_quantity
+        });
       });
 
       // Now process the orders with the purchase price data
@@ -136,18 +140,23 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
         // Calculate profits for each item in the order
         if (Array.isArray(items)) {
           items.forEach((item: any) => {
+            const productInfo = purchasePriceMap.get(item.product_id);
+            if (!productInfo) return;
+
             const sellingPrice = parseFloat(item.price) || 0;
-            const purchasePrice = purchasePriceMap.get(item.product_id) || 0;
             const quantity = parseInt(item.quantity) || 0;
 
             // Calculate profit based on bulk or regular pricing
-            if (item.is_bulk && item.bulk_quantity) {
-              // For bulk items, calculate profit
-              const profit = (sellingPrice - purchasePrice) * quantity;
-              onlineProfits += profit;
+            if (item.is_bulk && productInfo.bulk_quantity && productInfo.bulk_price) {
+              // Calculate bulk profit using the new formula:
+              // (bulk_price ÷ bulk_quantity - purchase_price) × bulk_quantity
+              const pricePerUnit = productInfo.bulk_price / productInfo.bulk_quantity;
+              const profitPerBulkUnit = (pricePerUnit - productInfo.purchase_price) * productInfo.bulk_quantity;
+              const numberOfBulkUnits = quantity / productInfo.bulk_quantity;
+              onlineProfits += profitPerBulkUnit * numberOfBulkUnits;
             } else {
               // For regular items
-              const profit = (sellingPrice - purchasePrice) * quantity;
+              const profit = (sellingPrice - productInfo.purchase_price) * quantity;
               onlineProfits += profit;
             }
           });
