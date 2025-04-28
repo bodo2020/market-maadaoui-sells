@@ -169,9 +169,7 @@ export default function Finance() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي الإيرادات</CardTitle>
-          </CardHeader>
+          
           <CardContent>
             {isLoadingSummary ? <div className="text-2xl font-bold animate-pulse">تحميل...</div> : <>
                 <div className="text-2xl font-bold">{formatCurrency(summaryData?.totalRevenue || 0)}</div>
