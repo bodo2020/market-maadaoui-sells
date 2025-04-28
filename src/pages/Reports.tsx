@@ -599,7 +599,7 @@ export default function Reports() {
             <CardHeader>
               <CardTitle>تقرير أداء الكاشير</CardTitle>
               <CardDescription>
-                مقارنة أداء الكاشير حسب المبيعات والأرباح
+                أداء الكاشير اليومي حسب المبيعات والأرباح
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -612,74 +612,82 @@ export default function Reports() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <Card>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">أفضل كاشير مبيعاً</CardTitle>
+                        <CardTitle className="text-sm font-medium">أفضل كاشير مبيعاً اليوم</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-xl font-bold">
-                          {cashierPerformance[0].name}
-                        </div>
-                        <div className="text-muted-foreground text-sm mt-1">
-                          {formatCurrency(cashierPerformance[0].totalSales)} ({cashierPerformance[0].salesCount} فاتورة)
-                        </div>
+                        {cashierPerformance.filter(c => c.date === new Date().toLocaleDateString('ar-EG')).length > 0 ? (
+                          <>
+                            <div className="text-xl font-bold">
+                              {cashierPerformance
+                                .filter(c => c.date === new Date().toLocaleDateString('ar-EG'))
+                                .sort((a, b) => b.totalSales - a.totalSales)[0]?.name}
+                            </div>
+                            <div className="text-muted-foreground text-sm mt-1">
+                              {formatCurrency(cashierPerformance
+                                .filter(c => c.date === new Date().toLocaleDateString('ar-EG'))
+                                .sort((a, b) => b.totalSales - a.totalSales)[0]?.totalSales || 0)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-muted-foreground">لا توجد مبيعات اليوم</div>
+                        )}
                       </CardContent>
                     </Card>
                     
                     <Card>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">أعلى متوسط فاتورة</CardTitle>
+                        <CardTitle className="text-sm font-medium">أعلى متوسط فاتورة اليوم</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-xl font-bold">
-                          {[...cashierPerformance]
-                            .filter(c => c.salesCount > 0)
-                            .sort((a, b) => b.averageSale - a.averageSale)[0]?.name || '-'}
-                        </div>
-                        <div className="text-muted-foreground text-sm mt-1">
-                          {formatCurrency([...cashierPerformance]
-                            .filter(c => c.salesCount > 0)
-                            .sort((a, b) => b.averageSale - a.averageSale)[0]?.averageSale || 0)} / فاتورة
-                        </div>
+                        {cashierPerformance.filter(c => c.date === new Date().toLocaleDateString('ar-EG')).length > 0 ? (
+                          <>
+                            <div className="text-xl font-bold">
+                              {cashierPerformance
+                                .filter(c => c.date === new Date().toLocaleDateString('ar-EG'))
+                                .sort((a, b) => b.averageSale - a.averageSale)[0]?.name}
+                            </div>
+                            <div className="text-muted-foreground text-sm mt-1">
+                              {formatCurrency(cashierPerformance
+                                .filter(c => c.date === new Date().toLocaleDateString('ar-EG'))
+                                .sort((a, b) => b.averageSale - a.averageSale)[0]?.averageSale || 0)} / فاتورة
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-muted-foreground">لا توجد مبيعات اليوم</div>
+                        )}
                       </CardContent>
                     </Card>
                     
                     <Card>
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">أعلى ربحية</CardTitle>
+                        <CardTitle className="text-sm font-medium">أعلى ربحية اليوم</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-xl font-bold">
-                          {[...cashierPerformance]
-                            .sort((a, b) => b.totalProfit - a.totalProfit)[0]?.name || '-'}
-                        </div>
-                        <div className="text-muted-foreground text-sm mt-1">
-                          {formatCurrency([...cashierPerformance]
-                            .sort((a, b) => b.totalProfit - a.totalProfit)[0]?.totalProfit || 0)}
-                        </div>
+                        {cashierPerformance.filter(c => c.date === new Date().toLocaleDateString('ar-EG')).length > 0 ? (
+                          <>
+                            <div className="text-xl font-bold">
+                              {cashierPerformance
+                                .filter(c => c.date === new Date().toLocaleDateString('ar-EG'))
+                                .sort((a, b) => b.totalProfit - a.totalProfit)[0]?.name}
+                            </div>
+                            <div className="text-muted-foreground text-sm mt-1">
+                              {formatCurrency(cashierPerformance
+                                .filter(c => c.date === new Date().toLocaleDateString('ar-EG'))
+                                .sort((a, b) => b.totalProfit - a.totalProfit)[0]?.totalProfit || 0)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-muted-foreground">لا توجد مبيعات اليوم</div>
+                        )}
                       </CardContent>
                     </Card>
-                  </div>
-
-                  <div className="mb-6">
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={cashierPerformance} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <RechartsTooltip 
-                            formatter={(value: number) => formatCurrency(value)} 
-                          />
-                          <Bar dataKey="totalSales" name="المبيعات" fill="#4338ca" />
-                          <Bar dataKey="totalProfit" name="الأرباح" fill="#10b981" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
                   </div>
 
                   <div className="rounded-md border">
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead>التاريخ</TableHead>
                           <TableHead>اسم الكاشير</TableHead>
                           <TableHead>عدد المبيعات</TableHead>
                           <TableHead>إجمالي المبيعات</TableHead>
@@ -689,14 +697,18 @@ export default function Reports() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {cashierPerformance.map(cashier => {
-                          const totalSalesAll = cashierPerformance.reduce((sum, c) => sum + c.totalSales, 0);
-                          const salesPercentage = totalSalesAll > 0 
-                            ? (cashier.totalSales / totalSalesAll) * 100 
+                        {cashierPerformance.map((cashier, index) => {
+                          const dailyTotal = cashierPerformance
+                            .filter(c => c.date === cashier.date)
+                            .reduce((sum, c) => sum + c.totalSales, 0);
+                          
+                          const salesPercentage = dailyTotal > 0 
+                            ? (cashier.totalSales / dailyTotal) * 100 
                             : 0;
                             
                           return (
-                            <TableRow key={cashier.id}>
+                            <TableRow key={`${cashier.id}-${cashier.date}-${index}`}>
+                              <TableCell>{cashier.date}</TableCell>
                               <TableCell className="font-medium">{cashier.name}</TableCell>
                               <TableCell>{cashier.salesCount} فاتورة</TableCell>
                               <TableCell>{formatCurrency(cashier.totalSales)}</TableCell>

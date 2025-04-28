@@ -43,7 +43,7 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
           queryStartDate = new Date(now.getFullYear(), 0, 1);
           break;
         default:
-          queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       }
     }
     
@@ -414,7 +414,7 @@ export const fetchCashierPerformance = async (period: string, startDate?: Date, 
           queryStartDate = new Date(now.getFullYear(), 0, 1);
           break;
         default:
-          queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       }
     }
     
@@ -424,6 +424,7 @@ export const fetchCashierPerformance = async (period: string, startDate?: Date, 
         cashier_id,
         total,
         profit,
+        date,
         users!inner (
           name
         )
@@ -438,14 +439,18 @@ export const fetchCashierPerformance = async (period: string, startDate?: Date, 
     
     if (salesError) throw salesError;
     
-    const cashierStats = new Map();
+    const dailySales = new Map();
     
     salesData?.forEach(sale => {
       if (!sale.cashier_id) return;
       
-      const currentStats = cashierStats.get(sale.cashier_id) || {
+      const dateKey = new Date(sale.date).toLocaleDateString('ar-EG');
+      const cashierKey = `${sale.cashier_id}-${dateKey}`;
+      
+      const currentStats = dailySales.get(cashierKey) || {
         id: sale.cashier_id,
         name: sale.users.name,
+        date: dateKey,
         totalSales: 0,
         salesCount: 0,
         averageSale: 0,
@@ -457,11 +462,15 @@ export const fetchCashierPerformance = async (period: string, startDate?: Date, 
       currentStats.totalProfit += sale.profit;
       currentStats.averageSale = currentStats.totalSales / currentStats.salesCount;
       
-      cashierStats.set(sale.cashier_id, currentStats);
+      dailySales.set(cashierKey, currentStats);
     });
     
-    return Array.from(cashierStats.values())
-      .sort((a, b) => b.totalSales - a.totalSales);
+    return Array.from(dailySales.values())
+      .sort((a, b) => {
+        const dateComparison = new Date(b.date).getTime() - new Date(a.date).getTime();
+        if (dateComparison !== 0) return dateComparison;
+        return b.totalSales - a.totalSales;
+      });
   } catch (error) {
     console.error('Error fetching cashier performance:', error);
     return [];
