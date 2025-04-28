@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
@@ -149,7 +148,7 @@ export default function Finance() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي الإيرادات</CardTitle>
+            <CardTitle className="text-sm font-medium">إجمال�� الإيرادات</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingSummary ? (
@@ -217,6 +216,54 @@ export default function Finance() {
                 <div className="flex items-center text-xs text-green-500 mt-1">
                   <ShoppingCart className="h-3 w-3 ml-1" />
                   <span>أرباح المبيعات الإلكترونية</span>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">إجمالي الأرباح</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingProfits ? (
+              <div className="text-2xl font-bold animate-pulse">تحميل...</div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {formatCurrency((profitsData?.storeProfits || 0) + (profitsData?.onlineProfits || 0))}
+                </div>
+                <div className="flex items-center text-xs text-green-500 mt-1">
+                  <TrendingUp className="h-3 w-3 ml-1" />
+                  <span>إجمالي الأرباح قبل خصم المصروفات</span>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">صافي الربح بعد المصروفات</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingProfits || isLoadingSummary ? (
+              <div className="text-2xl font-bold animate-pulse">تحميل...</div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {formatCurrency(
+                    (profitsData?.storeProfits || 0) + 
+                    (profitsData?.onlineProfits || 0) - 
+                    (summaryData?.totalExpenses || 0)
+                  )}
+                </div>
+                <div className="flex items-center text-xs text-green-500 mt-1">
+                  <DollarSign className="h-3 w-3 ml-1" />
+                  <span>صافي الربح بعد خصم المصروفات</span>
                 </div>
               </>
             )}
