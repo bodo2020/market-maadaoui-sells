@@ -148,10 +148,11 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
 
             // Calculate profit based on bulk or regular pricing
             if (item.is_bulk && productInfo.bulk_quantity && productInfo.bulk_price) {
-              // Calculate bulk profit using the new formula:
-              // (bulk_price ÷ bulk_quantity - purchase_price) × bulk_quantity
+              // Calculate bulk profit using the corrected formula:
+              // ((bulk_price ÷ bulk_quantity) - purchase_price) × bulk_quantity × number_of_bulk_units
               const pricePerUnit = productInfo.bulk_price / productInfo.bulk_quantity;
-              const profitPerBulkUnit = (pricePerUnit - productInfo.purchase_price) * productInfo.bulk_quantity;
+              const profitPerUnit = (pricePerUnit - productInfo.purchase_price);
+              const profitPerBulkUnit = profitPerUnit * productInfo.bulk_quantity;
               const numberOfBulkUnits = quantity / productInfo.bulk_quantity;
               onlineProfits += profitPerBulkUnit * numberOfBulkUnits;
             } else {
