@@ -1,4 +1,4 @@
-
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -7,7 +7,8 @@ import {
   ArrowUpRight, 
   ArrowDownLeft, 
   TrendingUp,
-  DollarSign
+  DollarSign,
+  Calendar as CalendarIcon
 } from "lucide-react";
 import { fetchFinancialSummary, fetchProfitsSummary } from "@/services/supabase/financeService";
 import { Button } from "@/components/ui/button";
