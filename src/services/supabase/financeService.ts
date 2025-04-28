@@ -14,6 +14,7 @@ export interface CashierPerformance {
   salesCount: number;
   averageSale: number;
   totalProfit: number;
+  date: string;
 }
 
 export const fetchProfitsSummary = async (period: string, startDate?: Date, endDate?: Date): Promise<ProfitData> => {
@@ -136,17 +137,14 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
             const sellingPrice = parseFloat(item.price) || 0;
             const quantity = parseFloat(item.quantity) || 0;
 
-            // Handle weight-based products
             if (productInfo.unit_of_measure === 'weight') {
               const profit = (sellingPrice - productInfo.purchase_price) * quantity;
               onlineProfits += profit;
             }
-            // Handle bulk products
             else if (item.is_bulk && productInfo.bulk_quantity && productInfo.bulk_price) {
               const profitPerBulk = (productInfo.bulk_price / productInfo.bulk_quantity - productInfo.purchase_price) * productInfo.bulk_quantity;
               onlineProfits += profitPerBulk * quantity;
             } 
-            // Handle regular products
             else {
               const profit = (sellingPrice - productInfo.purchase_price) * quantity;
               onlineProfits += profit;
