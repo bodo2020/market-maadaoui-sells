@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ProfitData {
@@ -254,19 +253,219 @@ export const fetchFinancialSummary = async (period: string, startDate?: Date, en
 };
 
 export const fetchMonthlyRevenue = async (period: string, startDate?: Date, endDate?: Date) => {
-  return [
-    { name: 'Jan', amount: 1200 },
-    { name: 'Feb', amount: 1500 },
-    { name: 'Mar', amount: 1800 }
-  ];
+  try {
+    let queryStartDate;
+    const now = new Date();
+    
+    if (period === "custom" && startDate && endDate) {
+      queryStartDate = startDate;
+    } else {
+      switch (period) {
+        case "day":
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case "week":
+          const day = now.getDay();
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+          break;
+        case "month":
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case "quarter":
+          const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+          queryStartDate = new Date(now.getFullYear(), quarterMonth, 1);
+          break;
+        case "year":
+          queryStartDate = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+    }
+    
+    let query = supabase
+      .from('sales')
+      .select('date, total')
+      .gte('date', queryStartDate.toISOString());
+    
+    if (period === "custom" && endDate) {
+      query = query.lte('date', endDate.toISOString());
+    }
+    
+    const { data: salesData, error: salesError } = await query;
+    
+    if (salesError) throw salesError;
+    
+    const monthlyRevenue = new Map();
+    
+    salesData?.forEach(sale => {
+      const date = new Date(sale.date);
+      const monthKey = date.toLocaleString('ar-EG', { month: 'short' });
+      const currentAmount = monthlyRevenue.get(monthKey) || 0;
+      monthlyRevenue.set(monthKey, currentAmount + sale.total);
+    });
+    
+    return Array.from(monthlyRevenue.entries()).map(([name, amount]) => ({
+      name,
+      amount
+    }));
+  } catch (error) {
+    console.error('Error fetching monthly revenue:', error);
+    return [];
+  }
 };
 
 export const fetchExpensesByCategory = async (period: string, startDate?: Date, endDate?: Date) => {
-  return [
-    { name: 'Rent', value: 2500, color: '#FF6B6B' },
-    { name: 'Utilities', value: 800, color: '#4ECDC4' },
-    { name: 'Payroll', value: 5000, color: '#FFD166' }
-  ];
+  try {
+    let queryStartDate;
+    const now = new Date();
+    
+    if (period === "custom" && startDate && endDate) {
+      queryStartDate = startDate;
+    } else {
+      switch (period) {
+        case "day":
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case "week":
+          const day = now.getDay();
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+          break;
+        case "month":
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case "quarter":
+          const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+          queryStartDate = new Date(now.getFullYear(), quarterMonth, 1);
+          break;
+        case "year":
+          queryStartDate = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+    }
+    
+    let query = supabase
+      .from('expenses')
+      .select('type, amount')
+      .gte('date', queryStartDate.toISOString());
+    
+    if (period === "custom" && endDate) {
+      query = query.lte('date', endDate.toISOString());
+    }
+    
+    const { data: expensesData, error: expensesError } = await query;
+    
+    if (expensesError) throw expensesError;
+    
+    const expensesByType = new Map();
+    const colors = ['#FF6B6B', '#4ECDC4', '#FFD166', '#45B7D1', '#96CEB4', '#FFEEAD'];
+    let colorIndex = 0;
+    
+    expensesData?.forEach(expense => {
+      const currentAmount = expensesByType.get(expense.type)?.value || 0;
+      if (!expensesByType.has(expense.type)) {
+        expensesByType.set(expense.type, {
+          value: currentAmount + expense.amount,
+          color: colors[colorIndex % colors.length]
+        });
+        colorIndex++;
+      } else {
+        expensesByType.get(expense.type).value += expense.amount;
+      }
+    });
+    
+    return Array.from(expensesByType.entries()).map(([name, data]) => ({
+      name,
+      value: data.value,
+      color: data.color
+    }));
+  } catch (error) {
+    console.error('Error fetching expenses by category:', error);
+    return [];
+  }
+};
+
+export const fetchCashierPerformance = async (period: string, startDate?: Date, endDate?: Date): Promise<CashierPerformance[]> => {
+  try {
+    let queryStartDate;
+    const now = new Date();
+    
+    if (period === "custom" && startDate && endDate) {
+      queryStartDate = startDate;
+    } else {
+      switch (period) {
+        case "day":
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case "week":
+          const day = now.getDay();
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+          break;
+        case "month":
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case "quarter":
+          const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+          queryStartDate = new Date(now.getFullYear(), quarterMonth, 1);
+          break;
+        case "year":
+          queryStartDate = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          queryStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+    }
+    
+    let query = supabase
+      .from('sales')
+      .select(`
+        cashier_id,
+        total,
+        profit,
+        users!inner (
+          name
+        )
+      `)
+      .gte('date', queryStartDate.toISOString());
+    
+    if (period === "custom" && endDate) {
+      query = query.lte('date', endDate.toISOString());
+    }
+    
+    const { data: salesData, error: salesError } = await query;
+    
+    if (salesError) throw salesError;
+    
+    const cashierStats = new Map();
+    
+    salesData?.forEach(sale => {
+      if (!sale.cashier_id) return;
+      
+      const currentStats = cashierStats.get(sale.cashier_id) || {
+        id: sale.cashier_id,
+        name: sale.users.name,
+        totalSales: 0,
+        salesCount: 0,
+        averageSale: 0,
+        totalProfit: 0
+      };
+      
+      currentStats.totalSales += sale.total;
+      currentStats.salesCount += 1;
+      currentStats.totalProfit += sale.profit;
+      currentStats.averageSale = currentStats.totalSales / currentStats.salesCount;
+      
+      cashierStats.set(sale.cashier_id, currentStats);
+    });
+    
+    return Array.from(cashierStats.values())
+      .sort((a, b) => b.totalSales - a.totalSales);
+  } catch (error) {
+    console.error('Error fetching cashier performance:', error);
+    return [];
+  }
 };
 
 export const fetchRecentTransactions = async (limit: number, period?: string, startDate?: Date, endDate?: Date) => {
@@ -280,13 +479,6 @@ export const fetchAllTransactions = async () => {
   return [
     { id: '1', type: 'income', description: 'Sales Revenue', amount: 1200, date: new Date().toISOString() },
     { id: '2', type: 'expense', description: 'Rent Payment', amount: 800, date: new Date().toISOString() }
-  ];
-};
-
-export const fetchCashierPerformance = async (period: string, startDate?: Date, endDate?: Date): Promise<CashierPerformance[]> => {
-  return [
-    { id: '1', name: 'Ahmed', totalSales: 5000, salesCount: 20, averageSale: 250, totalProfit: 1500 },
-    { id: '2', name: 'Sara', totalSales: 4500, salesCount: 18, averageSale: 250, totalProfit: 1350 }
   ];
 };
 
