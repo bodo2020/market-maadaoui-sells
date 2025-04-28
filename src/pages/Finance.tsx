@@ -167,65 +167,7 @@ export default function Finance() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card>
-          
-          <CardContent>
-            {isLoadingSummary ? <div className="text-2xl font-bold animate-pulse">تحميل...</div> : <>
-                <div className="text-2xl font-bold">{formatCurrency(summaryData?.totalRevenue || 0)}</div>
-                <div className="flex items-center text-xs text-green-500 mt-1">
-                  <ArrowUpRight className="h-3 w-3 ml-1" />
-                  <span>من المبيعات</span>
-                </div>
-              </>}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي المصروفات</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingSummary ? <div className="text-2xl font-bold animate-pulse">تحميل...</div> : <>
-                <div className="text-2xl font-bold">{formatCurrency(summaryData?.totalExpenses || 0)}</div>
-                <div className="flex items-center text-xs text-red-500 mt-1">
-                  <ArrowDownLeft className="h-3 w-3 ml-1" />
-                  <span>من المصروفات</span>
-                </div>
-              </>}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">صافي الربح</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingSummary ? <div className="text-2xl font-bold animate-pulse">تحميل...</div> : <>
-                <div className="text-2xl font-bold">{formatCurrency(summaryData?.netProfit || 0)}</div>
-                <div className="flex items-center text-xs text-green-500 mt-1">
-                  <TrendingUp className="h-3 w-3 ml-1" />
-                  <span>بنسبة {(summaryData?.profitMargin || 0).toFixed(1)}%</span>
-                </div>
-              </>}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">رصيد الصندوق</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoadingSummary ? <div className="text-2xl font-bold animate-pulse">تحميل...</div> : <>
-                <div className="text-2xl font-bold">{formatCurrency(summaryData?.cashBalance || 0)}</div>
-                <div className="flex items-center text-xs text-muted-foreground mt-1">
-                  <CreditCard className="h-3 w-3 ml-1" />
-                  <span>محدث {format(new Date(), "yyyy/MM/dd")}</span>
-                </div>
-              </>}
-          </CardContent>
-        </Card>
-      </div>
+      
       
       <Tabs value={reportType} onValueChange={value => setReportType(value as any)} className="space-y-4">
         <TabsList className="grid grid-cols-5 w-fit mb-4">
