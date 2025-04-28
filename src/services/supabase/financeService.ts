@@ -47,13 +47,11 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       }
     }
     
-    // Get sales data for both store and online
     let salesQuery = supabase
       .from('sales')
       .select('total, profit, items')
       .gte('date', queryStartDate.toISOString());
 
-    // Fixed the online orders query - removing the nested items selection that was causing the error
     let onlineQuery = supabase
       .from('online_orders')
       .select('total, items, status, shipping_cost')
@@ -73,7 +71,6 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
     if (salesData.error) throw salesData.error;
     if (onlineData.error) throw onlineData.error;
 
-    // Process store sales data
     let storeSales = 0;
     let storeProfits = 0;
 
@@ -82,11 +79,9 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       storeProfits += sale.profit;
     });
 
-    // Process online orders data
     let onlineSales = 0;
     let onlineProfits = 0;
 
-    // Extract product IDs from the orders' items
     const productIds = onlineData.data?.flatMap(order => {
       if (typeof order.items === 'string') {
         try {
@@ -100,17 +95,14 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       return [];
     }) || [];
     
-    // Get unique product ids
     const uniqueProductIds = [...new Set(productIds)].filter(Boolean);
     
     if (uniqueProductIds.length > 0) {
-      // Fetch all purchase prices in a single query
       const { data: products } = await supabase
         .from('products')
         .select('id, purchase_price, bulk_price, bulk_quantity')
         .in('id', uniqueProductIds);
       
-      // Create a lookup map for easier access
       const purchasePriceMap = new Map();
       products?.forEach(product => {
         purchasePriceMap.set(product.id, {
@@ -120,12 +112,10 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
         });
       });
 
-      // Now process the orders with the purchase price data
       onlineData.data?.forEach(order => {
         const orderTotalWithoutShipping = order.total - (order.shipping_cost || 0);
         onlineSales += orderTotalWithoutShipping;
         
-        // Parse items if they are stored as a JSON string
         let items;
         if (typeof order.items === 'string') {
           try {
@@ -137,7 +127,6 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
           items = order.items;
         }
         
-        // Calculate profits for each item in the order
         if (Array.isArray(items)) {
           items.forEach((item: any) => {
             const productInfo = purchasePriceMap.get(item.product_id);
@@ -146,17 +135,12 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
             const sellingPrice = parseFloat(item.price) || 0;
             const quantity = parseInt(item.quantity) || 0;
 
-            // Calculate profit based on bulk or regular pricing
             if (item.is_bulk && productInfo.bulk_quantity && productInfo.bulk_price) {
-              // Calculate bulk profit using the corrected formula:
-              // ((bulk_price ÷ bulk_quantity) - purchase_price) × bulk_quantity × number_of_bulk_units
               const pricePerUnit = productInfo.bulk_price / productInfo.bulk_quantity;
               const profitPerUnit = (pricePerUnit - productInfo.purchase_price);
-              const profitPerBulkUnit = profitPerUnit * productInfo.bulk_quantity;
-              const numberOfBulkUnits = quantity / productInfo.bulk_quantity;
-              onlineProfits += profitPerBulkUnit * numberOfBulkUnits;
+              const totalProfit = profitPerUnit * productInfo.bulk_quantity;
+              onlineProfits += totalProfit * quantity;
             } else {
-              // For regular items
               const profit = (sellingPrice - productInfo.purchase_price) * quantity;
               onlineProfits += profit;
             }
@@ -214,10 +198,8 @@ export const fetchFinancialSummary = async (period: string, startDate?: Date, en
       }
     }
     
-    // Get profits data
     const profitsData = await fetchProfitsSummary(period, startDate, endDate);
     
-    // Get expenses data
     const { data: expensesData, error: expensesError } = await supabase
       .from('expenses')
       .select('amount')
@@ -225,10 +207,8 @@ export const fetchFinancialSummary = async (period: string, startDate?: Date, en
       
     if (expensesError) throw expensesError;
     
-    // Calculate total expenses
     const totalExpenses = expensesData.reduce((sum, expense) => sum + expense.amount, 0);
     
-    // Get cash tracking data for both registers
     const { data: cashData, error: cashError } = await supabase
       .from('cash_tracking')
       .select('closing_balance, register_type')
@@ -237,16 +217,13 @@ export const fetchFinancialSummary = async (period: string, startDate?: Date, en
       
     if (cashError) throw cashError;
     
-    // Calculate total cash balance from both registers
     const storeCash = cashData?.find(c => c.register_type === 'store')?.closing_balance || 0;
     const onlineCash = cashData?.find(c => c.register_type === 'online')?.closing_balance || 0;
     const totalCashBalance = storeCash + onlineCash;
     
-    // Calculate total revenue and profit
     const totalRevenue = profitsData.storeSales + profitsData.onlineSales;
     const totalProfit = profitsData.storeProfits + profitsData.onlineProfits;
     
-    // Calculate profit margin
     const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
     
     return {
@@ -269,7 +246,6 @@ export const fetchFinancialSummary = async (period: string, startDate?: Date, en
 };
 
 export const fetchMonthlyRevenue = async (period: string, startDate?: Date, endDate?: Date) => {
-  // Mock implementation
   return [
     { name: 'Jan', amount: 1200 },
     { name: 'Feb', amount: 1500 },
@@ -278,7 +254,6 @@ export const fetchMonthlyRevenue = async (period: string, startDate?: Date, endD
 };
 
 export const fetchExpensesByCategory = async (period: string, startDate?: Date, endDate?: Date) => {
-  // Mock implementation
   return [
     { name: 'Rent', value: 2500, color: '#FF6B6B' },
     { name: 'Utilities', value: 800, color: '#4ECDC4' },
@@ -287,7 +262,6 @@ export const fetchExpensesByCategory = async (period: string, startDate?: Date, 
 };
 
 export const fetchRecentTransactions = async (limit: number, period?: string, startDate?: Date, endDate?: Date) => {
-  // Mock implementation
   return [
     { id: '1', type: 'income', description: 'Sales Revenue', amount: 1200, date: new Date().toISOString() },
     { id: '2', type: 'expense', description: 'Rent Payment', amount: 800, date: new Date().toISOString() }
@@ -295,7 +269,6 @@ export const fetchRecentTransactions = async (limit: number, period?: string, st
 };
 
 export const fetchAllTransactions = async () => {
-  // Mock implementation
   return [
     { id: '1', type: 'income', description: 'Sales Revenue', amount: 1200, date: new Date().toISOString() },
     { id: '2', type: 'expense', description: 'Rent Payment', amount: 800, date: new Date().toISOString() }
@@ -303,7 +276,6 @@ export const fetchAllTransactions = async () => {
 };
 
 export const fetchCashierPerformance = async (period: string, startDate?: Date, endDate?: Date): Promise<CashierPerformance[]> => {
-  // Mock implementation
   return [
     { id: '1', name: 'Ahmed', totalSales: 5000, salesCount: 20, averageSale: 250, totalProfit: 1500 },
     { id: '2', name: 'Sara', totalSales: 4500, salesCount: 18, averageSale: 250, totalProfit: 1350 }
@@ -311,7 +283,6 @@ export const fetchCashierPerformance = async (period: string, startDate?: Date, 
 };
 
 export const exportReportToExcel = async (period: string, reportType: string, startDate?: Date, endDate?: Date) => {
-  // Mock implementation
   console.log(`Exporting ${reportType} report for period ${period}`);
   return Promise.resolve();
 };
