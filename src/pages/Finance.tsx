@@ -37,9 +37,11 @@ export default function Finance() {
   } = useQuery({
     queryKey: ['financialSummary', period, startDate, endDate],
     queryFn: () => fetchFinancialSummary(period, startDate, endDate),
-    onError: (error) => {
-      console.error("Error fetching financial summary:", error);
-      toast.error("حدث خطأ أثناء تحميل البيانات المالية");
+    meta: {
+      onError: (error: Error) => {
+        console.error("Error fetching financial summary:", error);
+        toast.error("حدث خطأ أثناء تحميل البيانات المالية");
+      }
     }
   });
   
@@ -51,17 +53,19 @@ export default function Finance() {
   } = useQuery({
     queryKey: ['profitsSummary', period, startDate, endDate],
     queryFn: () => fetchProfitsSummary(period, startDate, endDate),
-    onError: (error) => {
-      console.error("Error fetching profits summary:", error);
-      toast.error("حدث خطأ أثناء تحميل بيانات الأرباح");
+    meta: {
+      onError: (error: Error) => {
+        console.error("Error fetching profits summary:", error);
+        toast.error("حدث خطأ أثناء تحميل بيانات الأرباح");
+      }
     }
   });
   
   useEffect(() => {
-    if (isSummaryError) {
+    if (isSummaryError && summaryError) {
       console.error("Financial summary error:", summaryError);
     }
-    if (isProfitsError) {
+    if (isProfitsError && profitsError) {
       console.error("Profits summary error:", profitsError);
     }
   }, [isSummaryError, isProfitsError, summaryError, profitsError]);
