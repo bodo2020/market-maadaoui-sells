@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -138,9 +137,6 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
   try {
-    // Modified to ensure we're only updating the fields provided in the product parameter
-    // Only handle special cases if those specific fields are being updated
-    
     // If changing barcode, check if it's a scale barcode
     if (product.barcode !== undefined) {
       if (product.barcode?.startsWith('2') && /^\d{6}$/.test(product.barcode)) {

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -42,6 +43,7 @@ const ProductAssignmentDialog = ({
 
   useEffect(() => {
     if (!open) {
+      // إعادة تعيين الحالة عند إغلاق الديالوج
       setSearchQuery("");
       setSelectedId(null);
       setSelectedCategoryId(null);
@@ -111,8 +113,10 @@ const ProductAssignmentDialog = ({
           updateData.subcategory_id = null;
           console.log("Updating to main category:", selectedId);
         } else if (selectedCategoryLevel === 'subcategory') {
+          // العثور على القسم الفرعي المحدد
           const subcategory = subcategories.find(sub => sub.id === selectedId);
           if (subcategory) {
+            // تعيين كل من القسم الرئيسي والفرعي
             updateData.main_category_id = subcategory.category_id;
             updateData.subcategory_id = selectedId;
             console.log("Updating to subcategory:", selectedId, "with main category:", subcategory.category_id);
@@ -129,6 +133,7 @@ const ProductAssignmentDialog = ({
       
       console.log("Updating product with data:", updateData);
       
+      // استخدام خدمة تحديث المنتج بدلاً من الاتصال المباشر بقاعدة البيانات
       await updateProduct(product.id, updateData);
       
       toast.success(`تم تحديث ${type === 'category' ? 'قسم' : 'شركة'} المنتج بنجاح`);
@@ -205,8 +210,9 @@ const ProductAssignmentDialog = ({
               value={selectedCategoryLevel} 
               onValueChange={(value: 'category' | 'subcategory') => {
                 setSelectedCategoryLevel(value);
-                setSelectedId(null);
+                setSelectedId(null); // إعادة تعيين التحديد عند تغيير المستوى
                 
+                // إذا رجعنا إلى اختيار القسم الرئيسي وكان هناك قسم رئيسي محدد مسبقا
                 if (value === 'category' && selectedCategoryId) {
                   setSelectedId(selectedCategoryId);
                 }
