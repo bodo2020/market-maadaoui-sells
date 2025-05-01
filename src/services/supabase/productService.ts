@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
@@ -140,12 +139,13 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
   try {
     // Modified to ensure we're only updating the fields provided in the product parameter
     // Only handle special cases if those specific fields are being updated
+    const updateData: any = { ...product };
     
     // If changing barcode, check if it's a scale barcode
     if (product.barcode !== undefined) {
       if (product.barcode?.startsWith('2') && /^\d{6}$/.test(product.barcode)) {
-        product.barcode_type = 'scale';
-        product.unit_of_measure = 'كجم';
+        updateData.barcode_type = 'scale';
+        updateData.unit_of_measure = 'كجم';
       }
     }
 
@@ -153,7 +153,7 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
     if (product.subcategory_id !== undefined) {
       if (product.subcategory_id === null) {
         // If clearing subcategory, also clear main category
-        product.main_category_id = null;
+        updateData.main_category_id = null;
       } else {
         // Get the main category from the subcategory
         const { data: subcategory, error: subcategoryError } = await supabase
@@ -167,16 +167,21 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
           throw subcategoryError;
         }
 
-        product.main_category_id = subcategory.category_id;
+        updateData.main_category_id = subcategory.category_id;
       }
     }
 
-    console.log("Updating product with data:", product);
+    // Only update main_category_id if it was explicitly provided or modified by subcategory change
+    if (product.main_category_id !== undefined && !updateData.hasOwnProperty('main_category_id')) {
+      updateData.main_category_id = product.main_category_id;
+    }
+
+    console.log("Updating product with data:", updateData);
 
     const { data, error } = await supabase
       .from("products")
       .update({
-        ...product,
+        ...updateData,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
@@ -276,5 +281,41 @@ export async function fetchProductsBySubcategory(subcategoryId: string) {
   } catch (error) {
     console.error("Error in fetchProductsBySubcategory:", error);
     return [];
+  }
+}
+
+// New function to update product quantity after sales
+export async function updateProductQuantity(productId: string, quantityChange: number) {
+  try {
+    // First, get the current quantity
+    const { data: product, error: fetchError } = await supabase
+      .from("products")
+      .select("quantity")
+      .eq("id", productId)
+      .single();
+
+    if (fetchError) {
+      console.error(`Error fetching product ${productId}:`, fetchError);
+      throw fetchError;
+    }
+
+    const currentQuantity = product.quantity || 0;
+    const newQuantity = Math.max(0, currentQuantity + quantityChange);
+
+    // Update the product quantity
+    const { error: updateError } = await supabase
+      .from("products")
+      .update({ quantity: newQuantity })
+      .eq("id", productId);
+
+    if (updateError) {
+      console.error(`Error updating product ${productId} quantity:`, updateError);
+      throw updateError;
+    }
+
+    return newQuantity;
+  } catch (error) {
+    console.error("Error updating product quantity:", error);
+    throw error;
   }
 }

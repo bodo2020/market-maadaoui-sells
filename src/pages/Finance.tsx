@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
@@ -10,30 +11,61 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ar } from "date-fns/locale";
+import { toast } from "sonner";
+
 function formatCurrency(amount: number): string {
   return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', {
     maximumFractionDigits: 2
   })}`;
 }
+
 export default function Finance() {
   const [period, setPeriod] = useState<"day" | "week" | "month" | "quarter" | "year" | "custom">("month");
   const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date | undefined>(endOfMonth(new Date()));
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  useEffect(() => {
+    console.log(`Finance page initialized with period: ${period}, dates: ${startDate} - ${endDate}`);
+  }, []);
+  
   const {
     data: summaryData,
-    isLoading: isLoadingSummary
+    isLoading: isLoadingSummary,
+    isError: isSummaryError,
+    error: summaryError
   } = useQuery({
     queryKey: ['financialSummary', period, startDate, endDate],
-    queryFn: () => fetchFinancialSummary(period, startDate, endDate)
+    queryFn: () => fetchFinancialSummary(period, startDate, endDate),
+    onError: (error) => {
+      console.error("Error fetching financial summary:", error);
+      toast.error("حدث خطأ أثناء تحميل البيانات المالية");
+    }
   });
+  
   const {
     data: profitsData,
-    isLoading: isLoadingProfits
+    isLoading: isLoadingProfits,
+    isError: isProfitsError,
+    error: profitsError
   } = useQuery({
     queryKey: ['profitsSummary', period, startDate, endDate],
-    queryFn: () => fetchProfitsSummary(period, startDate, endDate)
+    queryFn: () => fetchProfitsSummary(period, startDate, endDate),
+    onError: (error) => {
+      console.error("Error fetching profits summary:", error);
+      toast.error("حدث خطأ أثناء تحميل بيانات الأرباح");
+    }
   });
+  
+  useEffect(() => {
+    if (isSummaryError) {
+      console.error("Financial summary error:", summaryError);
+    }
+    if (isProfitsError) {
+      console.error("Profits summary error:", profitsError);
+    }
+  }, [isSummaryError, isProfitsError, summaryError, profitsError]);
+  
   const handleDateRangeChange = (value: "day" | "week" | "month" | "quarter" | "year" | "custom") => {
     setPeriod(value);
     if (value !== "custom") {
@@ -41,6 +73,7 @@ export default function Finance() {
       setEndDate(undefined);
     }
   };
+  
   const getDateRangeText = () => {
     if (period === "custom" && startDate && endDate) {
       return `${format(startDate, "dd/MM/yyyy")} - ${format(endDate, "dd/MM/yyyy")}`;
@@ -54,6 +87,7 @@ export default function Finance() {
       "custom": "مخصص"
     }[period] || "اختر الفترة";
   };
+  
   return <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">الإدارة المالية</h1>
@@ -103,7 +137,7 @@ export default function Finance() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي  الإيرادات</CardTitle>
+            <CardTitle className="text-sm font-medium">إجمالي  الإيرادات</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingSummary ? <div className="text-2xl font-bold animate-pulse">تحميل...</div> : <>

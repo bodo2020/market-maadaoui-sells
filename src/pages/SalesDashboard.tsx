@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -64,6 +63,7 @@ export default function SalesDashboard() {
   const { data: storeSales = [], isLoading: isStoreSalesLoading, refetch: refetchStoreSales } = useQuery({
     queryKey: ['sales', dateRange],
     queryFn: async () => {
+      console.log("Fetching store sales data for date range:", dateRange);
       const { data, error } = await supabase
         .from('sales')
         .select('*')
@@ -71,7 +71,12 @@ export default function SalesDashboard() {
         .lte('date', dateRange.to.toISOString())
         .order('date', { ascending: false });
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching sales data:", error);
+        throw error;
+      }
+      
+      console.log(`Retrieved ${data?.length || 0} store sales records`);
       
       return (data || []).map(sale => ({
         ...sale,
@@ -90,6 +95,7 @@ export default function SalesDashboard() {
   const { data: onlineOrders = [], isLoading: isOnlineOrdersLoading, refetch: refetchOnlineOrders } = useQuery({
     queryKey: ['onlineOrders', dateRange],
     queryFn: async () => {
+      console.log("Fetching online orders data for date range:", dateRange);
       const { data, error } = await supabase
         .from('online_orders')
         .select('*')
@@ -97,7 +103,12 @@ export default function SalesDashboard() {
         .lte('created_at', dateRange.to.toISOString())
         .order('created_at', { ascending: false });
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching online orders data:", error);
+        throw error;
+      }
+      
+      console.log(`Retrieved ${data?.length || 0} online orders records`);
       return data;
     }
   });
@@ -158,6 +169,7 @@ export default function SalesDashboard() {
       return balance;
     } catch (error) {
       console.error(`Error fetching ${registerType} balance:`, error);
+      toast.error(`حدث خطأ أثناء تحميل رصيد ${registerType === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
       return 0;
     }
   };

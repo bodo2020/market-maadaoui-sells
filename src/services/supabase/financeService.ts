@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ProfitData {
@@ -19,6 +20,8 @@ export interface CashierPerformance {
 
 export const fetchProfitsSummary = async (period: string, startDate?: Date, endDate?: Date): Promise<ProfitData> => {
   try {
+    console.log(`Fetching profits summary for period: ${period}, startDate: ${startDate}, endDate: ${endDate}`);
+    
     let queryStartDate;
     const now = new Date();
     
@@ -48,6 +51,8 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       }
     }
     
+    console.log("Query start date:", queryStartDate.toISOString());
+    
     let salesQuery = supabase
       .from('sales')
       .select('total, profit, items')
@@ -69,8 +74,17 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       onlineQuery
     ]);
 
-    if (salesData.error) throw salesData.error;
-    if (onlineData.error) throw onlineData.error;
+    if (salesData.error) {
+      console.error("Error fetching sales data:", salesData.error);
+      throw salesData.error;
+    }
+    if (onlineData.error) {
+      console.error("Error fetching online orders data:", onlineData.error);
+      throw onlineData.error;
+    }
+
+    console.log("Sales data retrieved:", salesData.data?.length || 0);
+    console.log("Online orders data retrieved:", onlineData.data?.length || 0);
 
     let storeSales = 0;
     let storeProfits = 0;
@@ -99,10 +113,17 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
     const uniqueProductIds = [...new Set(productIds)].filter(Boolean);
     
     if (uniqueProductIds.length > 0) {
-      const { data: products } = await supabase
+      const { data: products, error: productsError } = await supabase
         .from('products')
         .select('id, purchase_price, bulk_price, bulk_quantity, unit_of_measure')
         .in('id', uniqueProductIds);
+      
+      if (productsError) {
+        console.error("Error fetching products for profit calculation:", productsError);
+        throw productsError;
+      }
+      
+      console.log("Products retrieved for profit calculation:", products?.length || 0);
       
       const purchasePriceMap = new Map();
       products?.forEach(product => {
@@ -154,12 +175,15 @@ export const fetchProfitsSummary = async (period: string, startDate?: Date, endD
       });
     }
 
-    return {
+    const result = {
       storeProfits,
       onlineProfits,
       storeSales,
       onlineSales
     };
+    
+    console.log("Calculated profit summary:", result);
+    return result;
 
   } catch (error) {
     console.error('Error fetching profits summary:', error);
@@ -387,6 +411,8 @@ export const fetchExpensesByCategory = async (period: string, startDate?: Date, 
 
 export const fetchCashierPerformance = async (period: string, startDate?: Date, endDate?: Date): Promise<CashierPerformance[]> => {
   try {
+    console.log(`Fetching cashier performance for period: ${period}, startDate: ${startDate}, endDate: ${endDate}`);
+    
     let queryStartDate;
     const now = new Date();
     
@@ -416,6 +442,8 @@ export const fetchCashierPerformance = async (period: string, startDate?: Date, 
       }
     }
     
+    console.log("Query start date for cashier performance:", queryStartDate.toISOString());
+    
     let query = supabase
       .from('sales')
       .select(`
@@ -435,7 +463,12 @@ export const fetchCashierPerformance = async (period: string, startDate?: Date, 
     
     const { data: salesData, error: salesError } = await query;
     
-    if (salesError) throw salesError;
+    if (salesError) {
+      console.error("Error fetching sales data for cashier performance:", salesError);
+      throw salesError;
+    }
+    
+    console.log("Sales data retrieved for cashier performance:", salesData?.length || 0);
     
     const dailySales = new Map();
     
@@ -463,12 +496,15 @@ export const fetchCashierPerformance = async (period: string, startDate?: Date, 
       dailySales.set(cashierKey, currentStats);
     });
     
-    return Array.from(dailySales.values())
+    const result = Array.from(dailySales.values())
       .sort((a, b) => {
         const dateComparison = new Date(b.date).getTime() - new Date(a.date).getTime();
         if (dateComparison !== 0) return dateComparison;
         return b.totalSales - a.totalSales;
       });
+      
+    console.log("Calculated cashier performance:", result);
+    return result;
   } catch (error) {
     console.error('Error fetching cashier performance:', error);
     return [];

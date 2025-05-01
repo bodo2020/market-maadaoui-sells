@@ -59,12 +59,14 @@ export const useOrderManagement = (activeTab: string) => {
   };
 
   const subscribeToOrders = () => {
+    console.log("Setting up realtime subscription to orders");
     const channel = supabase.channel('online-orders')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'online_orders'
       }, payload => {
+        console.log("New order received:", payload);
         toast.info("طلب جديد!", {
           description: "تم استلام طلب جديد"
         });
@@ -81,6 +83,8 @@ export const useOrderManagement = (activeTab: string) => {
         fetchPendingOrdersCount();
       })
       .subscribe();
+      
+    console.log("Subscription channel established:", channel);
     return channel;
   };
 
@@ -126,6 +130,8 @@ export const useOrderManagement = (activeTab: string) => {
       const { data, error } = await query;
       if (error) throw error;
       
+      console.log(`Fetched ${data?.length || 0} orders for tab ${activeTab}`, data);
+      
       const transformedOrders: Order[] = (data || []).map((item: any) => ({
         id: item.id,
         created_at: item.created_at,
@@ -160,6 +166,7 @@ export const useOrderManagement = (activeTab: string) => {
   return {
     orders,
     loading,
-    handleOrderUpdate
+    handleOrderUpdate,
+    fetchOrders
   };
 };
