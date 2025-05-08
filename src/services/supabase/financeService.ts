@@ -357,22 +357,22 @@ export const fetchExpensesByCategory = async (
   try {
     const dateRange = getDateRange(period as PeriodType, startDate, endDate);
     
-    // Get expenses data with categories
+    // Get expenses data with type (using type instead of category)
     const { data: expensesData, error: expensesError } = await supabase
       .from("expenses")
-      .select("amount, category")
+      .select("amount, type")
       .gte("date", dateRange.start.toISOString())
       .lte("date", dateRange.end.toISOString());
     
     if (expensesError) throw expensesError;
     
-    // Process data by category
+    // Process data by type instead of category
     const expensesByCategory = new Map();
     const colors = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
     
     if (expensesData) {
       expensesData.forEach((expense) => {
-        const category = expense.category || 'أخرى';
+        const category = expense.type || 'أخرى';
         
         if (!expensesByCategory.has(category)) {
           expensesByCategory.set(category, 0);
@@ -411,10 +411,10 @@ export const fetchCashierPerformance = async (
   try {
     const dateRange = getDateRange(period as PeriodType, startDate, endDate);
     
-    // Get sales data with cashier information
+    // Get sales data (without using created_by and user columns)
     const { data: salesData, error: salesError } = await supabase
       .from("sales")
-      .select("id, date, total, profit, created_by, user:created_by(id, name)")
+      .select("id, date, total, profit, cashier_id")
       .gte("date", dateRange.start.toISOString())
       .lte("date", dateRange.end.toISOString());
     
@@ -424,13 +424,28 @@ export const fetchCashierPerformance = async (
       return [];
     }
     
+    // Get cashier information separately if needed
+    const { data: usersData, error: usersError } = await supabase
+      .from("users")
+      .select("id, name");
+
+    if (usersError) throw usersError;
+    
+    // Create a map of user IDs to names
+    const userMap = new Map();
+    if (usersData) {
+      usersData.forEach(user => {
+        userMap.set(user.id, user.name);
+      });
+    }
+    
     // Process data by cashier and date
     const performanceMap = new Map();
     
     salesData.forEach((sale) => {
       const date = new Date(sale.date).toLocaleDateString('ar-EG');
-      const cashierId = sale.created_by;
-      const cashierName = sale.user?.name || 'غير معروف';
+      const cashierId = sale.cashier_id || 'unknown';
+      const cashierName = userMap.get(cashierId) || 'غير معروف';
       const mapKey = `${cashierId}-${date}`;
       
       if (!performanceMap.has(mapKey)) {
@@ -629,8 +644,8 @@ export const exportReportToExcel = async (
         worksheet.addRow({ metric: 'الرصيد النقدي', value: data[0].cashBalance });
     }
 
-    // Set RTL direction for the worksheet
-    worksheet.rightToLeft = true;
+    // Set RTL direction for the worksheet - using a different approach that's compatible with ExcelJS
+    worksheet.views = [{ rightToLeft: true }];
     
     // Generate Excel file
     const buffer = await workbook.xlsx.writeBuffer();
