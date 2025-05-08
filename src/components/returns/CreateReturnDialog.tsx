@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ export function CreateReturnDialog({
   const [generalReason, setGeneralReason] = useState('');
   const [orderId, setOrderId] = useState('');
   const [customerName, setCustomerName] = useState('');
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
 
   const form = useForm({
     defaultValues: {
@@ -65,6 +67,7 @@ export function CreateReturnDialog({
     
     if (query.length < 2) {
       setProductOptions([]);
+      setSearchResults([]);
       return;
     }
     
@@ -83,6 +86,7 @@ export function CreateReturnDialog({
       }));
       
       setProductOptions(options);
+      setSearchResults(data as Product[]);
     } catch (error) {
       console.error('Error searching products:', error);
     }
@@ -151,6 +155,21 @@ export function CreateReturnDialog({
       console.error('Error adding selected product:', error);
       toast.error('حدث خطأ أثناء إضافة المنتج المحدد');
     }
+  };
+
+  const handleAddSearchedProduct = (product: Product) => {
+    handleAddProduct({
+      product_id: product.id,
+      product_name: product.name,
+      quantity: quantity,
+      price: product.price,
+      total: product.price * quantity,
+      reason: itemReason
+    });
+
+    // Reset search
+    setSearchQuery('');
+    setSearchResults([]);
   };
 
   const handleAddProduct = (item: ReturnItem) => {
@@ -283,6 +302,12 @@ export function CreateReturnDialog({
                     onChange={(e) => setBarcode(e.target.value)}
                     placeholder="أدخل الباركود"
                     className="flex-1"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleBarcodeSearch();
+                      }
+                    }}
                   />
                   <Button variant="default" onClick={handleBarcodeSearch}>
                     <Barcode className="h-4 w-4" />
@@ -292,13 +317,32 @@ export function CreateReturnDialog({
               
               <div className="space-y-3">
                 <Label>البحث بالاسم</Label>
-                <MultiSelect
-                  options={productOptions}
-                  value={selectedProductIds}
-                  onChange={setSelectedProductIds}
-                  placeholder="البحث عن منتج"
+                <Input
+                  placeholder="ابحث عن منتج"
+                  value={searchQuery}
+                  onChange={(e) => handleSearchProducts(e.target.value)}
                   className="w-full"
                 />
+                
+                {searchResults.length > 0 && (
+                  <div className="bg-white border rounded-md max-h-60 overflow-y-auto">
+                    {searchResults.map((product) => (
+                      <div 
+                        key={product.id} 
+                        className="flex justify-between items-center p-2 hover:bg-gray-50 cursor-pointer border-b"
+                      >
+                        <span>{product.name}</span>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => handleAddSearchedProduct(product)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -320,15 +364,6 @@ export function CreateReturnDialog({
                 />
               </div>
             </div>
-            
-            <Button 
-              className="mt-4 w-full" 
-              onClick={handleSelectProduct}
-              disabled={selectedProductIds.length === 0}
-            >
-              <Plus className="h-4 w-4 ml-2" />
-              إضافة المنتج
-            </Button>
           </div>
           
           {returnItems.length > 0 && (

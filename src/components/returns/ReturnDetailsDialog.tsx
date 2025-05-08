@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ export function ReturnDetailsDialog({
   const [quantity, setQuantity] = useState<number>(1);
   const [reason, setReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
   
   const form = useForm({
     defaultValues: {
@@ -99,6 +101,7 @@ export function ReturnDetailsDialog({
     
     if (query.length < 2) {
       setProductOptions([]);
+      setSearchResults([]);
       return;
     }
     
@@ -110,6 +113,8 @@ export function ReturnDetailsDialog({
         .limit(10);
       
       if (error) throw error;
+      
+      setSearchResults(data as Product[]);
       
       const options = data.map(product => ({
         label: product.name,
@@ -206,6 +211,8 @@ export function ReturnDetailsDialog({
       setQuantity(1);
       setReason('');
       setIsAddingProduct(false);
+      setSearchQuery('');
+      setSearchResults([]);
       
     } catch (error) {
       console.error('Error adding product to return:', error);
@@ -245,6 +252,27 @@ export function ReturnDetailsDialog({
     } catch (error) {
       console.error('Error adding selected product:', error);
       toast.error('حدث خطأ أثناء إضافة المنتج المحدد');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddSearchedProduct = async (product: Product) => {
+    try {
+      setIsSubmitting(true);
+      
+      addProductToReturn({
+        product_id: product.id,
+        product_name: product.name,
+        quantity: quantity,
+        price: product.price,
+        total: product.price * quantity,
+        reason: reason
+      });
+      
+    } catch (error) {
+      console.error('Error adding product:', error);
+      toast.error('حدث خطأ أثناء إضافة المنتج');
     } finally {
       setIsSubmitting(false);
     }
@@ -318,6 +346,12 @@ export function ReturnDetailsDialog({
                         onChange={(e) => setBarcode(e.target.value)}
                         placeholder="أدخل الباركود"
                         className="flex-1"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleBarcodeSearch();
+                          }
+                        }}
                       />
                       <Button variant="default" onClick={handleBarcodeSearch} disabled={isSubmitting}>
                         <Barcode className="h-4 w-4" />
@@ -328,13 +362,34 @@ export function ReturnDetailsDialog({
                   <div className="space-y-2">
                     <p className="text-sm">البحث بالاسم</p>
                     <div className="space-y-4">
-                      <MultiSelect
-                        options={productOptions}
-                        value={selectedProductIds}
-                        onChange={setSelectedProductIds}
-                        placeholder="البحث عن منتج"
+                      <Input
+                        value={searchQuery}
+                        onChange={(e) => handleSearchProducts(e.target.value)}
+                        placeholder="ابحث عن منتج"
                         className="w-full"
                       />
+                      
+                      {searchResults.length > 0 && (
+                        <div className="bg-white border rounded-md max-h-60 overflow-y-auto">
+                          {searchResults.map((product) => (
+                            <div 
+                              key={product.id} 
+                              className="flex justify-between items-center p-2 hover:bg-gray-50 cursor-pointer border-b"
+                            >
+                              <span>{product.name}</span>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                onClick={() => handleAddSearchedProduct(product)}
+                                disabled={isSubmitting}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
                           <label className="text-sm">الكمية</label>
@@ -354,14 +409,6 @@ export function ReturnDetailsDialog({
                           />
                         </div>
                       </div>
-                      
-                      <Button 
-                        onClick={handleSelectProduct} 
-                        disabled={selectedProductIds.length === 0 || isSubmitting}
-                        className="w-full"
-                      >
-                        إضافة المنتج
-                      </Button>
                     </div>
                   </div>
                 </div>
