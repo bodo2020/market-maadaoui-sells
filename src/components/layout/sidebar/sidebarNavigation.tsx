@@ -1,7 +1,8 @@
+
 import {
   BarChart4, Store, ShoppingCart, PackageOpen, Users, Settings, FileText,
   Receipt, Home, UserPlus, Truck, Building2, ImageIcon,
-  ShoppingBag, FolderOpen, MapPin, TrendingUp, Tag, Gift, Coins
+  ShoppingBag, FolderOpen, MapPin, TrendingUp, Tag, Gift, Coins, RotateCcw
 } from "lucide-react";
 import { SidebarGroupData } from "./types";
 
@@ -12,7 +13,8 @@ export const mainNavigation: SidebarGroupData = {
     { icon: FolderOpen, label: "الاقسام", href: "/categories" },
     { icon: TrendingUp, label: "لوحة المبيعات والخزينة", href: "/sales-dashboard" },
     { icon: BarChart4, label: "الإدارة المالية", href: "/finance" },
-    { icon: Coins, label: "متابعة النقدية", href: "/cash-tracking" }
+    { icon: Coins, label: "متابعة النقدية", href: "/cash-tracking" },
+    { icon: RotateCcw, label: "المرتجعات", href: "/returns" }
   ]
 };
 

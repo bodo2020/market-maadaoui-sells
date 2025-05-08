@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import Login from "@/pages/Login";
@@ -34,6 +35,7 @@ import OffersPage from "@/pages/OffersPage";
 import ProductCollections from "@/pages/ProductCollections";
 import CreateProductCollection from "@/pages/CreateProductCollection";
 import EditProductCollection from "@/pages/EditProductCollection";
+import Returns from "@/pages/Returns";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
@@ -73,6 +75,7 @@ function App() {
             <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
             <Route path="/expenses" element={<ProtectedRoute><ExpenseManagement /></ProtectedRoute>} />
+            <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
             <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
