@@ -127,7 +127,9 @@ export function ReturnDetailsDialog({
     }
   };
 
-  const handleBarcodeSearch = async () => {
+  const handleBarcodeSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
     if (!barcode || barcode.trim() === '') {
       toast.error('الرجاء إدخال الباركود');
       return;
@@ -141,7 +143,7 @@ export function ReturnDetailsDialog({
         return;
       }
       
-      addProductToReturn({
+      await addProductToReturn({
         product_id: product.id,
         product_name: product.name,
         quantity: 1,
@@ -151,7 +153,6 @@ export function ReturnDetailsDialog({
       });
       
       setBarcode('');
-      setIsAddingProduct(false);
     } catch (error) {
       console.error('Error fetching product by barcode:', error);
       toast.error('حدث خطأ أثناء البحث عن المنتج');
@@ -261,7 +262,7 @@ export function ReturnDetailsDialog({
     try {
       setIsSubmitting(true);
       
-      addProductToReturn({
+      await addProductToReturn({
         product_id: product.id,
         product_name: product.name,
         quantity: quantity,
@@ -340,55 +341,30 @@ export function ReturnDetailsDialog({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <p className="text-sm">البحث بالباركود</p>
-                    <div className="flex gap-2">
+                    <form onSubmit={handleBarcodeSearch} className="flex gap-2">
                       <Input
                         value={barcode}
                         onChange={(e) => setBarcode(e.target.value)}
                         placeholder="أدخل الباركود"
                         className="flex-1"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleBarcodeSearch();
-                          }
-                        }}
+                        autoComplete="off"
                       />
-                      <Button variant="default" onClick={handleBarcodeSearch} disabled={isSubmitting}>
+                      <Button variant="default" type="submit">
                         <Barcode className="h-4 w-4" />
                       </Button>
-                    </div>
+                    </form>
                   </div>
                   
                   <div className="space-y-2">
                     <p className="text-sm">البحث بالاسم</p>
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                       <Input
                         value={searchQuery}
                         onChange={(e) => handleSearchProducts(e.target.value)}
                         placeholder="ابحث عن منتج"
                         className="w-full"
+                        autoComplete="off"
                       />
-                      
-                      {searchResults.length > 0 && (
-                        <div className="bg-white border rounded-md max-h-60 overflow-y-auto">
-                          {searchResults.map((product) => (
-                            <div 
-                              key={product.id} 
-                              className="flex justify-between items-center p-2 hover:bg-gray-50 cursor-pointer border-b"
-                            >
-                              <span>{product.name}</span>
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                onClick={() => handleAddSearchedProduct(product)}
-                                disabled={isSubmitting}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                       
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
@@ -410,6 +386,31 @@ export function ReturnDetailsDialog({
                         </div>
                       </div>
                     </div>
+                    
+                    {searchResults.length > 0 && (
+                      <div className="bg-white border rounded-md max-h-60 overflow-y-auto mt-1">
+                        {searchResults.map((product) => (
+                          <div 
+                            key={product.id} 
+                            className="flex justify-between items-center p-2 hover:bg-gray-50 cursor-pointer border-b"
+                          >
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
+                            </div>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              className="text-primary hover:bg-primary/10"
+                              onClick={() => handleAddSearchedProduct(product)}
+                              disabled={isSubmitting}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

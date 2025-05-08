@@ -42,7 +42,6 @@ interface Return {
   id: string;
   order_id: string | null;
   customer_id: string | null;
-  customer_name?: string;
   customers?: { name: string };
   total_amount: number;
   reason: string | null;
@@ -101,11 +100,14 @@ export default function Returns() {
               })
             );
             
+            // Add customer_name property derived from customers.name or default value
+            const customer_name = returnItem.customers?.name || 'غير معروف';
+            
             return {
               ...returnItem,
-              customer_name: returnItem.customers?.name || returnItem.customer_name || 'غير معروف',
+              customer_name,
               items
-            } as Return;
+            };
           })
         );
         
@@ -148,7 +150,13 @@ export default function Returns() {
   };
   
   const handleViewDetails = (returnData: Return) => {
-    setSelectedReturn(returnData);
+    // Ensure returnData has customer_name property
+    const enhancedReturnData = {
+      ...returnData,
+      customer_name: returnData.customers?.name || 'غير معروف' 
+    };
+    
+    setSelectedReturn(enhancedReturnData);
     setDetailsDialogOpen(true);
   };
   
@@ -329,7 +337,7 @@ export default function Returns() {
                       <TableRow key={returnItem.id}>
                         <TableCell className="font-medium">{returnItem.id.slice(0, 8)}</TableCell>
                         <TableCell>{returnItem.order_id ? returnItem.order_id.slice(0, 8) : '-'}</TableCell>
-                        <TableCell>{returnItem.customer_name}</TableCell>
+                        <TableCell>{returnItem.customer_name || returnItem.customers?.name || 'غير معروف'}</TableCell>
                         <TableCell dir="ltr" className="text-right">{formatDate(returnItem.created_at)}</TableCell>
                         <TableCell>{formatCurrency(returnItem.total_amount)}</TableCell>
                         <TableCell>

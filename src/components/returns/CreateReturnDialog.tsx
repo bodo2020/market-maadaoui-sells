@@ -92,7 +92,9 @@ export function CreateReturnDialog({
     }
   };
 
-  const handleBarcodeSearch = async () => {
+  const handleBarcodeSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
     if (!barcode || barcode.trim() === '') {
       toast.error('الرجاء إدخال الباركود');
       return;
@@ -215,7 +217,7 @@ export function CreateReturnDialog({
         .from('returns')
         .insert({
           order_id: orderId || null,
-          customer_name: customerName || null,
+          customer_id: null, // Using customer_id instead of customer_name
           reason: generalReason || null,
           status: 'pending',
           total_amount: calculateTotal()
@@ -296,45 +298,68 @@ export function CreateReturnDialog({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <Label>البحث بالباركود</Label>
-                <div className="flex gap-2">
+                <form onSubmit={handleBarcodeSearch} className="flex gap-2">
                   <Input
                     value={barcode}
                     onChange={(e) => setBarcode(e.target.value)}
                     placeholder="أدخل الباركود"
                     className="flex-1"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleBarcodeSearch();
-                      }
-                    }}
+                    autoComplete="off"
                   />
-                  <Button variant="default" onClick={handleBarcodeSearch}>
+                  <Button variant="default" type="submit">
                     <Barcode className="h-4 w-4" />
                   </Button>
-                </div>
+                </form>
               </div>
               
               <div className="space-y-3">
                 <Label>البحث بالاسم</Label>
-                <Input
-                  placeholder="ابحث عن منتج"
-                  value={searchQuery}
-                  onChange={(e) => handleSearchProducts(e.target.value)}
-                  className="w-full"
-                />
+                <div className="space-y-2">
+                  <Input
+                    placeholder="ابحث عن منتج"
+                    value={searchQuery}
+                    onChange={(e) => handleSearchProducts(e.target.value)}
+                    className="w-full"
+                    autoComplete="off"
+                  />
+                </div>
                 
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label>الكمية</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={quantity}
+                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>سبب الإرجاع (للمنتج)</Label>
+                    <Input
+                      placeholder="سبب إرجاع المنتج"
+                      value={itemReason}
+                      onChange={(e) => setItemReason(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 {searchResults.length > 0 && (
-                  <div className="bg-white border rounded-md max-h-60 overflow-y-auto">
+                  <div className="bg-white border rounded-md max-h-60 overflow-y-auto mt-1">
                     {searchResults.map((product) => (
                       <div 
                         key={product.id} 
                         className="flex justify-between items-center p-2 hover:bg-gray-50 cursor-pointer border-b"
                       >
-                        <span>{product.name}</span>
+                        <div>
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
+                        </div>
                         <Button 
                           size="sm" 
-                          variant="ghost" 
+                          variant="ghost"
+                          className="text-primary hover:bg-primary/10" 
                           onClick={() => handleAddSearchedProduct(product)}
                         >
                           <Plus className="h-4 w-4" />
@@ -343,25 +368,6 @@ export function CreateReturnDialog({
                     ))}
                   </div>
                 )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label>الكمية</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label>سبب الإرجاع (للمنتج)</Label>
-                <Input
-                  placeholder="سبب إرجاع المنتج"
-                  value={itemReason}
-                  onChange={(e) => setItemReason(e.target.value)}
-                />
               </div>
             </div>
           </div>
