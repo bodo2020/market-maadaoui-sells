@@ -43,10 +43,12 @@ interface Return {
   order_id: string | null;
   customer_id: string | null;
   customer_name?: string;
+  customers?: { name: string };
   total_amount: number;
   reason: string | null;
   status: string;
   created_at: string;
+  updated_at: string;
   items?: ReturnItem[];
 }
 
@@ -83,9 +85,9 @@ export default function Returns() {
         
         // Fetch product names for each return item
         const returnsWithProductNames = await Promise.all(
-          (returnsData || []).map(async (returnItem) => {
+          (returnsData || []).map(async (returnItem: any) => {
             const items = await Promise.all(
-              (returnItem.return_items || []).map(async (item) => {
+              (returnItem.return_items || []).map(async (item: any) => {
                 const { data: productData } = await supabase
                   .from('products')
                   .select('name')
@@ -103,7 +105,7 @@ export default function Returns() {
               ...returnItem,
               customer_name: returnItem.customers?.name || returnItem.customer_name || 'غير معروف',
               items
-            };
+            } as Return;
           })
         );
         

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { fetchProductByBarcode } from "@/services/supabase/productService";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Search, Plus, BarcodeScan, Trash2 } from "lucide-react";
+import { Search, Plus, Barcode, Trash2 } from "lucide-react";
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -286,7 +285,7 @@ export function CreateReturnDialog({
                     className="flex-1"
                   />
                   <Button variant="default" onClick={handleBarcodeSearch}>
-                    <BarcodeScan className="h-4 w-4" />
+                    <Barcode className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
