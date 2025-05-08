@@ -1,9 +1,18 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { siteConfig } from "@/config/site";
+import { Input } from "@/components/ui/input";
+import { fetchProductByBarcode } from "@/services/supabase/productService";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Search, Plus, BarcodeScan } from "lucide-react";
+import { Product } from "@/types";
+import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 // Types
 interface ReturnItem {
@@ -40,6 +49,23 @@ export function ReturnDetailsDialog({
   onOpenChange,
   onStatusChange
 }: ReturnDetailsDialogProps) {
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [barcode, setBarcode] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [productOptions, setProductOptions] = useState<{label: string, value: string}[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [quantity, setQuantity] = useState<number>(1);
+  const [reason, setReason] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const form = useForm({
+    defaultValues: {
+      productId: "",
+      quantity: 1,
+      reason: ""
+    }
+  });
+
   const formatCurrency = (amount: number): string => {
     return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', {
       maximumFractionDigits: 2
@@ -66,6 +92,162 @@ export function ReturnDetailsDialog({
         return 'bg-red-100 text-red-800 border-red-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const handleSearchProducts = async (query: string) => {
+    setSearchQuery(query);
+    
+    if (query.length < 2) {
+      setProductOptions([]);
+      return;
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, price')
+        .ilike('name', `%${query}%`)
+        .limit(10);
+      
+      if (error) throw error;
+      
+      const options = data.map(product => ({
+        label: product.name,
+        value: product.id
+      }));
+      
+      setProductOptions(options);
+    } catch (error) {
+      console.error('Error searching products:', error);
+    }
+  };
+
+  const handleBarcodeSearch = async () => {
+    if (!barcode || barcode.trim() === '') {
+      toast.error('الرجاء إدخال الباركود');
+      return;
+    }
+    
+    try {
+      const product = await fetchProductByBarcode(barcode);
+      
+      if (!product) {
+        toast.error('لم يتم العثور على منتج بهذا الباركود');
+        return;
+      }
+      
+      addProductToReturn({
+        product_id: product.id,
+        product_name: product.name,
+        quantity: 1,
+        price: product.price,
+        total: product.price,
+        reason: ''
+      });
+      
+      setBarcode('');
+      setIsAddingProduct(false);
+    } catch (error) {
+      console.error('Error fetching product by barcode:', error);
+      toast.error('حدث خطأ أثناء البحث عن المنتج');
+    }
+  };
+
+  const addProductToReturn = async (newItem: ReturnItem) => {
+    try {
+      setIsSubmitting(true);
+      
+      // First check if the product already exists in the return items
+      const existingItem = returnData.items?.find(item => item.product_id === newItem.product_id);
+      
+      if (existingItem) {
+        toast.error('هذا المنتج موجود بالفعل في المرتجع');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Insert new return item
+      const { error: insertError } = await supabase
+        .from('return_items')
+        .insert({
+          return_id: returnData.id,
+          product_id: newItem.product_id,
+          quantity: newItem.quantity,
+          price: newItem.price,
+          total: newItem.price * newItem.quantity,
+          reason: newItem.reason
+        });
+
+      if (insertError) throw insertError;
+
+      // Update return total amount
+      const newTotal = (returnData.total_amount || 0) + (newItem.price * newItem.quantity);
+      
+      const { error: updateError } = await supabase
+        .from('returns')
+        .update({ 
+          total_amount: newTotal
+        })
+        .eq('id', returnData.id);
+
+      if (updateError) throw updateError;
+
+      // Add the new item to the existing items array
+      if (!returnData.items) {
+        returnData.items = [];
+      }
+      returnData.items.push(newItem);
+      returnData.total_amount = newTotal;
+
+      toast.success('تمت إضافة المنتج إلى المرتجع بنجاح');
+      
+      // Reset form
+      setSelectedProductIds([]);
+      setQuantity(1);
+      setReason('');
+      setIsAddingProduct(false);
+      
+    } catch (error) {
+      console.error('Error adding product to return:', error);
+      toast.error('حدث خطأ أثناء إضافة المنتج للمرتجع');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSelectProduct = async () => {
+    if (selectedProductIds.length === 0) {
+      toast.error('الرجاء اختيار منتج');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      // Fetch product details
+      const { data: product, error } = await supabase
+        .from('products')
+        .select('id, name, price')
+        .eq('id', selectedProductIds[0])
+        .single();
+        
+      if (error) throw error;
+
+      addProductToReturn({
+        product_id: product.id,
+        product_name: product.name,
+        quantity: quantity,
+        price: product.price,
+        total: product.price * quantity,
+        reason: reason
+      });
+      
+    } catch (error) {
+      console.error('Error adding selected product:', error);
+      toast.error('حدث خطأ أثناء إضافة المنتج المحدد');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -108,7 +290,85 @@ export function ReturnDetailsDialog({
           )}
 
           <div className="space-y-2">
-            <p className="font-medium">المنتجات المرتجعة</p>
+            <div className="flex justify-between items-center">
+              <p className="font-medium">المنتجات المرتجعة</p>
+              
+              {returnData.status === 'pending' && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-1"
+                  onClick={() => setIsAddingProduct(!isAddingProduct)}
+                >
+                  <Plus className="h-4 w-4" />
+                  إضافة منتج
+                </Button>
+              )}
+            </div>
+            
+            {isAddingProduct && (
+              <div className="bg-muted p-4 rounded-md space-y-3 mb-3">
+                <h3 className="font-medium">إضافة منتج للمرتجع</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <p className="text-sm">البحث بالباركود</p>
+                    <div className="flex gap-2">
+                      <Input
+                        value={barcode}
+                        onChange={(e) => setBarcode(e.target.value)}
+                        placeholder="أدخل الباركود"
+                        className="flex-1"
+                      />
+                      <Button variant="default" onClick={handleBarcodeSearch} disabled={isSubmitting}>
+                        <BarcodeScan className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <p className="text-sm">البحث بالاسم</p>
+                    <div className="space-y-4">
+                      <MultiSelect
+                        options={productOptions}
+                        value={selectedProductIds}
+                        onChange={setSelectedProductIds}
+                        placeholder="البحث عن منتج"
+                        className="w-full"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-sm">الكمية</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={quantity}
+                            onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm">السبب</label>
+                          <Input
+                            placeholder="سبب الإرجاع"
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      
+                      <Button 
+                        onClick={handleSelectProduct} 
+                        disabled={selectedProductIds.length === 0 || isSubmitting}
+                        className="w-full"
+                      >
+                        إضافة المنتج
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="border rounded-md">
               <table className="w-full">
                 <thead className="bg-muted">
@@ -120,14 +380,22 @@ export function ReturnDetailsDialog({
                   </tr>
                 </thead>
                 <tbody>
-                  {returnData.items?.map((item, index) => (
-                    <tr key={index} className="border-t">
-                      <td className="text-right p-2">{item.product_name}</td>
-                      <td className="text-center p-2">{item.quantity}</td>
-                      <td className="text-center p-2">{formatCurrency(item.price)}</td>
-                      <td className="text-center p-2">{formatCurrency(item.total)}</td>
+                  {returnData.items && returnData.items.length > 0 ? (
+                    returnData.items.map((item, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="text-right p-2">{item.product_name}</td>
+                        <td className="text-center p-2">{item.quantity}</td>
+                        <td className="text-center p-2">{formatCurrency(item.price)}</td>
+                        <td className="text-center p-2">{formatCurrency(item.total)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="text-center p-4 text-muted-foreground">
+                        لا توجد منتجات مرتجعة
+                      </td>
                     </tr>
-                  ))}
+                  )}
                   <tr className="border-t bg-muted">
                     <td className="text-right p-2 font-medium" colSpan={3}>الإجمالي</td>
                     <td className="text-center p-2 font-medium">{formatCurrency(returnData.total_amount)}</td>

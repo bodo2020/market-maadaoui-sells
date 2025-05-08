@@ -6,7 +6,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, RotateCcw, FilterIcon, FileDown } from "lucide-react";
+import { Search, RotateCcw, FilterIcon, FileDown, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   Table,
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ReturnDetailsDialog } from "@/components/returns/ReturnDetailsDialog";
+import { CreateReturnDialog } from "@/components/returns/CreateReturnDialog";
 
 // Types
 interface ReturnItem {
@@ -54,6 +55,7 @@ export default function Returns() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [returnsRefreshKey, setReturnsRefreshKey] = useState(0);
 
   // Fetch returns data
@@ -99,7 +101,7 @@ export default function Returns() {
             
             return {
               ...returnItem,
-              customer_name: returnItem.customers?.name || 'غير معروف',
+              customer_name: returnItem.customers?.name || returnItem.customer_name || 'غير معروف',
               items
             };
           })
@@ -203,10 +205,16 @@ export default function Returns() {
       <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">إدارة المرتجعات</h1>
-          <Button variant="outline" size="sm" className="flex items-center gap-1">
-            <FileDown className="h-4 w-4" />
-            تصدير التقرير
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="default" size="sm" className="flex items-center gap-1" onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4" />
+              إضافة مرتجع جديد
+            </Button>
+            <Button variant="outline" size="sm" className="flex items-center gap-1">
+              <FileDown className="h-4 w-4" />
+              تصدير التقرير
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -378,9 +386,18 @@ export default function Returns() {
               } else if (newStatus === 'rejected') {
                 handleRejectReturn(returnId);
               }
+              setDetailsDialogOpen(false);
             }}
           />
         )}
+        
+        <CreateReturnDialog
+          open={createDialogOpen}
+          onOpenChange={setCreateDialogOpen}
+          onSuccess={() => {
+            setReturnsRefreshKey(prev => prev + 1);
+          }}
+        />
       </div>
     </MainLayout>
   );
