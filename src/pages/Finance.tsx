@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUpRight, ArrowDownLeft, TrendingUp, DollarSign, Store, ShoppingCart, Calendar as CalendarIcon } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, TrendingUp, DollarSign, Store, ShoppingCart, Calendar as CalendarIcon, RotateCcw } from "lucide-react";
 import { fetchFinancialSummary, fetchProfitsSummary } from "@/services/supabase/financeService";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -200,7 +200,7 @@ export default function Finance() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">إجمالي الأرباح</CardTitle>
@@ -212,7 +212,7 @@ export default function Finance() {
                 </div>
                 <div className="flex items-center text-xs text-green-500 mt-1">
                   <TrendingUp className="h-3 w-3 ml-1" />
-                  <span>إجمالي الأرباح قبل خصم المصروفات</span>
+                  <span>إجمالي الأرباح قبل خصم المصروفات والمرتجعات</span>
                 </div>
               </>}
           </CardContent>
@@ -220,16 +220,33 @@ export default function Finance() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">صافي الربح بعد المصروفات</CardTitle>
+            <CardTitle className="text-sm font-medium">المرتجعات</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingProfits ? <div className="text-2xl font-bold animate-pulse">تحميل...</div> : <>
+                <div className="text-2xl font-bold text-red-500">
+                  {formatCurrency(profitsData?.returns || 0)}
+                </div>
+                <div className="flex items-center text-xs text-red-500 mt-1">
+                  <RotateCcw className="h-3 w-3 ml-1" />
+                  <span>قيمة المرتجعات من المنتجات</span>
+                </div>
+              </>}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">صافي الربح بعد المصروفات والمرتجعات</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingProfits || isLoadingSummary ? <div className="text-2xl font-bold animate-pulse">تحميل...</div> : <>
                 <div className="text-2xl font-bold">
-                  {formatCurrency((profitsData?.storeProfits || 0) + (profitsData?.onlineProfits || 0) - (summaryData?.totalExpenses || 0))}
+                  {formatCurrency(profitsData?.netProfits || 0 - (summaryData?.totalExpenses || 0))}
                 </div>
                 <div className="flex items-center text-xs text-green-500 mt-1">
                   <DollarSign className="h-3 w-3 ml-1" />
-                  <span>صافي الربح بعد خصم المصروفات</span>
+                  <span>صافي الربح بعد خصم المصروفات والمرتجعات</span>
                 </div>
               </>}
           </CardContent>

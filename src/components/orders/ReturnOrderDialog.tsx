@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { OrderItem } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { updateProductQuantity } from "@/services/supabase/productService";
+import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 
 interface ReturnOrderDialogProps {
   orderId: string;
@@ -63,19 +65,21 @@ export function ReturnOrderDialog({
 
       const totalAmount = returnItems.reduce((sum, item) => sum + (item?.total || 0), 0);
 
+      // Create the return record
       const { data: returnData, error: returnError } = await supabase
         .from('returns')
         .insert({
           order_id: orderId,
           total_amount: totalAmount,
           reason,
-          status: 'pending'
+          status: 'approved' // Set to approved immediately
         })
         .select()
         .single();
 
       if (returnError) throw returnError;
 
+      // Add the return items
       const { error: itemsError } = await supabase
         .from('return_items')
         .insert(
@@ -87,14 +91,30 @@ export function ReturnOrderDialog({
 
       if (itemsError) throw itemsError;
 
+      // Update the order's return status
       const { error: orderError } = await supabase
         .from('online_orders')
-        .update({ return_status: 'pending' })
+        .update({ return_status: 'returned' })
         .eq('id', orderId);
 
       if (orderError) throw orderError;
 
-      toast.success("تم تقديم طلب الإرجاع بنجاح");
+      // Process inventory changes - add back returned items to inventory
+      for (const item of returnItems) {
+        if (!item) continue;
+        await updateProductQuantity(item.product_id, item.quantity); // Positive to add back to inventory
+      }
+
+      // Record the cash transaction for the return (negative amount)
+      await recordCashTransaction(
+        -totalAmount, // Negative amount for return
+        'withdrawal', 
+        RegisterType.ONLINE,
+        `مرتجع للطلب #${orderId.slice(0, 8)}`,
+        reason || "إرجاع منتج"
+      );
+
+      toast.success("تم تسجيل المرتجع بنجاح");
       onConfirm();
       onOpenChange(false);
     } catch (error) {
@@ -147,7 +167,7 @@ export function ReturnOrderDialog({
               إلغاء
             </Button>
             <Button onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting ? "جاري التقديم..." : "تقديم طلب الإرجاع"}
+              {isSubmitting ? "جاري التقديم..." : "تأكيد الإرجاع"}
             </Button>
           </div>
         </div>
