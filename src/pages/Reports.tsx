@@ -60,7 +60,8 @@ import {
   fetchFinancialSummary,
   exportReportToExcel,
   fetchCashierPerformance,
-  CashierPerformance
+  CashierPerformance,
+  PeriodType
 } from "@/services/supabase/financeService";
 import { 
   ChartContainer, 
@@ -84,7 +85,7 @@ function calculateProfitMargin(sellingPrice: number, costPrice: number): number 
 }
 
 export default function Reports() {
-  const [dateRange, setDateRange] = useState("month");
+  const [dateRange, setDateRange] = useState<PeriodType>("month");
   const [reportType, setReportType] = useState("sales");
   const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date | undefined>(endOfMonth(new Date()));
@@ -158,7 +159,7 @@ export default function Reports() {
     .slice(0, 5);
 
   const handleDateRangeChange = (value: string) => {
-    setDateRange(value);
+    setDateRange(value as PeriodType);
     if (value !== "custom") {
       setStartDate(undefined);
       setEndDate(undefined);

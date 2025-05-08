@@ -1,6 +1,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from "date-fns";
+import * as ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 export type PeriodType = "day" | "week" | "month" | "quarter" | "year" | "custom";
 
@@ -18,6 +20,16 @@ export type ProfitData = {
   returns: number; // New field to track returns
   netProfits: number; // New field for net profits after returns
 };
+
+export interface CashierPerformance {
+  id: string;
+  name: string;
+  date: string;
+  salesCount: number;
+  totalSales: number;
+  averageSale: number;
+  totalProfit: number;
+}
 
 /**
  * Get date range based on period type
@@ -248,6 +260,390 @@ export const fetchProfitsSummary = async (
     };
   } catch (error) {
     console.error("Error fetching profits summary:", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch monthly revenue data for charts
+ */
+export const fetchMonthlyRevenue = async (
+  period: string = "year",
+  startDate?: Date,
+  endDate?: Date
+) => {
+  try {
+    const dateRange = getDateRange(period as PeriodType, startDate, endDate);
+    
+    // Get monthly sales data
+    const { data: salesData, error: salesError } = await supabase
+      .from("sales")
+      .select("date, total")
+      .gte("date", dateRange.start.toISOString())
+      .lte("date", dateRange.end.toISOString());
+    
+    if (salesError) throw salesError;
+    
+    // Get monthly online sales data
+    const { data: onlineData, error: onlineError } = await supabase
+      .from("online_orders")
+      .select("created_at, total")
+      .eq("status", "done")
+      .eq("payment_status", "paid")
+      .gte("created_at", dateRange.start.toISOString())
+      .lte("created_at", dateRange.end.toISOString());
+    
+    if (onlineError) throw onlineError;
+    
+    // Process data by month
+    const revenueByMonth = new Map();
+    
+    // Process store sales
+    if (salesData) {
+      salesData.forEach((sale) => {
+        const date = new Date(sale.date);
+        const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+        const monthName = date.toLocaleString('ar-EG', { month: 'long' });
+        
+        if (!revenueByMonth.has(monthKey)) {
+          revenueByMonth.set(monthKey, { name: monthName, amount: 0 });
+        }
+        
+        revenueByMonth.get(monthKey).amount += sale.total || 0;
+      });
+    }
+    
+    // Process online sales
+    if (onlineData) {
+      onlineData.forEach((order) => {
+        const date = new Date(order.created_at);
+        const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
+        const monthName = date.toLocaleString('ar-EG', { month: 'long' });
+        
+        if (!revenueByMonth.has(monthKey)) {
+          revenueByMonth.set(monthKey, { name: monthName, amount: 0 });
+        }
+        
+        revenueByMonth.get(monthKey).amount += order.total || 0;
+      });
+    }
+    
+    // Convert map to array and sort by month
+    const result = Array.from(revenueByMonth.entries())
+      .map(([key, value]) => ({ monthKey: key, ...value }))
+      .sort((a, b) => {
+        const [aYear, aMonth] = a.monthKey.split('-').map(Number);
+        const [bYear, bMonth] = b.monthKey.split('-').map(Number);
+        
+        if (aYear !== bYear) return aYear - bYear;
+        return aMonth - bMonth;
+      });
+      
+    return result;
+  } catch (error) {
+    console.error("Error fetching monthly revenue data:", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch expenses by category for charts
+ */
+export const fetchExpensesByCategory = async (
+  period: string = "month",
+  startDate?: Date,
+  endDate?: Date
+) => {
+  try {
+    const dateRange = getDateRange(period as PeriodType, startDate, endDate);
+    
+    // Get expenses data with categories
+    const { data: expensesData, error: expensesError } = await supabase
+      .from("expenses")
+      .select("amount, category")
+      .gte("date", dateRange.start.toISOString())
+      .lte("date", dateRange.end.toISOString());
+    
+    if (expensesError) throw expensesError;
+    
+    // Process data by category
+    const expensesByCategory = new Map();
+    const colors = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
+    
+    if (expensesData) {
+      expensesData.forEach((expense) => {
+        const category = expense.category || 'أخرى';
+        
+        if (!expensesByCategory.has(category)) {
+          expensesByCategory.set(category, 0);
+        }
+        
+        expensesByCategory.set(
+          category, 
+          expensesByCategory.get(category) + (expense.amount || 0)
+        );
+      });
+    }
+    
+    // Convert map to array for chart display
+    let colorIndex = 0;
+    const result = Array.from(expensesByCategory.entries()).map(([name, value]) => {
+      const color = colors[colorIndex % colors.length];
+      colorIndex++;
+      return { name, value, color };
+    });
+    
+    return result;
+  } catch (error) {
+    console.error("Error fetching expenses by category:", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch cashier performance data
+ */
+export const fetchCashierPerformance = async (
+  period: string = "month",
+  startDate?: Date,
+  endDate?: Date
+): Promise<CashierPerformance[]> => {
+  try {
+    const dateRange = getDateRange(period as PeriodType, startDate, endDate);
+    
+    // Get sales data with cashier information
+    const { data: salesData, error: salesError } = await supabase
+      .from("sales")
+      .select("id, date, total, profit, created_by, user:created_by(id, name)")
+      .gte("date", dateRange.start.toISOString())
+      .lte("date", dateRange.end.toISOString());
+    
+    if (salesError) throw salesError;
+    
+    if (!salesData || salesData.length === 0) {
+      return [];
+    }
+    
+    // Process data by cashier and date
+    const performanceMap = new Map();
+    
+    salesData.forEach((sale) => {
+      const date = new Date(sale.date).toLocaleDateString('ar-EG');
+      const cashierId = sale.created_by;
+      const cashierName = sale.user?.name || 'غير معروف';
+      const mapKey = `${cashierId}-${date}`;
+      
+      if (!performanceMap.has(mapKey)) {
+        performanceMap.set(mapKey, {
+          id: cashierId,
+          name: cashierName,
+          date,
+          salesCount: 0,
+          totalSales: 0,
+          totalProfit: 0
+        });
+      }
+      
+      const record = performanceMap.get(mapKey);
+      record.salesCount += 1;
+      record.totalSales += sale.total || 0;
+      record.totalProfit += sale.profit || 0;
+    });
+    
+    // Calculate average sale amount and format as array
+    const result = Array.from(performanceMap.values()).map(record => {
+      const averageSale = record.salesCount > 0 
+        ? record.totalSales / record.salesCount
+        : 0;
+        
+      return {
+        ...record,
+        averageSale
+      };
+    });
+    
+    // Sort by date (newest first) and by salesCount within same date
+    result.sort((a, b) => {
+      if (a.date !== b.date) {
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      }
+      return b.salesCount - a.salesCount;
+    });
+    
+    return result;
+  } catch (error) {
+    console.error("Error fetching cashier performance:", error);
+    throw error;
+  }
+};
+
+/**
+ * Export report data to Excel file
+ */
+export const exportReportToExcel = async (
+  period: string,
+  reportType: string,
+  startDate?: Date,
+  endDate?: Date
+) => {
+  try {
+    const dateRange = getDateRange(period as PeriodType, startDate, endDate);
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('التقرير');
+
+    // Add report header with period information
+    const periodText = period === 'custom' && startDate && endDate
+      ? `${startDate.toLocaleDateString('ar-EG')} إلى ${endDate.toLocaleDateString('ar-EG')}`
+      : {
+          'day': 'اليوم',
+          'week': 'هذا الأسبوع',
+          'month': 'هذا الشهر',
+          'quarter': 'هذا الربع',
+          'year': 'هذا العام'
+        }[period] || 'غير محدد';
+
+    worksheet.columns = [
+      { header: 'تقرير النظام', key: 'header', width: 30 }
+    ];
+    worksheet.addRow([`تقرير ${reportType === 'sales' ? 'المبيعات' : 
+                          reportType === 'products' ? 'المنتجات' :
+                          reportType === 'cashiers' ? 'الكاشير' :
+                          reportType === 'profitability' ? 'الربحية' : 'الاتجاهات'}`]);
+    worksheet.addRow([`الفترة: ${periodText}`]);
+    worksheet.addRow([`تاريخ التصدير: ${new Date().toLocaleDateString('ar-EG')}`]);
+    worksheet.addRow([]);
+
+    let data;
+    // Add report data based on type
+    switch (reportType) {
+      case 'sales':
+        // Get sales data
+        const { data: salesData } = await supabase
+          .from("sales")
+          .select("*")
+          .gte("date", dateRange.start.toISOString())
+          .lte("date", dateRange.end.toISOString());
+          
+        data = salesData || [];
+        
+        // Configure columns for sales report
+        worksheet.columns = [
+          { header: 'رقم الفاتورة', key: 'invoice_number', width: 15 },
+          { header: 'التاريخ', key: 'date', width: 15 },
+          { header: 'المبلغ الإجمالي', key: 'total', width: 15 },
+          { header: 'الربح', key: 'profit', width: 15 },
+          { header: 'طريقة الدفع', key: 'payment_method', width: 15 }
+        ];
+        
+        // Add data rows
+        data.forEach(sale => {
+          worksheet.addRow({
+            invoice_number: sale.invoice_number,
+            date: new Date(sale.date).toLocaleDateString('ar-EG'),
+            total: sale.total,
+            profit: sale.profit,
+            payment_method: sale.payment_method === 'cash' ? 'نقداً' : 
+                           sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'
+          });
+        });
+        
+        // Add summary row
+        const totalSales = data.reduce((sum, sale) => sum + (sale.total || 0), 0);
+        const totalProfit = data.reduce((sum, sale) => sum + (sale.profit || 0), 0);
+        
+        worksheet.addRow([]);
+        worksheet.addRow(['الإجمالي', '', totalSales, totalProfit, '']);
+        break;
+        
+      case 'products':
+        // Get products data with sales information
+        // This would require joining or multiple queries in a real app
+        // For this example, we'll use mock data
+        const { data: products } = await supabase
+          .from("products")
+          .select("*");
+          
+        data = products || [];
+        
+        worksheet.columns = [
+          { header: 'اسم المنتج', key: 'name', width: 30 },
+          { header: 'السعر', key: 'price', width: 15 },
+          { header: 'سعر الشراء', key: 'purchase_price', width: 15 },
+          { header: 'الكمية المباعة', key: 'quantity_sold', width: 15 }, // Would need to be calculated from sales
+          { header: 'هامش الربح', key: 'profit_margin', width: 15 }
+        ];
+        
+        // Add product rows with sample sales data
+        data.forEach(product => {
+          const profitMargin = ((product.price - product.purchase_price) / product.price * 100).toFixed(1);
+          worksheet.addRow({
+            name: product.name,
+            price: product.price,
+            purchase_price: product.purchase_price,
+            quantity_sold: product.quantity || 0, // In a real app, calculate from sales
+            profit_margin: `${profitMargin}%`
+          });
+        });
+        break;
+        
+      case 'cashiers':
+        // Get cashier performance data
+        const cashierData = await fetchCashierPerformance(period, startDate, endDate);
+        data = cashierData || [];
+        
+        worksheet.columns = [
+          { header: 'التاريخ', key: 'date', width: 15 },
+          { header: 'اسم الكاشير', key: 'name', width: 20 },
+          { header: 'عدد المبيعات', key: 'salesCount', width: 15 },
+          { header: 'إجمالي المبيعات', key: 'totalSales', width: 15 },
+          { header: 'متوسط قيمة الفاتورة', key: 'averageSale', width: 20 },
+          { header: 'إجمالي الربح', key: 'totalProfit', width: 15 }
+        ];
+        
+        data.forEach(cashier => {
+          worksheet.addRow({
+            date: cashier.date,
+            name: cashier.name,
+            salesCount: cashier.salesCount,
+            totalSales: cashier.totalSales,
+            averageSale: cashier.averageSale,
+            totalProfit: cashier.totalProfit
+          });
+        });
+        break;
+        
+      default:
+        // Get summary financial data
+        const summary = await fetchFinancialSummary(period as PeriodType, startDate, endDate);
+        data = [summary];
+        
+        worksheet.columns = [
+          { header: 'المؤشر', key: 'metric', width: 30 },
+          { header: 'القيمة', key: 'value', width: 20 }
+        ];
+        
+        worksheet.addRow({ metric: 'إجمالي الإيرادات', value: data[0].totalRevenue });
+        worksheet.addRow({ metric: 'إجمالي المصروفات', value: data[0].totalExpenses });
+        worksheet.addRow({ metric: 'صافي الربح', value: data[0].netProfit });
+        worksheet.addRow({ metric: 'هامش الربح', value: `${data[0].profitMargin.toFixed(1)}%` });
+        worksheet.addRow({ metric: 'الرصيد النقدي', value: data[0].cashBalance });
+    }
+
+    // Set RTL direction for the worksheet
+    worksheet.rightToLeft = true;
+    
+    // Generate Excel file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const fileDate = new Date().toISOString().split('T')[0];
+    const fileName = `تقرير_${reportType}_${fileDate}.xlsx`;
+    
+    // Save file using FileSaver.js
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, fileName);
+    
+    return fileName;
+  } catch (error) {
+    console.error("Error exporting report to Excel:", error);
     throw error;
   }
 };
