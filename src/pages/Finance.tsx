@@ -242,7 +242,7 @@ export default function Finance() {
           <CardContent>
             {isLoadingProfits || isLoadingSummary ? <div className="text-2xl font-bold animate-pulse">تحميل...</div> : <>
                 <div className="text-2xl font-bold">
-                  {formatCurrency(profitsData?.netProfits || 0 - (summaryData?.totalExpenses || 0))}
+                  {formatCurrency((profitsData?.netProfits || 0) - (summaryData?.totalExpenses || 0))}
                 </div>
                 <div className="flex items-center text-xs text-green-500 mt-1">
                   <DollarSign className="h-3 w-3 ml-1" />
