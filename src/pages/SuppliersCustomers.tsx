@@ -6,30 +6,32 @@ import SuppliersList from "@/components/suppliers/SuppliersList";
 import CustomersList from "@/components/customers/CustomersList";
 import { Briefcase, User, Download, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function SuppliersCustomers() {
   const [activeTab, setActiveTab] = useState("suppliers");
+  const isMobile = useIsMobile();
   
   return (
     <MainLayout>
-      <div className="container mx-auto p-4">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">إدارة الموردين والعملاء</h1>
+      <div className="container mx-auto p-2 md:p-4">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4 md:mb-6">
+          <h1 className="text-xl md:text-2xl font-bold">إدارة الموردين والعملاء</h1>
           
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => console.log("تصفية")}>
-              <Filter className="ml-2 h-4 w-4" />
+            <Button variant="outline" size={isMobile ? "sm" : "default"} onClick={() => console.log("تصفية")}>
+              <Filter className={`ml-2 h-4 w-4 ${isMobile ? "h-3 w-3" : ""}`} />
               تصفية
             </Button>
-            <Button variant="outline" onClick={() => console.log("تصدير")}>
-              <Download className="ml-2 h-4 w-4" />
+            <Button variant="outline" size={isMobile ? "sm" : "default"} onClick={() => console.log("تصدير")}>
+              <Download className={`ml-2 h-4 w-4 ${isMobile ? "h-3 w-3" : ""}`} />
               تصدير
             </Button>
           </div>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2 mb-4 md:mb-6">
             <TabsTrigger value="suppliers" className="flex items-center">
               <Briefcase className="mr-2 h-4 w-4" /> الموردين
             </TabsTrigger>

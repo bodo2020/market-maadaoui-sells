@@ -52,11 +52,13 @@ export default function MainLayout({
     return <Navigate to="/login" />;
   }
   
-  return <div className="min-h-screen bg-gray-50 flex">
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       <Sidebar />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col w-full">
         <Navbar />
-        <main className="flex-1 p-6 rounded-lg px-0 py-0">{children}</main>
+        <main className="flex-1 p-3 md:p-6 rounded-lg">{children}</main>
       </div>
-    </div>;
+    </div>
+  );
 }

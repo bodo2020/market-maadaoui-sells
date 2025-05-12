@@ -13,6 +13,7 @@ import { Product } from "@/types";
 import { Form, FormField, FormItem, FormControl } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Types
 interface ReturnItem {
@@ -58,6 +59,7 @@ export function ReturnDetailsDialog({
   const [reason, setReason] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const isMobile = useIsMobile();
   
   const form = useForm({
     defaultValues: {
@@ -158,6 +160,22 @@ export function ReturnDetailsDialog({
       toast.error('حدث خطأ أثناء البحث عن المنتج');
     }
   };
+
+  // تنفيذ البحث بالباركود عند الضغط على زر Enter
+  const handleBarcodeKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleBarcodeSearch();
+    }
+  };
+
+  // تنفيذ المسح التلقائي للباركود عندما يتم إدخاله بالكامل
+  React.useEffect(() => {
+    // إذا كان طول الباركود يساوي 13 (وهو طول قياسي للباركود)، قم بالبحث تلقائيًا
+    if (barcode.length === 13) {
+      handleBarcodeSearch();
+    }
+  }, [barcode]);
 
   const addProductToReturn = async (newItem: ReturnItem) => {
     try {
@@ -281,13 +299,13 @@ export function ReturnDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl dir-rtl">
+      <DialogContent className={`${isMobile ? 'max-w-full p-3' : 'max-w-3xl'} dir-rtl`}>
         <DialogHeader>
           <DialogTitle className="text-xl">تفاصيل المرتجع #{returnData.id.slice(0, 8)}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-4 md:space-y-6 overflow-y-auto max-h-[calc(100vh-200px)]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">رقم الطلب</p>
               <p className="font-medium">{returnData.order_id ? returnData.order_id.slice(0, 8) : '-'}</p>
@@ -324,33 +342,34 @@ export function ReturnDetailsDialog({
               {returnData.status === 'pending' && (
                 <Button 
                   variant="outline" 
-                  size="sm" 
+                  size={isMobile ? "sm" : "default"} 
                   className="gap-1"
                   onClick={() => setIsAddingProduct(!isAddingProduct)}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
                   إضافة منتج
                 </Button>
               )}
             </div>
             
             {isAddingProduct && (
-              <div className="bg-muted p-4 rounded-md space-y-3 mb-3">
+              <div className="bg-muted p-3 md:p-4 rounded-md space-y-3 mb-3">
                 <h3 className="font-medium">إضافة منتج للمرتجع</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-2">
                     <p className="text-sm">البحث بالباركود</p>
                     <form onSubmit={handleBarcodeSearch} className="flex gap-2">
                       <Input
                         value={barcode}
                         onChange={(e) => setBarcode(e.target.value)}
+                        onKeyPress={handleBarcodeKeyPress}
                         placeholder="أدخل الباركود"
                         className="flex-1"
                         autoComplete="off"
                       />
-                      <Button variant="default" type="submit">
-                        <Barcode className="h-4 w-4" />
+                      <Button variant="default" type="submit" size={isMobile ? "sm" : "default"}>
+                        <Barcode className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
                       </Button>
                     </form>
                   </div>
@@ -388,14 +407,14 @@ export function ReturnDetailsDialog({
                     </div>
                     
                     {searchResults.length > 0 && (
-                      <div className="bg-white border rounded-md max-h-60 overflow-y-auto mt-1">
+                      <div className="bg-white border rounded-md max-h-40 md:max-h-60 overflow-y-auto mt-1">
                         {searchResults.map((product) => (
                           <div 
                             key={product.id} 
                             className="flex justify-between items-center p-2 hover:bg-gray-50 cursor-pointer border-b"
                           >
                             <div>
-                              <div className="font-medium">{product.name}</div>
+                              <div className="font-medium text-sm">{product.name}</div>
                               <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
                             </div>
                             <Button 
@@ -416,8 +435,8 @@ export function ReturnDetailsDialog({
               </div>
             )}
             
-            <div className="border rounded-md">
-              <table className="w-full">
+            <div className="border rounded-md overflow-x-auto">
+              <table className="w-full min-w-[500px]">
                 <thead className="bg-muted">
                   <tr>
                     <th className="text-right p-2">المنتج</th>
@@ -457,19 +476,25 @@ export function ReturnDetailsDialog({
               <>
                 <Button 
                   variant="destructive" 
+                  size={isMobile ? "sm" : "default"}
                   onClick={() => onStatusChange(returnData.id, 'rejected')}
                 >
                   رفض الإرجاع
                 </Button>
                 <Button 
                   variant="default"
+                  size={isMobile ? "sm" : "default"}
                   onClick={() => onStatusChange(returnData.id, 'approved')}
                 >
                   قبول الإرجاع
                 </Button>
               </>
             )}
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button 
+              variant="outline" 
+              size={isMobile ? "sm" : "default"}
+              onClick={() => onOpenChange(false)}
+            >
               إغلاق
             </Button>
           </div>
@@ -478,3 +503,4 @@ export function ReturnDetailsDialog({
     </Dialog>
   );
 }
+
