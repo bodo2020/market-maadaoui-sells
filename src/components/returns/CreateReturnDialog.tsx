@@ -228,7 +228,7 @@ export function CreateReturnDialog({
         .insert({
           order_id: orderId || null,
           customer_id: null,
-          customer_name: customerName || null, // إضافة اسم العميل بشكل مباشر
+          customer_name: customerName || null, // Using the new customer_name column
           reason: generalReason || null,
           status: 'pending',
           total_amount: calculateTotal()

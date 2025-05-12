@@ -100,8 +100,8 @@ export default function Returns() {
               })
             );
             
-            // Add customer_name property derived from customers.name or default value
-            const customer_name = returnItem.customers?.name || 'غير معروف';
+            // Add customer_name property derived from customers.name, direct customer_name field, or default value
+            const customer_name = returnItem.customer_name || returnItem.customers?.name || 'غير معروف';
             
             return {
               ...returnItem,
