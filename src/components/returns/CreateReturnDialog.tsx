@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { Textarea } from "@/components/ui/textarea";
 import { Product } from "@/types";
 import { siteConfig } from "@/config/site";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ReturnItem {
   product_id: string;
@@ -47,6 +48,7 @@ export function CreateReturnDialog({
   const [orderId, setOrderId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const isMobile = useIsMobile();
 
   const form = useForm({
     defaultValues: {
@@ -120,6 +122,14 @@ export function CreateReturnDialog({
     } catch (error) {
       console.error('Error fetching product by barcode:', error);
       toast.error('حدث خطأ أثناء البحث عن المنتج');
+    }
+  };
+
+  // تنفيذ البحث بالباركود عند الضغط على زر Enter
+  const handleBarcodeKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleBarcodeSearch();
     }
   };
 
@@ -212,12 +222,13 @@ export function CreateReturnDialog({
     try {
       setIsSubmitting(true);
       
-      // Create the return record
+      // Create the return record with customer_name included
       const { data: newReturn, error: returnError } = await supabase
         .from('returns')
         .insert({
           order_id: orderId || null,
-          customer_id: null, // Using customer_id instead of customer_name
+          customer_id: null,
+          customer_name: customerName || null, // إضافة اسم العميل بشكل مباشر
           reason: generalReason || null,
           status: 'pending',
           total_amount: calculateTotal()
@@ -265,15 +276,23 @@ export function CreateReturnDialog({
     }
   };
 
+  // تنفيذ المسح التلقائي للباركود عندما يتم إدخاله بالكامل
+  useEffect(() => {
+    // إذا كان طول الباركود يساوي 13 (وهو طول قياسي للباركود)، قم بالبحث تلقائيًا
+    if (barcode.length === 13) {
+      handleBarcodeSearch();
+    }
+  }, [barcode]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl dir-rtl">
+      <DialogContent className={`${isMobile ? 'max-w-full p-3' : 'max-w-3xl'} dir-rtl`}>
         <DialogHeader>
           <DialogTitle className="text-xl">إنشاء مرتجع جديد</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4 md:space-y-6 overflow-y-auto max-h-[calc(100vh-200px)]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <div className="space-y-2">
               <Label htmlFor="orderId">رقم الطلب (اختياري)</Label>
               <Input 
@@ -293,26 +312,27 @@ export function CreateReturnDialog({
           </div>
           
           <div className="border-t pt-4">
-            <h3 className="font-medium mb-4">إضافة منتجات للمرتجع</h3>
+            <h3 className="font-medium mb-3 md:mb-4">إضافة منتجات للمرتجع</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+              <div className="space-y-2 md:space-y-3">
                 <Label>البحث بالباركود</Label>
                 <form onSubmit={handleBarcodeSearch} className="flex gap-2">
                   <Input
                     value={barcode}
                     onChange={(e) => setBarcode(e.target.value)}
+                    onKeyPress={handleBarcodeKeyPress}
                     placeholder="أدخل الباركود"
                     className="flex-1"
                     autoComplete="off"
                   />
-                  <Button variant="default" type="submit">
-                    <Barcode className="h-4 w-4" />
+                  <Button variant="default" type="submit" size={isMobile ? "sm" : "default"}>
+                    <Barcode className={`${isMobile ? 'h-3.5 w-3.5' : 'h-4 w-4'}`} />
                   </Button>
                 </form>
               </div>
               
-              <div className="space-y-3">
+              <div className="space-y-2 md:space-y-3">
                 <Label>البحث بالاسم</Label>
                 <div className="space-y-2">
                   <Input
@@ -325,7 +345,7 @@ export function CreateReturnDialog({
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-2">
+                  <div className="space-y-1 md:space-y-2">
                     <Label>الكمية</Label>
                     <Input
                       type="number"
@@ -335,7 +355,7 @@ export function CreateReturnDialog({
                     />
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-1 md:space-y-2">
                     <Label>سبب الإرجاع (للمنتج)</Label>
                     <Input
                       placeholder="سبب إرجاع المنتج"
@@ -346,14 +366,14 @@ export function CreateReturnDialog({
                 </div>
 
                 {searchResults.length > 0 && (
-                  <div className="bg-white border rounded-md max-h-60 overflow-y-auto mt-1">
+                  <div className="bg-white border rounded-md max-h-40 md:max-h-60 overflow-y-auto mt-1">
                     {searchResults.map((product) => (
                       <div 
                         key={product.id} 
                         className="flex justify-between items-center p-2 hover:bg-gray-50 cursor-pointer border-b"
                       >
                         <div>
-                          <div className="font-medium">{product.name}</div>
+                          <div className="font-medium text-sm md:text-base">{product.name}</div>
                           <div className="text-xs text-muted-foreground">{formatCurrency(product.price)}</div>
                         </div>
                         <Button 
@@ -373,8 +393,8 @@ export function CreateReturnDialog({
           </div>
           
           {returnItems.length > 0 && (
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full">
+            <div className="border rounded-md overflow-x-auto">
+              <table className="w-full min-w-[500px]">
                 <thead className="bg-muted">
                   <tr>
                     <th className="p-2 text-right">المنتج</th>
@@ -424,7 +444,7 @@ export function CreateReturnDialog({
             />
           </div>
           
-          <DialogFooter className="flex justify-end gap-2 dir-rtl">
+          <DialogFooter className="flex justify-end gap-2 dir-rtl pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               إلغاء
             </Button>
