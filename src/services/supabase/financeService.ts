@@ -256,18 +256,23 @@ export const fetchProfitsSummary = async (
       for (const order of onlineOrdersData) {
         if (order.items && Array.isArray(order.items)) {
           // Calculate based on actual items data
-          for (const item of order.items as OrderItem[]) {
-            // Fetch product details to get purchase price
-            const { data: productData } = await supabase
-              .from("products")
-              .select("purchase_price, price")
-              .eq("id", item.product_id)
-              .single();
-            
-            if (productData) {
-              // Calculate profit for this item: (selling price - purchase price) * quantity
-              const itemProfit = (productData.price - productData.purchase_price) * item.quantity;
-              onlineProfits += itemProfit;
+          // First cast to unknown, then to our type to avoid TypeScript errors
+          for (const itemRaw of order.items) {
+            // Safely access properties with type checking
+            const item = itemRaw as unknown as OrderItem;
+            if (typeof item.product_id === 'string' && typeof item.quantity === 'number') {
+              // Fetch product details to get purchase price
+              const { data: productData } = await supabase
+                .from("products")
+                .select("purchase_price, price")
+                .eq("id", item.product_id)
+                .single();
+              
+              if (productData) {
+                // Calculate profit for this item: (selling price - purchase price) * quantity
+                const itemProfit = (productData.price - productData.purchase_price) * item.quantity;
+                onlineProfits += itemProfit;
+              }
             }
           }
         } else {
@@ -290,22 +295,27 @@ export const fetchProfitsSummary = async (
       for (const ret of returnsData) {
         // Process return items if available
         if (ret.return_items && ret.return_items.length > 0) {
-          for (const item of ret.return_items as ReturnItem[]) {
-            // Get product details to determine actual profit impact
-            const { data: productData } = await supabase
-              .from("products")
-              .select("purchase_price")
-              .eq("id", item.product_id)
-              .single();
-            
-            if (productData) {
-              // Calculate actual profit impact: (selling price - purchase price) * quantity
-              // This is the EXACT profit margin that needs to be subtracted
-              const itemProfitImpact = (item.price - productData.purchase_price) * item.quantity;
-              returnsProfitImpact += itemProfitImpact;
-            } else {
-              // If product not found, use a conservative estimate
-              returnsProfitImpact += item.price * 0.15 * item.quantity;
+          // Safely cast to our ReturnItem type
+          for (const itemRaw of ret.return_items) {
+            // Type guard to ensure we have the required properties
+            const item = itemRaw as ReturnItem;
+            if (typeof item.product_id === 'string' && typeof item.quantity === 'number' && typeof item.price === 'number') {
+              // Get product details to determine actual profit impact
+              const { data: productData } = await supabase
+                .from("products")
+                .select("purchase_price")
+                .eq("id", item.product_id)
+                .single();
+              
+              if (productData) {
+                // Calculate actual profit impact: (selling price - purchase price) * quantity
+                // This is the EXACT profit margin that needs to be subtracted
+                const itemProfitImpact = (item.price - productData.purchase_price) * item.quantity;
+                returnsProfitImpact += itemProfitImpact;
+              } else {
+                // If product not found, use a conservative estimate
+                returnsProfitImpact += item.price * 0.15 * item.quantity;
+              }
             }
           }
         } else {
