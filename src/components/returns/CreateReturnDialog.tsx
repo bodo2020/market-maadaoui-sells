@@ -222,13 +222,22 @@ export function CreateReturnDialog({
     try {
       setIsSubmitting(true);
       
+      console.log("Creating return with data:", {
+        order_id: orderId || null,
+        customer_id: null,
+        customer_name: customerName || null,
+        reason: generalReason || null,
+        status: 'pending',
+        total_amount: calculateTotal()
+      });
+      
       // Create the return record with customer_name included
       const { data: newReturn, error: returnError } = await supabase
         .from('returns')
         .insert({
           order_id: orderId || null,
           customer_id: null,
-          customer_name: customerName || null, // Using the new customer_name column
+          customer_name: customerName || null,
           reason: generalReason || null,
           status: 'pending',
           total_amount: calculateTotal()
@@ -236,7 +245,12 @@ export function CreateReturnDialog({
         .select()
         .single();
       
-      if (returnError) throw returnError;
+      if (returnError) {
+        console.error("Return creation error details:", returnError);
+        throw returnError;
+      }
+      
+      console.log("Return created successfully:", newReturn);
       
       // Add return items
       const returnItemsToInsert = returnItems.map(item => ({
@@ -248,11 +262,16 @@ export function CreateReturnDialog({
         reason: item.reason
       }));
       
+      console.log("Inserting return items:", returnItemsToInsert);
+      
       const { error: itemsError } = await supabase
         .from('return_items')
         .insert(returnItemsToInsert);
       
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error("Return items creation error:", itemsError);
+        throw itemsError;
+      }
       
       toast.success('تم إنشاء المرتجع بنجاح');
       
@@ -268,9 +287,20 @@ export function CreateReturnDialog({
       // Refresh parent component
       if (onSuccess) onSuccess();
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating return:', error);
-      toast.error('حدث خطأ أثناء إنشاء المرتجع');
+      
+      // Enhanced error message
+      let errorMessage = 'حدث خطأ أثناء إنشاء المرتجع';
+      
+      // Try to extract more specific error details
+      if (error.message) {
+        errorMessage += `: ${error.message}`;
+      }
+      
+      toast.error(errorMessage, {
+        duration: 5000,
+      });
     } finally {
       setIsSubmitting(false);
     }
