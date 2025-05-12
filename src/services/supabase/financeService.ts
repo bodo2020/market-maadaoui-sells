@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from "date-fns";
 import * as ExcelJS from "exceljs";
@@ -242,48 +241,62 @@ export const fetchProfitsSummary = async (
     if (onlineOrdersData) {
       for (const order of onlineOrdersData) {
         if (order.items && Array.isArray(order.items)) {
-          // Estimate 30% profit margin for online orders if exact profit not available
-          onlineProfits += order.total * 0.3;
+          // Calculate based on actual items data
+          for (const item of order.items) {
+            // Fetch product details to get purchase price
+            const { data: productData } = await supabase
+              .from("products")
+              .select("purchase_price, price")
+              .eq("id", item.product_id)
+              .single();
+            
+            if (productData) {
+              // Calculate profit for this item: (selling price - purchase price) * quantity
+              const itemProfit = (productData.price - productData.purchase_price) * item.quantity;
+              onlineProfits += itemProfit;
+            }
+          }
+        } else {
+          // Fallback if no items data available
+          onlineProfits += order.total * 0.15; // Use a conservative profit margin estimate
         }
       }
     }
 
-    // Calculate total returns amount and the actual profit impact
+    // Calculate total returns amount
     const returns = returnsData?.reduce((sum, ret) => sum + (ret.total_amount || 0), 0) || 0;
     
-    // This is the important change: We're now calculating the exact profit loss from returns
-    // For each returned item, the profit impact is (selling price - purchase price) * quantity
-    const returnsProfitImpact = returnsData?.reduce((sum, ret) => {
-      let returnProfit = 0;
-      
-      if (ret.return_items && Array.isArray(ret.return_items)) {
-        // Get product details for each returned item to determine purchase price
-        const productPromises = ret.return_items.map(async (item) => {
-          const { data: productData } = await supabase
-            .from("products")
-            .select("purchase_price")
-            .eq("id", item.product_id)
-            .single();
-          
-          if (productData) {
-            // Profit impact = (selling price - purchase price) * quantity
-            const profitImpact = (item.price - productData.purchase_price) * item.quantity;
-            return profitImpact;
+    // Calculate the actual profit impact of returns
+    let returnsProfitImpact = 0;
+    
+    if (returnsData && returnsData.length > 0) {
+      // Process each return
+      for (const ret of returnsData) {
+        // Process return items if available
+        if (ret.return_items && ret.return_items.length > 0) {
+          for (const item of ret.return_items) {
+            // Get product details to determine actual profit impact
+            const { data: productData } = await supabase
+              .from("products")
+              .select("purchase_price")
+              .eq("id", item.product_id)
+              .single();
+            
+            if (productData) {
+              // Calculate actual profit impact: (selling price - purchase price) * quantity
+              const itemProfitImpact = (item.price - productData.purchase_price) * item.quantity;
+              returnsProfitImpact += itemProfitImpact;
+            } else {
+              // If product not found, use a more conservative estimate
+              returnsProfitImpact += item.price * 0.15 * item.quantity;
+            }
           }
-          return 0;
-        });
-        
-        // This is a synchronous operation since we're inside an async function
-        // In a real app, this would use Promise.all, but for simplicity and to avoid changing
-        // too much of the existing code structure, we'll use an estimated approach
+        } else {
+          // For returns without detailed items, use a conservative estimate
+          returnsProfitImpact += ret.total_amount * 0.15;
+        }
       }
-      
-      // For simplicity and to avoid changing the structure too much,
-      // we'll still use the 30% estimate if items details aren't available
-      returnProfit = ret.total_amount * 0.3;
-      
-      return sum + returnProfit;
-    }, 0) || 0;
+    }
     
     // Calculate net profits after returns (only deduct the profit impact, not full return value)
     const netProfits = storeProfits + onlineProfits - returnsProfitImpact;
