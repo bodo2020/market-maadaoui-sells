@@ -213,35 +213,45 @@ export function CreateReturnDialog({
     return returnItems.reduce((total, item) => total + item.total, 0);
   };
 
+  const validateOrderId = (value: string): boolean => {
+    // If empty, it's valid (will be stored as null)
+    if (!value || value.trim() === '') return true;
+    
+    // UUID validation regex pattern
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidPattern.test(value);
+  };
+
   const handleSubmit = async () => {
     if (returnItems.length === 0) {
       toast.error('الرجاء إضافة منتج واحد على الأقل');
       return;
     }
 
+    // Validate order_id if provided
+    if (orderId && !validateOrderId(orderId)) {
+      toast.error('رقم الطلب غير صحيح، يجب أن يكون قيمة معرف فريد (UUID)');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       
-      console.log("Creating return with data:", {
-        order_id: orderId || null,
+      const returnData = {
+        order_id: orderId && orderId.trim() !== '' ? orderId : null,
         customer_id: null,
-        customer_name: customerName || null,
-        reason: generalReason || null,
+        customer_name: customerName && customerName.trim() !== '' ? customerName : null,
+        reason: generalReason && generalReason.trim() !== '' ? generalReason : null,
         status: 'pending',
         total_amount: calculateTotal()
-      });
+      };
       
-      // Create the return record with customer_name included
+      console.log("Creating return with data:", returnData);
+      
+      // Create the return record
       const { data: newReturn, error: returnError } = await supabase
         .from('returns')
-        .insert({
-          order_id: orderId || null,
-          customer_id: null,
-          customer_name: customerName || null,
-          reason: generalReason || null,
-          status: 'pending',
-          total_amount: calculateTotal()
-        })
+        .insert(returnData)
         .select()
         .single();
       
@@ -329,6 +339,7 @@ export function CreateReturnDialog({
                 id="orderId"
                 value={orderId} 
                 onChange={(e) => setOrderId(e.target.value)} 
+                placeholder="اتركه فارغًا أو أدخل معرف الطلب"
               />
             </div>
             <div className="space-y-2">
