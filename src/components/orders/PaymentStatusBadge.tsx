@@ -8,10 +8,10 @@ import {
   BadgeDollarSign 
 } from "lucide-react";
 import { 
+  TooltipProvider, 
   Tooltip, 
   TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
+  TooltipTrigger
 } from "@/components/ui/tooltip";
 import {
   DropdownMenu,

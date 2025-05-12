@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { supabase } from "@/integrations/supabase/client";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -53,12 +54,14 @@ export default function MainLayout({
   }
   
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      <Sidebar />
-      <div className="flex-1 flex flex-col w-full">
-        <Navbar />
-        <main className="flex-1 p-3 md:p-6 rounded-lg">{children}</main>
+    <TooltipProvider>
+      <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+        <Sidebar />
+        <div className="flex-1 flex flex-col w-full">
+          <Navbar />
+          <main className="flex-1 p-3 md:p-6 rounded-lg">{children}</main>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

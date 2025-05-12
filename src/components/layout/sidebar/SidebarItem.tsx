@@ -6,6 +6,7 @@ import { LucideIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
@@ -50,19 +51,21 @@ export function SidebarItem({
 
   if (collapsed) {
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          {button}
-        </TooltipTrigger>
-        <TooltipContent side="right">
-          <p>{label}</p>
-          {badge !== undefined && badge > 0 && (
-            <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-destructive text-white">
-              {badge}
-            </span>
-          )}
-        </TooltipContent>
-      </Tooltip>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {button}
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>{label}</p>
+            {badge !== undefined && badge > 0 && (
+              <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-destructive text-white">
+                {badge}
+              </span>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   }
 
