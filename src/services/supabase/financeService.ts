@@ -17,8 +17,9 @@ export type FinancialSummaryData = {
 export type ProfitData = {
   storeProfits: number;
   onlineProfits: number;
-  returns: number; // New field to track returns
-  netProfits: number; // New field for net profits after returns
+  returns: number; // Total returns value
+  returnsProfitImpact: number; // New field tracking only the profit impact of returns
+  netProfits: number; // Net profits after considering only profit impact of returns
 };
 
 export interface CashierPerformance {
@@ -214,10 +215,18 @@ export const fetchProfitsSummary = async (
     
     if (onlineOrdersError) throw onlineOrdersError;
 
-    // Get returns
+    // Get returns and their items to calculate profit impact
     const { data: returnsData, error: returnsError } = await supabase
       .from("returns")
-      .select("total_amount")
+      .select(`
+        id, 
+        total_amount,
+        return_items (
+          product_id,
+          quantity,
+          price
+        )
+      `)
       .eq("status", "approved")
       .gte("created_at", dateRange.start.toISOString())
       .lte("created_at", dateRange.end.toISOString());
@@ -239,16 +248,33 @@ export const fetchProfitsSummary = async (
       }
     }
 
-    // Calculate total returns amount
+    // Calculate total returns amount and estimated profit impact (assuming 30% profit margin)
+    // This means we only count the lost profit from returns, not the full return value
     const returns = returnsData?.reduce((sum, ret) => sum + (ret.total_amount || 0), 0) || 0;
+    const returnsProfitImpact = returnsData?.reduce((sum, ret) => {
+      // Calculate the profit impact for each return based on its items
+      let returnProfit = 0;
+      if (ret.return_items && Array.isArray(ret.return_items)) {
+        returnProfit = ret.return_items.reduce((itemSum, item) => {
+          // Assume 30% profit margin on each returned item
+          const profitPerItem = item.price * 0.3;
+          return itemSum + (profitPerItem * item.quantity);
+        }, 0);
+      } else {
+        // Fallback: if items not available, assume 30% of total
+        returnProfit = ret.total_amount * 0.3;
+      }
+      return sum + returnProfit;
+    }, 0) || 0;
     
-    // Calculate net profits after returns
-    const netProfits = storeProfits + onlineProfits - returns;
+    // Calculate net profits after returns (only deduct the profit impact, not full return value)
+    const netProfits = storeProfits + onlineProfits - returnsProfitImpact;
     
     console.log("Profits summary results:", {
       storeProfits,
       onlineProfits,
       returns,
+      returnsProfitImpact,
       netProfits
     });
     
@@ -256,6 +282,7 @@ export const fetchProfitsSummary = async (
       storeProfits,
       onlineProfits,
       returns,
+      returnsProfitImpact,
       netProfits
     };
   } catch (error) {

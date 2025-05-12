@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
@@ -227,9 +226,9 @@ export default function Finance() {
                 <div className="text-2xl font-bold text-red-500">
                   {formatCurrency(profitsData?.returns || 0)}
                 </div>
-                <div className="flex items-center text-xs text-red-500 mt-1">
+                <div className="flex items-center text-xs text-muted-foreground mt-1">
                   <RotateCcw className="h-3 w-3 ml-1" />
-                  <span>قيمة المرتجعات من المنتجات</span>
+                  <span>إجمالي قيمة المرتجعات (تأثير الربح: {formatCurrency(profitsData?.returnsProfitImpact || 0)})</span>
                 </div>
               </>}
           </CardContent>
@@ -246,7 +245,7 @@ export default function Finance() {
                 </div>
                 <div className="flex items-center text-xs text-green-500 mt-1">
                   <DollarSign className="h-3 w-3 ml-1" />
-                  <span>صافي الربح بعد خصم المصروفات والمرتجعات</span>
+                  <span>صافي الربح بعد خصم المصروفات وتأثير المرتجعات</span>
                 </div>
               </>}
           </CardContent>
