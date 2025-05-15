@@ -1,8 +1,15 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderItem } from "@/types";
 import { toast } from "sonner";
+
+interface CustomerData {
+  id?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  phone_verified?: boolean;
+}
 
 export function useOrderDetails(orderId: string) {
   const [order, setOrder] = useState<Order | null>(null);
@@ -82,12 +89,14 @@ export function useOrderDetails(orderId: string) {
           return transformedItems;
         };
         
-        // Get customer info safely by ensuring customers is an object with expected properties
-        const customerData = data.customers || {};
-        const customerName = typeof customerData === 'object' && customerData !== null ? customerData.name || '' : '';
-        const customerEmail = typeof customerData === 'object' && customerData !== null ? customerData.email || '' : '';
-        const customerPhone = typeof customerData === 'object' && customerData !== null ? customerData.phone || '' : '';
-        const customerPhoneVerified = typeof customerData === 'object' && customerData !== null ? Boolean(customerData.phone_verified) : false;
+        // Handle customer data safely with proper typing
+        const customerData = (data.customers || {}) as CustomerData;
+        
+        // Extract customer properties with safe fallbacks
+        const customerName = customerData.name || '';
+        const customerEmail = customerData.email || '';
+        const customerPhone = customerData.phone || '';
+        const customerPhoneVerified = Boolean(customerData.phone_verified);
         
         const transformedItems = await transformItems(data.items);
         

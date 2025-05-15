@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,9 +11,19 @@ import { toast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Order, OrderItem } from "@/types";
 
+interface CustomerData {
+  id?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  phone_verified?: boolean;
+  address?: string | null;
+  notes?: string | null;
+}
+
 export default function CustomerProfile() {
   const { customerId } = useParams();
-  const [customer, setCustomer] = useState<any>(null);
+  const [customer, setCustomer] = useState<CustomerData | null>(null);
   const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -82,11 +91,12 @@ export default function CustomerProfile() {
               }
             }
 
-            // Safely access customer data
-            const customerName = customerData ? customerData.name || '' : '';
-            const customerEmail = customerData ? customerData.email || '' : '';
-            const customerPhone = customerData ? customerData.phone || '' : '';
-            const customerPhoneVerified = customerData ? Boolean(customerData.phone_verified) : false;
+            // Safely access customer data using the typed interface
+            const typedCustomerData = customerData as CustomerData;
+            const customerName = typedCustomerData?.name || '';
+            const customerEmail = typedCustomerData?.email || '';
+            const customerPhone = typedCustomerData?.phone || '';
+            const customerPhoneVerified = Boolean(typedCustomerData?.phone_verified);
             
             // Create a properly typed order object
             transformedOrders.push({
@@ -110,7 +120,7 @@ export default function CustomerProfile() {
           }
         }
         
-        setCustomer(customerData);
+        setCustomer(customerData as CustomerData);
         setCustomerOrders(transformedOrders);
       } catch (error) {
         console.error('Error fetching customer data:', error);
