@@ -23,10 +23,26 @@ export function useOrderDetails(orderId: string) {
       setIsLoading(true);
       console.log("Fetching order details for ID:", orderId);
       
-      // Get base order data first
+      // Get base order data first with all fields explicitly selected
       const { data, error } = await supabase.from('online_orders')
         .select(`
-          *,
+          id, 
+          created_at, 
+          total, 
+          status, 
+          payment_status, 
+          payment_method, 
+          shipping_address, 
+          items, 
+          customer_id, 
+          notes, 
+          tracking_number, 
+          delivery_person,
+          return_status,
+          governorate_id, 
+          city_id, 
+          area_id, 
+          neighborhood_id,
           customers(
             id,
             name,
