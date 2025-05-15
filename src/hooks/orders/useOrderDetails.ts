@@ -23,7 +23,7 @@ export function useOrderDetails(orderId: string) {
       setIsLoading(true);
       console.log("Fetching order details for ID:", orderId);
       
-      // Get order with location information through inner joins
+      // Get base order data first
       const { data, error } = await supabase.from('online_orders')
         .select(`
           *,
@@ -33,11 +33,7 @@ export function useOrderDetails(orderId: string) {
             email,
             phone,
             phone_verified
-          ),
-          governorates:governorate_id(id, name),
-          cities:city_id(id, name),
-          areas:area_id(id, name),
-          neighborhoods:neighborhood_id(id, name)
+          )
         `)
         .eq('id', orderId)
         .single();
@@ -45,6 +41,60 @@ export function useOrderDetails(orderId: string) {
       if (error) throw error;
       
       if (data) {
+        // Fetch location data separately if we have the IDs
+        let governorateName = '';
+        let cityName = '';
+        let areaName = '';
+        let neighborhoodName = '';
+        
+        if (data.governorate_id) {
+          const { data: governorate } = await supabase
+            .from('governorates')
+            .select('name')
+            .eq('id', data.governorate_id)
+            .single();
+          
+          if (governorate) {
+            governorateName = governorate.name;
+          }
+        }
+        
+        if (data.city_id) {
+          const { data: city } = await supabase
+            .from('cities')
+            .select('name')
+            .eq('id', data.city_id)
+            .single();
+          
+          if (city) {
+            cityName = city.name;
+          }
+        }
+        
+        if (data.area_id) {
+          const { data: area } = await supabase
+            .from('areas')
+            .select('name')
+            .eq('id', data.area_id)
+            .single();
+          
+          if (area) {
+            areaName = area.name;
+          }
+        }
+        
+        if (data.neighborhood_id) {
+          const { data: neighborhood } = await supabase
+            .from('neighborhoods')
+            .select('name')
+            .eq('id', data.neighborhood_id)
+            .single();
+          
+          if (neighborhood) {
+            neighborhoodName = neighborhood.name;
+          }
+        }
+        
         const validateOrderStatus = (status: string): Order['status'] => {
           const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
           return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
@@ -105,12 +155,6 @@ export function useOrderDetails(orderId: string) {
         const customerPhoneVerified = Boolean(customerData.phone_verified);
         
         const transformedItems = await transformItems(data.items);
-        
-        // Extract location names if available
-        const governorateName = data.governorates?.name || '';
-        const cityName = data.cities?.name || '';
-        const areaName = data.areas?.name || '';
-        const neighborhoodName = data.neighborhoods?.name || '';
         
         const orderObj: Order = {
           id: data.id,
