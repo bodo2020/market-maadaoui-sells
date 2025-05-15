@@ -83,11 +83,11 @@ export function useOrderDetails(orderId: string) {
         };
         
         // Get customer info safely
-        const customer = data.customers || {};
-        const customerName = customer.name || '';
-        const customerEmail = customer.email || '';
-        const customerPhone = customer.phone || '';
-        const customerPhoneVerified = !!customer.phone_verified;
+        const customerData = data.customers || {};
+        const customerName = customerData.name || '';
+        const customerEmail = customerData.email || '';
+        const customerPhone = customerData.phone || '';
+        const customerPhoneVerified = Boolean(customerData.phone_verified);
         
         const transformedItems = await transformItems(data.items);
         

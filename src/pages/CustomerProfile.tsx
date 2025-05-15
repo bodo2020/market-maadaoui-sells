@@ -29,10 +29,10 @@ export default function CustomerProfile() {
       try {
         setLoading(true);
         
-        // Fetch customer data
+        // Fetch customer data with phone_verified field
         const { data: customerData, error: customerError } = await supabase
           .from('customers')
-          .select('*')
+          .select('*, phone_verified')
           .eq('id', customerId)
           .single();
         
@@ -96,7 +96,7 @@ export default function CustomerProfile() {
               customer_name: customerData?.name || '',
               customer_email: customerData?.email || '',
               customer_phone: customerData?.phone || '',
-              customer_phone_verified: customerData?.phone_verified || false,
+              customer_phone_verified: Boolean(customerData?.phone_verified),
               notes: orderData.notes || '',
               tracking_number: orderData.tracking_number || null,
               delivery_person: orderData.delivery_person || null
@@ -105,7 +105,7 @@ export default function CustomerProfile() {
         }
         
         setCustomer(customerData);
-        setCustomerOrders(transformedOrders);
+        setCustomerOrders(transformedOrders as Order[]);
       } catch (error) {
         console.error('Error fetching customer data:', error);
         toast({ description: "حدث خطأ أثناء تحميل بيانات العميل", variant: "destructive" });
