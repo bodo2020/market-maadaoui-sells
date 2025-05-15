@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderItem } from "@/types";
@@ -23,26 +22,10 @@ export function useOrderDetails(orderId: string) {
       setIsLoading(true);
       console.log("Fetching order details for ID:", orderId);
       
-      // Get base order data first with all fields explicitly selected
+      // Get base order data first with standard fields
       const { data, error } = await supabase.from('online_orders')
         .select(`
-          id, 
-          created_at, 
-          total, 
-          status, 
-          payment_status, 
-          payment_method, 
-          shipping_address, 
-          items, 
-          customer_id, 
-          notes, 
-          tracking_number, 
-          delivery_person,
-          return_status,
-          governorate_id, 
-          city_id, 
-          area_id, 
-          neighborhood_id,
+          *,
           customers(
             id,
             name,
@@ -57,57 +40,68 @@ export function useOrderDetails(orderId: string) {
       if (error) throw error;
       
       if (data) {
-        // Fetch location data separately if we have the IDs
+        // Define location variables with default empty values
         let governorateName = '';
         let cityName = '';
         let areaName = '';
         let neighborhoodName = '';
         
-        if (data.governorate_id) {
-          const { data: governorate } = await supabase
-            .from('governorates')
-            .select('name')
-            .eq('id', data.governorate_id)
-            .single();
-          
-          if (governorate) {
-            governorateName = governorate.name;
-          }
-        }
-        
-        if (data.city_id) {
-          const { data: city } = await supabase
-            .from('cities')
-            .select('name')
-            .eq('id', data.city_id)
-            .single();
-          
-          if (city) {
-            cityName = city.name;
-          }
-        }
-        
-        if (data.area_id) {
-          const { data: area } = await supabase
-            .from('areas')
-            .select('name')
-            .eq('id', data.area_id)
-            .single();
-          
-          if (area) {
-            areaName = area.name;
-          }
-        }
-        
-        if (data.neighborhood_id) {
-          const { data: neighborhood } = await supabase
-            .from('neighborhoods')
-            .select('name')
-            .eq('id', data.neighborhood_id)
-            .single();
-          
-          if (neighborhood) {
-            neighborhoodName = neighborhood.name;
+        // Use the fetchLocationById utility function from deliveryService
+        // to get location details if delivery_location_id exists
+        if (data.delivery_location_id) {
+          try {
+            // Import the service function
+            const { fetchLocationById } = await import('@/services/supabase/deliveryService');
+            
+            // Get the location details for the delivery location
+            const locationDetails = await fetchLocationById(
+              undefined, undefined, undefined, data.delivery_location_id
+            );
+            
+            if (locationDetails.neighborhood) {
+              neighborhoodName = locationDetails.neighborhood.name;
+              
+              // Get the area details
+              if (locationDetails.neighborhood.area_id) {
+                const { data: area } = await supabase
+                  .from('areas')
+                  .select('*, cities(*)')
+                  .eq('id', locationDetails.neighborhood.area_id)
+                  .single();
+                
+                if (area) {
+                  areaName = area.name;
+                  
+                  // Get the city details
+                  if (area.city_id) {
+                    const { data: city } = await supabase
+                      .from('cities')
+                      .select('*, governorates(*)')
+                      .eq('id', area.city_id)
+                      .single();
+                    
+                    if (city) {
+                      cityName = city.name;
+                      
+                      // Get governorate details
+                      if (city.governorate_id) {
+                        const { data: governorate } = await supabase
+                          .from('governorates')
+                          .select('*')
+                          .eq('id', city.governorate_id)
+                          .single();
+                        
+                        if (governorate) {
+                          governorateName = governorate.name;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch (locError) {
+            console.error("Error fetching location details:", locError);
           }
         }
         
@@ -189,10 +183,10 @@ export function useOrderDetails(orderId: string) {
           notes: data.notes || '',
           tracking_number: data.tracking_number || null,
           delivery_person: data.delivery_person || null,
-          governorate_id: data.governorate_id || null,
-          city_id: data.city_id || null,
-          area_id: data.area_id || null,
-          neighborhood_id: data.neighborhood_id || null,
+          governorate_id: null,  // These fields don't exist in the database
+          city_id: null,         // Instead, we're looking them up based
+          area_id: null,         // on the delivery_location_id
+          neighborhood_id: data.delivery_location_id || null,
           governorate_name: governorateName,
           city_name: cityName,
           area_name: areaName,
