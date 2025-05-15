@@ -52,7 +52,9 @@ export default function Sidebar({
                 <X size={20} />
               </Button>
             </div>
-            <SidebarContent collapsed={false} />
+            <div className="flex-1 overflow-y-auto">
+              <SidebarContent collapsed={false} />
+            </div>
             <Button 
               variant="outline" 
               className="m-4 gap-2 justify-start" 
@@ -67,14 +69,16 @@ export default function Sidebar({
     );
   }
   
-  // Original desktop sidebar
+  // Original desktop sidebar with vertical scrolling
   return (
     <div className={cn(
-      "border-l bg-white h-screen overflow-y-auto flex flex-col transition-all duration-300",
+      "border-l bg-white h-screen flex flex-col transition-all duration-300",
       collapsed ? "w-20" : "w-64"
     )}>
       <SidebarLogo collapsed={collapsed} toggleSidebar={toggleSidebar} />
-      <SidebarContent collapsed={collapsed} />
+      <div className="flex-1 overflow-y-auto">
+        <SidebarContent collapsed={collapsed} />
+      </div>
       <Button 
         variant="outline" 
         className={cn("m-4 gap-2 w-auto justify-start", collapsed && "p-2")} 

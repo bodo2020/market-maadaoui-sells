@@ -12,4 +12,3 @@ export interface SidebarItemData {
 export interface SidebarGroupData {
   items: SidebarItemData[];
 }
-

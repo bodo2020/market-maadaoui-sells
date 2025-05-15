@@ -45,7 +45,7 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
   };
 
   return (
-    <div className="flex-1 space-y-1 px-0">
+    <div className="flex-1 space-y-1 px-0 overflow-y-auto">
       {renderItems(mainNavigation.items)}
       {isAdmin && renderItems(adminNavigation.items)}
       {renderItems(generalNavigation.items)}
