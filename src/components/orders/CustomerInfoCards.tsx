@@ -1,13 +1,13 @@
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Mail, Phone, MapPin, FileText } from "lucide-react";
 import { ReactNode } from "react";
 
 interface CustomerInfoCardsProps {
-  customerName: ReactNode;
+  customerName?: ReactNode;
   customerEmail?: string;
   customerPhone?: string;
   shippingAddress?: string;
+  locationDetails?: string | null;
   notes?: string;
 }
 
@@ -16,67 +16,67 @@ export function CustomerInfoCards({
   customerEmail,
   customerPhone,
   shippingAddress,
+  locationDetails,
   notes
 }: CustomerInfoCardsProps) {
   return (
     <div className="space-y-4">
-      <h3 className="font-medium text-lg mb-2">معلومات العميل</h3>
-      
       <Card>
-        <CardContent className="p-5">
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-base font-medium text-gray-700 mb-1">الاسم</h4>
-              <div className="text-[15px]">{customerName}</div>
+        <CardContent className="pt-6">
+          <h3 className="text-lg font-medium mb-2">بيانات العميل</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">الاسم</span>
+              <span className="font-semibold">{customerName || "غير محدد"}</span>
             </div>
             
-            {customerEmail && (
-              <div>
-                <h4 className="text-base font-medium text-gray-700 mb-1 flex items-center gap-1">
-                  <Mail className="w-4 h-4" />
-                  البريد الإلكتروني
-                </h4>
-                <a href={`mailto:${customerEmail}`} className="text-[15px] text-blue-600 hover:underline">
-                  {customerEmail}
-                </a>
+            {customerPhone && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">رقم الهاتف</span>
+                <span className="font-semibold">{customerPhone}</span>
               </div>
             )}
             
-            {customerPhone && (
-              <div>
-                <h4 className="text-base font-medium text-gray-700 mb-1 flex items-center gap-1">
-                  <Phone className="w-4 h-4" />
-                  رقم الهاتف
-                </h4>
-                <a href={`tel:${customerPhone}`} className="text-[15px] text-blue-600 hover:underline ltr:block">
-                  {customerPhone}
-                </a>
+            {customerEmail && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">البريد الإلكتروني</span>
+                <span className="font-semibold">{customerEmail}</span>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
-      
-      {shippingAddress && (
-        <Card>
-          <CardContent className="p-5">
-            <h4 className="text-base font-medium text-gray-700 mb-2 flex items-center gap-1">
-              <MapPin className="w-4 h-4" />
-              عنوان الشحن
-            </h4>
-            <p className="text-[15px]">{shippingAddress}</p>
-          </CardContent>
-        </Card>
-      )}
-      
+
+      <Card>
+        <CardContent className="pt-6">
+          <h3 className="text-lg font-medium mb-2">عنوان الشحن</h3>
+          <div className="space-y-3">
+            {locationDetails && (
+              <div>
+                <span className="block text-muted-foreground mb-1">المنطقة</span>
+                <span className="block">{locationDetails}</span>
+              </div>
+            )}
+            
+            {shippingAddress && (
+              <div>
+                <span className="block text-muted-foreground mb-1">العنوان التفصيلي</span>
+                <span className="block">{shippingAddress}</span>
+              </div>
+            )}
+
+            {!locationDetails && !shippingAddress && (
+              <span className="text-muted-foreground">لا يوجد عنوان شحن</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {notes && (
         <Card>
-          <CardContent className="p-5">
-            <h4 className="text-base font-medium text-gray-700 mb-2 flex items-center gap-1">
-              <FileText className="w-4 h-4" />
-              ملاحظات
-            </h4>
-            <p className="text-[15px]">{notes}</p>
+          <CardContent className="pt-6">
+            <h3 className="text-lg font-medium mb-2">ملاحظات</h3>
+            <p className="whitespace-pre-line">{notes}</p>
           </CardContent>
         </Card>
       )}

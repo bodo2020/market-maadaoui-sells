@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = "admin",
   CASHIER = "cashier",
@@ -183,6 +184,10 @@ export interface Customer {
   updated_at: string;
   user_id?: string | null;
   phone_verified?: boolean;
+  governorate_id?: string | null;
+  city_id?: string | null;
+  area_id?: string | null;
+  neighborhood_id?: string | null;
 }
 
 export interface Purchase {
@@ -241,4 +246,12 @@ export interface Order {
   tracking_number?: string | null;
   delivery_person?: string | null;
   return_status?: 'none' | 'partial' | 'full';
+  governorate_id?: string | null;
+  city_id?: string | null;
+  area_id?: string | null;
+  neighborhood_id?: string | null;
+  governorate_name?: string;
+  city_name?: string;
+  area_name?: string;
+  neighborhood_name?: string;
 }

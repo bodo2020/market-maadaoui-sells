@@ -141,7 +141,14 @@ export async function findCustomerByPhone(phone: string) {
   }
 }
 
-export async function findOrCreateCustomer(customerInfo: { name: string; phone?: string }) {
+export async function findOrCreateCustomer(customerInfo: { 
+  name: string; 
+  phone?: string;
+  governorate?: string;
+  city?: string;
+  area?: string;
+  neighborhood?: string;
+}) {
   if (!customerInfo.name && !customerInfo.phone) {
     return null;
   }
@@ -151,10 +158,23 @@ export async function findOrCreateCustomer(customerInfo: { name: string; phone?:
     if (customerInfo.phone) {
       const existingCustomer = await findCustomerByPhone(customerInfo.phone);
       if (existingCustomer) {
-        // If customer exists but name is different, update it
+        // If customer exists but location data is different, update it
+        const updates: Record<string, any> = {};
         if (existingCustomer.name !== customerInfo.name && customerInfo.name) {
-          return updateCustomer(existingCustomer.id, { name: customerInfo.name });
+          updates.name = customerInfo.name;
         }
+        
+        // Update location data if provided
+        if (customerInfo.governorate) updates.governorate_id = customerInfo.governorate;
+        if (customerInfo.city) updates.city_id = customerInfo.city;
+        if (customerInfo.area) updates.area_id = customerInfo.area;
+        if (customerInfo.neighborhood) updates.neighborhood_id = customerInfo.neighborhood;
+        
+        // Only update if there are changes
+        if (Object.keys(updates).length > 0) {
+          return updateCustomer(existingCustomer.id, updates);
+        }
+        
         return existingCustomer;
       }
     }
@@ -165,11 +185,36 @@ export async function findOrCreateCustomer(customerInfo: { name: string; phone?:
       phone: customerInfo.phone || null,
       email: null,
       address: null,
-      notes: null
+      notes: null,
+      governorate_id: customerInfo.governorate || null,
+      city_id: customerInfo.city || null,
+      area_id: customerInfo.area || null,
+      neighborhood_id: customerInfo.neighborhood || null
     });
     
   } catch (error) {
     console.error("Error in findOrCreateCustomer:", error);
     return null;
+  }
+}
+
+export async function searchCustomersByPhone(phone: string) {
+  try {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .ilike("phone", `%${phone}%`)
+      .order("name")
+      .limit(10);
+
+    if (error) {
+      console.error("Error searching customers by phone:", error);
+      return [];
+    }
+
+    return data as Customer[];
+  } catch (error) {
+    console.error("Unexpected error searching customers by phone:", error);
+    return [];
   }
 }

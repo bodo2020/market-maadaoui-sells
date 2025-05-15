@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderItem } from "@/types";
@@ -22,6 +23,7 @@ export function useOrderDetails(orderId: string) {
       setIsLoading(true);
       console.log("Fetching order details for ID:", orderId);
       
+      // Get order with location information through inner joins
       const { data, error } = await supabase.from('online_orders')
         .select(`
           *,
@@ -31,7 +33,11 @@ export function useOrderDetails(orderId: string) {
             email,
             phone,
             phone_verified
-          )
+          ),
+          governorates:governorate_id(id, name),
+          cities:city_id(id, name),
+          areas:area_id(id, name),
+          neighborhoods:neighborhood_id(id, name)
         `)
         .eq('id', orderId)
         .single();
@@ -100,6 +106,12 @@ export function useOrderDetails(orderId: string) {
         
         const transformedItems = await transformItems(data.items);
         
+        // Extract location names if available
+        const governorateName = data.governorates?.name || '';
+        const cityName = data.cities?.name || '';
+        const areaName = data.areas?.name || '';
+        const neighborhoodName = data.neighborhoods?.name || '';
+        
         const orderObj: Order = {
           id: data.id,
           created_at: data.created_at,
@@ -116,7 +128,15 @@ export function useOrderDetails(orderId: string) {
           customer_phone_verified: customerPhoneVerified,
           notes: data.notes || '',
           tracking_number: data.tracking_number || null,
-          delivery_person: data.delivery_person || null
+          delivery_person: data.delivery_person || null,
+          governorate_id: data.governorate_id || null,
+          city_id: data.city_id || null,
+          area_id: data.area_id || null,
+          neighborhood_id: data.neighborhood_id || null,
+          governorate_name: governorateName,
+          city_name: cityName,
+          area_name: areaName,
+          neighborhood_name: neighborhoodName
         };
         
         console.log("Parsed order:", orderObj);

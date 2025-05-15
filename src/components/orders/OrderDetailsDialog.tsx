@@ -48,7 +48,11 @@ export function OrderDetailsDialog({
         if (order.customer_name || order.customer_phone) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
-            phone: order.customer_phone || undefined
+            phone: order.customer_phone || undefined,
+            governorate: order.governorate_id,
+            city: order.city_id,
+            area: order.area_id,
+            neighborhood: order.neighborhood_id
           };
           
           const customer = await findOrCreateCustomer(customerInfo);
@@ -194,6 +198,20 @@ export function OrderDetailsDialog({
     );
   };
 
+  // Render location information based on available data
+  const renderLocationDetails = () => {
+    const locationParts = [];
+    
+    if (order.governorate_name) locationParts.push(order.governorate_name);
+    if (order.city_name) locationParts.push(order.city_name);
+    if (order.area_name) locationParts.push(order.area_name);
+    if (order.neighborhood_name) locationParts.push(order.neighborhood_name);
+    
+    return locationParts.length > 0 ? locationParts.join(' - ') : null;
+  };
+
+  const locationDetails = renderLocationDetails();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-[1000px] h-[90vh] overflow-y-auto">
@@ -228,6 +246,7 @@ export function OrderDetailsDialog({
               customerEmail={order.customer_email}
               customerPhone={order.customer_phone}
               shippingAddress={order.shipping_address}
+              locationDetails={locationDetails}
               notes={order.notes}
             />
           </div>
