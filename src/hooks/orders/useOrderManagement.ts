@@ -30,11 +30,17 @@ export const useOrderManagement = (activeTab: string) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
-  const { setUnreadOrders } = useNotificationStore();
+  const { 
+    setUnreadOrders, 
+    incrementUnreadOrders,
+    setUnreadReturns,
+    incrementUnreadReturns
+  } = useNotificationStore();
 
   useEffect(() => {
     fetchOrders();
     fetchPendingOrdersCount();
+    fetchPendingReturnsCount();
     const channel = subscribeToOrders();
     return () => {
       if (channel) {
@@ -58,9 +64,24 @@ export const useOrderManagement = (activeTab: string) => {
     }
   };
 
+  const fetchPendingReturnsCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('returns')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      
+      if (error) throw error;
+      
+      setUnreadReturns(count || 0);
+    } catch (error) {
+      console.error('Error fetching pending returns count:', error);
+    }
+  };
+
   const subscribeToOrders = () => {
     console.log("Setting up realtime subscription to orders");
-    const channel = supabase.channel('online-orders')
+    const channel = supabase.channel('online-orders-channel')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -71,6 +92,7 @@ export const useOrderManagement = (activeTab: string) => {
           description: "تم استلام طلب جديد"
         });
         fetchOrders();
+        incrementUnreadOrders();
         fetchPendingOrdersCount();
       })
       .on('postgres_changes', {
@@ -79,8 +101,26 @@ export const useOrderManagement = (activeTab: string) => {
         table: 'online_orders'
       }, payload => {
         console.log("Order updated:", payload);
+        const newStatus = payload.new?.status;
+        if (newStatus === 'waiting') {
+          toast.info("تحديث الطلب", {
+            description: "تم تحديث طلب إلى حالة الانتظار"
+          });
+        }
         fetchOrders();
         fetchPendingOrdersCount();
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'returns'
+      }, payload => {
+        console.log("New return request:", payload);
+        toast.warning("طلب إرجاع جديد!", {
+          description: "تم استلام طلب إرجاع جديد"
+        });
+        incrementUnreadReturns();
+        fetchPendingReturnsCount();
       })
       .subscribe();
       
@@ -108,7 +148,8 @@ export const useOrderManagement = (activeTab: string) => {
             id,
             name,
             phone,
-            email
+            email,
+            phone_verified
           )
         `)
         .order('created_at', {
@@ -125,6 +166,18 @@ export const useOrderManagement = (activeTab: string) => {
         query = query.eq('status', 'done');
       } else if (activeTab === "unpaid") {
         query = query.eq('payment_status', 'pending');
+      } else if (activeTab === "returns") {
+        // عندما تكون علامة التبويب النشطة هي "returns"، نقوم بسحب طلبات الإرجاع
+        // ملاحظة: سنحتاج إلى تنفيذ هذا في واجهة المستخدم أيضًا
+        const { data: returnsData, error: returnsError } = await supabase
+          .from('returns')
+          .select('*')
+          .eq('status', 'pending');
+          
+        if (returnsError) throw returnsError;
+        
+        console.log("Fetched returns:", returnsData);
+        // هنا يمكنك معالجة بيانات الإرجاع وإرجاعها كجزء من حالة التطبيق
       }
       
       const { data, error } = await query;
@@ -145,9 +198,11 @@ export const useOrderManagement = (activeTab: string) => {
         customer_name: item.customers?.name || '',
         customer_email: item.customers?.email || '',
         customer_phone: item.customers?.phone || '',
+        customer_phone_verified: Boolean(item.customers?.phone_verified),
         notes: item.notes || '',
         tracking_number: item.tracking_number || null,
-        delivery_person: item.delivery_person || null
+        delivery_person: item.delivery_person || null,
+        return_status: item.return_status || 'none'
       }));
       
       setOrders(transformedOrders);

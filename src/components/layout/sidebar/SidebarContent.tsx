@@ -15,19 +15,42 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
   const location = useLocation();
   const currentPath = location.pathname;
   const { user } = useAuth();
-  const { unreadOrders } = useNotificationStore();
+  const { unreadOrders, unreadReturns } = useNotificationStore();
   const isAdmin = user?.role === UserRole.ADMIN;
   const isCashier = user?.role === UserRole.CASHIER;
+  const isDelivery = user?.role === UserRole.DELIVERY;
 
   const renderItems = (items: SidebarItemData[]) => {
     return items.map(item => {
       // Skip admin-only items for non-admin users
       if (item.adminOnly && !isAdmin) return null;
       
+      // Skip cashier-only items for non-cashier users
+      if (item.cashierOnly && !isCashier) return null;
+      
+      // Skip delivery-only items for non-delivery users
+      if (item.deliveryOnly && !isDelivery) return null;
+      
       // For cashiers, only show specific routes
       if (isCashier) {
         const allowedCashierRoutes = ['/', '/pos', '/online-orders', '/invoices'];
         if (!allowedCashierRoutes.includes(item.href)) return null;
+      }
+      
+      // ضبط الشارات (badges) بناءً على نوع الصفحة
+      let badge = undefined;
+      let secondaryBadge = undefined;
+      
+      if (item.href === "/online-orders") {
+        badge = unreadOrders;
+      } else if (item.href === "/returns") {
+        badge = unreadReturns;
+      } else if (item.badge) {
+        badge = item.badge;
+      }
+      
+      if (item.secondaryBadge) {
+        secondaryBadge = item.secondaryBadge;
       }
       
       return (
@@ -38,7 +61,8 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
           href={item.href}
           active={currentPath === item.href}
           collapsed={collapsed}
-          badge={item.href === "/online-orders" ? unreadOrders : undefined}
+          badge={badge}
+          secondaryBadge={secondaryBadge}
         />
       );
     });

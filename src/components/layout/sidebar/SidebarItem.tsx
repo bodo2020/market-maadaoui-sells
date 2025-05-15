@@ -1,73 +1,66 @@
 
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 interface SidebarItemProps {
   icon: LucideIcon;
   label: string;
   href: string;
   active?: boolean;
-  onClick?: () => void;
-  badge?: number;
   collapsed?: boolean;
+  badge?: number;
+  secondaryBadge?: number;
 }
 
-export function SidebarItem({ 
+export function SidebarItem({
   icon: Icon,
-  label, 
-  href, 
-  active, 
-  onClick, 
+  label,
+  href,
+  active,
+  collapsed,
   badge,
-  collapsed 
+  secondaryBadge
 }: SidebarItemProps) {
-  const button = (
-    <Link to={href} onClick={onClick}>
-      <Button
-        variant={active ? "default" : "ghost"}
-        className={cn(
-          "w-full justify-start gap-2 mb-1",
-          active ? "bg-primary text-primary-foreground" : ""
+  const isExternalLink = href.startsWith('http');
+  const LinkComponent = isExternalLink ? 'a' : Link;
+  const linkProps = isExternalLink ? { href, target: '_blank', rel: 'noopener' } : { to: href };
+
+  return (
+    <LinkComponent
+      {...linkProps}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2 text-muted-foreground transition-colors",
+        active && "bg-muted text-foreground font-medium",
+        !active && "hover:bg-muted hover:text-foreground"
+      )}
+    >
+      <div className="relative">
+        <Icon className="h-5 w-5" />
+        {badge && badge > 0 && (
+          <Badge
+            variant="destructive"
+            className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
+          >
+            {badge > 99 ? '99+' : badge}
+          </Badge>
         )}
-      >
-        <Icon size={20} />
-        {!collapsed && <span>{label}</span>}
-        {!collapsed && badge !== undefined && badge > 0 && (
-          <span className="mr-auto w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-white text-xs">
-            {badge}
-          </span>
-        )}
-      </Button>
-    </Link>
+      </div>
+      
+      {!collapsed && (
+        <div className="flex-1 relative">
+          <span>{label}</span>
+          {secondaryBadge && secondaryBadge > 0 && (
+            <Badge 
+              variant="outline"
+              className="ml-2 bg-blue-100 text-blue-700 border-blue-200 text-xs"
+            >
+              {secondaryBadge > 99 ? '99+' : secondaryBadge}
+            </Badge>
+          )}
+        </div>
+      )}
+    </LinkComponent>
   );
-
-  if (collapsed) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {button}
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            <p>{label}</p>
-            {badge !== undefined && badge > 0 && (
-              <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-destructive text-white">
-                {badge}
-              </span>
-            )}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
-
-  return button;
 }
