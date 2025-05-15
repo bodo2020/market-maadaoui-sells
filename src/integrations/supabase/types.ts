@@ -450,6 +450,7 @@ export type Database = {
           neighborhood_id: string | null
           notes: string | null
           phone: string | null
+          phone_verified: boolean | null
           updated_at: string
           user_id: string | null
         }
@@ -467,6 +468,7 @@ export type Database = {
           neighborhood_id?: string | null
           notes?: string | null
           phone?: string | null
+          phone_verified?: boolean | null
           updated_at?: string
           user_id?: string | null
         }
@@ -484,6 +486,7 @@ export type Database = {
           neighborhood_id?: string | null
           notes?: string | null
           phone?: string | null
+          phone_verified?: boolean | null
           updated_at?: string
           user_id?: string | null
         }

@@ -82,12 +82,12 @@ export function useOrderDetails(orderId: string) {
           return transformedItems;
         };
         
-        // Get customer info safely
+        // Get customer info safely by ensuring customers is an object with expected properties
         const customerData = data.customers || {};
-        const customerName = customerData.name || '';
-        const customerEmail = customerData.email || '';
-        const customerPhone = customerData.phone || '';
-        const customerPhoneVerified = Boolean(customerData.phone_verified);
+        const customerName = typeof customerData === 'object' && customerData !== null ? customerData.name || '' : '';
+        const customerEmail = typeof customerData === 'object' && customerData !== null ? customerData.email || '' : '';
+        const customerPhone = typeof customerData === 'object' && customerData !== null ? customerData.phone || '' : '';
+        const customerPhoneVerified = typeof customerData === 'object' && customerData !== null ? Boolean(customerData.phone_verified) : false;
         
         const transformedItems = await transformItems(data.items);
         

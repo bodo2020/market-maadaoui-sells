@@ -81,6 +81,12 @@ export default function CustomerProfile() {
                 parsedItems = [];
               }
             }
+
+            // Safely access customer data
+            const customerName = customerData ? customerData.name || '' : '';
+            const customerEmail = customerData ? customerData.email || '' : '';
+            const customerPhone = customerData ? customerData.phone || '' : '';
+            const customerPhoneVerified = customerData ? Boolean(customerData.phone_verified) : false;
             
             // Create a properly typed order object
             transformedOrders.push({
@@ -93,10 +99,10 @@ export default function CustomerProfile() {
               shipping_address: orderData.shipping_address || '',
               items: parsedItems,
               customer_id: orderData.customer_id,
-              customer_name: customerData?.name || '',
-              customer_email: customerData?.email || '',
-              customer_phone: customerData?.phone || '',
-              customer_phone_verified: Boolean(customerData?.phone_verified),
+              customer_name: customerName,
+              customer_email: customerEmail,
+              customer_phone: customerPhone,
+              customer_phone_verified: customerPhoneVerified,
               notes: orderData.notes || '',
               tracking_number: orderData.tracking_number || null,
               delivery_person: orderData.delivery_person || null
@@ -105,7 +111,7 @@ export default function CustomerProfile() {
         }
         
         setCustomer(customerData);
-        setCustomerOrders(transformedOrders as Order[]);
+        setCustomerOrders(transformedOrders);
       } catch (error) {
         console.error('Error fetching customer data:', error);
         toast({ description: "حدث خطأ أثناء تحميل بيانات العميل", variant: "destructive" });
