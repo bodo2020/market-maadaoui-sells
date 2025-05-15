@@ -256,62 +256,6 @@ export async function fetchShippingProviders(): Promise<ShippingProvider[]> {
   }));
 }
 
-// Function to fetch location details by ID
-export async function fetchLocationById(governorateId?: string, cityId?: string, areaId?: string, neighborhoodId?: string) {
-  const result: Record<string, any> = {};
-  
-  try {
-    if (governorateId) {
-      const { data: governorate, error: govError } = await supabase
-        .from('governorates')
-        .select('*')
-        .eq('id', governorateId)
-        .single();
-      
-      if (govError) console.error("Error fetching governorate:", govError);
-      else result.governorate = governorate;
-    }
-    
-    if (cityId) {
-      const { data: city, error: cityError } = await supabase
-        .from('cities')
-        .select('*')
-        .eq('id', cityId)
-        .single();
-      
-      if (cityError) console.error("Error fetching city:", cityError);
-      else result.city = city;
-    }
-    
-    if (areaId) {
-      const { data: area, error: areaError } = await supabase
-        .from('areas')
-        .select('*')
-        .eq('id', areaId)
-        .single();
-      
-      if (areaError) console.error("Error fetching area:", areaError);
-      else result.area = area;
-    }
-    
-    if (neighborhoodId) {
-      const { data: neighborhood, error: neighError } = await supabase
-        .from('neighborhoods')
-        .select('*')
-        .eq('id', neighborhoodId)
-        .single();
-      
-      if (neighError) console.error("Error fetching neighborhood:", neighError);
-      else result.neighborhood = neighborhood;
-    }
-    
-    return result;
-  } catch (error) {
-    console.error("Error fetching location details:", error);
-    return {};
-  }
-}
-
 // Temporary function to fulfill the DeliveryLocationsTable component needs
 export async function fetchDeliveryLocations() {
   const { data: neighborhoods, error } = await supabase

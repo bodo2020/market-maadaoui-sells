@@ -24,10 +24,6 @@ export type OrderFromDB = {
   notes?: string | null;
   updated_at?: string | null;
   delivery_person?: string | null;
-  governorate_id?: string | null;
-  city_id?: string | null;
-  area_id?: string | null;
-  neighborhood_id?: string | null;
 };
 
 export const useOrderManagement = (activeTab: string) => {
@@ -154,11 +150,7 @@ export const useOrderManagement = (activeTab: string) => {
             phone,
             email,
             phone_verified
-          ),
-          governorates:governorate_id (name),
-          cities:city_id (name),
-          areas:area_id (name),
-          neighborhoods:neighborhood_id (name)
+          )
         `)
         .order('created_at', {
           ascending: false
@@ -210,15 +202,7 @@ export const useOrderManagement = (activeTab: string) => {
         notes: item.notes || '',
         tracking_number: item.tracking_number || null,
         delivery_person: item.delivery_person || null,
-        return_status: item.return_status || 'none',
-        governorate_id: item.governorate_id || null,
-        city_id: item.city_id || null,
-        area_id: item.area_id || null,
-        neighborhood_id: item.neighborhood_id || null,
-        governorate_name: item.governorates?.name || '',
-        city_name: item.cities?.name || '',
-        area_name: item.areas?.name || '',
-        neighborhood_name: item.neighborhoods?.name || ''
+        return_status: item.return_status || 'none'
       }));
       
       setOrders(transformedOrders);

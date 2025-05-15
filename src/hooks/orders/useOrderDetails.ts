@@ -22,7 +22,6 @@ export function useOrderDetails(orderId: string) {
       setIsLoading(true);
       console.log("Fetching order details for ID:", orderId);
       
-      // Get base order data first with standard fields
       const { data, error } = await supabase.from('online_orders')
         .select(`
           *,
@@ -40,71 +39,6 @@ export function useOrderDetails(orderId: string) {
       if (error) throw error;
       
       if (data) {
-        // Define location variables with default empty values
-        let governorateName = '';
-        let cityName = '';
-        let areaName = '';
-        let neighborhoodName = '';
-        
-        // Use the fetchLocationById utility function from deliveryService
-        // to get location details if delivery_location_id exists
-        if (data.delivery_location_id) {
-          try {
-            // Import the service function
-            const { fetchLocationById } = await import('@/services/supabase/deliveryService');
-            
-            // Get the location details for the delivery location
-            const locationDetails = await fetchLocationById(
-              undefined, undefined, undefined, data.delivery_location_id
-            );
-            
-            if (locationDetails.neighborhood) {
-              neighborhoodName = locationDetails.neighborhood.name;
-              
-              // Get the area details
-              if (locationDetails.neighborhood.area_id) {
-                const { data: area } = await supabase
-                  .from('areas')
-                  .select('*, cities(*)')
-                  .eq('id', locationDetails.neighborhood.area_id)
-                  .single();
-                
-                if (area) {
-                  areaName = area.name;
-                  
-                  // Get the city details
-                  if (area.city_id) {
-                    const { data: city } = await supabase
-                      .from('cities')
-                      .select('*, governorates(*)')
-                      .eq('id', area.city_id)
-                      .single();
-                    
-                    if (city) {
-                      cityName = city.name;
-                      
-                      // Get governorate details
-                      if (city.governorate_id) {
-                        const { data: governorate } = await supabase
-                          .from('governorates')
-                          .select('*')
-                          .eq('id', city.governorate_id)
-                          .single();
-                        
-                        if (governorate) {
-                          governorateName = governorate.name;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          } catch (locError) {
-            console.error("Error fetching location details:", locError);
-          }
-        }
-        
         const validateOrderStatus = (status: string): Order['status'] => {
           const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
           return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
@@ -182,15 +116,7 @@ export function useOrderDetails(orderId: string) {
           customer_phone_verified: customerPhoneVerified,
           notes: data.notes || '',
           tracking_number: data.tracking_number || null,
-          delivery_person: data.delivery_person || null,
-          governorate_id: null,  // These fields don't exist in the database
-          city_id: null,         // Instead, we're looking them up based
-          area_id: null,         // on the delivery_location_id
-          neighborhood_id: data.delivery_location_id || null,
-          governorate_name: governorateName,
-          city_name: cityName,
-          area_name: areaName,
-          neighborhood_name: neighborhoodName
+          delivery_person: data.delivery_person || null
         };
         
         console.log("Parsed order:", orderObj);

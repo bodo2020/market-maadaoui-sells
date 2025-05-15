@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { Order } from "@/types";
 import MainLayout from "@/components/layout/MainLayout";
@@ -39,19 +38,6 @@ export default function OrderDetails() {
     setPaymentConfirmOpen(true);
   };
 
-  const renderLocationDetails = () => {
-    if (!order) return null;
-    
-    const locationParts = [];
-    
-    if (order.governorate_name) locationParts.push(order.governorate_name);
-    if (order.city_name) locationParts.push(order.city_name);
-    if (order.area_name) locationParts.push(order.area_name);
-    if (order.neighborhood_name) locationParts.push(order.neighborhood_name);
-    
-    return locationParts.length > 0 ? locationParts.join(' - ') : null;
-  };
-
   const handleStatusChange = async () => {
     if (!order || isProcessingOrder || !selectedStatus) return;
     
@@ -62,11 +48,7 @@ export default function OrderDetails() {
         if (order.customer_name || order.customer_phone) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
-            phone: order.customer_phone || undefined,
-            governorate: order.governorate_id,
-            city: order.city_id,
-            area: order.area_id,
-            neighborhood: order.neighborhood_id
+            phone: order.customer_phone || undefined
           };
           
           const customer = await findOrCreateCustomer(customerInfo);
@@ -226,8 +208,6 @@ export default function OrderDetails() {
     );
   }
 
-  const locationDetails = renderLocationDetails();
-
   return (
     <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
@@ -283,7 +263,6 @@ export default function OrderDetails() {
               customerEmail={order?.customer_email}
               customerPhone={order?.customer_phone}
               shippingAddress={order?.shipping_address}
-              locationDetails={locationDetails}
               notes={order?.notes}
             />
           </div>
