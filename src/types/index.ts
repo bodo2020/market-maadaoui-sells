@@ -175,13 +175,14 @@ export interface Supplier {
 export interface Customer {
   id: string;
   name: string;
-  phone?: string | null;
-  email?: string | null;
-  address?: string | null;
-  notes?: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
   created_at: string;
-  updated_at?: string;
-  balance?: number;
+  updated_at: string;
+  user_id?: string | null;
+  phone_verified?: boolean;
 }
 
 export interface Purchase {
@@ -228,14 +229,16 @@ export interface Order {
   total: number;
   status: 'waiting' | 'ready' | 'shipped' | 'done';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
-  payment_method: string | null;
-  shipping_address: string | null;
+  payment_method: string;
+  shipping_address?: string;
   items: OrderItem[];
   customer_id?: string;
   customer_name?: string;
   customer_email?: string;
   customer_phone?: string;
+  customer_phone_verified?: boolean;
   notes?: string;
   tracking_number?: string | null;
   delivery_person?: string | null;
+  return_status?: 'none' | 'partial' | 'full';
 }

@@ -21,7 +21,8 @@ export function useOrderDetails(orderId: string) {
             id,
             name,
             email,
-            phone
+            phone,
+            phone_verified
           )
         `)
         .eq('id', orderId)
@@ -83,6 +84,7 @@ export function useOrderDetails(orderId: string) {
         const customerName = data.customers?.name || '';
         const customerEmail = data.customers?.email || '';
         const customerPhone = data.customers?.phone || '';
+        const customerPhoneVerified = data.customers?.phone_verified || false;
         
         const transformedItems = await transformItems(data.items);
         
@@ -99,6 +101,7 @@ export function useOrderDetails(orderId: string) {
           customer_name: customerName,
           customer_email: customerEmail,
           customer_phone: customerPhone,
+          customer_phone_verified: customerPhoneVerified,
           notes: data.notes || '',
           tracking_number: data.tracking_number || null,
           delivery_person: data.delivery_person || null

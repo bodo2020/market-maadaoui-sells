@@ -36,6 +36,7 @@ import ProductCollections from "@/pages/ProductCollections";
 import CreateProductCollection from "@/pages/CreateProductCollection";
 import EditProductCollection from "@/pages/EditProductCollection";
 import Returns from "@/pages/Returns";
+import CustomerProfile from "@/pages/CustomerProfile";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
@@ -81,6 +82,7 @@ function App() {
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
               <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
+              <Route path="/customer-profile/:customerId" element={<ProtectedRoute><CustomerProfile /></ProtectedRoute>} />
               <Route path="/suppliers-customers" element={<ProtectedRoute><SuppliersCustomers /></ProtectedRoute>} />
               <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
               <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />

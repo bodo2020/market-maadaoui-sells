@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Order } from "@/types/index";
@@ -8,10 +9,13 @@ import { OrderItemsList } from "./OrderItemsList";
 import { OrderSummaryActions } from "./OrderSummaryActions";
 import { CustomerInfoCards } from "./CustomerInfoCards";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
 import { updateProduct } from "@/services/supabase/productService";
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
+import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { Check } from "lucide-react";
 
 interface OrderDetailsDialogProps {
   order: Order | null;
@@ -169,6 +173,27 @@ export function OrderDetailsDialog({
     }
   };
 
+  const renderCustomerNameWithVerification = () => {
+    if (!order.customer_name) return <span>عميل غير معروف</span>;
+    
+    return (
+      <div className="flex items-center gap-2">
+        <Link 
+          to={`/customer-profile/${order.customer_id || 'unknown'}`} 
+          className="text-primary hover:underline"
+        >
+          {order.customer_name}
+        </Link>
+        {order.customer_phone_verified && (
+          <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 flex items-center gap-1">
+            <Check size={14} className="text-blue-600" />
+            <span>موثق</span>
+          </Badge>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-[1000px] h-[90vh] overflow-y-auto">
@@ -199,7 +224,7 @@ export function OrderDetailsDialog({
 
           <div className="w-full md:w-2/5">
             <CustomerInfoCards
-              customerName={order.customer_name}
+              customerName={renderCustomerNameWithVerification()}
               customerEmail={order.customer_email}
               customerPhone={order.customer_phone}
               shippingAddress={order.shipping_address}
