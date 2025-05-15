@@ -4,12 +4,12 @@ import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer } from "lucide-react";
-import { CartItem, Product, Sale } from "@/types";
+import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer, Phone, User } from "lucide-react";
+import { CartItem, Product, Sale, Customer } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 import { createSale, generateInvoiceNumber } from "@/services/supabase/saleService";
-import { findOrCreateCustomer } from "@/services/supabase/customerService";
+import { findOrCreateCustomer, searchCustomersByPhone } from "@/services/supabase/customerService";
 import { RegisterType } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -41,6 +42,8 @@ export default function POS() {
   const [showInvoice, setShowInvoice] = useState(false);
   const [currentSale, setCurrentSale] = useState<Sale | null>(null);
   const [manualBarcodeMode, setManualBarcodeMode] = useState(false);
+  const [customerResults, setCustomerResults] = useState<Customer[]>([]);
+  const [showCustomerSearch, setShowCustomerSearch] = useState(false);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const {
@@ -367,6 +370,24 @@ export default function POS() {
     }));
   };
 
+  const handleCustomerPhoneSearch = async () => {
+    if (!customerPhone || customerPhone.length < 3) return;
+    
+    try {
+      const results = await searchCustomersByPhone(customerPhone);
+      setCustomerResults(results);
+      setShowCustomerSearch(results.length > 0);
+    } catch (error) {
+      console.error("Error searching customers:", error);
+    }
+  };
+
+  const handleSelectCustomer = (customer: Customer) => {
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone || "");
+    setShowCustomerSearch(false);
+  };
+
   const openCheckout = () => {
     if (cartItems.length === 0) return;
     setIsCheckoutOpen(true);
@@ -440,24 +461,40 @@ export default function POS() {
       });
       return;
     }
+    
+    if (!customerPhone) {
+      toast({
+        title: "رقم الهاتف مطلوب",
+        description: "يرجى إدخال رقم هاتف العميل",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsProcessing(true);
     try {
       let customerData = null;
-      if (customerName || customerPhone) {
+      if (customerPhone) {
         customerData = await findOrCreateCustomer({
-          name: customerName,
+          name: customerName || "عميل",
           phone: customerPhone
         });
         if (customerData) {
           console.log("Customer data saved:", customerData);
+        } else {
+          // If customer creation failed, stop the process
+          setIsProcessing(false);
+          return;
         }
       }
+      
       const invoiceNumber = await generateInvoiceNumber();
       setCurrentInvoiceNumber(invoiceNumber);
       const profit = cartItems.reduce((sum, item) => {
         const itemCost = item.product.purchase_price * (item.weight || item.quantity);
         return sum + (item.total - itemCost);
       }, 0);
+      
       const saleData: Omit<Sale, "id" | "created_at" | "updated_at"> = {
         date: new Date().toISOString(),
         items: cartItems,
@@ -472,11 +509,14 @@ export default function POS() {
         customer_phone: customerPhone || undefined,
         invoice_number: invoiceNumber
       };
+      
       const sale = await createSale(saleData);
       setCurrentSale(sale);
+      
       if (paymentMethod === 'cash' || paymentMethod === 'mixed') {
         await recordSaleToCashRegister(paymentMethod === 'cash' ? total : parseFloat(cashAmount || "0"), paymentMethod);
       }
+      
       toast({
         title: "تم إتمام البيع بنجاح",
         description: `رقم الفاتورة: ${sale.invoice_number}`
@@ -825,15 +865,58 @@ export default function POS() {
             </div> : <>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <h3 className="font-semibold">معلومات العميل (اختياري)</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="customerName">اسم العميل</Label>
-                      <Input id="customerName" value={customerName} onChange={e => setCustomerName(e.target.value)} />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="customerPhone">رقم الهاتف</Label>
-                      <Input id="customerPhone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                  <h3 className="font-semibold">معلومات العميل</h3>
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <div className="flex items-center">
+                        <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                        <Label htmlFor="customerPhone" className="w-24">رقم الهاتف*</Label>
+                        <div className="flex-1 relative">
+                          <Input 
+                            id="customerPhone" 
+                            value={customerPhone} 
+                            onChange={e => setCustomerPhone(e.target.value)}
+                            onKeyUp={handleCustomerPhoneSearch}
+                            placeholder="أدخل رقم الهاتف" 
+                            className="flex-1"
+                            required
+                          />
+                          {showCustomerSearch && customerResults.length > 0 && (
+                            <div className="absolute z-50 mt-1 w-full rounded-md bg-white shadow-lg">
+                              <ScrollArea className="h-auto max-h-52">
+                                <div className="py-1">
+                                  {customerResults.map((customer) => (
+                                    <div
+                                      key={customer.id}
+                                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex justify-between items-center"
+                                      onClick={() => handleSelectCustomer(customer)}
+                                    >
+                                      <div>
+                                        <div className="font-medium">{customer.name}</div>
+                                        <div className="text-sm text-gray-600">{customer.phone}</div>
+                                      </div>
+                                      <Button variant="ghost" size="sm">
+                                        اختيار
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </ScrollArea>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    
+                    <div className="flex items-center">
+                      <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <Label htmlFor="customerName" className="w-24">اسم العميل</Label>
+                      <Input 
+                        id="customerName" 
+                        value={customerName} 
+                        onChange={e => setCustomerName(e.target.value)}
+                        placeholder="أدخل اسم العميل" 
+                        className="flex-1"
+                      />
                     </div>
                   </div>
                 </div>
@@ -907,7 +990,7 @@ export default function POS() {
               </div>
               
               <DialogFooter className="sm:justify-start">
-                <Button type="submit" disabled={isProcessing || !validatePayment()} onClick={completeSale}>
+                <Button type="submit" disabled={isProcessing || !validatePayment() || !customerPhone} onClick={completeSale}>
                   {isProcessing ? "جاري المعالجة..." : "تأكيد البيع"}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setIsCheckoutOpen(false)}>

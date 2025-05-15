@@ -26,7 +26,7 @@ export async function fetchCustomers() {
 
 export async function addCustomer(customer: Omit<Customer, "id" | "created_at" | "updated_at">) {
   try {
-    // Check if customer with same name or phone already exists
+    // Check if customer with same phone already exists
     if (customer.phone) {
       const { data: existingCustomer } = await supabase
         .from("customers")
@@ -35,6 +35,10 @@ export async function addCustomer(customer: Omit<Customer, "id" | "created_at" |
         .single();
       
       if (existingCustomer) {
+        // If customer exists but with different name, update the name
+        if (existingCustomer.name !== customer.name && customer.name) {
+          return updateCustomer(existingCustomer.id, { name: customer.name });
+        }
         return existingCustomer as Customer;
       }
     }
@@ -141,28 +145,48 @@ export async function findCustomerByPhone(phone: string) {
   }
 }
 
+export async function searchCustomersByPhone(phone: string) {
+  try {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .ilike("phone", `%${phone}%`)
+      .order("name")
+      .limit(5);
+
+    if (error) {
+      console.error("Error searching customers by phone:", error);
+      return [];
+    }
+
+    return data as Customer[];
+  } catch (error) {
+    console.error("Unexpected error searching customers by phone:", error);
+    return [];
+  }
+}
+
 export async function findOrCreateCustomer(customerInfo: { name: string; phone?: string }) {
-  if (!customerInfo.name && !customerInfo.phone) {
+  if (!customerInfo.phone) {
+    toast.error("يجب إدخال رقم هاتف العميل");
     return null;
   }
   
   try {
     // First check if customer exists by phone
-    if (customerInfo.phone) {
-      const existingCustomer = await findCustomerByPhone(customerInfo.phone);
-      if (existingCustomer) {
-        // If customer exists but name is different, update it
-        if (existingCustomer.name !== customerInfo.name && customerInfo.name) {
-          return updateCustomer(existingCustomer.id, { name: customerInfo.name });
-        }
-        return existingCustomer;
+    const existingCustomer = await findCustomerByPhone(customerInfo.phone);
+    if (existingCustomer) {
+      // If customer exists but name is different, update it
+      if (existingCustomer.name !== customerInfo.name && customerInfo.name) {
+        return updateCustomer(existingCustomer.id, { name: customerInfo.name });
       }
+      return existingCustomer;
     }
     
     // If no match by phone, create a new customer
     return addCustomer({
       name: customerInfo.name,
-      phone: customerInfo.phone || null,
+      phone: customerInfo.phone,
       email: null,
       address: null,
       notes: null
