@@ -1,15 +1,16 @@
+
 import { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer, Phone, User } from "lucide-react";
-import { CartItem, Product, Sale, Customer } from "@/types";
+import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer } from "lucide-react";
+import { CartItem, Product, Sale } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 import { createSale, generateInvoiceNumber } from "@/services/supabase/saleService";
-import { findOrCreateCustomer, searchCustomersByPhone } from "@/services/supabase/customerService";
+import { findOrCreateCustomer } from "@/services/supabase/customerService";
 import { RegisterType } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -17,7 +18,6 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -41,12 +41,91 @@ export default function POS() {
   const [barcodeBuffer, setBarcodeBuffer] = useState<string>("");
   const [showInvoice, setShowInvoice] = useState(false);
   const [currentSale, setCurrentSale] = useState<Sale | null>(null);
-  const [manualBarcodeMode, setManualBarcodeMode] = useState(false);
-  const [customerResults, setCustomerResults] = useState<Customer[]>([]);
-  const [showCustomerSearch, setShowCustomerSearch] = useState(false);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      const isSearchInput = target === searchInputRef.current;
+      if (isInput && !isSearchInput) return;
+      if (e.key === 'Enter' && barcodeBuffer) {
+        e.preventDefault();
+        console.log("External barcode scanned:", barcodeBuffer);
+        processBarcode(barcodeBuffer);
+        setBarcodeBuffer("");
+        return;
+      }
+      if (/^[a-zA-Z0-9]$/.test(e.key)) {
+        if (barcodeTimeoutRef.current) {
+          clearTimeout(barcodeTimeoutRef.current);
+        }
+        setBarcodeBuffer(prev => prev + e.key);
+        barcodeTimeoutRef.current = setTimeout(() => {
+          if (barcodeBuffer.length < 5) {
+            if (!isInput) {
+              setBarcodeBuffer("");
+            }
+          }
+        }, 100);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (barcodeTimeoutRef.current) {
+        clearTimeout(barcodeTimeoutRef.current);
+      }
+    };
+  }, [barcodeBuffer]);
+
+  const processBarcode = async (barcode: string) => {
+    if (barcode.length < 5) return;
+    try {
+      setSearch(barcode);
+      const product = await fetchProductByBarcode(barcode);
+      if (product) {
+        if (product.calculated_weight) {
+          handleAddScaleProductToCart(product, product.calculated_weight);
+        } else if (product.is_bulk_scan) {
+          handleAddBulkToCart(product);
+        } else {
+          handleAddToCart(product);
+        }
+        toast({
+          title: "تم المسح بنجاح",
+          description: `${barcode} - ${product.name}`
+        });
+      } else {
+        if (barcode.startsWith("2") && barcode.length === 13) {
+          const productCode = barcode.substring(1, 7);
+          const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
+          if (scaleProduct) {
+            const weightInGrams = parseInt(barcode.substring(7, 12));
+            const weightInKg = weightInGrams / 1000;
+            handleAddScaleProductToCart(scaleProduct, weightInKg);
+            return;
+          }
+        }
+        toast({
+          title: "لم يتم العثور على المنتج",
+          description: `لم يتم العثور على منتج بالباركود ${barcode}`,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error processing barcode:", error);
+      toast({
+        title: "خطأ في معالجة الباركود",
+        description: "حدث خطأ أثناء معالجة الباركود. يرجى المحاولة مرة أخرى.",
+        variant: "destructive"
+      });
+    }
+  };
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -68,176 +147,65 @@ export default function POS() {
     loadProducts();
   }, [toast]);
 
-  useEffect(() => {
-    if (!manualBarcodeMode) {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        const target = e.target as HTMLElement;
-        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-        const isSearchInput = target === searchInputRef.current;
-        if (isInput && !isSearchInput) return;
-        if (e.key === 'Enter' && barcodeBuffer) {
-          e.preventDefault();
-          console.log("External barcode scanned:", barcodeBuffer);
-          processBarcode(barcodeBuffer);
-          setBarcodeBuffer("");
-          return;
-        }
-        if (/^[a-zA-Z0-9]$/.test(e.key)) {
-          if (barcodeTimeoutRef.current) {
-            clearTimeout(barcodeTimeoutRef.current);
-          }
-          setBarcodeBuffer(prev => prev + e.key);
-          barcodeTimeoutRef.current = setTimeout(() => {
-            if (barcodeBuffer.length < 5) {
-              if (!isInput) {
-                setBarcodeBuffer("");
-              }
-            }
-          }, 100);
-        }
-      };
-      
-      document.addEventListener('keydown', handleKeyDown);
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-        if (barcodeTimeoutRef.current) {
-          clearTimeout(barcodeTimeoutRef.current);
-        }
-      };
-    }
-  }, [barcodeBuffer, manualBarcodeMode]);
+  const handleSearch = async () => {
+    if (!search) return;
 
-  const processBarcode = async (barcode: string) => {
-    if (barcode.length < 5) return;
-    
     try {
-      setSearch(barcode);
-      const product = await fetchProductByBarcode(barcode);
-      
+      const product = await fetchProductByBarcode(search);
       if (product) {
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
+          setSearch("");
+          return;
         } else if (product.is_bulk_scan) {
           handleAddBulkToCart(product);
+          setSearch("");
+          return;
         } else {
           handleAddToCart(product);
-        }
-        toast({
-          title: "تم المسح بنجاح",
-          description: `${barcode} - ${product.name}`
-        });
-      } else {
-        const bulkProduct = products.find(p => p.bulk_barcode === barcode && p.bulk_enabled);
-        
-        if (bulkProduct) {
-          handleAddBulkToCart(bulkProduct);
-          toast({
-            title: "تم المسح بنجاح",
-            description: `${barcode} - ${bulkProduct.name} (جملة)`
-          });
+          setSearch("");
           return;
         }
-        
-        if (barcode.startsWith("2") && barcode.length === 13) {
-          const productCode = barcode.substring(1, 7);
-          const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
-          if (scaleProduct) {
-            const weightInGrams = parseInt(barcode.substring(7, 12));
-            const weightInKg = weightInGrams / 1000;
-            handleAddScaleProductToCart(scaleProduct, weightInKg);
+      }
+    } catch (error) {
+      console.error("Error fetching product by barcode:", error);
+    }
+
+    if (search.startsWith("2") && search.length === 13) {
+      try {
+        const product = await fetchProductByBarcode(search);
+        if (product) {
+          if (product.calculated_weight) {
+            handleAddScaleProductToCart(product, product.calculated_weight);
+            setSearch("");
             return;
           }
         }
-        
-        toast({
-          title: "لم يتم العثور على المنتج",
-          description: `لم يتم العثور على منتج بالباركود ${barcode}`,
-          variant: "destructive"
-        });
+      } catch (error) {
+        console.error("Error fetching product by scale barcode:", error);
       }
-    } catch (error) {
-      console.error("Error processing barcode:", error);
-      toast({
-        title: "خطأ في معالجة الباركود",
-        description: "حدث خطأ أثناء معالجة الباركود. يرجى المحاولة مرة أخرى.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleSearch = async () => {
-    if (!search) return;
-    
-    try {
-      const product = await fetchProductByBarcode(search);
-      
-      if (product) {
-        if (product.calculated_weight) {
-          handleAddScaleProductToCart(product, product.calculated_weight);
-          setSearch("");
-          return;
-        } else if (product.is_bulk_scan) {
-          handleAddBulkToCart(product);
-          setSearch("");
-          return;
-        } else {
-          handleAddToCart(product);
-          setSearch("");
-          return;
-        }
-      }
-
-      const bulkProduct = products.find(p => p.bulk_barcode === search && p.bulk_enabled);
-      if (bulkProduct) {
-        handleAddBulkToCart(bulkProduct);
+      const productCode = search.substring(1, 7);
+      const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
+      if (scaleProduct) {
+        const weightInGrams = parseInt(search.substring(7, 12));
+        const weightInKg = weightInGrams / 1000;
+        handleAddScaleProductToCart(scaleProduct, weightInKg);
         setSearch("");
-        toast({
-          title: "تم إضافة منتج جملة",
-          description: `${bulkProduct.name} - ${bulkProduct.bulk_quantity} وحدة`
-        });
         return;
       }
+    }
 
-      if (search.startsWith("2") && search.length === 13) {
-        const productCode = search.substring(1, 7);
-        const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
-        
-        if (scaleProduct) {
-          const weightInGrams = parseInt(search.substring(7, 12));
-          const weightInKg = weightInGrams / 1000;
-          handleAddScaleProductToCart(scaleProduct, weightInKg);
-          setSearch("");
-          return;
-        }
-      }
+    const results = products.filter(product => product.barcode === search || product.name.includes(search));
+    setSearchResults(results);
 
-      const results = products.filter(product => 
-        product.barcode === search || 
-        product.name.toLowerCase().includes(search.toLowerCase())
-      );
-      setSearchResults(results);
-
-      const exactMatch = products.find(p => 
-        p.barcode === search && 
-        p.barcode_type === "normal" && 
-        !p.bulk_enabled
-      );
-
-      if (exactMatch) {
-        handleAddToCart(exactMatch);
-        setSearch("");
-      } else if (results.length === 1 && results[0].barcode_type === "scale") {
-        setCurrentScaleProduct(results[0]);
-        setShowWeightDialog(true);
-        setSearch("");
-      }
-    } catch (error) {
-      console.error("Error searching for product:", error);
-      toast({
-        title: "خطأ في البحث",
-        description: "حدث خطأ أثناء البحث عن المنتج",
-        variant: "destructive"
-      });
+    const exactMatch = products.find(p => p.barcode === search && p.barcode_type === "normal" && !p.bulk_enabled);
+    if (exactMatch) {
+      handleAddToCart(exactMatch);
+      setSearch("");
+    } else if (results.length === 1 && results[0].barcode_type === "scale") {
+      setCurrentScaleProduct(results[0]);
+      setShowWeightDialog(true);
+      setSearch("");
     }
   };
 
@@ -272,6 +240,7 @@ export default function POS() {
       });
       return;
     }
+    
     const itemPrice = product.price * weight;
     const discountPerKg = product.is_offer && product.offer_price ? product.price - product.offer_price : 0;
     setCartItems([...cartItems, {
@@ -301,6 +270,7 @@ export default function POS() {
       });
       return;
     }
+    
     if (!product.bulk_enabled || !product.bulk_quantity || !product.bulk_price) {
       toast({
         title: "خطأ",
@@ -347,7 +317,9 @@ export default function POS() {
     setCartItems(cartItems.map((item, i) => {
       if (i === index) {
         if (item.weight !== null && change > 0) return item;
+        
         const newQuantity = Math.max(1, item.quantity + change);
+        
         if (change > 0 && newQuantity > (item.product.quantity || 0)) {
           toast({
             title: "الكمية غير متوفرة",
@@ -356,6 +328,7 @@ export default function POS() {
           });
           return item;
         }
+        
         let price = item.price;
         let total = item.weight !== null ? item.price : newQuantity * price;
         return {
@@ -366,24 +339,6 @@ export default function POS() {
       }
       return item;
     }));
-  };
-
-  const handleCustomerPhoneSearch = async () => {
-    if (!customerPhone || customerPhone.length < 3) return;
-    
-    try {
-      const results = await searchCustomersByPhone(customerPhone);
-      setCustomerResults(results);
-      setShowCustomerSearch(results.length > 0);
-    } catch (error) {
-      console.error("Error searching customers:", error);
-    }
-  };
-
-  const handleSelectCustomer = (customer: Customer) => {
-    setCustomerName(customer.name);
-    setCustomerPhone(customer.phone || "");
-    setShowCustomerSearch(false);
   };
 
   const openCheckout = () => {
@@ -429,9 +384,20 @@ export default function POS() {
 
   const recordSaleToCashRegister = async (amount: number, paymentMethod: string) => {
     if (paymentMethod !== 'cash' && paymentMethod !== 'mixed') return;
-    const amountToRecord = paymentMethod === 'cash' ? amount : parseFloat(cashAmount || "0");
+    
+    const amountToRecord = paymentMethod === 'cash' 
+      ? amount 
+      : parseFloat(cashAmount || "0");
+      
     if (amountToRecord <= 0) return;
+    
     try {
+      console.log('Recording sale to cash register:', { 
+        amount: amountToRecord, 
+        transaction_type: 'deposit',
+        register_type: 'store'
+      });
+      
       const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
         body: {
           amount: amountToRecord,
@@ -440,10 +406,24 @@ export default function POS() {
           notes: 'مبيعات نقطة البيع'
         }
       });
-      if (error) throw error;
-      console.log('Sale recorded to cash register:', data);
+      
+      if (error) {
+        console.error('Error recording sale to cash register:', error);
+        throw error;
+      }
+      
+      console.log('Sale recorded to cash register successfully:', data);
+      toast({
+        title: "تم تسجيل المبلغ في الخزنة",
+        description: `تم إضافة ${amountToRecord} ${siteConfig.currency} إلى خزنة المحل`
+      });
     } catch (error) {
       console.error('Error recording sale to cash register:', error);
+      toast({
+        title: "خطأ في تسجيل المبيعات",
+        description: "حدث خطأ أثناء تسجيل المبيعات في الخزنة، يرجى المراجعة.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -456,39 +436,24 @@ export default function POS() {
       });
       return;
     }
-    
-    if (!customerPhone) {
-      toast({
-        title: "رقم الهاتف مطلوب",
-        description: "يرجى إدخال رقم هاتف العميل",
-        variant: "destructive"
-      });
-      return;
-    }
-    
     setIsProcessing(true);
     try {
       let customerData = null;
-      if (customerPhone) {
+      if (customerName || customerPhone) {
         customerData = await findOrCreateCustomer({
-          name: customerName || "عميل",
+          name: customerName,
           phone: customerPhone
         });
         if (customerData) {
           console.log("Customer data saved:", customerData);
-        } else {
-          setIsProcessing(false);
-          return;
         }
       }
-      
       const invoiceNumber = await generateInvoiceNumber();
       setCurrentInvoiceNumber(invoiceNumber);
       const profit = cartItems.reduce((sum, item) => {
         const itemCost = item.product.purchase_price * (item.weight || item.quantity);
         return sum + (item.total - itemCost);
       }, 0);
-      
       const saleData: Omit<Sale, "id" | "created_at" | "updated_at"> = {
         date: new Date().toISOString(),
         items: cartItems,
@@ -503,7 +468,6 @@ export default function POS() {
         customer_phone: customerPhone || undefined,
         invoice_number: invoiceNumber
       };
-      
       const sale = await createSale(saleData);
       setCurrentSale(sale);
       
@@ -928,10 +892,6 @@ export default function POS() {
                 <CreditCard className="ml-2 h-4 w-4" />
                 إتمام الشراء
               </Button>
-              <Button variant="outline" className="w-full" size="sm" disabled={cartItems.length === 0} onClick={handlePreviewInvoice}>
-                <Receipt className="ml-2 h-4 w-4" />
-                معاينة الفاتورة
-              </Button>
             </CardFooter>
           </Card>
         </div>
@@ -968,55 +928,15 @@ export default function POS() {
             <>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <h3 className="font-semibold mb-2">معلومات العميل</h3>
-                  <div className="space-y-3">
-                    <div className="relative">
-                      <div className="flex items-center">
-                        <Phone className="h-4 w-4 text-muted-foreground absolute right-3" />
-                        <Input
-                          placeholder="رقم هاتف العميل *"
-                          value={customerPhone}
-                          onChange={(e) => {
-                            setCustomerPhone(e.target.value);
-                            setCustomerResults([]);
-                          }}
-                          onBlur={handleCustomerPhoneSearch}
-                          className="pr-9"
-                          required
-                        />
-                      </div>
-                      
-                      {showCustomerSearch && customerResults.length > 0 && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-lg">
-                          <ScrollArea className="h-auto max-h-[200px]">
-                            <div className="p-1">
-                              {customerResults.map((customer) => (
-                                <div
-                                  key={customer.id}
-                                  className="flex items-center p-2 hover:bg-muted rounded-md cursor-pointer"
-                                  onClick={() => handleSelectCustomer(customer)}
-                                >
-                                  <User className="h-4 w-4 text-muted-foreground ml-2" />
-                                  <div>
-                                    <p className="text-sm font-medium">{customer.name}</p>
-                                    <p className="text-xs text-muted-foreground">{customer.phone}</p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        </div>
-                      )}
+                  <h3 className="font-semibold">معلومات العميل (اختياري)</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="customerName">اسم العميل</Label>
+                      <Input id="customerName" value={customerName} onChange={e => setCustomerName(e.target.value)} />
                     </div>
-                    
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 text-muted-foreground absolute right-3" />
-                      <Input
-                        placeholder="اسم العميل"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="pr-9"
-                      />
+                    <div className="space-y-1">
+                      <Label htmlFor="customerPhone">رقم الهاتف</Label>
+                      <Input id="customerPhone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
                     </div>
                   </div>
                 </div>

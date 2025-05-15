@@ -1214,92 +1214,6 @@ export type Database = {
           },
         ]
       }
-      return_request_items: {
-        Row: {
-          created_at: string
-          id: string
-          product_id: string
-          quantity: number
-          reason: string | null
-          return_request_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          product_id: string
-          quantity: number
-          reason?: string | null
-          return_request_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          product_id?: string
-          quantity?: number
-          reason?: string | null
-          return_request_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "return_request_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "return_request_items_return_request_id_fkey"
-            columns: ["return_request_id"]
-            isOneToOne: false
-            referencedRelation: "return_requests"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      return_requests: {
-        Row: {
-          admin_notes: string | null
-          created_at: string
-          id: string
-          images: string[] | null
-          order_id: string
-          reason: string
-          status: Database["public"]["Enums"]["return_request_status"] | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          admin_notes?: string | null
-          created_at?: string
-          id?: string
-          images?: string[] | null
-          order_id: string
-          reason: string
-          status?: Database["public"]["Enums"]["return_request_status"] | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          admin_notes?: string | null
-          created_at?: string
-          id?: string
-          images?: string[] | null
-          order_id?: string
-          reason?: string
-          status?: Database["public"]["Enums"]["return_request_status"] | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "return_requests_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "online_orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       returns: {
         Row: {
           created_at: string | null
@@ -1732,7 +1646,6 @@ export type Database = {
       order_payment_status: "pending" | "paid" | "failed" | "refunded"
       order_status: "waiting" | "ready" | "shipped" | "done"
       register_type: "store" | "online"
-      return_request_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1851,7 +1764,6 @@ export const Constants = {
       order_payment_status: ["pending", "paid", "failed", "refunded"],
       order_status: ["waiting", "ready", "shipped", "done"],
       register_type: ["store", "online"],
-      return_request_status: ["pending", "approved", "rejected"],
     },
   },
 } as const
