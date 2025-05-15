@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Check, Mail, Phone, MapPin, AlertCircle } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Order } from "@/types";
+import { Order, OrderItem } from "@/types";
 
 export default function CustomerProfile() {
   const { customerId } = useParams();
@@ -51,8 +51,61 @@ export default function CustomerProfile() {
           throw ordersError;
         }
         
+        // Transform orders to match the Order type
+        const transformedOrders: Order[] = [];
+        
+        if (ordersData) {
+          for (const orderData of ordersData) {
+            // Parse and transform items
+            let parsedItems: OrderItem[] = [];
+            if (orderData.items) {
+              // Handle items parsing
+              try {
+                const itemsData = typeof orderData.items === 'string' 
+                  ? JSON.parse(orderData.items) 
+                  : orderData.items;
+                
+                if (Array.isArray(itemsData)) {
+                  parsedItems = itemsData.map(item => ({
+                    product_id: item.product_id || '',
+                    product_name: item.product_name || '',
+                    quantity: item.quantity || 0,
+                    price: item.price || 0,
+                    total: item.total || 0,
+                    image_url: item.image_url || null,
+                    barcode: item.barcode || null
+                  }));
+                }
+              } catch (e) {
+                console.error('Error parsing order items:', e);
+                parsedItems = [];
+              }
+            }
+            
+            // Create a properly typed order object
+            transformedOrders.push({
+              id: orderData.id,
+              created_at: orderData.created_at,
+              total: orderData.total,
+              status: orderData.status,
+              payment_status: orderData.payment_status,
+              payment_method: orderData.payment_method || '',
+              shipping_address: orderData.shipping_address || '',
+              items: parsedItems,
+              customer_id: orderData.customer_id,
+              customer_name: customerData?.name || '',
+              customer_email: customerData?.email || '',
+              customer_phone: customerData?.phone || '',
+              customer_phone_verified: customerData?.phone_verified || false,
+              notes: orderData.notes || '',
+              tracking_number: orderData.tracking_number || null,
+              delivery_person: orderData.delivery_person || null
+            });
+          }
+        }
+        
         setCustomer(customerData);
-        setCustomerOrders(ordersData as Order[]);
+        setCustomerOrders(transformedOrders);
       } catch (error) {
         console.error('Error fetching customer data:', error);
         toast({ description: "حدث خطأ أثناء تحميل بيانات العميل", variant: "destructive" });
@@ -92,7 +145,7 @@ export default function CustomerProfile() {
       case 'shipped':
         return <Badge variant="default">تم الشحن</Badge>;
       case 'done':
-        return <Badge variant="success" className="bg-green-100 text-green-800 border-green-200">تم التسليم</Badge>;
+        return <Badge className="bg-green-100 text-green-800 border-green-200">تم التسليم</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }

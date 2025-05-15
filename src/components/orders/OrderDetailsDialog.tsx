@@ -9,7 +9,7 @@ import { OrderItemsList } from "./OrderItemsList";
 import { OrderSummaryActions } from "./OrderSummaryActions";
 import { CustomerInfoCards } from "./CustomerInfoCards";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
 import { updateProduct } from "@/services/supabase/productService";
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";

@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Order } from "@/types";
+import { Order, OrderItem } from "@/types";
 import { toast } from "sonner";
 
 export function useOrderDetails(orderId: string) {
@@ -41,7 +42,7 @@ export function useOrderDetails(orderId: string) {
           return validStatuses.includes(status as Order['payment_status']) ? status as Order['payment_status'] : 'pending';
         };
         
-        const transformItems = async (items: any): Promise<any[]> => {
+        const transformItems = async (items: any): Promise<OrderItem[]> => {
           if (!Array.isArray(items)) {
             try {
               if (typeof items === 'string') {
@@ -56,7 +57,7 @@ export function useOrderDetails(orderId: string) {
             }
           }
           
-          const transformedItems = [];
+          const transformedItems: OrderItem[] = [];
           for (const item of items) {
             const { data: product } = await supabase
               .from('products')
@@ -81,14 +82,16 @@ export function useOrderDetails(orderId: string) {
           return transformedItems;
         };
         
-        const customerName = data.customers?.name || '';
-        const customerEmail = data.customers?.email || '';
-        const customerPhone = data.customers?.phone || '';
-        const customerPhoneVerified = data.customers?.phone_verified || false;
+        // Get customer info safely
+        const customer = data.customers || {};
+        const customerName = customer.name || '';
+        const customerEmail = customer.email || '';
+        const customerPhone = customer.phone || '';
+        const customerPhoneVerified = !!customer.phone_verified;
         
         const transformedItems = await transformItems(data.items);
         
-        const orderObj = {
+        const orderObj: Order = {
           id: data.id,
           created_at: data.created_at,
           total: data.total,
