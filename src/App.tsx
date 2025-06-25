@@ -37,6 +37,7 @@ import CreateProductCollection from "@/pages/CreateProductCollection";
 import EditProductCollection from "@/pages/EditProductCollection";
 import Returns from "@/pages/Returns";
 import CustomerProfile from "@/pages/CustomerProfile";
+import MapPage from "@/pages/MapPage";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
@@ -95,6 +96,7 @@ function App() {
               <Route path="/product-collections" element={<ProtectedRoute><ProductCollections /></ProtectedRoute>} />
               <Route path="/product-collections/create" element={<ProtectedRoute><CreateProductCollection /></ProtectedRoute>} />
               <Route path="/product-collections/edit/:id" element={<ProtectedRoute><EditProductCollection /></ProtectedRoute>} />
+              <Route path="/map" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <SonnerToaster position="top-center" richColors />
