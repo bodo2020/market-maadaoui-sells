@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Input } from '@/components/ui/input';
@@ -18,7 +17,7 @@ const MapPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const API_KEY = 'AIzaSyC4KH_ddrMJ1mVX2v0DruGWG7WeSZVSbtU';
+  const API_KEY = 'AIzaSyALemtop_wdl7U6nmnTfflwlbFuU1gxc7c';
   const CENTER_LOCATION = { lat: 31.2566, lng: 31.1671 }; // المنصورة، مصر
 
   useEffect(() => {
