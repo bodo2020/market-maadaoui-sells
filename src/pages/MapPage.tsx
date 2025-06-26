@@ -17,7 +17,7 @@ const MapPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const API_KEY = 'AIzaSyALemtop_wdl7U6nmnTfflwlbFuU1gxc7c';
+  const API_KEY = 'AIzaSyBhWG1SZE7DCk9qiC4dCs82oqq3GWkVEhg';
   const CENTER_LOCATION = { lat: 31.2566, lng: 31.1671 }; // المنصورة، مصر
 
   useEffect(() => {
