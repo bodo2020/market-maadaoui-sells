@@ -3,22 +3,22 @@ import MainLayout from '@/components/layout/MainLayout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Navigation, Minus, Plus } from 'lucide-react';
-
 declare global {
   interface Window {
     google: any;
     initMap: () => void;
   }
 }
-
 const MapPage = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
-
   const API_KEY = 'AIzaSyBhWG1SZE7DCk9qiC4dCs82oqq3GWkVEhg';
-  const CENTER_LOCATION = { lat: 31.2566, lng: 31.1671 }; // المنصورة، مصر
+  const CENTER_LOCATION = {
+    lat: 31.2566,
+    lng: 31.1671
+  }; // المنصورة، مصر
 
   useEffect(() => {
     // Load Google Maps script
@@ -27,23 +27,18 @@ const MapPage = () => {
         initializeMap();
         return;
       }
-
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places&language=ar&region=EG`;
       script.async = true;
       script.defer = true;
-      
       window.initMap = initializeMap;
       script.onload = () => {
         setIsLoaded(true);
       };
-      
       document.head.appendChild(script);
     };
-
     const initializeMap = () => {
       if (!mapRef.current) return;
-
       const mapInstance = new window.google.maps.Map(mapRef.current, {
         center: CENTER_LOCATION,
         zoom: 13,
@@ -54,13 +49,13 @@ const MapPage = () => {
         streetViewControl: false,
         rotateControl: false,
         fullscreenControl: false,
-        styles: [
-          {
-            featureType: 'poi',
-            elementType: 'labels.text',
-            stylers: [{ visibility: 'on' }]
-          }
-        ]
+        styles: [{
+          featureType: 'poi',
+          elementType: 'labels.text',
+          stylers: [{
+            visibility: 'on'
+          }]
+        }]
       });
 
       // Add a marker at the center location
@@ -78,16 +73,12 @@ const MapPage = () => {
           anchor: new window.google.maps.Point(12, 24)
         }
       });
-
       setMap(mapInstance);
     };
-
     loadGoogleMaps();
   }, []);
-
   const handleSearch = () => {
     if (!map || !searchQuery || !window.google) return;
-
     const service = new window.google.maps.places.PlacesService(map);
     const request = {
       query: searchQuery,
@@ -95,12 +86,10 @@ const MapPage = () => {
       radius: 50000,
       language: 'ar'
     };
-
     service.textSearch(request, (results: any[], status: any) => {
       if (status === window.google.maps.places.PlacesServiceStatus.OK && results[0]) {
         map.setCenter(results[0].geometry.location);
         map.setZoom(15);
-        
         new window.google.maps.Marker({
           position: results[0].geometry.location,
           map: map,
@@ -109,28 +98,23 @@ const MapPage = () => {
       }
     });
   };
-
   const zoomIn = () => {
     if (map) {
       map.setZoom(map.getZoom() + 1);
     }
   };
-
   const zoomOut = () => {
     if (map) {
       map.setZoom(map.getZoom() - 1);
     }
   };
-
   const resetToCenter = () => {
     if (map) {
       map.setCenter(CENTER_LOCATION);
       map.setZoom(13);
     }
   };
-
-  return (
-    <MainLayout>
+  return <MainLayout>
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="bg-white p-4 shadow-sm border-b">
@@ -142,14 +126,7 @@ const MapPage = () => {
             
             <div className="flex-1 max-w-md">
               <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="ابحث عن موقع..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-10"
-                />
+                <Input type="text" placeholder="ابحث عن موقع..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSearch()} className="pl-10" />
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               </div>
             </div>
@@ -163,57 +140,31 @@ const MapPage = () => {
         {/* Map Container */}
         <div className="flex-1 relative">
           {/* Loading indicator */}
-          {!isLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+          {!isLoaded && <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <p className="text-gray-600">جاري تحميل الخريطة...</p>
               </div>
-            </div>
-          )}
+            </div>}
 
           {/* Map */}
           <div ref={mapRef} className="w-full h-full" />
 
           {/* Map Controls */}
           <div className="absolute left-4 top-4 flex flex-col gap-2">
-            <Button
-              onClick={zoomIn}
-              size="icon"
-              variant="outline"
-              className="bg-white shadow-md hover:bg-gray-50"
-            >
+            <Button onClick={zoomIn} size="icon" variant="outline" className="bg-white shadow-md hover:bg-gray-50">
               <Plus className="w-4 h-4" />
             </Button>
-            <Button
-              onClick={zoomOut}
-              size="icon"
-              variant="outline"
-              className="bg-white shadow-md hover:bg-gray-50"
-            >
+            <Button onClick={zoomOut} size="icon" variant="outline" className="bg-white shadow-md hover:bg-gray-50">
               <Minus className="w-4 h-4" />
             </Button>
-            <Button
-              onClick={resetToCenter}
-              size="icon"
-              variant="outline"
-              className="bg-white shadow-md hover:bg-gray-50"
-            >
+            <Button onClick={resetToCenter} size="icon" variant="outline" className="bg-white shadow-md hover:bg-gray-50">
               <Navigation className="w-4 h-4" />
             </Button>
           </div>
 
           {/* Map Info Panel */}
-          <div className="absolute right-4 top-4 bg-white rounded-lg shadow-lg p-4 max-w-xs">
-            <h3 className="font-semibold text-gray-800 mb-2">كيفية الاستخدام:</h3>
-            <ul className="text-sm text-gray-600 space-y-1">
-              <li>• اضغط في أي مكان لإضافة نقطة وعرض الطريق</li>
-              <li>• ابحث عن مواقع محددة</li>
-              <li>• اضغط على النقاط لرؤية التفاصيل</li>
-              <li>• الخط الأزرق يوضح الطريق بين النقاط</li>
-              <li>• المسافة والوقت من النقطة المرجعية</li>
-            </ul>
-          </div>
+          
 
           {/* Distance and Time Info */}
           <div className="absolute right-4 bottom-4 bg-white rounded-lg shadow-lg p-3">
@@ -234,8 +185,6 @@ const MapPage = () => {
           </div>
         </div>
       </div>
-    </MainLayout>
-  );
+    </MainLayout>;
 };
-
 export default MapPage;
