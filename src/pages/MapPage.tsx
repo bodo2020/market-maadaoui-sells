@@ -167,22 +167,7 @@ const MapPage = () => {
           
 
           {/* Distance and Time Info */}
-          <div className="absolute right-4 bottom-4 bg-white rounded-lg shadow-lg p-3">
-            <div className="text-sm">
-              <div className="flex items-center gap-2 text-green-600 mb-1">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span>مسافة مباشرة: 8.21 كم</span>
-              </div>
-              <div className="flex items-center gap-2 text-blue-600 mb-1">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                <span>مسافة الطريق: 15.3 كم</span>
-              </div>
-              <div className="flex items-center gap-2 text-purple-600">
-                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                <span>وقت الوصول: 31 دقيقة</span>
-              </div>
-            </div>
-          </div>
+          
         </div>
       </div>
     </MainLayout>;
