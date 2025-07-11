@@ -1,44 +1,161 @@
-
 import {
-  BarChart4, Store, ShoppingCart, PackageOpen, Users, Settings, FileText,
-  Receipt, Home, UserPlus, Truck, Building2, ImageIcon,
-  ShoppingBag, FolderOpen, MapPin, TrendingUp, Tag, Gift, Coins, RotateCcw
+  LayoutDashboard,
+  ShoppingCart,
+  ShoppingBag,
+  Receipt,
+  Package,
+  Grid3X3,
+  Building2,
+  Warehouse,
+  ClipboardList,
+  Truck,
+  Users,
+  UserCheck,
+  Wallet,
+  Image,
+  MapPin,
+  FolderOpen,
+  Tag,
+  TrendingUp,
+  DollarSign,
+  FileText,
+  RefreshCw,
+  Settings,
+  Map,
 } from "lucide-react";
-import { SidebarGroupData } from "./types";
+import { SidebarItemData, NavigationGroup } from "./types";
 
-export const mainNavigation: SidebarGroupData = {
+export const mainNavigation: NavigationGroup = {
+  title: "الرئيسية",
   items: [
-    { icon: Home, label: "الرئيسية", href: "/" },
-    { icon: ShoppingCart, label: "نقطة البيع", href: "/pos" },
-    { icon: FolderOpen, label: "الاقسام", href: "/categories" },
-    { icon: TrendingUp, label: "لوحة المبيعات والخزينة", href: "/sales-dashboard" },
-    { icon: BarChart4, label: "الإدارة المالية", href: "/finance" },
-    { icon: Coins, label: "متابعة النقدية", href: "/cash-tracking" },
-    { icon: RotateCcw, label: "المرتجعات", href: "/returns" }
-  ]
+    {
+      label: "لوحة التحكم",
+      href: "/",
+      icon: LayoutDashboard,
+    },
+    {
+      label: "نقطة البيع",
+      href: "/pos",
+      icon: ShoppingCart,
+    },
+    {
+      label: "الطلبات الإلكترونية",
+      href: "/online-orders",
+      icon: ShoppingBag,
+    },
+    {
+      label: "الفواتير",
+      href: "/invoices",
+      icon: Receipt,
+    },
+  ],
 };
 
-export const adminNavigation: SidebarGroupData = {
+export const adminNavigation: NavigationGroup = {
+  title: "الإدارة",
   items: [
-    { icon: Building2, label: "الشركات", href: "/companies", adminOnly: true },
-    { icon: ImageIcon, label: "البانرات", href: "/banners", adminOnly: true },
-    { icon: MapPin, label: "مناطق التوصيل", href: "/delivery-locations", adminOnly: true },
-    { icon: Tag, label: "العروض والكوبونات", href: "/offers", adminOnly: true }
-  ]
+    {
+      label: "المنتجات",
+      href: "/products",
+      icon: Package,
+    },
+    {
+      label: "الأقسام",
+      href: "/categories",
+      icon: Grid3X3,
+    },
+    {
+      label: "الشركات",
+      href: "/companies",
+      icon: Building2,
+    },
+    {
+      label: "إدارة المخزون",
+      href: "/inventory",
+      icon: Warehouse,
+    },
+    {
+      label: "الجرد اليومي",
+      href: "/daily-inventory",
+      icon: ClipboardList,
+    },
+    {
+      label: "مشتريات الموردين",
+      href: "/supplier-purchases",
+      icon: Truck,
+    },
+    {
+      label: "العملاء والموردين",
+      href: "/suppliers-customers",
+      icon: Users,
+    },
+    {
+      label: "إدارة الموظفين",
+      href: "/employees",
+      icon: UserCheck,
+      adminOnly: true,
+    },
+    {
+      label: "تتبع النقدية",
+      href: "/cash-tracking",
+      icon: Wallet,
+      adminOnly: true,
+    },
+    {
+      label: "الإعلانات",
+      href: "/banners",
+      icon: Image,
+    },
+    {
+      label: "أماكن التوصيل",
+      href: "/delivery-locations",
+      icon: MapPin,
+    },
+    {
+      label: "مجموعات المنتجات",
+      href: "/product-collections",
+      icon: FolderOpen,
+    },
+    {
+      label: "العروض والخصومات",
+      href: "/offers",
+      icon: Tag,
+    },
+  ],
 };
 
-export const generalNavigation: SidebarGroupData = {
+export const generalNavigation: NavigationGroup = {
+  title: "عام",
   items: [
-    { icon: Truck, label: "مشتريات الموردين", href: "/supplier-purchases" },
-    { icon: PackageOpen, label: "المنتجات", href: "/products" },
-    { icon: ShoppingBag, label: "مجموعات المنتجات", href: "/product-collections" },
-    { icon: ShoppingBag, label: "الطلبات الإلكترونية", href: "/online-orders" },
-    { icon: Receipt, label: "الفواتير", href: "/invoices" },
-    { icon: BarChart4, label: "التقارير والمالية", href: "/reports" },
-    { icon: Store, label: "المخزون", href: "/inventory" },
-    { icon: UserPlus, label: "العملاء والموردين", href: "/suppliers-customers" },
-    { icon: FileText, label: "المصروفات", href: "/expenses" },
-    { icon: Users, label: "الموظفين", href: "/employees", adminOnly: true },
-    { icon: Settings, label: "الإعدادات", href: "/settings" }
-  ]
+    {
+      label: "المبيعات",
+      href: "/sales-dashboard",
+      icon: TrendingUp,
+    },
+    {
+      label: "المالية",
+      href: "/finance",
+      icon: DollarSign,
+    },
+    {
+      label: "التقارير",
+      href: "/reports",
+      icon: FileText,
+    },
+    {
+      label: "المرتجعات",
+      href: "/returns",
+      icon: RefreshCw,
+    },
+    {
+      label: "الإعدادات",
+      href: "/settings",
+      icon: Settings,
+    },
+    {
+      label: "الخريطة",
+      href: "/map",
+      icon: Map,
+    },
+  ],
 };
