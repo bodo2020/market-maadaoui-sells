@@ -26,6 +26,7 @@ import { Product } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
+import * as XLSX from 'exceljs';
 
 interface InventoryItem extends Product {
   actualQuantity?: number;
@@ -90,92 +91,144 @@ export default function DailyInventoryPage() {
     }));
   };
 
-  const exportToWord = async () => {
+  const exportToExcel = async () => {
     setExporting(true);
     try {
-      // إنشاء محتوى HTML للتصدير
-      const currentDate = format(new Date(), 'yyyy-MM-dd', { locale: ar });
-      const completedItems = inventoryItems.filter(item => item.status !== 'pending');
-      
-      let htmlContent = `
-        <html dir="rtl">
-        <head>
-          <meta charset="UTF-8">
-          <style>
-            body { font-family: Arial, Unicode MS; direction: rtl; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th, td { border: 1px solid #000; padding: 8px; text-align: right; }
-            th { background-color: #f0f0f0; font-weight: bold; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .status-checked { color: green; }
-            .status-discrepancy { color: red; }
-            .summary { margin-top: 30px; padding: 15px; background-color: #f9f9f9; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>تقرير الجرد اليومي</h1>
-            <h3>تاريخ: ${currentDate}</h3>
-          </div>
-          
-          <table>
-            <thead>
-              <tr>
-                <th>اسم المنتج</th>
-                <th>الباركود</th>
-                <th>الكمية المتوقعة</th>
-                <th>الكمية الفعلية</th>
-                <th>الفرق</th>
-                <th>الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-      `;
+      const workbook = new XLSX.Workbook();
+      const worksheet = workbook.addWorksheet('تقرير الجرد اليومي');
 
-      completedItems.forEach(item => {
-        const statusText = item.status === 'checked' ? 'مطابق' : 'يوجد اختلاف';
-        const statusClass = item.status === 'checked' ? 'status-checked' : 'status-discrepancy';
-        
-        htmlContent += `
-          <tr>
-            <td>${item.name}</td>
-            <td>${item.barcode || '-'}</td>
-            <td>${item.quantity || 0}</td>
-            <td>${item.actualQuantity || 0}</td>
-            <td>${item.difference || 0}</td>
-            <td class="${statusClass}">${statusText}</td>
-          </tr>
-        `;
+      // إعداد خصائص الصفحة
+      worksheet.properties.defaultRowHeight = 25;
+      worksheet.properties.rightToLeft = true;
+
+      // إضافة العنوان الرئيسي
+      const currentDate = format(new Date(), 'yyyy-MM-dd', { locale: ar });
+      worksheet.mergeCells('A1:F3');
+      const titleCell = worksheet.getCell('A1');
+      titleCell.value = `تقرير الجرد اليومي\nتاريخ: ${currentDate}`;
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      titleCell.font = { size: 16, bold: true };
+      titleCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+
+      // إضافة رؤوس الأعمدة
+      const headers = ['اسم المنتج', 'الباركود', 'الكمية المتوقعة', 'الكمية الفعلية', 'الفرق', 'الحالة'];
+      const headerRow = worksheet.getRow(5);
+      headers.forEach((header, index) => {
+        const cell = headerRow.getCell(index + 1);
+        cell.value = header;
+        cell.font = { bold: true };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFD0D0D0' }
+        };
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
       });
 
+      // إضافة البيانات
+      const completedItems = inventoryItems.filter(item => item.status !== 'pending');
+      completedItems.forEach((item, index) => {
+        const row = worksheet.getRow(6 + index);
+        const statusText = item.status === 'checked' ? 'مطابق' : 'يوجد اختلاف';
+        
+        row.getCell(1).value = item.name;
+        row.getCell(2).value = item.barcode || '-';
+        row.getCell(3).value = item.quantity || 0;
+        row.getCell(4).value = item.actualQuantity || 0;
+        row.getCell(5).value = item.difference || 0;
+        row.getCell(6).value = statusText;
+
+        // تنسيق الصفوف
+        for (let i = 1; i <= 6; i++) {
+          const cell = row.getCell(i);
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+
+          // تلوين خلايا الحالة
+          if (i === 6) {
+            if (item.status === 'checked') {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFE0FFE0' }
+              };
+            } else if (item.status === 'discrepancy') {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFFFE0E0' }
+              };
+            }
+          }
+        }
+      });
+
+      // إضافة ملخص الجرد
+      const summaryStartRow = 8 + completedItems.length;
       const totalItems = completedItems.length;
       const checkedItems = completedItems.filter(item => item.status === 'checked').length;
       const discrepancyItems = completedItems.filter(item => item.status === 'discrepancy').length;
 
-      htmlContent += `
-            </tbody>
-          </table>
-          
-          <div class="summary">
-            <h3>ملخص الجرد:</h3>
-            <p>إجمالي المنتجات المجردة: ${totalItems}</p>
-            <p>المنتجات المطابقة: ${checkedItems}</p>
-            <p>المنتجات بها اختلاف: ${discrepancyItems}</p>
-            <p>تاريخ ووقت التصدير: ${format(new Date(), 'yyyy-MM-dd HH:mm', { locale: ar })}</p>
-          </div>
-        </body>
-        </html>
-      `;
+      worksheet.mergeCells(`A${summaryStartRow}:F${summaryStartRow}`);
+      const summaryTitleCell = worksheet.getCell(`A${summaryStartRow}`);
+      summaryTitleCell.value = 'ملخص الجرد';
+      summaryTitleCell.font = { size: 14, bold: true };
+      summaryTitleCell.alignment = { horizontal: 'center' };
+      summaryTitleCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF0F0F0' }
+      };
 
-      // إنشاء ملف Word
-      const blob = new Blob([htmlContent], { 
-        type: 'application/msword;charset=utf-8' 
+      const summaryData = [
+        [`إجمالي المنتجات المجردة: ${totalItems}`],
+        [`المنتجات المطابقة: ${checkedItems}`],
+        [`المنتجات بها اختلاف: ${discrepancyItems}`],
+        [`تاريخ ووقت التصدير: ${format(new Date(), 'yyyy-MM-dd HH:mm', { locale: ar })}`]
+      ];
+
+      summaryData.forEach((data, index) => {
+        const row = worksheet.getRow(summaryStartRow + 1 + index);
+        worksheet.mergeCells(`A${summaryStartRow + 1 + index}:F${summaryStartRow + 1 + index}`);
+        const cell = row.getCell(1);
+        cell.value = data[0];
+        cell.alignment = { horizontal: 'right' };
+        cell.font = { size: 11 };
+      });
+
+      // تعيين عرض الأعمدة
+      worksheet.getColumn(1).width = 25; // اسم المنتج
+      worksheet.getColumn(2).width = 15; // الباركود
+      worksheet.getColumn(3).width = 15; // الكمية المتوقعة
+      worksheet.getColumn(4).width = 15; // الكمية الفعلية
+      worksheet.getColumn(5).width = 10; // الفرق
+      worksheet.getColumn(6).width = 15; // الحالة
+
+      // تصدير الملف
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
       });
       
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `تقرير_الجرد_${currentDate}.doc`;
+      link.download = `تقرير_الجرد_${currentDate}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -183,10 +236,10 @@ export default function DailyInventoryPage() {
 
       toast({
         title: "تم التصدير بنجاح",
-        description: "تم تصدير تقرير الجرد إلى ملف Word",
+        description: "تم تصدير تقرير الجرد إلى ملف Excel",
       });
     } catch (error) {
-      console.error("Error exporting to Word:", error);
+      console.error("Error exporting to Excel:", error);
       toast({
         title: "خطأ في التصدير",
         description: "حدث خطأ أثناء تصدير التقرير",
@@ -241,11 +294,11 @@ export default function DailyInventoryPage() {
             </Button>
             
             <Button 
-              onClick={exportToWord}
+              onClick={exportToExcel}
               disabled={exporting || completedItems === 0}
             >
               <FileDown className="ml-2 h-4 w-4" />
-              {exporting ? 'جاري التصدير...' : 'تصدير لملف Word'}
+              {exporting ? 'جاري التصدير...' : 'تصدير لملف Excel'}
             </Button>
           </div>
         </div>
