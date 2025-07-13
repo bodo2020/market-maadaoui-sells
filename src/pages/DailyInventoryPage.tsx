@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -99,7 +98,6 @@ export default function DailyInventoryPage() {
 
       // إعداد خصائص الصفحة
       worksheet.properties.defaultRowHeight = 25;
-      worksheet.properties.rightToLeft = true;
 
       // إضافة العنوان الرئيسي
       const currentDate = format(new Date(), 'yyyy-MM-dd', { locale: ar });
