@@ -15,3 +15,8 @@ export interface SidebarItemData {
 export interface SidebarGroupData {
   items: SidebarItemData[];
 }
+
+export interface NavigationGroup {
+  title: string;
+  items: SidebarItemData[];
+}
