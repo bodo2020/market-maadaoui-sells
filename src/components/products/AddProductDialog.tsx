@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, Scan } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DragDropImage } from "@/components/ui/drag-drop-image";
+import BarcodeScanner from "@/components/POS/BarcodeScanner";
 
 const productSchema = z.object({
   name: z.string().min(2, { message: "يجب أن يحتوي اسم المنتج على حرفين على الأقل" }),
@@ -76,6 +77,7 @@ export function AddProductDialog({
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -104,6 +106,11 @@ export function AddProductDialog({
   useEffect(() => {
     form.setValue('subcategory_id', selectedSubcategory || undefined);
   }, [selectedSubcategory, form]);
+
+  const handleBarcodeScanned = (barcode: string) => {
+    form.setValue('barcode', barcode);
+    toast.success(`تم مسح الباركود: ${barcode}`);
+  };
 
   const handleClose = () => {
     form.reset();
@@ -328,7 +335,18 @@ export function AddProductDialog({
                   <FormItem>
                     <FormLabel>الباركود (اختياري)</FormLabel>
                     <FormControl>
-                      <Input placeholder="باركود المنتج" {...field} />
+                      <div className="flex gap-2">
+                        <Input placeholder="باركود المنتج" {...field} />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setIsScannerOpen(true)}
+                          className="flex-shrink-0"
+                        >
+                          <Scan className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -471,6 +489,12 @@ export function AddProductDialog({
             </div>
           </form>
         </Form>
+
+        <BarcodeScanner
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScan={handleBarcodeScanned}
+        />
       </DialogContent>
     </Dialog>
   );

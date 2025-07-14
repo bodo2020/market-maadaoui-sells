@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
@@ -10,12 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { fetchProductById, updateProduct, createProduct } from "@/services/supabase/productService";
 import { Product } from "@/types";
-import { Loader2 } from "lucide-react";
+import { Loader2, Scan } from "lucide-react";
 import { fetchMainCategories } from "@/services/supabase/categoryService";
 import { fetchCompanies } from "@/services/supabase/companyService";
 import { fetchSubcategories } from "@/services/supabase/categoryService";
 import { MainCategory, Subcategory, Company } from "@/types";
 import { DragDropImage } from "@/components/ui/drag-drop-image";
+import BarcodeScanner from "@/components/POS/BarcodeScanner";
 
 export default function AddProduct() {
   const [product, setProduct] = useState<Partial<Product>>({
@@ -31,6 +31,7 @@ export default function AddProduct() {
   const [categories, setCategories] = useState<MainCategory[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -235,6 +236,14 @@ export default function AddProduct() {
     }
   };
 
+  const handleBarcodeScanned = (barcode: string) => {
+    setProduct(prev => ({ ...prev, barcode }));
+    toast({
+      title: "تم مسح الباركود",
+      description: `تم إدخال الباركود: ${barcode}`,
+    });
+  };
+
   return (
     <MainLayout>
       <div className="container mx-auto p-6">
@@ -405,12 +414,23 @@ export default function AddProduct() {
 
             <div>
               <Label htmlFor="barcode">الباركود</Label>
-              <Input
-                id="barcode"
-                placeholder="ادخل الباركود"
-                value={product?.barcode || ''}
-                onChange={(e) => setProduct(prev => ({ ...prev, barcode: e.target.value }))}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="barcode"
+                  placeholder="ادخل الباركود"
+                  value={product?.barcode || ''}
+                  onChange={(e) => setProduct(prev => ({ ...prev, barcode: e.target.value }))}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsScannerOpen(true)}
+                  className="flex-shrink-0"
+                >
+                  <Scan className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <div>
@@ -473,12 +493,23 @@ export default function AddProduct() {
 
                 <div>
                   <Label htmlFor="bulk_barcode">باركود الجملة</Label>
-                  <Input
-                    id="bulk_barcode"
-                    placeholder="ادخل الباركود"
-                    value={product?.bulk_barcode || ''}
-                    onChange={(e) => setProduct(prev => ({ ...prev, bulk_barcode: e.target.value }))}
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="bulk_barcode"
+                      placeholder="ادخل الباركود"
+                      value={product?.bulk_barcode || ''}
+                      onChange={(e) => setProduct(prev => ({ ...prev, bulk_barcode: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setIsScannerOpen(true)}
+                      className="flex-shrink-0"
+                    >
+                      <Scan className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -501,6 +532,12 @@ export default function AddProduct() {
             {productId ? "تحديث المنتج" : "إضافة المنتج"}
           </Button>
         </form>
+
+        <BarcodeScanner
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScan={handleBarcodeScanned}
+        />
       </div>
     </MainLayout>
   );
