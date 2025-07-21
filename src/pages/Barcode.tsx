@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Printer, Settings, Bluetooth, Cable, RefreshCw, Plus, Wifi } from "lucide-react";
+import { Search, Printer, Settings, Bluetooth, Cable, RefreshCw, Plus, Wifi, Edit, Save, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import JsBarcode from "jsbarcode";
+import { fetchStoreSettings, StoreSettings } from "@/services/supabase/storeService";
 
 interface Product {
   id: string;
@@ -35,7 +36,12 @@ interface PrinterDevice {
 }
 
 // Simple Barcode Display Component
-const SimpleBarcodeDisplay = ({ value, className }: { value: string; className?: string }) => {
+const SimpleBarcodeDisplay = ({ value, productName, storeName, className }: { 
+  value: string; 
+  productName: string;
+  storeName: string;
+  className?: string;
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -56,7 +62,15 @@ const SimpleBarcodeDisplay = ({ value, className }: { value: string; className?:
     }
   }, [value]);
 
-  return <canvas ref={canvasRef} className={className} />;
+  return (
+    <div className="space-y-1">
+      <canvas ref={canvasRef} className={className} />
+      <div className="text-xs text-center space-y-1">
+        <div className="font-medium">{productName}</div>
+        <div className="text-muted-foreground">{storeName}</div>
+      </div>
+    </div>
+  );
 };
 
 export default function Barcode() {
@@ -68,10 +82,14 @@ export default function Barcode() {
   const [invoicePrinter, setInvoicePrinter] = useState<string>('');
   const [barcodePrinter, setBarcodePrinter] = useState<string>('');
   const [isScanning, setIsScanning] = useState(false);
+  const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
+  const [editingProduct, setEditingProduct] = useState<string | null>(null);
+  const [editingBarcode, setEditingBarcode] = useState({ barcode: '', bulk_barcode: '' });
 
   useEffect(() => {
     fetchProducts();
     scanForDevices();
+    fetchStoreData();
   }, []);
 
   const scanForDevices = async () => {
@@ -221,6 +239,55 @@ export default function Barcode() {
     }
   };
 
+  const fetchStoreData = async () => {
+    try {
+      const settings = await fetchStoreSettings();
+      setStoreSettings(settings);
+    } catch (error) {
+      console.error('Error fetching store settings:', error);
+    }
+  };
+
+  const startEditing = (product: Product) => {
+    setEditingProduct(product.id);
+    setEditingBarcode({
+      barcode: product.barcode || '',
+      bulk_barcode: product.bulk_barcode || ''
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingProduct(null);
+    setEditingBarcode({ barcode: '', bulk_barcode: '' });
+  };
+
+  const saveBarcode = async (productId: string) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          barcode: editingBarcode.barcode || null,
+          bulk_barcode: editingBarcode.bulk_barcode || null
+        })
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      // Update local state
+      setProducts(prev => prev.map(p => 
+        p.id === productId 
+          ? { ...p, barcode: editingBarcode.barcode, bulk_barcode: editingBarcode.bulk_barcode }
+          : p
+      ));
+
+      toast.success('تم حفظ الباركود بنجاح');
+      cancelEditing();
+    } catch (error) {
+      console.error('Error saving barcode:', error);
+      toast.error('حدث خطأ في حفظ الباركود');
+    }
+  };
+
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.barcode?.includes(searchTerm) ||
@@ -355,44 +422,108 @@ export default function Barcode() {
                         />
                       </div>
 
-                      <div className="space-y-3">
-                        {/* Regular Barcode */}
-                        {product.barcode && (
+                      {editingProduct === product.id ? (
+                        <div className="space-y-3">
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium text-primary">قطعة</span>
-                              <span className="text-xs text-muted-foreground">{product.price} ج.م</span>
-                            </div>
-                            <SimpleBarcodeDisplay 
-                              value={product.barcode} 
-                              className="h-12 w-full"
+                            <label className="text-xs font-medium">باركود القطعة</label>
+                            <Input
+                              value={editingBarcode.barcode}
+                              onChange={(e) => setEditingBarcode(prev => ({ ...prev, barcode: e.target.value }))}
+                              placeholder="أدخل باركود القطعة"
+                              className="text-xs"
                             />
-                            <p className="text-xs text-center font-mono">{product.barcode}</p>
                           </div>
-                        )}
-
-                        {/* Bulk Barcode */}
-                        {product.bulk_enabled && product.bulk_barcode && (
-                          <div className="space-y-2 pt-2 border-t">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium text-green-600">جملة</span>
-                              <span className="text-xs text-muted-foreground">{product.bulk_price} ج.م</span>
+                          {product.bulk_enabled && (
+                            <div className="space-y-2">
+                              <label className="text-xs font-medium">باركود الجملة</label>
+                              <Input
+                                value={editingBarcode.bulk_barcode}
+                                onChange={(e) => setEditingBarcode(prev => ({ ...prev, bulk_barcode: e.target.value }))}
+                                placeholder="أدخل باركود الجملة"
+                                className="text-xs"
+                              />
                             </div>
-                            <SimpleBarcodeDisplay 
-                              value={product.bulk_barcode} 
-                              className="h-12 w-full"
-                            />
-                            <p className="text-xs text-center font-mono">{product.bulk_barcode}</p>
+                          )}
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => saveBarcode(product.id)}>
+                              <Save className="h-3 w-3 mr-1" />
+                              حفظ
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={cancelEditing}>
+                              <X className="h-3 w-3 mr-1" />
+                              إلغاء
+                            </Button>
                           </div>
-                        )}
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {/* Edit Button */}
+                          <div className="flex justify-end">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditing(product);
+                              }}
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              تعديل
+                            </Button>
+                          </div>
 
-                        {/* No Barcode */}
-                        {!product.barcode && !product.bulk_barcode && (
-                          <div className="text-center py-4 text-muted-foreground text-sm">
-                            لا يوجد باركود لهذا المنتج
-                          </div>
-                        )}
-                      </div>
+                          {/* Regular Barcode */}
+                          {product.barcode && (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-primary">قطعة</span>
+                              </div>
+                              <SimpleBarcodeDisplay 
+                                value={product.barcode}
+                                productName={product.name}
+                                storeName={storeSettings?.name || 'المتجر'}
+                                className="h-12 w-full"
+                              />
+                              <p className="text-xs text-center font-mono">{product.barcode}</p>
+                            </div>
+                          )}
+
+                          {/* Bulk Barcode */}
+                          {product.bulk_enabled && product.bulk_barcode && (
+                            <div className="space-y-2 pt-2 border-t">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-green-600">جملة</span>
+                              </div>
+                              <SimpleBarcodeDisplay 
+                                value={product.bulk_barcode}
+                                productName={`${product.name} (جملة)`}
+                                storeName={storeSettings?.name || 'المتجر'}
+                                className="h-12 w-full"
+                              />
+                              <p className="text-xs text-center font-mono">{product.bulk_barcode}</p>
+                            </div>
+                          )}
+
+                          {/* No Barcode */}
+                          {!product.barcode && !product.bulk_barcode && (
+                            <div className="text-center py-4 text-muted-foreground text-sm">
+                              لا يوجد باركود لهذا المنتج
+                              <br />
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="mt-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEditing(product);
+                                }}
+                              >
+                                إضافة باركود
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))
