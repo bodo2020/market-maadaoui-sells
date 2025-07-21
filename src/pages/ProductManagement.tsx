@@ -20,6 +20,7 @@ import { Button as ShadcnButton } from "@/components/ui/button";
 import { Dialog as ShadcnDialog } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import ProductAssignmentDialog from "@/components/products/ProductAssignmentDialog";
+import { BarcodeGenerator } from "@/components/products/BarcodeGenerator";
 
 export default function ProductManagement() {
   const navigate = useNavigate();
@@ -494,6 +495,14 @@ export default function ProductManagement() {
                                 </DropdownMenuItem>}
                               
                               <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                                className="p-0"
+                              >
+                                <BarcodeGenerator product={product} />
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => {
                         setProductToEdit(product);
                         setIsAssignCategoryOpen(true);
