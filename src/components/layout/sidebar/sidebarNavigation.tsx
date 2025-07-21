@@ -27,6 +27,10 @@ export const mainNavigation = {
     { href: "/online-orders", icon: Truck, label: "الطلبات الأونلاين", cashierOnly: true },
     { href: "/sales", icon: TrendingUp, label: "المبيعات" },
     { href: "/returns", icon: RotateCcw, label: "المرتجعات" },
+    { href: "/customers", icon: Users, label: "العملاء" },
+    { href: "/suppliers", icon: Truck, label: "الموردين" },
+    { href: "/inventory", icon: Package, label: "المخزون" },
+    { href: "/reports", icon: DollarSign, label: "التقارير" },
   ] as SidebarItemData[]
 };
 
