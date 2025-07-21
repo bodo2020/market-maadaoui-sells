@@ -1,19 +1,24 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster"
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import ProtectedRoute from './components/Auth/ProtectedRoute';
+import ProtectedRoute from './components/ProtectedRoute';
+import Users from './pages/Users';
 import Categories from './pages/Categories';
 import Companies from './pages/Companies';
-import Expenses from './pages/ExpenseManagement';
+import Suppliers from './pages/Suppliers';
+import Customers from './pages/Customers';
+import Expenses from './pages/Expenses';
+import Products from './pages/Products';
 import AddProduct from './pages/AddProduct';
 import ProductManagement from './pages/ProductManagement';
-import POS from './pages/POS';
-import Orders from './pages/OnlineOrders';
-import Settings from './pages/Settings';
+import Pos from './pages/Pos';
+import Sales from './pages/Sales';
+import Orders from './pages/Orders';
+import SettingsPage from './pages/SettingsPage';
+import Profile from './pages/Profile';
 import Purchases from './pages/Purchases';
 import ProductCollections from './pages/ProductCollections';
 import DeliveryLocations from './pages/DeliveryLocations';
@@ -37,6 +42,11 @@ function App() {
                 <Dashboard />
               </ProtectedRoute>
             } />
+            <Route path="/users" element={
+              <ProtectedRoute>
+                <Users />
+              </ProtectedRoute>
+            } />
             <Route path="/categories" element={
               <ProtectedRoute>
                 <Categories />
@@ -45,6 +55,16 @@ function App() {
             <Route path="/companies" element={
               <ProtectedRoute>
                 <Companies />
+              </ProtectedRoute>
+            } />
+            <Route path="/suppliers" element={
+              <ProtectedRoute>
+                <Suppliers />
+              </ProtectedRoute>
+            } />
+            <Route path="/customers" element={
+              <ProtectedRoute>
+                <Customers />
               </ProtectedRoute>
             } />
             <Route path="/expenses" element={
@@ -64,7 +84,12 @@ function App() {
             } />
              <Route path="/pos" element={
               <ProtectedRoute>
-                <POS />
+                <Pos />
+              </ProtectedRoute>
+            } />
+            <Route path="/sales" element={
+              <ProtectedRoute>
+                <Sales />
               </ProtectedRoute>
             } />
              <Route path="/orders" element={
@@ -74,7 +99,12 @@ function App() {
             } />
             <Route path="/settings" element={
               <ProtectedRoute>
-                <Settings />
+                <SettingsPage />
+              </ProtectedRoute>
+            } />
+             <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             } />
             <Route path="/purchases" element={
@@ -92,6 +122,7 @@ function App() {
                 <DeliveryLocations />
               </ProtectedRoute>
             } />
+            {/* Add the new route */}
             <Route path="/barcode-printing" element={
               <ProtectedRoute>
                 <BarcodePrinting />
