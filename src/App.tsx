@@ -27,6 +27,7 @@ import EmployeeManagement from "@/pages/EmployeeManagement";
 import CashTracking from "@/pages/CashTracking";
 import Banners from "@/pages/Banners";
 import AddBanner from "@/pages/AddBanner";
+import Barcode from "@/pages/Barcode";
 import DeliveryLocationsPage from "@/pages/DeliveryLocationsPage";
 import DeliveryLocations from "@/pages/DeliveryLocations";
 import SalesDashboard from "@/pages/SalesDashboard";
@@ -97,7 +98,7 @@ function App() {
               <Route path="/product-collections" element={<ProtectedRoute><ProductCollections /></ProtectedRoute>} />
               <Route path="/product-collections/create" element={<ProtectedRoute><CreateProductCollection /></ProtectedRoute>} />
               <Route path="/product-collections/edit/:id" element={<ProtectedRoute><EditProductCollection /></ProtectedRoute>} />
-              <Route path="/map" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
+              <Route path="/barcode" element={<ProtectedRoute><Barcode /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <SonnerToaster position="top-center" richColors />
