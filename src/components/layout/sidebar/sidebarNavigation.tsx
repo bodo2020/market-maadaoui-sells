@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Settings,
   Map,
+  QrCode,
 } from "lucide-react";
 import { SidebarItemData, NavigationGroup } from "./types";
 
@@ -63,6 +64,11 @@ export const adminNavigation: NavigationGroup = {
       label: "الأقسام",
       href: "/categories",
       icon: Grid3X3,
+    },
+    {
+      label: "الباركود",
+      href: "/barcode",
+      icon: QrCode,
     },
     {
       label: "الشركات",
