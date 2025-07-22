@@ -4,16 +4,17 @@ import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer } from "lucide-react";
-import { CartItem, Product, Sale } from "@/types";
+import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer, User, Wallet } from "lucide-react";
+import { CartItem, Product, Sale, Customer } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 import { createSale, generateInvoiceNumber } from "@/services/supabase/saleService";
-import { findOrCreateCustomer } from "@/services/supabase/customerService";
-import { RegisterType } from "@/services/supabase/cashTrackingService";
+import { fetchCustomers, findOrCreateCustomer } from "@/services/supabase/customerService";
+import { RegisterType, getLatestCashBalance } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
@@ -26,6 +27,9 @@ export default function POS() {
   const [showWeightDialog, setShowWeightDialog] = useState(false);
   const [currentScaleProduct, setCurrentScaleProduct] = useState<Product | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
+  const [cashBalance, setCashBalance] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mixed'>('cash');
@@ -48,23 +52,29 @@ export default function POS() {
   } = useToast();
 
   useEffect(() => {
-    const loadProducts = async () => {
+    const loadData = async () => {
       try {
         setIsLoading(true);
-        const data = await fetchProducts();
-        setProducts(data);
+        const [productsData, customersData, balance] = await Promise.all([
+          fetchProducts(),
+          fetchCustomers(),
+          getLatestCashBalance(RegisterType.STORE)
+        ]);
+        setProducts(productsData);
+        setCustomers(customersData);
+        setCashBalance(balance);
       } catch (error) {
-        console.error("Error loading products:", error);
+        console.error("Error loading data:", error);
         toast({
-          title: "خطأ في تحميل المنتجات",
-          description: "حدث خطأ أثناء تحميل المنتجات، يرجى المحاولة مرة أخرى.",
+          title: "خطأ في تحميل البيانات",
+          description: "حدث خطأ أثناء تحميل البيانات، يرجى المحاولة مرة أخرى.",
           variant: "destructive"
         });
       } finally {
         setIsLoading(false);
       }
     };
-    loadProducts();
+    loadData();
   }, [toast]);
 
   useEffect(() => {
@@ -369,6 +379,16 @@ export default function POS() {
 
   const openCheckout = () => {
     if (cartItems.length === 0) return;
+    
+    // Set customer data if selected
+    if (selectedCustomer) {
+      const customer = customers.find(c => c.id === selectedCustomer);
+      if (customer) {
+        setCustomerName(customer.name);
+        setCustomerPhone(customer.phone || "");
+      }
+    }
+    
     setIsCheckoutOpen(true);
     setCashAmount(total.toFixed(2));
     setCardAmount("");
@@ -482,6 +502,13 @@ export default function POS() {
         description: `رقم الفاتورة: ${sale.invoice_number}`
       });
       setShowSuccess(true);
+      
+      // Clear cart after successful sale
+      setTimeout(() => {
+        resetSale();
+        // Refresh cash balance
+        getLatestCashBalance(RegisterType.STORE).then(setCashBalance);
+      }, 2000);
     } catch (error) {
       console.error("Error completing sale:", error);
       toast({
@@ -495,6 +522,9 @@ export default function POS() {
 
   const resetSale = () => {
     setCartItems([]);
+    setSearchResults([]);
+    setSearch("");
+    setSelectedCustomer("");
     setIsCheckoutOpen(false);
     setShowSuccess(false);
     setIsProcessing(false);
@@ -713,7 +743,13 @@ export default function POS() {
             <CardHeader className="pb-3">
               <div className="flex justify-between items-center">
                 <CardTitle>سلة المشتريات</CardTitle>
-                <ShoppingCart className="h-5 w-5 text-muted-foreground" />
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Wallet className="w-4 h-4" />
+                    {cashBalance.toFixed(2)} ج.م
+                  </div>
+                  <ShoppingCart className="h-5 w-5 text-muted-foreground" />
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -786,12 +822,33 @@ export default function POS() {
                 </>}
             </CardContent>
             <CardFooter className="flex flex-col space-y-2 pt-0">
+              {/* Customer Selection */}
+              <div className="w-full space-y-2">
+                <Label htmlFor="customer-select" className="text-sm font-medium">
+                  اختيار عميل (اختياري)
+                </Label>
+                <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر عميل موجود" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">بدون عميل</SelectItem>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          {customer.name} {customer.phone && `- ${customer.phone}`}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <Button className="w-full" size="lg" disabled={cartItems.length === 0} onClick={openCheckout}>
                 <CreditCard className="ml-2 h-4 w-4" />
                 إتمام الشراء
               </Button>
-              
-              
             </CardFooter>
           </Card>
         </div>
