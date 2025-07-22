@@ -381,7 +381,7 @@ export default function POS() {
     if (cartItems.length === 0) return;
     
     // Set customer data if selected
-    if (selectedCustomer) {
+    if (selectedCustomer && selectedCustomer !== "none") {
       const customer = customers.find(c => c.id === selectedCustomer);
       if (customer) {
         setCustomerName(customer.name);
@@ -832,7 +832,7 @@ export default function POS() {
                     <SelectValue placeholder="اختر عميل موجود" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">بدون عميل</SelectItem>
+                    <SelectItem value="none">بدون عميل</SelectItem>
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
                         <div className="flex items-center gap-2">
