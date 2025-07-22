@@ -32,6 +32,7 @@ export default function AddProduct() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerType, setScannerType] = useState<'normal' | 'bulk'>('normal');
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -237,11 +238,19 @@ export default function AddProduct() {
   };
 
   const handleBarcodeScanned = (barcode: string) => {
-    setProduct(prev => ({ ...prev, barcode }));
-    toast({
-      title: "تم مسح الباركود",
-      description: `تم إدخال الباركود: ${barcode}`,
-    });
+    if (scannerType === 'bulk') {
+      setProduct(prev => ({ ...prev, bulk_barcode: barcode }));
+      toast({
+        title: "تم مسح باركود الجملة",
+        description: `تم إدخال باركود الجملة: ${barcode}`,
+      });
+    } else {
+      setProduct(prev => ({ ...prev, barcode }));
+      toast({
+        title: "تم مسح الباركود",
+        description: `تم إدخال الباركود: ${barcode}`,
+      });
+    }
   };
 
   return (
@@ -425,7 +434,10 @@ export default function AddProduct() {
                   type="button"
                   variant="outline"
                   size="icon"
-                  onClick={() => setIsScannerOpen(true)}
+                  onClick={() => {
+                    setScannerType('normal');
+                    setIsScannerOpen(true);
+                  }}
                   className="flex-shrink-0"
                 >
                   <Scan className="h-4 w-4" />
@@ -504,7 +516,10 @@ export default function AddProduct() {
                       type="button"
                       variant="outline"
                       size="icon"
-                      onClick={() => setIsScannerOpen(true)}
+                      onClick={() => {
+                        setScannerType('bulk');
+                        setIsScannerOpen(true);
+                      }}
                       className="flex-shrink-0"
                     >
                       <Scan className="h-4 w-4" />
