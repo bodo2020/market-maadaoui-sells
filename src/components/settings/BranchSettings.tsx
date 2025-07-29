@@ -123,6 +123,9 @@ export default function BranchSettings() {
 
   const handleAddBranch = async () => {
     try {
+      console.log('Current user role:', currentUser?.role);
+      console.log('Current user ID:', currentUser?.id);
+      
       if (!formData.name) {
         toast({
           title: "خطأ",
