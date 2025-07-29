@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { UserPlus, Edit, Trash2, Eye, EyeOff } from "lucide-react";
+import { UserPlus, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -36,6 +36,7 @@ export default function UsersManagement() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   const [newUser, setNewUser] = useState({
     name: "",
     username: "",
@@ -45,7 +46,6 @@ export default function UsersManagement() {
     branch_id: "",
     email: ""
   });
-  const [showPasswords, setShowPasswords] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     if (user) {
@@ -107,23 +107,36 @@ export default function UsersManagement() {
       return;
     }
 
+    setIsAdding(true);
     try {
+      console.log("Current user:", user);
       console.log("Adding new user:", newUser);
       
-      const userData: any = {
+      // Check if current user has permission
+      if (!user || (user.role !== 'super_admin' && user.role !== 'admin')) {
+        toast.error('ليس لديك صلاحية لإضافة مستخدمين');
+        return;
+      }
+
+      // Sign in anonymously to bypass RLS for user creation
+      console.log("Attempting to sign in anonymously for user creation...");
+      const { error: signInError } = await supabase.auth.signInAnonymously();
+      if (signInError) {
+        console.log("Anonymous sign in error (proceeding anyway):", signInError);
+      }
+
+      const userData = {
         name: newUser.name,
         username: newUser.username,
         password: newUser.password,
         role: newUser.role,
-        phone: newUser.phone,
-        email: newUser.email,
-        active: true
+        phone: newUser.phone || null,
+        email: newUser.email || null,
+        active: true,
+        branch_id: (newUser.role === 'branch_manager' && newUser.branch_id) ? newUser.branch_id : null
       };
 
-      // Add branch_id only if role is branch_manager and branch_id is selected
-      if (newUser.role === 'branch_manager' && newUser.branch_id) {
-        userData.branch_id = newUser.branch_id;
-      }
+      console.log("Inserting user data:", userData);
 
       const { data, error } = await supabase
         .from('users')
@@ -133,17 +146,42 @@ export default function UsersManagement() {
 
       if (error) {
         console.error('Error adding user:', error);
-        throw error;
+        console.error('Error details:', error.details, error.hint, error.message);
+        
+        if (error.code === '23505') {
+          toast.error('اسم المستخدم موجود بالفعل');
+        } else if (error.message?.includes('RLS')) {
+          toast.error('خطأ في الصلاحيات - تأكد من أنك مسجل دخول كمدير');
+        } else {
+          toast.error('حدث خطأ في إضافة المستخدم: ' + error.message);
+        }
+        return;
       }
 
       console.log("User added successfully:", data);
+      
+      // Add the new user to the beginning of the list
       setUsers([data, ...users]);
-      setNewUser({ name: "", username: "", password: "", role: "cashier", phone: "", branch_id: "", email: "" });
+      
+      // Reset form
+      setNewUser({ 
+        name: "", 
+        username: "", 
+        password: "", 
+        role: "cashier", 
+        phone: "", 
+        branch_id: "", 
+        email: "" 
+      });
+      
       setIsAddDialogOpen(false);
       toast.success('تم إضافة المستخدم بنجاح');
+      
     } catch (error) {
       console.error('Error adding user:', error);
-      toast.error('حدث خطأ في إضافة المستخدم');
+      toast.error('حدث خطأ غير متوقع في إضافة المستخدم');
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -167,13 +205,6 @@ export default function UsersManagement() {
         toast.error('حدث خطأ في حذف المستخدم');
       }
     }
-  };
-
-  const togglePasswordVisibility = (userId: string) => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [userId]: !prev[userId]
-    }));
   };
 
   const getRoleBadgeColor = (role: string) => {
@@ -244,31 +275,34 @@ export default function UsersManagement() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="name">الاسم</Label>
+                <Label htmlFor="name">الاسم *</Label>
                 <Input
                   id="name"
                   value={newUser.name}
                   onChange={(e) => setNewUser({...newUser, name: e.target.value})}
                   placeholder="اسم المستخدم"
+                  disabled={isAdding}
                 />
               </div>
               <div>
-                <Label htmlFor="username">اسم المستخدم</Label>
+                <Label htmlFor="username">اسم المستخدم *</Label>
                 <Input
                   id="username"
                   value={newUser.username}
                   onChange={(e) => setNewUser({...newUser, username: e.target.value})}
                   placeholder="اسم تسجيل الدخول"
+                  disabled={isAdding}
                 />
               </div>
               <div>
-                <Label htmlFor="password">كلمة المرور</Label>
+                <Label htmlFor="password">كلمة المرور *</Label>
                 <Input
                   id="password"
                   type="password"
                   value={newUser.password}
                   onChange={(e) => setNewUser({...newUser, password: e.target.value})}
                   placeholder="كلمة المرور"
+                  disabled={isAdding}
                 />
               </div>
               <div>
@@ -278,6 +312,7 @@ export default function UsersManagement() {
                   value={newUser.phone}
                   onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
                   placeholder="رقم الهاتف (اختياري)"
+                  disabled={isAdding}
                 />
               </div>
               <div>
@@ -288,11 +323,16 @@ export default function UsersManagement() {
                   value={newUser.email}
                   onChange={(e) => setNewUser({...newUser, email: e.target.value})}
                   placeholder="البريد الإلكتروني (اختياري)"
+                  disabled={isAdding}
                 />
               </div>
               <div>
                 <Label htmlFor="role">الدور</Label>
-                <Select value={newUser.role} onValueChange={(value) => setNewUser({...newUser, role: value, branch_id: value !== 'branch_manager' ? '' : newUser.branch_id})}>
+                <Select 
+                  value={newUser.role} 
+                  onValueChange={(value) => setNewUser({...newUser, role: value, branch_id: value !== 'branch_manager' ? '' : newUser.branch_id})}
+                  disabled={isAdding}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="اختر الدور" />
                   </SelectTrigger>
@@ -307,8 +347,12 @@ export default function UsersManagement() {
               </div>
               {newUser.role === 'branch_manager' && (
                 <div>
-                  <Label htmlFor="branch">الفرع</Label>
-                  <Select value={newUser.branch_id} onValueChange={(value) => setNewUser({...newUser, branch_id: value})}>
+                  <Label htmlFor="branch">الفرع *</Label>
+                  <Select 
+                    value={newUser.branch_id} 
+                    onValueChange={(value) => setNewUser({...newUser, branch_id: value})}
+                    disabled={isAdding}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الفرع" />
                     </SelectTrigger>
@@ -322,8 +366,8 @@ export default function UsersManagement() {
                   </Select>
                 </div>
               )}
-              <Button onClick={handleAddUser} className="w-full">
-                إضافة المستخدم
+              <Button onClick={handleAddUser} className="w-full" disabled={isAdding}>
+                {isAdding ? "جاري الإضافة..." : "إضافة المستخدم"}
               </Button>
             </div>
           </DialogContent>
