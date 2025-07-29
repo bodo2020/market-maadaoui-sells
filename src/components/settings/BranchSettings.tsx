@@ -39,7 +39,7 @@ export default function BranchSettings() {
     address: "",
     phone: "",
     email: "",
-    manager_id: ""
+    manager_id: "none"
   });
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
@@ -105,7 +105,7 @@ export default function BranchSettings() {
       address: "",
       phone: "",
       email: "",
-      manager_id: ""
+      manager_id: "none"
     });
   };
 
@@ -116,7 +116,7 @@ export default function BranchSettings() {
       address: branch.address || "",
       phone: branch.phone || "",
       email: branch.email || "",
-      manager_id: branch.manager_id || ""
+      manager_id: branch.manager_id || "none"
     });
     setIsEditDialogOpen(true);
   };
@@ -137,7 +137,7 @@ export default function BranchSettings() {
         address: formData.address,
         phone: formData.phone,
         email: formData.email,
-        manager_id: formData.manager_id || undefined,
+        manager_id: formData.manager_id === "none" ? undefined : formData.manager_id || undefined,
         active: true
       });
 
@@ -168,7 +168,7 @@ export default function BranchSettings() {
         address: formData.address,
         phone: formData.phone,
         email: formData.email,
-        manager_id: formData.manager_id || undefined
+        manager_id: formData.manager_id === "none" ? undefined : formData.manager_id || undefined
       });
 
       toast({
@@ -294,7 +294,7 @@ export default function BranchSettings() {
                     <SelectValue placeholder="اختر مدير الفرع" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">بدون مدير</SelectItem>
+                    <SelectItem value="none">بدون مدير</SelectItem>
                     {users.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
                         {user.name} - {user.role === UserRole.ADMIN ? "مدير" : "مدير فرع"}
@@ -432,7 +432,7 @@ export default function BranchSettings() {
                   <SelectValue placeholder="اختر مدير الفرع" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">بدون مدير</SelectItem>
+                  <SelectItem value="none">بدون مدير</SelectItem>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name} - {user.role === UserRole.ADMIN ? "مدير" : "مدير فرع"}
