@@ -8,6 +8,7 @@ export interface SidebarItemData {
   badge?: number;
   secondaryBadge?: number; // إضافة دعم للإشعارات الثانوية  
   adminOnly?: boolean;
+  superAdminOnly?: boolean;
   cashierOnly?: boolean; // إضافة دعم للصفحات الخاصة بالكاشير
   deliveryOnly?: boolean; // إضافة دعم للصفحات الخاصة بمندوبي التوصيل
 }
