@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,7 +50,7 @@ export default function BranchSettings() {
         active: branch.active,
         created_at: branch.created_at,
         updated_at: branch.updated_at,
-        settings: branch.settings || {}
+        settings: (branch.settings as Record<string, any>) || {}
       }));
 
       setBranches(transformedData);
@@ -93,7 +94,7 @@ export default function BranchSettings() {
         active: data.active,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        settings: data.settings || {}
+        settings: (data.settings as Record<string, any>) || {}
       };
 
       setBranches([transformedBranch, ...branches]);
@@ -135,7 +136,7 @@ export default function BranchSettings() {
         active: data.active,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        settings: data.settings || {}
+        settings: (data.settings as Record<string, any>) || {}
       };
 
       setBranches(branches.map(branch => 
@@ -190,7 +191,7 @@ export default function BranchSettings() {
         active: data.active,
         created_at: data.created_at,
         updated_at: data.updated_at,
-        settings: data.settings || {}
+        settings: (data.settings as Record<string, any>) || {}
       };
 
       setBranches(branches.map(branch => 
@@ -395,3 +396,4 @@ export default function BranchSettings() {
     </div>
   );
 }
+
