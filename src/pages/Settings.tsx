@@ -32,6 +32,8 @@ export default function Settings() {
     { id: "invoices", label: "الفواتير", icon: <FileText className="ml-2 h-4 w-4" />, component: <InvoiceSettings /> },
   ];
 
+  console.log("User role:", user?.role, "isSuperAdmin:", isSuperAdmin, "tabs count:", tabs.length);
+
   // Mobile tabs sheet
   const MobileTabsSheet = () => (
     <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
