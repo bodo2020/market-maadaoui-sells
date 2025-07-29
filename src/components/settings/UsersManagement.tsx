@@ -20,10 +20,17 @@ interface User {
   role: string;
   phone: string;
   created_at: string;
+  branch_id?: string;
+}
+
+interface Branch {
+  id: string;
+  name: string;
 }
 
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({
@@ -31,12 +38,14 @@ export default function UsersManagement() {
     username: "",
     password: "",
     role: "cashier",
-    phone: ""
+    phone: "",
+    branch_id: ""
   });
   const [showPasswords, setShowPasswords] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     fetchUsers();
+    fetchBranches();
   }, []);
 
   const fetchUsers = async () => {
@@ -56,29 +65,57 @@ export default function UsersManagement() {
     }
   };
 
+  const fetchBranches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('id, name')
+        .eq('active', true)
+        .order('name');
+
+      if (error) throw error;
+      setBranches(data || []);
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+      toast.error('حدث خطأ في تحميل الفروع');
+    }
+  };
+
   const handleAddUser = async () => {
     if (!newUser.name || !newUser.username || !newUser.password) {
       toast.error('يرجى ملء جميع الحقول المطلوبة');
       return;
     }
 
+    if (newUser.role === 'branch_manager' && !newUser.branch_id) {
+      toast.error('يرجى اختيار الفرع لمدير الفرع');
+      return;
+    }
+
     try {
+      const userData: any = {
+        name: newUser.name,
+        username: newUser.username,
+        password: newUser.password,
+        role: newUser.role,
+        phone: newUser.phone
+      };
+
+      // Add branch_id only if role is branch_manager and branch_id is selected
+      if (newUser.role === 'branch_manager' && newUser.branch_id) {
+        userData.branch_id = newUser.branch_id;
+      }
+
       const { data, error } = await supabase
         .from('users')
-        .insert([{
-          name: newUser.name,
-          username: newUser.username,
-          password: newUser.password,
-          role: newUser.role,
-          phone: newUser.phone
-        }])
+        .insert([userData])
         .select()
         .single();
 
       if (error) throw error;
 
       setUsers([data, ...users]);
-      setNewUser({ name: "", username: "", password: "", role: "cashier", phone: "" });
+      setNewUser({ name: "", username: "", password: "", role: "cashier", phone: "", branch_id: "" });
       setIsAddDialogOpen(false);
       toast.success('تم إضافة المستخدم بنجاح');
     } catch (error) {
@@ -119,6 +156,8 @@ export default function UsersManagement() {
         return 'bg-red-100 text-red-800';
       case 'admin':
         return 'bg-blue-100 text-blue-800';
+      case 'branch_manager':
+        return 'bg-purple-100 text-purple-800';
       case 'cashier':
         return 'bg-green-100 text-green-800';
       case 'delivery':
@@ -126,6 +165,29 @@ export default function UsersManagement() {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'super_admin':
+        return 'مدير عام';
+      case 'admin':
+        return 'مدير';
+      case 'branch_manager':
+        return 'مدير فرع';
+      case 'cashier':
+        return 'كاشير';
+      case 'delivery':
+        return 'توصيل';
+      default:
+        return role;
+    }
+  };
+
+  const getBranchName = (branchId?: string) => {
+    if (!branchId) return '-';
+    const branch = branches.find(b => b.id === branchId);
+    return branch ? branch.name : '-';
   };
 
   if (loading) {
@@ -194,18 +256,36 @@ export default function UsersManagement() {
               </div>
               <div>
                 <Label htmlFor="role">الدور</Label>
-                <Select value={newUser.role} onValueChange={(value) => setNewUser({...newUser, role: value})}>
+                <Select value={newUser.role} onValueChange={(value) => setNewUser({...newUser, role: value, branch_id: value !== 'branch_manager' ? '' : newUser.branch_id})}>
                   <SelectTrigger>
                     <SelectValue placeholder="اختر الدور" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cashier">كاشير</SelectItem>
+                    <SelectItem value="branch_manager">مدير فرع</SelectItem>
                     <SelectItem value="admin">مدير</SelectItem>
                     <SelectItem value="super_admin">مدير عام</SelectItem>
                     <SelectItem value="delivery">توصيل</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {newUser.role === 'branch_manager' && (
+                <div>
+                  <Label htmlFor="branch">الفرع</Label>
+                  <Select value={newUser.branch_id} onValueChange={(value) => setNewUser({...newUser, branch_id: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر الفرع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <Button onClick={handleAddUser} className="w-full">
                 إضافة المستخدم
               </Button>
@@ -228,6 +308,7 @@ export default function UsersManagement() {
                 <TableHead>الاسم</TableHead>
                 <TableHead>اسم المستخدم</TableHead>
                 <TableHead>الدور</TableHead>
+                <TableHead>الفرع</TableHead>
                 <TableHead>رقم الهاتف</TableHead>
                 <TableHead>تاريخ الإنشاء</TableHead>
                 <TableHead>الإجراءات</TableHead>
@@ -240,12 +321,10 @@ export default function UsersManagement() {
                   <TableCell>{user.username}</TableCell>
                   <TableCell>
                     <Badge className={getRoleBadgeColor(user.role)}>
-                      {user.role === 'super_admin' ? 'مدير عام' : 
-                       user.role === 'admin' ? 'مدير' : 
-                       user.role === 'cashier' ? 'كاشير' : 
-                       user.role === 'delivery' ? 'توصيل' : user.role}
+                      {getRoleDisplayName(user.role)}
                     </Badge>
                   </TableCell>
+                  <TableCell>{getBranchName(user.branch_id)}</TableCell>
                   <TableCell>{user.phone || '-'}</TableCell>
                   <TableCell>{new Date(user.created_at).toLocaleDateString('ar-EG')}</TableCell>
                   <TableCell>
