@@ -11,16 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
-
-interface Branch {
-  id: string;
-  name: string;
-  address: string;
-  phone: string;
-  manager_name: string;
-  is_active: boolean;
-  created_at: string;
-}
+import { Branch } from "@/types";
 
 export default function BranchSettings() {
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -31,7 +22,7 @@ export default function BranchSettings() {
     name: "",
     address: "",
     phone: "",
-    manager_name: ""
+    email: ""
   });
 
   useEffect(() => {
@@ -46,7 +37,22 @@ export default function BranchSettings() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setBranches(data || []);
+      
+      // Transform database data to match Branch type
+      const transformedData: Branch[] = (data || []).map(branch => ({
+        id: branch.id,
+        name: branch.name,
+        address: branch.address || '',
+        phone: branch.phone || '',
+        email: branch.email || '',
+        manager_id: branch.manager_id,
+        active: branch.active,
+        created_at: branch.created_at,
+        updated_at: branch.updated_at,
+        settings: branch.settings || {}
+      }));
+
+      setBranches(transformedData);
     } catch (error) {
       console.error('Error fetching branches:', error);
       toast.error('حدث خطأ في تحميل الفروع');
@@ -68,16 +74,30 @@ export default function BranchSettings() {
           name: newBranch.name,
           address: newBranch.address,
           phone: newBranch.phone,
-          manager_name: newBranch.manager_name,
-          is_active: true
+          email: newBranch.email,
+          active: true
         }])
         .select()
         .single();
 
       if (error) throw error;
 
-      setBranches([data, ...branches]);
-      setNewBranch({ name: "", address: "", phone: "", manager_name: "" });
+      // Transform the response to match Branch type
+      const transformedBranch: Branch = {
+        id: data.id,
+        name: data.name,
+        address: data.address || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        manager_id: data.manager_id,
+        active: data.active,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        settings: data.settings || {}
+      };
+
+      setBranches([transformedBranch, ...branches]);
+      setNewBranch({ name: "", address: "", phone: "", email: "" });
       setIsAddDialogOpen(false);
       toast.success('تم إضافة الفرع بنجاح');
     } catch (error) {
@@ -96,7 +116,7 @@ export default function BranchSettings() {
           name: editingBranch.name,
           address: editingBranch.address,
           phone: editingBranch.phone,
-          manager_name: editingBranch.manager_name
+          email: editingBranch.email
         })
         .eq('id', editingBranch.id)
         .select()
@@ -104,8 +124,22 @@ export default function BranchSettings() {
 
       if (error) throw error;
 
+      // Transform the response to match Branch type
+      const transformedBranch: Branch = {
+        id: data.id,
+        name: data.name,
+        address: data.address || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        manager_id: data.manager_id,
+        active: data.active,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        settings: data.settings || {}
+      };
+
       setBranches(branches.map(branch => 
-        branch.id === editingBranch.id ? data : branch
+        branch.id === editingBranch.id ? transformedBranch : branch
       ));
       setEditingBranch(null);
       toast.success('تم تحديث الفرع بنجاح');
@@ -138,15 +172,29 @@ export default function BranchSettings() {
     try {
       const { data, error } = await supabase
         .from('branches')
-        .update({ is_active: !currentStatus })
+        .update({ active: !currentStatus })
         .eq('id', branchId)
         .select()
         .single();
 
       if (error) throw error;
 
+      // Transform the response to match Branch type
+      const transformedBranch: Branch = {
+        id: data.id,
+        name: data.name,
+        address: data.address || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        manager_id: data.manager_id,
+        active: data.active,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        settings: data.settings || {}
+      };
+
       setBranches(branches.map(branch => 
-        branch.id === branchId ? data : branch
+        branch.id === branchId ? transformedBranch : branch
       ));
       toast.success(`تم ${!currentStatus ? 'تفعيل' : 'إيقاف'} الفرع بنجاح`);
     } catch (error) {
@@ -211,12 +259,12 @@ export default function BranchSettings() {
                 />
               </div>
               <div>
-                <Label htmlFor="manager">اسم المدير</Label>
+                <Label htmlFor="email">البريد الإلكتروني</Label>
                 <Input
-                  id="manager"
-                  value={newBranch.manager_name}
-                  onChange={(e) => setNewBranch({...newBranch, manager_name: e.target.value})}
-                  placeholder="اسم مدير الفرع"
+                  id="email"
+                  value={newBranch.email}
+                  onChange={(e) => setNewBranch({...newBranch, email: e.target.value})}
+                  placeholder="البريد الإلكتروني"
                 />
               </div>
               <Button onClick={handleAddBranch} className="w-full">
@@ -250,7 +298,7 @@ export default function BranchSettings() {
                 <Label htmlFor="edit-address">العنوان</Label>
                 <Textarea
                   id="edit-address"
-                  value={editingBranch.address}
+                  value={editingBranch.address || ''}
                   onChange={(e) => setEditingBranch({...editingBranch, address: e.target.value})}
                   rows={3}
                 />
@@ -259,16 +307,16 @@ export default function BranchSettings() {
                 <Label htmlFor="edit-phone">رقم الهاتف</Label>
                 <Input
                   id="edit-phone"
-                  value={editingBranch.phone}
+                  value={editingBranch.phone || ''}
                   onChange={(e) => setEditingBranch({...editingBranch, phone: e.target.value})}
                 />
               </div>
               <div>
-                <Label htmlFor="edit-manager">اسم المدير</Label>
+                <Label htmlFor="edit-email">البريد الإلكتروني</Label>
                 <Input
-                  id="edit-manager"
-                  value={editingBranch.manager_name}
-                  onChange={(e) => setEditingBranch({...editingBranch, manager_name: e.target.value})}
+                  id="edit-email"
+                  value={editingBranch.email || ''}
+                  onChange={(e) => setEditingBranch({...editingBranch, email: e.target.value})}
                 />
               </div>
               <Button onClick={handleUpdateBranch} className="w-full">
@@ -293,7 +341,7 @@ export default function BranchSettings() {
                 <TableHead>اسم الفرع</TableHead>
                 <TableHead>العنوان</TableHead>
                 <TableHead>رقم الهاتف</TableHead>
-                <TableHead>المدير</TableHead>
+                <TableHead>البريد الإلكتروني</TableHead>
                 <TableHead>الحالة</TableHead>
                 <TableHead>تاريخ الإنشاء</TableHead>
                 <TableHead>الإجراءات</TableHead>
@@ -303,20 +351,20 @@ export default function BranchSettings() {
               {branches.map((branch) => (
                 <TableRow key={branch.id}>
                   <TableCell className="font-medium">{branch.name}</TableCell>
-                  <TableCell>{branch.address}</TableCell>
+                  <TableCell>{branch.address || '-'}</TableCell>
                   <TableCell>{branch.phone || '-'}</TableCell>
-                  <TableCell>{branch.manager_name || '-'}</TableCell>
+                  <TableCell>{branch.email || '-'}</TableCell>
                   <TableCell>
                     <Badge 
-                      variant={branch.is_active ? "default" : "secondary"}
+                      variant={branch.active ? "default" : "secondary"}
                       className={`cursor-pointer ${
-                        branch.is_active 
+                        branch.active 
                           ? "bg-green-100 text-green-800 hover:bg-green-200" 
                           : "bg-red-100 text-red-800 hover:bg-red-200"
                       }`}
-                      onClick={() => toggleBranchStatus(branch.id, branch.is_active)}
+                      onClick={() => toggleBranchStatus(branch.id, branch.active)}
                     >
-                      {branch.is_active ? 'نشط' : 'معطل'}
+                      {branch.active ? 'نشط' : 'معطل'}
                     </Badge>
                   </TableCell>
                   <TableCell>{new Date(branch.created_at).toLocaleDateString('ar-EG')}</TableCell>
