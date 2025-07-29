@@ -1,9 +1,10 @@
 
 import MainLayout from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Users, PackageOpen, CreditCard, Truck, Receipt, FileText, Settings as SettingsIcon } from "lucide-react";
+import { Store, Users, PackageOpen, CreditCard, Truck, Receipt, FileText, Settings as SettingsIcon, Building2 } from "lucide-react";
 import StoreSettings from "@/components/settings/StoreSettings";
 import UsersManagement from "@/components/settings/UsersManagement";
+import BranchSettings from "@/components/settings/BranchSettings";
 import ExpenseSettings from "@/components/settings/ExpenseSettings";
 import PaymentSettings from "@/components/settings/PaymentSettings";
 import InvoiceSettings from "@/components/settings/InvoiceSettings";
@@ -23,6 +24,7 @@ export default function Settings() {
   const tabs = [
     { id: "store", label: "المتجر", icon: <Store className="ml-2 h-4 w-4" />, component: <StoreSettings /> },
     ...(isAdmin ? [{ id: "users", label: "المستخدمين", icon: <Users className="ml-2 h-4 w-4" />, component: <UsersManagement /> }] : []),
+    ...(isAdmin ? [{ id: "branches", label: "الفروع", icon: <Building2 className="ml-2 h-4 w-4" />, component: <BranchSettings /> }] : []),
     { id: "products", label: "المنتجات", icon: <PackageOpen className="ml-2 h-4 w-4" />, component: <div className="text-center py-12 text-muted-foreground">إعدادات المنتجات ستكون متاحة قريباً</div> },
     { id: "payment", label: "الدفع", icon: <CreditCard className="ml-2 h-4 w-4" />, component: <PaymentSettings /> },
     { id: "shipping", label: "الشحن", icon: <Truck className="ml-2 h-4 w-4" />, component: <div className="text-center py-12 text-muted-foreground">إعدادات الشحن ستكون متاحة قريباً</div> },
@@ -79,7 +81,7 @@ export default function Settings() {
           </div>
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-7 mb-8">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-8 mb-8">
               {tabs.map(tab => (
                 <TabsTrigger key={tab.id} value={tab.id} className="flex items-center">
                   {tab.icon}
