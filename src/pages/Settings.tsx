@@ -17,14 +17,15 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 export default function Settings() {
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("store");
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const tabs = [
     { id: "store", label: "المتجر", icon: <Store className="ml-2 h-4 w-4" />, component: <StoreSettings /> },
-    ...(isSuperAdmin ? [{ id: "users", label: "المستخدمين", icon: <Users className="ml-2 h-4 w-4" />, component: <UsersManagement /> }] : []),
-    ...(isSuperAdmin ? [{ id: "branches", label: "الفروع", icon: <Building2 className="ml-2 h-4 w-4" />, component: <BranchSettings /> }] : []),
+    ...(isAdmin ? [{ id: "users", label: "المستخدمين", icon: <Users className="ml-2 h-4 w-4" />, component: <UsersManagement /> }] : []),
+    ...(isAdmin ? [{ id: "branches", label: "الفروع", icon: <Building2 className="ml-2 h-4 w-4" />, component: <BranchSettings /> }] : []),
     { id: "products", label: "المنتجات", icon: <PackageOpen className="ml-2 h-4 w-4" />, component: <div className="text-center py-12 text-muted-foreground">إعدادات المنتجات ستكون متاحة قريباً</div> },
     { id: "payment", label: "الدفع", icon: <CreditCard className="ml-2 h-4 w-4" />, component: <PaymentSettings /> },
     { id: "shipping", label: "الشحن", icon: <Truck className="ml-2 h-4 w-4" />, component: <div className="text-center py-12 text-muted-foreground">إعدادات الشحن ستكون متاحة قريباً</div> },
@@ -32,7 +33,7 @@ export default function Settings() {
     { id: "invoices", label: "الفواتير", icon: <FileText className="ml-2 h-4 w-4" />, component: <InvoiceSettings /> },
   ];
 
-  console.log("User role:", user?.role, "isSuperAdmin:", isSuperAdmin, "tabs count:", tabs.length);
+  console.log("User role:", user?.role, "isAdmin:", isAdmin, "isSuperAdmin:", isSuperAdmin, "tabs count:", tabs.length);
 
   // Mobile tabs sheet
   const MobileTabsSheet = () => (
