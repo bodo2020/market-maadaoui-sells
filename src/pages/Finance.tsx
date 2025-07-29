@@ -11,6 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ar } from "date-fns/locale";
 import { toast } from "sonner";
+import { useBranch } from "@/contexts/BranchContext";
 
 function formatCurrency(amount: number): string {
   return `${siteConfig.currency} ${amount.toLocaleString('ar-EG', {
@@ -19,6 +20,7 @@ function formatCurrency(amount: number): string {
 }
 
 export default function Finance() {
+  const { currentBranch } = useBranch();
   const [period, setPeriod] = useState<"day" | "week" | "month" | "quarter" | "year" | "custom">("month");
   const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date | undefined>(endOfMonth(new Date()));
@@ -34,8 +36,9 @@ export default function Finance() {
     isError: isSummaryError,
     error: summaryError
   } = useQuery({
-    queryKey: ['financialSummary', period, startDate, endDate],
-    queryFn: () => fetchFinancialSummary(period, startDate, endDate),
+    queryKey: ['financialSummary', period, startDate, endDate, currentBranch?.id],
+    queryFn: () => fetchFinancialSummary(period, startDate, endDate, currentBranch?.id),
+    enabled: !!currentBranch,
     meta: {
       onError: (error: Error) => {
         console.error("Error fetching financial summary:", error);
@@ -50,8 +53,9 @@ export default function Finance() {
     isError: isProfitsError,
     error: profitsError
   } = useQuery({
-    queryKey: ['profitsSummary', period, startDate, endDate],
-    queryFn: () => fetchProfitsSummary(period, startDate, endDate),
+    queryKey: ['profitsSummary', period, startDate, endDate, currentBranch?.id],
+    queryFn: () => fetchProfitsSummary(period, startDate, endDate, currentBranch?.id),
+    enabled: !!currentBranch,
     meta: {
       onError: (error: Error) => {
         console.error("Error fetching profits summary:", error);
@@ -93,7 +97,12 @@ export default function Finance() {
   
   return <MainLayout>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">الإدارة المالية</h1>
+        <div>
+          <h1 className="text-2xl font-bold">الإدارة المالية</h1>
+          {currentBranch && (
+            <p className="text-muted-foreground mt-1">فرع: {currentBranch.name}</p>
+          )}
+        </div>
         <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" className="w-auto flex items-center gap-2">

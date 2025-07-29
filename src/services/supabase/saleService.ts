@@ -75,8 +75,14 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
   }
 }
 
-export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale[]> {
+export async function fetchSales(startDate?: Date, endDate?: Date, branchId?: string): Promise<Sale[]> {
   let query = supabase.from("sales").select("*").order("date", { ascending: false });
+  
+  // Filter by branch if provided
+  if (branchId) {
+    query = query.eq("branch_id", branchId);
+  }
+  // If no branchId provided, let RLS handle filtering by user's branch
   
   if (startDate && endDate) {
     const start = new Date(startDate);

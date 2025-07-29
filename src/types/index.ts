@@ -95,6 +95,7 @@ export interface Product {
   main_category_id?: string;
   subcategory_id?: string;
   company_id?: string;
+  branch_id?: string;
   barcode_type?: string;
   bulk_enabled: boolean;
   bulk_quantity?: number;

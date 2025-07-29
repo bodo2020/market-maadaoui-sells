@@ -53,7 +53,7 @@ export default function SupplierPurchases() {
   
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
-    queryFn: fetchProducts
+    queryFn: () => fetchProducts()
   });
   
   const createPurchaseMutation = useMutation({

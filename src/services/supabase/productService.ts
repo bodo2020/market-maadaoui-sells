@@ -1,14 +1,19 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
-export async function fetchProducts() {
-  console.log("Fetching all products");
+export async function fetchProducts(branchId?: string) {
+  console.log("Fetching products", branchId ? `for branch: ${branchId}` : "for current user's branch");
   
   try {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("name");
+    let query = supabase.from("products").select("*");
+    
+    // If branchId is provided, filter by that branch
+    if (branchId) {
+      query = query.eq("branch_id", branchId);
+    }
+    // If no branchId provided, let RLS handle filtering by user's branch
+    
+    const { data, error } = await query.order("name");
 
     if (error) {
       console.error("Error fetching products:", error);
@@ -115,6 +120,7 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
       is_bulk: product.is_bulk || false,
       manufacturer_name: product.manufacturer_name,
       unit_of_measure: product.unit_of_measure,
+      branch_id: product.branch_id, // Include branch_id
     };
 
     const { data, error } = await supabase
