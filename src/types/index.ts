@@ -1,8 +1,23 @@
 export enum UserRole {
+  SUPER_ADMIN = "super_admin",
   ADMIN = "admin",
+  BRANCH_MANAGER = "branch_manager",
   CASHIER = "cashier",
   EMPLOYEE = "employee",
   DELIVERY = "delivery"
+}
+
+export interface Branch {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  manager_id?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  settings?: Record<string, any>;
 }
 
 export interface User {
@@ -18,6 +33,8 @@ export interface User {
   shifts?: Shift[];
   salary?: number;
   salary_type?: string;
+  branch_id?: string;
+  branch?: Branch;
 }
 
 export interface MainCategory {

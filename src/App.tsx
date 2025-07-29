@@ -14,6 +14,7 @@ import SupplierPurchases from "@/pages/SupplierPurchases";
 import Companies from "@/pages/Companies";
 import CompanyDetails from "@/pages/CompanyDetails";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { BranchProvider } from "@/contexts/BranchContext";
 import Purchases from "@/pages/Purchases";
 import Invoices from "@/pages/Invoices";
 import Reports from "@/pages/Reports";
@@ -39,6 +40,7 @@ import Returns from "@/pages/Returns";
 import CustomerProfile from "@/pages/CustomerProfile";
 import MapPage from "@/pages/MapPage";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
+import BranchManagement from "@/pages/BranchManagement";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
@@ -58,7 +60,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Router>
         <AuthProvider>
-          <TooltipProvider>
+          <BranchProvider>
+            <TooltipProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -99,11 +102,13 @@ function App() {
               <Route path="/product-collections/create" element={<ProtectedRoute><CreateProductCollection /></ProtectedRoute>} />
               <Route path="/product-collections/edit/:id" element={<ProtectedRoute><EditProductCollection /></ProtectedRoute>} />
               <Route path="/barcode" element={<ProtectedRoute><Barcode /></ProtectedRoute>} />
+              <Route path="/branches" element={<ProtectedRoute><BranchManagement /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <SonnerToaster position="top-center" richColors />
             <Toaster />
-          </TooltipProvider>
+            </TooltipProvider>
+          </BranchProvider>
         </AuthProvider>
       </Router>
     </QueryClientProvider>
