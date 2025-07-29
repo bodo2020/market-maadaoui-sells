@@ -34,6 +34,7 @@ export default function Settings() {
   ];
 
   console.log("User role:", user?.role, "isAdmin:", isAdmin, "isSuperAdmin:", isSuperAdmin, "tabs count:", tabs.length);
+  console.log("Available tabs:", tabs.map(tab => tab.label));
 
   // Mobile tabs sheet
   const MobileTabsSheet = () => (
