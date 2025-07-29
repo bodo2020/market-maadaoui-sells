@@ -119,12 +119,31 @@ export default function UsersManagement() {
         return 'bg-red-100 text-red-800';
       case 'admin':
         return 'bg-blue-100 text-blue-800';
+      case 'branch_manager':
+        return 'bg-purple-100 text-purple-800';
       case 'cashier':
         return 'bg-green-100 text-green-800';
       case 'delivery':
         return 'bg-yellow-100 text-yellow-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'super_admin':
+        return 'مدير عام';
+      case 'admin':
+        return 'مدير';
+      case 'branch_manager':
+        return 'مدير فرع';
+      case 'cashier':
+        return 'كاشير';
+      case 'delivery':
+        return 'توصيل';
+      default:
+        return role;
     }
   };
 
@@ -200,6 +219,7 @@ export default function UsersManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cashier">كاشير</SelectItem>
+                    <SelectItem value="branch_manager">مدير فرع</SelectItem>
                     <SelectItem value="admin">مدير</SelectItem>
                     <SelectItem value="super_admin">مدير عام</SelectItem>
                     <SelectItem value="delivery">توصيل</SelectItem>
@@ -240,10 +260,7 @@ export default function UsersManagement() {
                   <TableCell>{user.username}</TableCell>
                   <TableCell>
                     <Badge className={getRoleBadgeColor(user.role)}>
-                      {user.role === 'super_admin' ? 'مدير عام' : 
-                       user.role === 'admin' ? 'مدير' : 
-                       user.role === 'cashier' ? 'كاشير' : 
-                       user.role === 'delivery' ? 'توصيل' : user.role}
+                      {getRoleDisplayName(user.role)}
                     </Badge>
                   </TableCell>
                   <TableCell>{user.phone || '-'}</TableCell>
