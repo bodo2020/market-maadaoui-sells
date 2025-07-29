@@ -27,13 +27,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { UserRole, User } from "@/types";
+import { UserRole, User, Branch } from "@/types";
 import { fetchUsers, createUser, updateUser, deleteUser } from "@/services/supabase/userService";
+import { fetchBranches } from "@/services/supabase/branchService";
 import { Loader2, UserPlus, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -44,13 +46,15 @@ export default function UsersManagement() {
     username: "",
     password: "",
     role: UserRole.EMPLOYEE,
-    active: true
+    active: true,
+    branch_id: ""
   });
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
 
   useEffect(() => {
     loadUsers();
+    loadBranches();
   }, []);
 
   const loadUsers = async () => {
@@ -81,6 +85,15 @@ export default function UsersManagement() {
     }
   };
 
+  const loadBranches = async () => {
+    try {
+      const data = await fetchBranches();
+      setBranches(data);
+    } catch (error) {
+      console.error("Error loading branches:", error);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
@@ -90,6 +103,10 @@ export default function UsersManagement() {
     setFormData({ ...formData, role: value as UserRole });
   };
 
+  const handleBranchChange = (value: string) => {
+    setFormData({ ...formData, branch_id: value });
+  };
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -97,7 +114,8 @@ export default function UsersManagement() {
       username: "",
       password: "",
       role: UserRole.EMPLOYEE,
-      active: true
+      active: true,
+      branch_id: ""
     });
   };
 
@@ -109,7 +127,8 @@ export default function UsersManagement() {
       username: user.username,
       password: "", // Don't set password when editing
       role: user.role,
-      active: user.active !== false // Default to true if undefined
+      active: user.active !== false, // Default to true if undefined
+      branch_id: user.branch_id || ""
     });
     setIsEditDialogOpen(true);
   };
@@ -131,7 +150,8 @@ export default function UsersManagement() {
         username: formData.username,
         password: formData.password,
         role: formData.role,
-        active: formData.active
+        active: formData.active,
+        branch_id: formData.branch_id || undefined
       });
 
       toast({
@@ -160,7 +180,8 @@ export default function UsersManagement() {
         name: formData.name,
         phone: formData.phone,
         role: formData.role,
-        active: formData.active
+        active: formData.active,
+        branch_id: formData.branch_id || undefined
       };
 
       if (formData.password) {
@@ -211,6 +232,8 @@ export default function UsersManagement() {
     switch (role) {
       case UserRole.ADMIN:
         return "مدير";
+      case UserRole.BRANCH_MANAGER:
+        return "مدير فرع";
       case UserRole.CASHIER:
         return "كاشير";
       case UserRole.EMPLOYEE:
@@ -220,6 +243,12 @@ export default function UsersManagement() {
       default:
         return role;
     }
+  };
+
+  const getBranchName = (branchId?: string) => {
+    if (!branchId) return "—";
+    const branch = branches.find(b => b.id === branchId);
+    return branch?.name || "—";
   };
 
   if (!currentUser || currentUser.role !== UserRole.ADMIN) {
@@ -304,12 +333,33 @@ export default function UsersManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
+                    <SelectItem value={UserRole.BRANCH_MANAGER}>مدير فرع</SelectItem>
                     <SelectItem value={UserRole.CASHIER}>كاشير</SelectItem>
                     <SelectItem value={UserRole.EMPLOYEE}>موظف</SelectItem>
                     <SelectItem value={UserRole.DELIVERY}>مندوب توصيل</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {formData.role === UserRole.BRANCH_MANAGER && (
+                <div className="space-y-2">
+                  <Label htmlFor="branch">الفرع</Label>
+                  <Select
+                    value={formData.branch_id}
+                    onValueChange={handleBranchChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر الفرع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button onClick={handleAddUser}>إضافة المستخدم</Button>
@@ -443,12 +493,33 @@ export default function UsersManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
+                  <SelectItem value={UserRole.BRANCH_MANAGER}>مدير فرع</SelectItem>
                   <SelectItem value={UserRole.CASHIER}>كاشير</SelectItem>
                   <SelectItem value={UserRole.EMPLOYEE}>موظف</SelectItem>
                   <SelectItem value={UserRole.DELIVERY}>مندوب توصيل</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {formData.role === UserRole.BRANCH_MANAGER && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-branch">الفرع</Label>
+                <Select
+                  value={formData.branch_id}
+                  onValueChange={handleBranchChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="اختر الفرع" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button onClick={handleUpdateUser}>حفظ التغييرات</Button>
