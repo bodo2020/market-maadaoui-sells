@@ -123,39 +123,24 @@ export async function authenticateUser(username: string, password: string) {
 
 export async function createUser(user: Omit<User, "id" | "created_at" | "updated_at" | "shifts">) {
   try {
-    console.log("Creating user with data:", user);
-    
-    // Sign in as admin temporarily to bypass RLS for user creation
-    const { error: signInError } = await supabase.auth.signInAnonymously();
-    if (signInError) {
-      console.log("Anonymous sign in failed, proceeding anyway:", signInError);
-    }
-
-    const userData = {
-      name: user.name,
-      role: user.role,
-      phone: user.phone,
-      password: user.password,
-      username: user.username || user.phone,
-      email: user.email,
-      active: user.active !== false,
-      branch_id: user.branch_id || null
-    };
-
-    console.log("Inserting user data:", userData);
-
     const { data, error } = await supabase
       .from("users")
-      .insert([userData])
+      .insert([{
+        name: user.name,
+        role: user.role,
+        phone: user.phone,
+        password: user.password,
+        username: user.username || user.phone,
+        email: user.email,
+        active: user.active !== false
+      }])
       .select();
 
     if (error) {
       console.error("Error creating user:", error);
-      console.error("Error details:", error.details, error.hint, error.message);
       throw error;
     }
 
-    console.log("User created successfully:", data);
     return { ...data[0], shifts: [] } as User;
   } catch (error) {
     console.error("Error in createUser:", error);
