@@ -21,6 +21,8 @@ interface User {
   phone: string;
   created_at: string;
   branch_id?: string;
+  email?: string;
+  active?: boolean;
 }
 
 interface Branch {
@@ -29,6 +31,7 @@ interface Branch {
 }
 
 export default function UsersManagement() {
+  const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,23 +42,32 @@ export default function UsersManagement() {
     password: "",
     role: "cashier",
     phone: "",
-    branch_id: ""
+    branch_id: "",
+    email: ""
   });
   const [showPasswords, setShowPasswords] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
-    fetchUsers();
-    fetchBranches();
-  }, []);
+    if (user) {
+      fetchUsers();
+      fetchBranches();
+    }
+  }, [user]);
 
   const fetchUsers = async () => {
     try {
+      console.log("Fetching users...");
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+      }
+      
+      console.log("Users fetched successfully:", data);
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -73,7 +85,10 @@ export default function UsersManagement() {
         .eq('active', true)
         .order('name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching branches:', error);
+        throw error;
+      }
       setBranches(data || []);
     } catch (error) {
       console.error('Error fetching branches:', error);
@@ -93,12 +108,16 @@ export default function UsersManagement() {
     }
 
     try {
+      console.log("Adding new user:", newUser);
+      
       const userData: any = {
         name: newUser.name,
         username: newUser.username,
         password: newUser.password,
         role: newUser.role,
-        phone: newUser.phone
+        phone: newUser.phone,
+        email: newUser.email,
+        active: true
       };
 
       // Add branch_id only if role is branch_manager and branch_id is selected
@@ -112,10 +131,14 @@ export default function UsersManagement() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error adding user:', error);
+        throw error;
+      }
 
+      console.log("User added successfully:", data);
       setUsers([data, ...users]);
-      setNewUser({ name: "", username: "", password: "", role: "cashier", phone: "", branch_id: "" });
+      setNewUser({ name: "", username: "", password: "", role: "cashier", phone: "", branch_id: "", email: "" });
       setIsAddDialogOpen(false);
       toast.success('تم إضافة المستخدم بنجاح');
     } catch (error) {
@@ -132,7 +155,10 @@ export default function UsersManagement() {
           .delete()
           .eq('id', userId);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error deleting user:', error);
+          throw error;
+        }
 
         setUsers(users.filter(user => user.id !== userId));
         toast.success('تم حذف المستخدم بنجاح');
@@ -255,6 +281,16 @@ export default function UsersManagement() {
                 />
               </div>
               <div>
+                <Label htmlFor="email">البريد الإلكتروني</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                  placeholder="البريد الإلكتروني (اختياري)"
+                />
+              </div>
+              <div>
                 <Label htmlFor="role">الدور</Label>
                 <Select value={newUser.role} onValueChange={(value) => setNewUser({...newUser, role: value, branch_id: value !== 'branch_manager' ? '' : newUser.branch_id})}>
                   <SelectTrigger>
@@ -298,50 +334,64 @@ export default function UsersManagement() {
         <CardHeader>
           <CardTitle>قائمة المستخدمين</CardTitle>
           <CardDescription>
-            إدارة جميع مستخدمي النظام
+            إدارة جميع مستخدمي النظام ({users.length} مستخدم)
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>الاسم</TableHead>
-                <TableHead>اسم المستخدم</TableHead>
-                <TableHead>الدور</TableHead>
-                <TableHead>الفرع</TableHead>
-                <TableHead>رقم الهاتف</TableHead>
-                <TableHead>تاريخ الإنشاء</TableHead>
-                <TableHead>الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.username}</TableCell>
-                  <TableCell>
-                    <Badge className={getRoleBadgeColor(user.role)}>
-                      {getRoleDisplayName(user.role)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{getBranchName(user.branch_id)}</TableCell>
-                  <TableCell>{user.phone || '-'}</TableCell>
-                  <TableCell>{new Date(user.created_at).toLocaleDateString('ar-EG')}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+          {users.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              لا توجد مستخدمين مسجلين بعد
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>الاسم</TableHead>
+                  <TableHead>اسم المستخدم</TableHead>
+                  <TableHead>الدور</TableHead>
+                  <TableHead>الفرع</TableHead>
+                  <TableHead>رقم الهاتف</TableHead>
+                  <TableHead>البريد الإلكتروني</TableHead>
+                  <TableHead>الحالة</TableHead>
+                  <TableHead>تاريخ الإنشاء</TableHead>
+                  <TableHead>الإجراءات</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell>{user.username}</TableCell>
+                    <TableCell>
+                      <Badge className={getRoleBadgeColor(user.role)}>
+                        {getRoleDisplayName(user.role)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{getBranchName(user.branch_id)}</TableCell>
+                    <TableCell>{user.phone || '-'}</TableCell>
+                    <TableCell>{user.email || '-'}</TableCell>
+                    <TableCell>
+                      <Badge className={user.active !== false ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                        {user.active !== false ? 'نشط' : 'غير نشط'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{new Date(user.created_at).toLocaleDateString('ar-EG')}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteUser(user.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
