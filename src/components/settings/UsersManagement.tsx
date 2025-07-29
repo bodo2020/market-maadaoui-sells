@@ -118,13 +118,6 @@ export default function UsersManagement() {
         return;
       }
 
-      // Sign in anonymously to bypass RLS for user creation
-      console.log("Attempting to sign in anonymously for user creation...");
-      const { error: signInError } = await supabase.auth.signInAnonymously();
-      if (signInError) {
-        console.log("Anonymous sign in error (proceeding anyway):", signInError);
-      }
-
       const userData = {
         name: newUser.name,
         username: newUser.username,
