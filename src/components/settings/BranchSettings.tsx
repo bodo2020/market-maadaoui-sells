@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,12 +30,18 @@ export default function BranchSettings() {
 
   const fetchBranches = async () => {
     try {
+      console.log('Fetching branches...');
       const { data, error } = await supabase
         .from('branches')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching branches:', error);
+        throw error;
+      }
+      
+      console.log('Branches fetched successfully:', data);
       
       // Transform database data to match Branch type
       const transformedData: Branch[] = (data || []).map(branch => ({
@@ -69,6 +73,23 @@ export default function BranchSettings() {
     }
 
     try {
+      console.log('Attempting to create branch with data:', newBranch);
+      
+      // Get current user info for debugging
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user);
+      
+      // Check user role
+      if (user) {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+          
+        console.log('User role data:', userData, 'Error:', userError);
+      }
+
       const { data, error } = await supabase
         .from('branches')
         .insert([{
@@ -81,7 +102,18 @@ export default function BranchSettings() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating branch:', error);
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
+
+      console.log('Branch created successfully:', data);
 
       // Transform the response to match Branch type
       const transformedBranch: Branch = {
@@ -103,7 +135,18 @@ export default function BranchSettings() {
       toast.success('تم إضافة الفرع بنجاح');
     } catch (error) {
       console.error('Error adding branch:', error);
-      toast.error('حدث خطأ في إضافة الفرع');
+      
+      // More detailed error handling
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        if (error.message.includes('row-level security')) {
+          toast.error('ليس لديك الصلاحية لإنشاء فرع جديد');
+        } else {
+          toast.error(`حدث خطأ في إضافة الفرع: ${error.message}`);
+        }
+      } else {
+        toast.error('حدث خطأ في إضافة الفرع');
+      }
     }
   };
 
@@ -396,4 +439,3 @@ export default function BranchSettings() {
     </div>
   );
 }
-
