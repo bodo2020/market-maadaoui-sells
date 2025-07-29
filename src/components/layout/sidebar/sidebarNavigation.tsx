@@ -99,7 +99,7 @@ export const adminNavigation: NavigationGroup = {
       label: "إدارة الموظفين",
       href: "/employees",
       icon: UserCheck,
-      superAdminOnly: true,
+      adminOnly: true,
     },
     {
       label: "تتبع النقدية",
