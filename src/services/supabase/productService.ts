@@ -19,27 +19,11 @@ export async function fetchProducts(branchId?: string) {
         throw error;
       }
 
-      // Get branch inventory for quantity information
-      try {
-        const branchInventory = await fetchBranchInventory(branchId);
-        const inventoryMap = new Map(branchInventory.map(inv => [inv.product_id, inv.quantity]));
-        
-        // Update product quantities with branch-specific quantities
-        const productsWithBranchQuantity = (data || []).map(product => ({
-          ...product,
-          quantity: inventoryMap.get(product.id) || 0
-        }));
-
-        console.log(`Successfully fetched ${productsWithBranchQuantity.length} products with branch quantities`);
-        return productsWithBranchQuantity as Product[];
-      } catch (inventoryError) {
-        console.error('Error fetching branch inventory:', inventoryError);
-        console.log(`Successfully fetched ${data.length} products (without branch quantities)`);
-        return data as Product[];
-      }
+      console.log(`Successfully fetched ${data.length} products for branch ${branchId}`);
+      return data as Product[];
     }
-    // If no branchId provided, let RLS handle filtering by user's branch
     
+    // If no branchId provided, get all products (temporarily for debugging)
     const { data, error } = await query.order("name");
 
     if (error) {
@@ -47,7 +31,7 @@ export async function fetchProducts(branchId?: string) {
       throw error;
     }
 
-    console.log(`Successfully fetched ${data.length} products`);
+    console.log(`Successfully fetched ${data.length} total products (no branch filter)`);
     return data as Product[];
   } catch (error) {
     console.error("Error in fetchProducts:", error);
