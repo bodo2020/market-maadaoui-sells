@@ -255,7 +255,8 @@ export const fetchProfitsSummary = async (
         return_items (
           product_id,
           quantity,
-          price
+          price,
+          profit_loss
         )
       `)
       .eq("status", "approved")
@@ -303,9 +304,8 @@ export const fetchProfitsSummary = async (
     // Calculate total returns amount
     const returns = returnsData?.reduce((sum, ret) => sum + (ret.total_amount || 0), 0) || 0;
     
-    // Calculate the actual profit impact of returns
-    // THIS IS THE KEY CORRECTION: We're calculating the actual profit (selling price - purchase price) 
-    // that should be deducted from the net profit for returns
+    
+    // Calculate the actual profit impact of returns using saved profit_loss values
     let returnsProfitImpact = 0;
     
     if (returnsData && returnsData.length > 0) {
@@ -313,12 +313,14 @@ export const fetchProfitsSummary = async (
       for (const ret of returnsData) {
         // Process return items if available
         if (ret.return_items && ret.return_items.length > 0) {
-          // Safely cast to our ReturnItem type
+          // Use the saved profit_loss values
           for (const itemRaw of ret.return_items) {
-            // Type guard to ensure we have the required properties
-            const item = itemRaw as ReturnItem;
-            if (typeof item.product_id === 'string' && typeof item.quantity === 'number' && typeof item.price === 'number') {
-              // Get product details to determine actual profit impact
+            const item = itemRaw as any;
+            if (item.profit_loss !== undefined) {
+              // Use the pre-calculated profit loss
+              returnsProfitImpact += item.profit_loss || 0;
+            } else if (typeof item.product_id === 'string' && typeof item.quantity === 'number' && typeof item.price === 'number') {
+              // Fallback: Calculate profit impact if not saved
               const { data: productData } = await supabase
                 .from("products")
                 .select("purchase_price")
@@ -326,12 +328,9 @@ export const fetchProfitsSummary = async (
                 .single();
               
               if (productData) {
-                // Calculate actual profit impact: (selling price - purchase price) * quantity
-                // This is the EXACT profit margin that needs to be subtracted
                 const itemProfitImpact = (item.price - productData.purchase_price) * item.quantity;
                 returnsProfitImpact += itemProfitImpact;
               } else {
-                // If product not found, use a conservative estimate
                 returnsProfitImpact += item.price * 0.15 * item.quantity;
               }
             }
