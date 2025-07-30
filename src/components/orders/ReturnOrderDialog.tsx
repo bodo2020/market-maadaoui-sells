@@ -99,16 +99,44 @@ export function ReturnOrderDialog({
 
       if (orderError) throw orderError;
 
-      // Process inventory changes - add back returned items to inventory
+      // Process inventory changes - add back returned items to branch inventory
       console.log('Processing inventory changes for returned items:', returnItems);
       for (const item of returnItems) {
         if (!item) continue;
-        console.log(`Updating product ${item.product_id} quantity by +${item.quantity}`);
+        console.log(`Updating branch inventory for product ${item.product_id} quantity by +${item.quantity}`);
         try {
-          await updateProductQuantity(item.product_id, item.quantity); // Positive to add back to inventory
-          console.log(`Successfully updated product ${item.product_id} inventory`);
+          // Get current quantity first, then update
+          const { data: currentInventory, error: fetchError } = await supabase
+            .from('branch_inventory')
+            .select('quantity')
+            .eq('product_id', item.product_id)
+            .single();
+            
+          if (fetchError) {
+            console.error(`Failed to fetch current inventory for product ${item.product_id}:`, fetchError);
+            throw fetchError;
+          }
+          
+          const newQuantity = (currentInventory?.quantity || 0) + item.quantity;
+          
+          // Update branch inventory with new quantity
+          const { error: inventoryError } = await supabase
+            .from('branch_inventory')
+            .update({ 
+              quantity: newQuantity,
+              updated_at: new Date().toISOString()
+            })
+            .eq('product_id', item.product_id);
+            
+          if (inventoryError) {
+            console.error(`Failed to update branch inventory for product ${item.product_id}:`, inventoryError);
+            throw inventoryError;
+          }
+          
+          console.log(`Successfully updated branch inventory for product ${item.product_id}`);
         } catch (error) {
-          console.error(`Failed to update product ${item.product_id} inventory:`, error);
+          console.error(`Failed to update branch inventory for product ${item.product_id}:`, error);
+          throw error;
         }
       }
 
