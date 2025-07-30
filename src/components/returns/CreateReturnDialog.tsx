@@ -303,15 +303,30 @@ export function CreateReturnDialog({
       console.log('تحديث مخزون المنتجات المرتجعة...');
       
       // الحصول على فرع المستخدم الحالي
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user?.id) {
+        console.error('User ID is not available');
+        toast.error('خطأ في تحديد المستخدم');
+        return;
+      }
+      
       const { data: userData, error: userFetchError } = await supabase
         .from('users')
         .select('branch_id')
-        .eq('id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('id', user.id)
         .single();
 
       if (userFetchError) {
         console.error('Error fetching user branch:', userFetchError);
-        throw userFetchError;
+        toast.error('خطأ في جلب بيانات الفرع');
+        return;
+      }
+
+      if (!userData?.branch_id) {
+        console.error('Branch ID is not available for user');
+        toast.error('لم يتم تحديد فرع للمستخدم');
+        return;
       }
 
       const branchId = userData.branch_id;
