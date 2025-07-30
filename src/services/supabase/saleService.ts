@@ -15,7 +15,9 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
       // Convert CartItem[] to Json for Supabase
       items: JSON.parse(JSON.stringify(sale.items)),
       // Add cashier ID to the sale record
-      cashier_id: cashierId
+      cashier_id: cashierId,
+      // Set branch_id to null to allow sales without branch restrictions for now
+      branch_id: null
     };
     
     // Create the sale record
