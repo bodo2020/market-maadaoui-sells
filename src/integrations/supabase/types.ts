@@ -17,6 +17,7 @@ export type Database = {
       areas: {
         Row: {
           active: boolean | null
+          branch_id: string | null
           city_id: string
           created_at: string | null
           id: string
@@ -25,6 +26,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          branch_id?: string | null
           city_id: string
           created_at?: string | null
           id?: string
@@ -33,6 +35,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          branch_id?: string | null
           city_id?: string
           created_at?: string | null
           id?: string
@@ -40,6 +43,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "areas_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "areas_city_id_fkey"
             columns: ["city_id"]
@@ -111,6 +121,54 @@ export type Database = {
             columns: ["main_category_id"]
             isOneToOne: false
             referencedRelation: "main_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      branch_inventory: {
+        Row: {
+          branch_id: string
+          created_at: string | null
+          id: string
+          max_stock_level: number | null
+          min_stock_level: number | null
+          product_id: string
+          quantity: number
+          updated_at: string | null
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string | null
+          id?: string
+          max_stock_level?: number | null
+          min_stock_level?: number | null
+          product_id: string
+          quantity?: number
+          updated_at?: string | null
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string | null
+          id?: string
+          max_stock_level?: number | null
+          min_stock_level?: number | null
+          product_id?: string
+          quantity?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branch_inventory_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branch_inventory_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -308,6 +366,7 @@ export type Database = {
       cities: {
         Row: {
           active: boolean | null
+          branch_id: string | null
           created_at: string | null
           governorate_id: string
           id: string
@@ -316,6 +375,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          branch_id?: string | null
           created_at?: string | null
           governorate_id: string
           id?: string
@@ -324,6 +384,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          branch_id?: string | null
           created_at?: string | null
           governorate_id?: string
           id?: string
@@ -331,6 +392,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cities_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cities_governorate_id_fkey"
             columns: ["governorate_id"]
@@ -697,6 +765,7 @@ export type Database = {
       governorates: {
         Row: {
           active: boolean | null
+          branch_id: string | null
           created_at: string | null
           id: string
           name: string
@@ -705,6 +774,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean | null
+          branch_id?: string | null
           created_at?: string | null
           id?: string
           name: string
@@ -713,6 +783,7 @@ export type Database = {
         }
         Update: {
           active?: boolean | null
+          branch_id?: string | null
           created_at?: string | null
           id?: string
           name?: string
@@ -720,6 +791,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "governorates_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "governorates_provider_id_fkey"
             columns: ["provider_id"]
@@ -808,6 +886,7 @@ export type Database = {
         Row: {
           active: boolean | null
           area_id: string
+          branch_id: string | null
           created_at: string | null
           estimated_time: string | null
           id: string
@@ -818,6 +897,7 @@ export type Database = {
         Insert: {
           active?: boolean | null
           area_id: string
+          branch_id?: string | null
           created_at?: string | null
           estimated_time?: string | null
           id?: string
@@ -828,6 +908,7 @@ export type Database = {
         Update: {
           active?: boolean | null
           area_id?: string
+          branch_id?: string | null
           created_at?: string | null
           estimated_time?: string | null
           id?: string
@@ -841,6 +922,13 @@ export type Database = {
             columns: ["area_id"]
             isOneToOne: false
             referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "neighborhoods_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
             referencedColumns: ["id"]
           },
         ]

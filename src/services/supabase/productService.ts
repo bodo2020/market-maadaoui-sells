@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
+import { fetchBranchInventory, updateBranchInventoryQuantity } from "./branchInventoryService";
 
 export async function fetchProducts(branchId?: string) {
   console.log("Fetching products", branchId ? `for branch: ${branchId}` : "for current user's branch");
@@ -7,9 +8,35 @@ export async function fetchProducts(branchId?: string) {
   try {
     let query = supabase.from("products").select("*");
     
-    // If branchId is provided, filter by that branch
+    // If branchId is provided, filter by that branch and get branch-specific quantities
     if (branchId) {
       query = query.eq("branch_id", branchId);
+      
+      const { data, error } = await query.order("name");
+
+      if (error) {
+        console.error("Error fetching products:", error);
+        throw error;
+      }
+
+      // Get branch inventory for quantity information
+      try {
+        const branchInventory = await fetchBranchInventory(branchId);
+        const inventoryMap = new Map(branchInventory.map(inv => [inv.product_id, inv.quantity]));
+        
+        // Update product quantities with branch-specific quantities
+        const productsWithBranchQuantity = (data || []).map(product => ({
+          ...product,
+          quantity: inventoryMap.get(product.id) || 0
+        }));
+
+        console.log(`Successfully fetched ${productsWithBranchQuantity.length} products with branch quantities`);
+        return productsWithBranchQuantity as Product[];
+      } catch (inventoryError) {
+        console.error('Error fetching branch inventory:', inventoryError);
+        console.log(`Successfully fetched ${data.length} products (without branch quantities)`);
+        return data as Product[];
+      }
     }
     // If no branchId provided, let RLS handle filtering by user's branch
     
@@ -290,36 +317,45 @@ export async function fetchProductsBySubcategory(subcategoryId: string) {
   }
 }
 
-// New function to update product quantity after sales
-export async function updateProductQuantity(productId: string, quantityChange: number) {
+// New function to update product quantity after sales (now uses branch inventory)
+export async function updateProductQuantity(
+  productId: string, 
+  quantityChange: number, 
+  branchId?: string
+) {
   try {
-    // First, get the current quantity
-    const { data: product, error: fetchError } = await supabase
-      .from("products")
-      .select("quantity")
-      .eq("id", productId)
-      .single();
+    if (branchId) {
+      // Use branch-specific inventory
+      return await updateBranchInventoryQuantity(productId, branchId, quantityChange);
+    } else {
+      // Fallback to original product table (for backward compatibility)
+      const { data: product, error: fetchError } = await supabase
+        .from("products")
+        .select("quantity")
+        .eq("id", productId)
+        .single();
 
-    if (fetchError) {
-      console.error(`Error fetching product ${productId}:`, fetchError);
-      throw fetchError;
+      if (fetchError) {
+        console.error(`Error fetching product ${productId}:`, fetchError);
+        throw fetchError;
+      }
+
+      const currentQuantity = product.quantity || 0;
+      const newQuantity = Math.max(0, currentQuantity + quantityChange);
+
+      // Update the product quantity
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({ quantity: newQuantity })
+        .eq("id", productId);
+
+      if (updateError) {
+        console.error(`Error updating product ${productId} quantity:`, updateError);
+        throw updateError;
+      }
+
+      return newQuantity;
     }
-
-    const currentQuantity = product.quantity || 0;
-    const newQuantity = Math.max(0, currentQuantity + quantityChange);
-
-    // Update the product quantity
-    const { error: updateError } = await supabase
-      .from("products")
-      .update({ quantity: newQuantity })
-      .eq("id", productId);
-
-    if (updateError) {
-      console.error(`Error updating product ${productId} quantity:`, updateError);
-      throw updateError;
-    }
-
-    return newQuantity;
   } catch (error) {
     console.error("Error updating product quantity:", error);
     throw error;

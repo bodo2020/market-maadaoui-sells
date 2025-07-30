@@ -4,7 +4,11 @@ import {
   ShippingProvider, 
   DeliveryLocation,
   DeliveryType, 
-  DeliveryTypePrice 
+  DeliveryTypePrice,
+  DeliveryGovernorate,
+  DeliveryCity,
+  DeliveryArea,
+  DeliveryNeighborhood
 } from "@/types/shipping";
 
 // Governorates functions
@@ -55,6 +59,7 @@ export async function fetchNeighborhoods(areaId: string) {
 export async function createGovernorate(data: { 
   name: string;
   provider_id?: string;
+  branch_id?: string;
 }) {
   const { data: result, error } = await supabase
     .from('governorates')
@@ -69,6 +74,7 @@ export async function createGovernorate(data: {
 export async function createCity(data: { 
   name: string;
   governorate_id: string;
+  branch_id?: string;
 }) {
   try {
     const { data: result, error } = await supabase
@@ -88,6 +94,7 @@ export async function createCity(data: {
 export async function createArea(data: { 
   name: string;
   city_id: string;
+  branch_id?: string;
 }) {
   const { data: result, error } = await supabase
     .from('areas')
@@ -104,6 +111,7 @@ export async function createNeighborhood(data: {
   area_id: string;
   price?: number;
   estimated_time?: string;
+  branch_id?: string;
 }) {
   const { data: result, error } = await supabase
     .from('neighborhoods')
