@@ -65,20 +65,39 @@ export function ReturnOrderDialog({
 
       const totalAmount = returnItems.reduce((sum, item) => sum + (item?.total || 0), 0);
 
-      // Get the order's branch_id first
-      const { data: orderData, error: orderFetchError } = await supabase
-        .from('online_orders')
-        .select('branch_id')
-        .eq('id', orderId)
-        .single();
+      let branchId = null;
 
-      if (orderFetchError) {
-        console.error('Error fetching order branch:', orderFetchError);
-        throw orderFetchError;
+      // If we have an orderId, get the branch from the order
+      if (orderId) {
+        const { data: orderData, error: orderFetchError } = await supabase
+          .from('online_orders')
+          .select('branch_id')
+          .eq('id', orderId)
+          .single();
+
+        if (orderFetchError) {
+          console.error('Error fetching order branch:', orderFetchError);
+          throw orderFetchError;
+        }
+
+        branchId = orderData.branch_id;
+        console.log('Order branch ID:', branchId);
+      } else {
+        // For direct returns (no order), get the current user's branch
+        const { data: userData, error: userFetchError } = await supabase
+          .from('users')
+          .select('branch_id')
+          .eq('id', (await supabase.auth.getUser()).data.user?.id)
+          .single();
+
+        if (userFetchError) {
+          console.error('Error fetching user branch:', userFetchError);
+          throw userFetchError;
+        }
+
+        branchId = userData.branch_id;
+        console.log('User branch ID:', branchId);
       }
-
-      const branchId = orderData.branch_id;
-      console.log('Order branch ID:', branchId);
 
       // Create the return record
       const { data: returnData, error: returnError } = await supabase
