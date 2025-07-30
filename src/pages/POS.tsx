@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -50,6 +51,7 @@ export default function POS() {
   const {
     toast
   } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     const loadData = async () => {
@@ -490,9 +492,10 @@ export default function POS() {
         card_amount: paymentMethod === 'cash' ? undefined : parseFloat(cardAmount || "0"),
         customer_name: customerName || undefined,
         customer_phone: customerPhone || undefined,
-        invoice_number: invoiceNumber
+        invoice_number: invoiceNumber,
+        cashier_name: user?.name
       };
-      const sale = await createSale(saleData);
+      const sale = await createSale(saleData, user?.name);
       setCurrentSale(sale);
       if (paymentMethod === 'cash' || paymentMethod === 'mixed') {
         await recordSaleToCashRegister(paymentMethod === 'cash' ? total : parseFloat(cashAmount || "0"), paymentMethod);

@@ -21,6 +21,8 @@ interface ReturnItem {
   product_name: string;
   quantity: number;
   price: number;
+  purchase_price: number;
+  profit_loss: number; // الربح المخصوم (الفرق بين البيع والشراء)
   total: number;
   reason?: string;
 }
@@ -76,7 +78,7 @@ export function CreateReturnDialog({
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, price')
+        .select('id, name, price, purchase_price')
         .ilike('name', `%${query}%`)
         .limit(10);
       
@@ -110,12 +112,16 @@ export function CreateReturnDialog({
         return;
       }
       
+      const profitPerItem = product.price - (product.purchase_price || 0);
       handleAddProduct({
         product_id: product.id,
         product_name: product.name,
         quantity: 1,
         price: product.price,
-        total: product.price
+        purchase_price: product.purchase_price || 0,
+        profit_loss: profitPerItem,
+        total: profitPerItem, // المبلغ المرتجع هو الربح فقط
+        reason: itemReason
       });
       
       setBarcode('');
@@ -143,18 +149,21 @@ export function CreateReturnDialog({
       // Fetch product details
       const { data: product, error } = await supabase
         .from('products')
-        .select('id, name, price')
+        .select('id, name, price, purchase_price')
         .eq('id', selectedProductIds[0])
         .single();
         
       if (error) throw error;
 
+      const profitPerItem = product.price - (product.purchase_price || 0);
       handleAddProduct({
         product_id: product.id,
         product_name: product.name,
         quantity: quantity,
         price: product.price,
-        total: product.price * quantity,
+        purchase_price: product.purchase_price || 0,
+        profit_loss: profitPerItem * quantity,
+        total: profitPerItem * quantity, // المبلغ المرتجع هو الربح فقط
         reason: itemReason
       });
       
@@ -170,12 +179,15 @@ export function CreateReturnDialog({
   };
 
   const handleAddSearchedProduct = (product: Product) => {
+    const profitPerItem = product.price - (product.purchase_price || 0);
     handleAddProduct({
       product_id: product.id,
       product_name: product.name,
       quantity: quantity,
       price: product.price,
-      total: product.price * quantity,
+      purchase_price: product.purchase_price || 0,
+      profit_loss: profitPerItem * quantity,
+      total: profitPerItem * quantity, // المبلغ المرتجع هو الربح فقط
       reason: itemReason
     });
 
@@ -192,7 +204,9 @@ export function CreateReturnDialog({
       // Update existing item
       const updatedItems = [...returnItems];
       updatedItems[existingItemIndex].quantity += item.quantity;
-      updatedItems[existingItemIndex].total = updatedItems[existingItemIndex].price * updatedItems[existingItemIndex].quantity;
+      const profitPerItem = updatedItems[existingItemIndex].price - updatedItems[existingItemIndex].purchase_price;
+      updatedItems[existingItemIndex].profit_loss = profitPerItem * updatedItems[existingItemIndex].quantity;
+      updatedItems[existingItemIndex].total = profitPerItem * updatedItems[existingItemIndex].quantity;
       
       setReturnItems(updatedItems);
       toast.success('تم تحديث كمية المنتج');

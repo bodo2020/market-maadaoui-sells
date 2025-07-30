@@ -1,4 +1,5 @@
 export enum UserRole {
+  SUPER_ADMIN = "super_admin",
   ADMIN = "admin",
   CASHIER = "cashier",
   EMPLOYEE = "employee",
@@ -117,6 +118,7 @@ export interface Sale {
   discount: number;
   items: CartItem[];
   cashier_id?: string;
+  cashier_name?: string;
   created_at: string;
   updated_at: string;
   cash_amount?: number;

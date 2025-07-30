@@ -2,7 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, CartItem } from "@/types";
 
-export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
+export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">, cashierName?: string) {
   try {
     // Get current user (cashier)
     const { data: userData } = await supabase.auth.getUser();
@@ -14,8 +14,9 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
       date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date,
       // Convert CartItem[] to Json for Supabase
       items: JSON.parse(JSON.stringify(sale.items)),
-      // Add cashier ID to the sale record
+      // Add cashier ID and name to the sale record
       cashier_id: cashierId,
+      cashier_name: cashierName || sale.cashier_name,
       // Set branch_id to null to allow sales without branch restrictions for now
       branch_id: null
     };
@@ -345,6 +346,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
         <div class="invoice-details">
           <div>رقم الفاتورة: <span class="invoice-number">${sale.invoice_number}</span></div>
           <div>التاريخ: ${formattedDate}</div>
+          ${sale.cashier_name ? `<div>الكاشير: ${sale.cashier_name}</div>` : ''}
           ${sale.customer_name ? `<div>العميل: ${sale.customer_name}</div>` : ''}
           ${sale.customer_phone ? `<div>هاتف: ${sale.customer_phone}</div>` : ''}
         </div>

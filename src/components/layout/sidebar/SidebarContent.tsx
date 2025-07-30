@@ -17,13 +17,14 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
   const { user } = useAuth();
   const { unreadOrders, unreadReturns } = useNotificationStore();
   const isAdmin = user?.role === UserRole.ADMIN;
+  const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
   const isCashier = user?.role === UserRole.CASHIER;
   const isDelivery = user?.role === UserRole.DELIVERY;
 
   const renderItems = (items: SidebarItemData[]) => {
     return items.map(item => {
-      // Skip admin-only items for non-admin users
-      if (item.adminOnly && !isAdmin) return null;
+      // Skip admin-only items for non-admin users (except super admin)
+      if (item.adminOnly && !isAdmin && !isSuperAdmin) return null;
       
       // Skip cashier-only items for non-cashier users
       if (item.cashierOnly && !isCashier) return null;
@@ -31,8 +32,8 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
       // Skip delivery-only items for non-delivery users
       if (item.deliveryOnly && !isDelivery) return null;
       
-      // For cashiers, only show specific routes
-      if (isCashier) {
+      // For cashiers, only show specific routes (super admin sees everything)
+      if (isCashier && !isSuperAdmin) {
         const allowedCashierRoutes = ['/', '/pos', '/online-orders', '/invoices'];
         if (!allowedCashierRoutes.includes(item.href)) return null;
       }
@@ -71,7 +72,7 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
   return (
     <div className="flex-1 space-y-1 px-0 overflow-y-auto">
       {renderItems(mainNavigation.items)}
-      {isAdmin && renderItems(adminNavigation.items)}
+      {(isAdmin || isSuperAdmin) && renderItems(adminNavigation.items)}
       {renderItems(generalNavigation.items)}
     </div>
   );
