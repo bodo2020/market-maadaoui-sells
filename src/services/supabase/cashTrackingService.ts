@@ -175,61 +175,8 @@ export async function recordCashTransaction(
   }
 }
 
-export async function transferBetweenRegisters(
-  amount: number,
-  fromRegister: RegisterType,
-  toRegister: RegisterType,
-  notes: string,
-  userId: string
-) {
-  const fromBalance = await getLatestCashBalance(fromRegister);
-  
-  if (fromBalance < amount) {
-    throw new Error('لا يوجد رصيد كافي في الخزنة المصدر');
-  }
-  
-  // First, record the withdrawal from the source register
-  await recordCashTransaction(amount, 'withdrawal', fromRegister, 
-    `تحويل إلى خزنة ${toRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}: ${notes}`, userId);
-  
-  // Then, record the deposit to the destination register
-  await recordCashTransaction(amount, 'deposit', toRegister, 
-    `تحويل من خزنة ${fromRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}: ${notes}`, userId);
-  
-  // Record the transfer in the register_transfers table
-  const { error: transferError } = await supabase
-    .from('register_transfers')
-    .insert([{
-      date: new Date().toISOString().split('T')[0],
-      amount,
-      from_register: fromRegister,
-      to_register: toRegister,
-      notes,
-      created_by: userId
-    }]);
-    
-  if (transferError) throw transferError;
-  
-  return true;
-}
-
-export async function fetchTransfers(dateRange?: { from: Date, to: Date }) {
-  let query = supabase
-    .from('register_transfers')
-    .select('*')
-    .order('date', { ascending: false });
-    
-  if (dateRange?.from && dateRange?.to) {
-    const fromDate = dateRange.from.toISOString().split('T')[0];
-    const toDate = dateRange.to.toISOString().split('T')[0];
-    query = query.gte('date', fromDate).lte('date', toDate);
-  }
-  
-  const { data, error } = await query;
-    
-  if (error) throw error;
-  return data as TransferRecord[];
-}
+// تم حذف دالات التحويل بين الخزن لأنها لا تنطبق على النظام الجديد بدون فروع
+// transferBetweenRegisters و fetchTransfers محذوفة
 
 export async function fetchCashTransactions(registerType?: RegisterType, dateRange?: { from: Date, to: Date }) {
   let query = supabase

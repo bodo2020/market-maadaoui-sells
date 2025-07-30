@@ -65,39 +65,7 @@ export function ReturnOrderDialog({
 
       const totalAmount = returnItems.reduce((sum, item) => sum + (item?.total || 0), 0);
 
-      let branchId = null;
-
-      // If we have an orderId, get the branch from the order
-      if (orderId) {
-        const { data: orderData, error: orderFetchError } = await supabase
-          .from('online_orders')
-          .select('branch_id')
-          .eq('id', orderId)
-          .single();
-
-        if (orderFetchError) {
-          console.error('Error fetching order branch:', orderFetchError);
-          throw orderFetchError;
-        }
-
-        branchId = orderData.branch_id;
-        console.log('Order branch ID:', branchId);
-      } else {
-        // For direct returns (no order), get the current user's branch
-        const { data: userData, error: userFetchError } = await supabase
-          .from('users')
-          .select('branch_id')
-          .eq('id', (await supabase.auth.getUser()).data.user?.id)
-          .single();
-
-        if (userFetchError) {
-          console.error('Error fetching user branch:', userFetchError);
-          throw userFetchError;
-        }
-
-        branchId = userData.branch_id;
-        console.log('User branch ID:', branchId);
-      }
+      // لا نحتاج معرف فرع بعد الآن - سنستخدم جدول المخزون مباشرة
 
       // Create the return record
       const { data: returnData, error: returnError } = await supabase
@@ -133,45 +101,49 @@ export function ReturnOrderDialog({
 
       if (orderError) throw orderError;
 
-      // Process inventory changes - add back returned items to branch inventory
-      console.log('Processing branch inventory changes for returned items:', returnItems);
+      // Process inventory changes - add back returned items to inventory
+      console.log('Processing inventory changes for returned items:', returnItems);
       for (const item of returnItems) {
         if (!item) continue;
-        console.log(`Updating branch inventory for product ${item.product_id} in branch ${branchId} quantity by +${item.quantity}`);
+        console.log(`Updating inventory for product ${item.product_id} quantity by +${item.quantity}`);
         try {
-          // Get current branch inventory
+          // Get current inventory
           const { data: currentInventory, error: fetchError } = await supabase
-            .from('branch_inventory')
+            .from('inventory')
             .select('quantity')
             .eq('product_id', item.product_id)
-            .eq('branch_id', branchId)
-            .single();
+            .maybeSingle();
             
           if (fetchError) {
-            console.error(`Failed to fetch branch inventory for product ${item.product_id}:`, fetchError);
+            console.error(`Failed to fetch inventory for product ${item.product_id}:`, fetchError);
             throw fetchError;
           }
           
-          const newQuantity = (currentInventory?.quantity || 0) + item.quantity;
+          const currentQuantity = currentInventory?.quantity || 0;
+          const newQuantity = currentQuantity + item.quantity;
           
-          // Update branch inventory with new quantity
+          // Update inventory with new quantity using upsert
           const { error: inventoryError } = await supabase
-            .from('branch_inventory')
-            .update({ 
+            .from('inventory')
+            .upsert({ 
+              product_id: item.product_id,
               quantity: newQuantity,
+              min_stock_level: 5,
+              max_stock_level: 100,
               updated_at: new Date().toISOString()
-            })
-            .eq('product_id', item.product_id)
-            .eq('branch_id', branchId);
+            }, {
+              onConflict: 'product_id',
+              ignoreDuplicates: false
+            });
             
           if (inventoryError) {
-            console.error(`Failed to update branch inventory for product ${item.product_id}:`, inventoryError);
+            console.error(`Failed to update inventory for product ${item.product_id}:`, inventoryError);
             throw inventoryError;
           }
           
-          console.log(`Successfully updated branch inventory for product ${item.product_id} in branch ${branchId}`);
+          console.log(`Successfully updated inventory for product ${item.product_id}`);
         } catch (error) {
-          console.error(`Failed to update branch inventory for product ${item.product_id}:`, error);
+          console.error(`Failed to update inventory for product ${item.product_id}:`, error);
           throw error;
         }
       }

@@ -185,32 +185,17 @@ export default function Returns() {
         
       if (error) throw error;
       
-      // تحديث المخزون - الحصول على أول فرع متاح
-      const { data: branchData, error: branchFetchError } = await supabase
-        .from('branches')
-        .select('id')
-        .eq('active', true)
-        .limit(1)
-        .single();
-
-      if (branchFetchError || !branchData?.id) {
-        console.error('Error fetching branch:', branchFetchError);
-        toast.success('تم قبول المرتجع (لا يوجد فرع متاح لتحديث المخزون)');
-        setReturnsRefreshKey(prev => prev + 1);
-        return;
-      }
-
-      const branchId = branchData.id;
+      // تحديث المخزون مباشرة بدون فروع
+      const inventoryUpdates = returnData.return_items;
       
       // تحديث المخزون لكل منتج مرتجع
       for (const item of returnData.return_items) {
         try {
-          // جلب الكمية الحالية
+          // جلب الكمية الحالية من جدول inventory الجديد
           const { data: currentInventory } = await supabase
-            .from('branch_inventory')
+            .from('inventory')
             .select('quantity')
             .eq('product_id', item.product_id)
-            .eq('branch_id', branchId)
             .maybeSingle();
 
           const currentQuantity = currentInventory?.quantity || 0;
@@ -218,16 +203,15 @@ export default function Returns() {
 
           // استخدام upsert لتجنب مشاكل التكرار
           const { error: inventoryError } = await supabase
-            .from('branch_inventory')
+            .from('inventory')
             .upsert({
               product_id: item.product_id,
-              branch_id: branchId,
               quantity: newQuantity,
               min_stock_level: 5,
               max_stock_level: 100,
               updated_at: new Date().toISOString()
             }, {
-              onConflict: 'product_id,branch_id',
+              onConflict: 'product_id',
               ignoreDuplicates: false
             });
             

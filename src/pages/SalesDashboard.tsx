@@ -22,9 +22,7 @@ import {
   RegisterType, 
   fetchCashRecords, 
   getLatestCashBalance, 
-  transferBetweenRegisters,
-  recordCashTransaction,
-  fetchTransfers
+  recordCashTransaction
 } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -141,19 +139,8 @@ export default function SalesDashboard() {
     }
   });
   
-  const { data: transfers = [], isLoading: isTransfersLoading, refetch: refetchTransfers } = useQuery({
-    queryKey: ['registerTransfers', dateRange],
-    queryFn: async () => {
-      try {
-        const data = await fetchTransfers(dateRange);
-        console.log("Register transfers:", data);
-        return data;
-      } catch (error) {
-        console.error("Error fetching register transfers:", error);
-        throw error;
-      }
-    }
-  });
+  // تم إزالة استعلام transfers لأنه لم يعد مدعوماً في النظام الجديد
+  const transfers: any[] = [];
 
   const fetchCurrentBalance = async (registerType: RegisterType) => {
     try {
@@ -267,38 +254,9 @@ export default function SalesDashboard() {
     }
   };
   
+  // تم إزالة وظيفة التحويل بين الخزن لأنها لا تنطبق على النظام الجديد بدون فروع
   const handleTransfer = async () => {
-    if (!transferAmount || isNaN(Number(transferAmount)) || Number(transferAmount) <= 0) {
-      toast.error("الرجاء إدخال مبلغ صحيح");
-      return;
-    }
-    
-    if (fromRegister === toRegister) {
-      toast.error("لا يمكن التحويل إلى نفس الخزنة");
-      return;
-    }
-    
-    try {
-      await transferBetweenRegisters(
-        Number(transferAmount),
-        fromRegister,
-        toRegister,
-        transferNote,
-        user?.id || ''
-      );
-      
-      toast.success(`تم تحويل ${transferAmount} بنجاح من خزنة ${fromRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'} إلى خزنة ${toRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
-      setTransferAmount("");
-      setTransferNote("");
-      setIsTransferDialogOpen(false);
-      
-      refetchStoreRecords();
-      refetchOnlineRecords();
-      refetchTransfers();
-    } catch (error: any) {
-      console.error("Error processing transfer:", error);
-      toast.error(error.message || "حدث خطأ أثناء عملية التحويل");
-    }
+    toast.error("وظيفة التحويل بين الخزنات غير متاحة في النظام الحالي");
   };
 
   return (
