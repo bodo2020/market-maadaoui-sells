@@ -3,48 +3,51 @@ import { Product } from "@/types";
 import { fetchBranchInventory, updateBranchInventoryQuantity } from "./branchInventoryService";
 
 export async function fetchProducts(branchId?: string) {
-  console.log("Fetching products", branchId ? `for branch: ${branchId}` : "for current user's branch");
+  console.log("Fetching all products", branchId ? `with quantities for branch: ${branchId}` : "without branch-specific quantities");
   
   try {
-    // Query products without complex relationships to avoid foreign key conflicts
-    let query = supabase
+    // Always fetch all products (no branch filtering)
+    const { data: products, error } = await supabase
       .from("products")
-      .select("*");
-    
-    // If branchId is provided, filter by that branch
-    if (branchId) {
-      query = query.eq("branch_id", branchId);
-    }
-    
-    const { data: products, error } = await query.order("name");
+      .select("*")
+      .order("name");
 
     if (error) {
       console.error("Error fetching products:", error);
       throw error;
     }
 
-    // If we have products, get branch inventory data separately
-    if (products && products.length > 0) {
+    // If we have products and a specific branch, get branch-specific quantities
+    if (products && products.length > 0 && branchId) {
       try {
+        console.log(`Fetching branch inventory for branch: ${branchId}`);
         const branchInventory = await fetchBranchInventory(branchId);
         const inventoryMap = new Map(branchInventory.map(inv => [inv.product_id, inv.quantity]));
         
-        // Update product quantities with branch-specific quantities
+        // Update product quantities with branch-specific quantities (0 if not in branch inventory)
         const productsWithBranchQuantity = products.map(product => ({
           ...product,
-          quantity: inventoryMap.get(product.id) || 0
+          quantity: inventoryMap.get(product.id) || 0,
+          branch_quantity: inventoryMap.get(product.id) || 0 // Keep track of branch-specific quantity
         }));
 
-        console.log(`Successfully fetched ${productsWithBranchQuantity.length} products with branch quantities`);
+        console.log(`Successfully fetched ${productsWithBranchQuantity.length} products with branch quantities for branch ${branchId}`);
         return productsWithBranchQuantity as Product[];
       } catch (inventoryError) {
         console.error('Error fetching branch inventory:', inventoryError);
-        console.log(`Successfully fetched ${products.length} products (without branch quantities)`);
-        return products as Product[];
+        // If branch inventory fails, show all products with 0 quantities
+        const productsWithZeroQuantity = products.map(product => ({
+          ...product,
+          quantity: 0,
+          branch_quantity: 0
+        }));
+        console.log(`Successfully fetched ${products.length} products with zero quantities (inventory error)`);
+        return productsWithZeroQuantity as Product[];
       }
     }
 
-    console.log(`Successfully fetched ${products.length} products`);
+    // If no branchId provided, return products with their original quantities
+    console.log(`Successfully fetched ${products.length} products without branch filtering`);
     return products as Product[];
   } catch (error) {
     console.error("Error in fetchProducts:", error);
