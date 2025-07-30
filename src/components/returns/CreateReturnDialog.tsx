@@ -323,40 +323,60 @@ export function CreateReturnDialog({
       for (const item of returnItems) {
         console.log(`تحديث مخزون المنتج ${item.product_id} في الفرع ${branchId} بإضافة ${item.quantity}`);
         try {
-          // الحصول على المخزون الحالي
+          // محاولة الحصول على المخزون الحالي
           const { data: currentInventory, error: fetchError } = await supabase
             .from('branch_inventory')
             .select('quantity')
             .eq('product_id', item.product_id)
             .eq('branch_id', branchId)
-            .single();
+            .maybeSingle();
             
           if (fetchError) {
             console.error(`فشل في جلب مخزون المنتج ${item.product_id}:`, fetchError);
-            throw fetchError;
+            continue; // تخطي هذا المنتج والانتقال للتالي
           }
           
-          const newQuantity = (currentInventory?.quantity || 0) + item.quantity;
+          let newQuantity = item.quantity;
           
-          // تحديث المخزون
-          const { error: inventoryError } = await supabase
-            .from('branch_inventory')
-            .update({ 
-              quantity: newQuantity,
-              updated_at: new Date().toISOString()
-            })
-            .eq('product_id', item.product_id)
-            .eq('branch_id', branchId);
+          if (currentInventory) {
+            // إذا كان السجل موجود، أضف الكمية الجديدة
+            newQuantity = (currentInventory.quantity || 0) + item.quantity;
             
-          if (inventoryError) {
-            console.error(`فشل في تحديث مخزون المنتج ${item.product_id}:`, inventoryError);
-            throw inventoryError;
+            const { error: inventoryError } = await supabase
+              .from('branch_inventory')
+              .update({ 
+                quantity: newQuantity,
+                updated_at: new Date().toISOString()
+              })
+              .eq('product_id', item.product_id)
+              .eq('branch_id', branchId);
+              
+            if (inventoryError) {
+              console.error(`فشل في تحديث مخزون المنتج ${item.product_id}:`, inventoryError);
+              continue;
+            }
+          } else {
+            // إذا لم يكن السجل موجود، أنشئ سجل جديد
+            const { error: inventoryError } = await supabase
+              .from('branch_inventory')
+              .insert({
+                product_id: item.product_id,
+                branch_id: branchId,
+                quantity: newQuantity,
+                min_stock_level: 5,
+                max_stock_level: 100
+              });
+              
+            if (inventoryError) {
+              console.error(`فشل في إنشاء سجل مخزون جديد للمنتج ${item.product_id}:`, inventoryError);
+              continue;
+            }
           }
           
           console.log(`تم تحديث مخزون المنتج ${item.product_id} بنجاح`);
         } catch (error) {
           console.error(`فشل في تحديث مخزون المنتج ${item.product_id}:`, error);
-          throw error;
+          continue; // تخطي هذا المنتج والانتقال للتالي
         }
       }
       
