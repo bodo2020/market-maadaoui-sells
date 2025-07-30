@@ -106,12 +106,12 @@ export async function createArea(data: {
   return result;
 }
 
-export async function createNeighborhood(data: { 
+export async function createNeighborhood(data: {
   name: string;
   area_id: string;
   price?: number;
   estimated_time?: string;
-  branch_id?: string;
+  branch_id: string; // Made required for branch linking
 }) {
   const { data: result, error } = await supabase
     .from('neighborhoods')
@@ -265,8 +265,8 @@ export async function fetchShippingProviders(): Promise<ShippingProvider[]> {
 }
 
 // Temporary function to fulfill the DeliveryLocationsTable component needs
-export async function fetchDeliveryLocations() {
-  const { data: neighborhoods, error } = await supabase
+export async function fetchDeliveryLocations(branchId?: string) {
+  let query = supabase
     .from('neighborhoods')
     .select(`
       *,
@@ -278,6 +278,13 @@ export async function fetchDeliveryLocations() {
         )
       )
     `);
+    
+  // Filter by branch if specified
+  if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+  
+  const { data: neighborhoods, error } = await query;
     
   if (error) throw error;
   

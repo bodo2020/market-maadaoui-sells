@@ -22,6 +22,7 @@ import {
 } from "@/services/supabase/deliveryService";
 import DeliveryLocationDialog from "./DeliveryLocationDialog";
 import DeliveryTypePricing from "./DeliveryTypePricing";
+import { useBranch } from "@/contexts/BranchContext";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +36,7 @@ import {
 
 export default function HierarchicalLocations() {
   const queryClient = useQueryClient();
+  const { currentBranch } = useBranch();
   const [selectedGovernorate, setSelectedGovernorate] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
@@ -88,7 +90,8 @@ export default function HierarchicalLocations() {
           name: data.name,
           area_id: selectedArea!,
           price: data.price || 0,
-          estimated_time: data.estimated_time
+          estimated_time: data.estimated_time,
+          branch_id: currentBranch?.id || ''
         });
       }
     },

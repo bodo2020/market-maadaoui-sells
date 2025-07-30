@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { ShippingProvider, DeliveryLocation } from "@/types/shipping";
 import ShippingProviderDialog from "./ShippingProviderDialog";
+import { useBranch } from "@/contexts/BranchContext";
 import { 
   Accordion,
   AccordionContent,
@@ -55,16 +56,17 @@ export default function DeliveryLocationsTable({ onAddLocation }: DeliveryLocati
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
   const [showProviderDialog, setShowProviderDialog] = useState(false);
+  const { currentBranch } = useBranch();
 
   useEffect(() => {
     loadProviders();
   }, []);
 
   useEffect(() => {
-    if (selectedProvider) {
+    if (selectedProvider && currentBranch) {
       loadLocations();
     }
-  }, [selectedProvider]);
+  }, [selectedProvider, currentBranch]);
 
   const loadProviders = async () => {
     try {
@@ -89,9 +91,12 @@ export default function DeliveryLocationsTable({ onAddLocation }: DeliveryLocati
   };
 
   const loadLocations = async () => {
+    if (!currentBranch) return;
+    
     try {
       setLoading(true);
-      const data = await fetchDeliveryLocations();
+      // Load locations filtered by current branch
+      const data = await fetchDeliveryLocations(currentBranch.id);
       const filteredData = selectedProvider
         ? data.filter(loc => loc.provider_id === selectedProvider)
         : data;
