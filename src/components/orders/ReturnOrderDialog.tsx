@@ -100,19 +100,32 @@ export function ReturnOrderDialog({
       if (orderError) throw orderError;
 
       // Process inventory changes - add back returned items to inventory
+      console.log('Processing inventory changes for returned items:', returnItems);
       for (const item of returnItems) {
         if (!item) continue;
-        await updateProductQuantity(item.product_id, item.quantity); // Positive to add back to inventory
+        console.log(`Updating product ${item.product_id} quantity by +${item.quantity}`);
+        try {
+          await updateProductQuantity(item.product_id, item.quantity); // Positive to add back to inventory
+          console.log(`Successfully updated product ${item.product_id} inventory`);
+        } catch (error) {
+          console.error(`Failed to update product ${item.product_id} inventory:`, error);
+        }
       }
 
       // Record the cash transaction for the return (negative amount)
-      await recordCashTransaction(
-        -totalAmount, // Negative amount for return
-        'withdrawal', 
-        RegisterType.ONLINE,
-        `مرتجع للطلب #${orderId.slice(0, 8)}`,
-        reason || "إرجاع منتج"
-      );
+      console.log(`Recording cash transaction: -${totalAmount} for return`);
+      try {
+        await recordCashTransaction(
+          totalAmount, // Use positive amount 
+          'withdrawal', 
+          RegisterType.ONLINE,
+          `مرتجع للطلب #${orderId.slice(0, 8)}`,
+          reason || "إرجاع منتج"
+        );
+        console.log('Cash transaction recorded successfully');
+      } catch (error) {
+        console.error('Failed to record cash transaction:', error);
+      }
 
       toast.success("تم تسجيل المرتجع بنجاح");
       onConfirm();
