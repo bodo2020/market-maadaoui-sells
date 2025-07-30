@@ -298,8 +298,67 @@ export function CreateReturnDialog({
         console.error("Return items creation error:", itemsError);
         throw itemsError;
       }
+
+      // تحديث مخزون المنتجات - إضافة الكمية المرتجعة
+      console.log('تحديث مخزون المنتجات المرتجعة...');
       
-      toast.success('تم إنشاء المرتجع بنجاح');
+      // الحصول على فرع المستخدم الحالي
+      const { data: userData, error: userFetchError } = await supabase
+        .from('users')
+        .select('branch_id')
+        .eq('id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
+
+      if (userFetchError) {
+        console.error('Error fetching user branch:', userFetchError);
+        throw userFetchError;
+      }
+
+      const branchId = userData.branch_id;
+      console.log('User branch ID:', branchId);
+
+      // تحديث المخزون لكل منتج مرتجع
+      for (const item of returnItems) {
+        console.log(`تحديث مخزون المنتج ${item.product_id} في الفرع ${branchId} بإضافة ${item.quantity}`);
+        try {
+          // الحصول على المخزون الحالي
+          const { data: currentInventory, error: fetchError } = await supabase
+            .from('branch_inventory')
+            .select('quantity')
+            .eq('product_id', item.product_id)
+            .eq('branch_id', branchId)
+            .single();
+            
+          if (fetchError) {
+            console.error(`فشل في جلب مخزون المنتج ${item.product_id}:`, fetchError);
+            throw fetchError;
+          }
+          
+          const newQuantity = (currentInventory?.quantity || 0) + item.quantity;
+          
+          // تحديث المخزون
+          const { error: inventoryError } = await supabase
+            .from('branch_inventory')
+            .update({ 
+              quantity: newQuantity,
+              updated_at: new Date().toISOString()
+            })
+            .eq('product_id', item.product_id)
+            .eq('branch_id', branchId);
+            
+          if (inventoryError) {
+            console.error(`فشل في تحديث مخزون المنتج ${item.product_id}:`, inventoryError);
+            throw inventoryError;
+          }
+          
+          console.log(`تم تحديث مخزون المنتج ${item.product_id} بنجاح`);
+        } catch (error) {
+          console.error(`فشل في تحديث مخزون المنتج ${item.product_id}:`, error);
+          throw error;
+        }
+      }
+      
+      toast.success('تم إنشاء المرتجع وتحديث المخزون بنجاح');
       
       // Reset form
       setReturnItems([]);
