@@ -1405,47 +1405,6 @@ export type Database = {
           },
         ]
       }
-      register_transfers: {
-        Row: {
-          amount: number
-          created_at: string | null
-          created_by: string | null
-          date: string
-          from_register: string
-          id: string
-          notes: string | null
-          to_register: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string | null
-          created_by?: string | null
-          date?: string
-          from_register: string
-          id?: string
-          notes?: string | null
-          to_register: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string | null
-          created_by?: string | null
-          date?: string
-          from_register?: string
-          id?: string
-          notes?: string | null
-          to_register?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "register_transfers_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       return_items: {
         Row: {
           created_at: string | null
