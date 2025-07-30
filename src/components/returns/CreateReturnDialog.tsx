@@ -120,7 +120,7 @@ export function CreateReturnDialog({
         price: product.price,
         purchase_price: product.purchase_price || 0,
         profit_loss: profitPerItem,
-        total: profitPerItem, // المبلغ المرتجع هو الربح فقط
+        total: product.price, // المبلغ المرتجع هو قيمة البيع الكاملة
         reason: itemReason
       });
       
@@ -163,7 +163,7 @@ export function CreateReturnDialog({
         price: product.price,
         purchase_price: product.purchase_price || 0,
         profit_loss: profitPerItem * quantity,
-        total: profitPerItem * quantity, // المبلغ المرتجع هو الربح فقط
+        total: product.price * quantity, // المبلغ المرتجع هو قيمة البيع الكاملة
         reason: itemReason
       });
       
@@ -187,7 +187,7 @@ export function CreateReturnDialog({
       price: product.price,
       purchase_price: product.purchase_price || 0,
       profit_loss: profitPerItem * quantity,
-      total: profitPerItem * quantity, // المبلغ المرتجع هو الربح فقط
+      total: product.price * quantity, // المبلغ المرتجع هو قيمة البيع الكاملة
       reason: itemReason
     });
 
@@ -206,7 +206,7 @@ export function CreateReturnDialog({
       updatedItems[existingItemIndex].quantity += item.quantity;
       const profitPerItem = updatedItems[existingItemIndex].price - updatedItems[existingItemIndex].purchase_price;
       updatedItems[existingItemIndex].profit_loss = profitPerItem * updatedItems[existingItemIndex].quantity;
-      updatedItems[existingItemIndex].total = profitPerItem * updatedItems[existingItemIndex].quantity;
+      updatedItems[existingItemIndex].total = updatedItems[existingItemIndex].price * updatedItems[existingItemIndex].quantity;
       
       setReturnItems(updatedItems);
       toast.success('تم تحديث كمية المنتج');
@@ -457,7 +457,7 @@ export function CreateReturnDialog({
                     <th className="p-2 text-right">المنتج</th>
                     <th className="p-2 text-center">الكمية</th>
                     <th className="p-2 text-center">سعر البيع</th>
-                    <th className="p-2 text-center">الربح المخصوم</th>
+                    <th className="p-2 text-center">المبلغ المرتجع</th>
                     <th className="p-2 text-center">الإجراءات</th>
                   </tr>
                 </thead>
@@ -481,7 +481,7 @@ export function CreateReturnDialog({
                     </tr>
                   ))}
                   <tr className="border-t bg-muted">
-                    <td className="p-2 text-right font-medium" colSpan={3}>إجمالي الربح المخصوم</td>
+                    <td className="p-2 text-right font-medium" colSpan={3}>إجمالي المبلغ المرتجع</td>
                     <td className="p-2 text-center font-medium text-red-600">{formatCurrency(calculateTotal())}</td>
                     <td></td>
                   </tr>
