@@ -302,30 +302,31 @@ export function CreateReturnDialog({
       // تحديث مخزون المنتجات - إضافة الكمية المرتجعة
       console.log('تحديث مخزون المنتجات المرتجعة...');
       
-      // الحصول على فرع المستخدم الحالي
-      const { data: { user } } = await supabase.auth.getUser();
+      // التحقق من وجود المستخدم
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
       
-      if (!user?.id) {
-        console.error('User ID is not available');
-        toast.error('خطأ في تحديد المستخدم');
+      if (authError || !user?.id) {
+        console.log('User not authenticated, skipping inventory update');
+        toast.success('تم إنشاء المرتجع بنجاح (بدون تحديث المخزون)');
         return;
       }
       
+      // محاولة الحصول على فرع المستخدم
       const { data: userData, error: userFetchError } = await supabase
         .from('users')
         .select('branch_id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (userFetchError) {
         console.error('Error fetching user branch:', userFetchError);
-        toast.error('خطأ في جلب بيانات الفرع');
+        toast.success('تم إنشاء المرتجع بنجاح (خطأ في جلب بيانات الفرع)');
         return;
       }
 
       if (!userData?.branch_id) {
-        console.error('Branch ID is not available for user');
-        toast.error('لم يتم تحديد فرع للمستخدم');
+        console.log('No branch assigned to user, skipping inventory update');
+        toast.success('تم إنشاء المرتجع بنجاح (لا يوجد فرع محدد)');
         return;
       }
 
