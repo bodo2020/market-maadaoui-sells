@@ -2020,6 +2020,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_branch_from_delivery_location: {
+        Args: { location_id: string }
+        Returns: string
+      }
       get_customer_id_from_user: {
         Args: Record<PropertyKey, never>
         Returns: string
