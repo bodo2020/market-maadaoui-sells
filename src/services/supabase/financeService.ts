@@ -139,10 +139,17 @@ export const fetchFinancialSummary = async (
     
     if (expensesError) throw expensesError;
 
-    // Get total returns
+    // Get total returns - fetch the actual return items to calculate total value
     const { data: returnsData, error: returnsError } = await supabase
       .from("returns")
-      .select("total_amount")
+      .select(`
+        id,
+        return_items (
+          quantity,
+          price,
+          total
+        )
+      `)
       .eq("status", "approved")
       .gte("created_at", dateRange.start.toISOString())
       .lte("created_at", dateRange.end.toISOString());
@@ -153,7 +160,18 @@ export const fetchFinancialSummary = async (
     const salesRevenue = salesData?.reduce((sum, sale) => sum + (sale.total || 0), 0) || 0;
     const onlineRevenue = onlineOrdersData?.reduce((sum, order) => sum + (order.total || 0), 0) || 0;
     const totalExpenses = expensesData?.reduce((sum, expense) => sum + (expense.amount || 0), 0) || 0;
-    const totalReturns = returnsData?.reduce((sum, ret) => sum + (ret.total_amount || 0), 0) || 0;
+    
+    // Calculate total returns value from actual return items
+    let totalReturns = 0;
+    if (returnsData && returnsData.length > 0) {
+      for (const ret of returnsData) {
+        if (ret.return_items && ret.return_items.length > 0) {
+          for (const item of ret.return_items) {
+            totalReturns += item.total || (item.price * item.quantity) || 0;
+          }
+        }
+      }
+    }
     
     const totalRevenue = salesRevenue + onlineRevenue - totalReturns;
     const netProfit = totalRevenue - totalExpenses;
