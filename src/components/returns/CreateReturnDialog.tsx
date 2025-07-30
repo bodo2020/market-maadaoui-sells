@@ -282,6 +282,8 @@ export function CreateReturnDialog({
         product_id: item.product_id,
         quantity: item.quantity,
         price: item.price,
+        purchase_price: item.purchase_price,
+        profit_loss: item.profit_loss,
         total: item.total,
         reason: item.reason
       }));
@@ -454,8 +456,8 @@ export function CreateReturnDialog({
                   <tr>
                     <th className="p-2 text-right">المنتج</th>
                     <th className="p-2 text-center">الكمية</th>
-                    <th className="p-2 text-center">السعر</th>
-                    <th className="p-2 text-center">المجموع</th>
+                    <th className="p-2 text-center">سعر البيع</th>
+                    <th className="p-2 text-center">الربح المخصوم</th>
                     <th className="p-2 text-center">الإجراءات</th>
                   </tr>
                 </thead>
@@ -465,7 +467,7 @@ export function CreateReturnDialog({
                       <td className="p-2 text-right">{item.product_name}</td>
                       <td className="p-2 text-center">{item.quantity}</td>
                       <td className="p-2 text-center">{formatCurrency(item.price)}</td>
-                      <td className="p-2 text-center">{formatCurrency(item.total)}</td>
+                      <td className="p-2 text-center text-red-600 font-medium">{formatCurrency(item.total)}</td>
                       <td className="p-2 text-center">
                         <Button 
                           variant="ghost" 
@@ -479,8 +481,8 @@ export function CreateReturnDialog({
                     </tr>
                   ))}
                   <tr className="border-t bg-muted">
-                    <td className="p-2 text-right font-medium" colSpan={3}>الإجمالي</td>
-                    <td className="p-2 text-center font-medium">{formatCurrency(calculateTotal())}</td>
+                    <td className="p-2 text-right font-medium" colSpan={3}>إجمالي الربح المخصوم</td>
+                    <td className="p-2 text-center font-medium text-red-600">{formatCurrency(calculateTotal())}</td>
                     <td></td>
                   </tr>
                 </tbody>

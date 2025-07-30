@@ -1452,6 +1452,8 @@ export type Database = {
           id: string
           price: number
           product_id: string | null
+          profit_loss: number | null
+          purchase_price: number | null
           quantity: number
           reason: string | null
           return_id: string | null
@@ -1462,6 +1464,8 @@ export type Database = {
           id?: string
           price: number
           product_id?: string | null
+          profit_loss?: number | null
+          purchase_price?: number | null
           quantity: number
           reason?: string | null
           return_id?: string | null
@@ -1472,6 +1476,8 @@ export type Database = {
           id?: string
           price?: number
           product_id?: string | null
+          profit_loss?: number | null
+          purchase_price?: number | null
           quantity?: number
           reason?: string | null
           return_id?: string | null
@@ -1637,6 +1643,7 @@ export type Database = {
           card_amount: number | null
           cash_amount: number | null
           cashier_id: string | null
+          cashier_name: string | null
           created_at: string | null
           customer_name: string | null
           customer_phone: string | null
@@ -1656,6 +1663,7 @@ export type Database = {
           card_amount?: number | null
           cash_amount?: number | null
           cashier_id?: string | null
+          cashier_name?: string | null
           created_at?: string | null
           customer_name?: string | null
           customer_phone?: string | null
@@ -1675,6 +1683,7 @@ export type Database = {
           card_amount?: number | null
           cash_amount?: number | null
           cashier_id?: string | null
+          cashier_name?: string | null
           created_at?: string | null
           customer_name?: string | null
           customer_phone?: string | null
