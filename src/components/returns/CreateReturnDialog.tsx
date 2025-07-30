@@ -302,36 +302,22 @@ export function CreateReturnDialog({
       // تحديث مخزون المنتجات - إضافة الكمية المرتجعة
       console.log('تحديث مخزون المنتجات المرتجعة...');
       
-      // التحقق من وجود المستخدم
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user?.id) {
-        console.log('User not authenticated, skipping inventory update');
-        toast.success('تم إنشاء المرتجع بنجاح (بدون تحديث المخزون)');
-        return;
-      }
-      
-      // محاولة الحصول على فرع المستخدم
-      const { data: userData, error: userFetchError } = await supabase
-        .from('users')
-        .select('branch_id')
-        .eq('id', user.id)
-        .maybeSingle();
+      // الحصول على أول فرع متاح في النظام
+      const { data: branchData, error: branchFetchError } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('active', true)
+        .limit(1)
+        .single();
 
-      if (userFetchError) {
-        console.error('Error fetching user branch:', userFetchError);
-        toast.success('تم إنشاء المرتجع بنجاح (خطأ في جلب بيانات الفرع)');
+      if (branchFetchError || !branchData?.id) {
+        console.error('Error fetching branch:', branchFetchError);
+        toast.success('تم إنشاء المرتجع بنجاح (لا يوجد فرع متاح)');
         return;
       }
 
-      if (!userData?.branch_id) {
-        console.log('No branch assigned to user, skipping inventory update');
-        toast.success('تم إنشاء المرتجع بنجاح (لا يوجد فرع محدد)');
-        return;
-      }
-
-      const branchId = userData.branch_id;
-      console.log('User branch ID:', branchId);
+      const branchId = branchData.id;
+      console.log('Using branch ID:', branchId);
 
       // تحديث المخزون لكل منتج مرتجع
       for (const item of returnItems) {
