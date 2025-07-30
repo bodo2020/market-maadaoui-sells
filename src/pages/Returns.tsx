@@ -27,6 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ReturnDetailsDialog } from "@/components/returns/ReturnDetailsDialog";
 import { CreateReturnDialog } from "@/components/returns/CreateReturnDialog";
+import { updateProductQuantity } from "@/services/supabase/productService";
 
 // Types
 interface ReturnItem {
@@ -191,35 +192,8 @@ export default function Returns() {
       // تحديث المخزون لكل منتج مرتجع
       for (const item of returnData.return_items) {
         try {
-          // جلب الكمية الحالية من جدول inventory الجديد
-          const { data: currentInventory } = await supabase
-            .from('inventory')
-            .select('quantity')
-            .eq('product_id', item.product_id)
-            .maybeSingle();
-
-          const currentQuantity = currentInventory?.quantity || 0;
-          const newQuantity = currentQuantity + item.quantity;
-
-          // استخدام upsert لتجنب مشاكل التكرار
-          const { error: inventoryError } = await supabase
-            .from('inventory')
-            .upsert({
-              product_id: item.product_id,
-              quantity: newQuantity,
-              min_stock_level: 5,
-              max_stock_level: 100,
-              updated_at: new Date().toISOString()
-            }, {
-              onConflict: 'product_id',
-              ignoreDuplicates: false
-            });
-            
-          if (inventoryError) {
-            console.error(`فشل في تحديث مخزون المنتج ${item.product_id}:`, inventoryError);
-            continue;
-          }
-          
+          console.log(`تحديث مخزون المنتج ${item.product_id} بكمية +${item.quantity}`);
+          await updateProductQuantity(item.product_id, item.quantity);
           console.log(`تم تحديث مخزون المنتج ${item.product_id} بنجاح`);
         } catch (error) {
           console.error(`فشل في تحديث مخزون المنتج ${item.product_id}:`, error);
