@@ -53,6 +53,12 @@ export default function OnlineOrders() {
       
       const orderItems = Array.isArray(orderDetails.items) ? orderDetails.items : [];
       
+      // Get branch ID from order or use default
+      const branchId = orderDetails.branch_id || '49c736ed-9983-4d11-9408-203e39365afb';
+      
+      // Import updateBranchInventoryQuantity
+      const { updateBranchInventoryQuantity } = await import("@/services/supabase/branchInventoryService");
+      
       for (const item of orderItems) {
         const orderItem = item as unknown as OrderItem;
         
@@ -61,25 +67,13 @@ export default function OnlineOrders() {
           continue;
         }
         
-        const { data: product, error: productError } = await supabase
-          .from('products')
-          .select('*')
-          .eq('id', orderItem.product_id)
-          .single();
-          
-        if (productError) {
-          console.error("Error fetching product:", productError);
-          continue;
+        try {
+          // Update branch inventory (subtract quantity)
+          await updateBranchInventoryQuantity(orderItem.product_id, branchId, -(orderItem.quantity || 0));
+          console.log(`Updated branch inventory for product ${orderItem.product_id}`);
+        } catch (updateError) {
+          console.error(`Error updating branch inventory for product ${orderItem.product_id}:`, updateError);
         }
-        
-        const newQuantity = Math.max(0, (product.quantity || 0) - (orderItem.quantity || 0));
-        
-        await supabase
-          .from('products')
-          .update({ quantity: newQuantity })
-          .eq('id', product.id);
-        
-        console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
       }
       
       if (orderDetails.payment_status === 'paid') {

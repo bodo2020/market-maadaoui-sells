@@ -807,6 +807,103 @@ export type Database = {
           },
         ]
       }
+      inventory_transfers: {
+        Row: {
+          completed_by: string | null
+          completed_date: string | null
+          confirmed_by: string | null
+          confirmed_date: string | null
+          created_at: string | null
+          from_branch_id: string
+          id: string
+          notes: string | null
+          product_id: string
+          quantity: number
+          request_date: string
+          requested_by: string | null
+          status: string
+          to_branch_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          completed_by?: string | null
+          completed_date?: string | null
+          confirmed_by?: string | null
+          confirmed_date?: string | null
+          created_at?: string | null
+          from_branch_id: string
+          id?: string
+          notes?: string | null
+          product_id: string
+          quantity: number
+          request_date?: string
+          requested_by?: string | null
+          status?: string
+          to_branch_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          completed_by?: string | null
+          completed_date?: string | null
+          confirmed_by?: string | null
+          confirmed_date?: string | null
+          created_at?: string | null
+          from_branch_id?: string
+          id?: string
+          notes?: string | null
+          product_id?: string
+          quantity?: number
+          request_date?: string
+          requested_by?: string | null
+          status?: string
+          to_branch_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_transfers_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transfers_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transfers_from_branch_id_fkey"
+            columns: ["from_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transfers_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transfers_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transfers_to_branch_id_fkey"
+            columns: ["to_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_settings: {
         Row: {
           auto_print: boolean | null
@@ -1937,6 +2034,10 @@ export type Database = {
       }
       is_super_admin: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      process_inventory_transfer: {
+        Args: { transfer_id: string; action: string }
         Returns: boolean
       }
     }

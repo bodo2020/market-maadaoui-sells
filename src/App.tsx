@@ -41,6 +41,7 @@ import CustomerProfile from "@/pages/CustomerProfile";
 import MapPage from "@/pages/MapPage";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
 import BranchManagement from "@/pages/BranchManagement";
+import InventoryTransfer from "@/pages/InventoryTransfer";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
@@ -103,6 +104,7 @@ function App() {
               <Route path="/product-collections/edit/:id" element={<ProtectedRoute><EditProductCollection /></ProtectedRoute>} />
               <Route path="/barcode" element={<ProtectedRoute><Barcode /></ProtectedRoute>} />
               <Route path="/branches" element={<ProtectedRoute><BranchManagement /></ProtectedRoute>} />
+              <Route path="/inventory-transfer" element={<ProtectedRoute><InventoryTransfer /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <SonnerToaster position="top-center" richColors />

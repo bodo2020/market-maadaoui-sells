@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { OrderItem } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { updateProductQuantity } from "@/services/supabase/productService";
+import { updateBranchInventoryQuantity } from "@/services/supabase/branchInventoryService";
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 
 interface ReturnOrderDialogProps {
@@ -100,9 +100,20 @@ export function ReturnOrderDialog({
       if (orderError) throw orderError;
 
       // Process inventory changes - add back returned items to inventory
+      // Get the order's branch_id first
+      const { data: orderData } = await supabase
+        .from('online_orders')
+        .select('branch_id')
+        .eq('id', orderId)
+        .single();
+      
+      const branchId = orderData?.branch_id;
+      
       for (const item of returnItems) {
         if (!item) continue;
-        await updateProductQuantity(item.product_id, item.quantity); // Positive to add back to inventory
+        if (branchId) {
+          await updateBranchInventoryQuantity(item.product_id, branchId, item.quantity); // Positive to add back to inventory
+        }
       }
 
       // Record the cash transaction for the return (negative amount)
