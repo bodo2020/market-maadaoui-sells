@@ -6,15 +6,10 @@ export async function fetchProducts(branchId?: string) {
   console.log("Fetching products", branchId ? `for branch: ${branchId}` : "for current user's branch");
   
   try {
-    // Query products with their branch inventory quantities
+    // Query products without complex relationships to avoid foreign key conflicts
     let query = supabase
       .from("products")
-      .select(`
-        *,
-        companies (name),
-        main_categories (name),
-        subcategories (name)
-      `);
+      .select("*");
     
     // If branchId is provided, filter by that branch
     if (branchId) {
@@ -28,19 +23,25 @@ export async function fetchProducts(branchId?: string) {
       throw error;
     }
 
-    // Get branch inventory data for these products
+    // If we have products, get branch inventory data separately
     if (products && products.length > 0) {
-      const branchInventory = await fetchBranchInventory(branchId);
-      const inventoryMap = new Map(branchInventory.map(inv => [inv.product_id, inv.quantity]));
-      
-      // Update product quantities with branch-specific quantities
-      const productsWithBranchQuantity = products.map(product => ({
-        ...product,
-        quantity: inventoryMap.get(product.id) || 0
-      }));
+      try {
+        const branchInventory = await fetchBranchInventory(branchId);
+        const inventoryMap = new Map(branchInventory.map(inv => [inv.product_id, inv.quantity]));
+        
+        // Update product quantities with branch-specific quantities
+        const productsWithBranchQuantity = products.map(product => ({
+          ...product,
+          quantity: inventoryMap.get(product.id) || 0
+        }));
 
-      console.log(`Successfully fetched ${productsWithBranchQuantity.length} products with branch quantities`);
-      return productsWithBranchQuantity as Product[];
+        console.log(`Successfully fetched ${productsWithBranchQuantity.length} products with branch quantities`);
+        return productsWithBranchQuantity as Product[];
+      } catch (inventoryError) {
+        console.error('Error fetching branch inventory:', inventoryError);
+        console.log(`Successfully fetched ${products.length} products (without branch quantities)`);
+        return products as Product[];
+      }
     }
 
     console.log(`Successfully fetched ${products.length} products`);
