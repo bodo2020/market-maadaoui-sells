@@ -162,6 +162,22 @@ export default function Returns() {
   
   const handleApproveReturn = async (returnId: string) => {
     try {
+      // جلب بيانات المرتجع وعناصره
+      const { data: returnData, error: returnFetchError } = await supabase
+        .from('returns')
+        .select(`
+          *,
+          return_items (
+            product_id,
+            quantity
+          )
+        `)
+        .eq('id', returnId)
+        .single();
+        
+      if (returnFetchError) throw returnFetchError;
+      
+      // تحديث حالة المرتجع إلى مقبول
       const { error } = await supabase
         .from('returns')
         .update({ status: 'approved' })
@@ -169,8 +185,85 @@ export default function Returns() {
         
       if (error) throw error;
       
+      // تحديث المخزون - الحصول على أول فرع متاح
+      const { data: branchData, error: branchFetchError } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('active', true)
+        .limit(1)
+        .single();
+
+      if (branchFetchError || !branchData?.id) {
+        console.error('Error fetching branch:', branchFetchError);
+        toast.success('تم قبول المرتجع (لا يوجد فرع متاح لتحديث المخزون)');
+        setReturnsRefreshKey(prev => prev + 1);
+        return;
+      }
+
+      const branchId = branchData.id;
+      
+      // تحديث المخزون لكل منتج مرتجع
+      for (const item of returnData.return_items) {
+        try {
+          // محاولة الحصول على المخزون الحالي
+          const { data: currentInventory, error: fetchError } = await supabase
+            .from('branch_inventory')
+            .select('quantity')
+            .eq('product_id', item.product_id)
+            .eq('branch_id', branchId)
+            .maybeSingle();
+            
+          if (fetchError) {
+            console.error(`فشل في جلب مخزون المنتج ${item.product_id}:`, fetchError);
+            continue;
+          }
+          
+          let newQuantity = item.quantity;
+          
+          if (currentInventory) {
+            // إذا كان السجل موجود، أضف الكمية الجديدة
+            newQuantity = (currentInventory.quantity || 0) + item.quantity;
+            
+            const { error: inventoryError } = await supabase
+              .from('branch_inventory')
+              .update({ 
+                quantity: newQuantity,
+                updated_at: new Date().toISOString()
+              })
+              .eq('product_id', item.product_id)
+              .eq('branch_id', branchId);
+              
+            if (inventoryError) {
+              console.error(`فشل في تحديث مخزون المنتج ${item.product_id}:`, inventoryError);
+              continue;
+            }
+          } else {
+            // إذا لم يكن السجل موجود، أنشئ سجل جديد
+            const { error: inventoryError } = await supabase
+              .from('branch_inventory')
+              .insert({
+                product_id: item.product_id,
+                branch_id: branchId,
+                quantity: newQuantity,
+                min_stock_level: 5,
+                max_stock_level: 100
+              });
+              
+            if (inventoryError) {
+              console.error(`فشل في إنشاء سجل مخزون جديد للمنتج ${item.product_id}:`, inventoryError);
+              continue;
+            }
+          }
+          
+          console.log(`تم تحديث مخزون المنتج ${item.product_id} بنجاح`);
+        } catch (error) {
+          console.error(`فشل في تحديث مخزون المنتج ${item.product_id}:`, error);
+          continue;
+        }
+      }
+      
       setReturnsRefreshKey(prev => prev + 1);
-      toast.success("تم قبول طلب الإرجاع بنجاح");
+      toast.success("تم قبول طلب الإرجاع وتحديث المخزون بنجاح");
     } catch (error) {
       console.error("Error approving return:", error);
       toast.error("حدث خطأ أثناء قبول طلب الإرجاع");
