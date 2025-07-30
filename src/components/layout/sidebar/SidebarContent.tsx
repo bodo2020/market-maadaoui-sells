@@ -16,8 +16,7 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
   const currentPath = location.pathname;
   const { user } = useAuth();
   const { unreadOrders, unreadReturns } = useNotificationStore();
-  const isAdmin = user?.role === UserRole.ADMIN || user?.role === 'super_admin';
-  const isSuperAdmin = user?.role === 'super_admin';
+  const isAdmin = user?.role === UserRole.ADMIN;
   const isCashier = user?.role === UserRole.CASHIER;
   const isDelivery = user?.role === UserRole.DELIVERY;
 
@@ -25,9 +24,6 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
     return items.map(item => {
       // Skip admin-only items for non-admin users
       if (item.adminOnly && !isAdmin) return null;
-      
-      // Skip super admin-only items for non-super admin users
-      if (item.superAdminOnly && !isSuperAdmin) return null;
       
       // Skip cashier-only items for non-cashier users
       if (item.cashierOnly && !isCashier) return null;

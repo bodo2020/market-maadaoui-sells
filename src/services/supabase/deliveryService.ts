@@ -4,11 +4,7 @@ import {
   ShippingProvider, 
   DeliveryLocation,
   DeliveryType, 
-  DeliveryTypePrice,
-  DeliveryGovernorate,
-  DeliveryCity,
-  DeliveryArea,
-  DeliveryNeighborhood
+  DeliveryTypePrice 
 } from "@/types/shipping";
 
 // Governorates functions
@@ -59,7 +55,6 @@ export async function fetchNeighborhoods(areaId: string) {
 export async function createGovernorate(data: { 
   name: string;
   provider_id?: string;
-  branch_id?: string;
 }) {
   const { data: result, error } = await supabase
     .from('governorates')
@@ -74,7 +69,6 @@ export async function createGovernorate(data: {
 export async function createCity(data: { 
   name: string;
   governorate_id: string;
-  branch_id?: string;
 }) {
   try {
     const { data: result, error } = await supabase
@@ -94,7 +88,6 @@ export async function createCity(data: {
 export async function createArea(data: { 
   name: string;
   city_id: string;
-  branch_id?: string;
 }) {
   const { data: result, error } = await supabase
     .from('areas')
@@ -106,12 +99,11 @@ export async function createArea(data: {
   return result;
 }
 
-export async function createNeighborhood(data: {
+export async function createNeighborhood(data: { 
   name: string;
   area_id: string;
   price?: number;
   estimated_time?: string;
-  branch_id: string; // Made required for branch linking
 }) {
   const { data: result, error } = await supabase
     .from('neighborhoods')
@@ -265,8 +257,8 @@ export async function fetchShippingProviders(): Promise<ShippingProvider[]> {
 }
 
 // Temporary function to fulfill the DeliveryLocationsTable component needs
-export async function fetchDeliveryLocations(branchId?: string) {
-  let query = supabase
+export async function fetchDeliveryLocations() {
+  const { data: neighborhoods, error } = await supabase
     .from('neighborhoods')
     .select(`
       *,
@@ -278,13 +270,6 @@ export async function fetchDeliveryLocations(branchId?: string) {
         )
       )
     `);
-    
-  // Filter by branch if specified
-  if (branchId) {
-    query = query.eq('branch_id', branchId);
-  }
-  
-  const { data: neighborhoods, error } = await query;
     
   if (error) throw error;
   

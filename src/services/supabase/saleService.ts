@@ -4,19 +4,9 @@ import { Sale, CartItem } from "@/types";
 
 export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">) {
   try {
-    // Get current user (cashier) and their branch
+    // Get current user (cashier)
     const { data: userData } = await supabase.auth.getUser();
     const cashierId = userData.user?.id;
-    
-    let branchId = (sale as any).branch_id;
-    if (!branchId && cashierId) {
-      const { data: userBranch } = await supabase
-        .from('users')
-        .select('branch_id')
-        .eq('id', cashierId)
-        .single();
-      branchId = userBranch?.branch_id;
-    }
 
     // Ensure date is a string
     const saleData = {
@@ -24,9 +14,8 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
       date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date,
       // Convert CartItem[] to Json for Supabase
       items: JSON.parse(JSON.stringify(sale.items)),
-      // Add cashier ID and branch ID to the sale record
-      cashier_id: cashierId,
-      branch_id: branchId
+      // Add cashier ID to the sale record
+      cashier_id: cashierId
     };
     
     // Create the sale record
@@ -40,18 +29,35 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
       throw error;
     }
 
-    // Update product quantities in branch inventory for each sold item
-    if (sale.items && sale.items.length > 0 && branchId) {
-      const { updateBranchInventoryQuantity } = await import("./branchInventoryService");
-      
+    // Update product quantities for each sold item
+    if (sale.items && sale.items.length > 0) {
       for (const item of sale.items) {
         if (!item.product || !item.product.id) continue;
         
-        try {
-          // Update branch inventory (subtract quantity)
-          await updateBranchInventoryQuantity(item.product.id, branchId, -item.quantity);
-        } catch (updateError) {
-          console.error(`Error updating branch inventory for product ${item.product.id}:`, updateError);
+        // Get current quantity
+        const { data: product, error: fetchError } = await supabase
+          .from("products")
+          .select("quantity")
+          .eq("id", item.product.id)
+          .single();
+
+        if (fetchError) {
+          console.error(`Error fetching product ${item.product.id}:`, fetchError);
+          continue;
+        }
+
+        // Calculate new quantity (ensure it doesn't go below 0)
+        const currentQuantity = product.quantity || 0;
+        const newQuantity = Math.max(0, currentQuantity - item.quantity);
+
+        // Update the product quantity
+        const { error: updateError } = await supabase
+          .from("products")
+          .update({ quantity: newQuantity })
+          .eq("id", item.product.id);
+
+        if (updateError) {
+          console.error(`Error updating product ${item.product.id} quantity:`, updateError);
         }
       }
     }
@@ -69,14 +75,8 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
   }
 }
 
-export async function fetchSales(startDate?: Date, endDate?: Date, branchId?: string): Promise<Sale[]> {
+export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale[]> {
   let query = supabase.from("sales").select("*").order("date", { ascending: false });
-  
-  // Filter by branch if provided
-  if (branchId) {
-    query = query.eq("branch_id", branchId);
-  }
-  // If no branchId provided, let RLS handle filtering by user's branch
   
   if (startDate && endDate) {
     const start = new Date(startDate);

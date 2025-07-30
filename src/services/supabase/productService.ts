@@ -1,13 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
-import { fetchBranchInventory, updateBranchInventoryQuantity } from "./branchInventoryService";
 
-export async function fetchProducts(branchId?: string) {
-  console.log("Fetching all products", branchId ? `with quantities for branch: ${branchId}` : "without branch-specific quantities");
+export async function fetchProducts() {
+  console.log("Fetching all products");
   
   try {
-    // Always fetch all products (no branch filtering)
-    const { data: products, error } = await supabase
+    const { data, error } = await supabase
       .from("products")
       .select("*")
       .order("name");
@@ -17,38 +15,8 @@ export async function fetchProducts(branchId?: string) {
       throw error;
     }
 
-    // If we have products and a specific branch, get branch-specific quantities
-    if (products && products.length > 0 && branchId) {
-      try {
-        console.log(`Fetching branch inventory for branch: ${branchId}`);
-        const branchInventory = await fetchBranchInventory(branchId);
-        const inventoryMap = new Map(branchInventory.map(inv => [inv.product_id, inv.quantity]));
-        
-        // Update product quantities with branch-specific quantities (0 if not in branch inventory)
-        const productsWithBranchQuantity = products.map(product => ({
-          ...product,
-          quantity: inventoryMap.get(product.id) || 0,
-          branch_quantity: inventoryMap.get(product.id) || 0 // Keep track of branch-specific quantity
-        }));
-
-        console.log(`Successfully fetched ${productsWithBranchQuantity.length} products with branch quantities for branch ${branchId}`);
-        return productsWithBranchQuantity as Product[];
-      } catch (inventoryError) {
-        console.error('Error fetching branch inventory:', inventoryError);
-        // If branch inventory fails, show all products with 0 quantities
-        const productsWithZeroQuantity = products.map(product => ({
-          ...product,
-          quantity: 0,
-          branch_quantity: 0
-        }));
-        console.log(`Successfully fetched ${products.length} products with zero quantities (inventory error)`);
-        return productsWithZeroQuantity as Product[];
-      }
-    }
-
-    // If no branchId provided, return products with their original quantities
-    console.log(`Successfully fetched ${products.length} products without branch filtering`);
-    return products as Product[];
+    console.log(`Successfully fetched ${data.length} products`);
+    return data as Product[];
   } catch (error) {
     console.error("Error in fetchProducts:", error);
     return [];
@@ -147,7 +115,6 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
       is_bulk: product.is_bulk || false,
       manufacturer_name: product.manufacturer_name,
       unit_of_measure: product.unit_of_measure,
-      branch_id: product.branch_id, // Include branch_id
     };
 
     const { data, error } = await supabase
@@ -317,45 +284,36 @@ export async function fetchProductsBySubcategory(subcategoryId: string) {
   }
 }
 
-// New function to update product quantity after sales (now uses branch inventory)
-export async function updateProductQuantity(
-  productId: string, 
-  quantityChange: number, 
-  branchId?: string
-) {
+// New function to update product quantity after sales
+export async function updateProductQuantity(productId: string, quantityChange: number) {
   try {
-    if (branchId) {
-      // Use branch-specific inventory
-      return await updateBranchInventoryQuantity(productId, branchId, quantityChange);
-    } else {
-      // Fallback to original product table (for backward compatibility)
-      const { data: product, error: fetchError } = await supabase
-        .from("products")
-        .select("quantity")
-        .eq("id", productId)
-        .single();
+    // First, get the current quantity
+    const { data: product, error: fetchError } = await supabase
+      .from("products")
+      .select("quantity")
+      .eq("id", productId)
+      .single();
 
-      if (fetchError) {
-        console.error(`Error fetching product ${productId}:`, fetchError);
-        throw fetchError;
-      }
-
-      const currentQuantity = product.quantity || 0;
-      const newQuantity = Math.max(0, currentQuantity + quantityChange);
-
-      // Update the product quantity
-      const { error: updateError } = await supabase
-        .from("products")
-        .update({ quantity: newQuantity })
-        .eq("id", productId);
-
-      if (updateError) {
-        console.error(`Error updating product ${productId} quantity:`, updateError);
-        throw updateError;
-      }
-
-      return newQuantity;
+    if (fetchError) {
+      console.error(`Error fetching product ${productId}:`, fetchError);
+      throw fetchError;
     }
+
+    const currentQuantity = product.quantity || 0;
+    const newQuantity = Math.max(0, currentQuantity + quantityChange);
+
+    // Update the product quantity
+    const { error: updateError } = await supabase
+      .from("products")
+      .update({ quantity: newQuantity })
+      .eq("id", productId);
+
+    if (updateError) {
+      console.error(`Error updating product ${productId} quantity:`, updateError);
+      throw updateError;
+    }
+
+    return newQuantity;
   } catch (error) {
     console.error("Error updating product quantity:", error);
     throw error;

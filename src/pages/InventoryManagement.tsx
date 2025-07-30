@@ -47,12 +47,9 @@ import { Product } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, updateProduct } from "@/services/supabase/productService";
-import { fetchBranchInventory, setBranchInventoryQuantity, getLowStockItems } from "@/services/supabase/branchInventoryService";
-import { useBranch } from "@/contexts/BranchContext";
 import { checkLowStockProducts, showLowStockToasts } from "@/services/notificationService";
 
 export default function InventoryManagement() {
-  const { currentBranch } = useBranch();
   const [inventory, setInventory] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -63,25 +60,21 @@ export default function InventoryManagement() {
   const navigate = useNavigate();
   
   useEffect(() => {
-    if (currentBranch) {
-      loadProducts();
-      
-      // Check for low stock and display notifications
-      const checkStock = async () => {
-        await checkLowStockProducts();
-        showLowStockToasts();
-      };
-      
-      checkStock();
-    }
-  }, [currentBranch]);
+    loadProducts();
+    
+    // Check for low stock and display notifications
+    const checkStock = async () => {
+      await checkLowStockProducts();
+      showLowStockToasts();
+    };
+    
+    checkStock();
+  }, []);
 
   const loadProducts = async () => {
-    if (!currentBranch) return;
-    
     setLoading(true);
     try {
-      const products = await fetchProducts(currentBranch.id);
+      const products = await fetchProducts();
       setInventory(products);
     } catch (error) {
       console.error("Error loading products:", error);
@@ -104,17 +97,21 @@ export default function InventoryManagement() {
   const lowStockProducts = inventory.filter(product => (product.quantity || 0) < 10);
   
   const handleAddStock = async () => {
-    if (selectedProduct && stockToAdd > 0 && currentBranch) {
+    if (selectedProduct && stockToAdd > 0) {
       setLoading(true);
       try {
-        await setBranchInventoryQuantity(
-          selectedProduct.id,
-          currentBranch.id,
-          (selectedProduct.quantity || 0) + stockToAdd
-        );
+        const updatedProduct = {
+          ...selectedProduct,
+          quantity: (selectedProduct.quantity || 0) + stockToAdd
+        };
         
-        // Reload products to get updated quantities
-        await loadProducts();
+        await updateProduct(selectedProduct.id, updatedProduct);
+        
+        setInventory(inventory.map(product => 
+          product.id === selectedProduct.id 
+            ? { ...product, quantity: (product.quantity || 0) + stockToAdd } 
+            : product
+        ));
         
         toast({
           title: "تم بنجاح",

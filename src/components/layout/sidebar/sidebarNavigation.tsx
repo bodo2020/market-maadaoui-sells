@@ -23,7 +23,6 @@ import {
   Settings,
   Map,
   QrCode,
-  ArrowRightLeft,
 } from "lucide-react";
 import { SidebarItemData, NavigationGroup } from "./types";
 
@@ -85,11 +84,6 @@ export const adminNavigation: NavigationGroup = {
       label: "الجرد اليومي",
       href: "/daily-inventory",
       icon: ClipboardList,
-    },
-    {
-      label: "نقل المخزون",
-      href: "/inventory-transfer",
-      icon: ArrowRightLeft,
     },
     {
       label: "مشتريات الموردين",

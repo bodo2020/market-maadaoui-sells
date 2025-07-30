@@ -57,9 +57,7 @@ export default function ProductManagement() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      // Load all products without branch filtering temporarily
       const data = await fetchProducts();
-      console.log("Loaded products:", data);
       setProducts(data);
     } catch (error) {
       console.error("Error loading products:", error);

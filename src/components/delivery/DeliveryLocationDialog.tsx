@@ -12,7 +12,6 @@ import {
 } from "@/services/supabase/deliveryService";
 import DeliveryTypePricing from "./DeliveryTypePricing";
 import { toast } from "sonner";
-import { useBranch } from "@/contexts/BranchContext";
 
 interface DeliveryLocationDialogProps {
   open: boolean;
@@ -35,18 +34,12 @@ export default function DeliveryLocationDialog({
   const [loading, setLoading] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
   const [newLocationId, setNewLocationId] = useState<string | null>(null);
-  const { currentBranch } = useBranch();
 
   const isFormValid = name.trim() !== "";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid) return;
-    
-    if (!currentBranch) {
-      toast.error("يجب اختيار فرع أولاً");
-      return;
-    }
     
     setLoading(true);
 
@@ -57,8 +50,7 @@ export default function DeliveryLocationDialog({
         case 'governorate':
           result = await createGovernorate({
             name,
-            provider_id: providerId || undefined,
-            branch_id: currentBranch.id
+            provider_id: providerId || undefined
           });
           break;
 
@@ -66,8 +58,7 @@ export default function DeliveryLocationDialog({
           if (!parentId) throw new Error("Governorate ID is required");
           result = await createCity({
             name,
-            governorate_id: parentId,
-            branch_id: currentBranch.id
+            governorate_id: parentId
           });
           break;
 
@@ -75,8 +66,7 @@ export default function DeliveryLocationDialog({
           if (!parentId) throw new Error("City ID is required");
           result = await createArea({
             name,
-            city_id: parentId,
-            branch_id: currentBranch.id
+            city_id: parentId
           });
           break;
 
@@ -85,8 +75,7 @@ export default function DeliveryLocationDialog({
           result = await createNeighborhood({
             name,
             area_id: parentId,
-            price: 0,
-            branch_id: currentBranch.id
+            price: 0
           });
           
           if (result?.id) {

@@ -16,7 +16,6 @@ import { fetchSales } from "@/services/supabase/saleService";
 import { fetchProducts } from "@/services/supabase/productService";
 import { CartItem, Product, Sale } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
-import { useBranch } from "@/contexts/BranchContext";
 
 interface StatCardProps {
   title: string;
@@ -62,21 +61,18 @@ function formatCurrency(amount: number): string {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { currentBranch } = useBranch();
   const isAdmin = user?.role === 'admin';
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
   const { data: sales, isLoading: salesLoading } = useQuery({
-    queryKey: ['sales', currentBranch?.id],
-    queryFn: () => fetchSales(undefined, undefined, currentBranch?.id),
-    enabled: !!currentBranch
+    queryKey: ['sales'],
+    queryFn: () => fetchSales()
   });
 
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ['products', currentBranch?.id],
-    queryFn: () => fetchProducts(currentBranch?.id),
-    enabled: !!currentBranch
+    queryKey: ['products'],
+    queryFn: fetchProducts
   });
 
   const todaySales = sales?.filter(sale => {

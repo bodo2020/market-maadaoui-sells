@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, BellDot, User, LogOut, X, Check, Building2 } from "lucide-react";
+import { Bell, BellDot, User, LogOut, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
-import { useBranch } from "@/contexts/BranchContext";
 import { useNavigate } from "react-router-dom";
 import { 
   getNotifications, 
@@ -26,7 +25,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
-  const { currentBranch, allBranches, setCurrentBranch, canManageMultipleBranches } = useBranch();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<StockNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -86,46 +84,11 @@ export default function Navbar() {
 
   return (
     <header className="border-b bg-white py-3 px-6 flex items-center justify-between">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center">
         <h2 className="text-lg font-medium">لوحة التحكم</h2>
-        {currentBranch && (
-          <div className="flex items-center gap-2 bg-primary/10 px-3 py-1 rounded-full">
-            <Building2 className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">{currentBranch.name}</span>
-          </div>
-        )}
       </div>
       
       <div className="flex items-center gap-4">
-        {/* Branch Selector for Super Admin */}
-        {canManageMultipleBranches && allBranches.length > 1 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                <span>اختر الفرع</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>اختر الفرع</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {allBranches.map(branch => (
-                <DropdownMenuItem 
-                  key={branch.id}
-                  onClick={() => setCurrentBranch(branch)}
-                  className={currentBranch?.id === branch.id ? "bg-primary/10" : ""}
-                >
-                  <Building2 className="ml-2 h-4 w-4" />
-                  <span>{branch.name}</span>
-                  {currentBranch?.id === branch.id && (
-                    <Check className="mr-2 h-4 w-4" />
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        
         <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
