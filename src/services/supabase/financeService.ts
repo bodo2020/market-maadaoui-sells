@@ -265,8 +265,8 @@ export const fetchProfitsSummary = async (
 
     if (returnsError) throw returnsError;
     
-    // Calculate total store profits
-    const storeProfits = storeData?.reduce((sum, sale) => sum + (sale.profit || 0), 0) || 0;
+    // Calculate total store profits (raw profits from sales)
+    const rawStoreProfits = storeData?.reduce((sum, sale) => sum + (sale.profit || 0), 0) || 0;
     
     // Calculate online profits (estimated based on item prices)
     let onlineProfits = 0;
@@ -342,8 +342,9 @@ export const fetchProfitsSummary = async (
       }
     }
     
-    // Calculate net profits after returns (only deduct the profit impact, not full return value)
-    const netProfits = storeProfits + onlineProfits - returnsProfitImpact;
+    // Calculate net profits after returns (deduct profit impact from store and online profits)
+    const storeProfits = rawStoreProfits - returnsProfitImpact; // خصم أرباح المرتجعات من أرباح المحل
+    const netProfits = storeProfits + onlineProfits;
     
     console.log("Profits summary results:", {
       storeProfits,
