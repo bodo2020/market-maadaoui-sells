@@ -243,8 +243,26 @@ export default function Returns() {
         }
       }
       
+      // إضافة معاملة نقدية لخصم مبلغ الإرجاع من الخزنة
+      try {
+        const { error: cashError } = await supabase.rpc('add_cash_transaction', {
+          p_amount: returnData.total_amount,
+          p_transaction_type: 'withdrawal',
+          p_register_type: 'store',
+          p_notes: `إرجاع طلب رقم ${returnData.id}`
+        });
+
+        if (cashError) {
+          console.error('Error adding cash transaction:', cashError);
+          toast.error('تم قبول الإرجاع وتحديث المخزون لكن فشل تسجيل المعاملة النقدية');
+        }
+      } catch (error) {
+        console.error('Error processing cash transaction:', error);
+        toast.error('تم قبول الإرجاع وتحديث المخزون لكن فشل تسجيل المعاملة النقدية');
+      }
+      
       setReturnsRefreshKey(prev => prev + 1);
-      toast.success("تم قبول طلب الإرجاع وتحديث المخزون بنجاح");
+      toast.success("تم قبول طلب الإرجاع وتحديث المخزون وخصم المبلغ من الخزنة بنجاح");
     } catch (error) {
       console.error("Error approving return:", error);
       toast.error("حدث خطأ أثناء قبول طلب الإرجاع");
