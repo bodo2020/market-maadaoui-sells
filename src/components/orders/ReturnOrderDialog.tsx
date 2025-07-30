@@ -107,40 +107,7 @@ export function ReturnOrderDialog({
         if (!item) continue;
         console.log(`Updating inventory for product ${item.product_id} quantity by +${item.quantity}`);
         try {
-          // Get current inventory
-          const { data: currentInventory, error: fetchError } = await supabase
-            .from('inventory')
-            .select('quantity')
-            .eq('product_id', item.product_id)
-            .maybeSingle();
-            
-          if (fetchError) {
-            console.error(`Failed to fetch inventory for product ${item.product_id}:`, fetchError);
-            throw fetchError;
-          }
-          
-          const currentQuantity = currentInventory?.quantity || 0;
-          const newQuantity = currentQuantity + item.quantity;
-          
-          // Update inventory with new quantity using upsert
-          const { error: inventoryError } = await supabase
-            .from('inventory')
-            .upsert({ 
-              product_id: item.product_id,
-              quantity: newQuantity,
-              min_stock_level: 5,
-              max_stock_level: 100,
-              updated_at: new Date().toISOString()
-            }, {
-              onConflict: 'product_id',
-              ignoreDuplicates: false
-            });
-            
-          if (inventoryError) {
-            console.error(`Failed to update inventory for product ${item.product_id}:`, inventoryError);
-            throw inventoryError;
-          }
-          
+          await updateProductQuantity(item.product_id, item.quantity);
           console.log(`Successfully updated inventory for product ${item.product_id}`);
         } catch (error) {
           console.error(`Failed to update inventory for product ${item.product_id}:`, error);
