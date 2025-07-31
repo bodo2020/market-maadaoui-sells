@@ -107,7 +107,7 @@ export function ReturnOrderDialog({
         if (!item) continue;
         console.log(`Updating inventory for product ${item.product_id} quantity by +${item.quantity}`);
         try {
-          await updateProductQuantity(item.product_id, item.quantity);
+          await updateProductQuantity(item.product_id, item.quantity, 'increase');
           console.log(`Successfully updated inventory for product ${item.product_id}`);
         } catch (error) {
           console.error(`Failed to update inventory for product ${item.product_id}:`, error);

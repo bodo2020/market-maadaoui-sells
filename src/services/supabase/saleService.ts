@@ -346,7 +346,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
         <div class="invoice-details">
           <div>رقم الفاتورة: <span class="invoice-number">${sale.invoice_number}</span></div>
           <div>التاريخ: ${formattedDate}</div>
-          ${sale.cashier_name ? `<div>الكاشير: ${sale.cashier_name}</div>` : ''}
+          ${sale.cashier_name ? `<div>البائع: ${sale.cashier_name}</div>` : ''}
           ${sale.customer_name ? `<div>العميل: ${sale.customer_name}</div>` : ''}
           ${sale.customer_phone ? `<div>هاتف: ${sale.customer_phone}</div>` : ''}
         </div>

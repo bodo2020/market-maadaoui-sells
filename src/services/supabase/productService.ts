@@ -338,9 +338,10 @@ export async function updateInventoryQuantity(productId: string, quantityChange:
   }
 }
 
-// Updated function to use inventory table
-export async function updateProductQuantity(productId: string, quantityChange: number) {
-  return await updateInventoryQuantity(productId, quantityChange);
+// Updated function to use inventory table with operation type
+export async function updateProductQuantity(productId: string, quantityChange: number, operation: 'increase' | 'decrease' = 'decrease') {
+  const adjustedChange = operation === 'increase' ? Math.abs(quantityChange) : -Math.abs(quantityChange);
+  return await updateInventoryQuantity(productId, adjustedChange);
 }
 
 // Barcode management functions

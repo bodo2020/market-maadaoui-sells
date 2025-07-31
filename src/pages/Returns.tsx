@@ -6,7 +6,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, RotateCcw, FilterIcon, FileDown, Plus } from "lucide-react";
+import { Search, RotateCcw, FilterIcon, FileDown, Plus, Barcode } from "lucide-react";
 import { toast } from "sonner";
 import {
   Table,
@@ -27,6 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ReturnDetailsDialog } from "@/components/returns/ReturnDetailsDialog";
 import { CreateReturnDialog } from "@/components/returns/CreateReturnDialog";
+import { AddProductToReturnDialog } from "@/components/returns/AddProductToReturnDialog";
 import { updateProductQuantity } from "@/services/supabase/productService";
 
 // Types
@@ -58,6 +59,7 @@ export default function Returns() {
   const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [addProductDialogOpen, setAddProductDialogOpen] = useState(false);
   const [returnsRefreshKey, setReturnsRefreshKey] = useState(0);
 
   // Fetch returns data
@@ -193,7 +195,7 @@ export default function Returns() {
       for (const item of returnData.return_items) {
         try {
           console.log(`تحديث مخزون المنتج ${item.product_id} بكمية +${item.quantity}`);
-          await updateProductQuantity(item.product_id, item.quantity);
+          await updateProductQuantity(item.product_id, item.quantity, 'increase');
           console.log(`تم تحديث مخزون المنتج ${item.product_id} بنجاح`);
         } catch (error) {
           console.error(`فشل في تحديث مخزون المنتج ${item.product_id}:`, error);
@@ -269,6 +271,10 @@ export default function Returns() {
             <Button variant="default" size="sm" className="flex items-center gap-1" onClick={() => setCreateDialogOpen(true)}>
               <Plus className="h-4 w-4" />
               إضافة مرتجع جديد
+            </Button>
+            <Button variant="outline" size="sm" className="flex items-center gap-1" onClick={() => setAddProductDialogOpen(true)}>
+              <Barcode className="h-4 w-4" />
+              إضافة منتج بالباركود
             </Button>
             <Button variant="outline" size="sm" className="flex items-center gap-1">
               <FileDown className="h-4 w-4" />
@@ -456,6 +462,49 @@ export default function Returns() {
           onOpenChange={setCreateDialogOpen}
           onSuccess={() => {
             setReturnsRefreshKey(prev => prev + 1);
+          }}
+        />
+        
+        <AddProductToReturnDialog
+          open={addProductDialogOpen}
+          onOpenChange={setAddProductDialogOpen}
+          onProductAdded={async (product, quantity) => {
+            try {
+              // Create a new return for this product
+              const totalAmount = product.price * quantity;
+              
+              const { data: returnData, error: returnError } = await supabase
+                .from('returns')
+                .insert({
+                  total_amount: totalAmount,
+                  reason: 'مرتجع مضاف عبر الباركود',
+                  status: 'pending'
+                })
+                .select()
+                .single();
+
+              if (returnError) throw returnError;
+
+              // Add the return item
+              const { error: itemError } = await supabase
+                .from('return_items')
+                .insert({
+                  return_id: returnData.id,
+                  product_id: product.id,
+                  quantity,
+                  price: product.price,
+                  total: totalAmount,
+                  reason: 'مرتجع مضاف عبر الباركود'
+                });
+
+              if (itemError) throw itemError;
+
+              setReturnsRefreshKey(prev => prev + 1);
+              toast.success("تم إنشاء مرتجع جديد بنجاح");
+            } catch (error) {
+              console.error("Error creating return:", error);
+              toast.error("حدث خطأ أثناء إنشاء المرتجع");
+            }
           }}
         />
       </div>
