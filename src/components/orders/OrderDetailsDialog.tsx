@@ -209,6 +209,7 @@ export function OrderDetailsDialog({
                 items={order.items} 
                 orderId={order.id}
                 onItemDeleted={onStatusUpdated}
+                onItemUpdated={onStatusUpdated}
               />
             </div>
 

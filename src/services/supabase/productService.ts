@@ -284,38 +284,83 @@ export async function fetchProductsBySubcategory(subcategoryId: string) {
   }
 }
 
-// New function to update product quantity after sales
-export async function updateProductQuantity(productId: string, quantityChange: number) {
+// Inventory management functions
+export async function updateInventoryQuantity(productId: string, quantityChange: number) {
   try {
-    // First, get the current quantity
-    const { data: product, error: fetchError } = await supabase
-      .from("products")
+    // Get current inventory quantity
+    const { data: inventory, error: fetchError } = await supabase
+      .from("inventory")
       .select("quantity")
-      .eq("id", productId)
-      .single();
+      .eq("product_id", productId)
+      .maybeSingle();
 
     if (fetchError) {
-      console.error(`Error fetching product ${productId}:`, fetchError);
+      console.error(`Error fetching inventory for product ${productId}:`, fetchError);
       throw fetchError;
     }
 
-    const currentQuantity = product.quantity || 0;
+    const currentQuantity = inventory?.quantity || 0;
     const newQuantity = Math.max(0, currentQuantity + quantityChange);
 
-    // Update the product quantity
+    // Update inventory using upsert to handle cases where inventory record doesn't exist
     const { error: updateError } = await supabase
+      .from("inventory")
+      .upsert({
+        product_id: productId,
+        quantity: newQuantity,
+        min_stock_level: 5,
+        max_stock_level: 100,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'product_id',
+        ignoreDuplicates: false
+      });
+
+    if (updateError) {
+      console.error(`Error updating inventory for product ${productId}:`, updateError);
+      throw updateError;
+    }
+
+    // Also update products table for backward compatibility
+    const { error: productUpdateError } = await supabase
       .from("products")
       .update({ quantity: newQuantity })
       .eq("id", productId);
 
-    if (updateError) {
-      console.error(`Error updating product ${productId} quantity:`, updateError);
-      throw updateError;
+    if (productUpdateError) {
+      console.error(`Error updating product ${productId} quantity:`, productUpdateError);
     }
 
     return newQuantity;
   } catch (error) {
-    console.error("Error updating product quantity:", error);
+    console.error("Error updating inventory quantity:", error);
+    throw error;
+  }
+}
+
+// Updated function to use inventory table
+export async function updateProductQuantity(productId: string, quantityChange: number) {
+  return await updateInventoryQuantity(productId, quantityChange);
+}
+
+// Barcode management functions
+export async function generateBarcodeForProduct(productId: string): Promise<string> {
+  const timestamp = Date.now().toString().slice(-6);
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `${timestamp}${random}`;
+}
+
+export async function updateProductBarcode(productId: string, barcode: string) {
+  try {
+    const { error } = await supabase
+      .from("products")
+      .update({ barcode })
+      .eq("id", productId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error("Error updating product barcode:", error);
     throw error;
   }
 }
