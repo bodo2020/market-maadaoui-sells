@@ -16,9 +16,7 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
       items: JSON.parse(JSON.stringify(sale.items)),
       // Add cashier ID and name to the sale record
       cashier_id: cashierId,
-      cashier_name: cashierName || sale.cashier_name,
-      // Set branch_id to null to allow sales without branch restrictions for now
-      branch_id: null
+      cashier_name: cashierName || sale.cashier_name
     };
     
     // Create the sale record
