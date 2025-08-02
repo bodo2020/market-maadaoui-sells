@@ -269,6 +269,10 @@ export default function OrderDetails() {
               customerPhone={order?.customer_phone}
               shippingAddress={order?.shipping_address}
               notes={order?.notes}
+              governorate={order?.governorate}
+              city={order?.city}
+              area={order?.area}
+              neighborhood={order?.neighborhood}
             />
           </div>
         </div>

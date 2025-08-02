@@ -9,6 +9,10 @@ interface CustomerData {
   email?: string;
   phone?: string;
   phone_verified?: boolean;
+  governorate_id?: string;
+  city_id?: string;
+  area_id?: string;
+  neighborhood_id?: string;
 }
 
 export function useOrderDetails(orderId: string) {
@@ -30,7 +34,11 @@ export function useOrderDetails(orderId: string) {
             name,
             email,
             phone,
-            phone_verified
+            phone_verified,
+            governorate_id,
+            city_id,
+            area_id,
+            neighborhood_id
           )
         `)
         .eq('id', orderId)
@@ -100,6 +108,48 @@ export function useOrderDetails(orderId: string) {
         
         const transformedItems = await transformItems(data.items);
         
+        // Fetch location names if IDs exist
+        let governorate = '';
+        let city = '';
+        let area = '';
+        let neighborhood = '';
+        
+        if (customerData.governorate_id) {
+          const { data: govData } = await supabase
+            .from('governorates')
+            .select('name')
+            .eq('id', customerData.governorate_id)
+            .single();
+          governorate = govData?.name || '';
+        }
+        
+        if (customerData.city_id) {
+          const { data: cityData } = await supabase
+            .from('cities')
+            .select('name')
+            .eq('id', customerData.city_id)
+            .single();
+          city = cityData?.name || '';
+        }
+        
+        if (customerData.area_id) {
+          const { data: areaData } = await supabase
+            .from('areas')
+            .select('name')
+            .eq('id', customerData.area_id)
+            .single();
+          area = areaData?.name || '';
+        }
+        
+        if (customerData.neighborhood_id) {
+          const { data: neighborhoodData } = await supabase
+            .from('neighborhoods')
+            .select('name')
+            .eq('id', customerData.neighborhood_id)
+            .single();
+          neighborhood = neighborhoodData?.name || '';
+        }
+        
         const orderObj: Order = {
           id: data.id,
           created_at: data.created_at,
@@ -116,7 +166,11 @@ export function useOrderDetails(orderId: string) {
           customer_phone_verified: customerPhoneVerified,
           notes: data.notes || '',
           tracking_number: data.tracking_number || null,
-          delivery_person: data.delivery_person || null
+          delivery_person: data.delivery_person || null,
+          governorate,
+          city,
+          area,
+          neighborhood
         };
         
         console.log("Parsed order:", orderObj);
