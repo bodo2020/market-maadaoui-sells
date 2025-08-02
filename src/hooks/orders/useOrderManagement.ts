@@ -150,10 +150,10 @@ export const useOrderManagement = (activeTab: string) => {
             phone,
             email,
             phone_verified,
-            governorates (name),
-            cities (name),
-            areas (name),
-            neighborhoods (name)
+            governorate_id,
+            city_id,
+            area_id,
+            neighborhood_id
           )
         `)
         .order('created_at', {
@@ -207,10 +207,10 @@ export const useOrderManagement = (activeTab: string) => {
         tracking_number: item.tracking_number || null,
         delivery_person: item.delivery_person || null,
         return_status: item.return_status || 'none',
-        governorate: item.customers?.governorates?.name || '',
-        city: item.customers?.cities?.name || '',
-        area: item.customers?.areas?.name || '',
-        neighborhood: item.customers?.neighborhoods?.name || ''
+        governorate: '',
+        city: '',
+        area: '',
+        neighborhood: ''
       }));
       
       setOrders(transformedOrders);
