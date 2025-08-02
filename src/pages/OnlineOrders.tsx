@@ -17,6 +17,7 @@ import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmati
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
+import { updateProductQuantity } from "@/services/supabase/productService";
 
 export default function OnlineOrders() {
   const [activeTab, setActiveTab] = useState("all");
@@ -61,25 +62,13 @@ export default function OnlineOrders() {
           continue;
         }
         
-        const { data: product, error: productError } = await supabase
-          .from('products')
-          .select('*')
-          .eq('id', orderItem.product_id)
-          .single();
-          
-        if (productError) {
-          console.error("Error fetching product:", productError);
+        try {
+          await updateProductQuantity(orderItem.product_id, orderItem.quantity || 0, 'decrease');
+          console.log(`Updated inventory for product ${orderItem.product_id}: decreased by ${orderItem.quantity}`);
+        } catch (inventoryError) {
+          console.error("Error updating inventory:", inventoryError);
           continue;
         }
-        
-        const newQuantity = Math.max(0, (product.quantity || 0) - (orderItem.quantity || 0));
-        
-        await supabase
-          .from('products')
-          .update({ quantity: newQuantity })
-          .eq('id', product.id);
-        
-        console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
       }
       
       if (orderDetails.payment_status === 'paid') {
