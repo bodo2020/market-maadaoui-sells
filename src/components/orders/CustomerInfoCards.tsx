@@ -9,6 +9,10 @@ interface CustomerInfoCardsProps {
   customerPhone?: string;
   shippingAddress?: string;
   notes?: string;
+  governorate?: string;
+  city?: string;
+  area?: string;
+  neighborhood?: string;
 }
 
 export function CustomerInfoCards({
@@ -16,7 +20,11 @@ export function CustomerInfoCards({
   customerEmail,
   customerPhone,
   shippingAddress,
-  notes
+  notes,
+  governorate,
+  city,
+  area,
+  neighborhood
 }: CustomerInfoCardsProps) {
   return (
     <div className="space-y-4">
@@ -57,14 +65,45 @@ export function CustomerInfoCards({
         </CardContent>
       </Card>
       
-      {shippingAddress && (
+      {(governorate || city || area || neighborhood || shippingAddress) && (
         <Card>
           <CardContent className="p-5">
             <h4 className="text-base font-medium text-gray-700 mb-2 flex items-center gap-1">
               <MapPin className="w-4 h-4" />
-              عنوان الشحن
+              معلومات الموقع
             </h4>
-            <p className="text-[15px]">{shippingAddress}</p>
+            <div className="space-y-2 text-[15px]">
+              {governorate && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-600">المحافظة:</span>
+                  <span>{governorate}</span>
+                </div>
+              )}
+              {city && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-600">المدينة:</span>
+                  <span>{city}</span>
+                </div>
+              )}
+              {area && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-600">المنطقة:</span>
+                  <span>{area}</span>
+                </div>
+              )}
+              {neighborhood && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-600">الحي:</span>
+                  <span>{neighborhood}</span>
+                </div>
+              )}
+              {shippingAddress && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <span className="font-medium text-gray-600">العنوان التفصيلي:</span>
+                  <p className="mt-1">{shippingAddress}</p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

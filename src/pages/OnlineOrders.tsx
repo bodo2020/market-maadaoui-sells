@@ -29,6 +29,8 @@ export default function OnlineOrders() {
   const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
   const [returnItems, setReturnItems] = useState<OrderItem[]>([]);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
   const { orders, loading, handleOrderUpdate } = useOrderManagement(activeTab);
   const { markOrdersAsRead } = useNotificationStore();
@@ -140,6 +142,10 @@ export default function OnlineOrders() {
       email: order.customer_email,
       phone: order.customer_phone,
       address: order.shipping_address,
+      governorate: order.governorate,
+      city: order.city,
+      area: order.area,
+      neighborhood: order.neighborhood,
       order: order
     });
   };
@@ -148,6 +154,51 @@ export default function OnlineOrders() {
     setReturnOrderId(order.id);
     setReturnItems(order.items);
     setReturnDialogOpen(true);
+  };
+
+  // Selection handlers
+  const handleSelectAll = () => {
+    if (selectedOrders.length === filteredOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(filteredOrders.map(order => order.id));
+    }
+  };
+
+  const handleSelectOrder = (orderId: string) => {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) 
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
+  };
+
+  // Bulk cancel selected orders
+  const handleBulkCancel = async () => {
+    if (selectedOrders.length === 0) return;
+    
+    setBulkActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('online_orders')
+        .update({
+          status: 'done',
+          notes: 'تم إلغاء هذا الطلب - إلغاء جماعي',
+          updated_at: new Date().toISOString()
+        })
+        .in('id', selectedOrders);
+        
+      if (error) throw error;
+      
+      setSelectedOrders([]);
+      handleOrderUpdate();
+      toast.success(`تم إلغاء ${selectedOrders.length} طلب بنجاح`);
+    } catch (error) {
+      console.error('Error bulk cancelling orders:', error);
+      toast.error("حدث خطأ أثناء إلغاء الطلبات");
+    } finally {
+      setBulkActionLoading(false);
+    }
   };
 
   const filteredOrders = orders.filter(order => {
@@ -181,7 +232,7 @@ export default function OnlineOrders() {
           onTabChange={setActiveTab}
         />
 
-        <div className="mb-4 flex">
+        <div className="mb-4 flex justify-between items-center">
           <div className="relative w-full max-w-sm">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -191,6 +242,31 @@ export default function OnlineOrders() {
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
+          
+          {selectedOrders.length > 0 && (
+            <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-lg border">
+              <span className="text-sm text-muted-foreground">
+                تم تحديد {selectedOrders.length} طلب
+              </span>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={handleBulkCancel}
+                disabled={bulkActionLoading}
+                className="h-8"
+              >
+                {bulkActionLoading ? "جاري الإلغاء..." : "إلغاء المحدد"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSelectedOrders([])}
+                className="h-8"
+              >
+                إلغاء التحديد
+              </Button>
+            </div>
+          )}
         </div>
 
         <Card>
@@ -213,6 +289,9 @@ export default function OnlineOrders() {
                   onAssignDelivery={handleAssignDelivery}
                   onOrderUpdate={handleOrderUpdate}
                   onReturn={handleReturn}
+                  selectedOrders={selectedOrders}
+                  onSelectOrder={handleSelectOrder}
+                  onSelectAll={handleSelectAll}
                 />
               </div>
             )}

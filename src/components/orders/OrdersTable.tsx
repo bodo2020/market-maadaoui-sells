@@ -20,6 +20,9 @@ interface OrdersTableProps {
   onAssignDelivery: (order: Order) => void;
   onOrderUpdate?: () => void;
   onReturn?: (order: Order) => void;
+  selectedOrders?: string[];
+  onSelectOrder?: (orderId: string) => void;
+  onSelectAll?: () => void;
 }
 
 export function OrdersTable({
@@ -32,7 +35,10 @@ export function OrdersTable({
   onPaymentConfirm,
   onAssignDelivery,
   onOrderUpdate,
-  onReturn
+  onReturn,
+  selectedOrders = [],
+  onSelectOrder,
+  onSelectAll
 }: OrdersTableProps) {
   const navigate = useNavigate();
 
@@ -59,31 +65,43 @@ export function OrdersTable({
   };
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-10 text-center">
-            <Checkbox />
-          </TableHead>
-          <TableHead className="text-right">#</TableHead>
-          <TableHead className="text-right">التاريخ</TableHead>
-          <TableHead className="text-right">العميل</TableHead>
-          <TableHead className="text-center">المبلغ</TableHead>
-          <TableHead className="text-center">حالة الدفع</TableHead>
-          <TableHead className="text-center">حالة الطلب</TableHead>
-          <TableHead className="text-center cursor-pointer">العناصر</TableHead>
-          <TableHead className="text-center">الإجراءات</TableHead>
-        </TableRow>
-      </TableHeader>
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead className="w-10 text-center border-l">
+              <Checkbox 
+                checked={selectedOrders.length === orders.length && orders.length > 0}
+                onCheckedChange={onSelectAll}
+                aria-label="تحديد الكل"
+              />
+            </TableHead>
+            <TableHead className="text-right font-semibold border-l">#</TableHead>
+            <TableHead className="text-right font-semibold border-l">التاريخ</TableHead>
+            <TableHead className="text-right font-semibold border-l">العميل</TableHead>
+            <TableHead className="text-right font-semibold border-l">الموقع</TableHead>
+            <TableHead className="text-center font-semibold border-l">المبلغ</TableHead>
+            <TableHead className="text-center font-semibold border-l">حالة الدفع</TableHead>
+            <TableHead className="text-center font-semibold border-l">حالة الطلب</TableHead>
+            <TableHead className="text-center font-semibold border-l">العناصر</TableHead>
+            <TableHead className="text-center font-semibold">الإجراءات</TableHead>
+          </TableRow>
+        </TableHeader>
       <TableBody>
-        {orders.map((order) => (
+        {orders.map((order, index) => (
           <TableRow 
             key={order.id} 
-            className="cursor-pointer hover:bg-muted/50"
+            className={`cursor-pointer transition-colors hover:bg-muted/50 ${
+              selectedOrders.includes(order.id) ? 'bg-primary/5 border-primary/20' : ''
+            } ${index % 2 === 0 ? 'bg-muted/20' : ''}`}
             onClick={() => handleRowClick(order.id)}
           >
-            <TableCell className="text-center">
-              <Checkbox />
+            <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+              <Checkbox 
+                checked={selectedOrders.includes(order.id)}
+                onCheckedChange={() => onSelectOrder?.(order.id)}
+                aria-label={`تحديد الطلب ${order.id}`}
+              />
             </TableCell>
             <TableCell className="font-medium">#{order.id.slice(0, 8)}</TableCell>
             <TableCell className="whitespace-nowrap">
@@ -100,6 +118,14 @@ export function OrdersTable({
               >
                 {order.customer_name || 'عميل غير معروف'}
               </Button>
+            </TableCell>
+            <TableCell className="text-right">
+              <div className="text-sm space-y-1">
+                {order.governorate && <div className="text-muted-foreground">{order.governorate}</div>}
+                {order.city && <div className="text-xs">{order.city}</div>}
+                {order.area && <div className="text-xs text-muted-foreground">{order.area}</div>}
+                {order.neighborhood && <div className="text-xs text-muted-foreground">{order.neighborhood}</div>}
+              </div>
             </TableCell>
             <TableCell className="text-center">{order.total} ج.م</TableCell>
             <TableCell className="text-center">
@@ -129,5 +155,6 @@ export function OrdersTable({
         ))}
       </TableBody>
     </Table>
+    </div>
   );
 }

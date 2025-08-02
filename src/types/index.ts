@@ -243,4 +243,9 @@ export interface Order {
   tracking_number?: string | null;
   delivery_person?: string | null;
   return_status?: 'none' | 'partial' | 'full';
+  // Location data
+  governorate?: string;
+  city?: string;
+  area?: string;
+  neighborhood?: string;
 }

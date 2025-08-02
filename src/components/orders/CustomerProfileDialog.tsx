@@ -14,6 +14,10 @@ interface CustomerProfileProps {
     email?: string;
     phone?: string;
     address?: string;
+    governorate?: string;
+    city?: string;
+    area?: string;
+    neighborhood?: string;
     order: Order;
   } | null;
   open: boolean;
@@ -87,12 +91,40 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
               )}
             </div>
             
-            {customer.address && (
+            {(customer.governorate || customer.city || customer.area || customer.neighborhood || customer.address) && (
               <div className="space-y-4">
-                <h4 className="text-lg font-medium">عنوان الشحن</h4>
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-                  <p>{customer.address}</p>
+                <h4 className="text-lg font-medium">معلومات الموقع</h4>
+                <div className="space-y-2">
+                  {customer.governorate && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-muted-foreground">المحافظة:</span>
+                      <span>{customer.governorate}</span>
+                    </div>
+                  )}
+                  {customer.city && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-muted-foreground">المدينة:</span>
+                      <span>{customer.city}</span>
+                    </div>
+                  )}
+                  {customer.area && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-muted-foreground">المنطقة:</span>
+                      <span>{customer.area}</span>
+                    </div>
+                  )}
+                  {customer.neighborhood && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-muted-foreground">الحي:</span>
+                      <span>{customer.neighborhood}</span>
+                    </div>
+                  )}
+                  {customer.address && (
+                    <div className="flex items-start gap-2 mt-3 pt-3 border-t">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                      <p>{customer.address}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

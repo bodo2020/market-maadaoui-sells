@@ -149,7 +149,11 @@ export const useOrderManagement = (activeTab: string) => {
             name,
             phone,
             email,
-            phone_verified
+            phone_verified,
+            governorates (name),
+            cities (name),
+            areas (name),
+            neighborhoods (name)
           )
         `)
         .order('created_at', {
@@ -202,7 +206,11 @@ export const useOrderManagement = (activeTab: string) => {
         notes: item.notes || '',
         tracking_number: item.tracking_number || null,
         delivery_person: item.delivery_person || null,
-        return_status: item.return_status || 'none'
+        return_status: item.return_status || 'none',
+        governorate: item.customers?.governorates?.name || '',
+        city: item.customers?.cities?.name || '',
+        area: item.customers?.areas?.name || '',
+        neighborhood: item.customers?.neighborhoods?.name || ''
       }));
       
       setOrders(transformedOrders);
