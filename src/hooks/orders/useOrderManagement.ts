@@ -187,31 +187,78 @@ export const useOrderManagement = (activeTab: string) => {
       const { data, error } = await query;
       if (error) throw error;
       
+      
       console.log(`Fetched ${data?.length || 0} orders for tab ${activeTab}`, data);
       
-      const transformedOrders: Order[] = (data || []).map((item: any) => ({
-        id: item.id,
-        created_at: item.created_at,
-        total: item.total,
-        status: validateOrderStatus(item.status),
-        payment_status: validatePaymentStatus(item.payment_status),
-        payment_method: item.payment_method,
-        shipping_address: item.shipping_address,
-        items: Array.isArray(item.items) ? item.items : [],
-        customer_id: item.customer_id,
-        customer_name: item.customers?.name || '',
-        customer_email: item.customers?.email || '',
-        customer_phone: item.customers?.phone || '',
-        customer_phone_verified: Boolean(item.customers?.phone_verified),
-        notes: item.notes || '',
-        tracking_number: item.tracking_number || null,
-        delivery_person: item.delivery_person || null,
-        return_status: item.return_status || 'none',
-        governorate: '',
-        city: '',
-        area: '',
-        neighborhood: ''
-      }));
+      const transformedOrders: Order[] = [];
+      
+      for (const item of data || []) {
+        let governorate = '';
+        let city = '';
+        let area = '';
+        let neighborhood = '';
+        
+        // Fetch location names if IDs exist
+        if (item.customers?.governorate_id) {
+          const { data: govData } = await supabase
+            .from('governorates')
+            .select('name')
+            .eq('id', item.customers.governorate_id)
+            .single();
+          governorate = govData?.name || '';
+        }
+        
+        if (item.customers?.city_id) {
+          const { data: cityData } = await supabase
+            .from('cities')
+            .select('name')
+            .eq('id', item.customers.city_id)
+            .single();
+          city = cityData?.name || '';
+        }
+        
+        if (item.customers?.area_id) {
+          const { data: areaData } = await supabase
+            .from('areas')
+            .select('name')
+            .eq('id', item.customers.area_id)
+            .single();
+          area = areaData?.name || '';
+        }
+        
+        if (item.customers?.neighborhood_id) {
+          const { data: neighborhoodData } = await supabase
+            .from('neighborhoods')
+            .select('name')
+            .eq('id', item.customers.neighborhood_id)
+            .single();
+          neighborhood = neighborhoodData?.name || '';
+        }
+        
+        transformedOrders.push({
+          id: item.id,
+          created_at: item.created_at,
+          total: item.total,
+          status: validateOrderStatus(item.status),
+          payment_status: validatePaymentStatus(item.payment_status),
+          payment_method: item.payment_method,
+          shipping_address: item.shipping_address,
+          items: Array.isArray(item.items) ? item.items as any[] : [],
+          customer_id: item.customer_id,
+          customer_name: item.customers?.name || '',
+          customer_email: item.customers?.email || '',
+          customer_phone: item.customers?.phone || '',
+          customer_phone_verified: Boolean(item.customers?.phone_verified),
+          notes: item.notes || '',
+          tracking_number: item.tracking_number || null,
+          delivery_person: item.delivery_person || null,
+          return_status: (item.return_status === 'partial' || item.return_status === 'full') ? item.return_status : 'none',
+          governorate,
+          city,
+          area,
+          neighborhood
+        });
+      }
       
       setOrders(transformedOrders);
     } catch (error) {
