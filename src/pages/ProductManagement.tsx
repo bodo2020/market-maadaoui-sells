@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { Dialog as ShadcnDialog } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import ProductAssignmentDialog from "@/components/products/ProductAssignmentDialog";
 import { BarcodeGenerator } from "@/components/products/BarcodeGenerator";
+import { BrowserMultiFormatReader } from "@zxing/library";
 export default function ProductManagement() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
@@ -44,6 +45,9 @@ export default function ProductManagement() {
   const [productToAddOffer, setProductToAddOffer] = useState<Product | null>(null);
   const [isAssignCategoryOpen, setIsAssignCategoryOpen] = useState(false);
   const [isAssignCompanyOpen, setIsAssignCompanyOpen] = useState(false);
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const {
     toast
   } = useToast();
@@ -274,8 +278,58 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
+  const startCameraScanner = async () => {
+    try {
+      setIsCameraScannerOpen(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' } 
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        
+        readerRef.current = new BrowserMultiFormatReader();
+        
+        readerRef.current.decodeFromVideoDevice(undefined, videoRef.current, (result, error) => {
+          if (result) {
+            const scannedText = result.getText();
+            setSearch(scannedText);
+            stopCameraScanner();
+            toast({
+              title: "تم مسح الباركود",
+              description: `الباركود: ${scannedText}`,
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error starting camera scanner:', error);
+      toast({
+        title: "خطأ",
+        description: "لا يمكن الوصول إلى الكاميرا",
+        variant: "destructive"
+      });
+      setIsCameraScannerOpen(false);
+    }
+  };
+
+  const stopCameraScanner = () => {
+    if (readerRef.current) {
+      readerRef.current.reset();
+    }
+    
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    
+    setIsCameraScannerOpen(false);
+  };
+
   const handleBarcodeScanning = () => {
-    setIsBarcodeDialogOpen(true);
+    startCameraScanner();
   };
   const validateWeightBarcode = (barcode: string) => {
     if (!/^\d{1,6}$/.test(barcode)) {
@@ -618,5 +672,35 @@ export default function ProductManagement() {
       <ProductAssignmentDialog open={isAssignCategoryOpen} onOpenChange={setIsAssignCategoryOpen} product={productToEdit} onSaved={loadProducts} type="category" />
       
       <ProductAssignmentDialog open={isAssignCompanyOpen} onOpenChange={setIsAssignCompanyOpen} product={productToEdit} onSaved={loadProducts} type="company" />
+      
+      <Dialog open={isCameraScannerOpen} onOpenChange={stopCameraScanner}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>ماسح الباركود</DialogTitle>
+            <DialogDescription>
+              وجه الكاميرا نحو الباركود لمسحه تلقائياً
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+              <video
+                ref={videoRef}
+                className="w-full h-full object-cover"
+                autoPlay
+                playsInline
+                muted
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="border-2 border-white border-dashed w-64 h-32 rounded-lg opacity-50"></div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={stopCameraScanner}>
+              إلغاء
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>;
 }
