@@ -37,11 +37,11 @@ export function OrderStats({ orders, activeTab, onTabChange }: OrderStatsProps) 
         <Badge className="mr-2 bg-green-500">{getOrdersCount('ready')}</Badge>
       </button>
       <button
-        onClick={() => onTabChange("shipped")}
-        className={`font-semibold p-2 ${activeTab === "shipped" ? "bg-blue-500 text-white" : ""}`}
+        onClick={() => onTabChange("done")}
+        className={`font-semibold p-2 ${activeTab === "done" ? "bg-gray-500 text-white" : ""}`}
       >
-        تم الشحن
-        <Badge className="mr-2 bg-blue-500">{getOrdersCount('shipped')}</Badge>
+        مكتمل
+        <Badge className="mr-2 bg-gray-500">{getOrdersCount('done')}</Badge>
       </button>
       <button
         onClick={() => onTabChange("cancelled")}
