@@ -48,7 +48,7 @@ export function useOrderDetails(orderId: string) {
       
       if (data) {
         const validateOrderStatus = (status: string): Order['status'] => {
-          const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
+          const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done', 'cancelled'];
           return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
         };
         
@@ -221,7 +221,8 @@ export function useOrderDetails(orderId: string) {
       toast.success(`تم تحديث حالة الطلب إلى ${
         selectedStatus === 'waiting' ? 'في الانتظار' : 
         selectedStatus === 'ready' ? 'جاهز للشحن' : 
-        selectedStatus === 'shipped' ? 'تم الشحن' : 'تم التسليم'
+        selectedStatus === 'shipped' ? 'تم الشحن' : 
+        selectedStatus === 'cancelled' ? 'ملغي' : 'تم التسليم'
       }`);
       
       setSelectedStatus(null);

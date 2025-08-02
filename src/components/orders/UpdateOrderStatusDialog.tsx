@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Check, Clock, Package, Truck } from "lucide-react";
+import { Check, Clock, Package, Truck, X } from "lucide-react";
 import { Order } from "@/types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -154,7 +154,8 @@ export function UpdateOrderStatusDialog({
     { value: 'waiting', label: 'في الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
     { value: 'ready', label: 'جاهز', icon: <Package className="h-4 w-4 text-green-500" /> },
     { value: 'shipped', label: 'تم الشحن', icon: <Truck className="h-4 w-4 text-blue-500" /> },
-    { value: 'done', label: 'مكتمل', icon: <Check className="h-4 w-4 text-gray-500" /> }
+    { value: 'done', label: 'مكتمل', icon: <Check className="h-4 w-4 text-gray-500" /> },
+    { value: 'cancelled', label: 'ملغي', icon: <X className="h-4 w-4 text-red-500" /> }
   ];
 
   const getStatusClass = (statusValue: Order['status']) => {
@@ -162,7 +163,8 @@ export function UpdateOrderStatusDialog({
       waiting: 'border-amber-500 hover:bg-amber-50',
       ready: 'border-green-500 hover:bg-green-50',
       shipped: 'border-blue-500 hover:bg-blue-50',
-      done: 'border-gray-500 hover:bg-gray-50'
+      done: 'border-gray-500 hover:bg-gray-50',
+      cancelled: 'border-red-500 hover:bg-red-50'
     };
     return classes[statusValue] || '';
   };

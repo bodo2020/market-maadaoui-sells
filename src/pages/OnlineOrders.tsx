@@ -111,7 +111,7 @@ export default function OnlineOrders() {
       
       const { error } = await supabase.from('online_orders')
         .update({
-          status: 'done',
+          status: 'cancelled',
           notes,
           updated_at: new Date().toISOString()
         })
@@ -182,7 +182,7 @@ export default function OnlineOrders() {
       const { error } = await supabase
         .from('online_orders')
         .update({
-          status: 'done',
+          status: 'cancelled',
           notes: 'تم إلغاء هذا الطلب - إلغاء جماعي',
           updated_at: new Date().toISOString()
         })

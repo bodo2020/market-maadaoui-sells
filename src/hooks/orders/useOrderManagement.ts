@@ -129,7 +129,7 @@ export const useOrderManagement = (activeTab: string) => {
   };
 
   const validateOrderStatus = (status: string): Order['status'] => {
-    const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done'];
+    const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done', 'cancelled'];
     return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
   };
 
@@ -168,6 +168,8 @@ export const useOrderManagement = (activeTab: string) => {
         query = query.eq('status', 'shipped');
       } else if (activeTab === "done") {
         query = query.eq('status', 'done');
+      } else if (activeTab === "cancelled") {
+        query = query.eq('status', 'cancelled');
       } else if (activeTab === "unpaid") {
         query = query.eq('payment_status', 'pending');
       } else if (activeTab === "returns") {
@@ -192,48 +194,38 @@ export const useOrderManagement = (activeTab: string) => {
       
       const transformedOrders: Order[] = [];
       
+      // Batch fetch all location data to improve performance
+      const allGovernorateIds = [...new Set(data?.map(item => item.customers?.governorate_id).filter(Boolean))];
+      const allCityIds = [...new Set(data?.map(item => item.customers?.city_id).filter(Boolean))];
+      const allAreaIds = [...new Set(data?.map(item => item.customers?.area_id).filter(Boolean))];
+      const allNeighborhoodIds = [...new Set(data?.map(item => item.customers?.neighborhood_id).filter(Boolean))];
+      
+      // Fetch all location names in parallel
+      const [governoratesData, citiesData, areasData, neighborhoodsData] = await Promise.all([
+        allGovernorateIds.length > 0 ? supabase.from('governorates').select('id, name').in('id', allGovernorateIds) : Promise.resolve({ data: [] }),
+        allCityIds.length > 0 ? supabase.from('cities').select('id, name').in('id', allCityIds) : Promise.resolve({ data: [] }),
+        allAreaIds.length > 0 ? supabase.from('areas').select('id, name').in('id', allAreaIds) : Promise.resolve({ data: [] }),
+        allNeighborhoodIds.length > 0 ? supabase.from('neighborhoods').select('id, name').in('id', allNeighborhoodIds) : Promise.resolve({ data: [] })
+      ]);
+      
+      // Create lookup maps for fast access
+      const governorateMap = new Map<string, string>();
+      governoratesData.data?.forEach(g => governorateMap.set(g.id, g.name));
+      
+      const cityMap = new Map<string, string>();
+      citiesData.data?.forEach(c => cityMap.set(c.id, c.name));
+      
+      const areaMap = new Map<string, string>();
+      areasData.data?.forEach(a => areaMap.set(a.id, a.name));
+      
+      const neighborhoodMap = new Map<string, string>();
+      neighborhoodsData.data?.forEach(n => neighborhoodMap.set(n.id, n.name));
+      
       for (const item of data || []) {
-        let governorate = '';
-        let city = '';
-        let area = '';
-        let neighborhood = '';
-        
-        // Fetch location names if IDs exist
-        if (item.customers?.governorate_id) {
-          const { data: govData } = await supabase
-            .from('governorates')
-            .select('name')
-            .eq('id', item.customers.governorate_id)
-            .single();
-          governorate = govData?.name || '';
-        }
-        
-        if (item.customers?.city_id) {
-          const { data: cityData } = await supabase
-            .from('cities')
-            .select('name')
-            .eq('id', item.customers.city_id)
-            .single();
-          city = cityData?.name || '';
-        }
-        
-        if (item.customers?.area_id) {
-          const { data: areaData } = await supabase
-            .from('areas')
-            .select('name')
-            .eq('id', item.customers.area_id)
-            .single();
-          area = areaData?.name || '';
-        }
-        
-        if (item.customers?.neighborhood_id) {
-          const { data: neighborhoodData } = await supabase
-            .from('neighborhoods')
-            .select('name')
-            .eq('id', item.customers.neighborhood_id)
-            .single();
-          neighborhood = neighborhoodData?.name || '';
-        }
+        const governorate = governorateMap.get(item.customers?.governorate_id) || '';
+        const city = cityMap.get(item.customers?.city_id) || '';
+        const area = areaMap.get(item.customers?.area_id) || '';
+        const neighborhood = neighborhoodMap.get(item.customers?.neighborhood_id) || '';
         
         transformedOrders.push({
           id: item.id,

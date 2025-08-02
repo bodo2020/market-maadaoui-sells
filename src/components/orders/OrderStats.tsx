@@ -14,7 +14,7 @@ export function OrderStats({ orders, activeTab, onTabChange }: OrderStatsProps) 
   };
 
   return (
-    <div className="grid grid-cols-4 mb-4">
+    <div className="grid grid-cols-5 mb-4">
       <button
         onClick={() => onTabChange("all")}
         className={`relative font-semibold p-2 ${activeTab === "all" ? "bg-primary text-white" : ""}`}
@@ -42,6 +42,13 @@ export function OrderStats({ orders, activeTab, onTabChange }: OrderStatsProps) 
       >
         تم الشحن
         <Badge className="mr-2 bg-blue-500">{getOrdersCount('shipped')}</Badge>
+      </button>
+      <button
+        onClick={() => onTabChange("cancelled")}
+        className={`font-semibold p-2 ${activeTab === "cancelled" ? "bg-red-500 text-white" : ""}`}
+      >
+        ملغي
+        <Badge className="mr-2 bg-red-500">{getOrdersCount('cancelled')}</Badge>
       </button>
     </div>
   );

@@ -229,7 +229,7 @@ export interface Order {
   id: string;
   created_at: string;
   total: number;
-  status: 'waiting' | 'ready' | 'shipped' | 'done';
+  status: 'waiting' | 'ready' | 'shipped' | 'done' | 'cancelled';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   payment_method: string;
   shipping_address?: string;

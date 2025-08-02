@@ -1746,7 +1746,7 @@ export type Database = {
     }
     Enums: {
       order_payment_status: "pending" | "paid" | "failed" | "refunded"
-      order_status: "waiting" | "ready" | "shipped" | "done"
+      order_status: "waiting" | "ready" | "shipped" | "done" | "cancelled"
       register_type: "store" | "online"
       return_request_status: "pending" | "approved" | "rejected"
     }
@@ -1877,7 +1877,7 @@ export const Constants = {
   public: {
     Enums: {
       order_payment_status: ["pending", "paid", "failed", "refunded"],
-      order_status: ["waiting", "ready", "shipped", "done"],
+      order_status: ["waiting", "ready", "shipped", "done", "cancelled"],
       register_type: ["store", "online"],
       return_request_status: ["pending", "approved", "rejected"],
     },
