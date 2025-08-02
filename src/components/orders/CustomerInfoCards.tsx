@@ -65,48 +65,40 @@ export function CustomerInfoCards({
         </CardContent>
       </Card>
       
-      {(governorate || city || area || neighborhood || shippingAddress) && (
-        <Card>
-          <CardContent className="p-5">
-            <h4 className="text-base font-medium text-gray-700 mb-2 flex items-center gap-1">
-              <MapPin className="w-4 h-4" />
-              معلومات الموقع
-            </h4>
-            <div className="space-y-2 text-[15px]">
-              {governorate && (
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-600">المحافظة:</span>
-                  <span>{governorate}</span>
-                </div>
-              )}
-              {city && (
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-600">المدينة:</span>
-                  <span>{city}</span>
-                </div>
-              )}
-              {area && (
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-600">المنطقة:</span>
-                  <span>{area}</span>
-                </div>
-              )}
-              {neighborhood && (
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-600">الحي:</span>
-                  <span>{neighborhood}</span>
-                </div>
-              )}
-              {shippingAddress && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <span className="font-medium text-gray-600">العنوان التفصيلي:</span>
-                  <p className="mt-1">{shippingAddress}</p>
-                </div>
-              )}
+      <Card>
+        <CardContent className="p-5">
+          <h4 className="text-base font-medium text-gray-700 mb-2 flex items-center gap-1">
+            <MapPin className="w-4 h-4" />
+            معلومات الموقع والعنوان
+          </h4>
+          <div className="space-y-3 text-[15px]">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-600 min-w-[70px]">المحافظة:</span>
+              <span className="text-gray-800">{governorate || 'غير محدد'}</span>
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-600 min-w-[70px]">المدينة:</span>
+              <span className="text-gray-800">{city || 'غير محدد'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-600 min-w-[70px]">المنطقة:</span>
+              <span className="text-gray-800">{area || 'غير محدد'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-600 min-w-[70px]">الحي:</span>
+              <span className="text-gray-800">{neighborhood || 'غير محدد'}</span>
+            </div>
+            {shippingAddress && (
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <div className="flex items-start gap-2">
+                  <span className="font-medium text-gray-600 min-w-[70px] mt-0.5">العنوان:</span>
+                  <p className="text-gray-800 leading-relaxed">{shippingAddress}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       
       {notes && (
         <Card>
