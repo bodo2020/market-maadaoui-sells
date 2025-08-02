@@ -18,7 +18,6 @@ import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPe
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
 import { updateProductQuantity } from "@/services/supabase/productService";
-
 export default function OnlineOrders() {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -31,39 +30,35 @@ export default function OnlineOrders() {
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
-
-  const { orders, loading, handleOrderUpdate } = useOrderManagement(activeTab);
-  const { markOrdersAsRead } = useNotificationStore();
+  const {
+    orders,
+    loading,
+    handleOrderUpdate
+  } = useOrderManagement(activeTab);
+  const {
+    markOrdersAsRead
+  } = useNotificationStore();
   const navigate = useNavigate();
-
   const handleArchive = (order: Order) => {
     toast.success("تم أرشفة الطلب");
   };
-
   const handleProcess = (order: Order) => {
     navigate(`/online-orders/${order.id}`);
   };
-
   const handleComplete = async (order: Order) => {
     try {
-      const { data: orderDetails, error: orderError } = await supabase
-        .from('online_orders')
-        .select('*')
-        .eq('id', order.id)
-        .single();
-        
+      const {
+        data: orderDetails,
+        error: orderError
+      } = await supabase.from('online_orders').select('*').eq('id', order.id).single();
       if (orderError) throw orderError;
-      
       const orderItems = Array.isArray(orderDetails.items) ? orderDetails.items : [];
-      
       for (const item of orderItems) {
         const orderItem = item as unknown as OrderItem;
-        
         if (!orderItem.product_id) {
           console.error("Invalid order item missing product_id:", item);
           continue;
         }
-        
         try {
           await updateProductQuantity(orderItem.product_id, orderItem.quantity || 0, 'decrease');
           console.log(`Updated inventory for product ${orderItem.product_id}: decreased by ${orderItem.quantity}`);
@@ -72,30 +67,21 @@ export default function OnlineOrders() {
           continue;
         }
       }
-      
       if (orderDetails.payment_status === 'paid') {
         try {
-          await recordCashTransaction(
-            orderDetails.total, 
-            'deposit', 
-            RegisterType.ONLINE, 
-            `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-            ''
-          );
+          await recordCashTransaction(orderDetails.total, 'deposit', RegisterType.ONLINE, `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, '');
           console.log(`Added ${orderDetails.total} to online cash register`);
         } catch (cashError) {
           console.error("Error recording cash transaction:", cashError);
           toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
         }
       }
-
-      const { error } = await supabase.from('online_orders')
-        .update({
-          status: 'done',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', order.id);
-        
+      const {
+        error
+      } = await supabase.from('online_orders').update({
+        status: 'done',
+        updated_at: new Date().toISOString()
+      }).eq('id', order.id);
       if (error) throw error;
       handleOrderUpdate();
       toast.success("تم اكتمال الطلب وتحديث المخزون");
@@ -104,19 +90,16 @@ export default function OnlineOrders() {
       toast.error("حدث خطأ أثناء اكتمال الطلب");
     }
   };
-
   const handleCancel = async (order: Order) => {
     try {
       const notes = `${order.notes ? order.notes + ' - ' : ''}تم إلغاء هذا الطلب`;
-      
-      const { error } = await supabase.from('online_orders')
-        .update({
-          status: 'cancelled',
-          notes,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', order.id);
-        
+      const {
+        error
+      } = await supabase.from('online_orders').update({
+        status: 'cancelled',
+        notes,
+        updated_at: new Date().toISOString()
+      }).eq('id', order.id);
       if (error) throw error;
       handleOrderUpdate();
       toast.success("تم إلغاء الطلب");
@@ -125,17 +108,14 @@ export default function OnlineOrders() {
       toast.error("حدث خطأ أثناء إلغاء الطلب");
     }
   };
-
   const handlePaymentConfirm = (order: Order) => {
     setCurrentOrderId(order.id);
     setPaymentConfirmOpen(true);
   };
-
   const handleAssignDelivery = (order: Order) => {
     setCurrentOrderId(order.id);
     setAssignDeliveryOpen(true);
   };
-
   const showCustomerProfile = (order: Order) => {
     setSelectedCustomer({
       name: order.customer_name,
@@ -149,7 +129,6 @@ export default function OnlineOrders() {
       order: order
     });
   };
-
   const handleReturn = async (order: Order) => {
     setReturnOrderId(order.id);
     setReturnItems(order.items);
@@ -164,32 +143,23 @@ export default function OnlineOrders() {
       setSelectedOrders(filteredOrders.map(order => order.id));
     }
   };
-
   const handleSelectOrder = (orderId: string) => {
-    setSelectedOrders(prev => 
-      prev.includes(orderId) 
-        ? prev.filter(id => id !== orderId)
-        : [...prev, orderId]
-    );
+    setSelectedOrders(prev => prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]);
   };
 
   // Bulk cancel selected orders
   const handleBulkCancel = async () => {
     if (selectedOrders.length === 0) return;
-    
     setBulkActionLoading(true);
     try {
-      const { error } = await supabase
-        .from('online_orders')
-        .update({
-          status: 'cancelled',
-          notes: 'تم إلغاء هذا الطلب - إلغاء جماعي',
-          updated_at: new Date().toISOString()
-        })
-        .in('id', selectedOrders);
-        
+      const {
+        error
+      } = await supabase.from('online_orders').update({
+        status: 'cancelled',
+        notes: 'تم إلغاء هذا الطلب - إلغاء جماعي',
+        updated_at: new Date().toISOString()
+      }).in('id', selectedOrders);
       if (error) throw error;
-      
       setSelectedOrders([]);
       handleOrderUpdate();
       toast.success(`تم إلغاء ${selectedOrders.length} طلب بنجاح`);
@@ -200,73 +170,37 @@ export default function OnlineOrders() {
       setBulkActionLoading(false);
     }
   };
-
   const filteredOrders = orders.filter(order => {
     if (!searchQuery) return true;
     const searchLower = searchQuery.toLowerCase();
-    return order.id.toLowerCase().includes(searchLower) || 
-           order.customer_name?.toLowerCase().includes(searchLower) || 
-           order.customer_phone?.toLowerCase().includes(searchLower);
+    return order.id.toLowerCase().includes(searchLower) || order.customer_name?.toLowerCase().includes(searchLower) || order.customer_phone?.toLowerCase().includes(searchLower);
   });
-
-  return (
-    <MainLayout>
+  return <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">الطلبات</h1>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex items-center gap-1">
-              <Download className="h-4 w-4" />
-              استخراج
-            </Button>
-            <Button variant="default" size="sm" className="flex items-center gap-1">
-              <Plus className="h-4 w-4" />
-              أنشئ طلب
-            </Button>
-          </div>
+          
         </div>
 
-        <OrderStats
-          orders={orders}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
+        <OrderStats orders={orders} activeTab={activeTab} onTabChange={setActiveTab} />
 
         <div className="mb-4 flex justify-between items-center">
           <div className="relative w-full max-w-sm">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="البحث والتصنيفات"
-              className="pl-10 pr-10"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
+            <Input placeholder="البحث والتصنيفات" className="pl-10 pr-10" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
           </div>
           
-          {selectedOrders.length > 0 && (
-            <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-lg border">
+          {selectedOrders.length > 0 && <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-lg border">
               <span className="text-sm text-muted-foreground">
                 تم تحديد {selectedOrders.length} طلب
               </span>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={handleBulkCancel}
-                disabled={bulkActionLoading}
-                className="h-8"
-              >
+              <Button size="sm" variant="destructive" onClick={handleBulkCancel} disabled={bulkActionLoading} className="h-8">
                 {bulkActionLoading ? "جاري الإلغاء..." : "إلغاء المحدد"}
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setSelectedOrders([])}
-                className="h-8"
-              >
+              <Button size="sm" variant="outline" onClick={() => setSelectedOrders([])} className="h-8">
                 إلغاء التحديد
               </Button>
-            </div>
-          )}
+            </div>}
         </div>
 
         <Card>
@@ -274,64 +208,21 @@ export default function OnlineOrders() {
             <CardTitle>قائمة الطلبات</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <p className="text-center py-4">جاري التحميل...</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <OrdersTable
-                  orders={filteredOrders}
-                  onShowCustomer={showCustomerProfile}
-                  onArchive={handleArchive}
-                  onCancel={handleCancel}
-                  onProcess={handleProcess}
-                  onComplete={handleComplete}
-                  onPaymentConfirm={handlePaymentConfirm}
-                  onAssignDelivery={handleAssignDelivery}
-                  onOrderUpdate={handleOrderUpdate}
-                  onReturn={handleReturn}
-                  selectedOrders={selectedOrders}
-                  onSelectOrder={handleSelectOrder}
-                  onSelectAll={handleSelectAll}
-                />
-              </div>
-            )}
+            {loading ? <p className="text-center py-4">جاري التحميل...</p> : <div className="overflow-x-auto">
+                <OrdersTable orders={filteredOrders} onShowCustomer={showCustomerProfile} onArchive={handleArchive} onCancel={handleCancel} onProcess={handleProcess} onComplete={handleComplete} onPaymentConfirm={handlePaymentConfirm} onAssignDelivery={handleAssignDelivery} onOrderUpdate={handleOrderUpdate} onReturn={handleReturn} selectedOrders={selectedOrders} onSelectOrder={handleSelectOrder} onSelectAll={handleSelectAll} />
+              </div>}
           </CardContent>
         </Card>
 
-        <CustomerProfileDialog
-          customer={selectedCustomer}
-          open={!!selectedCustomer}
-          onOpenChange={open => !open && setSelectedCustomer(null)}
-        />
+        <CustomerProfileDialog customer={selectedCustomer} open={!!selectedCustomer} onOpenChange={open => !open && setSelectedCustomer(null)} />
 
-        {currentOrderId && (
-          <>
-            <PaymentConfirmationDialog
-              open={paymentConfirmOpen}
-              onOpenChange={setPaymentConfirmOpen}
-              orderId={currentOrderId}
-              onConfirm={handleOrderUpdate}
-            />
+        {currentOrderId && <>
+            <PaymentConfirmationDialog open={paymentConfirmOpen} onOpenChange={setPaymentConfirmOpen} orderId={currentOrderId} onConfirm={handleOrderUpdate} />
             
-            <AssignDeliveryPersonDialog
-              open={assignDeliveryOpen}
-              onOpenChange={setAssignDeliveryOpen}
-              orderId={currentOrderId}
-              onConfirm={handleOrderUpdate}
-            />
-          </>
-        )}
+            <AssignDeliveryPersonDialog open={assignDeliveryOpen} onOpenChange={setAssignDeliveryOpen} orderId={currentOrderId} onConfirm={handleOrderUpdate} />
+          </>}
 
-        {returnOrderId && returnItems.length > 0 && (
-          <ReturnOrderDialog
-            orderId={returnOrderId}
-            items={returnItems}
-            open={returnDialogOpen}
-            onOpenChange={setReturnDialogOpen}
-            onConfirm={handleOrderUpdate}
-          />
-        )}
+        {returnOrderId && returnItems.length > 0 && <ReturnOrderDialog orderId={returnOrderId} items={returnItems} open={returnDialogOpen} onOpenChange={setReturnDialogOpen} onConfirm={handleOrderUpdate} />}
       </div>
-    </MainLayout>
-  );
+    </MainLayout>;
 }
