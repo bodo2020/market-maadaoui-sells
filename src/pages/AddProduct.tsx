@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { fetchProductById, updateProduct, createProduct } from "@/services/supabase/productService";
+import { fetchProductById, updateProduct, createProduct, fetchProductByBarcode } from "@/services/supabase/productService";
 import { Product } from "@/types";
 import { Loader2, Scan } from "lucide-react";
 import { fetchMainCategories } from "@/services/supabase/categoryService";
@@ -141,6 +141,34 @@ export default function AddProduct() {
 
     setLoading(true);
     try {
+      // Check for barcode duplication if barcode is provided
+      if (product.barcode && product.barcode.trim() !== "") {
+        const existingProduct = await fetchProductByBarcode(product.barcode);
+        if (existingProduct && existingProduct.id !== productId) {
+          toast({
+            title: "خطأ - باركود مكرر",
+            description: `يوجد منتج آخر بنفس الباركود: ${existingProduct.name}`,
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Check for bulk barcode duplication if bulk barcode is provided
+      if (product.bulk_barcode && product.bulk_barcode.trim() !== "") {
+        const existingBulkProduct = await fetchProductByBarcode(product.bulk_barcode);
+        if (existingBulkProduct && existingBulkProduct.id !== productId) {
+          toast({
+            title: "خطأ - باركود الجملة مكرر",
+            description: `يوجد منتج آخر بنفس باركود الجملة: ${existingBulkProduct.name}`,
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       const productData = {
         ...product,
         name: product.name, // Ensure name is included and not undefined
