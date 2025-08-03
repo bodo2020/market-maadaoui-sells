@@ -1,24 +1,23 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Plus, Trash2, Edit } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, Edit, FolderPlus, Package } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AddSubcategoryDialog from "./AddSubcategoryDialog";
 import EditSubcategoryDialog from "./EditSubcategoryDialog";
 import { fetchSubcategories, deleteSubcategory } from "@/services/supabase/categoryService";
+import { fetchProductsBySubcategory } from "@/services/supabase/productService";
 import { Subcategory } from "@/types";
 import { toast } from "sonner";
-import AddProductsToSubcategoryDialog from "./AddProductsToSubcategoryDialog";
 
 export default function SubcategoryList() {
   const { id: categoryId } = useParams<{ id: string }>();
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [subcategories, setSubcategories] = useState<(Subcategory & { product_count?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSubcategory, setSelectedSubcategory] = useState<Subcategory | null>(null);
-  const [isProductsDialogOpen, setIsProductsDialogOpen] = useState(false);
 
   useEffect(() => {
     if (categoryId) {
@@ -30,18 +29,37 @@ export default function SubcategoryList() {
     try {
       setLoading(true);
       const data = await fetchSubcategories(categoryId);
-      setSubcategories(data);
+      
+      if (!data || data.length === 0) {
+        setSubcategories([]);
+        return;
+      }
+      
+      const subcategoriesWithCount = await Promise.all(
+        data.map(async (subcategory) => {
+          try {
+            const products = await fetchProductsBySubcategory(subcategory.id);
+            return {
+              ...subcategory,
+              product_count: products ? products.length : 0
+            };
+          } catch (error) {
+            console.error(`Error fetching products for subcategory ${subcategory.id}:`, error);
+            return {
+              ...subcategory,
+              product_count: 0
+            };
+          }
+        })
+      );
+      
+      setSubcategories(subcategoriesWithCount);
     } catch (error) {
       console.error("Error loading subcategories:", error);
       toast.error("حدث خطأ أثناء تحميل الأقسام الفرعية");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleAddProducts = (subcategory: Subcategory) => {
-    setSelectedSubcategory(subcategory);
-    setIsProductsDialogOpen(true);
   };
 
   const handleEdit = (subcategory: Subcategory) => {
@@ -75,49 +93,69 @@ export default function SubcategoryList() {
       ) : (
         <ScrollArea className="h-[500px]">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {subcategories.map((subcategory) => (
-              <Card key={subcategory.id}>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <div className="flex items-center gap-3">
-                    {subcategory.image_url && (
-                      <img 
-                        src={subcategory.image_url} 
-                        alt={subcategory.name}
-                        className="w-12 h-12 object-cover rounded-md"
-                      />
-                    )}
-                    <CardTitle className="text-lg">{subcategory.name}</CardTitle>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleAddProducts(subcategory)}
-                    >
-                      <Plus className="h-4 w-4 ml-2" />
-                      إضافة منتجات
-                    </Button>
+            {subcategories.length > 0 ? subcategories.map((subcategory) => (
+              <div 
+                key={subcategory.id} 
+                className="border rounded-lg overflow-hidden hover:border-primary transition-colors cursor-pointer"
+              >
+                <div className="h-40 bg-gray-100 relative">
+                  {subcategory.image_url ? (
+                    <img 
+                      src={subcategory.image_url} 
+                      alt={subcategory.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <FolderPlus className="h-16 w-16 text-gray-300" />
+                    </div>
+                  )}
+                  <Badge variant="outline" className="absolute top-2 right-2 bg-white">
+                    قسم فرعي
+                  </Badge>
+                  
+                  <Badge variant="secondary" className="absolute top-2 left-2 flex items-center gap-1 bg-white">
+                    <Package className="h-3 w-3" />
+                    {subcategory.product_count || 0} منتج
+                  </Badge>
+                </div>
+                <div className="p-4">
+                  <h3 className="font-semibold text-lg mb-1">{subcategory.name}</h3>
+                  {subcategory.description && (
+                    <p className="text-gray-500 text-sm line-clamp-2">{subcategory.description}</p>
+                  )}
+                  <div className="flex justify-between items-center mt-3">
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      onClick={() => handleEdit(subcategory)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(subcategory);
+                      }}
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-4 w-4 ml-1" />
+                      تعديل
                     </Button>
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => handleDelete(subcategory)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(subcategory);
+                      }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{subcategory.description}</p>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              </div>
+            )) : (
+              <div className="col-span-3 text-center p-8 bg-gray-50 rounded-lg border">
+                <FolderPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <h3 className="text-lg font-medium">لا توجد أقسام فرعية</h3>
+                <p className="text-gray-500 mb-4">يمكنك إضافة أقسام فرعية جديدة من خلال الزر أعلاه</p>
+              </div>
+            )}
           </div>
         </ScrollArea>
       )}
@@ -138,15 +176,6 @@ export default function SubcategoryList() {
         onSuccess={loadSubcategories}
       />
 
-      {selectedSubcategory && (
-        <AddProductsToSubcategoryDialog
-          open={isProductsDialogOpen}
-          onOpenChange={setIsProductsDialogOpen}
-          categoryId={categoryId}
-          subcategoryId={selectedSubcategory.id}
-          onSuccess={loadSubcategories}
-        />
-      )}
     </div>
   );
 }
