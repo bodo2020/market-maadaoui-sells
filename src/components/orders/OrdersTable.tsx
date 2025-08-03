@@ -118,7 +118,6 @@ export function OrdersTable({
             <TableHead className="text-center font-semibold border-l">المبلغ</TableHead>
             <TableHead className="text-center font-semibold border-l">حالة الدفع</TableHead>
             <TableHead className="text-center font-semibold border-l">حالة الطلب</TableHead>
-            <TableHead className="text-center font-semibold border-l">العناصر</TableHead>
             <TableHead className="text-center font-semibold">الإجراءات</TableHead>
           </TableRow>
         </TableHeader>
@@ -176,9 +175,6 @@ export function OrdersTable({
                 order={order} 
                 onStatusChange={onOrderUpdate}
               />
-            </TableCell>
-            <TableCell className="text-center">
-              {order.items?.length || 0}
             </TableCell>
             <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
               <OrderActionsMenu
