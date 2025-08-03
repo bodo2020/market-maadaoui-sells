@@ -17,6 +17,17 @@ export const formatDate = (dateString: string) => {
   }).format(date);
 };
 
+export const formatCompactDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('ar-EG', {
+    year: '2-digit',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  }).format(date);
+};
+
 export const getOrderStatusText = (status: string): string => {
   switch(status) {
     case 'pending': return 'قيد الانتظار';

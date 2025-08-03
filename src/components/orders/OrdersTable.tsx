@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Order } from "@/types";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatCompactDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -139,8 +139,8 @@ export function OrdersTable({
               />
             </TableCell>
             <TableCell className="font-medium">#{order.id.slice(0, 8)}</TableCell>
-            <TableCell className="whitespace-nowrap">
-              {formatDate(order.created_at)}
+            <TableCell className="whitespace-nowrap text-xs">
+              {formatCompactDate(order.created_at)}
             </TableCell>
             <TableCell>
               <div className="flex items-center gap-2">
