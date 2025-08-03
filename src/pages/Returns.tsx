@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { ReturnDetailsDialog } from "@/components/returns/ReturnDetailsDialog";
 import { CreateReturnDialog } from "@/components/returns/CreateReturnDialog";
 import { AddProductToReturnDialog } from "@/components/returns/AddProductToReturnDialog";
+import { InvoiceBasedReturnDialog } from "@/components/returns/InvoiceBasedReturnDialog";
 import { updateProductQuantity } from "@/services/supabase/productService";
 
 // Types
@@ -60,6 +61,7 @@ export default function Returns() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [addProductDialogOpen, setAddProductDialogOpen] = useState(false);
+  const [invoiceReturnDialogOpen, setInvoiceReturnDialogOpen] = useState(false);
   const [returnsRefreshKey, setReturnsRefreshKey] = useState(0);
 
   // Fetch returns data
@@ -268,7 +270,21 @@ export default function Returns() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">إدارة المرتجعات</h1>
           <div className="flex gap-2">
-            <Button variant="default" size="sm" className="flex items-center gap-1" onClick={() => setCreateDialogOpen(true)}>
+            <Button 
+              variant="default" 
+              size="sm" 
+              className="flex items-center gap-1" 
+              onClick={() => setInvoiceReturnDialogOpen(true)}
+            >
+              <Search className="h-4 w-4" />
+              إرجاع بالفاتورة
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center gap-1" 
+              onClick={() => setCreateDialogOpen(true)}
+            >
               <Plus className="h-4 w-4" />
               إضافة مرتجع جديد
             </Button>
@@ -456,6 +472,12 @@ export default function Returns() {
             }}
           />
         )}
+        
+        <InvoiceBasedReturnDialog
+          open={invoiceReturnDialogOpen}
+          onOpenChange={setInvoiceReturnDialogOpen}
+          onSuccess={() => setReturnsRefreshKey(prev => prev + 1)}
+        />
         
         <CreateReturnDialog
           open={createDialogOpen}
