@@ -34,13 +34,13 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  if (!customer) return null;
-
   useEffect(() => {
     if (open && customer) {
       fetchCustomerData();
     }
   }, [open, customer]);
+
+  if (!customer) return null;
 
   const fetchCustomerData = async () => {
     if (!customer.phone && !customer.email) return;
