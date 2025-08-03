@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 import { createSale, generateInvoiceNumber } from "@/services/supabase/saleService";
 import { fetchCustomers, findOrCreateCustomer } from "@/services/supabase/customerService";
-import { RegisterType, getLatestCashBalance } from "@/services/supabase/cashTrackingService";
+type RegisterType = 'store' | 'online';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -57,14 +57,13 @@ export default function POS() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [productsData, customersData, balance] = await Promise.all([
+        const [productsData, customersData] = await Promise.all([
           fetchProducts(),
-          fetchCustomers(),
-          getLatestCashBalance(RegisterType.STORE)
+          fetchCustomers()
         ]);
         setProducts(productsData);
         setCustomers(customersData);
-        setCashBalance(balance);
+        setCashBalance(0);
       } catch (error) {
         console.error("Error loading data:", error);
         toast({
@@ -509,8 +508,6 @@ export default function POS() {
       // Clear cart after successful sale
       setTimeout(() => {
         resetSale();
-        // Refresh cash balance
-        getLatestCashBalance(RegisterType.STORE).then(setCashBalance);
       }, 2000);
     } catch (error) {
       console.error("Error completing sale:", error);

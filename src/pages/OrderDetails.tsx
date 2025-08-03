@@ -13,8 +13,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
 import { updateProduct } from "@/services/supabase/productService";
-import { RegisterType } from "@/services/supabase/cashTrackingService";
-import { recordCashTransaction } from "@/services/supabase/cashTrackingService";
+type RegisterType = 'store' | 'online';
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -105,21 +104,6 @@ export default function OrderDetails() {
           console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
         }
         
-        if (order.payment_status === 'paid') {
-          try {
-            await recordCashTransaction(
-              order.total, 
-              'deposit', 
-              RegisterType.ONLINE, 
-              `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-              ''
-            );
-            console.log(`Added ${order.total} to online cash register`);
-          } catch (cashError) {
-            console.error("Error recording cash transaction:", cashError);
-            toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
-          }
-        }
       }
       
       await originalHandleStatusChange();
@@ -155,21 +139,6 @@ export default function OrderDetails() {
         newStatus === 'failed' ? 'فشل الدفع' : 'تم الاسترجاع'
       }`);
       
-      if (newStatus === 'paid' && order.status === 'done') {
-        try {
-          await recordCashTransaction(
-            order.total, 
-            'deposit', 
-            RegisterType.ONLINE, 
-            `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-            ''
-          );
-          console.log(`Added ${order.total} to online cash register`);
-        } catch (cashError) {
-          console.error("Error recording cash transaction:", cashError);
-          toast.error("تم تحديث حالة الدفع لكن حدث خطأ في تسجيل المعاملة المالية");
-        }
-      }
       
       fetchOrder();
     } catch (error) {

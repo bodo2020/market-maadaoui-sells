@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
 import { updateProduct } from "@/services/supabase/productService";
-import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
+type RegisterType = 'store' | 'online';
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
@@ -109,22 +109,6 @@ export function OrderDetailsDialog({
           console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
         }
         
-        // If the order is marked as paid, add the amount to the online cash register
-        if (order.payment_status === 'paid') {
-          try {
-            await recordCashTransaction(
-              order.total, 
-              'deposit', 
-              RegisterType.ONLINE, 
-              `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-              ''
-            );
-            console.log(`Added ${order.total} to online cash register`);
-          } catch (cashError) {
-            console.error("Error recording cash transaction:", cashError);
-            toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
-          }
-        }
       }
 
       const { error } = await supabase
