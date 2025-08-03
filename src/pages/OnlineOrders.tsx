@@ -15,7 +15,7 @@ import { OrdersTable } from "@/components/orders/OrdersTable";
 import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog";
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
-type RegisterType = 'store' | 'online';
+import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
 import { updateProductQuantity } from "@/services/supabase/productService";
 export default function OnlineOrders() {
@@ -65,6 +65,15 @@ export default function OnlineOrders() {
         } catch (inventoryError) {
           console.error("Error updating inventory:", inventoryError);
           continue;
+        }
+      }
+      if (orderDetails.payment_status === 'paid') {
+        try {
+          await recordCashTransaction(orderDetails.total, 'deposit', RegisterType.ONLINE, `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, '');
+          console.log(`Added ${orderDetails.total} to online cash register`);
+        } catch (cashError) {
+          console.error("Error recording cash transaction:", cashError);
+          toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
         }
       }
       const {

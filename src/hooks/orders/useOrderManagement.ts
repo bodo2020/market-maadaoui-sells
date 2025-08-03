@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Order } from "@/types";
 import { useNotificationStore } from "@/stores/notificationStore";
-type RegisterType = 'store' | 'online';
+import { RegisterType } from "@/services/supabase/cashTrackingService";
 
 export type OrderFromDB = {
   id: string;

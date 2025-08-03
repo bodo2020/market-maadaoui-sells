@@ -8,7 +8,7 @@ import { OrderItem } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { updateProductQuantity } from "@/services/supabase/productService";
-type RegisterType = 'store' | 'online';
+import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 
 interface ReturnOrderDialogProps {
   orderId: string;
@@ -117,6 +117,21 @@ export function ReturnOrderDialog({
 
       // Record the cash transaction for the return (negative amount)
       console.log(`Recording cash transaction: -${totalAmount} for return`);
+      try {
+        // Get current user ID
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        await recordCashTransaction(
+          totalAmount, // Use positive amount 
+          'withdrawal', 
+          RegisterType.ONLINE,
+          `مرتجع للطلب #${orderId.slice(0, 8)}`,
+          user?.id || 'system' // Pass user ID
+        );
+        console.log('Cash transaction recorded successfully');
+      } catch (error) {
+        console.error('Failed to record cash transaction:', error);
+      }
 
       toast.success("تم تسجيل المرتجع بنجاح");
       onConfirm();

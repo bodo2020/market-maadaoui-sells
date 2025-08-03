@@ -16,7 +16,7 @@ import CompanyDetails from "@/pages/CompanyDetails";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Purchases from "@/pages/Purchases";
 import Invoices from "@/pages/Invoices";
-
+import Reports from "@/pages/Reports";
 import Finance from "@/pages/Finance";
 import ExpenseManagement from "@/pages/ExpenseManagement";
 import Settings from "@/pages/Settings";
@@ -24,20 +24,20 @@ import OnlineOrders from "@/pages/OnlineOrders";
 import OrderDetails from "@/pages/OrderDetails";
 import SuppliersCustomers from "@/pages/SuppliersCustomers";
 import EmployeeManagement from "@/pages/EmployeeManagement";
-
+import CashTracking from "@/pages/CashTracking";
 import Banners from "@/pages/Banners";
 import AddBanner from "@/pages/AddBanner";
 import Barcode from "@/pages/Barcode";
 import DeliveryLocationsPage from "@/pages/DeliveryLocationsPage";
 import DeliveryLocations from "@/pages/DeliveryLocations";
-
+import SalesDashboard from "@/pages/SalesDashboard";
 import OffersPage from "@/pages/OffersPage";
 import ProductCollections from "@/pages/ProductCollections";
 import CreateProductCollection from "@/pages/CreateProductCollection";
 import EditProductCollection from "@/pages/EditProductCollection";
 import Returns from "@/pages/Returns";
 import CustomerProfile from "@/pages/CustomerProfile";
-
+import MapPage from "@/pages/MapPage";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
 import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
 
@@ -81,7 +81,7 @@ function App() {
               <Route path="/purchases/:id" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
               <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
               <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
-              
+              <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
               <Route path="/expenses" element={<ProtectedRoute><ExpenseManagement /></ProtectedRoute>} />
               <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
@@ -90,12 +90,12 @@ function App() {
               <Route path="/customer-profile/:customerId" element={<ProtectedRoute><CustomerProfile /></ProtectedRoute>} />
               <Route path="/suppliers-customers" element={<ProtectedRoute><SuppliersCustomers /></ProtectedRoute>} />
               <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
-              
+              <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />
               <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
               <Route path="/banners/add" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
               <Route path="/delivery-locations" element={<ProtectedRoute><DeliveryLocationsPage /></ProtectedRoute>} />
               <Route path="/delivery-locations/:id" element={<ProtectedRoute><DeliveryLocations /></ProtectedRoute>} />
-              
+              <Route path="/sales-dashboard" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
               <Route path="/offers" element={<ProtectedRoute><OffersPage /></ProtectedRoute>} />
               <Route path="/product-collections" element={<ProtectedRoute><ProductCollections /></ProtectedRoute>} />
               <Route path="/product-collections/create" element={<ProtectedRoute><CreateProductCollection /></ProtectedRoute>} />

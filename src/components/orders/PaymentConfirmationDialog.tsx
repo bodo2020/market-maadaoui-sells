@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-type RegisterType = 'store' | 'online';
+import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 
 interface PaymentConfirmationDialogProps {
   open: boolean;
@@ -54,6 +54,26 @@ export function PaymentConfirmationDialog({
       
       if (error) throw error;
       
+      // If the order is already marked as done, add the amount to cash tracking
+      if (orderData.status === 'done') {
+        try {
+          await recordCashTransaction(
+            orderData.total, 
+            'deposit', 
+            RegisterType.ONLINE, 
+            `أمر الدفع من الطلب الإلكتروني #${orderId.slice(0, 8)} - ${
+              paymentMethod === 'cash' ? 'نقداً' : 
+              paymentMethod === 'card' ? 'بطاقة' : 
+              'تحويل بنكي'
+            }`, 
+            ''
+          );
+          console.log(`Added ${orderData.total} to online cash register`);
+        } catch (cashError) {
+          console.error("Error recording cash transaction:", cashError);
+          toast.error("تم تأكيد الدفع لكن حدث خطأ في تسجيل المعاملة المالية");
+        }
+      }
       
       toast.success('تم تأكيد الدفع بنجاح');
       onOpenChange(false);

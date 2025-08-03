@@ -11,13 +11,17 @@ import {
   Truck,
   Users,
   UserCheck,
+  Wallet,
   Image,
   MapPin,
   FolderOpen,
   Tag,
+  TrendingUp,
   DollarSign,
+  FileText,
   RefreshCw,
   Settings,
+  Map,
   QrCode,
 } from "lucide-react";
 import { SidebarItemData, NavigationGroup } from "./types";
@@ -98,6 +102,12 @@ export const adminNavigation: NavigationGroup = {
       adminOnly: true,
     },
     {
+      label: "تتبع النقدية",
+      href: "/cash-tracking",
+      icon: Wallet,
+      adminOnly: true,
+    },
+    {
       label: "الإعلانات",
       href: "/banners",
       icon: Image,
@@ -124,9 +134,19 @@ export const generalNavigation: NavigationGroup = {
   title: "عام",
   items: [
     {
+      label: "المبيعات",
+      href: "/sales-dashboard",
+      icon: TrendingUp,
+    },
+    {
       label: "المالية",
       href: "/finance",
       icon: DollarSign,
+    },
+    {
+      label: "التقارير",
+      href: "/reports",
+      icon: FileText,
     },
     {
       label: "المرتجعات",
@@ -137,6 +157,11 @@ export const generalNavigation: NavigationGroup = {
       label: "الإعدادات",
       href: "/settings",
       icon: Settings,
+    },
+    {
+      label: "الخريطة",
+      href: "/map",
+      icon: Map,
     },
   ],
 };
