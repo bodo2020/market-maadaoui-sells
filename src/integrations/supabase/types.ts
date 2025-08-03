@@ -461,6 +461,7 @@ export type Database = {
           phone_verified: boolean | null
           updated_at: string
           user_id: string | null
+          verified: boolean
         }
         Insert: {
           address?: string | null
@@ -479,6 +480,7 @@ export type Database = {
           phone_verified?: boolean | null
           updated_at?: string
           user_id?: string | null
+          verified?: boolean
         }
         Update: {
           address?: string | null
@@ -497,6 +499,7 @@ export type Database = {
           phone_verified?: boolean | null
           updated_at?: string
           user_id?: string | null
+          verified?: boolean
         }
         Relationships: []
       }
