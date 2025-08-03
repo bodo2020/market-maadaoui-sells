@@ -67,17 +67,19 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
 
       setCustomerData(customerInfo);
 
-      // Fetch all orders for this customer
-      const { data: orders, error: ordersError } = await supabase
-        .from('online_orders')
-        .select('*')
-        .or(`customer_phone.eq.${customer.phone},customer_email.eq.${customer.email}`)
-        .order('created_at', { ascending: false });
+      // Fetch all orders for this customer using customer_id
+      if (customerInfo) {
+        const { data: orders, error: ordersError } = await supabase
+          .from('online_orders')
+          .select('*')
+          .eq('customer_id', customerInfo.id)
+          .order('created_at', { ascending: false });
 
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
-      } else {
-        setCustomerOrders(orders || []);
+        if (ordersError) {
+          console.error('Error fetching orders:', ordersError);
+        } else {
+          setCustomerOrders(orders || []);
+        }
       }
     } catch (error) {
       console.error('Error:', error);
