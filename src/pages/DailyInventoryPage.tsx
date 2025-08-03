@@ -21,7 +21,10 @@ import {
   CheckCircle,
   AlertCircle,
   History,
-  Save
+  Save,
+  Scan,
+  Search,
+  BarChart3
 } from "lucide-react";
 import { fetchProducts } from "@/services/supabase/productService";
 import { 
@@ -36,6 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import * as XLSX from 'exceljs';
+import BarcodeScanner from "@/components/POS/BarcodeScanner";
 
 export default function DailyInventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -43,6 +47,10 @@ export default function DailyInventoryPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [inventoryType, setInventoryType] = useState<'daily' | 'full'>('daily');
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [searchBarcode, setSearchBarcode] = useState('');
+  const [filteredRecords, setFilteredRecords] = useState<InventoryRecord[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
   const currentDate = format(new Date(), 'yyyy-MM-dd');
@@ -50,6 +58,19 @@ export default function DailyInventoryPage() {
   useEffect(() => {
     loadInventoryData();
   }, []);
+
+  useEffect(() => {
+    // تصفية النتائج بناء على البحث بالباركود
+    if (searchBarcode) {
+      const filtered = inventoryRecords.filter(record => 
+        record.products?.barcode?.includes(searchBarcode) ||
+        record.products?.name?.toLowerCase().includes(searchBarcode.toLowerCase())
+      );
+      setFilteredRecords(filtered);
+    } else {
+      setFilteredRecords(inventoryRecords);
+    }
+  }, [searchBarcode, inventoryRecords]);
 
   const loadInventoryData = async () => {
     setLoading(true);
@@ -76,13 +97,22 @@ export default function DailyInventoryPage() {
     }
   };
 
-  const startNewInventory = async () => {
+  const startNewInventory = async (type: 'daily' | 'full' = 'daily') => {
     try {
       const allProducts = await fetchProducts();
-      // اختيار 10-15 منتج عشوائي للجرد اليومي
-      const randomCount = Math.floor(Math.random() * 6) + 10;
-      const shuffled = allProducts.sort(() => 0.5 - Math.random());
-      const selectedProducts = shuffled.slice(0, randomCount);
+      let selectedProducts: Product[];
+      
+      if (type === 'full') {
+        // جرد كامل - كل المنتجات
+        selectedProducts = allProducts;
+        setInventoryType('full');
+      } else {
+        // جرد يومي - اختيار عشوائي
+        const randomCount = Math.floor(Math.random() * 6) + 10;
+        const shuffled = allProducts.sort(() => 0.5 - Math.random());
+        selectedProducts = shuffled.slice(0, randomCount);
+        setInventoryType('daily');
+      }
       
       const inventoryData = selectedProducts.map(product => ({
         product_id: product.id,
@@ -98,13 +128,46 @@ export default function DailyInventoryPage() {
       
       toast({
         title: "تم إنشاء جرد جديد",
-        description: `تم اختيار ${selectedProducts.length} منتج للجرد اليومي`,
+        description: `تم اختيار ${selectedProducts.length} منتج للجرد ${type === 'full' ? 'الكامل' : 'اليومي'}`,
       });
     } catch (error) {
       console.error("Error creating new inventory:", error);
       toast({
         title: "خطأ",
         description: "حدث خطأ أثناء إنشاء الجرد الجديد",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleBarcodeScanned = (barcode: string) => {
+    setSearchBarcode(barcode);
+    setScannerOpen(false);
+    
+    // البحث عن المنتج والتمرير إليه
+    const foundRecord = inventoryRecords.find(record => 
+      record.products?.barcode === barcode
+    );
+    
+    if (foundRecord) {
+      // التمرير إلى العنصر
+      const element = document.getElementById(`record-${foundRecord.id}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.style.backgroundColor = '#fef3c7';
+        setTimeout(() => {
+          element.style.backgroundColor = '';
+        }, 2000);
+      }
+      
+      toast({
+        title: "تم العثور على المنتج",
+        description: foundRecord.products?.name || 'منتج غير معروف',
+      });
+    } else {
+      toast({
+        title: "لم يتم العثور على المنتج",
+        description: "هذا المنتج غير موجود في قائمة الجرد الحالية",
         variant: "destructive"
       });
     }
@@ -154,16 +217,21 @@ export default function DailyInventoryPage() {
     setExporting(true);
     try {
       const workbook = new XLSX.Workbook();
-      const worksheet = workbook.addWorksheet('تقرير الجرد اليومي');
+      const worksheet = workbook.addWorksheet('تقرير الجرد');
 
-      // إعداد خصائص الصفحة
+      // إعداد خصائص الصفحة للـ RTL
       worksheet.properties.defaultRowHeight = 25;
+      worksheet.views = [{
+        rightToLeft: true,
+        showGridLines: true
+      }];
 
       // إضافة العنوان الرئيسي
       const currentDate = format(new Date(), 'yyyy-MM-dd', { locale: ar });
+      const inventoryTypeText = inventoryType === 'full' ? 'الكامل' : 'اليومي';
       worksheet.mergeCells('A1:F3');
       const titleCell = worksheet.getCell('A1');
-      titleCell.value = `تقرير الجرد اليومي\nتاريخ: ${currentDate}`;
+      titleCell.value = `تقرير الجرد ${inventoryTypeText}\nتاريخ: ${currentDate}`;
       titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       titleCell.font = { size: 16, bold: true };
       titleCell.fill = {
@@ -172,8 +240,8 @@ export default function DailyInventoryPage() {
         fgColor: { argb: 'FFE0E0E0' }
       };
 
-      // إضافة رؤوس الأعمدة
-      const headers = ['اسم المنتج', 'الباركود', 'الكمية المتوقعة', 'الكمية الفعلية', 'الفرق', 'الحالة'];
+      // إضافة رؤوس الأعمدة بترتيب RTL
+      const headers = ['الحالة', 'الفرق', 'الكمية الفعلية', 'الكمية المتوقعة', 'الباركود', 'اسم المنتج'];
       const headerRow = worksheet.getRow(5);
       headers.forEach((header, index) => {
         const cell = headerRow.getCell(index + 1);
@@ -193,18 +261,19 @@ export default function DailyInventoryPage() {
         };
       });
 
-      // إضافة البيانات
+      // إضافة البيانات بترتيب RTL
       const completedItems = inventoryRecords.filter(record => record.status !== 'pending');
       completedItems.forEach((record, index) => {
         const row = worksheet.getRow(6 + index);
         const statusText = record.status === 'checked' ? 'مطابق' : 'يوجد اختلاف';
         
-        row.getCell(1).value = record.products?.name || '';
-        row.getCell(2).value = record.products?.barcode || '-';
-        row.getCell(3).value = record.expected_quantity;
-        row.getCell(4).value = record.actual_quantity;
-        row.getCell(5).value = record.difference;
-        row.getCell(6).value = statusText;
+        // ترتيب البيانات من اليمين لليسار
+        row.getCell(1).value = statusText; // الحالة
+        row.getCell(2).value = record.difference; // الفرق
+        row.getCell(3).value = record.actual_quantity; // الكمية الفعلية
+        row.getCell(4).value = record.expected_quantity; // الكمية المتوقعة
+        row.getCell(5).value = record.products?.barcode || '-'; // الباركود
+        row.getCell(6).value = record.products?.name || ''; // اسم المنتج
 
         // تنسيق الصفوف
         for (let i = 1; i <= 6; i++) {
@@ -218,7 +287,7 @@ export default function DailyInventoryPage() {
           };
 
           // تلوين خلايا الحالة
-          if (i === 6) {
+          if (i === 1) { // عمود الحالة
             if (record.status === 'checked') {
               cell.fill = {
                 type: 'pattern',
@@ -273,13 +342,13 @@ export default function DailyInventoryPage() {
         cell.font = { size: 11 };
       });
 
-      // تعيين عرض الأعمدة
-      worksheet.getColumn(1).width = 25; // اسم المنتج
-      worksheet.getColumn(2).width = 15; // الباركود
-      worksheet.getColumn(3).width = 15; // الكمية المتوقعة
-      worksheet.getColumn(4).width = 15; // الكمية الفعلية
-      worksheet.getColumn(5).width = 10; // الفرق
-      worksheet.getColumn(6).width = 15; // الحالة
+      // تعيين عرض الأعمدة بترتيب RTL
+      worksheet.getColumn(1).width = 15; // الحالة
+      worksheet.getColumn(2).width = 10; // الفرق
+      worksheet.getColumn(3).width = 15; // الكمية الفعلية
+      worksheet.getColumn(4).width = 15; // الكمية المتوقعة
+      worksheet.getColumn(5).width = 15; // الباركود
+      worksheet.getColumn(6).width = 25; // اسم المنتج
 
       // تصدير الملف
       const buffer = await workbook.xlsx.writeBuffer();
@@ -290,7 +359,7 @@ export default function DailyInventoryPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `تقرير_الجرد_${currentDate}.xlsx`;
+      link.download = `تقرير_الجرد_${inventoryTypeText}_${currentDate}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -361,11 +430,20 @@ export default function DailyInventoryPage() {
             
             <Button 
               variant="outline" 
-              onClick={startNewInventory}
+              onClick={() => startNewInventory('daily')}
               disabled={loading}
             >
               <RefreshCw className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              جرد جديد
+              جرد يومي
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => startNewInventory('full')}
+              disabled={loading}
+            >
+              <BarChart3 className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              جرد كامل
             </Button>
             
             <Button 
@@ -424,9 +502,34 @@ export default function DailyInventoryPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Calendar className="ml-2 h-5 w-5" />
-              منتجات الجرد اليومي
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Calendar className="ml-2 h-5 w-5" />
+                منتجات الجرد {inventoryType === 'full' ? 'الكامل' : 'اليومي'}
+              </div>
+              
+              {inventoryType === 'full' && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setScannerOpen(true)}
+                  >
+                    <Scan className="ml-2 h-4 w-4" />
+                    مسح باركود
+                  </Button>
+                  
+                  <div className="flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    <Input
+                      placeholder="البحث بالباركود أو اسم المنتج..."
+                      value={searchBarcode}
+                      onChange={(e) => setSearchBarcode(e.target.value)}
+                      className="w-64"
+                    />
+                  </div>
+                </div>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -448,8 +551,8 @@ export default function DailyInventoryPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {inventoryRecords.map((record) => (
-                      <TableRow key={record.id}>
+                    {filteredRecords.map((record) => (
+                      <TableRow key={record.id} id={`record-${record.id}`}>
                         <TableCell>
                           <div className="flex items-center space-x-3 space-x-reverse">
                             <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center">
@@ -523,6 +626,12 @@ export default function DailyInventoryPage() {
           </CardContent>
         </Card>
       </div>
+      
+      <BarcodeScanner
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={handleBarcodeScanned}
+      />
     </MainLayout>
   );
 }
