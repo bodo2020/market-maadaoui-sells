@@ -144,11 +144,6 @@ export const generalNavigation: NavigationGroup = {
       icon: DollarSign,
     },
     {
-      label: "التقارير",
-      href: "/reports",
-      icon: FileText,
-    },
-    {
       label: "المرتجعات",
       href: "/returns",
       icon: RefreshCw,
@@ -157,11 +152,6 @@ export const generalNavigation: NavigationGroup = {
       label: "الإعدادات",
       href: "/settings",
       icon: Settings,
-    },
-    {
-      label: "الخريطة",
-      href: "/map",
-      icon: Map,
     },
   ],
 };
