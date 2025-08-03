@@ -14,7 +14,7 @@ export function OrderStats({ orders, activeTab, onTabChange }: OrderStatsProps) 
   };
 
   return (
-    <div className="grid grid-cols-5 mb-4">
+    <div className="grid grid-cols-4 mb-4">
       <button
         onClick={() => onTabChange("all")}
         className={`relative font-semibold p-2 ${activeTab === "all" ? "bg-primary text-white" : ""}`}
@@ -33,15 +33,8 @@ export function OrderStats({ orders, activeTab, onTabChange }: OrderStatsProps) 
         onClick={() => onTabChange("ready")}
         className={`font-semibold p-2 ${activeTab === "ready" ? "bg-green-500 text-white" : ""}`}
       >
-        جاهز
+        جاهز ومكتمل
         <Badge className="mr-2 bg-green-500">{getOrdersCount('ready')}</Badge>
-      </button>
-      <button
-        onClick={() => onTabChange("done")}
-        className={`font-semibold p-2 ${activeTab === "done" ? "bg-gray-500 text-white" : ""}`}
-      >
-        مكتمل
-        <Badge className="mr-2 bg-gray-500">{getOrdersCount('done')}</Badge>
       </button>
       <button
         onClick={() => onTabChange("cancelled")}
