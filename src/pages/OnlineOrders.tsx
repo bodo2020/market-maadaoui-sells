@@ -176,7 +176,7 @@ export default function OnlineOrders() {
     return order.id.toLowerCase().includes(searchLower) || order.customer_name?.toLowerCase().includes(searchLower) || order.customer_phone?.toLowerCase().includes(searchLower);
   });
   return <MainLayout>
-      <div className="container mx-auto p-6 dir-rtl">
+      <div className="container p-6 dir-rtl mx-0 px-0 py-px">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">الطلبات</h1>
           
