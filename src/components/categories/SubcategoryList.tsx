@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Edit } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AddSubcategoryDialog from "./AddSubcategoryDialog";
+import EditSubcategoryDialog from "./EditSubcategoryDialog";
 import { fetchSubcategories, deleteSubcategory } from "@/services/supabase/categoryService";
 import { Subcategory } from "@/types";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ export default function SubcategoryList() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSubcategory, setSelectedSubcategory] = useState<Subcategory | null>(null);
   const [isProductsDialogOpen, setIsProductsDialogOpen] = useState(false);
 
@@ -40,6 +42,11 @@ export default function SubcategoryList() {
   const handleAddProducts = (subcategory: Subcategory) => {
     setSelectedSubcategory(subcategory);
     setIsProductsDialogOpen(true);
+  };
+
+  const handleEdit = (subcategory: Subcategory) => {
+    setSelectedSubcategory(subcategory);
+    setIsEditDialogOpen(true);
   };
 
   const handleDelete = async (subcategory: Subcategory) => {
@@ -71,7 +78,16 @@ export default function SubcategoryList() {
             {subcategories.map((subcategory) => (
               <Card key={subcategory.id}>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-lg">{subcategory.name}</CardTitle>
+                  <div className="flex items-center gap-3">
+                    {subcategory.image_url && (
+                      <img 
+                        src={subcategory.image_url} 
+                        alt={subcategory.name}
+                        className="w-12 h-12 object-cover rounded-md"
+                      />
+                    )}
+                    <CardTitle className="text-lg">{subcategory.name}</CardTitle>
+                  </div>
                   <div className="flex gap-2">
                     <Button 
                       variant="ghost" 
@@ -80,6 +96,13 @@ export default function SubcategoryList() {
                     >
                       <Plus className="h-4 w-4 ml-2" />
                       إضافة منتجات
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(subcategory)}
+                    >
+                      <Edit className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="destructive"
@@ -107,6 +130,13 @@ export default function SubcategoryList() {
           onSuccess={loadSubcategories}
         />
       )}
+
+      <EditSubcategoryDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        subcategory={selectedSubcategory}
+        onSuccess={loadSubcategories}
+      />
 
       {selectedSubcategory && (
         <AddProductsToSubcategoryDialog
