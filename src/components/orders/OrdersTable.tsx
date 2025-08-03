@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from "react";
 import { Order } from "@/types";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { OrderActionsMenu } from "./OrderActionsMenu";
 import { OrderStatusDropdown } from "./OrderStatusDropdown";
+import { ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface OrdersTableProps {
   orders: Order[];
@@ -41,6 +44,38 @@ export function OrdersTable({
   onSelectAll
 }: OrdersTableProps) {
   const navigate = useNavigate();
+  const [verifiedCustomers, setVerifiedCustomers] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    // Fetch verification status for all customers in the current orders
+    const fetchVerificationStatus = async () => {
+      const customerPhones = orders
+        .map(order => order.customer_phone)
+        .filter((phone): phone is string => !!phone);
+      
+      const customerEmails = orders
+        .map(order => order.customer_email)
+        .filter((email): email is string => !!email);
+
+      if (customerPhones.length > 0 || customerEmails.length > 0) {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('phone, email, verified')
+          .or(`phone.in.(${customerPhones.join(',')}),email.in.(${customerEmails.join(',')})`);
+
+        if (data && !error) {
+          const verificationMap: Record<string, boolean> = {};
+          data.forEach(customer => {
+            if (customer.phone) verificationMap[customer.phone] = customer.verified;
+            if (customer.email) verificationMap[customer.email] = customer.verified;
+          });
+          setVerifiedCustomers(verificationMap);
+        }
+      }
+    };
+
+    fetchVerificationStatus();
+  }, [orders]);
 
   const getPaymentStatusBadge = (status: Order['payment_status']) => {
     const variants: Record<Order['payment_status'], "default" | "destructive" | "outline" | "secondary"> = {
@@ -108,16 +143,21 @@ export function OrdersTable({
               {formatDate(order.created_at)}
             </TableCell>
             <TableCell>
-              <Button
-                variant="link"
-                className="p-0 h-auto text-right underline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onShowCustomer(order);
-                }}
-              >
-                {order.customer_name || 'عميل غير معروف'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="link"
+                  className="p-0 h-auto text-right underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShowCustomer(order);
+                  }}
+                >
+                  {order.customer_name || 'عميل غير معروف'}
+                </Button>
+                {(verifiedCustomers[order.customer_phone || ''] || verifiedCustomers[order.customer_email || '']) && (
+                  <ShieldCheck className="h-4 w-4 text-green-600" />
+                )}
+              </div>
             </TableCell>
             <TableCell className="text-right">
               <div className="text-sm space-y-1">

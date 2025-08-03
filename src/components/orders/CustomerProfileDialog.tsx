@@ -58,7 +58,7 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
         query = query.eq('email', customer.email);
       }
 
-      const { data: customerInfo, error: customerError } = await query.single();
+      const { data: customerInfo, error: customerError } = await query.maybeSingle();
 
       if (customerError) {
         console.error('Error fetching customer:', customerError);
