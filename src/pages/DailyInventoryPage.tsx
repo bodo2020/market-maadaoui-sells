@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,53 +19,56 @@ import {
   Package, 
   Calendar,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  History,
+  Save
 } from "lucide-react";
 import { fetchProducts } from "@/services/supabase/productService";
+import { 
+  createInventoryRecords,
+  updateInventoryRecord,
+  fetchInventoryRecordsByDate,
+  completeInventorySession,
+  InventoryRecord
+} from "@/services/supabase/inventoryService";
 import { Product } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import * as XLSX from 'exceljs';
 
-interface InventoryItem extends Product {
-  actualQuantity?: number;
-  difference?: number;
-  status?: 'pending' | 'checked' | 'discrepancy';
-}
-
 export default function DailyInventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryRecords, setInventoryRecords] = useState<InventoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const currentDate = format(new Date(), 'yyyy-MM-dd');
 
   useEffect(() => {
-    loadRandomProducts();
+    loadInventoryData();
   }, []);
 
-  const loadRandomProducts = async () => {
+  const loadInventoryData = async () => {
     setLoading(true);
     try {
-      const allProducts = await fetchProducts();
-      // اختيار 10-15 منتج عشوائي للجرد اليومي
-      const randomCount = Math.floor(Math.random() * 6) + 10; // 10 إلى 15 منتج
-      const shuffled = allProducts.sort(() => 0.5 - Math.random());
-      const selectedProducts = shuffled.slice(0, randomCount);
+      // التحقق من وجود جرد لليوم الحالي
+      const existingRecords = await fetchInventoryRecordsByDate(currentDate);
       
-      const inventoryData = selectedProducts.map(product => ({
-        ...product,
-        status: 'pending' as const
-      }));
-      
-      setProducts(allProducts);
-      setInventoryItems(inventoryData);
+      if (existingRecords.length > 0) {
+        // إذا كان هناك جرد موجود، اعرضه
+        setInventoryRecords(existingRecords);
+      } else {
+        // إنشاء جرد جديد
+        await startNewInventory();
+      }
     } catch (error) {
-      console.error("Error loading products:", error);
+      console.error("Error loading inventory data:", error);
       toast({
         title: "خطأ",
-        description: "حدث خطأ أثناء تحميل المنتجات",
+        description: "حدث خطأ أثناء تحميل بيانات الجرد",
         variant: "destructive"
       });
     } finally {
@@ -72,22 +76,78 @@ export default function DailyInventoryPage() {
     }
   };
 
-  const handleQuantityChange = (productId: string, actualQuantity: number) => {
-    setInventoryItems(prev => prev.map(item => {
-      if (item.id === productId) {
-        const expectedQuantity = item.quantity || 0;
-        const difference = actualQuantity - expectedQuantity;
-        const status = difference === 0 ? 'checked' : 'discrepancy';
-        
-        return {
-          ...item,
-          actualQuantity,
-          difference,
-          status
-        };
-      }
-      return item;
-    }));
+  const startNewInventory = async () => {
+    try {
+      const allProducts = await fetchProducts();
+      // اختيار 10-15 منتج عشوائي للجرد اليومي
+      const randomCount = Math.floor(Math.random() * 6) + 10;
+      const shuffled = allProducts.sort(() => 0.5 - Math.random());
+      const selectedProducts = shuffled.slice(0, randomCount);
+      
+      const inventoryData = selectedProducts.map(product => ({
+        product_id: product.id,
+        expected_quantity: product.quantity || 0,
+        purchase_price: product.purchase_price
+      }));
+      
+      await createInventoryRecords(inventoryData);
+      
+      // إعادة تحميل البيانات
+      const newRecords = await fetchInventoryRecordsByDate(currentDate);
+      setInventoryRecords(newRecords);
+      
+      toast({
+        title: "تم إنشاء جرد جديد",
+        description: `تم اختيار ${selectedProducts.length} منتج للجرد اليومي`,
+      });
+    } catch (error) {
+      console.error("Error creating new inventory:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء إنشاء الجرد الجديد",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleQuantityChange = async (recordId: string, actualQuantity: number, notes?: string) => {
+    setSaving(true);
+    try {
+      await updateInventoryRecord(recordId, { actual_quantity: actualQuantity, notes });
+      
+      // تحديث البيانات محلياً
+      setInventoryRecords(prev => prev.map(record => {
+        if (record.id === recordId) {
+          const difference = actualQuantity - record.expected_quantity;
+          const difference_value = difference * record.purchase_price;
+          const status = difference === 0 ? 'checked' : 'discrepancy';
+          
+          return {
+            ...record,
+            actual_quantity: actualQuantity,
+            difference,
+            difference_value,
+            status,
+            notes
+          };
+        }
+        return record;
+      }));
+      
+      toast({
+        title: "تم الحفظ",
+        description: "تم حفظ كمية الجرد بنجاح",
+      });
+    } catch (error) {
+      console.error("Error updating inventory record:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء حفظ البيانات",
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const exportToExcel = async () => {
@@ -134,16 +194,16 @@ export default function DailyInventoryPage() {
       });
 
       // إضافة البيانات
-      const completedItems = inventoryItems.filter(item => item.status !== 'pending');
-      completedItems.forEach((item, index) => {
+      const completedItems = inventoryRecords.filter(record => record.status !== 'pending');
+      completedItems.forEach((record, index) => {
         const row = worksheet.getRow(6 + index);
-        const statusText = item.status === 'checked' ? 'مطابق' : 'يوجد اختلاف';
+        const statusText = record.status === 'checked' ? 'مطابق' : 'يوجد اختلاف';
         
-        row.getCell(1).value = item.name;
-        row.getCell(2).value = item.barcode || '-';
-        row.getCell(3).value = item.quantity || 0;
-        row.getCell(4).value = item.actualQuantity || 0;
-        row.getCell(5).value = item.difference || 0;
+        row.getCell(1).value = record.products?.name || '';
+        row.getCell(2).value = record.products?.barcode || '-';
+        row.getCell(3).value = record.expected_quantity;
+        row.getCell(4).value = record.actual_quantity;
+        row.getCell(5).value = record.difference;
         row.getCell(6).value = statusText;
 
         // تنسيق الصفوف
@@ -159,13 +219,13 @@ export default function DailyInventoryPage() {
 
           // تلوين خلايا الحالة
           if (i === 6) {
-            if (item.status === 'checked') {
+            if (record.status === 'checked') {
               cell.fill = {
                 type: 'pattern',
                 pattern: 'solid',
                 fgColor: { argb: 'FFE0FFE0' }
               };
-            } else if (item.status === 'discrepancy') {
+            } else if (record.status === 'discrepancy') {
               cell.fill = {
                 type: 'pattern',
                 pattern: 'solid',
@@ -179,8 +239,11 @@ export default function DailyInventoryPage() {
       // إضافة ملخص الجرد
       const summaryStartRow = 8 + completedItems.length;
       const totalItems = completedItems.length;
-      const checkedItems = completedItems.filter(item => item.status === 'checked').length;
-      const discrepancyItems = completedItems.filter(item => item.status === 'discrepancy').length;
+      const checkedItems = completedItems.filter(record => record.status === 'checked').length;
+      const discrepancyItems = completedItems.filter(record => record.status === 'discrepancy').length;
+      const totalDiscrepancyValue = completedItems
+        .filter(record => record.status === 'discrepancy')
+        .reduce((sum, record) => sum + Math.abs(record.difference_value), 0);
 
       worksheet.mergeCells(`A${summaryStartRow}:F${summaryStartRow}`);
       const summaryTitleCell = worksheet.getCell(`A${summaryStartRow}`);
@@ -197,6 +260,7 @@ export default function DailyInventoryPage() {
         [`إجمالي المنتجات المجردة: ${totalItems}`],
         [`المنتجات المطابقة: ${checkedItems}`],
         [`المنتجات بها اختلاف: ${discrepancyItems}`],
+        [`قيمة الفروقات: ${totalDiscrepancyValue.toFixed(2)} ج.م`],
         [`تاريخ ووقت التصدير: ${format(new Date(), 'yyyy-MM-dd HH:mm', { locale: ar })}`]
       ];
 
@@ -264,8 +328,13 @@ export default function DailyInventoryPage() {
     }
   };
 
-  const completedItems = inventoryItems.filter(item => item.status !== 'pending').length;
-  const totalItems = inventoryItems.length;
+  const completedItems = inventoryRecords.filter(record => record.status !== 'pending').length;
+  const totalItems = inventoryRecords.length;
+  const matchedItems = inventoryRecords.filter(record => record.status === 'checked').length;
+  const discrepancyItems = inventoryRecords.filter(record => record.status === 'discrepancy').length;
+  const discrepancyValue = inventoryRecords
+    .filter(record => record.status === 'discrepancy')
+    .reduce((sum, record) => sum + Math.abs(record.difference_value), 0);
 
   return (
     <MainLayout>
@@ -284,7 +353,15 @@ export default function DailyInventoryPage() {
           <div className="flex gap-2">
             <Button 
               variant="outline" 
-              onClick={loadRandomProducts}
+              onClick={() => navigate('/inventory-history')}
+            >
+              <History className="ml-2 h-4 w-4" />
+              سجل الجرد
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={startNewInventory}
               disabled={loading}
             >
               <RefreshCw className={`ml-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -322,14 +399,12 @@ export default function DailyInventoryPage() {
             </CardContent>
           </Card>
           
-          <Card>
+            <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">مطابق</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {inventoryItems.filter(item => item.status === 'checked').length}
-              </div>
+              <div className="text-2xl font-bold text-green-600">{matchedItems}</div>
               <p className="text-xs text-muted-foreground">منتج مطابق للنظام</p>
             </CardContent>
           </Card>
@@ -339,10 +414,10 @@ export default function DailyInventoryPage() {
               <CardTitle className="text-sm font-medium">يحتاج مراجعة</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {inventoryItems.filter(item => item.status === 'discrepancy').length}
-              </div>
-              <p className="text-xs text-muted-foreground">منتج به اختلاف</p>
+              <div className="text-2xl font-bold text-red-600">{discrepancyItems}</div>
+              <p className="text-xs text-muted-foreground">
+                قيمة الفروقات: {discrepancyValue.toFixed(2)} ج.م
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -373,28 +448,28 @@ export default function DailyInventoryPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {inventoryItems.map((item) => (
-                      <TableRow key={item.id}>
+                    {inventoryRecords.map((record) => (
+                      <TableRow key={record.id}>
                         <TableCell>
                           <div className="flex items-center space-x-3 space-x-reverse">
                             <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center">
                               <img 
-                                src={item.image_urls?.[0] || "/placeholder.svg"} 
-                                alt={item.name}
+                                src={record.products?.image_urls?.[0] || "/placeholder.svg"} 
+                                alt={record.products?.name}
                                 className="h-6 w-6 object-contain"
                               />
                             </div>
                             <div>
-                              <div className="font-medium">{item.name}</div>
+                              <div className="font-medium">{record.products?.name}</div>
                               <div className="text-sm text-muted-foreground">
-                                {item.unit_of_measure || 'قطعة'}
+                                {record.products?.unit_of_measure || 'قطعة'}
                               </div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{item.barcode || '-'}</TableCell>
+                        <TableCell>{record.products?.barcode || '-'}</TableCell>
                         <TableCell>
-                          <span className="font-medium">{item.quantity || 0}</span>
+                          <span className="font-medium">{record.expected_quantity}</span>
                         </TableCell>
                         <TableCell>
                           <div className="w-20">
@@ -402,34 +477,40 @@ export default function DailyInventoryPage() {
                               type="number"
                               min="0"
                               placeholder="الكمية"
-                              value={item.actualQuantity || ''}
+                              value={record.actual_quantity || ''}
                               onChange={(e) => 
-                                handleQuantityChange(item.id, parseInt(e.target.value) || 0)
+                                handleQuantityChange(record.id, parseInt(e.target.value) || 0)
                               }
                               className="text-center"
+                              disabled={saving}
                             />
                           </div>
                         </TableCell>
                         <TableCell>
-                          {item.difference !== undefined && (
+                          <div className="text-center">
                             <span className={`font-medium ${
-                              item.difference === 0 
+                              record.difference === 0 
                                 ? 'text-green-600' 
-                                : item.difference > 0 
+                                : record.difference > 0 
                                   ? 'text-blue-600' 
                                   : 'text-red-600'
                             }`}>
-                              {item.difference > 0 ? '+' : ''}{item.difference}
+                              {record.difference > 0 ? '+' : ''}{record.difference}
                             </span>
-                          )}
+                            {record.difference !== 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                {Math.abs(record.difference_value).toFixed(2)} ج.م
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2 space-x-reverse">
-                            {getStatusIcon(item.status || 'pending')}
-                            <span className={`text-sm ${getStatusColor(item.status || 'pending')}`}>
-                              {item.status === 'checked' && 'مطابق'}
-                              {item.status === 'discrepancy' && 'اختلاف'}
-                              {item.status === 'pending' && 'في الانتظار'}
+                            {getStatusIcon(record.status)}
+                            <span className={`text-sm ${getStatusColor(record.status)}`}>
+                              {record.status === 'checked' && 'مطابق'}
+                              {record.status === 'discrepancy' && 'اختلاف'}
+                              {record.status === 'pending' && 'في الانتظار'}
                             </span>
                           </div>
                         </TableCell>

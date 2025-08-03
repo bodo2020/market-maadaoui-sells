@@ -705,6 +705,104 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_records: {
+        Row: {
+          actual_quantity: number
+          created_at: string
+          created_by: string | null
+          difference: number
+          difference_value: number
+          expected_quantity: number
+          id: string
+          inventory_date: string
+          notes: string | null
+          product_id: string
+          purchase_price: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          actual_quantity?: number
+          created_at?: string
+          created_by?: string | null
+          difference?: number
+          difference_value?: number
+          expected_quantity?: number
+          id?: string
+          inventory_date?: string
+          notes?: string | null
+          product_id: string
+          purchase_price?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          actual_quantity?: number
+          created_at?: string
+          created_by?: string | null
+          difference?: number
+          difference_value?: number
+          expected_quantity?: number
+          id?: string
+          inventory_date?: string
+          notes?: string | null
+          product_id?: string
+          purchase_price?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_records_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_sessions: {
+        Row: {
+          completed_products: number
+          created_at: string
+          created_by: string | null
+          discrepancy_products: number
+          id: string
+          matched_products: number
+          session_date: string
+          status: string
+          total_difference_value: number
+          total_products: number
+          updated_at: string
+        }
+        Insert: {
+          completed_products?: number
+          created_at?: string
+          created_by?: string | null
+          discrepancy_products?: number
+          id?: string
+          matched_products?: number
+          session_date?: string
+          status?: string
+          total_difference_value?: number
+          total_products?: number
+          updated_at?: string
+        }
+        Update: {
+          completed_products?: number
+          created_at?: string
+          created_by?: string | null
+          discrepancy_products?: number
+          id?: string
+          matched_products?: number
+          session_date?: string
+          status?: string
+          total_difference_value?: number
+          total_products?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invoice_settings: {
         Row: {
           auto_print: boolean | null
