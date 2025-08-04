@@ -88,7 +88,15 @@ export function InvoiceBasedReturnDialog({
       }
 
       // جلب تفاصيل المنتجات
-      const productIds = items.map((item: any) => item.product_id);
+      const productIds = items
+        .map((item: any) => item.product_id)
+        .filter(id => id && id !== 'undefined'); // فلترة المعرفات الفارغة أو غير المحددة
+      
+      if (productIds.length === 0) {
+        toast.error('لا توجد منتجات صالحة في هذه الفاتورة');
+        return;
+      }
+
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('id, name, price, purchase_price, offer_price, is_offer')
