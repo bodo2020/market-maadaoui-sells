@@ -204,7 +204,7 @@ export const fetchLowStockProducts = async () => {
   
   // فلترة المنتجات التي تحتاج تنبيه وتم تفعيل التنبيه لها
   const lowStockItems = data?.filter(item => {
-    const alert = item.inventory_alerts?.[0];
+    const alert = item.inventory_alerts;
     if (!alert || !alert.alert_enabled || !alert.min_stock_level) return false;
     return (item.quantity || 0) < alert.min_stock_level;
   }) || [];
@@ -229,13 +229,13 @@ export const fetchInventoryWithAlerts = async () => {
   
   // تصنيف المنتجات حسب حالة المخزون
   const lowStock = data?.filter(item => {
-    const alert = item.inventory_alerts?.[0];
+    const alert = item.inventory_alerts;
     if (!alert || !alert.alert_enabled || !alert.min_stock_level) return false;
     return (item.quantity || 0) < alert.min_stock_level;
   }) || [];
   
   const normalStock = data?.filter(item => {
-    const alert = item.inventory_alerts?.[0];
+    const alert = item.inventory_alerts;
     if (!alert || !alert.alert_enabled || !alert.min_stock_level) return true;
     return (item.quantity || 0) >= alert.min_stock_level;
   }) || [];
