@@ -89,7 +89,7 @@ export function InvoiceBasedReturnDialog({
 
       // جلب تفاصيل المنتجات
       const productIds = items
-        .map((item: any) => item.product_id)
+        .map((item: any) => item.product?.id || item.product_id)
         .filter(id => id && id !== 'undefined'); // فلترة المعرفات الفارغة أو غير المحددة
       
       if (productIds.length === 0) {
@@ -110,7 +110,8 @@ export function InvoiceBasedReturnDialog({
 
       // تكوين قائمة المنتجات مع الأسعار الصحيحة
       const invoiceItemsData: InvoiceItem[] = items.map((item: any) => {
-        const product = productsData?.find(p => p.id === item.product_id);
+        const productId = item.product?.id || item.product_id;
+        const product = productsData?.find(p => p.id === productId);
         
         if (!product) {
           return null;
