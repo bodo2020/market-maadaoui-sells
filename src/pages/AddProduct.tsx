@@ -365,14 +365,17 @@ export default function AddProduct() {
                 <div>
                   <Label htmlFor="company">الشركة</Label>
                   <Select
-                    value={product?.company_id || ""}
-                    onValueChange={(value) => setProduct((prev) => ({ ...prev, company_id: value }))}
+                    value={product?.company_id || "none"}
+                    onValueChange={(value) => setProduct((prev) => ({ 
+                      ...prev, 
+                      company_id: value === "none" ? "" : value 
+                    }))}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الشركة" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">بدون شركة</SelectItem>
+                      <SelectItem value="none">بدون شركة</SelectItem>
                       {companies.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
@@ -385,11 +388,16 @@ export default function AddProduct() {
                 <div>
                   <Label htmlFor="main_category">الفئة الرئيسية</Label>
                   <Select
-                    value={product?.main_category_id || ""}
+                    value={product?.main_category_id || "none"}
                     onValueChange={(value) => {
-                      setProduct((prev) => ({ ...prev, main_category_id: value, subcategory_id: "" }));
-                      if (value) {
-                        loadSubcategories(value);
+                      const categoryId = value === "none" ? "" : value;
+                      setProduct((prev) => ({ 
+                        ...prev, 
+                        main_category_id: categoryId, 
+                        subcategory_id: "" 
+                      }));
+                      if (categoryId) {
+                        loadSubcategories(categoryId);
                       } else {
                         setSubcategories([]);
                       }
@@ -399,7 +407,7 @@ export default function AddProduct() {
                       <SelectValue placeholder="اختر الفئة الرئيسية" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">بدون فئة</SelectItem>
+                      <SelectItem value="none">بدون فئة</SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
@@ -412,15 +420,18 @@ export default function AddProduct() {
                 <div>
                   <Label htmlFor="subcategory">الفئة الفرعية</Label>
                   <Select
-                    value={product?.subcategory_id || ""}
-                    onValueChange={(value) => setProduct((prev) => ({ ...prev, subcategory_id: value }))}
+                    value={product?.subcategory_id || "none"}
+                    onValueChange={(value) => setProduct((prev) => ({ 
+                      ...prev, 
+                      subcategory_id: value === "none" ? "" : value 
+                    }))}
                     disabled={!product?.main_category_id}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الفئة الفرعية" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">بدون فئة فرعية</SelectItem>
+                      <SelectItem value="none">بدون فئة فرعية</SelectItem>
                       {subcategories.map((subcategory) => (
                         <SelectItem key={subcategory.id} value={subcategory.id}>
                           {subcategory.name}
