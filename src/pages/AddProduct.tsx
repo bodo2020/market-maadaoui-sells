@@ -169,8 +169,9 @@ export default function AddProduct() {
         }
       }
 
+      const { min_stock_level, ...productDataClean } = product;
       const productData = {
-        ...product,
+        ...productDataClean,
         name: product.name, // Ensure name is included and not undefined
         price: Number(product.price), // Ensure price is a number
         purchase_price: Number(product.purchase_price), // Ensure purchase_price is a number
@@ -180,9 +181,7 @@ export default function AddProduct() {
         image_urls: product.image_urls || [],
         is_bulk: product.is_bulk || false,
         bulk_enabled: product.bulk_enabled || false,
-        // Remove min_stock_level and max_stock_level from product data
-        // These will be handled in inventory table separately
-      } as Omit<Product, "id" | "created_at" | "updated_at" | "min_stock_level" | "max_stock_level">;
+      } as Omit<Product, "id" | "created_at" | "updated_at" | "min_stock_level">;
       
       console.log("Submitting product data:", productData);
       

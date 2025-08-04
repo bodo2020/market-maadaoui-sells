@@ -165,9 +165,9 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
   try {
-    // Modified to ensure we're only updating the fields provided in the product parameter
-    // Only handle special cases if those specific fields are being updated
-    const updateData: any = { ...product };
+    // Extract min_stock_level from product to handle separately
+    const { min_stock_level, ...productUpdateData } = product;
+    const updateData: any = { ...productUpdateData };
     
     // If changing barcode, check if it's a scale barcode
     if (product.barcode !== undefined) {
@@ -197,11 +197,6 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
 
         updateData.main_category_id = subcategory.category_id;
       }
-    }
-
-    // Only update main_category_id if it was explicitly provided or modified by subcategory change
-    if (product.main_category_id !== undefined && !updateData.hasOwnProperty('main_category_id')) {
-      updateData.main_category_id = product.main_category_id;
     }
 
     console.log("Updating product with data:", updateData);
