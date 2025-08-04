@@ -705,6 +705,41 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_alerts: {
+        Row: {
+          alert_enabled: boolean | null
+          created_at: string | null
+          id: string
+          min_stock_level: number | null
+          product_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          alert_enabled?: boolean | null
+          created_at?: string | null
+          id?: string
+          min_stock_level?: number | null
+          product_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          alert_enabled?: boolean | null
+          created_at?: string | null
+          id?: string
+          min_stock_level?: number | null
+          product_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_alerts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_records: {
         Row: {
           actual_quantity: number

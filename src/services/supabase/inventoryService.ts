@@ -191,13 +191,23 @@ export const fetchInventoryStats = async () => {
 export const fetchLowStockProducts = async () => {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select(`
+      *,
+      inventory_alerts (
+        min_stock_level,
+        alert_enabled
+      )
+    `)
     .order('quantity', { ascending: true });
 
   if (error) throw error;
   
-  // فلترة المنتجات التي تحتاج تنبيه (أقل من 10 وحدات)
-  const lowStockItems = data?.filter(item => (item.quantity || 0) < 10) || [];
+  // فلترة المنتجات التي تحتاج تنبيه وتم تفعيل التنبيه لها
+  const lowStockItems = data?.filter(item => {
+    const alert = item.inventory_alerts?.[0];
+    if (!alert || !alert.alert_enabled || !alert.min_stock_level) return false;
+    return (item.quantity || 0) < alert.min_stock_level;
+  }) || [];
   
   return lowStockItems;
 };
@@ -206,14 +216,29 @@ export const fetchLowStockProducts = async () => {
 export const fetchInventoryWithAlerts = async () => {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select(`
+      *,
+      inventory_alerts (
+        min_stock_level,
+        alert_enabled
+      )
+    `)
     .order('quantity', { ascending: true });
 
   if (error) throw error;
   
-  // تصنيف المنتجات حسب حالة المخزون (أقل من 10 وحدات)
-  const lowStock = data?.filter(item => (item.quantity || 0) < 10) || [];
-  const normalStock = data?.filter(item => (item.quantity || 0) >= 10) || [];
+  // تصنيف المنتجات حسب حالة المخزون
+  const lowStock = data?.filter(item => {
+    const alert = item.inventory_alerts?.[0];
+    if (!alert || !alert.alert_enabled || !alert.min_stock_level) return false;
+    return (item.quantity || 0) < alert.min_stock_level;
+  }) || [];
+  
+  const normalStock = data?.filter(item => {
+    const alert = item.inventory_alerts?.[0];
+    if (!alert || !alert.alert_enabled || !alert.min_stock_level) return true;
+    return (item.quantity || 0) >= alert.min_stock_level;
+  }) || [];
 
   return {
     all: data || [],
@@ -222,4 +247,33 @@ export const fetchInventoryWithAlerts = async () => {
     totalProducts: data?.length || 0,
     lowStockCount: lowStock.length,
   };
+};
+
+// حفظ إعدادات التنبيه للمنتج
+export const saveInventoryAlert = async (productId: string, minStockLevel: number | null, alertEnabled: boolean) => {
+  const { data, error } = await supabase
+    .from('inventory_alerts')
+    .upsert({
+      product_id: productId,
+      min_stock_level: minStockLevel,
+      alert_enabled: alertEnabled
+    }, {
+      onConflict: 'product_id'
+    })
+    .select();
+
+  if (error) throw error;
+  return data[0];
+};
+
+// جلب إعدادات التنبيه للمنتج
+export const getInventoryAlert = async (productId: string) => {
+  const { data, error } = await supabase
+    .from('inventory_alerts')
+    .select('*')
+    .eq('product_id', productId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
 };
