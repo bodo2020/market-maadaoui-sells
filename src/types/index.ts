@@ -95,7 +95,6 @@ export interface Product {
   is_bulk_scan?: boolean;
   track_inventory?: boolean;
   min_stock_level?: number;
-  max_stock_level?: number;
 }
 
 export interface CartItem {

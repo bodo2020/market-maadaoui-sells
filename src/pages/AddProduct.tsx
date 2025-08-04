@@ -180,9 +180,9 @@ export default function AddProduct() {
         image_urls: product.image_urls || [],
         is_bulk: product.is_bulk || false,
         bulk_enabled: product.bulk_enabled || false,
-        min_stock_level: Number(product.min_stock_level) || 5,
-        max_stock_level: Number(product.max_stock_level) || 100,
-      } as Omit<Product, "id" | "created_at" | "updated_at">;
+        // Remove min_stock_level and max_stock_level from product data
+        // These will be handled in inventory table separately
+      } as Omit<Product, "id" | "created_at" | "updated_at" | "min_stock_level" | "max_stock_level">;
       
       console.log("Submitting product data:", productData);
       
@@ -384,18 +384,6 @@ export default function AddProduct() {
               />
             </div>
 
-            <div>
-              <Label htmlFor="max_stock_level">الحد الأقصى للمخزون</Label>
-              <Input
-                type="number"
-                id="max_stock_level"
-                placeholder="100"
-                value={product?.max_stock_level || ""}
-                onChange={(e) =>
-                  setProduct((prev) => ({ ...prev, max_stock_level: Number(e.target.value) }))
-                }
-              />
-            </div>
 
             <div className="flex items-center space-x-2 rtl:space-x-reverse">
               <Checkbox

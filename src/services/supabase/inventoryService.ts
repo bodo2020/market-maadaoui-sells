@@ -232,20 +232,15 @@ export const fetchInventoryWithAlerts = async () => {
 
   if (error) throw error;
   
-  // تصنيف المنتجات حسب حالة المخزون
+  // تصنيف المنتجات حسب حالة المخزون (فقط منخفض وعادي)
   const lowStock = data?.filter(item => item.quantity < item.min_stock_level) || [];
-  const highStock = data?.filter(item => item.quantity > item.max_stock_level) || [];
-  const normalStock = data?.filter(item => 
-    item.quantity >= item.min_stock_level && item.quantity <= item.max_stock_level
-  ) || [];
+  const normalStock = data?.filter(item => item.quantity >= item.min_stock_level) || [];
 
   return {
     all: data || [],
     lowStock,
-    highStock,
     normalStock,
     totalProducts: data?.length || 0,
     lowStockCount: lowStock.length,
-    highStockCount: highStock.length
   };
 };

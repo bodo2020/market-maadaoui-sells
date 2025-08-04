@@ -35,17 +35,16 @@ export async function fetchProductById(id: string) {
     throw error;
   }
 
-  // جلب بيانات المخزون للمنتج
+  // جلب بيانات المخزون للمنتج (الحد الأدنى فقط)
   const { data: inventoryData } = await supabase
     .from("inventory")
-    .select("min_stock_level, max_stock_level")
+    .select("min_stock_level")
     .eq("product_id", id)
     .maybeSingle();
 
   const productWithInventory = {
     ...data,
     min_stock_level: inventoryData?.min_stock_level || 5,
-    max_stock_level: inventoryData?.max_stock_level || 100
   };
 
   return productWithInventory as Product;
@@ -142,12 +141,11 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 
     console.log("Product created successfully:", data[0]);
     
-    // إنشاء سجل مخزون للمنتج مع حدود التنبيه
+    // إنشاء سجل مخزون للمنتج مع حدود التنبيه (فقط الحد الأدنى)
     const inventoryData = {
       product_id: data[0].id,
       quantity: productData.quantity || 0,
-      min_stock_level: product.min_stock_level || 5,
-      max_stock_level: product.max_stock_level || 100
+      min_stock_level: 5, // قيمة افتراضية للحد الأدنى
     };
     
     const { error: inventoryError } = await supabase
@@ -222,15 +220,11 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
       throw error;
     }
 
-    // تحديث حدود التنبيه في جدول المخزون إذا تم تمريرها
-    if (product.min_stock_level !== undefined || product.max_stock_level !== undefined) {
-      const inventoryUpdate: any = {};
-      if (product.min_stock_level !== undefined) {
-        inventoryUpdate.min_stock_level = product.min_stock_level;
-      }
-      if (product.max_stock_level !== undefined) {
-        inventoryUpdate.max_stock_level = product.max_stock_level;
-      }
+    // تحديث الحد الأدنى للمخزون في جدول المخزون إذا تم تمريره
+    if (product.min_stock_level !== undefined) {
+      const inventoryUpdate: any = {
+        min_stock_level: product.min_stock_level,
+      };
       
       const { error: inventoryError } = await supabase
         .from("inventory")
@@ -361,8 +355,7 @@ export async function updateInventoryQuantity(productId: string, quantityChange:
       .upsert({
         product_id: productId,
         quantity: newQuantity,
-        min_stock_level: 5,
-        max_stock_level: 100,
+        min_stock_level: 5, // قيمة افتراضية للحد الأدنى
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'product_id',
