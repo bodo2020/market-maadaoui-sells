@@ -1,11 +1,12 @@
 
 import { Product } from "@/types";
 import { fetchProducts } from "./supabase/productService";
+import { fetchInventoryWithAlerts } from "./supabase/inventoryService";
 import { toast } from "@/components/ui/sonner";
 
 export interface StockNotification {
   id: string;
-  product: Product;
+  product: any; // Using any since we're getting products with inventory_alerts from fetchInventoryWithAlerts
   type: 'low_stock';
   read: boolean;
   createdAt: Date;
@@ -111,8 +112,8 @@ export const removeNotification = (notificationId: string): void => {
 // Check for low stock products and generate notifications
 export const checkLowStockProducts = async (): Promise<StockNotification[]> => {
   try {
-    const products = await fetchProducts();
-    const lowStockProducts = products.filter(product => (product.quantity || 0) < LOW_STOCK_THRESHOLD);
+    const inventoryData = await fetchInventoryWithAlerts();
+    const lowStockProducts = inventoryData.lowStock;
     
     const notifications: StockNotification[] = [];
     
@@ -151,9 +152,11 @@ export const showLowStockToasts = (): void => {
   // Show toast for each new notification
   newNotifications.forEach(notification => {
     const { product } = notification;
+    const alert = product.inventory_alerts;
+    const minStockText = alert?.min_stock_level ? ` (الحد الأدنى: ${alert.min_stock_level})` : '';
     
     toast("تنبيه المخزون المنخفض", {
-      description: `المنتج "${product.name}" منخفض المخزون (${product.quantity} وحدة متبقية)`,
+      description: `المنتج "${product.name}" منخفض المخزون (${product.quantity} وحدة متبقية)${minStockText}`,
       duration: 5000
     });
     
