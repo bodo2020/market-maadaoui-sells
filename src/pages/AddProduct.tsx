@@ -180,6 +180,8 @@ export default function AddProduct() {
         image_urls: product.image_urls || [],
         is_bulk: product.is_bulk || false,
         bulk_enabled: product.bulk_enabled || false,
+        min_stock_level: Number(product.min_stock_level) || 5,
+        max_stock_level: Number(product.max_stock_level) || 100,
       } as Omit<Product, "id" | "created_at" | "updated_at">;
       
       console.log("Submitting product data:", productData);
