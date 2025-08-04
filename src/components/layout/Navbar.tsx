@@ -89,69 +89,71 @@ export default function Navbar() {
       </div>
       
       <div className="flex items-center gap-4">
-        <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              {unreadCount > 0 ? (
-                <>
-                  <BellDot size={20} className="text-yellow-500" />
-                  <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                </>
-              ) : (
-                <Bell size={20} />
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel className="flex items-center justify-between">
-              <span>الإشعارات</span>
-              {unreadCount > 0 && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-7 text-xs"
-                  onClick={handleMarkAllAsRead}
-                >
-                  <Check className="ml-1 h-3 w-3" /> تعيين الكل كمقروء
-                </Button>
-              )}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            
-            <ScrollArea className="h-[300px]">
-              {notifications.length === 0 ? (
-                <div className="py-4 px-2 text-center text-muted-foreground">
-                  لا توجد إشعارات
-                </div>
-              ) : (
-                notifications.map(notification => (
-                  <DropdownMenuItem 
-                    key={notification.id}
-                    className={`p-3 cursor-pointer ${!notification.read ? 'bg-yellow-50' : ''}`}
-                    onClick={() => handleNotificationClick(notification)}
+        {(user?.role === 'admin' || user?.role === 'super_admin') && (
+          <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative">
+                {unreadCount > 0 ? (
+                  <>
+                    <BellDot size={20} className="text-yellow-500" />
+                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
+                      {unreadCount}
+                    </span>
+                  </>
+                ) : (
+                  <Bell size={20} />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuLabel className="flex items-center justify-between">
+                <span>الإشعارات</span>
+                {unreadCount > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-xs"
+                    onClick={handleMarkAllAsRead}
                   >
-                    <div className="flex gap-3 items-start w-full">
-                      <div className={`h-2 w-2 mt-2 rounded-full ${!notification.read ? 'bg-yellow-500' : 'bg-gray-200'}`} />
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <p className="font-medium text-sm">تنبيه المخزون المنخفض</p>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(notification.createdAt).toLocaleDateString('ar-EG')}
-                          </span>
+                    <Check className="ml-1 h-3 w-3" /> تعيين الكل كمقروء
+                  </Button>
+                )}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              
+              <ScrollArea className="h-[300px]">
+                {notifications.length === 0 ? (
+                  <div className="py-4 px-2 text-center text-muted-foreground">
+                    لا توجد إشعارات
+                  </div>
+                ) : (
+                  notifications.map(notification => (
+                    <DropdownMenuItem 
+                      key={notification.id}
+                      className={`p-3 cursor-pointer ${!notification.read ? 'bg-yellow-50' : ''}`}
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      <div className="flex gap-3 items-start w-full">
+                        <div className={`h-2 w-2 mt-2 rounded-full ${!notification.read ? 'bg-yellow-500' : 'bg-gray-200'}`} />
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <p className="font-medium text-sm">تنبيه المخزون المنخفض</p>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(notification.createdAt).toLocaleDateString('ar-EG')}
+                            </span>
+                          </div>
+                          <p className="text-sm mt-1">
+                            المنتج "{notification.product.name}" منخفض المخزون ({notification.product.quantity} وحدة متبقية)
+                          </p>
                         </div>
-                        <p className="text-sm mt-1">
-                          المنتج "{notification.product.name}" منخفض المخزون ({notification.product.quantity} وحدة متبقية)
-                        </p>
                       </div>
-                    </div>
-                  </DropdownMenuItem>
-                ))
-              )}
-            </ScrollArea>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </ScrollArea>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
