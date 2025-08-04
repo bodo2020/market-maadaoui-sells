@@ -179,9 +179,9 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
 
     // If changing subcategory, ensure we update main category accordingly
     if (product.subcategory_id !== undefined) {
-      if (product.subcategory_id === null) {
-        // If clearing subcategory, also clear main category
-        updateData.main_category_id = null;
+      if (product.subcategory_id === null || product.subcategory_id === "") {
+        // If clearing subcategory, don't change main category automatically
+        updateData.subcategory_id = null;
       } else {
         // Get the main category from the subcategory
         const { data: subcategory, error: subcategoryError } = await supabase
