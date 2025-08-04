@@ -186,3 +186,66 @@ export const fetchInventoryStats = async () => {
     )
   };
 };
+
+// جلب المنتجات التي تحتاج تنبيه (أقل من الحد الأدنى)
+export const fetchLowStockProducts = async () => {
+  const { data, error } = await supabase
+    .from('inventory')
+    .select(`
+      *,
+      products (
+        id,
+        name,
+        barcode,
+        image_urls,
+        unit_of_measure,
+        price
+      )
+    `)
+    .order('quantity', { ascending: true });
+
+  if (error) throw error;
+  
+  // فلترة المنتجات التي تحتاج تنبيه
+  const lowStockItems = data?.filter(item => item.quantity < item.min_stock_level) || [];
+  
+  return lowStockItems;
+};
+
+// جلب جميع معلومات المخزون مع التنبيهات
+export const fetchInventoryWithAlerts = async () => {
+  const { data, error } = await supabase
+    .from('inventory')
+    .select(`
+      *,
+      products (
+        id,
+        name,
+        barcode,
+        image_urls,
+        unit_of_measure,
+        price,
+        purchase_price
+      )
+    `)
+    .order('quantity', { ascending: true });
+
+  if (error) throw error;
+  
+  // تصنيف المنتجات حسب حالة المخزون
+  const lowStock = data?.filter(item => item.quantity < item.min_stock_level) || [];
+  const highStock = data?.filter(item => item.quantity > item.max_stock_level) || [];
+  const normalStock = data?.filter(item => 
+    item.quantity >= item.min_stock_level && item.quantity <= item.max_stock_level
+  ) || [];
+
+  return {
+    all: data || [],
+    lowStock,
+    highStock,
+    normalStock,
+    totalProducts: data?.length || 0,
+    lowStockCount: lowStock.length,
+    highStockCount: highStock.length
+  };
+};

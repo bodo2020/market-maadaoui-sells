@@ -369,6 +369,32 @@ export default function AddProduct() {
               />
             </div>
 
+            <div>
+              <Label htmlFor="min_stock_level">كمية التنبيه (الحد الأدنى)</Label>
+              <Input
+                type="number"
+                id="min_stock_level"
+                placeholder="5"
+                value={product?.min_stock_level || ""}
+                onChange={(e) =>
+                  setProduct((prev) => ({ ...prev, min_stock_level: Number(e.target.value) }))
+                }
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="max_stock_level">الحد الأقصى للمخزون</Label>
+              <Input
+                type="number"
+                id="max_stock_level"
+                placeholder="100"
+                value={product?.max_stock_level || ""}
+                onChange={(e) =>
+                  setProduct((prev) => ({ ...prev, max_stock_level: Number(e.target.value) }))
+                }
+              />
+            </div>
+
             <div className="flex items-center space-x-2 rtl:space-x-reverse">
               <Checkbox
                 id="is_offer"

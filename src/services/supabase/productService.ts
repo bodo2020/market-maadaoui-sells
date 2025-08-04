@@ -35,7 +35,20 @@ export async function fetchProductById(id: string) {
     throw error;
   }
 
-  return data as Product;
+  // جلب بيانات المخزون للمنتج
+  const { data: inventoryData } = await supabase
+    .from("inventory")
+    .select("min_stock_level, max_stock_level")
+    .eq("product_id", id)
+    .maybeSingle();
+
+  const productWithInventory = {
+    ...data,
+    min_stock_level: inventoryData?.min_stock_level || 5,
+    max_stock_level: inventoryData?.max_stock_level || 100
+  };
+
+  return productWithInventory as Product;
 }
 
 export async function fetchProductByBarcode(barcode: string) {
@@ -128,6 +141,23 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
     }
 
     console.log("Product created successfully:", data[0]);
+    
+    // إنشاء سجل مخزون للمنتج مع حدود التنبيه
+    const inventoryData = {
+      product_id: data[0].id,
+      quantity: productData.quantity || 0,
+      min_stock_level: product.min_stock_level || 5,
+      max_stock_level: product.max_stock_level || 100
+    };
+    
+    const { error: inventoryError } = await supabase
+      .from("inventory")
+      .upsert(inventoryData, { onConflict: 'product_id' });
+      
+    if (inventoryError) {
+      console.warn("Warning: Could not create inventory record:", inventoryError);
+    }
+    
     return data[0] as Product;
   } catch (error) {
     console.error("Error in createProduct:", error);
@@ -190,6 +220,29 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
     if (error) {
       console.error("Error updating product:", error);
       throw error;
+    }
+
+    // تحديث حدود التنبيه في جدول المخزون إذا تم تمريرها
+    if (product.min_stock_level !== undefined || product.max_stock_level !== undefined) {
+      const inventoryUpdate: any = {};
+      if (product.min_stock_level !== undefined) {
+        inventoryUpdate.min_stock_level = product.min_stock_level;
+      }
+      if (product.max_stock_level !== undefined) {
+        inventoryUpdate.max_stock_level = product.max_stock_level;
+      }
+      
+      const { error: inventoryError } = await supabase
+        .from("inventory")
+        .upsert({
+          product_id: id,
+          ...inventoryUpdate,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'product_id' });
+        
+      if (inventoryError) {
+        console.warn("Warning: Could not update inventory record:", inventoryError);
+      }
     }
 
     return data[0] as Product;
