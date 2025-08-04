@@ -48,9 +48,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, updateProduct } from "@/services/supabase/productService";
 import { checkLowStockProducts, showLowStockToasts } from "@/services/notificationService";
+import { fetchInventoryWithAlerts } from "@/services/supabase/inventoryService";
 
 export default function InventoryManagement() {
   const [inventory, setInventory] = useState<Product[]>([]);
+  const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isAddStockDialogOpen, setIsAddStockDialogOpen] = useState(false);
@@ -71,11 +73,31 @@ export default function InventoryManagement() {
     checkStock();
   }, []);
 
+  // Add effect to reload data when returning from edit page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadProducts();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const products = await fetchProducts();
+      // Load products and inventory data with alerts
+      const [products, inventoryData] = await Promise.all([
+        fetchProducts(),
+        fetchInventoryWithAlerts()
+      ]);
+      
       setInventory(products);
+      setLowStockProducts(inventoryData.lowStock);
     } catch (error) {
       console.error("Error loading products:", error);
       toast({
@@ -93,8 +115,6 @@ export default function InventoryManagement() {
     (product.barcode && product.barcode.toString().includes(search))
   );
 
-  // Products with low stock (less than 10 units)
-  const lowStockProducts = inventory.filter(product => (product.quantity || 0) < 10);
   
   const handleAddStock = async () => {
     if (selectedProduct && stockToAdd > 0) {
@@ -107,11 +127,8 @@ export default function InventoryManagement() {
         
         await updateProduct(selectedProduct.id, updatedProduct);
         
-        setInventory(inventory.map(product => 
-          product.id === selectedProduct.id 
-            ? { ...product, quantity: (product.quantity || 0) + stockToAdd } 
-            : product
-        ));
+        // Reload data to get updated inventory alerts
+        await loadProducts();
         
         toast({
           title: "تم بنجاح",
