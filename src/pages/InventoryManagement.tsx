@@ -51,7 +51,7 @@ import { checkLowStockProducts, showLowStockToasts } from "@/services/notificati
 import { fetchInventoryWithAlerts } from "@/services/supabase/inventoryService";
 
 export default function InventoryManagement() {
-  const [inventory, setInventory] = useState<Product[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -90,13 +90,10 @@ export default function InventoryManagement() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      // Load products and inventory data with alerts
-      const [products, inventoryData] = await Promise.all([
-        fetchProducts(),
-        fetchInventoryWithAlerts()
-      ]);
+      // Load inventory data with alerts
+      const inventoryData = await fetchInventoryWithAlerts();
       
-      setInventory(products);
+      setInventory(inventoryData.all);
       setLowStockProducts(inventoryData.lowStock);
     } catch (error) {
       console.error("Error loading products:", error);
@@ -376,21 +373,43 @@ export default function InventoryManagement() {
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.barcode}</TableCell>
                         <TableCell>{product.purchase_price} {siteConfig.currency}</TableCell>
-                        <TableCell>
-                          {(product.quantity || 0) > 10 ? (
-                            <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                              {product.quantity || 0} وحدة
-                            </span>
-                          ) : (product.quantity || 0) > 0 ? (
-                            <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                              {product.quantity || 0} وحدة
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
-                              غير متوفر
-                            </span>
-                          )}
-                        </TableCell>
+                         <TableCell>
+                           {(() => {
+                             const alert = product.inventory_alerts;
+                             const currentQuantity = product.quantity || 0;
+                             const hasAlert = alert && alert.alert_enabled && alert.min_stock_level;
+                             
+                             if (currentQuantity === 0) {
+                               return (
+                                 <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
+                                   غير متوفر
+                                 </span>
+                               );
+                             }
+                             
+                             if (hasAlert && currentQuantity < alert.min_stock_level) {
+                               return (
+                                 <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
+                                   {currentQuantity} وحدة (منخفض)
+                                 </span>
+                               );
+                             }
+                             
+                             if (hasAlert && currentQuantity === alert.min_stock_level) {
+                               return (
+                                 <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                                   {currentQuantity} وحدة (حد أدنى)
+                                 </span>
+                               );
+                             }
+                             
+                             return (
+                               <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                                 {currentQuantity} وحدة
+                               </span>
+                             );
+                           })()}
+                         </TableCell>
                         <TableCell>
                           {(product.purchase_price * (product.quantity || 0)).toFixed(2)} {siteConfig.currency}
                         </TableCell>
