@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
@@ -60,6 +61,7 @@ export default function InventoryManagement() {
   const [stockToAdd, setStockToAdd] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   useEffect(() => {
     loadProducts();
@@ -161,10 +163,12 @@ export default function InventoryManagement() {
             <Filter className="ml-2 h-4 w-4" />
             تصفية
           </Button>
-          <Button variant="outline">
-            <Download className="ml-2 h-4 w-4" />
-            تصدير
-          </Button>
+          {(user?.role === 'admin' || user?.role === 'super_admin') && (
+            <Button variant="outline">
+              <Download className="ml-2 h-4 w-4" />
+              تصدير
+            </Button>
+          )}
           <Button 
             variant="default"
             onClick={() => {
