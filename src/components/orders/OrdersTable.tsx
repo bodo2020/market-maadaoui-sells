@@ -23,6 +23,7 @@ interface OrdersTableProps {
   onAssignDelivery: (order: Order) => void;
   onOrderUpdate?: () => void;
   onReturn?: (order: Order) => void;
+  onPrintInvoice?: (order: Order) => void;
   selectedOrders?: string[];
   onSelectOrder?: (orderId: string) => void;
   onSelectAll?: () => void;
@@ -39,6 +40,7 @@ export function OrdersTable({
   onAssignDelivery,
   onOrderUpdate,
   onReturn,
+  onPrintInvoice,
   selectedOrders = [],
   onSelectOrder,
   onSelectAll
@@ -185,6 +187,7 @@ export function OrdersTable({
                 onPaymentConfirm={() => onPaymentConfirm(order)}
                 onAssignDelivery={() => onAssignDelivery(order)}
                 onReturn={onReturn ? () => onReturn(order) : undefined}
+                onPrintInvoice={onPrintInvoice ? () => onPrintInvoice(order) : undefined}
               />
             </TableCell>
           </TableRow>

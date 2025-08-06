@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Archive, X, Package, Check, CreditCard, Truck, RotateCcw } from "lucide-react";
+import { MoreHorizontal, Archive, X, Package, Check, CreditCard, Truck, RotateCcw, FileText } from "lucide-react";
 
 interface OrderActionsMenuProps {
   onArchive: () => void;
@@ -18,6 +18,7 @@ interface OrderActionsMenuProps {
   onPaymentConfirm?: () => void;
   onAssignDelivery?: () => void;
   onReturn?: () => void;
+  onPrintInvoice?: () => void;
 }
 
 export function OrderActionsMenu({ 
@@ -27,7 +28,8 @@ export function OrderActionsMenu({
   onComplete,
   onPaymentConfirm,
   onAssignDelivery,
-  onReturn
+  onReturn,
+  onPrintInvoice
 }: OrderActionsMenuProps) {
   return (
     <DropdownMenu>
@@ -63,6 +65,13 @@ export function OrderActionsMenu({
           <DropdownMenuItem className="gap-2" onClick={onReturn}>
             <RotateCcw className="h-4 w-4" />
             <span>إرجاع المنتجات</span>
+          </DropdownMenuItem>
+        )}
+        
+        {onPrintInvoice && (
+          <DropdownMenuItem className="gap-2" onClick={onPrintInvoice}>
+            <FileText className="h-4 w-4" />
+            <span>طباعة الفاتورة</span>
           </DropdownMenuItem>
         )}
         

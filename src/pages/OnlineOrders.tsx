@@ -18,6 +18,7 @@ import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPe
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
 import { updateProductQuantity } from "@/services/supabase/productService";
+import OnlineOrderInvoiceDialog from "@/components/orders/OnlineOrderInvoiceDialog";
 export default function OnlineOrders() {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,6 +31,8 @@ export default function OnlineOrders() {
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<Order | null>(null);
   const {
     orders,
     loading,
@@ -135,6 +138,11 @@ export default function OnlineOrders() {
     setReturnDialogOpen(true);
   };
 
+  const handlePrintInvoice = (order: Order) => {
+    setSelectedOrderForInvoice(order);
+    setInvoiceDialogOpen(true);
+  };
+
   // Selection handlers
   const handleSelectAll = () => {
     if (selectedOrders.length === filteredOrders.length) {
@@ -209,7 +217,7 @@ export default function OnlineOrders() {
           </CardHeader>
           <CardContent>
             {loading ? <p className="text-center py-4">جاري التحميل...</p> : <div className="overflow-x-auto">
-                <OrdersTable orders={filteredOrders} onShowCustomer={showCustomerProfile} onArchive={handleArchive} onCancel={handleCancel} onProcess={handleProcess} onComplete={handleComplete} onPaymentConfirm={handlePaymentConfirm} onAssignDelivery={handleAssignDelivery} onOrderUpdate={handleOrderUpdate} onReturn={handleReturn} selectedOrders={selectedOrders} onSelectOrder={handleSelectOrder} onSelectAll={handleSelectAll} />
+                <OrdersTable orders={filteredOrders} onShowCustomer={showCustomerProfile} onArchive={handleArchive} onCancel={handleCancel} onProcess={handleProcess} onComplete={handleComplete} onPaymentConfirm={handlePaymentConfirm} onAssignDelivery={handleAssignDelivery} onOrderUpdate={handleOrderUpdate} onReturn={handleReturn} onPrintInvoice={handlePrintInvoice} selectedOrders={selectedOrders} onSelectOrder={handleSelectOrder} onSelectAll={handleSelectAll} />
               </div>}
           </CardContent>
         </Card>
@@ -223,6 +231,15 @@ export default function OnlineOrders() {
           </>}
 
         {returnOrderId && returnItems.length > 0 && <ReturnOrderDialog orderId={returnOrderId} items={returnItems} open={returnDialogOpen} onOpenChange={setReturnDialogOpen} onConfirm={handleOrderUpdate} />}
+
+        <OnlineOrderInvoiceDialog
+          isOpen={invoiceDialogOpen}
+          onClose={() => {
+            setInvoiceDialogOpen(false);
+            setSelectedOrderForInvoice(null);
+          }}
+          order={selectedOrderForInvoice}
+        />
       </div>
     </MainLayout>;
 }

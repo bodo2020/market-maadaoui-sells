@@ -15,7 +15,9 @@ import { updateProduct } from "@/services/supabase/productService";
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Check } from "lucide-react";
+import { Check, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import OnlineOrderInvoiceDialog from "./OnlineOrderInvoiceDialog";
 
 interface OrderDetailsDialogProps {
   order: Order | null;
@@ -34,6 +36,7 @@ export function OrderDetailsDialog({
   const [isUpdatingShipping, setIsUpdatingShipping] = useState(false);
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
   const [assignDeliveryOpen, setAssignDeliveryOpen] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
 
   if (!order) return null;
 
@@ -198,7 +201,18 @@ export function OrderDetailsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-[1000px] h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">تجهيز المنتجات #{order.id.slice(0, 8)}</DialogTitle>
+          <DialogTitle className="text-xl flex items-center justify-between">
+            <span>تجهيز المنتجات #{order.id.slice(0, 8)}</span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setInvoiceDialogOpen(true)}
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              طباعة الفاتورة
+            </Button>
+          </DialogTitle>
         </DialogHeader>
         
         <div className="flex justify-between items-start flex-wrap md:flex-nowrap gap-6 dir-rtl">
@@ -253,6 +267,12 @@ export function OrderDetailsDialog({
           onOpenChange={setAssignDeliveryOpen}
           orderId={order.id}
           onConfirm={onStatusUpdated}
+        />
+
+        <OnlineOrderInvoiceDialog
+          isOpen={invoiceDialogOpen}
+          onClose={() => setInvoiceDialogOpen(false)}
+          order={order}
         />
       </DialogContent>
     </Dialog>

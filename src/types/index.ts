@@ -234,6 +234,7 @@ export interface Order {
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   payment_method: string;
   shipping_address?: string;
+  shipping_cost?: number;
   items: OrderItem[];
   customer_id?: string;
   customer_name?: string;
