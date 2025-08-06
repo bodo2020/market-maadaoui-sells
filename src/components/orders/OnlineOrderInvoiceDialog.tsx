@@ -228,8 +228,10 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
               ${order.customer_phone ? `<p><strong>رقم الهاتف:</strong> ${order.customer_phone}</p>` : ''}
               ${order.customer_email ? `<p><strong>البريد الإلكتروني:</strong> ${order.customer_email}</p>` : ''}
               ${order.shipping_address ? `<p><strong>عنوان التوصيل:</strong> ${order.shipping_address}</p>` : ''}
-              ${order.governorate || order.city || order.area || order.neighborhood ? 
-                `<p><strong>المنطقة:</strong> ${[order.governorate, order.city, order.area, order.neighborhood].filter(Boolean).join(' - ')}</p>` : ''}
+              ${order.governorate ? `<p><strong>المحافظة:</strong> ${order.governorate}</p>` : ''}
+              ${order.city ? `<p><strong>المدينة:</strong> ${order.city}</p>` : ''}
+              ${order.area ? `<p><strong>المنطقة:</strong> ${order.area}</p>` : ''}
+              ${order.neighborhood ? `<p><strong>الحي:</strong> ${order.neighborhood}</p>` : ''}
             </div>
 
             <table class="items-table">
@@ -244,7 +246,7 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
               <tbody>
                 ${order.items.map(item => `
                   <tr>
-                    <td>${item.product_name || 'منتج غير معروف'}</td>
+                    <td>${item.product_name || 'منتج غير محدد'}</td>
                     <td>${item.quantity}</td>
                     <td>${(item.price || 0).toFixed(2)} ${siteConfig.currency}</td>
                     <td>${((item.price || 0) * (item.quantity || 0)).toFixed(2)} ${siteConfig.currency}</td>
@@ -358,9 +360,10 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
             {order.customer_phone && <p><strong>الهاتف:</strong> {order.customer_phone}</p>}
             {order.customer_email && <p><strong>البريد الإلكتروني:</strong> {order.customer_email}</p>}
             {order.shipping_address && <p><strong>العنوان:</strong> {order.shipping_address}</p>}
-            {(order.governorate || order.city || order.area || order.neighborhood) && (
-              <p><strong>المنطقة:</strong> {[order.governorate, order.city, order.area, order.neighborhood].filter(Boolean).join(' - ')}</p>
-            )}
+            {order.governorate && <p><strong>المحافظة:</strong> {order.governorate}</p>}
+            {order.city && <p><strong>المدينة:</strong> {order.city}</p>}
+            {order.area && <p><strong>المنطقة:</strong> {order.area}</p>}
+            {order.neighborhood && <p><strong>الحي:</strong> {order.neighborhood}</p>}
           </div>
           
           <div className="border-t border-b py-2 my-4">
@@ -376,7 +379,7 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
               <tbody className="text-sm">
                 {order.items.map((item, index) => (
                   <tr key={index} className="border-b border-dashed">
-                    <td className="py-2">{item.product_name || 'منتج غير معروف'}</td>
+                    <td className="py-2">{item.product_name || 'منتج غير محدد'}</td>
                     <td className="text-center py-2">{item.quantity}</td>
                     <td className="text-center py-2">{(item.price || 0).toFixed(2)}</td>
                     <td className="text-left py-2">{((item.price || 0) * (item.quantity || 0)).toFixed(2)} {siteConfig.currency}</td>
