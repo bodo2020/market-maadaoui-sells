@@ -244,10 +244,10 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
               <tbody>
                 ${order.items.map(item => `
                   <tr>
-                    <td>${item.product_name || "منتج غير معروف"}</td>
+                    <td>${item.product_name || 'منتج غير معروف'}</td>
                     <td>${item.quantity}</td>
                     <td>${(item.price || 0).toFixed(2)} ${siteConfig.currency}</td>
-                    <td>${((item.price || 0) * (item.quantity || 0)).toFixed(2)} ${siteConfig.currency} الجملة</td>
+                    <td>${((item.price || 0) * (item.quantity || 0)).toFixed(2)} ${siteConfig.currency}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -376,10 +376,10 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
               <tbody className="text-sm">
                 {order.items.map((item, index) => (
                   <tr key={index} className="border-b border-dashed">
-                    <td className="py-2">{item.product_name || "منتج غير معروف"}</td>
+                    <td className="py-2">{item.product_name || 'منتج غير معروف'}</td>
                     <td className="text-center py-2">{item.quantity}</td>
                     <td className="text-center py-2">{(item.price || 0).toFixed(2)}</td>
-                    <td className="text-left py-2">{((item.price || 0) * (item.quantity || 0)).toFixed(2)} {siteConfig.currency} الجملة</td>
+                    <td className="text-left py-2">{((item.price || 0) * (item.quantity || 0)).toFixed(2)} {siteConfig.currency}</td>
                   </tr>
                 ))}
               </tbody>
