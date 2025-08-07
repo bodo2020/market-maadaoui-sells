@@ -51,20 +51,20 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
 
         if (error) {
           console.error('Error fetching product names:', error);
-          setEnrichedItems(order.items.map(item => ({
-            ...item,
-            product_name: item.product_name || 'منتج غير محدد'
-          })));
+        setEnrichedItems(order.items.map(item => ({
+          ...item,
+          product_name: (item as any).name || item.product_name || 'منتج غير محدد'
+        })));
           return;
         }
 
         // Create a map of product_id to product_name
         const productNameMap = new Map(products.map(p => [p.id, p.name]));
 
-        // Enrich order items with database product names
+        // Enrich order items with database product names - use (item as any).name to access raw data
         const enriched = order.items.map(item => ({
           ...item,
-          product_name: productNameMap.get(item.product_id) || item.product_name || 'منتج غير محدد'
+          product_name: productNameMap.get(item.product_id) || (item as any).name || item.product_name || 'منتج غير محدد'
         }));
 
         setEnrichedItems(enriched);
@@ -72,7 +72,7 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
         console.error('Error enriching order items:', error);
         setEnrichedItems(order.items.map(item => ({
           ...item,
-          product_name: item.product_name || 'منتج غير محدد'
+          product_name: (item as any).name || item.product_name || 'منتج غير محدد'
         })));
       } finally {
         setIsLoading(false);
