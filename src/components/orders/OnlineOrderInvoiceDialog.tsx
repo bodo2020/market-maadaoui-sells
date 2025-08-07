@@ -30,10 +30,11 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
   onClose, 
   order
 }) => {
+  // Move early return BEFORE any hooks to follow Rules of Hooks
+  if (!order) return null;
+
   const [enrichedItems, setEnrichedItems] = useState<EnrichedOrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-
-  if (!order) return null;
 
   // Fetch product names from database
   useEffect(() => {
