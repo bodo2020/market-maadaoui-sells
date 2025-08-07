@@ -44,7 +44,7 @@ export function UpdateOrderStatusDialog({
         updated_at: new Date().toISOString()
       };
 
-      if (status === 'ready' && order.status !== 'ready') {
+      if (status === 'done' && order.status !== 'done') {
         if (order.customer_name || order.customer_phone) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
@@ -100,7 +100,7 @@ export function UpdateOrderStatusDialog({
           console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
         }
         
-        if (order.payment_status === 'paid' || status === 'ready') {
+        if (order.payment_status === 'paid') {
           try {
             await recordCashTransaction(
               order.total, 
@@ -152,8 +152,9 @@ export function UpdateOrderStatusDialog({
 
   const statusOptions: {value: Order['status'], label: string, icon: JSX.Element}[] = [
     { value: 'waiting', label: 'في الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
-    { value: 'ready', label: 'جاهز ومكتمل', icon: <Check className="h-4 w-4 text-green-500" /> },
+    { value: 'ready', label: 'جاهز للشحن', icon: <Package className="h-4 w-4 text-green-500" /> },
     { value: 'shipped', label: 'تم الشحن', icon: <Truck className="h-4 w-4 text-blue-500" /> },
+    { value: 'done', label: 'مكتمل', icon: <Check className="h-4 w-4 text-green-600" /> },
     { value: 'cancelled', label: 'ملغي', icon: <X className="h-4 w-4 text-red-500" /> }
   ];
 
@@ -212,15 +213,15 @@ export function UpdateOrderStatusDialog({
             {status === 'ready' && order.payment_status === 'pending' && (
               <div className="text-sm bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-2">
                 <p className="text-yellow-800">
-                  سيتم تحديث حالة الدفع تلقائيًا إلى "مدفوع" عند تحديث الحالة إلى "جاهز ومكتمل".
+                  سيتم تحديث حالة الدفع تلقائيًا إلى "مدفوع" عند تحديث الحالة إلى "جاهز للشحن".
                 </p>
               </div>
             )}
 
-            {status === 'ready' && (
+            {status === 'done' && (
               <div className="text-sm bg-blue-50 border border-blue-200 rounded-md p-3 mt-2">
                 <p className="text-blue-800">
-                  سيتم خصم المنتجات من المخزون وإضافة المبلغ إلى خزنة الأونلاين عند جعل الطلب جاهز.
+                  سيتم خصم المنتجات من المخزون وإضافة المبلغ إلى خزنة الأونلاين عند اكتمال الطلب.
                 </p>
               </div>
             )}
