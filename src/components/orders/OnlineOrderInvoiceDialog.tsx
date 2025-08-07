@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
 import { Order } from "@/types";
 import { Printer } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface OnlineOrderInvoiceDialogProps {
   isOpen: boolean;
@@ -11,20 +12,85 @@ interface OnlineOrderInvoiceDialogProps {
   order: Order | null;
 }
 
+interface EnrichedOrderItem {
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  price: number;
+  total: number;
+  image_url?: string;
+  barcode?: string;
+  is_bulk?: boolean;
+  is_weight_based?: boolean;
+  bulk_quantity?: number;
+}
+
 const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({ 
   isOpen, 
   onClose, 
   order
 }) => {
+  const [enrichedItems, setEnrichedItems] = useState<EnrichedOrderItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
   if (!order) return null;
+
+  // Fetch product names from database
+  useEffect(() => {
+    const fetchProductNames = async () => {
+      if (!order?.items || order.items.length === 0) return;
+      
+      setIsLoading(true);
+      try {
+        const productIds = order.items.map(item => item.product_id);
+        
+        const { data: products, error } = await supabase
+          .from('products')
+          .select('id, name')
+          .in('id', productIds);
+
+        if (error) {
+          console.error('Error fetching product names:', error);
+          setEnrichedItems(order.items.map(item => ({
+            ...item,
+            product_name: item.product_name || 'منتج غير محدد'
+          })));
+          return;
+        }
+
+        // Create a map of product_id to product_name
+        const productNameMap = new Map(products.map(p => [p.id, p.name]));
+
+        // Enrich order items with database product names
+        const enriched = order.items.map(item => ({
+          ...item,
+          product_name: productNameMap.get(item.product_id) || item.product_name || 'منتج غير محدد'
+        }));
+
+        setEnrichedItems(enriched);
+      } catch (error) {
+        console.error('Error enriching order items:', error);
+        setEnrichedItems(order.items.map(item => ({
+          ...item,
+          product_name: item.product_name || 'منتج غير محدد'
+        })));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isOpen && order) {
+      fetchProductNames();
+    }
+  }, [isOpen, order]);
 
   const handlePrint = () => {
     // Create a new window for printing
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    // Generate the HTML for the invoice
-    const invoiceHTML = generateInvoiceHTML(order);
+    // Generate the HTML for the invoice using enriched items
+    const invoiceHTML = generateInvoiceHTML(order, enrichedItems);
     
     printWindow.document.write(invoiceHTML);
     printWindow.document.close();
@@ -33,7 +99,7 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
     printWindow.close();
   };
 
-  const generateInvoiceHTML = (order: Order) => {
+  const generateInvoiceHTML = (order: Order, items: EnrichedOrderItem[]) => {
     const orderDate = new Date(order.created_at);
     const formattedDate = orderDate.toLocaleDateString('ar-EG', {
       year: 'numeric',
@@ -244,9 +310,9 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
                 </tr>
               </thead>
               <tbody>
-                ${order.items.map(item => `
+                ${items.map(item => `
                   <tr>
-                    <td>${item.product_name || 'منتج غير محدد'}</td>
+                    <td>${item.product_name}</td>
                     <td>${item.quantity}</td>
                     <td>${(item.price || 0).toFixed(2)} ${siteConfig.currency}</td>
                     <td>${((item.price || 0) * (item.quantity || 0)).toFixed(2)} ${siteConfig.currency}</td>
@@ -377,9 +443,9 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {order.items.map((item, index) => (
+                {enrichedItems.map((item, index) => (
                   <tr key={index} className="border-b border-dashed">
-                    <td className="py-2">{item.product_name || 'منتج غير محدد'}</td>
+                    <td className="py-2">{item.product_name}</td>
                     <td className="text-center py-2">{item.quantity}</td>
                     <td className="text-center py-2">{(item.price || 0).toFixed(2)}</td>
                     <td className="text-left py-2">{((item.price || 0) * (item.quantity || 0)).toFixed(2)} {siteConfig.currency}</td>
@@ -423,9 +489,13 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
         </div>
         
         <DialogFooter className="sm:justify-start">
-          <Button onClick={handlePrint} className="gap-2">
+          <Button 
+            onClick={handlePrint} 
+            className="gap-2" 
+            disabled={isLoading || enrichedItems.length === 0}
+          >
             <Printer className="h-4 w-4" />
-            طباعة الفاتورة
+            {isLoading ? 'جاري التحميل...' : 'طباعة الفاتورة'}
           </Button>
           <Button variant="outline" onClick={onClose}>
             إغلاق
