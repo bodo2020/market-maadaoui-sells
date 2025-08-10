@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, BellDot, User, LogOut, X, Check } from "lucide-react";
+import { Bell, BellDot, User, LogOut, X, Check, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,12 +23,14 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import BranchSwitcher from "@/components/layout/BranchSwitcher";
+import SuperAdminDashboardDialog from "@/components/superadmin/SuperAdminDashboardDialog";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<StockNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [superAdminOpen, setSuperAdminOpen] = useState(false);
 
   // Load notifications on mount and when notifications change
   const loadNotifications = () => {
@@ -90,6 +92,14 @@ export default function Navbar() {
       </div>
       
       <div className="flex items-center gap-4">
+        {/* زر لوحة السوبر أدمن - للسوبر أدمن فقط */}
+        {user?.role === 'super_admin' && (
+          <Button variant="outline" size="sm" onClick={() => setSuperAdminOpen(true)} className="hidden sm:flex items-center gap-2">
+            <Gauge className="h-4 w-4" />
+            لوحة السوبر أدمن
+          </Button>
+        )}
+
         {(user?.role === 'admin' || user?.role === 'super_admin') && (
           <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
             <DropdownMenuTrigger asChild>
@@ -97,7 +107,7 @@ export default function Navbar() {
                 {unreadCount > 0 ? (
                   <>
                     <BellDot size={20} className="text-yellow-500" />
-                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
+                    <span className="absolute top-0 right-0 w-4 h-4 rounded-full text-white text-xs flex items-center justify-center bg-destructive">
                       {unreadCount}
                     </span>
                   </>
@@ -186,6 +196,11 @@ export default function Navbar() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* نافذة لوحة السوبر أدمن */}
+      {user?.role === 'super_admin' && (
+        <SuperAdminDashboardDialog open={superAdminOpen} onOpenChange={setSuperAdminOpen} />
+      )}
     </header>
   );
 }

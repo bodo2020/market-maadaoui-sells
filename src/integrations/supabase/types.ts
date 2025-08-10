@@ -118,6 +118,48 @@ export type Database = {
           },
         ]
       }
+      branch_neighborhoods: {
+        Row: {
+          active: boolean | null
+          branch_id: string
+          created_at: string | null
+          id: string
+          neighborhood_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          branch_id: string
+          created_at?: string | null
+          id?: string
+          neighborhood_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          branch_id?: string
+          created_at?: string | null
+          id?: string
+          neighborhood_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branch_neighborhoods_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branch_neighborhoods_neighborhood_id_fkey"
+            columns: ["neighborhood_id"]
+            isOneToOne: false
+            referencedRelation: "neighborhoods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           active: boolean | null
@@ -2109,6 +2151,32 @@ export type Database = {
       is_super_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      sales_summary_by_branch: {
+        Args: { p_start?: string; p_end?: string }
+        Returns: {
+          branch_id: string
+          branch_name: string
+          sales_count: number
+          total_sales: number
+          total_profit: number
+        }[]
+      }
+      top_products_by_branch: {
+        Args: {
+          p_branch?: string
+          p_start?: string
+          p_end?: string
+          p_limit?: number
+        }
+        Returns: {
+          branch_id: string
+          branch_name: string
+          product_id: string
+          product_name: string
+          qty_sold: number
+          total_sales: number
+        }[]
       }
     }
     Enums: {
