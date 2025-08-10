@@ -70,6 +70,7 @@ export function DateRangePicker({
             onSelect={onSelect}
             numberOfMonths={2}
             locale={ar}
+            className={cn("p-3 pointer-events-auto")}
           />
         </PopoverContent>
       </Popover>

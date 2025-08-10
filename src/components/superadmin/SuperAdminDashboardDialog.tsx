@@ -93,12 +93,11 @@ export default function SuperAdminDashboardDialog({ open, onOpenChange }: Props)
         <div className="px-6 pb-6">
           <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
             <DateRangePicker
-              numberOfMonths={2}
-              initialDateFrom={range.from}
-              initialDateTo={range.to}
-              onUpdate={(r) => {
-                const from = r.range.from ? startOfDay(r.range.from) : range.from;
-                const to = r.range.to ? endOfDay(r.range.to) : range.to;
+              from={range.from}
+              to={range.to}
+              onSelect={(r) => {
+                const from = r?.from ? startOfDay(r.from) : range.from;
+                const to = r?.to ? endOfDay(r.to) : range.to;
                 setRange({ from, to });
               }}
             />
