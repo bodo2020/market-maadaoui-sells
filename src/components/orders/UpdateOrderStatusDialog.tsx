@@ -8,7 +8,7 @@ import { Order } from "@/types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
-import { updateProduct } from "@/services/supabase/productService";
+import { updateProductQuantity } from "@/services/supabase/productService";
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 
 interface UpdateOrderStatusDialogProps {
@@ -79,25 +79,15 @@ export function UpdateOrderStatusDialog({
           }
           
           let quantityToDeduct = item.quantity;
-          
           if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
             quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
           }
-          
-          let newQuantity: number;
-          
           if (item.is_weight_based || product.barcode_type === 'scale') {
-            const currentQuantity = Math.floor(product.quantity || 0);
-            newQuantity = Math.max(0, currentQuantity - Math.floor(quantityToDeduct));
-          } else {
-            newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
+            quantityToDeduct = Math.floor(quantityToDeduct);
           }
           
-          await updateProduct(product.id, {
-            quantity: newQuantity
-          });
-          
-          console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
+          await updateProductQuantity(product.id, quantityToDeduct, 'decrease');
+          console.log(`Deducted ${quantityToDeduct} from product ${product.name}`);
         }
         
         if (order.payment_status === 'paid') {

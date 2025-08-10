@@ -22,6 +22,7 @@ import {
 } from "@/services/notificationService";
 import { toast } from "@/components/ui/sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import BranchSwitcher from "@/components/layout/BranchSwitcher";
 
 export default function Navbar() {
   const { user, logout } = useAuth();

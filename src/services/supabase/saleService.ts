@@ -1,6 +1,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, CartItem } from "@/types";
+import { updateProductQuantity } from "@/services/supabase/productService";
+import { useBranchStore } from "@/stores/branchStore";
 
 export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">, cashierName?: string) {
   try {
@@ -8,15 +10,19 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
     const { data: userData } = await supabase.auth.getUser();
     const cashierId = userData.user?.id;
 
+    // Ensure branch id
+    const branchId = await useBranchStore.getState().ensureInitialized();
+
     // Ensure date is a string
     const saleData = {
       ...sale,
       date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date,
       // Convert CartItem[] to Json for Supabase
       items: JSON.parse(JSON.stringify(sale.items)),
-      // Add cashier ID and name to the sale record
+      // Add cashier/branch info
       cashier_id: cashierId,
-      cashier_name: cashierName || sale.cashier_name
+      cashier_name: cashierName || sale.cashier_name,
+      branch_id: branchId
     };
     
     // Create the sale record
@@ -30,35 +36,14 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
       throw error;
     }
 
-    // Update product quantities for each sold item
+    // Update product quantities per branch using inventory table
     if (sale.items && sale.items.length > 0) {
       for (const item of sale.items) {
         if (!item.product || !item.product.id) continue;
-        
-        // Get current quantity
-        const { data: product, error: fetchError } = await supabase
-          .from("products")
-          .select("quantity")
-          .eq("id", item.product.id)
-          .single();
-
-        if (fetchError) {
-          console.error(`Error fetching product ${item.product.id}:`, fetchError);
-          continue;
-        }
-
-        // Calculate new quantity (ensure it doesn't go below 0)
-        const currentQuantity = product.quantity || 0;
-        const newQuantity = Math.max(0, currentQuantity - item.quantity);
-
-        // Update the product quantity
-        const { error: updateError } = await supabase
-          .from("products")
-          .update({ quantity: newQuantity })
-          .eq("id", item.product.id);
-
-        if (updateError) {
-          console.error(`Error updating product ${item.product.id} quantity:`, updateError);
+        try {
+          await updateProductQuantity(item.product.id, item.quantity, 'decrease');
+        } catch (e) {
+          console.error(`Failed to update inventory for product ${item.product.id}`, e);
         }
       }
     }
