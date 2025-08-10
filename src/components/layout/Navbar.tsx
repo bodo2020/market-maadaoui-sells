@@ -24,6 +24,8 @@ import { toast } from "@/components/ui/sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import BranchSwitcher from "@/components/layout/BranchSwitcher";
 import SuperAdminDashboardDialog from "@/components/superadmin/SuperAdminDashboardDialog";
+import BranchesManagementDialog from "@/components/superadmin/BranchesManagementDialog";
+import InventoryTransferDialog from "@/components/superadmin/InventoryTransferDialog";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -31,6 +33,8 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState<StockNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [superAdminOpen, setSuperAdminOpen] = useState(false);
+  const [manageBranchesOpen, setManageBranchesOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   // Load notifications on mount and when notifications change
   const loadNotifications = () => {
@@ -94,10 +98,13 @@ export default function Navbar() {
       <div className="flex items-center gap-4">
         {/* زر لوحة السوبر أدمن - للسوبر أدمن فقط */}
         {user?.role === 'super_admin' && (
-          <Button variant="outline" size="sm" onClick={() => setSuperAdminOpen(true)} className="hidden sm:flex items-center gap-2">
-            <Gauge className="h-4 w-4" />
-            لوحة السوبر أدمن
-          </Button>
+          <div className="hidden sm:flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setSuperAdminOpen(true)} className="flex items-center gap-2">
+              <Gauge className="h-4 w-4" /> لوحة السوبر أدمن
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setManageBranchesOpen(true)}>إدارة الفروع</Button>
+            <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>تحويل مخزون</Button>
+          </div>
         )}
 
         {(user?.role === 'admin' || user?.role === 'super_admin') && (
@@ -197,9 +204,13 @@ export default function Navbar() {
         </DropdownMenu>
       </div>
 
-      {/* نافذة لوحة السوبر أدمن */}
+      {/* نوافذ السوبر أدمن */}
       {user?.role === 'super_admin' && (
-        <SuperAdminDashboardDialog open={superAdminOpen} onOpenChange={setSuperAdminOpen} />
+        <>
+          <SuperAdminDashboardDialog open={superAdminOpen} onOpenChange={setSuperAdminOpen} />
+          <BranchesManagementDialog open={manageBranchesOpen} onOpenChange={setManageBranchesOpen} />
+          <InventoryTransferDialog open={transferOpen} onOpenChange={setTransferOpen} />
+        </>
       )}
     </header>
   );
