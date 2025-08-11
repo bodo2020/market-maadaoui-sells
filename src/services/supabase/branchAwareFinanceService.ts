@@ -260,7 +260,15 @@ export async function getSalesStats(
 
     // حساب عدد العناصر المباعة
     const totalItems = data?.reduce((sum, sale) => {
-      const items = Array.isArray(sale.items) ? sale.items : JSON.parse(sale.items || '[]');
+      const rawItems = (sale as any).items;
+      let items: any[] = [];
+      if (typeof rawItems === 'string') {
+        try { items = JSON.parse(rawItems || '[]'); } catch { items = []; }
+      } else if (Array.isArray(rawItems)) {
+        items = rawItems as any[];
+      } else if (rawItems && typeof rawItems === 'object') {
+        items = [rawItems];
+      }
       return sum + items.reduce((itemSum: number, item: any) => 
         itemSum + (item.quantity || item.weight || 0), 0
       );

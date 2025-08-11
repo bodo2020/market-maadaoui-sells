@@ -110,7 +110,7 @@ export async function addCashTransaction(
   registerType: string,
   notes?: string,
   branchId?: string
-): Promise<CashTransaction | null> {
+): Promise<number | null> {
   try {
     const targetBranchId = branchId || useBranchStore.getState().currentBranchId;
     
@@ -137,7 +137,7 @@ export async function addCashTransaction(
         .limit(1);
     }
 
-    return data;
+    return (data as unknown as number) ?? null;
   } catch (error) {
     console.error('Error in addCashTransaction:', error);
     return null;
