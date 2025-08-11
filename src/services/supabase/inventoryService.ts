@@ -510,7 +510,8 @@ export const fetchInventoryWithAlerts = async (branchId?: string) => {
         name,
         price,
         purchase_price,
-        barcode
+        barcode,
+        image_urls
       )
     `)
     .eq('branch_id', targetBranchId)
@@ -518,10 +519,20 @@ export const fetchInventoryWithAlerts = async (branchId?: string) => {
 
   if (error) throw error;
   
-  const all = (data || []).map(item => ({
-    ...item,
-    product: Array.isArray(item.products) ? item.products[0] : item.products
-  }));
+  const all = (data || []).map(item => {
+    const p = Array.isArray(item.products) ? item.products[0] : item.products;
+    return {
+      ...item,
+      // keep nested for backward compatibility
+      product: p,
+      // flatten key product fields for UI filters and rendering
+      name: p?.name,
+      barcode: p?.barcode,
+      price: p?.price,
+      purchase_price: p?.purchase_price,
+      image_urls: p?.image_urls || []
+    };
+  });
   
   // تصنيف المنتجات حسب حالة المخزون
   const lowStock = all.filter(item => 

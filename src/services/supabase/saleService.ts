@@ -62,40 +62,35 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
 }
 
 export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale[]> {
+  // Always scope to current branch if available
+  const branchId = await useBranchStore.getState().ensureInitialized();
   let query = supabase.from("sales").select("*").order("date", { ascending: false });
-  
+  if (branchId) {
+    query = query.eq("branch_id", branchId);
+  }
   if (startDate && endDate) {
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
-    
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
-    
     query = query
       .gte("date", start.toISOString())
       .lte("date", end.toISOString());
   }
-  
   const { data, error } = await query;
-  
   if (error) {
     console.error("Error fetching sales:", error);
     throw error;
   }
-  
-  // Convert the items field from JSON to CartItem[] in each sale
-  // Also ensure payment_method is one of the allowed values
   return (data || []).map(sale => ({
     ...sale,
-    // Ensure payment_method is one of the allowed values in the Sale type
     payment_method: (sale.payment_method === 'cash' || 
                     sale.payment_method === 'card' || 
                     sale.payment_method === 'mixed') 
                     ? sale.payment_method as 'cash' | 'card' | 'mixed'
-                    : 'cash', // Default to 'cash' if invalid value
-    // Parse items properly
+                    : 'cash',
     items: Array.isArray(sale.items) 
-      ? sale.items as unknown as CartItem[]  // If already an array
+      ? sale.items as unknown as CartItem[]
       : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
   })) as Sale[];
 }
@@ -172,6 +167,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
   paymentInstructions?: string;
   logoChoice?: string;
   customLogoUrl?: string | null;
+  branchName?: string;
 }) {
   // Get formatted date
   const saleDate = new Date(sale.date);
@@ -320,6 +316,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
           <div class="store-name">${storeInfo.name}</div>
           <div class="store-info">
             ${storeInfo.address}<br>
+            ${storeInfo.branchName ? `الفرع: ${storeInfo.branchName}<br>` : ''}
             هاتف: ${storeInfo.phone}
             ${storeInfo.website ? `<br>${storeInfo.website}` : ''}
             ${(storeInfo.showVat && storeInfo.vatNumber) ? `<br>الرقم الضريبي: ${storeInfo.vatNumber}` : ''}
@@ -417,6 +414,7 @@ export function printInvoice(sale: Sale, storeInfo: {
   paymentInstructions?: string;
   logoChoice?: string;
   customLogoUrl?: string | null;
+  branchName?: string;
 }) {
   const invoiceHTML = generateInvoiceHTML(sale, storeInfo);
   

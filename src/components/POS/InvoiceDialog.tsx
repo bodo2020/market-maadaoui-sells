@@ -6,6 +6,7 @@ import { siteConfig } from "@/config/site";
 import { Sale } from "@/types";
 import { Printer, Save, FileText } from "lucide-react";
 import { printInvoice } from '@/services/supabase/saleService';
+import { useBranchStore } from '@/stores/branchStore';
 
 interface InvoiceDialogProps {
   isOpen: boolean;
@@ -40,6 +41,9 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
     ...siteConfig.invoice,
     ...(settings || {})
   };
+
+  const { branches, currentBranchId } = useBranchStore();
+  const branchName = branches.find(b => b.id === currentBranchId)?.name;
 
   const handlePrint = () => {
     // Get store info from site config, overriding with preview settings if any
