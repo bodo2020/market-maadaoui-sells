@@ -152,19 +152,25 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
       const st = useBranchStore.getState();
       return await st.ensureInitialized();
     })();
-    const inventoryData = {
-      product_id: data[0].id,
-      branch_id: branchId as string,
-      quantity: productData.quantity || 0,
-      min_stock_level: 5, // قيمة افتراضية للحد الأدنى
-    } as const;
     
-    const { error: inventoryError } = await supabase
-      .from("inventory")
-      .upsert(inventoryData, { onConflict: 'product_id,branch_id' });
+    // Only create inventory if we have a valid branch
+    if (branchId) {
+      const inventoryData = {
+        product_id: data[0].id,
+        branch_id: branchId as string,
+        quantity: productData.quantity || 0,
+        min_stock_level: 5, // قيمة افتراضية للحد الأدنى
+      } as const;
       
-    if (inventoryError) {
-      console.warn("Warning: Could not create inventory record:", inventoryError);
+      const { error: inventoryError } = await supabase
+        .from("inventory")
+        .upsert(inventoryData, { onConflict: 'product_id,branch_id' });
+        
+      if (inventoryError) {
+        console.warn("Warning: Could not create inventory record:", inventoryError);
+      }
+    } else {
+      console.warn("No branch selected - skipping inventory creation");
     }
     
     return data[0] as Product;

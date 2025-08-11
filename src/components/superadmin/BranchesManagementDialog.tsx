@@ -67,6 +67,13 @@ export default function BranchesManagementDialog({ open, onOpenChange }: Props) 
     await loadAssignments();
   };
 
+  const handleEnterBranch = (branchId: string) => {
+    setCurrentBranch(branchId);
+    toast.success('تم تغيير الفرع بنجاح');
+    // Close the dialog after switching
+    onOpenChange(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl w-[95vw] p-0">
@@ -116,7 +123,7 @@ export default function BranchesManagementDialog({ open, onOpenChange }: Props) 
                             <div className="text-muted-foreground text-xs">{a.role}</div>
                           </div>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setCurrentBranch(selectedBranchId!)}>الدخول للفرع</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleEnterBranch(selectedBranchId!)}>الدخول للفرع</Button>
                             <Button variant="destructive" size="sm" onClick={() => handleRemoveAssignment(a.id)}>حذف</Button>
                           </div>
                         </div>
@@ -152,7 +159,7 @@ export default function BranchesManagementDialog({ open, onOpenChange }: Props) 
                         <td className="py-2">{b.active ? 'نشط' : 'موقوف'}</td>
                         <td className="py-2">
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setCurrentBranch(b.id)}>الدخول</Button>
+                            <Button variant="outline" size="sm" onClick={() => handleEnterBranch(b.id)}>الدخول</Button>
                           </div>
                         </td>
                       </tr>
