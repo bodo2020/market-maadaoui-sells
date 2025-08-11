@@ -54,7 +54,8 @@ export default function DailyInventoryPage() {
   const [filteredRecords, setFilteredRecords] = useState<InventoryRecord[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const currentDate = format(new Date(), 'yyyy-MM-dd');
+  // استخدم تاريخ UTC لضمان التطابق مع CURRENT_DATE في قاعدة البيانات
+  const currentDate = new Date().toISOString().slice(0, 10);
   const getBranchId = () => (typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null);
 
   useEffect(() => {
