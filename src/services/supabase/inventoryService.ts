@@ -14,6 +14,7 @@ export interface InventoryRecord {
   created_by?: string;
   created_at: string;
   updated_at: string;
+  branch_id?: string;
   // بيانات المنتج المرتبط
   products?: {
     id: string;
@@ -44,7 +45,8 @@ export const createInventoryRecords = async (
     product_id: string;
     expected_quantity: number;
     purchase_price: number;
-  }>
+  }>,
+  branchId?: string
 ) => {
   const { data, error } = await supabase
     .from('inventory_records')
@@ -56,7 +58,8 @@ export const createInventoryRecords = async (
         difference: -product.expected_quantity,
         purchase_price: product.purchase_price,
         difference_value: -product.expected_quantity * product.purchase_price,
-        status: 'pending' as const
+        status: 'pending' as const,
+        branch_id: branchId || undefined
       }))
     )
     .select();
@@ -103,8 +106,8 @@ export const updateInventoryRecord = async (
 };
 
 // جلب سجلات الجرد لتاريخ معين
-export const fetchInventoryRecordsByDate = async (date: string) => {
-  const { data, error } = await supabase
+export const fetchInventoryRecordsByDate = async (date: string, branchId?: string) => {
+  let query = supabase
     .from('inventory_records')
     .select(`
       *,
@@ -118,6 +121,12 @@ export const fetchInventoryRecordsByDate = async (date: string) => {
     `)
     .eq('inventory_date', date)
     .order('created_at', { ascending: false });
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return data as InventoryRecord[];

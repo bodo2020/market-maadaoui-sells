@@ -1,6 +1,23 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
 
+// Helper: get current branch id from localStorage or fallback to first active branch
+async function getCurrentBranchId(): Promise<string | null> {
+  try {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    if (saved) return saved;
+    const { data } = await supabase
+      .from('branches')
+      .select('id')
+      .eq('active', true)
+      .order('created_at', { ascending: true })
+      .limit(1);
+    return data?.[0]?.id || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchProducts() {
   console.log("Fetching all products");
   
@@ -141,19 +158,22 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 
     console.log("Product created successfully:", data[0]);
     
-    // إنشاء سجل مخزون للمنتج مع حدود التنبيه (فقط الحد الأدنى)
-    const inventoryData = {
-      product_id: data[0].id,
-      quantity: productData.quantity || 0,
-      min_stock_level: 5, // قيمة افتراضية للحد الأدنى
-    };
-    
-    const { error: inventoryError } = await supabase
-      .from("inventory")
-      .upsert(inventoryData, { onConflict: 'product_id' });
-      
-    if (inventoryError) {
-      console.warn("Warning: Could not create inventory record:", inventoryError);
+    // إنشاء سجل مخزون للمنتج للفرع الحالي
+    const currentBranchId = await getCurrentBranchId();
+    if (currentBranchId) {
+      const { error: inventoryError } = await supabase
+        .from("inventory")
+        .upsert({
+          product_id: data[0].id,
+          branch_id: currentBranchId,
+          quantity: productData.quantity || 0,
+          min_stock_level: 5, // قيمة افتراضية للحد الأدنى
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'product_id,branch_id' });
+        
+      if (inventoryError) {
+        console.warn("Warning: Could not create inventory record:", inventoryError);
+      }
     }
     
     return data[0] as Product;
@@ -217,20 +237,33 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
 
     // تحديث الحد الأدنى للمخزون في جدول المخزون إذا تم تمريره
     if (product.min_stock_level !== undefined) {
-      const inventoryUpdate: any = {
-        min_stock_level: product.min_stock_level,
-      };
-      
-      const { error: inventoryError } = await supabase
-        .from("inventory")
-        .upsert({
-          product_id: id,
-          ...inventoryUpdate,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'product_id' });
+      const currentBranchId = await getCurrentBranchId();
+      if (currentBranchId) {
+        const { error: inventoryError } = await supabase
+          .from("inventory")
+          .upsert({
+            product_id: id,
+            branch_id: currentBranchId,
+            min_stock_level: product.min_stock_level,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'product_id,branch_id' });
         
-      if (inventoryError) {
-        console.warn("Warning: Could not update inventory record:", inventoryError);
+        if (inventoryError) {
+          console.warn("Warning: Could not update inventory record:", inventoryError);
+        }
+      } else {
+        // Fallback: تحديث كل صفوف المخزون لهذا المنتج
+        const { error: inventoryError } = await supabase
+          .from("inventory")
+          .update({
+            min_stock_level: product.min_stock_level,
+            updated_at: new Date().toISOString()
+          })
+          .eq("product_id", id);
+        
+        if (inventoryError) {
+          console.warn("Warning: Could not update inventory record:", inventoryError);
+        }
       }
     }
 
@@ -327,52 +360,78 @@ export async function fetchProductsBySubcategory(subcategoryId: string) {
 }
 
 // Inventory management functions
-export async function updateInventoryQuantity(productId: string, quantityChange: number) {
+export async function updateInventoryQuantity(productId: string, quantityChange: number, branchId?: string) {
   try {
-    // Get current inventory quantity
-    const { data: inventory, error: fetchError } = await supabase
-      .from("inventory")
-      .select("quantity")
-      .eq("product_id", productId)
-      .maybeSingle();
+    const resolvedBranchId = branchId || await getCurrentBranchId();
 
-    if (fetchError) {
-      console.error(`Error fetching inventory for product ${productId}:`, fetchError);
-      throw fetchError;
+    if (resolvedBranchId) {
+      // Get current inventory quantity for this branch
+      const { data: inventory, error: fetchError } = await supabase
+        .from("inventory")
+        .select("quantity")
+        .eq("product_id", productId)
+        .eq("branch_id", resolvedBranchId)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error(`Error fetching inventory for product ${productId}:`, fetchError);
+        throw fetchError;
+      }
+
+      const currentQuantity = inventory?.quantity || 0;
+      const newQuantity = Math.max(0, currentQuantity + quantityChange);
+
+      // Upsert inventory row for this branch
+      const { error: updateError } = await supabase
+        .from("inventory")
+        .upsert({
+          product_id: productId,
+          branch_id: resolvedBranchId,
+          quantity: newQuantity,
+          min_stock_level: 5,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'product_id,branch_id',
+          ignoreDuplicates: false
+        });
+
+      if (updateError) {
+        console.error(`Error updating inventory for product ${productId}:`, updateError);
+        throw updateError;
+      }
+
+      // Sync products.quantity to the total across all branches
+      const { data: allRows } = await supabase
+        .from("inventory")
+        .select("quantity")
+        .eq("product_id", productId);
+      const totalQty = (allRows || []).reduce((sum: number, r: any) => sum + (r.quantity || 0), 0);
+      const { error: productUpdateError } = await supabase
+        .from("products")
+        .update({ quantity: totalQty })
+        .eq("id", productId);
+      if (productUpdateError) {
+        console.warn(`Warning: Could not sync product ${productId} quantity:`, productUpdateError);
+      }
+
+      return newQuantity;
+    } else {
+      // Fallback: no branch context - update products table only
+      const { data: product, error: fetchProductError } = await supabase
+        .from("products")
+        .select("quantity")
+        .eq("id", productId)
+        .single();
+      if (fetchProductError) throw fetchProductError;
+      const currentQuantity = product?.quantity || 0;
+      const newQuantity = Math.max(0, currentQuantity + quantityChange);
+      const { error: productUpdateError } = await supabase
+        .from("products")
+        .update({ quantity: newQuantity })
+        .eq("id", productId);
+      if (productUpdateError) throw productUpdateError;
+      return newQuantity;
     }
-
-    const currentQuantity = inventory?.quantity || 0;
-    const newQuantity = Math.max(0, currentQuantity + quantityChange);
-
-    // Update inventory using upsert to handle cases where inventory record doesn't exist
-    const { error: updateError } = await supabase
-      .from("inventory")
-      .upsert({
-        product_id: productId,
-        quantity: newQuantity,
-        min_stock_level: 5, // قيمة افتراضية للحد الأدنى
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'product_id',
-        ignoreDuplicates: false
-      });
-
-    if (updateError) {
-      console.error(`Error updating inventory for product ${productId}:`, updateError);
-      throw updateError;
-    }
-
-    // Also update products table for backward compatibility
-    const { error: productUpdateError } = await supabase
-      .from("products")
-      .update({ quantity: newQuantity })
-      .eq("id", productId);
-
-    if (productUpdateError) {
-      console.error(`Error updating product ${productId} quantity:`, productUpdateError);
-    }
-
-    return newQuantity;
   } catch (error) {
     console.error("Error updating inventory quantity:", error);
     throw error;
@@ -380,9 +439,14 @@ export async function updateInventoryQuantity(productId: string, quantityChange:
 }
 
 // Updated function to use inventory table with operation type
-export async function updateProductQuantity(productId: string, quantityChange: number, operation: 'increase' | 'decrease' = 'decrease') {
+export async function updateProductQuantity(
+  productId: string,
+  quantityChange: number,
+  operation: 'increase' | 'decrease' = 'decrease',
+  branchId?: string
+) {
   const adjustedChange = operation === 'increase' ? Math.abs(quantityChange) : -Math.abs(quantityChange);
-  return await updateInventoryQuantity(productId, adjustedChange);
+  return await updateInventoryQuantity(productId, adjustedChange, branchId);
 }
 
 // Barcode management functions

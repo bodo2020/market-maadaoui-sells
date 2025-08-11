@@ -54,6 +54,7 @@ export default function DailyInventoryPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const currentDate = format(new Date(), 'yyyy-MM-dd');
+  const getBranchId = () => (typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null);
 
   useEffect(() => {
     loadInventoryData();
@@ -75,14 +76,15 @@ export default function DailyInventoryPage() {
   const loadInventoryData = async () => {
     setLoading(true);
     try {
-      // التحقق من وجود جرد لليوم الحالي
-      const existingRecords = await fetchInventoryRecordsByDate(currentDate);
+      const branchId = getBranchId();
+      // التحقق من وجود جرد لليوم الحالي للفرع الحالي
+      const existingRecords = await fetchInventoryRecordsByDate(currentDate, branchId || undefined);
       
       if (existingRecords.length > 0) {
         // إذا كان هناك جرد موجود، اعرضه
         setInventoryRecords(existingRecords);
       } else {
-        // إنشاء جرد جديد
+        // إنشاء جرد جديد لهذا الفرع
         await startNewInventory();
       }
     } catch (error) {

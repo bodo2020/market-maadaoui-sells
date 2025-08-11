@@ -816,7 +816,15 @@ export type Database = {
           quantity?: number
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventory_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory_alerts: {
         Row: {
@@ -856,6 +864,7 @@ export type Database = {
       inventory_records: {
         Row: {
           actual_quantity: number
+          branch_id: string | null
           created_at: string
           created_by: string | null
           difference: number
@@ -871,6 +880,7 @@ export type Database = {
         }
         Insert: {
           actual_quantity?: number
+          branch_id?: string | null
           created_at?: string
           created_by?: string | null
           difference?: number
@@ -886,6 +896,7 @@ export type Database = {
         }
         Update: {
           actual_quantity?: number
+          branch_id?: string | null
           created_at?: string
           created_by?: string | null
           difference?: number
@@ -900,6 +911,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "inventory_records_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "inventory_records_product_id_fkey"
             columns: ["product_id"]
