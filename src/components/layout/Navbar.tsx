@@ -23,6 +23,7 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import BranchSwitcher from "@/components/layout/BranchSwitcher";
+import { useBranchStore } from "@/stores/branchStore";
 import SuperAdminDashboardDialog from "@/components/superadmin/SuperAdminDashboardDialog";
 import BranchesManagementDialog from "@/components/superadmin/BranchesManagementDialog";
 import InventoryTransferDialog from "@/components/superadmin/InventoryTransferDialog";
@@ -30,6 +31,7 @@ import InventoryTransferDialog from "@/components/superadmin/InventoryTransferDi
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { branches, currentBranchId } = useBranchStore();
   const [notifications, setNotifications] = useState<StockNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [superAdminOpen, setSuperAdminOpen] = useState(false);
@@ -88,14 +90,24 @@ export default function Navbar() {
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  const currentBranch = branches.find(b => b.id === currentBranchId);
 
   return (
     <header className="border-b bg-white py-3 px-6 flex items-center justify-between">
-      <div className="flex items-center">
+      <div className="flex items-center gap-4">
         <h2 className="text-lg font-medium">لوحة التحكم</h2>
+        {currentBranch && (
+          <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-lg">
+            <span className="text-sm font-medium text-primary">الفرع الحالي:</span>
+            <span className="text-sm font-semibold text-primary">{currentBranch.name}</span>
+          </div>
+        )}
       </div>
       
       <div className="flex items-center gap-4">
+        {/* Branch Switcher - visible to all users */}
+        <BranchSwitcher />
+        
         {/* زر لوحة السوبر أدمن - للسوبر أدمن فقط */}
         {user?.role === 'super_admin' && (
           <div className="hidden sm:flex items-center gap-2">
