@@ -1,6 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/types";
-import { useBranchStore } from "@/stores/branchStore";
 
 export async function fetchProducts() {
   console.log("Fetching all products");
@@ -36,16 +35,11 @@ export async function fetchProductById(id: string) {
     throw error;
   }
 
-  // جلب بيانات المخزون للمنتج (الحد الأدنى فقط) حسب الفرع الحالي
-  const branchId = await (async () => {
-    const st = useBranchStore.getState();
-    return await st.ensureInitialized();
-  })();
+  // جلب بيانات المخزون للمنتج (الحد الأدنى فقط)
   const { data: inventoryData } = await supabase
     .from("inventory")
     .select("min_stock_level")
     .eq("product_id", id)
-    .eq("branch_id", branchId as string)
     .maybeSingle();
 
   const productWithInventory = {
@@ -147,30 +141,19 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 
     console.log("Product created successfully:", data[0]);
     
-    // إنشاء سجل مخزون للمنتج في الفرع الحالي مع حدود التنبيه (فقط الحد الأدنى)
-    const branchId = await (async () => {
-      const st = useBranchStore.getState();
-      return await st.ensureInitialized();
-    })();
+    // إنشاء سجل مخزون للمنتج مع حدود التنبيه (فقط الحد الأدنى)
+    const inventoryData = {
+      product_id: data[0].id,
+      quantity: productData.quantity || 0,
+      min_stock_level: 5, // قيمة افتراضية للحد الأدنى
+    };
     
-    // Only create inventory if we have a valid branch
-    if (branchId) {
-      const inventoryData = {
-        product_id: data[0].id,
-        branch_id: branchId as string,
-        quantity: productData.quantity || 0,
-        min_stock_level: 5, // قيمة افتراضية للحد الأدنى
-      } as const;
+    const { error: inventoryError } = await supabase
+      .from("inventory")
+      .upsert(inventoryData, { onConflict: 'product_id' });
       
-      const { error: inventoryError } = await supabase
-        .from("inventory")
-        .upsert(inventoryData, { onConflict: 'product_id,branch_id' });
-        
-      if (inventoryError) {
-        console.warn("Warning: Could not create inventory record:", inventoryError);
-      }
-    } else {
-      console.warn("No branch selected - skipping inventory creation");
+    if (inventoryError) {
+      console.warn("Warning: Could not create inventory record:", inventoryError);
     }
     
     return data[0] as Product;
@@ -238,18 +221,13 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
         min_stock_level: product.min_stock_level,
       };
       
-      const branchId = await (async () => {
-        const st = useBranchStore.getState();
-        return await st.ensureInitialized();
-      })();
       const { error: inventoryError } = await supabase
         .from("inventory")
         .upsert({
           product_id: id,
-          branch_id: branchId as string,
           ...inventoryUpdate,
           updated_at: new Date().toISOString()
-        }, { onConflict: 'product_id,branch_id' });
+        }, { onConflict: 'product_id' });
         
       if (inventoryError) {
         console.warn("Warning: Could not update inventory record:", inventoryError);
@@ -351,17 +329,11 @@ export async function fetchProductsBySubcategory(subcategoryId: string) {
 // Inventory management functions
 export async function updateInventoryQuantity(productId: string, quantityChange: number) {
   try {
-    const branchId = await (async () => {
-      const st = useBranchStore.getState();
-      return await st.ensureInitialized();
-    })();
-
-    // Get current inventory quantity for this branch
+    // Get current inventory quantity
     const { data: inventory, error: fetchError } = await supabase
       .from("inventory")
       .select("quantity")
       .eq("product_id", productId)
-      .eq("branch_id", branchId as string)
       .maybeSingle();
 
     if (fetchError) {
@@ -377,18 +349,27 @@ export async function updateInventoryQuantity(productId: string, quantityChange:
       .from("inventory")
       .upsert({
         product_id: productId,
-        branch_id: branchId as string,
         quantity: newQuantity,
         min_stock_level: 5, // قيمة افتراضية للحد الأدنى
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'product_id,branch_id',
+        onConflict: 'product_id',
         ignoreDuplicates: false
       });
 
     if (updateError) {
       console.error(`Error updating inventory for product ${productId}:`, updateError);
       throw updateError;
+    }
+
+    // Also update products table for backward compatibility
+    const { error: productUpdateError } = await supabase
+      .from("products")
+      .update({ quantity: newQuantity })
+      .eq("id", productId);
+
+    if (productUpdateError) {
+      console.error(`Error updating product ${productId} quantity:`, productUpdateError);
     }
 
     return newQuantity;

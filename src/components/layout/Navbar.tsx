@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, BellDot, User, LogOut, X, Check, Gauge } from "lucide-react";
+import { Bell, BellDot, User, LogOut, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,21 +22,12 @@ import {
 } from "@/services/notificationService";
 import { toast } from "@/components/ui/sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import BranchSwitcher from "@/components/layout/BranchSwitcher";
-import { useBranchStore } from "@/stores/branchStore";
-import SuperAdminDashboardDialog from "@/components/superadmin/SuperAdminDashboardDialog";
-import BranchesManagementDialog from "@/components/superadmin/BranchesManagementDialog";
-import InventoryTransferDialog from "@/components/superadmin/InventoryTransferDialog";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { branches, currentBranchId } = useBranchStore();
   const [notifications, setNotifications] = useState<StockNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [superAdminOpen, setSuperAdminOpen] = useState(false);
-  const [manageBranchesOpen, setManageBranchesOpen] = useState(false);
-  const [transferOpen, setTransferOpen] = useState(false);
 
   // Load notifications on mount and when notifications change
   const loadNotifications = () => {
@@ -65,16 +56,6 @@ export default function Navbar() {
     return () => clearInterval(interval);
   }, []);
 
-  // Re-check low stock when branch changes
-  useEffect(() => {
-    const run = async () => {
-      await checkLowStockProducts();
-      showLowStockToasts();
-      loadNotifications();
-    };
-    if (currentBranchId) run();
-  }, [currentBranchId]);
-
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -100,35 +81,14 @@ export default function Navbar() {
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
-  const currentBranch = branches.find(b => b.id === currentBranchId);
 
   return (
     <header className="border-b bg-white py-3 px-6 flex items-center justify-between">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center">
         <h2 className="text-lg font-medium">لوحة التحكم</h2>
-        {currentBranch && (
-          <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-lg">
-            <span className="text-sm font-medium text-primary">الفرع الحالي:</span>
-            <span className="text-sm font-semibold text-primary">{currentBranch.name}</span>
-          </div>
-        )}
       </div>
       
       <div className="flex items-center gap-4">
-        {/* Branch Switcher - visible to all users */}
-        <BranchSwitcher />
-        
-        {/* زر لوحة السوبر أدمن - للسوبر أدمن فقط */}
-        {user?.role === 'super_admin' && (
-          <div className="hidden sm:flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setSuperAdminOpen(true)} className="flex items-center gap-2">
-              <Gauge className="h-4 w-4" /> لوحة السوبر أدمن
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setManageBranchesOpen(true)}>إدارة الفروع</Button>
-            <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)}>تحويل مخزون</Button>
-          </div>
-        )}
-
         {(user?.role === 'admin' || user?.role === 'super_admin') && (
           <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
             <DropdownMenuTrigger asChild>
@@ -136,7 +96,7 @@ export default function Navbar() {
                 {unreadCount > 0 ? (
                   <>
                     <BellDot size={20} className="text-yellow-500" />
-                    <span className="absolute top-0 right-0 w-4 h-4 rounded-full text-white text-xs flex items-center justify-center bg-destructive">
+                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
                       {unreadCount}
                     </span>
                   </>
@@ -225,15 +185,6 @@ export default function Navbar() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-
-      {/* نوافذ السوبر أدمن */}
-      {user?.role === 'super_admin' && (
-        <>
-          <SuperAdminDashboardDialog open={superAdminOpen} onOpenChange={setSuperAdminOpen} />
-          <BranchesManagementDialog open={manageBranchesOpen} onOpenChange={setManageBranchesOpen} />
-          <InventoryTransferDialog open={transferOpen} onOpenChange={setTransferOpen} />
-        </>
-      )}
     </header>
   );
 }

@@ -127,18 +127,6 @@ export const adminNavigation: NavigationGroup = {
       href: "/offers",
       icon: Tag,
     },
-    {
-      label: "إدارة الفروع",
-      href: "/admin/branches",
-      icon: Building2,
-      adminOnly: true,
-    },
-    {
-      label: "تحويلات المخزون",
-      href: "/inventory/transfers",
-      icon: RefreshCw,
-      adminOnly: true,
-    },
   ],
 };
 

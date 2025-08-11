@@ -38,8 +38,6 @@ import Returns from "@/pages/Returns";
 import CustomerProfile from "@/pages/CustomerProfile";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
 import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
-import BranchesManagement from "@/pages/BranchesManagement";
-import InventoryTransfers from "@/pages/InventoryTransfers";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
@@ -100,9 +98,6 @@ function App() {
               <Route path="/product-collections/create" element={<ProtectedRoute><CreateProductCollection /></ProtectedRoute>} />
               <Route path="/product-collections/edit/:id" element={<ProtectedRoute><EditProductCollection /></ProtectedRoute>} />
               <Route path="/barcode" element={<ProtectedRoute><Barcode /></ProtectedRoute>} />
-              {/* Super Admin pages */}
-              <Route path="/admin/branches" element={<ProtectedRoute><BranchesManagement /></ProtectedRoute>} />
-              <Route path="/inventory/transfers" element={<ProtectedRoute><InventoryTransfers /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <SonnerToaster position="top-center" richColors />
