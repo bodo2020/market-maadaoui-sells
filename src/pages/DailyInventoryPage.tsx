@@ -40,6 +40,7 @@ import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import * as XLSX from 'exceljs';
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function DailyInventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -122,10 +123,26 @@ export default function DailyInventoryPage() {
         purchase_price: product.purchase_price
       }));
       
-      await createInventoryRecords(inventoryData);
+      // تحديد الفرع الحالي (من التخزين المحلي أو أول فرع فعّال)
+      let branchId = getBranchId();
+      if (!branchId) {
+        const { data } = await supabase
+          .from('branches')
+          .select('id, name')
+          .eq('active', true)
+          .order('created_at', { ascending: true })
+          .limit(1);
+        branchId = data?.[0]?.id || null;
+        if (branchId) {
+          localStorage.setItem('currentBranchId', branchId);
+          if (data?.[0]?.name) localStorage.setItem('currentBranchName', data[0].name);
+        }
+      }
+      
+      await createInventoryRecords(inventoryData, branchId || undefined);
       
       // إعادة تحميل البيانات
-      const newRecords = await fetchInventoryRecordsByDate(currentDate);
+      const newRecords = await fetchInventoryRecordsByDate(currentDate, branchId || undefined);
       setInventoryRecords(newRecords);
       
       toast({
