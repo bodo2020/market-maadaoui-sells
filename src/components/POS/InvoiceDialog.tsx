@@ -62,6 +62,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       paymentInstructions: invoiceSettings.paymentInstructions || "",
       logoChoice: invoiceSettings.logoChoice || "store",
       customLogoUrl: invoiceSettings.customLogoUrl || null,
+      branchName,
     };
     
     // Print the invoice

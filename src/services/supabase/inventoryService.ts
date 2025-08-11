@@ -60,32 +60,19 @@ export interface InventorySession {
 // جلب المخزون للفرع المحدد
 export async function fetchInventoryByBranch(branchId?: string): Promise<InventoryItem[]> {
   try {
-    // استخدام الفرع المحدد أو الفرع الحالي
-    const targetBranchId = branchId || useBranchStore.getState().currentBranchId;
-    
+    const st = useBranchStore.getState();
+    const targetBranchId = branchId || st.currentBranchId || await st.ensureInitialized();
     if (!targetBranchId) {
       console.warn("No branch selected");
       return [];
     }
 
-    const { data, error } = await supabase
+    // 1) Fetch inventory rows only (no FK join)
+    const { data: inv, error } = await supabase
       .from("inventory")
-      .select(`
-        id,
-        product_id,
-        branch_id,
-        quantity,
-        min_stock_level,
-        max_stock_level,
-        created_at,
-        updated_at,
-        products:product_id (
-          name,
-          price,
-          purchase_price,
-          barcode
-        )
-      `)
+      .select(
+        "id, product_id, branch_id, quantity, min_stock_level, max_stock_level, created_at, updated_at"
+      )
       .eq("branch_id", targetBranchId)
       .order("updated_at", { ascending: false });
 
@@ -94,9 +81,22 @@ export async function fetchInventoryByBranch(branchId?: string): Promise<Invento
       throw error;
     }
 
-    return (data || []).map(item => ({
+    const inventory = inv || [];
+    if (inventory.length === 0) return [];
+
+    // 2) Fetch products for the product_ids in one batch
+    const productIds = Array.from(new Set(inventory.map((i) => i.product_id).filter(Boolean)));
+    const { data: prods } = await supabase
+      .from("products")
+      .select("id, name, price, purchase_price, barcode")
+      .in("id", productIds);
+
+    const map = new Map((prods || []).map((p: any) => [p.id, p]));
+
+    // 3) Merge
+    return inventory.map((item: any) => ({
       ...item,
-      product: Array.isArray(item.products) ? item.products[0] : item.products
+      product: map.get(item.product_id) || undefined,
     })) as InventoryItem[];
   } catch (error) {
     console.error("Error in fetchInventoryByBranch:", error);
@@ -143,45 +143,46 @@ export async function updateInventoryQuantity(
 // جلب المنتجات منخفضة المخزون للفرع المحدد
 export async function getLowStockProducts(threshold?: number, branchId?: string) {
   try {
-    const targetBranchId = branchId || useBranchStore.getState().currentBranchId;
-    
+    const st = useBranchStore.getState();
+    const targetBranchId = branchId || st.currentBranchId || await st.ensureInitialized();
     if (!targetBranchId) {
       console.warn("No branch selected");
       return [];
     }
 
-    let query = supabase
+    // 1) Fetch inventory rows
+    const { data: inv, error } = await supabase
       .from("inventory")
-      .select(`
-        id,
-        product_id,
-        quantity,
-        min_stock_level,
-        products:product_id (
-          name,
-          price,
-          purchase_price
-        )
-      `)
-      .eq("branch_id", targetBranchId);
-
-    // استخدام min_stock_level إذا لم يتم تمرير threshold
-    if (threshold !== undefined) {
-      query = query.lte("quantity", threshold);
-    } else {
-      query = query.filter("quantity", "lte", "min_stock_level");
-    }
-
-    const { data, error } = await query.order("quantity", { ascending: true });
+      .select("id, product_id, quantity, min_stock_level")
+      .eq("branch_id", targetBranchId)
+      .order("quantity", { ascending: true });
 
     if (error) {
       console.error("Error fetching low stock products:", error);
       throw error;
     }
 
-    return (data || []).map(item => ({
+    const inventory = inv || [];
+
+    // 2) Filter low stock client-side when no explicit threshold
+    const lowInv = threshold !== undefined
+      ? inventory.filter((i) => (i.quantity || 0) <= threshold)
+      : inventory.filter((i) => i.min_stock_level != null && (i.quantity || 0) <= (i.min_stock_level as number));
+
+    if (lowInv.length === 0) return [];
+
+    // 3) Fetch products batch
+    const productIds = Array.from(new Set(lowInv.map((i) => i.product_id).filter(Boolean)));
+    const { data: prods } = await supabase
+      .from("products")
+      .select("id, name, price, purchase_price")
+      .in("id", productIds);
+
+    const map = new Map((prods || []).map((p: any) => [p.id, p]));
+
+    return lowInv.map((item: any) => ({
       ...item,
-      product: Array.isArray(item.products) ? item.products[0] : item.products
+      product: map.get(item.product_id) || undefined,
     }));
   } catch (error) {
     console.error("Error in getLowStockProducts:", error);
@@ -457,39 +458,45 @@ export const fetchInventoryStats = async () => {
 
 // جلب المنتجات التي تحتاج تنبيه (أقل من الحد الأدنى) للفرع المحدد
 export const fetchLowStockProducts = async (branchId?: string) => {
-  const targetBranchId = branchId || useBranchStore.getState().currentBranchId;
-  
+  const st = useBranchStore.getState();
+  const targetBranchId = branchId || st.currentBranchId || await st.ensureInitialized();
   if (!targetBranchId) {
     console.warn("No branch selected");
     return [];
   }
 
-  const { data, error } = await supabase
+  // 1) Fetch inventory rows
+  const { data: inv, error } = await supabase
     .from('inventory')
-    .select(`
-      *,
-      products:product_id (
-        name,
-        price,
-        purchase_price,
-        barcode
-      )
-    `)
+    .select('id, product_id, quantity, min_stock_level')
     .eq('branch_id', targetBranchId)
-    .filter('quantity', 'lte', 'min_stock_level')
     .order('quantity', { ascending: true });
 
   if (error) throw error;
-  
-  return (data || []).map(item => ({
+
+  const inventory = inv || [];
+  const lowInv = inventory.filter(i => i.min_stock_level != null && (i.quantity || 0) <= (i.min_stock_level as number));
+  if (lowInv.length === 0) return [];
+
+  // 2) Fetch products batch
+  const productIds = Array.from(new Set(lowInv.map(i => i.product_id).filter(Boolean)));
+  const { data: prods } = await supabase
+    .from('products')
+    .select('id, name, price, purchase_price, barcode, image_urls')
+    .in('id', productIds);
+
+  const map = new Map((prods || []).map((p: any) => [p.id, p]));
+
+  return lowInv.map((item: any) => ({
     ...item,
-    product: Array.isArray(item.products) ? item.products[0] : item.products
+    product: map.get(item.product_id) || undefined,
   }));
 };
 
 // جلب جميع معلومات المخزون مع التنبيهات للفرع المحدد
 export const fetchInventoryWithAlerts = async (branchId?: string) => {
-  const targetBranchId = branchId || useBranchStore.getState().currentBranchId;
+  const st = useBranchStore.getState();
+  const targetBranchId = branchId || st.currentBranchId || await st.ensureInitialized();
   
   if (!targetBranchId) {
     console.warn("No branch selected");
@@ -502,30 +509,34 @@ export const fetchInventoryWithAlerts = async (branchId?: string) => {
     };
   }
 
-  const { data, error } = await supabase
+  // 1) Fetch inventory rows only
+  const { data: inv, error } = await supabase
     .from('inventory')
-    .select(`
-      *,
-      products:product_id (
-        name,
-        price,
-        purchase_price,
-        barcode,
-        image_urls
-      )
-    `)
+    .select('id, product_id, branch_id, quantity, min_stock_level, max_stock_level, updated_at')
     .eq('branch_id', targetBranchId)
     .order('quantity', { ascending: true });
 
   if (error) throw error;
-  
-  const all = (data || []).map(item => {
-    const p = Array.isArray(item.products) ? item.products[0] : item.products;
+
+  const inventory = inv || [];
+  if (inventory.length === 0) {
+    return { all: [], lowStock: [], normalStock: [], totalProducts: 0, lowStockCount: 0 };
+  }
+
+  // 2) Fetch products batch
+  const productIds = Array.from(new Set(inventory.map(i => i.product_id).filter(Boolean)));
+  const { data: prods } = await supabase
+    .from('products')
+    .select('id, name, price, purchase_price, barcode, image_urls')
+    .in('id', productIds);
+  const map = new Map((prods || []).map((p: any) => [p.id, p]));
+
+  // 3) Merge and flatten fields needed by UI
+  const all = inventory.map((item: any) => {
+    const p = map.get(item.product_id) || {};
     return {
       ...item,
-      // keep nested for backward compatibility
       product: p,
-      // flatten key product fields for UI filters and rendering
       name: p?.name,
       barcode: p?.barcode,
       price: p?.price,
@@ -534,14 +545,8 @@ export const fetchInventoryWithAlerts = async (branchId?: string) => {
     };
   });
   
-  // تصنيف المنتجات حسب حالة المخزون
-  const lowStock = all.filter(item => 
-    item.min_stock_level && item.quantity < item.min_stock_level
-  );
-  
-  const normalStock = all.filter(item => 
-    !item.min_stock_level || item.quantity >= item.min_stock_level
-  );
+  const lowStock = all.filter(item => item.min_stock_level && item.quantity < item.min_stock_level);
+  const normalStock = all.filter(item => !item.min_stock_level || item.quantity >= item.min_stock_level);
 
   return {
     all,
