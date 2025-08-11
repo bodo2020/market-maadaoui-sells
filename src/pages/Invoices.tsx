@@ -15,6 +15,7 @@ import InvoicePreviewDialog from '@/components/POS/InvoiceDialog';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
+import { useBranchStore } from '@/stores/branchStore';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const Invoices = () => {
@@ -27,6 +28,7 @@ const Invoices = () => {
   const [invoiceType, setInvoiceType] = useState<'sales' | 'purchases'>('sales');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const { currentBranchId } = useBranchStore();
 
   // Fetch all sales
   const { 
@@ -35,7 +37,7 @@ const Invoices = () => {
     isError: salesError, 
     refetch: refetchSales 
   } = useQuery({
-    queryKey: ['sales'],
+    queryKey: ['sales', currentBranchId],
     queryFn: () => fetchSales()
   });
 

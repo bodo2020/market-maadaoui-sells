@@ -65,6 +65,16 @@ export default function Navbar() {
     return () => clearInterval(interval);
   }, []);
 
+  // Re-check low stock when branch changes
+  useEffect(() => {
+    const run = async () => {
+      await checkLowStockProducts();
+      showLowStockToasts();
+      loadNotifications();
+    };
+    if (currentBranchId) run();
+  }, [currentBranchId]);
+
   const handleLogout = () => {
     logout();
     navigate('/login');

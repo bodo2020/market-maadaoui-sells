@@ -50,6 +50,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, updateProduct } from "@/services/supabase/productService";
 import { checkLowStockProducts, showLowStockToasts } from "@/services/notificationService";
 import { fetchInventoryWithAlerts } from "@/services/supabase/inventoryService";
+import { useBranchStore } from "@/stores/branchStore";
 
 export default function InventoryManagement() {
   const [inventory, setInventory] = useState<any[]>([]);
@@ -62,6 +63,7 @@ export default function InventoryManagement() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { currentBranchId } = useBranchStore();
   
   useEffect(() => {
     loadProducts();
@@ -74,6 +76,14 @@ export default function InventoryManagement() {
     
     checkStock();
   }, []);
+
+  // Reload inventory when branch changes
+  useEffect(() => {
+    if (currentBranchId) {
+      loadProducts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBranchId]);
 
   // Add effect to reload data when returning from edit page
   useEffect(() => {
