@@ -703,7 +703,12 @@ export default function SalesDashboard() {
                 {isStoreRecordsLoading ? (
                   <div className="text-center p-4">جاري التحميل...</div>
                 ) : storeRecords.length === 0 ? (
-                  <div className="text-center p-4">لا توجد حركات نقدية في هذه الفترة</div>
+                  <div className="text-center p-4">
+                    <p>لا توجد حركات نقدية في هذه الفترة</p>
+                    <Button variant="outline" size="sm" className="mt-2" onClick={() => refetchStoreRecords()}>
+                      تحديث
+                    </Button>
+                  </div>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -753,7 +758,12 @@ export default function SalesDashboard() {
                 {isOnlineRecordsLoading ? (
                   <div className="text-center p-4">جاري التحميل...</div>
                 ) : onlineRecords.length === 0 ? (
-                  <div className="text-center p-4">لا توجد حركات نقدية في هذه الفترة</div>
+                  <div className="text-center p-4">
+                    <p>لا توجد حركات نقدية في هذه الفترة</p>
+                    <Button variant="outline" size="sm" className="mt-2" onClick={() => refetchOnlineRecords()}>
+                      تحديث
+                    </Button>
+                  </div>
                 ) : (
                   <Table>
                     <TableHeader>
