@@ -717,6 +717,7 @@ export default function SalesDashboard() {
                         <TableHead>الرصيد الافتتاحي</TableHead>
                         <TableHead>الرصيد الختامي</TableHead>
                         <TableHead>الفرق</TableHead>
+                        <TableHead>المستخدم</TableHead>
                         <TableHead>ملاحظات</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -737,6 +738,7 @@ export default function SalesDashboard() {
                                 {Math.abs(Number(difference)).toLocaleString('ar-EG')} ج.م
                               </div>
                             </TableCell>
+                            <TableCell>{record.created_by ? record.created_by.substring(0, 8) : '-'}</TableCell>
                             <TableCell>{record.notes || '-'}</TableCell>
                           </TableRow>
                         );
@@ -772,6 +774,7 @@ export default function SalesDashboard() {
                         <TableHead>الرصيد الافتتاحي</TableHead>
                         <TableHead>الرصيد الختامي</TableHead>
                         <TableHead>الفرق</TableHead>
+                        <TableHead>المستخدم</TableHead>
                         <TableHead>ملاحظات</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -792,6 +795,7 @@ export default function SalesDashboard() {
                                 {Math.abs(Number(difference)).toLocaleString('ar-EG')} ج.م
                               </div>
                             </TableCell>
+                            <TableCell>{record.created_by ? record.created_by.substring(0, 8) : '-'}</TableCell>
                             <TableCell>{record.notes || '-'}</TableCell>
                           </TableRow>
                         );
