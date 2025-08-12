@@ -17,7 +17,9 @@ import { RegisterType, getLatestCashBalance } from "@/services/supabase/cashTrac
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Wallet, Plus, Minus } from "lucide-react";
+import { Wallet, Plus, Minus, Download } from "lucide-react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 
 interface CashRecord {
   id: string;
@@ -54,6 +56,7 @@ export default function CashTracking() {
   const [amount, setAmount] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [processingTransaction, setProcessingTransaction] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fetchRecords = async () => {
     try {
@@ -204,12 +207,56 @@ export default function CashTracking() {
     fetchRecords();
   }, []);
 
+  const handleExportExcel = async () => {
+    try {
+      setExporting(true);
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('المعاملات');
+
+      worksheet.columns = [
+        { header: 'التاريخ', key: 'date', width: 22 },
+        { header: 'النوع', key: 'type', width: 12 },
+        { header: 'المبلغ', key: 'amount', width: 14 },
+        { header: 'الرصيد بعد العملية', key: 'balance_after', width: 20 },
+        { header: 'ملاحظات', key: 'notes', width: 30 },
+      ];
+
+      transactions.forEach((t) => {
+        worksheet.addRow({
+          date: new Date(t.transaction_date).toLocaleString('ar'),
+          type: t.transaction_type === 'deposit' ? 'إيداع' : 'سحب',
+          amount: Number(t.amount).toFixed(2),
+          balance_after: Number(t.balance_after).toFixed(2),
+          notes: t.notes || '',
+        });
+      });
+
+      worksheet.getRow(1).font = { bold: true };
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        `سجل-المعاملات-النقدية-${new Date().toISOString().slice(0,10)}.xlsx`
+      );
+      toast.success('تم تصدير المعاملات إلى Excel');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('تعذر تصدير الملف');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="container mx-auto p-6" dir="rtl">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">متابعة النقدية</h1>
           <div className="flex space-x-2 space-x-reverse">
+            <Button variant="outline" onClick={handleExportExcel} disabled={exporting}>
+              <Download className="ml-2 h-4 w-4" />
+              تصدير Excel
+            </Button>
             <Button 
               variant="outline" 
               className="mr-2" 
@@ -239,6 +286,45 @@ export default function CashTracking() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="overflow-hidden mb-6">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>التاريخ</TableHead>
+                <TableHead>النوع</TableHead>
+                <TableHead>المبلغ</TableHead>
+                <TableHead>الرصيد بعد العملية</TableHead>
+                <TableHead>الملاحظات</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center">
+                    جاري التحميل...
+                  </TableCell>
+                </TableRow>
+              ) : transactions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    لا توجد معاملات نقدية حتى الآن
+                  </TableCell>
+                </TableRow>
+              ) : (
+                transactions.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell>{new Date(t.transaction_date).toLocaleString('ar')}</TableCell>
+                    <TableCell>{t.transaction_type === 'deposit' ? 'إيداع' : 'سحب'}</TableCell>
+                    <TableCell>{t.amount.toFixed(2)}</TableCell>
+                    <TableCell>{t.balance_after.toFixed(2)}</TableCell>
+                    <TableCell>{t.notes || '-'}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Card>
 
         <Card className="overflow-hidden">
           <Table>
