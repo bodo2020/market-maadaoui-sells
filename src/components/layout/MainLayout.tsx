@@ -54,16 +54,14 @@ export default function MainLayout({
 
     const fetchCounts = async () => {
       try {
-        const [ordersRes, returnsRes, requestsRes] = await Promise.all([
+        const [ordersRes, returnsRes] = await Promise.all([
           supabase.from('online_orders').select('*', { count: 'exact', head: true }).eq('status', 'waiting'),
-          supabase.from('returns').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-          supabase.from('return_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+          supabase.from('returns').select('*', { count: 'exact', head: true }).eq('status', 'pending')
         ]);
         if (ordersRes.error) console.error('Error counting waiting orders:', ordersRes.error);
         if (returnsRes.error) console.error('Error counting pending returns:', returnsRes.error);
-        if (requestsRes.error) console.error('Error counting pending return requests:', requestsRes.error);
         setUnreadOrders(ordersRes.count || 0);
-        setUnreadReturns((returnsRes.count || 0) + (requestsRes.count || 0));
+        setUnreadReturns(returnsRes.count || 0);
       } catch (e) {
         console.error('Error fetching counts:', e);
       }
@@ -84,12 +82,6 @@ export default function MainLayout({
         fetchCounts();
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'returns' }, () => {
-        fetchCounts();
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'return_requests' }, () => {
-        fetchCounts();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'return_requests' }, () => {
         fetchCounts();
       })
       .subscribe();

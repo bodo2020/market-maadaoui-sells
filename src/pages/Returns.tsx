@@ -64,12 +64,11 @@ export default function Returns() {
   const [invoiceReturnDialogOpen, setInvoiceReturnDialogOpen] = useState(false);
   const [returnsRefreshKey, setReturnsRefreshKey] = useState(0);
 
-  // Fetch returns data (merged with online return requests)
+  // Fetch returns data
   const { data: returns, isLoading } = useQuery({
     queryKey: ['returns', returnsRefreshKey],
     queryFn: async () => {
       try {
-        // 1) Fetch processed returns with items and customer name
         const { data: returnsData, error: returnsError } = await supabase
           .from('returns')
           .select(`
@@ -85,8 +84,10 @@ export default function Returns() {
             )
           `)
           .order('created_at', { ascending: false });
+        
         if (returnsError) throw returnsError;
-
+        
+        // Fetch product names for each return item
         const returnsWithProductNames = await Promise.all(
           (returnsData || []).map(async (returnItem: any) => {
             const items = await Promise.all(
@@ -96,55 +97,26 @@ export default function Returns() {
                   .select('name')
                   .eq('id', item.product_id)
                   .single();
-                return { ...item, product_name: productData?.name || 'منتج غير معروف' };
+                
+                return {
+                  ...item,
+                  product_name: productData?.name || 'منتج غير معروف'
+                };
               })
             );
+            
+            // Add customer_name property derived from customers.name, direct customer_name field, or default value
             const customer_name = returnItem.customer_name || returnItem.customers?.name || 'غير معروف';
-            return { ...returnItem, customer_name, items, source: 'return' };
+            
+            return {
+              ...returnItem,
+              customer_name,
+              items
+            };
           })
         );
-
-        // 2) Fetch online return requests and map to the same shape (no items/amount yet)
-        const { data: requestsData, error: requestsError } = await supabase
-          .from('return_requests')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (requestsError) throw requestsError;
-
-        // Fetch customer names for the user_ids found in requests
-        const userIds = Array.from(new Set((requestsData || []).map((r: any) => r.user_id).filter(Boolean)));
-        let customersByUserId: Record<string, string> = {};
-        if (userIds.length > 0) {
-          const { data: customersData } = await supabase
-            .from('customers')
-            .select('user_id, name')
-            .in('user_id', userIds);
-          (customersData || []).forEach((c: any) => {
-            if (c.user_id) customersByUserId[c.user_id] = c.name || 'غير معروف';
-          });
-        }
-
-        const mappedRequests = (requestsData || []).map((req: any) => ({
-          id: req.id,
-          order_id: req.order_id || null,
-          customer_id: null,
-          customers: undefined,
-          customer_name: customersByUserId[req.user_id] || 'غير معروف',
-          total_amount: 0,
-          reason: req.reason || null,
-          status: req.status || 'pending',
-          created_at: req.created_at,
-          updated_at: req.updated_at,
-          items: [],
-          source: 'request'
-        }));
-
-        // 3) Merge and sort by date desc
-        const combined = [...returnsWithProductNames, ...mappedRequests].sort(
-          (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-
-        return combined;
+        
+        return returnsWithProductNames;
       } catch (error) {
         console.error("Error fetching returns:", error);
         toast.error("حدث خطأ أثناء تحميل بيانات المرتجعات");
@@ -449,35 +421,29 @@ export default function Returns() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            { (returnItem as any).source === 'request' ? (
-                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">طلب أونلاين</Badge>
-                            ) : (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handleViewDetails(returnItem)}
+                            >
+                              التفاصيل
+                            </Button>
+                            {returnItem.status === 'pending' && (
                               <>
                                 <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  onClick={() => handleViewDetails(returnItem)}
+                                  variant="default" 
+                                  size="sm"
+                                  onClick={() => handleApproveReturn(returnItem.id)}
                                 >
-                                  التفاصيل
+                                  قبول
                                 </Button>
-                                {returnItem.status === 'pending' && (
-                                  <>
-                                    <Button 
-                                      variant="default" 
-                                      size="sm"
-                                      onClick={() => handleApproveReturn(returnItem.id)}
-                                    >
-                                      قبول
-                                    </Button>
-                                    <Button 
-                                      variant="destructive" 
-                                      size="sm"
-                                      onClick={() => handleRejectReturn(returnItem.id)}
-                                    >
-                                      رفض
-                                    </Button>
-                                  </>
-                                )}
+                                <Button 
+                                  variant="destructive" 
+                                  size="sm"
+                                  onClick={() => handleRejectReturn(returnItem.id)}
+                                >
+                                  رفض
+                                </Button>
                               </>
                             )}
                           </div>
