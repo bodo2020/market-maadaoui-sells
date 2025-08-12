@@ -42,6 +42,7 @@ interface CashTransaction {
   register_type: RegisterType;
   notes?: string;
   created_by?: string;
+  created_by_name?: string;
   created_at?: string;
 }
 
@@ -82,7 +83,38 @@ export default function CashTracking() {
       }
       
       console.log("Cash transactions fetched:", transactionData);
-      setTransactions(transactionData as CashTransaction[]);
+      const tx = (transactionData as CashTransaction[]) || [];
+
+      // Fetch user names for creators
+      const creatorIds = Array.from(
+        new Set(
+          tx.map((t) => t.created_by).filter((id): id is string => Boolean(id))
+        )
+      );
+
+      if (creatorIds.length > 0) {
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('id,name,username')
+          .in('id', creatorIds);
+
+        if (usersError) {
+          console.error('Error fetching users for transactions:', usersError);
+          setTransactions(tx);
+        } else {
+          const nameMap = new Map<string, string>(
+            usersData?.map((u: any) => [u.id, u.name || u.username || 'غير معروف']) || []
+          );
+          setTransactions(
+            tx.map((t) => ({
+              ...t,
+              created_by_name: t.created_by ? (nameMap.get(t.created_by) || 'غير معروف') : '-'
+            }))
+          );
+        }
+      } else {
+        setTransactions(tx);
+      }
       
       // Also fetch the cash tracking records
       const { data: cashData, error: cashError } = await supabase
@@ -218,6 +250,7 @@ export default function CashTracking() {
         { header: 'النوع', key: 'type', width: 12 },
         { header: 'المبلغ', key: 'amount', width: 14 },
         { header: 'الرصيد بعد العملية', key: 'balance_after', width: 20 },
+        { header: 'المستخدم', key: 'user', width: 22 },
         { header: 'ملاحظات', key: 'notes', width: 30 },
       ];
 
@@ -227,6 +260,7 @@ export default function CashTracking() {
           type: t.transaction_type === 'deposit' ? 'إيداع' : 'سحب',
           amount: Number(t.amount).toFixed(2),
           balance_after: Number(t.balance_after).toFixed(2),
+          user: t.created_by_name || '-',
           notes: t.notes || '',
         });
       });
@@ -295,19 +329,20 @@ export default function CashTracking() {
                 <TableHead>النوع</TableHead>
                 <TableHead>المبلغ</TableHead>
                 <TableHead>الرصيد بعد العملية</TableHead>
+                <TableHead>المستخدم</TableHead>
                 <TableHead>الملاحظات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     جاري التحميل...
                   </TableCell>
                 </TableRow>
               ) : transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     لا توجد معاملات نقدية حتى الآن
                   </TableCell>
                 </TableRow>
@@ -318,6 +353,7 @@ export default function CashTracking() {
                     <TableCell>{t.transaction_type === 'deposit' ? 'إيداع' : 'سحب'}</TableCell>
                     <TableCell>{t.amount.toFixed(2)}</TableCell>
                     <TableCell>{t.balance_after.toFixed(2)}</TableCell>
+                    <TableCell>{t.created_by_name || '-'}</TableCell>
                     <TableCell>{t.notes || '-'}</TableCell>
                   </TableRow>
                 ))
