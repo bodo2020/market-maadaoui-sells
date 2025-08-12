@@ -124,7 +124,8 @@ export default function CashTracking() {
           amount: parseFloat(amount),
           transaction_type: 'deposit',
           register_type: RegisterType.STORE,
-          notes: notes || "إيداع نقدي"
+          notes: notes || "إيداع نقدي",
+          created_by: user?.id || undefined
         }
       });
 
@@ -174,7 +175,8 @@ export default function CashTracking() {
           amount: parseFloat(amount),
           transaction_type: 'withdrawal',
           register_type: RegisterType.STORE,
-          notes: notes || "سحب نقدي"
+          notes: notes || "سحب نقدي",
+          created_by: user?.id || undefined
         }
       });
 

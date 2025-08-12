@@ -7,6 +7,7 @@ interface CashTransactionRequest {
   transaction_type: 'deposit' | 'withdrawal';
   register_type: 'store' | 'online';
   notes?: string;
+  created_by?: string;
 }
 
 const corsHeaders = {
@@ -35,8 +36,8 @@ serve(async (req) => {
       }
     );
 
-    // Get the request body
-    const { amount, transaction_type, register_type, notes } = await req.json() as CashTransactionRequest;
+// Get the request body
+const { amount, transaction_type, register_type, notes, created_by } = await req.json() as CashTransactionRequest;
 
     console.log('Processing transaction:', { amount, transaction_type, register_type, notes });
 
@@ -114,7 +115,8 @@ serve(async (req) => {
         p_amount: amount,
         p_transaction_type: transaction_type,
         p_register_type: register_type,
-        p_notes: notes || null
+        p_notes: notes || null,
+        p_created_by: created_by || null
       }
     );
 

@@ -2134,12 +2134,20 @@ export type Database = {
     }
     Functions: {
       add_cash_transaction: {
-        Args: {
-          p_amount: number
-          p_transaction_type: string
-          p_register_type: string
-          p_notes: string
-        }
+        Args:
+          | {
+              p_amount: number
+              p_transaction_type: string
+              p_register_type: string
+              p_notes: string
+            }
+          | {
+              p_amount: number
+              p_transaction_type: string
+              p_register_type: string
+              p_notes: string
+              p_created_by?: string
+            }
         Returns: number
       }
       create_bucket_if_not_exists: {
