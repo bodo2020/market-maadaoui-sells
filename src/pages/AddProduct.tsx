@@ -221,25 +221,6 @@ export default function AddProduct() {
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="barcode">الباركود</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="barcode"
-                      placeholder="الباركود"
-                      value={product?.barcode || ""}
-                      onChange={(e) => setProduct((prev) => ({ ...prev, barcode: e.target.value }))}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsScannerOpen(true)}
-                      className="flex-shrink-0"
-                    >
-                      <Scan className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
 
                 <div>
                   <Label htmlFor="price">سعر البيع</Label>
@@ -300,6 +281,52 @@ export default function AddProduct() {
                   value={product?.description || ""}
                   onChange={(e) => setProduct((prev) => ({ ...prev, description: e.target.value }))}
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* الباركود */}
+          <Card>
+            <CardHeader>
+              <CardTitle>الباركود</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="barcode">الباركود</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="barcode"
+                      placeholder="الباركود"
+                      value={product?.barcode || ""}
+                      onChange={(e) => setProduct((prev) => ({ ...prev, barcode: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsScannerOpen(true)}
+                      className="flex-shrink-0"
+                    >
+                      <Scan className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="barcode_type">نوع الباركود</Label>
+                  <Select
+                    value={product?.barcode_type || "normal"}
+                    onValueChange={(value) => setProduct((prev) => ({ ...prev, barcode_type: value as any }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر نوع الباركود" />
+                    </SelectTrigger>
+                    <SelectContent className="z-50 bg-background">
+                      <SelectItem value="normal">عادي</SelectItem>
+                      <SelectItem value="scale">ميزان</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
