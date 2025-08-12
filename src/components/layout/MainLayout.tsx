@@ -20,8 +20,7 @@ export default function MainLayout({
     isLoading
   } = useAuth();
   const {
-    setUnreadOrders,
-    setUnreadReturns
+    setUnreadOrders
   } = useNotificationStore();
   const isMobile = useIsMobile();
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -47,49 +46,6 @@ export default function MainLayout({
       fetchUnreadOrders();
     }
   }, [isAuthenticated, setUnreadOrders]);
-
-  // Realtime subscription for order/return counts
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const fetchCounts = async () => {
-      try {
-        const [ordersRes, returnsRes] = await Promise.all([
-          supabase.from('online_orders').select('*', { count: 'exact', head: true }).eq('status', 'waiting'),
-          supabase.from('returns').select('*', { count: 'exact', head: true }).eq('status', 'pending')
-        ]);
-        if (ordersRes.error) console.error('Error counting waiting orders:', ordersRes.error);
-        if (returnsRes.error) console.error('Error counting pending returns:', returnsRes.error);
-        setUnreadOrders(ordersRes.count || 0);
-        setUnreadReturns(returnsRes.count || 0);
-      } catch (e) {
-        console.error('Error fetching counts:', e);
-      }
-    };
-
-    // initial fetch
-    fetchCounts();
-
-    const channel = supabase
-      .channel('global-notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'online_orders' }, () => {
-        fetchCounts();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'online_orders' }, () => {
-        fetchCounts();
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'returns' }, () => {
-        fetchCounts();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'returns' }, () => {
-        fetchCounts();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isAuthenticated, setUnreadOrders, setUnreadReturns]);
 
   // If loading, show loading indicator
   if (isLoading) {
