@@ -398,12 +398,14 @@ export default function POS() {
         register_type: 'store'
       });
       
+      const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
       const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
         body: {
           amount: amountToRecord,
           transaction_type: 'deposit',
           register_type: 'store',
-          notes: 'مبيعات نقطة البيع'
+          notes: 'مبيعات نقطة البيع',
+          branch_id: branchId || undefined
         }
       });
       

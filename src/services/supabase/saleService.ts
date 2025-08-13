@@ -8,15 +8,19 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
     const { data: userData } = await supabase.auth.getUser();
     const cashierId = userData.user?.id;
 
+    // Resolve current branch from localStorage (client-side)
+    const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+
     // Ensure date is a string
     const saleData = {
       ...sale,
       date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date,
       // Convert CartItem[] to Json for Supabase
       items: JSON.parse(JSON.stringify(sale.items)),
-      // Add cashier ID and name to the sale record
+      // Add cashier and branch info
       cashier_id: cashierId,
-      cashier_name: cashierName || sale.cashier_name
+      cashier_name: cashierName || sale.cashier_name,
+      branch_id: branchId || sale.branch_id || null
     };
     
     // Create the sale record

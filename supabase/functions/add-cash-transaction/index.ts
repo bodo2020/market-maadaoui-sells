@@ -8,6 +8,7 @@ interface CashTransactionRequest {
   register_type: 'store' | 'online';
   notes?: string;
   created_by?: string;
+  branch_id?: string;
 }
 
 const corsHeaders = {
@@ -37,59 +38,84 @@ serve(async (req) => {
     );
 
 // Get the request body
-const { amount, transaction_type, register_type, notes, created_by } = await req.json() as CashTransactionRequest;
+const payload = await req.json() as CashTransactionRequest;
+const { amount, transaction_type, register_type, notes, created_by } = payload;
 
-    console.log('Processing transaction:', { amount, transaction_type, register_type, notes });
+console.log('Processing transaction:', { amount, transaction_type, register_type, notes, branch_id: payload.branch_id });
 
-    // Validate inputs
-    if (!amount || amount <= 0) {
-      return new Response(
-        JSON.stringify({ error: 'Amount must be greater than zero' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
+// Validate inputs
+if (!amount || amount <= 0) {
+  return new Response(
+    JSON.stringify({ error: 'Amount must be greater than zero' }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+  );
+}
 
-    if (!['deposit', 'withdrawal'].includes(transaction_type)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid transaction type' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
+if (!['deposit', 'withdrawal'].includes(transaction_type)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid transaction type' }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+  );
+}
 
-    if (!['store', 'online'].includes(register_type)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid register type' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
+if (!['store', 'online'].includes(register_type)) {
+  return new Response(
+    JSON.stringify({ error: 'Invalid register type' }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+  );
+}
 
-    // Get the current balance before the transaction
-    const { data: currentBalanceData, error: balanceError } = await supabaseClient
-      .from('cash_transactions')
-      .select('balance_after')
-      .eq('register_type', register_type)
-      .order('transaction_date', { ascending: false })
-      .limit(1);
+// Resolve user and branch
+const { data: authData } = await supabaseClient.auth.getUser();
+const userId = authData?.user?.id || created_by || null;
+
+let branchId: string | null = payload.branch_id || null;
+if (!branchId && userId) {
+  const { data: branchRow } = await supabaseClient
+    .from('user_branch_roles')
+    .select('branch_id')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  branchId = branchRow?.branch_id || null;
+}
+
+// Get the current balance before the transaction
+let currentBalance = 0;
+let txQuery = supabaseClient
+  .from('cash_transactions')
+  .select('balance_after')
+  .eq('register_type', register_type)
+  .order('transaction_date', { ascending: false })
+  .limit(1);
+
+if (branchId) {
+  txQuery = txQuery.eq('branch_id', branchId);
+}
+const { data: currentBalanceData, error: balanceError } = await txQuery;
     
-    let currentBalance = 0;
-    if (!balanceError && currentBalanceData && currentBalanceData.length > 0) {
-      currentBalance = currentBalanceData[0].balance_after || 0;
-      console.log('Current balance from transactions:', currentBalance);
-    } else {
-      // If no transactions, check the tracking table
-      const { data: trackingBalanceData, error: trackingBalanceError } = await supabaseClient
-        .from('cash_tracking')
-        .select('closing_balance')
-        .eq('register_type', register_type)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (!trackingBalanceError && trackingBalanceData && trackingBalanceData.length > 0) {
-        currentBalance = trackingBalanceData[0].closing_balance || 0;
-        console.log('Current balance from tracking:', currentBalance);
-      }
-    }
+if (!balanceError && currentBalanceData && currentBalanceData.length > 0) {
+  currentBalance = currentBalanceData[0].balance_after || 0;
+  console.log('Current balance from transactions:', currentBalance);
+} else {
+  // If no transactions, check the tracking table
+  let trQuery = supabaseClient
+    .from('cash_tracking')
+    .select('closing_balance')
+    .eq('register_type', register_type)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (branchId) {
+    trQuery = trQuery.eq('branch_id', branchId);
+  }
+  const { data: trackingBalanceData, error: trackingBalanceError } = await trQuery;
+  if (!trackingBalanceError && trackingBalanceData && trackingBalanceData.length > 0) {
+    currentBalance = trackingBalanceData[0].closing_balance || 0;
+    console.log('Current balance from tracking:', currentBalance);
+  }
+}
 
     // Calculate new balance
     let newBalance = currentBalance;
@@ -116,7 +142,8 @@ const { amount, transaction_type, register_type, notes, created_by } = await req
         p_transaction_type: transaction_type,
         p_register_type: register_type,
         p_notes: notes || null,
-        p_created_by: created_by || null
+        p_created_by: created_by || null,
+        p_branch_id: branchId || null
       }
     );
 
@@ -136,13 +163,16 @@ const { amount, transaction_type, register_type, notes, created_by } = await req
     console.log('Transaction successfully recorded, new balance:', functionData);
 
     // Get the newly created transaction to return to the client
-    const { data: transactionData, error: transactionError } = await supabaseClient
-      .from('cash_transactions')
-      .select('*')
-      .eq('register_type', register_type)
-      .order('transaction_date', { ascending: false })
-      .limit(1)
-      .single();
+let txFetch = supabaseClient
+  .from('cash_transactions')
+  .select('*')
+  .eq('register_type', register_type)
+  .order('transaction_date', { ascending: false })
+  .limit(1);
+if (branchId) {
+  txFetch = txFetch.eq('branch_id', branchId);
+}
+const { data: transactionData, error: transactionError } = await txFetch.single();
 
     let transaction = null;
     if (transactionError) {
@@ -154,14 +184,17 @@ const { amount, transaction_type, register_type, notes, created_by } = await req
     }
 
     // Get the latest tracking record
-    const { data: trackingData, error: trackingError } = await supabaseClient
-      .from('cash_tracking')
-      .select('*')
-      .eq('register_type', register_type)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+let trackingFetch = supabaseClient
+  .from('cash_tracking')
+  .select('*')
+  .eq('register_type', register_type)
+  .order('date', { ascending: false })
+  .order('created_at', { ascending: false })
+  .limit(1);
+if (branchId) {
+  trackingFetch = trackingFetch.eq('branch_id', branchId);
+}
+const { data: trackingData, error: trackingError } = await trackingFetch.single();
 
     let tracking = null;
     if (trackingError) {

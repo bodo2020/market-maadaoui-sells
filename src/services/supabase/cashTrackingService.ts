@@ -53,6 +53,12 @@ export async function fetchCashRecords(registerType?: RegisterType, dateRange?: 
     query = query.eq('register_type', registerType);
   }
   
+  // Filter by current branch if available
+  const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+  if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+  
   if (dateRange?.from && dateRange?.to) {
     const fromDate = dateRange.from.toISOString().split('T')[0];
     const toDate = dateRange.to.toISOString().split('T')[0];
@@ -95,12 +101,17 @@ export async function getLatestCashBalance(registerType: RegisterType) {
   try {
     // First check the transactions table, which is more reliable
     console.log(`Fetching balance for register ${registerType} from transactions table`);
-    const { data: transactionData, error: transactionError } = await supabase
+    const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    let txQuery = supabase
       .from('cash_transactions')
       .select('balance_after')
       .eq('register_type', registerType)
       .order('transaction_date', { ascending: false })
       .limit(1);
+    if (branchId) {
+      txQuery = txQuery.eq('branch_id', branchId);
+    }
+    const { data: transactionData, error: transactionError } = await txQuery;
       
     if (!transactionError && transactionData && transactionData.length > 0) {
       const balance = transactionData[0].balance_after || 0;
@@ -111,13 +122,17 @@ export async function getLatestCashBalance(registerType: RegisterType) {
     console.log('No transactions found or error, checking tracking table');
     
     // If no transactions found, check the tracking table
-    const { data, error } = await supabase
+    let trackingQuery = supabase
       .from('cash_tracking')
       .select('closing_balance, opening_balance')
       .eq('register_type', registerType)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(1);
+    if (branchId) {
+      trackingQuery = trackingQuery.eq('branch_id', branchId);
+    }
+    const { data, error } = await trackingQuery;
       
     if (error) {
       console.error('Error fetching cash tracking:', error);
@@ -153,12 +168,14 @@ export async function recordCashTransaction(
       notes
     });
     
+    const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
     const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
       body: {
         amount,
         transaction_type: transactionType,
         register_type: registerType,
-        notes
+        notes,
+        branch_id: branchId || undefined
       }
     });
       
@@ -186,6 +203,11 @@ export async function fetchCashTransactions(registerType?: RegisterType, dateRan
     
   if (registerType) {
     query = query.eq('register_type', registerType);
+  }
+  
+  const branchIdTx = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+  if (branchIdTx) {
+    query = query.eq('branch_id', branchIdTx);
   }
   
   if (dateRange?.from && dateRange?.to) {

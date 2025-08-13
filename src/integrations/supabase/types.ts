@@ -2148,6 +2148,14 @@ export type Database = {
               p_notes: string
               p_created_by?: string
             }
+          | {
+              p_amount: number
+              p_transaction_type: string
+              p_register_type: string
+              p_notes: string
+              p_created_by?: string
+              p_branch_id?: string
+            }
         Returns: number
       }
       create_bucket_if_not_exists: {

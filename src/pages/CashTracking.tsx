@@ -154,13 +154,15 @@ export default function CashTracking() {
         notes: notes || "إيداع نقدي"
       });
       
+      const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
       const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
         body: {
           amount: parseFloat(amount),
           transaction_type: 'deposit',
           register_type: RegisterType.STORE,
           notes: notes || "إيداع نقدي",
-          created_by: user?.id || undefined
+          created_by: user?.id || undefined,
+          branch_id: branchId || undefined
         }
       });
 
