@@ -53,7 +53,7 @@ export async function fetchCashRecords(registerType?: RegisterType, dateRange?: 
     query = query.eq('register_type', registerType);
   }
   
-  // Filter by current branch if available
+  // Filter by current branch if available, otherwise show all data
   const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
   if (branchId) {
     query = query.eq('branch_id', branchId);
@@ -108,6 +108,7 @@ export async function getLatestCashBalance(registerType: RegisterType) {
       .eq('register_type', registerType)
       .order('transaction_date', { ascending: false })
       .limit(1);
+    // Only filter by branch if we have a branch ID, otherwise show all
     if (branchId) {
       txQuery = txQuery.eq('branch_id', branchId);
     }
@@ -129,6 +130,7 @@ export async function getLatestCashBalance(registerType: RegisterType) {
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(1);
+    // Only filter by branch if we have a branch ID, otherwise show all
     if (branchId) {
       trackingQuery = trackingQuery.eq('branch_id', branchId);
     }
@@ -206,6 +208,7 @@ export async function fetchCashTransactions(registerType?: RegisterType, dateRan
   }
   
   const branchIdTx = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+  // Only filter by branch if we have a branch ID, otherwise show all
   if (branchIdTx) {
     query = query.eq('branch_id', branchIdTx);
   }
