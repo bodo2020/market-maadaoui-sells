@@ -120,6 +120,7 @@ export interface Sale {
   items: CartItem[];
   cashier_id?: string;
   cashier_name?: string;
+  branch_id?: string;
   created_at: string;
   updated_at: string;
   cash_amount?: number;
