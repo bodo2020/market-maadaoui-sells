@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -2137,24 +2137,24 @@ export type Database = {
         Args:
           | {
               p_amount: number
-              p_transaction_type: string
-              p_register_type: string
-              p_notes: string
-            }
-          | {
-              p_amount: number
-              p_transaction_type: string
-              p_register_type: string
-              p_notes: string
-              p_created_by?: string
-            }
-          | {
-              p_amount: number
-              p_transaction_type: string
-              p_register_type: string
-              p_notes: string
-              p_created_by?: string
               p_branch_id?: string
+              p_created_by?: string
+              p_notes: string
+              p_register_type: string
+              p_transaction_type: string
+            }
+          | {
+              p_amount: number
+              p_created_by?: string
+              p_notes: string
+              p_register_type: string
+              p_transaction_type: string
+            }
+          | {
+              p_amount: number
+              p_notes: string
+              p_register_type: string
+              p_transaction_type: string
             }
         Returns: number
       }
@@ -2175,7 +2175,7 @@ export type Database = {
         Returns: string
       }
       has_branch_access: {
-        Args: { _user: string; _branch: string }
+        Args: { _branch: string; _user: string }
         Returns: boolean
       }
       is_admin: {
@@ -2187,21 +2187,21 @@ export type Database = {
         Returns: boolean
       }
       sales_summary_by_branch: {
-        Args: { p_start?: string; p_end?: string }
+        Args: { p_end?: string; p_start?: string }
         Returns: {
           branch_id: string
           branch_name: string
           sales_count: number
-          total_sales: number
           total_profit: number
+          total_sales: number
         }[]
       }
       top_products_by_branch: {
         Args: {
           p_branch?: string
-          p_start?: string
           p_end?: string
           p_limit?: number
+          p_start?: string
         }
         Returns: {
           branch_id: string
