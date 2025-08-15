@@ -159,7 +159,20 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
     console.log("Product created successfully:", data[0]);
     
     // إنشاء سجل مخزون للمنتج للفرع الحالي
-    const currentBranchId = await getCurrentBranchId();
+    let currentBranchId = await getCurrentBranchId();
+    
+    // إذا لم يتم العثور على فرع، استخدم الفرع الرئيسي كافتراضي
+    if (!currentBranchId) {
+      const { data: defaultBranch } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('active', true)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      
+      currentBranchId = defaultBranch?.[0]?.id;
+    }
+    
     if (currentBranchId) {
       const { error: inventoryError } = await supabase
         .from("inventory")
@@ -172,8 +185,11 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
         }, { onConflict: 'product_id,branch_id' });
         
       if (inventoryError) {
-        console.warn("Warning: Could not create inventory record:", inventoryError);
+        console.error("Error creating inventory record:", inventoryError);
+        throw inventoryError; // يجب أن نتوقف إذا فشل إنشاء سجل المخزون
       }
+    } else {
+      throw new Error("لا يمكن العثور على فرع نشط لإنشاء سجل المخزون");
     }
     
     return data[0] as Product;
