@@ -698,7 +698,7 @@ export default function POS() {
                 </div>
               )}
               
-              <div className="mt-6">
+                <div className="mt-6">
                 <h3 className="font-semibold mb-4">المنتجات المقترحة</h3>
                 
                 {isLoading ? (
@@ -710,65 +710,117 @@ export default function POS() {
                     <p>لا توجد منتجات متاحة</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {products.slice(0, 8).map(product => (
-                      <Card 
-                        key={product.id} 
-                        className="cursor-pointer hover:bg-gray-50 transition-colors" 
-                        onClick={() => {
-                          if (product.barcode_type === "scale") {
-                            setCurrentScaleProduct(product);
-                            setShowWeightDialog(true);
-                          } else {
-                            handleAddToCart(product);
-                          }
-                        }}
-                      >
-                        <CardContent className="p-3">
-                          <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
-                            <img 
-                              src={product.image_urls?.[0] || "/placeholder.svg"} 
-                              alt={product.name} 
-                              className="h-16 w-16 object-contain" 
-                            />
-                          </div>
-                          <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
-                          
-                          <div className="flex gap-1 my-1">
-                            {product.barcode_type === "scale" && (
-                              <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
-                                <Scale className="h-3 w-3 ml-1" />
-                                بالوزن
-                              </span>
-                            )}
-                            {product.bulk_enabled && (
-                              <span className="bg-amber-100 text-amber-800 text-xs rounded px-1.5 py-0.5 flex items-center">
-                                <Box className="h-3 w-3 ml-1" />
-                                جملة
-                              </span>
-                            )}
-                          </div>
-                          
-                          <div className="flex justify-between items-center mt-2">
-                            <p className="text-sm font-bold">
-                              {product.barcode_type === "scale" ? (
-                                <span>{product.price} / كجم</span>
-                              ) : product.is_offer && product.offer_price ? (
-                                <>
-                                  <span className="text-primary">{product.offer_price}</span>
-                                  <span className="mr-1 text-xs text-muted-foreground line-through">{product.price}</span>
-                                </>
-                              ) : (
-                                <span>{product.price}</span>
+                  <>
+                    {/* Bulk Products Section */}
+                    {products.filter(p => p.bulk_enabled && p.quantity > 0).length > 0 && (
+                      <div className="mb-6">
+                        <h4 className="text-lg font-semibold mb-3 text-orange-700 flex items-center gap-2">
+                          <Box className="w-5 h-5" />
+                          منتجات الجملة
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4 bg-orange-50/30 rounded-lg border border-orange-200">
+                          {products.filter(p => p.bulk_enabled && p.quantity > 0).slice(0, 4).map(product => (
+                            <Card 
+                              key={product.id} 
+                              className="cursor-pointer hover:bg-orange-100 transition-colors border-orange-200" 
+                              onClick={() => handleAddBulkToCart(product)}
+                            >
+                              <CardContent className="p-3">
+                                <div className="aspect-square rounded bg-orange-100 flex items-center justify-center mb-2">
+                                  <img 
+                                    src={product.image_urls?.[0] || "/placeholder.svg"} 
+                                    alt={product.name} 
+                                    className="h-16 w-16 object-contain" 
+                                  />
+                                </div>
+                                <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
+                                
+                                <div className="flex gap-1 my-1">
+                                  <span className="bg-orange-200 text-orange-800 text-xs rounded px-1.5 py-0.5 flex items-center">
+                                    <Box className="h-3 w-3 ml-1" />
+                                    {product.bulk_quantity} وحدة
+                                  </span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center mt-2">
+                                  <p className="text-sm font-bold text-orange-700">
+                                    <span>{product.bulk_price}</span>
+                                    <span className="mr-1 text-xs">{siteConfig.currency}</span>
+                                  </p>
+                                  <p className="text-xs text-orange-600">
+                                    وفر {product.bulk_quantity && product.bulk_price ? 
+                                      ((product.price * product.bulk_quantity - product.bulk_price) / (product.price * product.bulk_quantity) * 100).toFixed(0) 
+                                      : 0}%
+                                  </p>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Regular Products */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {products.filter(p => !p.bulk_enabled && p.quantity > 0).slice(0, 8).map(product => (
+                        <Card 
+                          key={product.id} 
+                          className="cursor-pointer hover:bg-gray-50 transition-colors" 
+                          onClick={() => {
+                            if (product.barcode_type === "scale") {
+                              setCurrentScaleProduct(product);
+                              setShowWeightDialog(true);
+                            } else {
+                              handleAddToCart(product);
+                            }
+                          }}
+                        >
+                          <CardContent className="p-3">
+                            <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
+                              <img 
+                                src={product.image_urls?.[0] || "/placeholder.svg"} 
+                                alt={product.name} 
+                                className="h-16 w-16 object-contain" 
+                              />
+                            </div>
+                            <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
+                            
+                            <div className="flex gap-1 my-1">
+                              {product.barcode_type === "scale" && (
+                                <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
+                                  <Scale className="h-3 w-3 ml-1" />
+                                  بالوزن
+                                </span>
                               )}
-                              <span className="mr-1 text-xs">{siteConfig.currency}</span>
-                            </p>
-                            {product.is_offer && <Tag className="h-4 w-4 text-primary" />}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                              {product.bulk_enabled && (
+                                <span className="bg-amber-100 text-amber-800 text-xs rounded px-1.5 py-0.5 flex items-center">
+                                  <Box className="h-3 w-3 ml-1" />
+                                  جملة
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="flex justify-between items-center mt-2">
+                              <p className="text-sm font-bold">
+                                {product.barcode_type === "scale" ? (
+                                  <span>{product.price} / كجم</span>
+                                ) : product.is_offer && product.offer_price ? (
+                                  <>
+                                    <span className="text-primary">{product.offer_price}</span>
+                                    <span className="mr-1 text-xs text-muted-foreground line-through">{product.price}</span>
+                                  </>
+                                ) : (
+                                  <span>{product.price}</span>
+                                )}
+                                <span className="mr-1 text-xs">{siteConfig.currency}</span>
+                              </p>
+                              {product.is_offer && <Tag className="h-4 w-4 text-primary" />}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </CardContent>
