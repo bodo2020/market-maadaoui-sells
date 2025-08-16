@@ -271,19 +271,6 @@ export default function AddProduct() {
                     onChange={(e) => setProduct((prev) => ({ ...prev, unit_of_measure: e.target.value }))}
                   />
                 </div>
-
-                <div>
-                  <Label htmlFor="wholesale_price">سعر الجملة</Label>
-                  <Input
-                    id="wholesale_price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="سعر الجملة"
-                    value={product?.wholesale_price || ""}
-                    onChange={(e) => setProduct((prev) => ({ ...prev, wholesale_price: parseFloat(e.target.value) || 0 }))}
-                  />
-                </div>
               </div>
 
               <div>

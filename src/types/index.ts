@@ -74,7 +74,6 @@ export interface Product {
   price: number;
   purchase_price: number; 
   offer_price?: number;
-  wholesale_price?: number;
   is_offer: boolean;
   category_id?: string;
   main_category_id?: string;
