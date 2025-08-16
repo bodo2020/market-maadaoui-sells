@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchProductById, updateProduct, createProduct, fetchProductByBarcode } from "@/services/supabase/productService";
 import { saveInventoryAlert, getInventoryAlert } from "@/services/supabase/inventoryService";
 import { Product } from "@/types";
-import { Loader2, Scan, Bell, BellOff, AlertTriangle } from "lucide-react";
+import { Loader2, Scan, Bell, BellOff, AlertTriangle, QrCode } from "lucide-react";
 import { fetchMainCategories } from "@/services/supabase/categoryService";
 import { fetchCompanies } from "@/services/supabase/companyService";
 import { fetchSubcategories } from "@/services/supabase/categoryService";
@@ -515,12 +515,22 @@ export default function AddProduct() {
 
                   <div>
                     <Label htmlFor="bulk_barcode">باركود الجملة</Label>
-                    <Input
-                      id="bulk_barcode"
-                      placeholder="باركود الجملة"
-                      value={product?.bulk_barcode || ""}
-                      onChange={(e) => setProduct((prev) => ({ ...prev, bulk_barcode: e.target.value }))}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="bulk_barcode"
+                        placeholder="باركود الجملة"
+                        value={product?.bulk_barcode || ""}
+                        onChange={(e) => setProduct((prev) => ({ ...prev, bulk_barcode: e.target.value }))}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setIsScannerOpen(true)}
+                      >
+                        <QrCode className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
