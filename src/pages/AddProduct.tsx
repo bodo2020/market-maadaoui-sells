@@ -484,6 +484,62 @@ export default function AddProduct() {
             </CardContent>
           </Card>
 
+          {/* بيع الجملة */}
+          <Card>
+            <CardHeader>
+              <CardTitle>بيع الجملة</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <Checkbox
+                  id="bulk_enabled"
+                  checked={product?.bulk_enabled || false}
+                  onCheckedChange={(checked) => setProduct((prev) => ({ ...prev, bulk_enabled: !!checked }))}
+                />
+                <Label htmlFor="bulk_enabled">تفعيل بيع الجملة</Label>
+              </div>
+
+              {product?.bulk_enabled && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="bulk_quantity">كمية الجملة</Label>
+                    <Input
+                      id="bulk_quantity"
+                      type="number"
+                      min="1"
+                      placeholder="كمية الجملة"
+                      value={product?.bulk_quantity || ""}
+                      onChange={(e) => setProduct((prev) => ({ ...prev, bulk_quantity: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="bulk_price">سعر الجملة</Label>
+                    <Input
+                      id="bulk_price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="سعر الجملة"
+                      value={product?.bulk_price || ""}
+                      onChange={(e) => setProduct((prev) => ({ ...prev, bulk_price: parseFloat(e.target.value) || 0 }))}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="bulk_barcode">باركود الجملة</Label>
+                    <Input
+                      id="bulk_barcode"
+                      placeholder="باركود الجملة"
+                      value={product?.bulk_barcode || ""}
+                      onChange={(e) => setProduct((prev) => ({ ...prev, bulk_barcode: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* العروض */}
           <Card>
             <CardHeader>
