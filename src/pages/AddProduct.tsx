@@ -527,6 +527,7 @@ export default function AddProduct() {
                         variant="outline"
                         size="icon"
                         onClick={() => setIsScannerOpen(true)}
+                        title="مسح الباركود"
                       >
                         <QrCode className="h-4 w-4" />
                       </Button>
