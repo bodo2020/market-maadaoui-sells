@@ -41,6 +41,7 @@ export default function AddProduct() {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scanType, setScanType] = useState<'regular' | 'bulk'>('regular'); // نوع المسح
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -169,20 +170,25 @@ export default function AddProduct() {
 
   const handleBarcodeScanned = async (barcode: string) => {
     setIsScannerOpen(false);
-    setProduct((prev) => ({ ...prev, barcode }));
     
-    // البحث عن منتج موجود بنفس الباركود
-    try {
-      const existingProduct = await fetchProductByBarcode(barcode);
-      if (existingProduct && existingProduct.id !== productId) {
-        toast({
-          title: "تحذير",
-          description: "يوجد منتج آخر بنفس الباركود",
-          variant: "destructive",
-        });
+    if (scanType === 'bulk') {
+      setProduct((prev) => ({ ...prev, bulk_barcode: barcode }));
+    } else {
+      setProduct((prev) => ({ ...prev, barcode }));
+      
+      // البحث عن منتج موجود بنفس الباركود فقط للباركود العادي
+      try {
+        const existingProduct = await fetchProductByBarcode(barcode);
+        if (existingProduct && existingProduct.id !== productId) {
+          toast({
+            title: "تحذير",
+            description: "يوجد منتج آخر بنفس الباركود",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        // لا يوجد منتج بنفس الباركود، يمكن المتابعة
       }
-    } catch (error) {
-      // لا يوجد منتج بنفس الباركود، يمكن المتابعة
     }
   };
 
@@ -304,7 +310,10 @@ export default function AddProduct() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setIsScannerOpen(true)}
+                      onClick={() => {
+                        setScanType('regular');
+                        setIsScannerOpen(true);
+                      }}
                       className="flex-shrink-0"
                     >
                       <Scan className="h-4 w-4" />
@@ -526,8 +535,11 @@ export default function AddProduct() {
                         type="button"
                         variant="outline"
                         size="icon"
-                        onClick={() => setIsScannerOpen(true)}
-                        title="مسح الباركود"
+                        onClick={() => {
+                          setScanType('bulk');
+                          setIsScannerOpen(true);
+                        }}
+                        title="مسح باركود الجملة"
                       >
                         <QrCode className="h-4 w-4" />
                       </Button>
