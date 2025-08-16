@@ -1353,7 +1353,6 @@ export type Database = {
           subcategory_id: string | null
           unit_of_measure: string | null
           updated_at: string | null
-          wholesale_price: number | null
         }
         Insert: {
           barcode?: string | null
@@ -1379,7 +1378,6 @@ export type Database = {
           subcategory_id?: string | null
           unit_of_measure?: string | null
           updated_at?: string | null
-          wholesale_price?: number | null
         }
         Update: {
           barcode?: string | null
@@ -1405,7 +1403,6 @@ export type Database = {
           subcategory_id?: string | null
           unit_of_measure?: string | null
           updated_at?: string | null
-          wholesale_price?: number | null
         }
         Relationships: [
           {
