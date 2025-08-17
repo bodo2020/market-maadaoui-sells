@@ -13,8 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CustomerSearch } from "./CustomerSearch";
 
-export default function CustomersList() {
+interface CustomersListProps {
+  searchTerm?: string;
+}
+
+export default function CustomersList({ searchTerm: externalSearchTerm }: CustomersListProps = {}) {
   const [searchTerm, setSearchTerm] = useState("");
+  const effectiveSearchTerm = externalSearchTerm || searchTerm;
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   
