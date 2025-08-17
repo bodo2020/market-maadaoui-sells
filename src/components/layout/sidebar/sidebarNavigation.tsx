@@ -23,6 +23,7 @@ import {
   Settings,
   Map,
   QrCode,
+  UserCog,
 } from "lucide-react";
 import { SidebarItemData, NavigationGroup } from "./types";
 
@@ -94,6 +95,11 @@ export const adminNavigation: NavigationGroup = {
       label: "العملاء والموردين",
       href: "/suppliers-customers",
       icon: Users,
+    },
+    {
+      label: "إدارة العملاء (CRM)",
+      href: "/crm",
+      icon: UserCog,
     },
     {
       label: "إدارة الموظفين",

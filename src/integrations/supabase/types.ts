@@ -542,6 +542,56 @@ export type Database = {
           },
         ]
       }
+      customer_interactions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          description: string | null
+          id: string
+          priority: string
+          scheduled_at: string | null
+          status: string
+          subject: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          description?: string | null
+          id?: string
+          priority?: string
+          scheduled_at?: string | null
+          status?: string
+          subject: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          description?: string | null
+          id?: string
+          priority?: string
+          scheduled_at?: string | null
+          status?: string
+          subject?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_interactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -1101,6 +1151,45 @@ export type Database = {
           tax_id?: string | null
           terms_and_conditions?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          score: number | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          score?: number | null
+          source: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          score?: number | null
+          source?: string
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }

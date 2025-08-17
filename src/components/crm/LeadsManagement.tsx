@@ -136,8 +136,8 @@ export function LeadsManagement() {
 
   // إحصائيات سريعة
   const totalLeads = leads.length;
-  const qualifiedLeads = leads.filter((lead: Lead) => lead.status === 'qualified').length;
-  const closedWonLeads = leads.filter((lead: Lead) => lead.status === 'closed_won').length;
+  const qualifiedLeads = (leads as any[]).filter((lead: any) => lead.status === 'qualified').length;
+  const closedWonLeads = (leads as any[]).filter((lead: any) => lead.status === 'closed_won').length;
   const conversionRate = totalLeads > 0 ? ((closedWonLeads / totalLeads) * 100).toFixed(1) : 0;
 
   if (isLoading) {
@@ -314,7 +314,7 @@ export function LeadsManagement() {
             </CardContent>
           </Card>
         ) : (
-          leads.map((lead: Lead) => (
+          (leads as any[]).map((lead: any) => (
             <Card key={lead.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">

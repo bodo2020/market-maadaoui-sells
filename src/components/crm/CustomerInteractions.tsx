@@ -262,7 +262,7 @@ export function CustomerInteractions() {
             </CardContent>
           </Card>
         ) : (
-          interactions.map((interaction: Interaction) => (
+          interactions.map((interaction: any) => (
             <Card key={interaction.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">

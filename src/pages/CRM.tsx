@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MainLayout } from "@/components/layout/MainLayout";
+import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CustomersList } from "@/components/customers/CustomersList";
+import CustomersList from "@/components/customers/CustomersList";
 import { CustomerInteractions } from "@/components/crm/CustomerInteractions";
 import { CustomerAnalytics } from "@/components/crm/CustomerAnalytics";
 import { LeadsManagement } from "@/components/crm/LeadsManagement";
