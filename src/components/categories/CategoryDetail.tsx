@@ -34,20 +34,7 @@ export default function CategoryDetail() {
       try {
         setLoading(true);
         
-        // Try to fetch as subcategory
-        try {
-          const subcategory = await fetchSubcategoryById(id);
-          setName(subcategory.name);
-          setDescription(subcategory.description || "");
-          setImageUrl(subcategory.image_url);
-          setCategoryType('subcategory');
-          setCategoryId(id);
-          return;
-        } catch (error) {
-          console.error('Error fetching subcategory:', error);
-        }
-        
-        // Lastly, try as main category
+        // Try to fetch as main category first
         try {
           const mainCategory = await fetchMainCategoryById(id);
           setName(mainCategory.name);
@@ -55,8 +42,21 @@ export default function CategoryDetail() {
           setImageUrl(mainCategory.image_url);
           setCategoryType('category');
           setCategoryId(id);
+          return;
         } catch (error) {
           console.error('Error fetching main category:', error);
+        }
+        
+        // Then try as subcategory
+        try {
+          const subcategory = await fetchSubcategoryById(id);
+          setName(subcategory.name);
+          setDescription(subcategory.description || "");
+          setImageUrl(subcategory.image_url);
+          setCategoryType('subcategory');
+          setCategoryId(id);
+        } catch (error) {
+          console.error('Error fetching subcategory:', error);
           toast.error("حدث خطأ أثناء تحميل بيانات القسم");
           setCategoryType(null);
         }

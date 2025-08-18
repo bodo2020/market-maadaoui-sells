@@ -83,7 +83,7 @@ export function DragDropImage({ value, onChange, bucketName = "images" }: DragDr
       setIsUploading(true);
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-      const filePath = fileName;
+      const filePath = `categories/${fileName}`;
 
       console.log(`Attempting to upload to bucket: ${bucketName}, file path: ${filePath}`);
 
