@@ -31,9 +31,9 @@ export default function ProductManagement() {
   const [subcategories, setSubcategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState<string>("");
-  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("");
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
+  const [selectedCompany, setSelectedCompany] = useState<string>("all");
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("all");
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
@@ -112,9 +112,9 @@ export default function ProductManagement() {
     const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase()) || 
       (product.barcode && product.barcode.includes(search));
     
-    const matchesCompany = !selectedCompany || product.company_id === selectedCompany;
-    const matchesMainCategory = !selectedMainCategory || product.main_category_id === selectedMainCategory;
-    const matchesSubcategory = !selectedSubcategory || product.subcategory_id === selectedSubcategory;
+    const matchesCompany = selectedCompany === "all" || product.company_id === selectedCompany;
+    const matchesMainCategory = selectedMainCategory === "all" || product.main_category_id === selectedMainCategory;
+    const matchesSubcategory = selectedSubcategory === "all" || product.subcategory_id === selectedSubcategory;
     
     return matchesSearch && matchesCompany && matchesMainCategory && matchesSubcategory;
   });
@@ -494,7 +494,7 @@ export default function ProductManagement() {
                   <SelectValue placeholder="فلترة بالشركة" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">جميع الشركات</SelectItem>
+                  <SelectItem value="all">جميع الشركات</SelectItem>
                   {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
@@ -505,13 +505,13 @@ export default function ProductManagement() {
 
               <Select value={selectedMainCategory} onValueChange={(value) => {
                 setSelectedMainCategory(value);
-                setSelectedSubcategory(""); // Reset subcategory when main category changes
+                setSelectedSubcategory("all"); // Reset subcategory when main category changes
               }}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="فلترة بالقسم الرئيسي" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">جميع الأقسام الرئيسية</SelectItem>
+                  <SelectItem value="all">جميع الأقسام الرئيسية</SelectItem>
                   {mainCategories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
@@ -523,15 +523,15 @@ export default function ProductManagement() {
               <Select 
                 value={selectedSubcategory} 
                 onValueChange={setSelectedSubcategory}
-                disabled={!selectedMainCategory}
+                disabled={selectedMainCategory === "all"}
               >
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="فلترة بالقسم الفرعي" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">جميع الأقسام الفرعية</SelectItem>
+                  <SelectItem value="all">جميع الأقسام الفرعية</SelectItem>
                   {subcategories
-                    .filter(sub => !selectedMainCategory || sub.category_id === selectedMainCategory)
+                    .filter(sub => selectedMainCategory === "all" || sub.category_id === selectedMainCategory)
                     .map((subcategory) => (
                     <SelectItem key={subcategory.id} value={subcategory.id}>
                       {subcategory.name}
@@ -540,13 +540,13 @@ export default function ProductManagement() {
                 </SelectContent>
               </Select>
 
-              {(selectedCompany || selectedMainCategory || selectedSubcategory) && (
+              {(selectedCompany !== "all" || selectedMainCategory !== "all" || selectedSubcategory !== "all") && (
                 <Button 
                   variant="ghost" 
                   onClick={() => {
-                    setSelectedCompany("");
-                    setSelectedMainCategory("");
-                    setSelectedSubcategory("");
+                    setSelectedCompany("all");
+                    setSelectedMainCategory("all");
+                    setSelectedSubcategory("all");
                   }}
                   className="text-muted-foreground"
                 >
