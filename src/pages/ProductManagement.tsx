@@ -14,6 +14,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchProductById } from "@/services/supabase/productService";
+import { fetchCompanies } from "@/services/supabase/companyService";
+import { fetchMainCategories, fetchSubcategories } from "@/services/supabase/categoryService";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { Dialog as ShadcnDialog } from "@/components/ui/dialog";
@@ -24,8 +26,14 @@ import { BrowserMultiFormatReader } from "@zxing/library";
 export default function ProductManagement() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [mainCategories, setMainCategories] = useState<any[]>([]);
+  const [subcategories, setSubcategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState<string>("");
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
@@ -53,6 +61,9 @@ export default function ProductManagement() {
   } = useToast();
   useEffect(() => {
     loadProducts();
+    loadCompanies();
+    loadMainCategories();
+    loadSubcategories();
   }, []);
   const loadProducts = async () => {
     setLoading(true);
@@ -70,7 +81,43 @@ export default function ProductManagement() {
       setLoading(false);
     }
   };
-  const filteredProducts = products.filter(product => product.name.toLowerCase().includes(search.toLowerCase()) || product.barcode && product.barcode.includes(search));
+
+  const loadCompanies = async () => {
+    try {
+      const data = await fetchCompanies();
+      setCompanies(data);
+    } catch (error) {
+      console.error("Error loading companies:", error);
+    }
+  };
+
+  const loadMainCategories = async () => {
+    try {
+      const data = await fetchMainCategories();
+      setMainCategories(data);
+    } catch (error) {
+      console.error("Error loading main categories:", error);
+    }
+  };
+
+  const loadSubcategories = async () => {
+    try {
+      const data = await fetchSubcategories();
+      setSubcategories(data);
+    } catch (error) {
+      console.error("Error loading subcategories:", error);
+    }
+  };
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase()) || 
+      (product.barcode && product.barcode.includes(search));
+    
+    const matchesCompany = !selectedCompany || product.company_id === selectedCompany;
+    const matchesMainCategory = !selectedMainCategory || product.main_category_id === selectedMainCategory;
+    const matchesSubcategory = !selectedSubcategory || product.subcategory_id === selectedSubcategory;
+    
+    return matchesSearch && matchesCompany && matchesMainCategory && matchesSubcategory;
+  });
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const {
       id,
@@ -423,16 +470,90 @@ export default function ProductManagement() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2 mb-6">
-            <Input placeholder="ابحث بالاسم أو الباركود" value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
-            <Button variant="outline">
-              <Search className="ml-2 h-4 w-4" />
-              بحث
-            </Button>
-            <Button variant="outline" onClick={handleBarcodeScanning}>
-              <QrCode className="ml-2 h-4 w-4" />
-              ماسح الباركود
-            </Button>
+          <div className="space-y-4 mb-6">
+            <div className="flex gap-2">
+              <Input 
+                placeholder="ابحث بالاسم أو الباركود" 
+                value={search} 
+                onChange={e => setSearch(e.target.value)} 
+                className="max-w-sm" 
+              />
+              <Button variant="outline">
+                <Search className="ml-2 h-4 w-4" />
+                بحث
+              </Button>
+              <Button variant="outline" onClick={handleBarcodeScanning}>
+                <QrCode className="ml-2 h-4 w-4" />
+                ماسح الباركود
+              </Button>
+            </div>
+            
+            <div className="flex gap-2 flex-wrap">
+              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="فلترة بالشركة" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">جميع الشركات</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedMainCategory} onValueChange={(value) => {
+                setSelectedMainCategory(value);
+                setSelectedSubcategory(""); // Reset subcategory when main category changes
+              }}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="فلترة بالقسم الرئيسي" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">جميع الأقسام الرئيسية</SelectItem>
+                  {mainCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select 
+                value={selectedSubcategory} 
+                onValueChange={setSelectedSubcategory}
+                disabled={!selectedMainCategory}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="فلترة بالقسم الفرعي" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">جميع الأقسام الفرعية</SelectItem>
+                  {subcategories
+                    .filter(sub => !selectedMainCategory || sub.category_id === selectedMainCategory)
+                    .map((subcategory) => (
+                    <SelectItem key={subcategory.id} value={subcategory.id}>
+                      {subcategory.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {(selectedCompany || selectedMainCategory || selectedSubcategory) && (
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    setSelectedCompany("");
+                    setSelectedMainCategory("");
+                    setSelectedSubcategory("");
+                  }}
+                  className="text-muted-foreground"
+                >
+                  مسح الفلاتر
+                </Button>
+              )}
+            </div>
           </div>
           
           {loading ? <div className="flex justify-center items-center py-16">
