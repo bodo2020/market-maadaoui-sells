@@ -103,8 +103,22 @@ export default function AddProduct() {
       const data = await fetchProductById(id);
       setProduct(data);
       
+      // إصلاح مشكلة الفئة الفرعية: تحميل الفئات الفرعية بناءً على الفئة الرئيسية
       if (data.main_category_id) {
         await loadSubcategories(data.main_category_id);
+      } else if (data.subcategory_id) {
+        // إذا كان هناك فئة فرعية ولكن لا توجد فئة رئيسية، ابحث عن الفئة الرئيسية من الفئة الفرعية
+        try {
+          const allSubcategories = await fetchSubcategories(); // تحميل جميع الفئات الفرعية
+          const currentSubcategory = allSubcategories.find(sub => sub.id === data.subcategory_id);
+          if (currentSubcategory && currentSubcategory.category_id) {
+            await loadSubcategories(currentSubcategory.category_id);
+            // تحديث الفئة الرئيسية في البيانات
+            setProduct(prev => ({ ...prev, main_category_id: currentSubcategory.category_id }));
+          }
+        } catch (error) {
+          console.error("Error loading subcategory data:", error);
+        }
       }
       
       // تحميل إعدادات التنبيه

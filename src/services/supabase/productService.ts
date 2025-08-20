@@ -213,13 +213,13 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
       }
     }
 
-    // If changing subcategory, ensure we update main category accordingly
+    // إصلاح مشكلة الفئة الفرعية: التأكد من عدم فقدان الفئة الفرعية أثناء التحديث
     if (product.subcategory_id !== undefined) {
-      if (product.subcategory_id === null || product.subcategory_id === "") {
-        // If clearing subcategory, don't change main category automatically
+      if (product.subcategory_id === null || product.subcategory_id === "" || product.subcategory_id === "none") {
+        // If clearing subcategory, set it to null but preserve main category if no change requested
         updateData.subcategory_id = null;
       } else {
-        // Get the main category from the subcategory
+        // Get the main category from the subcategory and ensure both are set correctly
         const { data: subcategory, error: subcategoryError } = await supabase
           .from("subcategories")
           .select("category_id")
@@ -231,7 +231,33 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
           throw subcategoryError;
         }
 
+        // Set both subcategory and its parent main category
+        updateData.subcategory_id = product.subcategory_id;
         updateData.main_category_id = subcategory.category_id;
+      }
+    }
+
+    // If only main_category_id is being updated without subcategory, preserve existing subcategory if it belongs to the new main category
+    if (product.main_category_id !== undefined && product.subcategory_id === undefined) {
+      // Get current product data to check existing subcategory
+      const { data: currentProduct, error: fetchError } = await supabase
+        .from("products")
+        .select("subcategory_id")
+        .eq("id", id)
+        .single();
+
+      if (!fetchError && currentProduct?.subcategory_id) {
+        // Check if existing subcategory belongs to the new main category
+        const { data: subcategory, error: subError } = await supabase
+          .from("subcategories")
+          .select("category_id")
+          .eq("id", currentProduct.subcategory_id)
+          .single();
+
+        if (!subError && subcategory.category_id !== product.main_category_id) {
+          // If subcategory doesn't belong to new main category, clear it
+          updateData.subcategory_id = null;
+        }
       }
     }
 
