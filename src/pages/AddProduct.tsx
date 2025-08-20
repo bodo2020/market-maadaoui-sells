@@ -447,13 +447,14 @@ export default function AddProduct() {
                       const categoryId = value === "none" ? "" : value;
                       setProduct((prev) => ({ 
                         ...prev, 
-                        main_category_id: categoryId, 
-                        subcategory_id: "" 
+                        main_category_id: categoryId
                       }));
                       if (categoryId) {
                         loadSubcategories(categoryId);
                       } else {
                         setSubcategories([]);
+                        // فقط امسح الفئة الفرعية إذا لم تكن هناك فئة رئيسية
+                        setProduct((prev) => ({ ...prev, subcategory_id: "" }));
                       }
                     }}
                   >
