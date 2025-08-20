@@ -263,6 +263,28 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
 
     console.log("Updating product with data:", updateData);
 
+    // إذا كان هناك تحديث للكمية، تحديثها في جدول المخزون أولاً
+    if (product.quantity !== undefined) {
+      const currentBranchId = await getCurrentBranchId();
+      if (currentBranchId) {
+        const { error: inventoryError } = await supabase
+          .from("inventory")
+          .upsert({
+            product_id: id,
+            branch_id: currentBranchId,
+            quantity: product.quantity,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'product_id,branch_id' });
+        
+        if (inventoryError) {
+          console.error("Error updating inventory quantity:", inventoryError);
+          throw inventoryError;
+        }
+      }
+      // إزالة الكمية من بيانات تحديث المنتج لأن الـ trigger سيقوم بتحديثها
+      delete updateData.quantity;
+    }
+
     const { data, error } = await supabase
       .from("products")
       .update({
