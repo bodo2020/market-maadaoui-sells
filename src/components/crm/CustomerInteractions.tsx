@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 import { fetchCustomerInteractions, addCustomerInteraction } from "@/services/supabase/crmService";
+import { fetchCustomers } from "@/services/supabase/customerService";
 import { 
   Phone, 
   Mail, 
@@ -46,6 +47,11 @@ export function CustomerInteractions() {
   const { data: interactions = [], isLoading } = useQuery({
     queryKey: ["customer-interactions"],
     queryFn: fetchCustomerInteractions,
+  });
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers"],
+    queryFn: fetchCustomers,
   });
 
   const form = useForm({
@@ -131,7 +137,12 @@ export function CustomerInteractions() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">تفاعلات العملاء</h2>
+        <div>
+          <h2 className="text-2xl font-bold">تفاعلات العملاء</h2>
+          <p className="text-muted-foreground">
+            إجمالي {interactions.length} تفاعل مع العملاء
+          </p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -151,9 +162,20 @@ export function CustomerInteractions() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>العميل</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="معرف العميل" required />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر العميل" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {customers.map((customer: any) => (
+                            <SelectItem key={customer.id} value={customer.id}>
+                              {customer.name} {customer.phone && `- ${customer.phone}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

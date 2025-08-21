@@ -61,14 +61,42 @@ export async function fetchCustomerAnalytics() {
     // جلب إحصائيات المبيعات
     const { data: sales, error: salesError } = await supabase
       .from("sales")
-      .select("*");
+      .select("customer_name, customer_phone, total, created_at");
 
     if (salesError) throw salesError;
 
+    // جلب الطلبات الإلكترونية
+    const { data: onlineOrders, error: ordersError } = await supabase
+      .from("online_orders")
+      .select("customer_id, total, created_at, status");
+
+    if (ordersError) throw ordersError;
+
+    // حساب الإحصائيات المتقدمة
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    const newCustomersThisMonth = customers?.filter(customer => {
+      const customerDate = new Date(customer.created_at);
+      return customerDate.getMonth() === currentMonth && 
+             customerDate.getFullYear() === currentYear;
+    }).length || 0;
+
+    const verifiedCustomers = customers?.filter(customer => customer.phone_verified).length || 0;
+    
+    const totalRevenue = (sales?.reduce((sum, sale) => sum + Number(sale.total || 0), 0) || 0) +
+                        (onlineOrders?.reduce((sum, order) => sum + Number(order.total || 0), 0) || 0);
+
+    const averageOrderValue = sales?.length ? totalRevenue / (sales.length + (onlineOrders?.length || 0)) : 0;
+
     return {
       totalCustomers: customers?.length || 0,
-      totalSales: sales?.length || 0,
-      // يمكن إضافة المزيد من الإحصائيات هنا
+      newCustomersThisMonth,
+      verifiedCustomers,
+      totalSales: (sales?.length || 0) + (onlineOrders?.length || 0),
+      totalRevenue,
+      averageOrderValue,
+      conversionRate: customers?.length ? (verifiedCustomers / customers.length) * 100 : 0,
     };
   } catch (error) {
     console.error("Error fetching customer analytics:", error);
