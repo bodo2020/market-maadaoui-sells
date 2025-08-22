@@ -99,8 +99,35 @@ export async function updateCashRecord(id: string, updates: Partial<CashRecord>)
 
 export async function getLatestCashBalance(registerType: RegisterType) {
   try {
+    console.log(`Fetching balance for register ${registerType} using new function`);
+    
+    // استخدم الدالة الجديدة لحساب الرصيد
+    const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    const { data, error } = await supabase.rpc('get_current_cash_balance', {
+      p_register_type: registerType,
+      p_branch_id: branchId
+    });
+    
+    if (error) {
+      console.error('Error calling get_current_cash_balance:', error);
+      // عودة للطريقة القديمة في حالة وجود خطأ
+      return await getLatestCashBalanceFallback(registerType);
+    }
+    
+    const balance = data || 0;
+    console.log(`Balance from new function: ${balance}`);
+    return balance;
+  } catch (error) {
+    console.error(`Error getting latest cash balance for ${registerType}:`, error);
+    // عودة للطريقة القديمة في حالة وجود خطأ
+    return await getLatestCashBalanceFallback(registerType);
+  }
+}
+
+async function getLatestCashBalanceFallback(registerType: RegisterType) {
+  try {
     // First check the transactions table, which is more reliable
-    console.log(`Fetching balance for register ${registerType} from transactions table`);
+    console.log(`Fallback: Fetching balance for register ${registerType} from transactions table`);
     const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
     let txQuery = supabase
       .from('cash_transactions')
@@ -120,38 +147,11 @@ export async function getLatestCashBalance(registerType: RegisterType) {
       return balance;
     }
     
-    console.log('No transactions found or error, checking tracking table');
-    
-    // If no transactions found, check the tracking table
-    let trackingQuery = supabase
-      .from('cash_tracking')
-      .select('closing_balance, opening_balance')
-      .eq('register_type', registerType)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(1);
-    // Only filter by branch if we have a branch ID, otherwise show all
-    if (branchId) {
-      trackingQuery = trackingQuery.eq('branch_id', branchId);
-    }
-    const { data, error } = await trackingQuery;
-      
-    if (error) {
-      console.error('Error fetching cash tracking:', error);
-      throw error;
-    }
-    
-    if (data && data.length > 0) {
-      const balance = data[0].closing_balance || data[0].opening_balance || 0;
-      console.log(`Found balance in tracking table: ${balance}`);
-      return balance;
-    }
-    
-    console.log('No cash records found, returning 0');
+    console.log('No transactions found, returning 0');
     return 0;
   } catch (error) {
-    console.error(`Error getting latest cash balance for ${registerType}:`, error);
-    throw error;
+    console.error(`Error in fallback method for ${registerType}:`, error);
+    return 0;
   }
 }
 

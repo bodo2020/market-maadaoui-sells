@@ -2259,6 +2259,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_current_cash_balance: {
+        Args: { p_branch_id?: string; p_register_type: string }
+        Returns: number
+      }
       get_customer_id_from_user: {
         Args: Record<PropertyKey, never>
         Returns: string
