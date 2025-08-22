@@ -5,6 +5,7 @@ import { Customer } from "@/types";
 
 export async function fetchCustomers() {
   try {
+    console.log("Fetching customers...");
     const { data, error } = await supabase
       .from("customers")
       .select("*")
@@ -16,6 +17,7 @@ export async function fetchCustomers() {
       return [];
     }
 
+    console.log("Successfully fetched customers:", data?.length || 0);
     return data as Customer[];
   } catch (error) {
     console.error("Unexpected error fetching customers:", error);

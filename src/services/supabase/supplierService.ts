@@ -4,6 +4,7 @@ import { Supplier } from "@/types";
 
 export async function fetchSuppliers() {
   try {
+    console.log("Fetching suppliers...");
     const { data, error } = await supabase
       .from("suppliers")
       .select("*")
@@ -15,6 +16,7 @@ export async function fetchSuppliers() {
       return [];
     }
 
+    console.log("Successfully fetched suppliers:", data?.length || 0);
     return data as Supplier[];
   } catch (error) {
     console.error("Unexpected error fetching suppliers:", error);
