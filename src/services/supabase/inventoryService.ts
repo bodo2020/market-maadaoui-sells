@@ -48,6 +48,8 @@ export const createInventoryRecords = async (
   }>,
   branchId?: string
 ) => {
+  console.log(`Creating inventory records for ${products.length} products, branch: ${branchId}`);
+  
   const { data, error } = await supabase
     .from('inventory_records')
     .insert(
@@ -59,12 +61,17 @@ export const createInventoryRecords = async (
         purchase_price: product.purchase_price,
         difference_value: -product.expected_quantity * product.purchase_price,
         status: 'pending' as const,
-        branch_id: branchId || undefined
+        branch_id: branchId || null
       }))
     )
     .select();
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error creating inventory records:', error);
+    throw error;
+  }
+  
+  console.log(`Successfully created ${data?.length || 0} inventory records`);
   return data;
 };
 
@@ -107,6 +114,8 @@ export const updateInventoryRecord = async (
 
 // جلب سجلات الجرد لتاريخ معين
 export const fetchInventoryRecordsByDate = async (date: string, branchId?: string) => {
+  console.log(`Fetching inventory records for date: ${date}, branch: ${branchId}`);
+  
   let query = supabase
     .from('inventory_records')
     .select(`
@@ -122,13 +131,19 @@ export const fetchInventoryRecordsByDate = async (date: string, branchId?: strin
     .eq('inventory_date', date)
     .order('created_at', { ascending: false });
 
-  if (branchId) {
+  // Only add branch filter if branchId is provided and not null
+  if (branchId && branchId !== 'null') {
     query = query.eq('branch_id', branchId);
   }
 
   const { data, error } = await query;
 
-  if (error) throw error;
+  if (error) {
+    console.error('Error fetching inventory records:', error);
+    throw error;
+  }
+  
+  console.log(`Found ${data?.length || 0} inventory records`);
   return data as InventoryRecord[];
 };
 
