@@ -88,9 +88,19 @@ class BluetoothPrinterService {
   async printInvoice(text: string, withInit: boolean = true): Promise<boolean> {
     const commands = [];
     if (withInit) {
-      commands.push(new Uint8Array([0x1B, 0x40])); // Init printer
+        // 1. Initialize printer
+        commands.push(new Uint8Array([0x1B, 0x40])); 
     }
-    commands.push(new Uint8Array([0x1B, 0x74, 21])); // Select Arabic codepage
+    
+    // [THE FINAL FIX] This sequence is crucial for Xprinter Arabic support.
+    // 2. Select international character set: Arabic (n=8)
+    commands.push(new Uint8Array([0x1B, 0x52, 8])); 
+    
+    // 3. Select character code table: PC864 Arabic (n=26)
+    // We try a different, more compatible codepage.
+    commands.push(new Uint8Array([0x1B, 0x74, 26])); 
+    
+    // 4. Encode the Arabic text
     commands.push(this.encodeArabicToCp1256(text));
 
     const totalLength = commands.reduce((p, c) => p + c.length, 0);
@@ -104,31 +114,23 @@ class BluetoothPrinterService {
     return this.printData(fullData);
   }
 
-  /**
-   * [NEW] Prints a raster image (like a logo).
-   */
   async printImage(imageElement: HTMLImageElement): Promise<boolean> {
     if (!this.isConnected()) {
       toast.error("الطابعة غير متصلة لطباعة الصورة.");
       return false;
     }
-
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (!context) return false;
-
-    // Resize image to a reasonable width for thermal printers (e.g., 384px)
     const maxWidth = 384;
     const scale = maxWidth / imageElement.width;
     canvas.width = maxWidth;
     canvas.height = imageElement.height * scale;
     context.drawImage(imageElement, 0, 0, canvas.width, canvas.height);
-
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
     const pixels = imageData.data;
     const data = new Uint8Array(canvas.width * canvas.height / 8);
     let dataIndex = 0;
-
     for (let y = 0; y < canvas.height; y++) {
       for (let x = 0; x < canvas.width; x += 8) {
         let byte = 0;
@@ -137,7 +139,6 @@ class BluetoothPrinterService {
           const r = pixels[pixelIndex];
           const g = pixels[pixelIndex + 1];
           const b = pixels[pixelIndex + 2];
-          // Convert to grayscale and check threshold for black/white
           if ((r + g + b) / 3 < 128) {
             byte |= (1 << (7 - bit));
           }
@@ -145,23 +146,12 @@ class BluetoothPrinterService {
         data[dataIndex++] = byte;
       }
     }
-
     const widthBytes = canvas.width / 8;
     const heightPixels = canvas.height;
-    
-    // ESC/POS command to print a raster bit image: GS v 0
-    const command = new Uint8Array([
-      0x1D, 0x76, 0x30, 0, // GS v 0 m
-      widthBytes % 256,    // xL
-      Math.floor(widthBytes / 256), // xH
-      heightPixels % 256,  // yL
-      Math.floor(heightPixels / 256) // yH
-    ]);
-
+    const command = new Uint8Array([0x1D, 0x76, 0x30, 0, widthBytes % 256, Math.floor(widthBytes / 256), heightPixels % 256, Math.floor(heightPixels / 256)]);
     const fullData = new Uint8Array(command.length + data.length);
     fullData.set(command);
     fullData.set(data, command.length);
-
     return this.printData(fullData);
   }
 
