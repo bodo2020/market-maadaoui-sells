@@ -41,7 +41,6 @@ interface BluetoothPrinter {
 class BluetoothPrinterService {
   private printer: BluetoothPrinter | null = null;
 
-  // ... (Arabic encoding function remains the same)
   private encodeArabicToCp1256(text: string): Uint8Array {
     const cp1256Map: { [key: string]: number } = {
       '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '†': 0x86, '‡': 0x87,
@@ -63,7 +62,6 @@ class BluetoothPrinterService {
     return buffer;
   }
 
-  // ... (connect, disconnect, isConnected, getConnectedPrinterName remain the same)
   async connectPrinter(): Promise<boolean> { if (!navigator.bluetooth) { toast.error('المتصفح لا يدعم بلوتوث الويب.'); return false; } try { const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true }); if (!device.gatt) return false; toast.loading(`جاري الاتصال بـ ${device.name || 'طابعة'}...`); const server = await device.gatt.connect(); const services = await server.getPrimaryServices(); let writableCharacteristic: BluetoothRemoteGATTCharacteristic | null = null; for (const service of services) { const characteristics = await service.getCharacteristics(); const characteristic = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse); if (characteristic) { writableCharacteristic = characteristic; break; } } if (!writableCharacteristic) { toast.error("لم يتم العثور على خدمة طباعة متوافقة."); server.disconnect(); return false; } this.printer = { device, server, characteristic: writableCharacteristic }; device.addEventListener('gattserverdisconnected', () => { this.printer = null; toast.warning("تم فصل اتصال الطابعة."); }); toast.success(`تم الاتصال بنجاح بـ: ${device.name || 'طابعة بلوتوث'}`); return true; } catch (error: any) { if (error.name !== 'NotFoundError') { toast.error('فشل الاتصال، تأكد من إلغاء الاقتران القديم.'); } return false; } }
   disconnectPrinter(): void { if (this.printer?.server?.connected) this.printer.server.disconnect(); this.printer = null; }
   isConnected(): boolean { return !!this.printer?.server?.connected; }
@@ -75,7 +73,6 @@ class BluetoothPrinterService {
       return false;
     }
     try {
-      // Sending data in chunks is crucial for reliability
       const chunkSize = 128;
       for (let i = 0; i < data.byteLength; i += chunkSize) {
         const chunk = data.slice(i, i + chunkSize);
@@ -88,58 +85,45 @@ class BluetoothPrinterService {
     }
   }
 
+  /**
+   * [FINAL ARABIC FIX]
+   * This function now sends the correct sequence of commands for Xprinter models.
+   */
   async printInvoice(text: string): Promise<boolean> {
-    const selectArabicCommand = new Uint8Array([0x1B, 0x74, 26]);
+    // 1. Command to initialize the printer (resets any previous settings)
+    const initPrinter = new Uint8Array([0x1B, 0x40]); 
+    
+    // 2. Command to select the Windows-1256 Arabic character table (n=21)
+    // This is the correct codepage for most Xprinter models for Arabic.
+    const selectArabicCommand = new Uint8Array([0x1B, 0x74, 21]); 
+    
+    // 3. Encode the Arabic text using our existing function
     const encodedText = this.encodeArabicToCp1256(text);
-    const fullData = new Uint8Array(selectArabicCommand.length + encodedText.length);
-    fullData.set(selectArabicCommand);
-    fullData.set(encodedText, selectArabicCommand.length);
+    
+    // 4. Combine all commands and text into one package to send
+    const fullData = new Uint8Array(initPrinter.length + selectArabicCommand.length + encodedText.length);
+    fullData.set(initPrinter);
+    fullData.set(selectArabicCommand, initPrinter.length);
+    fullData.set(encodedText, initPrinter.length + selectArabicCommand.length);
+    
     return this.printData(fullData);
   }
 
-  /**
-   * [NEW] Prints a native barcode using ESC/POS commands.
-   * @param barcodeData The data to encode in the barcode (e.g., "123456789").
-   * @param barcodeType The type of barcode to print. We'll use CODE128.
-   */
   async printBarcode(barcodeData: string, labelText?: string): Promise<boolean> {
-    if (!this.isConnected()) {
-      toast.error("الطابعة غير متصلة.");
-      return false;
-    }
-    
-    // ESC/POS commands to generate a CODE128 barcode
     const commands = [];
-
-    // 1. Optional: Add text label above the barcode
     if (labelText) {
-      const encodedLabel = this.encodeArabicToCp1256(labelText + '\n');
-      commands.push(new Uint8Array([0x1B, 0x74, 26])); // Select Arabic
-      commands.push(encodedLabel);
+      commands.push(new Uint8Array([0x1B, 0x74, 21]));
+      commands.push(this.encodeArabicToCp1256(labelText + '\n'));
     }
-
-    // 2. Set barcode height (e.g., 60 dots)
     commands.push(new Uint8Array([0x1D, 0x68, 60]));
-    // 3. Set barcode width (e.g., 2 dots)
     commands.push(new Uint8Array([0x1D, 0x77, 2]));
-    // 4. Set Human Readable Interpretation (HRI) text position (2 = below barcode)
     commands.push(new Uint8Array([0x1D, 0x48, 2]));
-    
-    // 5. Print Barcode command for CODE128 (GS k m d... NUL)
-    // m=73 for CODE128
     const barcodeBytes = new TextEncoder().encode(barcodeData);
     const printCommand = new Uint8Array(4 + barcodeBytes.length);
-    printCommand[0] = 0x1D; // GS
-    printCommand[1] = 0x6B; // k
-    printCommand[2] = 73;   // m = CODE128
-    printCommand[3] = barcodeBytes.length; // Number of bytes
+    printCommand.set([0x1D, 0x6B, 73, barcodeBytes.length]);
     printCommand.set(barcodeBytes, 4);
     commands.push(printCommand);
-
-    // 6. Add some line feeds to push the paper out
-    commands.push(new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A])); // 4 line feeds
-
-    // Combine all commands into a single buffer
+    commands.push(new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A]));
     const totalLength = commands.reduce((p, c) => p + c.length, 0);
     const fullData = new Uint8Array(totalLength);
     let offset = 0;
@@ -147,12 +131,11 @@ class BluetoothPrinterService {
       fullData.set(cmd, offset);
       offset += cmd.length;
     }
-
     return this.printData(fullData);
   }
 
   async testPrint(): Promise<void> {
-    const testText = `\n--------------------------------\nPrinter Test - اختبار الطابعة\n\nSuccess - نجاح ✓\n--------------------------------\n\n\n`;
+    const testText = `\n--------------------------------\nPrinter Test - اختبار الطابعة\n\nتم الاتصال بنجاح ✓\n--------------------------------\n\n\n`;
     toast.info("جاري إرسال صفحة اختبار...");
     if (await this.printInvoice(testText)) {
       toast.success("تم إرسال صفحة الاختبار بنجاح.");
