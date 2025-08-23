@@ -14,16 +14,23 @@ declare global {
     addEventListener(type: 'gattserverdisconnected', listener: (this: this, ev: Event) => any): void;
   }
   interface BluetoothRemoteGATTServer {
-    connected: boolean; // This property exists on the server object
+    connected: boolean;
     connect(): Promise<BluetoothRemoteGATTServer>;
     disconnect(): void;
-    getPrimaryService(uuid: string): Promise<BluetoothRemoteGATTService>;
+    getPrimaryServices(): Promise<BluetoothRemoteGATTService[]>; // Get all services
   }
   interface BluetoothRemoteGATTService {
-    getCharacteristic(uuid: string): Promise<BluetoothRemoteGATTCharacteristic>;
+    uuid: string;
+    getCharacteristics(): Promise<BluetoothRemoteGATTCharacteristic[]>; // Get all characteristics
   }
   interface BluetoothRemoteGATTCharacteristic {
+    uuid: string;
+    properties: BluetoothCharacteristicProperties;
     writeValue(data: ArrayBuffer): Promise<void>;
+  }
+  interface BluetoothCharacteristicProperties {
+    write: boolean;
+    writeWithoutResponse: boolean;
   }
 }
 
@@ -35,35 +42,67 @@ interface BluetoothPrinter {
 
 class BluetoothPrinterService {
   private printer: BluetoothPrinter | null = null;
-  
-  private readonly SERVICE_UUID = '00001101-0000-1000-8000-00805f9b34fb';
-  private readonly CHARACTERISTIC_UUID = '00001101-0000-1000-8000-00805f9b34fb';
 
+  /**
+   * [THE FIX] This is a more robust connection method.
+   * It connects to the device first, then searches for any writable characteristic.
+   */
   async connectPrinter(): Promise<boolean> {
     if (!navigator.bluetooth) {
       toast.error('المتصفح لا يدعم بلوتوث الويب.');
       return false;
     }
     try {
+      toast.info("الرجاء اختيار الطابعة من القائمة...");
       const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [this.SERVICE_UUID],
+        acceptAllDevices: true, // We accept any device
+        // We don't specify optionalServices to discover everything
       });
-      if (!device.gatt) return false;
+
+      if (!device.gatt) {
+        toast.error("لا يمكن الاتصال بهذا الجهاز.");
+        return false;
+      }
 
       toast.loading(`جاري الاتصال بـ ${device.name || 'طابعة'}...`);
       const server = await device.gatt.connect();
-      const service = await server.getPrimaryService(this.SERVICE_UUID);
-      const characteristic = await service.getCharacteristic(this.CHARACTERISTIC_UUID);
-      this.printer = { device, server, characteristic };
+
+      // Search for a writable characteristic
+      const services = await server.getPrimaryServices();
+      let writableCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+
+      for (const service of services) {
+        const characteristics = await service.getCharacteristics();
+        for (const characteristic of characteristics) {
+          if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+            writableCharacteristic = characteristic;
+            break; // Found a writable characteristic
+          }
+        }
+        if (writableCharacteristic) break; // Exit the outer loop as well
+      }
+
+      if (!writableCharacteristic) {
+        toast.error("لم يتم العثور على خدمة طباعة متوافقة في هذا الجهاز.");
+        server.disconnect();
+        return false;
+      }
+
+      this.printer = { device, server, characteristic: writableCharacteristic };
+
       device.addEventListener('gattserverdisconnected', () => {
         this.printer = null;
         toast.warning("تم فصل اتصال الطابعة.");
       });
+
       toast.success(`تم الاتصال بنجاح بـ: ${device.name || 'طابعة بلوتوث'}`);
       return true;
-    } catch (error) {
-      toast.error('فشل الاتصال، تأكد أن الطابعة في وضع الاقتران.');
+
+    } catch (error: any) {
+      if (error.name !== 'NotFoundError') {
+        toast.error('فشل الاتصال، يرجى التأكد من اتباع خطوات التحقق.');
+        console.error('Bluetooth connection error:', error);
+      }
       return false;
     }
   }
@@ -76,25 +115,14 @@ class BluetoothPrinterService {
   }
 
   isConnected(): boolean {
-    // [FIX] Correctly checks the 'connected' property
     return !!this.printer?.server?.connected;
   }
-  
-  // [FIX] Added missing method 'getSavedPrinter'
+
   getSavedPrinter(): { name: string } | null {
     if (this.isConnected() && this.printer?.device.name) {
       return { name: this.printer.device.name };
     }
     return null;
-  }
-
-  getConnectedPrinterName(): string | null {
-    return this.getSavedPrinter()?.name || null;
-  }
-
-  // [FIX] Added missing method 'printText' as an alias for printInvoice
-  async printText(text: string): Promise<boolean> {
-    return this.printInvoice(text);
   }
 
   async printInvoice(text: string): Promise<boolean> {
@@ -121,42 +149,12 @@ class BluetoothPrinterService {
     }
   }
 
-  // [FIX] Added missing method 'printBarcode' using a popup window
-  async printBarcode(canvas: HTMLCanvasElement): Promise<boolean> {
-    const dataURL = canvas.toDataURL('image/png');
-    const printWindow = window.open('', '_blank', 'width=300,height=200');
-    if (!printWindow) {
-      toast.error('لا يمكن فتح نافذة الطباعة. الرجاء السماح بالنوافذ المنبثقة.');
-      return false;
-    }
-    printWindow.document.write(`<html><body style="margin:0;"><img src="${dataURL}" onload="window.print();window.close()" /></body></html>`);
-    printWindow.document.close();
-    return true;
-  }
-
   async testPrint(): Promise<void> {
     const testText = `\n--------------------------------\n      Printer Connection Test\n\n      Success ✓\n--------------------------------\n\n\n`;
     toast.info("جاري إرسال صفحة اختبار...");
     if (await this.printInvoice(testText)) {
       toast.success("تم إرسال صفحة الاختبار بنجاح.");
     }
-  }
-
-  // [FIX] Added missing method 'generateInvoiceText'
-  generateInvoiceText(sale: any, storeInfo: any): string {
-    let text = `${storeInfo.name}\n`;
-    text += '--------------------------------\n';
-    text += `Invoice: ${sale.invoice_number}\n`;
-    text += `Date: ${new Date(sale.date).toLocaleString('ar-EG')}\n`;
-    text += '--------------------------------\n';
-    sale.items.forEach((item: any) => {
-      text += `${item.product.name}\n`;
-      text += `  ${item.quantity} x ${item.price.toFixed(2)} = ${item.total.toFixed(2)}\n`;
-    });
-    text += '--------------------------------\n';
-    text += `Total: ${sale.total.toFixed(2)} ${storeInfo.currency || 'EGP'}\n`;
-    text += '\nThank You!\n\n\n';
-    return text;
   }
 }
 
