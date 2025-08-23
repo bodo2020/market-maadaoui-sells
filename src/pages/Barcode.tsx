@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Printer, Settings, Bluetooth, Cable, RefreshCw, Plus, Wifi, Edit, Save, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
 import JsBarcode from "jsbarcode";
 import { fetchStoreSettings, StoreSettings } from "@/services/supabase/storeService";
 
@@ -181,30 +182,28 @@ export default function Barcode() {
 
   const requestBluetoothDevice = async () => {
     try {
-      if (!('bluetooth' in navigator)) {
-        toast.error('متصفحك لا يدعم البلوتوث');
-        return;
-      }
-
-      const device = await (navigator as any).bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: ['00001101-0000-1000-8000-00805f9b34fb'] // Serial Port Profile
-      });
-
-      const newDevice: PrinterDevice = {
-        id: `bluetooth-${Date.now()}`,
-        name: device.name || `Bluetooth Device ${printers.length + 1}`,
-        type: 'bluetooth',
-        status: 'connected',
-        device: device
-      };
-
-      setPrinters(prev => [...prev, newDevice]);
-      toast.success('تم إضافة جهاز البلوتوث بنجاح');
+      // استخدام خدمة الطباعة البلوتوث الجديدة
+      const success = await bluetoothPrinterService.connectPrinter();
       
+      if (success) {
+        const savedPrinter = bluetoothPrinterService.getSavedPrinter();
+        if (savedPrinter) {
+          const newPrinter: PrinterDevice = {
+            id: `bluetooth-${Date.now()}`,
+            name: savedPrinter.name,
+            type: 'bluetooth',
+            status: 'connected'
+          };
+          
+          setPrinters(prev => [...prev, newPrinter]);
+          setInvoicePrinter(newPrinter.id);
+          setBarcodePrinter(newPrinter.id);
+          toast.success('تم ربط الطابعة للفواتير والباركود معاً');
+        }
+      }
     } catch (error) {
-      console.error('Error requesting Bluetooth device:', error);
-      toast.error('تم إلغاء اختيار الجهاز أو حدث خطأ');
+      console.error('Bluetooth connection failed:', error);
+      toast.error('فشل في الاتصال بطابعة البلوتوث');
     }
   };
 
@@ -668,8 +667,96 @@ export default function Barcode() {
                   </Button>
                   <Button variant="outline" className="flex-1">
                     <Printer className="h-4 w-4 mr-2" />
-                    اختبار طابعة الباركود
+                  اختبار طابعة الباركود
                   </Button>
+                </div>
+
+                {/* Bluetooth Printer Manager */}
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-4">إدارة طابعة البلوتوث</h3>
+                  <div className="p-4 border rounded-lg bg-blue-50 mb-4">
+                    <div className="flex items-center gap-2 text-blue-800 mb-2">
+                      <Bluetooth className="h-5 w-5" />
+                      <span className="font-medium">طابعة واحدة للكل</span>
+                    </div>
+                    <p className="text-sm text-blue-700">
+                      يمكنك ربط طابعة بلوتوث واحدة تعمل للفواتير والباركود معاً. 
+                      ستطبع الفواتير تلقائياً بعد كل عملية بيع.
+                    </p>
+                  </div>
+
+                  {bluetoothPrinterService.isConnected() ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
+                        <div className="flex items-center gap-3">
+                          <Bluetooth className="h-5 w-5 text-green-600" />
+                          <div>
+                            <p className="font-medium text-green-800">
+                              {bluetoothPrinterService.getSavedPrinter()?.name || 'طابعة بلوتوث'}
+                            </p>
+                            <p className="text-sm text-green-600">متصلة وجاهزة</p>
+                          </div>
+                        </div>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={async () => {
+                            await bluetoothPrinterService.disconnectPrinter();
+                            window.location.reload();
+                          }}
+                        >
+                          فصل الطابعة
+                        </Button>
+                      </div>
+                      
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={async () => {
+                          const testText = `
+================================
+         اختبار طباعة
+================================
+
+التاريخ: ${new Date().toLocaleDateString('ar-EG')}
+الوقت: ${new Date().toLocaleTimeString('ar-EG')}
+
+هذه رسالة اختبار للتأكد من 
+عمل الطابعة بشكل صحيح.
+
+================================
+       تم بنجاح ✓
+================================
+
+`;
+                          await bluetoothPrinterService.printText(testText);
+                        }}
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        اختبار الطباعة
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <Bluetooth className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p className="text-muted-foreground mb-4">لا توجد طابعة مربوطة</p>
+                      
+                      <Button 
+                        onClick={requestBluetoothDevice}
+                        className="gap-2"
+                      >
+                        <Bluetooth className="h-4 w-4" />
+                        ربط طابعة بلوتوث
+                      </Button>
+                      
+                      <div className="mt-4 text-xs text-muted-foreground space-y-1">
+                        <p>• تأكد من تشغيل البلوتوث في جهازك</p>
+                        <p>• اجعل الطابعة في وضع الاكتشاف</p>
+                        <p>• ستطبع الفواتير تلقائياً بعد كل عملية بيع</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

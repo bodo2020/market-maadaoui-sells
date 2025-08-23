@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
+import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function POS() {
@@ -505,6 +506,21 @@ export default function POS() {
         description: `رقم الفاتورة: ${sale.invoice_number}`
       });
       setShowSuccess(true);
+      
+      // طباعة الفاتورة تلقائياً إذا كانت الطابعة متصلة
+      if (bluetoothPrinterService.isConnected()) {
+        const storeInfo = {
+          name: siteConfig.name,
+          address: siteConfig.address || "العنوان غير متوفر",
+          phone: siteConfig.phone || "الهاتف غير متوفر",
+          currency: siteConfig.currency || 'ج.م'
+        };
+        
+        const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
+        setTimeout(() => {
+          bluetoothPrinterService.printText(invoiceText);
+        }, 1000);
+      }
       
       // Clear cart after successful sale
       setTimeout(() => {

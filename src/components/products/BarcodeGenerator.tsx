@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Printer, QrCode, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
 import { Product } from '@/types';
 import { fetchStoreSettings } from '@/services/supabase/storeService';
 
@@ -120,12 +121,18 @@ export const BarcodeGenerator: React.FC<BarcodeGeneratorProps> = ({
     }
   }, [isOpen, barcodeValue, product, storeName]);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!printCanvasRef.current) return;
 
     generateBarcode(printCanvasRef.current, true);
     
-    // Create print window
+    // Try Bluetooth printer first
+    if (bluetoothPrinterService.isConnected()) {
+      const success = await bluetoothPrinterService.printBarcode(printCanvasRef.current);
+      if (success) return;
+    }
+    
+    // Fallback to regular print window
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error('لا يمكن فتح نافذة الطباعة');

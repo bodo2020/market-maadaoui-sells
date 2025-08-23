@@ -6,6 +6,7 @@ import { siteConfig } from "@/config/site";
 import { Sale } from "@/types";
 import { Printer, Save, FileText } from "lucide-react";
 import { printInvoice } from '@/services/supabase/saleService';
+import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
 
 interface InvoiceDialogProps {
   isOpen: boolean;
@@ -41,7 +42,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
     ...(settings || {})
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     // Get store info from site config, overriding with preview settings if any
     const storeInfo = {
       name: siteConfig.name,
@@ -58,9 +59,17 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       paymentInstructions: invoiceSettings.paymentInstructions || "",
       logoChoice: invoiceSettings.logoChoice || "store",
       customLogoUrl: invoiceSettings.customLogoUrl || null,
+      currency: siteConfig.currency || 'ج.م'
     };
     
-    // Print the invoice
+    // Try Bluetooth printer first, fallback to regular print
+    if (bluetoothPrinterService.isConnected()) {
+      const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
+      const success = await bluetoothPrinterService.printText(invoiceText);
+      if (success) return;
+    }
+    
+    // Fallback to regular print
     printInvoice(sale, storeInfo);
   };
 
