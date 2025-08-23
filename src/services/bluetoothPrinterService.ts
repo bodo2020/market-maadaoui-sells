@@ -43,28 +43,49 @@ interface BluetoothPrinter {
 class BluetoothPrinterService {
   private printer: BluetoothPrinter | null = null;
 
+  /**
+   * [THE ARABIC FIX]
+   * This function converts a standard JavaScript string (UTF-8) into a byte array
+   * using the CP1256 encoding that thermal printers understand for Arabic.
+   */
+  private encodeArabicToCp1256(text: string): Uint8Array {
+    const cp1256Map: { [key: string]: number } = {
+      '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '†': 0x86, '‡': 0x87,
+      'ˆ': 0x88, '‰': 0x89, '‹': 0x8B, '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94,
+      '•': 0x95, '–': 0x96, '—': 0x97, '™': 0x99, '›': 0x9B, ' ': 0xA0, '،': 0xA1,
+      '»': 0xAB, '«': 0xBB, '،': 0xAC, '؟': 0xBF, 'ء': 0xC1, 'آ': 0xC2, 'أ': 0xC3,
+      'ؤ': 0xC4, 'إ': 0xC5, 'ئ': 0xC6, 'ا': 0xC7, 'ب': 0xC8, 'ة': 0xC9, 'ت': 0xCA,
+      'ث': 0xCB, 'ج': 0xCC, 'ح': 0xCD, 'خ': 0xCE, 'د': 0xCF, 'ذ': 0xD0, 'ر': 0xD1,
+      'ز': 0xD2, 'س': 0xD3, 'ش': 0xD4, 'ص': 0xD5, 'ض': 0xD6, 'ط': 0xD7, 'ظ': 0xD8,
+      'ع': 0xD9, 'غ': 0xDA, 'ـ': 0xDC, 'ف': 0xE1, 'ق': 0xE2, 'ك': 0xE3, 'ل': 0xE4,
+      'م': 0xE5, 'ن': 0xE6, 'ه': 0xE7, 'و': 0xE8, 'ى': 0xE9, 'ي': 0xEA, 'ً': 0xEB,
+      'ٌ': 0xEC, 'ٍ': 0xED, 'َ': 0xEE, 'ُ': 0xEF, 'ِ': 0xF0, 'ّ': 0xF1, 'ْ': 0xF2,
+    };
+
+    const buffer = new Uint8Array(text.length);
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      // If character is in our map, use the mapped value, otherwise use its ASCII value
+      buffer[i] = cp1256Map[char] || char.charCodeAt(0);
+    }
+    return buffer;
+  }
+
   async connectPrinter(): Promise<boolean> {
+    // ... (connection logic remains the same)
     if (!navigator.bluetooth) {
       toast.error('المتصفح لا يدعم بلوتوث الويب.');
       return false;
     }
     try {
-      toast.info("الرجاء اختيار الطابعة من القائمة...");
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
       });
-
-      if (!device.gatt) {
-        toast.error("لا يمكن الاتصال بهذا الجهاز.");
-        return false;
-      }
-
+      if (!device.gatt) return false;
       toast.loading(`جاري الاتصال بـ ${device.name || 'طابعة'}...`);
       const server = await device.gatt.connect();
-
       const services = await server.getPrimaryServices();
       let writableCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
-
       for (const service of services) {
         const characteristics = await service.getCharacteristics();
         const characteristic = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
@@ -73,27 +94,21 @@ class BluetoothPrinterService {
           break;
         }
       }
-
       if (!writableCharacteristic) {
-        toast.error("لم يتم العثور على خدمة طباعة متوافقة في هذا الجهاز.");
+        toast.error("لم يتم العثور على خدمة طباعة متوافقة.");
         server.disconnect();
         return false;
       }
-
       this.printer = { device, server, characteristic: writableCharacteristic };
-
       device.addEventListener('gattserverdisconnected', () => {
         this.printer = null;
         toast.warning("تم فصل اتصال الطابعة.");
       });
-
       toast.success(`تم الاتصال بنجاح بـ: ${device.name || 'طابعة بلوتوث'}`);
       return true;
-
     } catch (error: any) {
       if (error.name !== 'NotFoundError') {
-        toast.error('فشل الاتصال، يرجى التأكد من اتباع خطوات التحقق.');
-        console.error('Bluetooth connection error:', error);
+        toast.error('فشل الاتصال، تأكد من إلغاء الاقتران القديم.');
       }
       return false;
     }
@@ -110,20 +125,14 @@ class BluetoothPrinterService {
     return !!this.printer?.server?.connected;
   }
 
-  /**
-   * [FIX] This is the missing function that Barcode.tsx was calling.
-   */
   getConnectedPrinterName(): string | null {
-    if (this.isConnected() && this.printer?.device.name) {
-      return this.printer.device.name;
-    }
-    return null;
+    return this.printer?.device.name || null;
   }
 
   async printInvoice(text: string): Promise<boolean> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(text);
-    return this.printData(data);
+    // Now uses the Arabic encoding function before printing
+    const encodedData = this.encodeArabicToCp1256(text);
+    return this.printData(encodedData);
   }
 
   private async printData(data: ArrayBuffer): Promise<boolean> {
@@ -132,7 +141,7 @@ class BluetoothPrinterService {
       return false;
     }
     try {
-      const chunkSize = 512;
+      const chunkSize = 100; // Smaller chunk size can be more reliable
       for (let i = 0; i < data.byteLength; i += chunkSize) {
         const chunk = data.slice(i, i + chunkSize);
         await this.printer.characteristic.writeValue(chunk);
@@ -145,7 +154,7 @@ class BluetoothPrinterService {
   }
 
   async testPrint(): Promise<void> {
-    const testText = `\n--------------------------------\n      Printer Connection Test\n\n      Success ✓\n--------------------------------\n\n\n`;
+    const testText = `\n--------------------------------\nPrinter Test - اختبار الطابعة\n\nSuccess - نجاح ✓\n--------------------------------\n\n\n`;
     toast.info("جاري إرسال صفحة اختبار...");
     if (await this.printInvoice(testText)) {
       toast.success("تم إرسال صفحة الاختبار بنجاح.");
