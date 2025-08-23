@@ -1,5 +1,4 @@
 import { toast } from "sonner";
-import { toArabic } from "arabic-persian-reshaper";
 
 // Type declarations for Web Bluetooth API
 declare global {
@@ -46,6 +45,13 @@ interface BluetoothPrinter {
 
 class BluetoothPrinterService {
   private printer: BluetoothPrinter | null = null;
+
+  /**
+   * دالة بسيطة لعكس النص العربي (علشان الطابعة تطبعه من اليمين لليسار)
+   */
+  private reshapeArabic(text: string): string {
+    return text.split("").reverse().join("");
+  }
 
   async connectPrinter(): Promise<boolean> {
     if (!navigator.bluetooth) {
@@ -107,19 +113,19 @@ class BluetoothPrinterService {
 
   async printInvoice(text: string): Promise<boolean> {
     // [1] Initialize
-    const init = new Uint8Array([0x1b, 0x40]);
+    const init = new Uint8Array([0x1B, 0x40]);
 
     // [2] اختيار Arabic Code Page (PC864 = 22)
-    const selectArabic = new Uint8Array([0x1b, 0x74, 22]);
+    const selectArabic = new Uint8Array([0x1B, 0x74, 22]);
 
     // [3] reshaping للنص العربي
-    const reshaped = toArabic(text);
+    const reshaped = this.reshapeArabic(text);
 
     // [4] تحويل النص لـ UTF-8
     const encoder = new TextEncoder();
     const encodedText = encoder.encode(reshaped + "\n\n");
 
-    // [5] دمج كل الأوامر
+    // [5] دمج الأوامر
     const fullData = new Uint8Array(
       init.length + selectArabic.length + encodedText.length
     );
@@ -136,7 +142,7 @@ class BluetoothPrinterService {
       return false;
     }
     try {
-      const chunkSize = 128; // تقسيم البيانات لأجزاء صغيرة علشان مايحصلش drop
+      const chunkSize = 128;
       for (let i = 0; i < data.byteLength; i += chunkSize) {
         const chunk = data.slice(i, i + chunkSize);
         await this.printer.characteristic.writeValue(chunk);
