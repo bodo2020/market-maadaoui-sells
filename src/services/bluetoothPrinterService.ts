@@ -17,11 +17,11 @@ declare global {
     connected: boolean;
     connect(): Promise<BluetoothRemoteGATTServer>;
     disconnect(): void;
-    getPrimaryServices(): Promise<BluetoothRemoteGATTService[]>; // Get all services
+    getPrimaryServices(): Promise<BluetoothRemoteGATTService[]>;
   }
   interface BluetoothRemoteGATTService {
     uuid: string;
-    getCharacteristics(): Promise<BluetoothRemoteGATTCharacteristic[]>; // Get all characteristics
+    getCharacteristics(): Promise<BluetoothRemoteGATTCharacteristic[]>;
   }
   interface BluetoothRemoteGATTCharacteristic {
     uuid: string;
@@ -43,10 +43,6 @@ interface BluetoothPrinter {
 class BluetoothPrinterService {
   private printer: BluetoothPrinter | null = null;
 
-  /**
-   * [THE FIX] This is a more robust connection method.
-   * It connects to the device first, then searches for any writable characteristic.
-   */
   async connectPrinter(): Promise<boolean> {
     if (!navigator.bluetooth) {
       toast.error('المتصفح لا يدعم بلوتوث الويب.');
@@ -55,8 +51,7 @@ class BluetoothPrinterService {
     try {
       toast.info("الرجاء اختيار الطابعة من القائمة...");
       const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true, // We accept any device
-        // We don't specify optionalServices to discover everything
+        acceptAllDevices: true,
       });
 
       if (!device.gatt) {
@@ -67,19 +62,16 @@ class BluetoothPrinterService {
       toast.loading(`جاري الاتصال بـ ${device.name || 'طابعة'}...`);
       const server = await device.gatt.connect();
 
-      // Search for a writable characteristic
       const services = await server.getPrimaryServices();
       let writableCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
 
       for (const service of services) {
         const characteristics = await service.getCharacteristics();
-        for (const characteristic of characteristics) {
-          if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
-            writableCharacteristic = characteristic;
-            break; // Found a writable characteristic
-          }
+        const characteristic = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
+        if (characteristic) {
+          writableCharacteristic = characteristic;
+          break;
         }
-        if (writableCharacteristic) break; // Exit the outer loop as well
       }
 
       if (!writableCharacteristic) {
@@ -118,9 +110,12 @@ class BluetoothPrinterService {
     return !!this.printer?.server?.connected;
   }
 
-  getSavedPrinter(): { name: string } | null {
+  /**
+   * [FIX] This is the missing function that Barcode.tsx was calling.
+   */
+  getConnectedPrinterName(): string | null {
     if (this.isConnected() && this.printer?.device.name) {
-      return { name: this.printer.device.name };
+      return this.printer.device.name;
     }
     return null;
   }
