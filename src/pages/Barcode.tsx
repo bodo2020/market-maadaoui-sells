@@ -714,23 +714,11 @@ export default function Barcode() {
                         variant="outline" 
                         className="w-full"
                         onClick={async () => {
-                          const testText = `
-================================
-         اختبار طباعة
-================================
-
-التاريخ: ${new Date().toLocaleDateString('ar-EG')}
-الوقت: ${new Date().toLocaleTimeString('ar-EG')}
-
-هذه رسالة اختبار للتأكد من 
-عمل الطابعة بشكل صحيح.
-
-================================
-       تم بنجاح ✓
-================================
-
-`;
-                          await bluetoothPrinterService.printText(testText);
+                          if (bluetoothPrinterService.isConnected()) {
+                            await bluetoothPrinterService.testPrint();
+                          } else {
+                            toast.error('الطابعة غير متصلة');
+                          }
                         }}
                       >
                         <Printer className="h-4 w-4 mr-2" />
@@ -753,10 +741,22 @@ export default function Barcode() {
                       <div className="mt-4 text-xs text-muted-foreground space-y-1">
                         <p>• تأكد من تشغيل البلوتوث في جهازك</p>
                         <p>• اجعل الطابعة في وضع الاكتشاف</p>
+                        <p>• استخدم Chrome أو Edge للحصول على أفضل دعم</p>
                         <p>• ستطبع الفواتير تلقائياً بعد كل عملية بيع</p>
                       </div>
                     </div>
                   )}
+                  
+                  {/* معلومات إضافية */}
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <h4 className="font-medium mb-2">نصائح للاستخدام:</h4>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>• إذا فشل الاتصال، جرب إعادة تشغيل البلوتوث</li>
+                      <li>• بعض الطابعات تحتاج وضع "Pairing Mode"</li>
+                      <li>• إذا لم تعمل الطباعة المباشرة، ستفتح نافذة طباعة</li>
+                      <li>• يمكنك استخدام نفس الطابعة للفواتير والباركود</li>
+                    </ul>
+                  </div>
                 </div>
               </CardContent>
             </Card>

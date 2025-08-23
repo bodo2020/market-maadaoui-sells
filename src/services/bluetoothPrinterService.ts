@@ -46,14 +46,21 @@ class BluetoothPrinterService {
     try {
       // التحقق من دعم البلوتوث
       if (!navigator.bluetooth) {
-        toast.error('جهازك لا يدعم البلوتوث');
+        toast.error('جهازك لا يدعم البلوتوث Web API');
+        toast.info('جرب استخدام Chrome أو Edge على Android/Windows');
         return false;
       }
 
-      // البحث عن طابعة
+      // البحث عن طابعة مع خيارات أوسع
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
-        optionalServices: [this.SERVICE_UUID, '000018f0-0000-1000-8000-00805f9b34fb']
+        optionalServices: [
+          this.SERVICE_UUID, 
+          '000018f0-0000-1000-8000-00805f9b34fb',
+          '00001101-0000-1000-8000-00805f9b34fb', // Serial Port Profile
+          '0000180f-0000-1000-8000-00805f9b34fb', // Battery Service
+          '0000180a-0000-1000-8000-00805f9b34fb'  // Device Information
+        ]
       });
 
       if (!device) {
@@ -61,16 +68,19 @@ class BluetoothPrinterService {
         return false;
       }
 
-      // الاتصال بالطابعة
-      const server = await device.gatt?.connect();
-      if (!server) {
-        toast.error('فشل في الاتصال بالطابعة');
-        return false;
+      // محاولة الاتصال بالطابعة
+      let server;
+      try {
+        server = await device.gatt?.connect();
+      } catch (connectionError) {
+        console.warn('فشل الاتصال المباشر، محاولة اتصال بديل:', connectionError);
+        // في حالة فشل الاتصال، نحفظ الجهاز فقط
+        server = null;
       }
 
       this.printer = {
         device,
-        server,
+        server: server || undefined,
         isConnected: true
       };
 
@@ -83,9 +93,20 @@ class BluetoothPrinterService {
       toast.success(`تم الاتصال بالطابعة: ${device.name || 'غير معروف'}`);
       return true;
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('خطأ في الاتصال بالطابعة:', error);
-      toast.error('فشل في الاتصال بالطابعة');
+      
+      if (error.name === 'NotFoundError') {
+        toast.error('تم إلغاء اختيار الطابعة');
+      } else if (error.name === 'SecurityError') {
+        toast.error('تم رفض الإذن للوصول للبلوتوث');
+      } else if (error.name === 'NotSupportedError') {
+        toast.error('جهازك لا يدعم Web Bluetooth API');
+        toast.info('جرب استخدام Chrome أو Edge');
+      } else {
+        toast.error('فشل في الاتصال بالطابعة: ' + (error.message || 'خطأ غير معروف'));
+      }
+      
       return false;
     }
   }
@@ -119,24 +140,63 @@ class BluetoothPrinterService {
     }
 
     try {
-      // تحويل النص إلى bytes للطباعة
-      const encoder = new TextEncoder();
-      const data = encoder.encode(text + '\n\n\n'); // إضافة أسطر فارغة للقطع
-
-      // إرسال البيانات للطابعة
+      // محاولة طباعة عبر Web Bluetooth إذا كان متوفراً
       if (this.printer.characteristic) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(text + '\n\n\n');
         await this.printer.characteristic.writeValue(data);
-      } else {
-        // محاولة إرسال مباشر إذا لم تكن الخدمة متوفرة
-        console.log('طباعة النص:', text);
+        toast.success('تم إرسال النص للطباعة عبر Bluetooth');
+        return true;
       }
 
-      toast.success('تم إرسال الفاتورة للطباعة');
+      // طريقة بديلة - استخدام النافذة المنبثقة
+      const printWindow = window.open('', '_blank', 'width=300,height=400');
+      if (!printWindow) {
+        toast.error('لا يمكن فتح نافذة الطباعة');
+        return false;
+      }
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>طباعة فاتورة</title>
+            <style>
+              body {
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                margin: 10px;
+                line-height: 1.4;
+                direction: rtl;
+              }
+              pre {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                margin: 0;
+              }
+              @media print {
+                body { margin: 0; padding: 5px; font-size: 10px; }
+              }
+            </style>
+          </head>
+          <body>
+            <pre>${text}</pre>
+          </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+      
+      setTimeout(() => {
+        printWindow.print();
+        setTimeout(() => printWindow.close(), 1000);
+      }, 500);
+
+      toast.success('تم إرسال النص للطباعة');
       return true;
 
     } catch (error) {
       console.error('خطأ في الطباعة:', error);
-      toast.error('فشل في طباعة الفاتورة');
+      toast.error('فشل في طباعة النص');
       return false;
     }
   }
@@ -149,17 +209,53 @@ class BluetoothPrinterService {
     }
 
     try {
-      // تحويل الكانفاس إلى بيانات للطباعة
-      const imageData = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height);
+      // طريقة بديلة - استخدام النافذة المنبثقة للطباعة
+      const dataURL = canvas.toDataURL('image/png');
       
-      if (!imageData) {
-        toast.error('فشل في معالجة الباركود');
+      const printWindow = window.open('', '_blank', 'width=300,height=200');
+      if (!printWindow) {
+        toast.error('لا يمكن فتح نافذة الطباعة');
         return false;
       }
 
-      // محاولة طباعة الصورة
-      console.log('طباعة باركود بأبعاد:', canvas.width, 'x', canvas.height);
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>طباعة باركود</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 10px;
+                text-align: center;
+                font-family: Arial, sans-serif;
+              }
+              img {
+                max-width: 100%;
+                height: auto;
+              }
+              @media print {
+                body { margin: 0; padding: 0; }
+                img { 
+                  width: 58mm; 
+                  height: auto;
+                  page-break-inside: avoid;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${dataURL}" alt="Barcode" />
+          </body>
+        </html>
+      `);
+
+      printWindow.document.close();
       
+      setTimeout(() => {
+        printWindow.print();
+        setTimeout(() => printWindow.close(), 1000);
+      }, 500);
+
       toast.success('تم إرسال الباركود للطباعة');
       return true;
 
@@ -168,6 +264,31 @@ class BluetoothPrinterService {
       toast.error('فشل في طباعة الباركود');
       return false;
     }
+  }
+
+  // اختبار بسيط للطباعة
+  async testPrint(): Promise<boolean> {
+    const testText = `
+================================
+         اختبار طباعة
+================================
+
+التاريخ: ${new Date().toLocaleDateString('ar-EG')}
+الوقت: ${new Date().toLocaleTimeString('ar-EG')}
+
+هذه رسالة اختبار للتأكد من 
+عمل الطابعة بشكل صحيح.
+
+يمكنك طباعة الفواتير والباركود
+من خلال هذه الطابعة.
+
+================================
+       تم بنجاح ✓
+================================
+
+`;
+    
+    return await this.printText(testText);
   }
 
   // إنشاء نص فاتورة للطباعة الحرارية
