@@ -1,41 +1,35 @@
 import { toast } from "sonner";
 
 // Type declarations for Web Bluetooth API
-// These ensure TypeScript understands the browser's Bluetooth functions.
 declare global {
   interface Navigator {
     bluetooth: {
       requestDevice(options?: any): Promise<BluetoothDevice>;
     };
   }
-  
   interface BluetoothDevice {
     name?: string;
     id: string;
     gatt?: BluetoothRemoteGATTServer;
     addEventListener(type: 'gattserverdisconnected', listener: (this: this, ev: Event) => any): void;
   }
-  
   interface BluetoothRemoteGATTServer {
     connect(): Promise<BluetoothRemoteGATTServer>;
     disconnect(): void;
     getPrimaryService(uuid: string): Promise<BluetoothRemoteGATTService>;
   }
-  
   interface BluetoothRemoteGATTService {
     getCharacteristic(uuid: string): Promise<BluetoothRemoteGATTCharacteristic>;
   }
-  
   interface BluetoothRemoteGATTCharacteristic {
     writeValue(data: ArrayBuffer): Promise<void>;
   }
 }
 
-// Interface for our printer object
 interface BluetoothPrinter {
   device: BluetoothDevice;
-  server?: BluetoothRemoteGATTServer;
-  characteristic?: BluetoothRemoteGATTCharacteristic;
+  server: BluetoothRemoteGATTServer;
+  characteristic: BluetoothRemoteGATTCharacteristic;
 }
 
 class BluetoothPrinterService {
@@ -51,12 +45,10 @@ class BluetoothPrinterService {
   async connectPrinter(): Promise<boolean> {
     if (!navigator.bluetooth) {
       toast.error('المتصفح لا يدعم بلوتوث الويب.');
-      toast.info('جرب استخدام Chrome أو Edge على جهاز كمبيوتر أو Android.');
       return false;
     }
 
     try {
-      toast.info("جاري البحث عن طابعات، الرجاء اختيار طابعتك...");
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
         optionalServices: [this.SERVICE_UUID],
@@ -74,9 +66,11 @@ class BluetoothPrinterService {
 
       this.printer = { device, server, characteristic };
 
+      // Listen for disconnection events to clear the printer state
       device.addEventListener('gattserverdisconnected', () => {
         toast.warning("تم فصل اتصال الطابعة.");
         this.printer = null;
+        // You might want to notify the UI to update here if needed
       });
 
       toast.success(`تم الاتصال بنجاح بـ: ${device.name || 'طابعة بلوتوث'}`);
@@ -84,7 +78,7 @@ class BluetoothPrinterService {
 
     } catch (error: any) {
       if (error.name === 'NotFoundError') {
-        toast.error('تم إلغاء اختيار الطابعة.');
+        // This is not an error, the user just cancelled the dialog.
       } else {
         toast.error('فشل الاتصال، تأكد أن الطابعة في وضع الاقتران.');
         console.error('Bluetooth connection error:', error);
@@ -97,9 +91,8 @@ class BluetoothPrinterService {
    * Disconnects from the currently connected printer.
    */
   disconnectPrinter(): void {
-    if (this.printer?.server) {
+    if (this.printer?.server?.connected) {
       this.printer.server.disconnect();
-      toast.success('تم فصل الطابعة بنجاح.');
     }
     this.printer = null;
   }
@@ -112,18 +105,17 @@ class BluetoothPrinterService {
   }
   
   /**
-   * Gets the name of the connected printer.
+   * Gets the name of the currently connected printer.
    */
-  getSavedPrinter(): { name: string } | null {
-      if (this.isConnected() && this.printer?.device.name) {
-          return { name: this.printer.device.name };
-      }
-      return null;
+  getConnectedPrinterName(): string | null {
+    if (this.isConnected() && this.printer?.device.name) {
+      return this.printer.device.name;
+    }
+    return null;
   }
 
   /**
-   * [FIX] This is the missing method. It prints text-based content like invoices.
-   * It now correctly calls the internal printData method.
+   * Prints text-based content like invoices.
    */
   async printInvoice(text: string): Promise<boolean> {
     const encoder = new TextEncoder();
@@ -141,7 +133,6 @@ class BluetoothPrinterService {
     }
 
     try {
-      // Sending data in chunks is crucial for reliability.
       const chunkSize = 512;
       for (let i = 0; i < data.byteLength; i += chunkSize) {
         const chunk = data.slice(i, i + chunkSize);
@@ -158,25 +149,14 @@ class BluetoothPrinterService {
   /**
    * Runs a simple test print.
    */
-  async testPrint(): Promise<boolean> {
-    const testText = `
---------------------------------
-      Printer Connection Test
-      اختبار الاتصال بالطابعة
-
-Date: ${new Date().toLocaleDateString('ar-EG')}
-Time: ${new Date().toLocaleTimeString('ar-EG')}
-
-      Success ✓
---------------------------------
-\n\n\n`;
+  async testPrint(): Promise<void> {
+    const testText = `\n--------------------------------\n      Printer Connection Test\n      اختبار الاتصال بالطابعة\n\n      Success ✓\n--------------------------------\n\n\n`;
     
     toast.info("جاري إرسال صفحة اختبار...");
     const success = await this.printInvoice(testText);
     if(success) {
         toast.success("تم إرسال صفحة الاختبار بنجاح.");
     }
-    return success;
   }
 }
 
