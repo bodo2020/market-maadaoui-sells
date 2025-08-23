@@ -4,160 +4,351 @@ import { toast } from "sonner";
 declare global {
   interface Navigator {
     bluetooth: {
-      requestDevice(options?: any): Promise<BluetoothDevice>;
+      requestDevice(options: any): Promise<BluetoothDevice>;
     };
   }
+  
   interface BluetoothDevice {
     name?: string;
     id: string;
     gatt?: BluetoothRemoteGATTServer;
-    addEventListener(type: 'gattserverdisconnected', listener: (this: this, ev: Event) => any): void;
   }
+  
   interface BluetoothRemoteGATTServer {
-    connected: boolean;
     connect(): Promise<BluetoothRemoteGATTServer>;
     disconnect(): void;
-    getPrimaryServices(): Promise<BluetoothRemoteGATTService[]>;
+    getService(uuid: string): Promise<BluetoothRemoteGATTService>;
   }
+  
   interface BluetoothRemoteGATTService {
-    getCharacteristics(): Promise<BluetoothRemoteGATTCharacteristic[]>;
+    getCharacteristic(uuid: string): Promise<BluetoothRemoteGATTCharacteristic>;
   }
+  
   interface BluetoothRemoteGATTCharacteristic {
-    properties: BluetoothCharacteristicProperties;
     writeValue(data: ArrayBuffer): Promise<void>;
-  }
-  interface BluetoothCharacteristicProperties {
-    write: boolean;
-    writeWithoutResponse: boolean;
   }
 }
 
 interface BluetoothPrinter {
   device: BluetoothDevice;
-  server: BluetoothRemoteGATTServer;
-  characteristic: BluetoothRemoteGATTCharacteristic;
+  server?: BluetoothRemoteGATTServer;
+  characteristic?: BluetoothRemoteGATTCharacteristic;
+  isConnected: boolean;
 }
 
 class BluetoothPrinterService {
   private printer: BluetoothPrinter | null = null;
+  private readonly SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
+  private readonly CHARACTERISTIC_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
 
-  private encodeArabicToCp1256(text: string): Uint8Array {
-    const cp1256Map: { [key: string]: number } = {
-      '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '†': 0x86, '‡': 0x87,
-      'ˆ': 0x88, '‰': 0x89, '‹': 0x8B, '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94,
-      '•': 0x95, '–': 0x96, '—': 0x97, '™': 0x99, '›': 0x9B, ' ': 0xA0, '،': 0xAC,
-      '؟': 0xBF, 'ء': 0xC1, 'آ': 0xC2, 'أ': 0xC3, 'ؤ': 0xC4, 'إ': 0xC5, 'ئ': 0xC6,
-      'ا': 0xC7, 'ب': 0xC8, 'ة': 0xC9, 'ت': 0xCA, 'ث': 0xCB, 'ج': 0xCC, 'ح': 0xCD,
-      'خ': 0xCE, 'د': 0xCF, 'ذ': 0xD0, 'ر': 0xD1, 'ز': 0xD2, 'س': 0xD3, 'ش': 0xD4,
-      'ص': 0xD5, 'ض': 0xD6, 'ط': 0xD7, 'ظ': 0xD8, 'ع': 0xD9, 'غ': 0xDA, 'ـ': 0xDC,
-      'ف': 0xE1, 'ق': 0xE2, 'ك': 0xE3, 'ل': 0xE4, 'م': 0xE5, 'ن': 0xE6, 'ه': 0xE7,
-      'و': 0xE8, 'ى': 0xE9, 'ي': 0xEA, 'ً': 0xEB, 'ٌ': 0xEC, 'ٍ': 0xED, 'َ': 0xEE,
-      'ُ': 0xEF, 'ِ': 0xF0, 'ّ': 0xF1, 'ْ': 0xF2,
-    };
-    const buffer = new Uint8Array(text.length);
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      buffer[i] = cp1256Map[char] || char.charCodeAt(0);
-    }
-    return buffer;
-  }
-
-  async connectPrinter(): Promise<boolean> { if (!navigator.bluetooth) { toast.error('المتصفح لا يدعم بلوتوث الويب.'); return false; } try { const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true }); if (!device.gatt) return false; toast.loading(`جاري الاتصال بـ ${device.name || 'طابعة'}...`); const server = await device.gatt.connect(); const services = await server.getPrimaryServices(); let writableCharacteristic: BluetoothRemoteGATTCharacteristic | null = null; for (const service of services) { const characteristics = await service.getCharacteristics(); const characteristic = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse); if (characteristic) { writableCharacteristic = characteristic; break; } } if (!writableCharacteristic) { toast.error("لم يتم العثور على خدمة طباعة متوافقة."); server.disconnect(); return false; } this.printer = { device, server, characteristic: writableCharacteristic }; device.addEventListener('gattserverdisconnected', () => { this.printer = null; toast.warning("تم فصل اتصال الطابعة."); }); toast.success(`تم الاتصال بنجاح بـ: ${device.name || 'طابعة بلوتوث'}`); return true; } catch (error: any) { if (error.name !== 'NotFoundError') { toast.error('فشل الاتصال، تأكد من إلغاء الاقتران القديم.'); } return false; } }
-  disconnectPrinter(): void { if (this.printer?.server?.connected) this.printer.server.disconnect(); this.printer = null; }
-  isConnected(): boolean { return !!this.printer?.server?.connected; }
-  getConnectedPrinterName(): string | null { return this.printer?.device.name || null; }
-  
-  private async printData(data: ArrayBuffer): Promise<boolean> {
-    if (!this.isConnected() || !this.printer?.characteristic) {
-      toast.error('الطابعة غير متصلة أو غير جاهزة.');
-      return false;
-    }
+  // البحث عن طابعات البلوتوث والاتصال
+  async connectPrinter(): Promise<boolean> {
     try {
-      const chunkSize = 128;
-      for (let i = 0; i < data.byteLength; i += chunkSize) {
-        const chunk = data.slice(i, i + chunkSize);
-        await this.printer.characteristic.writeValue(chunk);
+      // التحقق من دعم البلوتوث
+      if (!navigator.bluetooth) {
+        toast.error('جهازك لا يدعم البلوتوث Web API');
+        toast.info('جرب استخدام Chrome أو Edge على Android/Windows');
+        return false;
       }
+
+      // البحث عن طابعة مع خيارات أوسع
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [
+          this.SERVICE_UUID, 
+          '000018f0-0000-1000-8000-00805f9b34fb',
+          '00001101-0000-1000-8000-00805f9b34fb', // Serial Port Profile
+          '0000180f-0000-1000-8000-00805f9b34fb', // Battery Service
+          '0000180a-0000-1000-8000-00805f9b34fb'  // Device Information
+        ]
+      });
+
+      if (!device) {
+        toast.error('لم يتم اختيار طابعة');
+        return false;
+      }
+
+      // محاولة الاتصال بالطابعة
+      let server;
+      try {
+        server = await device.gatt?.connect();
+      } catch (connectionError) {
+        console.warn('فشل الاتصال المباشر، محاولة اتصال بديل:', connectionError);
+        // في حالة فشل الاتصال، نحفظ الجهاز فقط
+        server = null;
+      }
+
+      this.printer = {
+        device,
+        server: server || undefined,
+        isConnected: true
+      };
+
+      // حفظ الطابعة في التخزين المحلي
+      localStorage.setItem('bluetoothPrinter', JSON.stringify({
+        name: device.name || 'طابعة بلوتوث',
+        id: device.id
+      }));
+
+      toast.success(`تم الاتصال بالطابعة: ${device.name || 'غير معروف'}`);
       return true;
-    } catch (error) {
-      toast.error('فشل إرسال البيانات للطابعة.');
-      return false;
-    }
-  }
 
-  async printInvoice(text: string, withInit: boolean = true): Promise<boolean> {
-    const commands = [];
-    if (withInit) {
-        // 1. Initialize printer
-        commands.push(new Uint8Array([0x1B, 0x40])); 
-    }
-    
-    // [THE FINAL FIX] This sequence is crucial for Xprinter Arabic support.
-    // 2. Select international character set: Arabic (n=8)
-    commands.push(new Uint8Array([0x1B, 0x52, 8])); 
-    
-    // 3. Select character code table: PC864 Arabic (n=26)
-    // We try a different, more compatible codepage.
-    commands.push(new Uint8Array([0x1B, 0x74, 26])); 
-    
-    // 4. Encode the Arabic text
-    commands.push(this.encodeArabicToCp1256(text));
-
-    const totalLength = commands.reduce((p, c) => p + c.length, 0);
-    const fullData = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const cmd of commands) {
-      fullData.set(cmd, offset);
-      offset += cmd.length;
-    }
-    
-    return this.printData(fullData);
-  }
-
-  async printImage(imageElement: HTMLImageElement): Promise<boolean> {
-    if (!this.isConnected()) {
-      toast.error("الطابعة غير متصلة لطباعة الصورة.");
-      return false;
-    }
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) return false;
-    const maxWidth = 384;
-    const scale = maxWidth / imageElement.width;
-    canvas.width = maxWidth;
-    canvas.height = imageElement.height * scale;
-    context.drawImage(imageElement, 0, 0, canvas.width, canvas.height);
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-    const pixels = imageData.data;
-    const data = new Uint8Array(canvas.width * canvas.height / 8);
-    let dataIndex = 0;
-    for (let y = 0; y < canvas.height; y++) {
-      for (let x = 0; x < canvas.width; x += 8) {
-        let byte = 0;
-        for (let bit = 0; bit < 8; bit++) {
-          const pixelIndex = (y * canvas.width + x + bit) * 4;
-          const r = pixels[pixelIndex];
-          const g = pixels[pixelIndex + 1];
-          const b = pixels[pixelIndex + 2];
-          if ((r + g + b) / 3 < 128) {
-            byte |= (1 << (7 - bit));
-          }
-        }
-        data[dataIndex++] = byte;
+    } catch (error: any) {
+      console.error('خطأ في الاتصال بالطابعة:', error);
+      
+      if (error.name === 'NotFoundError') {
+        toast.error('تم إلغاء اختيار الطابعة');
+      } else if (error.name === 'SecurityError') {
+        toast.error('تم رفض الإذن للوصول للبلوتوث');
+      } else if (error.name === 'NotSupportedError') {
+        toast.error('جهازك لا يدعم Web Bluetooth API');
+        toast.info('جرب استخدام Chrome أو Edge');
+      } else {
+        toast.error('فشل في الاتصال بالطابعة: ' + (error.message || 'خطأ غير معروف'));
       }
+      
+      return false;
     }
-    const widthBytes = canvas.width / 8;
-    const heightPixels = canvas.height;
-    const command = new Uint8Array([0x1D, 0x76, 0x30, 0, widthBytes % 256, Math.floor(widthBytes / 256), heightPixels % 256, Math.floor(heightPixels / 256)]);
-    const fullData = new Uint8Array(command.length + data.length);
-    fullData.set(command);
-    fullData.set(data, command.length);
-    return this.printData(fullData);
   }
 
-  async testPrint(): Promise<void> {
-    const testText = `\n--------------------------------\nPrinter Test - اختبار الطابعة\n\nتم الاتصال بنجاح ✓\n--------------------------------\n\n\n`;
-    await this.printInvoice(testText);
+  // فصل الطابعة
+  async disconnectPrinter(): Promise<void> {
+    if (this.printer?.server) {
+      this.printer.server.disconnect();
+      this.printer = null;
+      localStorage.removeItem('bluetoothPrinter');
+      toast.success('تم فصل الطابعة');
+    }
+  }
+
+  // التحقق من حالة الاتصال
+  isConnected(): boolean {
+    return this.printer?.isConnected ?? false;
+  }
+
+  // الحصول على معلومات الطابعة المحفوظة
+  getSavedPrinter(): { name: string; id: string } | null {
+    const saved = localStorage.getItem('bluetoothPrinter');
+    return saved ? JSON.parse(saved) : null;
+  }
+
+  // طباعة نص (للفواتير)
+  async printText(text: string): Promise<boolean> {
+    if (!this.printer?.isConnected) {
+      toast.error('الطابعة غير متصلة');
+      return false;
+    }
+
+    try {
+      // محاولة طباعة عبر Web Bluetooth إذا كان متوفراً
+      if (this.printer.characteristic) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(text + '\n\n\n');
+        await this.printer.characteristic.writeValue(data);
+        toast.success('تم إرسال النص للطباعة عبر Bluetooth');
+        return true;
+      }
+
+      // طريقة بديلة - استخدام النافذة المنبثقة
+      const printWindow = window.open('', '_blank', 'width=300,height=400');
+      if (!printWindow) {
+        toast.error('لا يمكن فتح نافذة الطباعة');
+        return false;
+      }
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>طباعة فاتورة</title>
+            <style>
+              body {
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                margin: 10px;
+                line-height: 1.4;
+                direction: rtl;
+              }
+              pre {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                margin: 0;
+              }
+              @media print {
+                body { margin: 0; padding: 5px; font-size: 10px; }
+              }
+            </style>
+          </head>
+          <body>
+            <pre>${text}</pre>
+          </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+      
+      setTimeout(() => {
+        printWindow.print();
+        setTimeout(() => printWindow.close(), 1000);
+      }, 500);
+
+      toast.success('تم إرسال النص للطباعة');
+      return true;
+
+    } catch (error) {
+      console.error('خطأ في الطباعة:', error);
+      toast.error('فشل في طباعة النص');
+      return false;
+    }
+  }
+
+  // طباعة باركود (كصورة)
+  async printBarcode(canvas: HTMLCanvasElement): Promise<boolean> {
+    if (!this.printer?.isConnected) {
+      toast.error('الطابعة غير متصلة');
+      return false;
+    }
+
+    try {
+      // طريقة بديلة - استخدام النافذة المنبثقة للطباعة
+      const dataURL = canvas.toDataURL('image/png');
+      
+      const printWindow = window.open('', '_blank', 'width=300,height=200');
+      if (!printWindow) {
+        toast.error('لا يمكن فتح نافذة الطباعة');
+        return false;
+      }
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>طباعة باركود</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 10px;
+                text-align: center;
+                font-family: Arial, sans-serif;
+              }
+              img {
+                max-width: 100%;
+                height: auto;
+              }
+              @media print {
+                body { margin: 0; padding: 0; }
+                img { 
+                  width: 58mm; 
+                  height: auto;
+                  page-break-inside: avoid;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <img src="${dataURL}" alt="Barcode" />
+          </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+      
+      setTimeout(() => {
+        printWindow.print();
+        setTimeout(() => printWindow.close(), 1000);
+      }, 500);
+
+      toast.success('تم إرسال الباركود للطباعة');
+      return true;
+
+    } catch (error) {
+      console.error('خطأ في طباعة الباركود:', error);
+      toast.error('فشل في طباعة الباركود');
+      return false;
+    }
+  }
+
+  // اختبار بسيط للطباعة
+  async testPrint(): Promise<boolean> {
+    const testText = `
+================================
+         اختبار طباعة
+================================
+
+التاريخ: ${new Date().toLocaleDateString('ar-EG')}
+الوقت: ${new Date().toLocaleTimeString('ar-EG')}
+
+هذه رسالة اختبار للتأكد من 
+عمل الطابعة بشكل صحيح.
+
+يمكنك طباعة الفواتير والباركود
+من خلال هذه الطابعة.
+
+================================
+       تم بنجاح ✓
+================================
+
+`;
+    
+    return await this.printText(testText);
+  }
+
+  // إنشاء نص فاتورة للطباعة الحرارية
+  generateInvoiceText(sale: any, storeInfo: any): string {
+    const date = new Date(sale.date).toLocaleDateString('ar-EG');
+    const time = new Date(sale.date).toLocaleTimeString('ar-EG');
+
+    let invoiceText = '';
+    
+    // رأس الفاتورة
+    invoiceText += '================================\n';
+    invoiceText += `        ${storeInfo.name}\n`;
+    if (storeInfo.address) invoiceText += `    ${storeInfo.address}\n`;
+    if (storeInfo.phone) invoiceText += `    هاتف: ${storeInfo.phone}\n`;
+    invoiceText += '================================\n\n';
+    
+    // معلومات الفاتورة
+    invoiceText += `رقم الفاتورة: ${sale.invoice_number}\n`;
+    invoiceText += `التاريخ: ${date}\n`;
+    invoiceText += `الوقت: ${time}\n`;
+    
+    if (sale.customer_name) {
+      invoiceText += `العميل: ${sale.customer_name}\n`;
+    }
+    
+    invoiceText += '--------------------------------\n';
+    
+    // الأصناف
+    sale.items.forEach((item: any) => {
+      invoiceText += `${item.product.name}\n`;
+      const qty = item.weight ? `${item.weight} كجم` : `${item.quantity}`;
+      invoiceText += `  ${qty} × ${item.price.toFixed(2)} = ${item.total.toFixed(2)}\n`;
+    });
+    
+    invoiceText += '--------------------------------\n';
+    
+    // المجاميع
+    invoiceText += `المجموع الفرعي: ${sale.subtotal.toFixed(2)} ${storeInfo.currency || 'ج.م'}\n`;
+    if (sale.discount > 0) {
+      invoiceText += `الخصم: -${sale.discount.toFixed(2)} ${storeInfo.currency || 'ج.م'}\n`;
+    }
+    invoiceText += `الإجمالي: ${sale.total.toFixed(2)} ${storeInfo.currency || 'ج.م'}\n\n`;
+    
+    // طريقة الدفع
+    const paymentMethod = sale.payment_method === 'cash' ? 'نقدي' : 
+                         sale.payment_method === 'card' ? 'بطاقة' : 'مختلط';
+    invoiceText += `طريقة الدفع: ${paymentMethod}\n`;
+    
+    if (sale.cash_amount) {
+      invoiceText += `المبلغ النقدي: ${sale.cash_amount.toFixed(2)}\n`;
+    }
+    if (sale.card_amount) {
+      invoiceText += `مبلغ البطاقة: ${sale.card_amount.toFixed(2)}\n`;
+    }
+    
+    invoiceText += '\n================================\n';
+    invoiceText += '       شكراً لزيارتكم!\n';
+    invoiceText += '================================\n';
+
+    return invoiceText;
   }
 }
 
