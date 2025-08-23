@@ -44,7 +44,7 @@ class BluetoothPrinterService {
   private printer: BluetoothPrinter | null = null;
 
   /**
-   * [THE ARABIC FIX]
+   * [ARABIC ENCODING FIX]
    * This function converts a standard JavaScript string (UTF-8) into a byte array
    * using the CP1256 encoding that thermal printers understand for Arabic.
    */
@@ -52,20 +52,18 @@ class BluetoothPrinterService {
     const cp1256Map: { [key: string]: number } = {
       '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '†': 0x86, '‡': 0x87,
       'ˆ': 0x88, '‰': 0x89, '‹': 0x8B, '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94,
-      '•': 0x95, '–': 0x96, '—': 0x97, '™': 0x99, '›': 0x9B, ' ': 0xA0, '،': 0xA1,
-      '»': 0xAB, '«': 0xBB, '،': 0xAC, '؟': 0xBF, 'ء': 0xC1, 'آ': 0xC2, 'أ': 0xC3,
-      'ؤ': 0xC4, 'إ': 0xC5, 'ئ': 0xC6, 'ا': 0xC7, 'ب': 0xC8, 'ة': 0xC9, 'ت': 0xCA,
-      'ث': 0xCB, 'ج': 0xCC, 'ح': 0xCD, 'خ': 0xCE, 'د': 0xCF, 'ذ': 0xD0, 'ر': 0xD1,
-      'ز': 0xD2, 'س': 0xD3, 'ش': 0xD4, 'ص': 0xD5, 'ض': 0xD6, 'ط': 0xD7, 'ظ': 0xD8,
-      'ع': 0xD9, 'غ': 0xDA, 'ـ': 0xDC, 'ف': 0xE1, 'ق': 0xE2, 'ك': 0xE3, 'ل': 0xE4,
-      'م': 0xE5, 'ن': 0xE6, 'ه': 0xE7, 'و': 0xE8, 'ى': 0xE9, 'ي': 0xEA, 'ً': 0xEB,
-      'ٌ': 0xEC, 'ٍ': 0xED, 'َ': 0xEE, 'ُ': 0xEF, 'ِ': 0xF0, 'ّ': 0xF1, 'ْ': 0xF2,
+      '•': 0x95, '–': 0x96, '—': 0x97, '™': 0x99, '›': 0x9B, ' ': 0xA0, '،': 0xAC,
+      '؟': 0xBF, 'ء': 0xC1, 'آ': 0xC2, 'أ': 0xC3, 'ؤ': 0xC4, 'إ': 0xC5, 'ئ': 0xC6,
+      'ا': 0xC7, 'ب': 0xC8, 'ة': 0xC9, 'ت': 0xCA, 'ث': 0xCB, 'ج': 0xCC, 'ح': 0xCD,
+      'خ': 0xCE, 'د': 0xCF, 'ذ': 0xD0, 'ر': 0xD1, 'ز': 0xD2, 'س': 0xD3, 'ش': 0xD4,
+      'ص': 0xD5, 'ض': 0xD6, 'ط': 0xD7, 'ظ': 0xD8, 'ع': 0xD9, 'غ': 0xDA, 'ـ': 0xDC,
+      'ف': 0xE1, 'ق': 0xE2, 'ك': 0xE3, 'ل': 0xE4, 'م': 0xE5, 'ن': 0xE6, 'ه': 0xE7,
+      'و': 0xE8, 'ى': 0xE9, 'ي': 0xEA, 'ً': 0xEB, 'ٌ': 0xEC, 'ٍ': 0xED, 'َ': 0xEE,
+      'ُ': 0xEF, 'ِ': 0xF0, 'ّ': 0xF1, 'ْ': 0xF2,
     };
-
     const buffer = new Uint8Array(text.length);
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
-      // If character is in our map, use the mapped value, otherwise use its ASCII value
       buffer[i] = cp1256Map[char] || char.charCodeAt(0);
     }
     return buffer;
@@ -78,9 +76,7 @@ class BluetoothPrinterService {
       return false;
     }
     try {
-      const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-      });
+      const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
       if (!device.gatt) return false;
       toast.loading(`جاري الاتصال بـ ${device.name || 'طابعة'}...`);
       const server = await device.gatt.connect();
@@ -115,9 +111,7 @@ class BluetoothPrinterService {
   }
 
   disconnectPrinter(): void {
-    if (this.printer?.server?.connected) {
-      this.printer.server.disconnect();
-    }
+    if (this.printer?.server?.connected) this.printer.server.disconnect();
     this.printer = null;
   }
 
@@ -130,9 +124,20 @@ class BluetoothPrinterService {
   }
 
   async printInvoice(text: string): Promise<boolean> {
-    // Now uses the Arabic encoding function before printing
-    const encodedData = this.encodeArabicToCp1256(text);
-    return this.printData(encodedData);
+    // [THE FIX] We now send a command to the printer to select the Arabic character set
+    // The command is ESC t n, where n=26 is the codepage for PC864 (Arabic)
+    const selectArabicCommand = new Uint8Array([0x1B, 0x74, 26]);
+    
+    // Encode the Arabic text to the correct format
+    const encodedText = this.encodeArabicToCp1256(text);
+    
+    // Combine the command and the text into one package
+    const fullData = new Uint8Array(selectArabicCommand.length + encodedText.length);
+    fullData.set(selectArabicCommand);
+    fullData.set(encodedText, selectArabicCommand.length);
+    
+    // Send the complete package to the printer
+    return this.printData(fullData);
   }
 
   private async printData(data: ArrayBuffer): Promise<boolean> {
@@ -141,7 +146,7 @@ class BluetoothPrinterService {
       return false;
     }
     try {
-      const chunkSize = 100; // Smaller chunk size can be more reliable
+      const chunkSize = 128; // Using a smaller chunk size for reliability
       for (let i = 0; i < data.byteLength; i += chunkSize) {
         const chunk = data.slice(i, i + chunkSize);
         await this.printer.characteristic.writeValue(chunk);
