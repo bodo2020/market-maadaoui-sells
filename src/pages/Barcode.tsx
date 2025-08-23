@@ -1,26 +1,22 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Printer, Settings, Bluetooth, Cable, RefreshCw, Edit, Save, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Printer, Settings, Bluetooth } from "lucide-react";
 import { toast } from "sonner";
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
-import JsBarcode from "jsbarcode";
 import { fetchStoreSettings, StoreSettings } from "@/services/supabase/storeService";
 
-// Helper function to format invoice text
+// [THE EDIT] This function is now fully in Arabic
 const formatInvoiceForPrinting = (invoiceData: any): string => {
   let content = '';
   content += `${invoiceData.storeName}\n`;
   content += '--------------------------------\n';
-  content += `Invoice No: ${invoiceData.id}\n`;
-  content += `Date: ${new Date().toLocaleString('ar-EG')}\n`;
+  content += `رقم الفاتورة: ${invoiceData.id}\n`;
+  content += `التاريخ: ${new Date().toLocaleString('ar-EG')}\n`;
   content += '--------------------------------\n';
-  content += 'Item        Qty    Price    Total\n';
+  content += 'الصنف      الكمية   السعر   الإجمالي\n';
   invoiceData.items.forEach((item: any) => {
     const name = item.name.padEnd(12, ' ');
     const qty = item.quantity.toString().padEnd(7, ' ');
@@ -29,49 +25,35 @@ const formatInvoiceForPrinting = (invoiceData: any): string => {
     content += `${name}${qty}${price}${total}\n`;
   });
   content += '--------------------------------\n';
-  content += `Total: ${invoiceData.total.toFixed(2)} EGP\n\n`;
-  content += 'Test Invoice - Thank You!\n\n\n';
+  content += `الإجمالي: ${invoiceData.total.toFixed(2)} جنيه\n\n`;
+  content += 'فاتورة تجريبية - شكراً لكم!\n\n\n';
   return content;
 };
 
-// Type Interfaces
-interface Product {
-  id: string;
-  name: string;
-  barcode?: string;
-  bulk_barcode?: string;
-  price: number;
-  bulk_price?: number;
-  is_bulk: boolean;
-  bulk_enabled: boolean;
-  companies?: { name: string; };
-}
-
 export default function Barcode() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
   
-  // [THE FIX] This state is used to force the component to re-render
+  // This state is used to force the component to re-render
   const [connectionVersion, setConnectionVersion] = useState(0);
   const forceUpdate = () => setConnectionVersion(v => v + 1);
 
   useEffect(() => {
-    fetchProducts();
     fetchStoreData();
-    // Check status on initial load
-    forceUpdate(); 
+    // Set up a listener for disconnection to auto-update the UI
+    const interval = setInterval(() => {
+        // Force update if the service connection state changes
+        forceUpdate();
+    }, 2000); // Check every 2 seconds
+    return () => clearInterval(interval);
   }, []);
 
   const handleConnect = async () => {
     await bluetoothPrinterService.connectPrinter();
-    // Force UI to update after connection attempt
     forceUpdate();
   };
 
   const handleDisconnect = () => {
     bluetoothPrinterService.disconnectPrinter();
-    // Force UI to update after disconnection
     forceUpdate();
   };
 
@@ -93,19 +75,6 @@ export default function Barcode() {
     
     const formattedInvoice = formatInvoiceForPrinting(testInvoiceData);
     await bluetoothPrinterService.printInvoice(formattedInvoice);
-  };
-
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('products').select(`*, companies(name)`).order('name');
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error) {
-      toast.error('حدث خطأ في تحميل المنتجات');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const fetchStoreData = async () => {
