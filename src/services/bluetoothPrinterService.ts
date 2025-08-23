@@ -85,45 +85,14 @@ class BluetoothPrinterService {
     }
   }
 
-  /**
-   * [FINAL ARABIC FIX]
-   * This function now sends the correct sequence of commands for Xprinter models.
-   */
-  async printInvoice(text: string): Promise<boolean> {
-    // 1. Command to initialize the printer (resets any previous settings)
-    const initPrinter = new Uint8Array([0x1B, 0x40]); 
-    
-    // 2. Command to select the Windows-1256 Arabic character table (n=21)
-    // This is the correct codepage for most Xprinter models for Arabic.
-    const selectArabicCommand = new Uint8Array([0x1B, 0x74, 21]); 
-    
-    // 3. Encode the Arabic text using our existing function
-    const encodedText = this.encodeArabicToCp1256(text);
-    
-    // 4. Combine all commands and text into one package to send
-    const fullData = new Uint8Array(initPrinter.length + selectArabicCommand.length + encodedText.length);
-    fullData.set(initPrinter);
-    fullData.set(selectArabicCommand, initPrinter.length);
-    fullData.set(encodedText, initPrinter.length + selectArabicCommand.length);
-    
-    return this.printData(fullData);
-  }
-
-  async printBarcode(barcodeData: string, labelText?: string): Promise<boolean> {
+  async printInvoice(text: string, withInit: boolean = true): Promise<boolean> {
     const commands = [];
-    if (labelText) {
-      commands.push(new Uint8Array([0x1B, 0x74, 21]));
-      commands.push(this.encodeArabicToCp1256(labelText + '\n'));
+    if (withInit) {
+      commands.push(new Uint8Array([0x1B, 0x40])); // Init printer
     }
-    commands.push(new Uint8Array([0x1D, 0x68, 60]));
-    commands.push(new Uint8Array([0x1D, 0x77, 2]));
-    commands.push(new Uint8Array([0x1D, 0x48, 2]));
-    const barcodeBytes = new TextEncoder().encode(barcodeData);
-    const printCommand = new Uint8Array(4 + barcodeBytes.length);
-    printCommand.set([0x1D, 0x6B, 73, barcodeBytes.length]);
-    printCommand.set(barcodeBytes, 4);
-    commands.push(printCommand);
-    commands.push(new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A]));
+    commands.push(new Uint8Array([0x1B, 0x74, 21])); // Select Arabic codepage
+    commands.push(this.encodeArabicToCp1256(text));
+
     const totalLength = commands.reduce((p, c) => p + c.length, 0);
     const fullData = new Uint8Array(totalLength);
     let offset = 0;
@@ -131,15 +100,74 @@ class BluetoothPrinterService {
       fullData.set(cmd, offset);
       offset += cmd.length;
     }
+    
+    return this.printData(fullData);
+  }
+
+  /**
+   * [NEW] Prints a raster image (like a logo).
+   */
+  async printImage(imageElement: HTMLImageElement): Promise<boolean> {
+    if (!this.isConnected()) {
+      toast.error("الطابعة غير متصلة لطباعة الصورة.");
+      return false;
+    }
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return false;
+
+    // Resize image to a reasonable width for thermal printers (e.g., 384px)
+    const maxWidth = 384;
+    const scale = maxWidth / imageElement.width;
+    canvas.width = maxWidth;
+    canvas.height = imageElement.height * scale;
+    context.drawImage(imageElement, 0, 0, canvas.width, canvas.height);
+
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imageData.data;
+    const data = new Uint8Array(canvas.width * canvas.height / 8);
+    let dataIndex = 0;
+
+    for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < canvas.width; x += 8) {
+        let byte = 0;
+        for (let bit = 0; bit < 8; bit++) {
+          const pixelIndex = (y * canvas.width + x + bit) * 4;
+          const r = pixels[pixelIndex];
+          const g = pixels[pixelIndex + 1];
+          const b = pixels[pixelIndex + 2];
+          // Convert to grayscale and check threshold for black/white
+          if ((r + g + b) / 3 < 128) {
+            byte |= (1 << (7 - bit));
+          }
+        }
+        data[dataIndex++] = byte;
+      }
+    }
+
+    const widthBytes = canvas.width / 8;
+    const heightPixels = canvas.height;
+    
+    // ESC/POS command to print a raster bit image: GS v 0
+    const command = new Uint8Array([
+      0x1D, 0x76, 0x30, 0, // GS v 0 m
+      widthBytes % 256,    // xL
+      Math.floor(widthBytes / 256), // xH
+      heightPixels % 256,  // yL
+      Math.floor(heightPixels / 256) // yH
+    ]);
+
+    const fullData = new Uint8Array(command.length + data.length);
+    fullData.set(command);
+    fullData.set(data, command.length);
+
     return this.printData(fullData);
   }
 
   async testPrint(): Promise<void> {
     const testText = `\n--------------------------------\nPrinter Test - اختبار الطابعة\n\nتم الاتصال بنجاح ✓\n--------------------------------\n\n\n`;
-    toast.info("جاري إرسال صفحة اختبار...");
-    if (await this.printInvoice(testText)) {
-      toast.success("تم إرسال صفحة الاختبار بنجاح.");
-    }
+    await this.printInvoice(testText);
   }
 }
 
