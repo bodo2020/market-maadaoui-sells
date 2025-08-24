@@ -82,11 +82,16 @@ export default function POS() {
 
   useEffect(() => {
     if (!manualBarcodeMode) {
+      // Detect Android
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      
       const handleKeyDown = (e: KeyboardEvent) => {
         const target = e.target as HTMLElement;
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
         const isSearchInput = target === searchInputRef.current;
         if (isInput && !isSearchInput) return;
+        
+        console.log("Key pressed:", e.key, "Current buffer:", barcodeBuffer);
         
         // Handle Enter key - process current buffer
         if (e.key === 'Enter' && barcodeBuffer) {
@@ -104,7 +109,9 @@ export default function POS() {
           }
           setBarcodeBuffer(prev => prev + e.key);
           
-          // Auto-process after timeout (for Bluetooth scanners that don't send Enter)
+          // Different timeout for Android vs other platforms
+          const timeoutDuration = isAndroid ? 800 : 500;
+          
           barcodeTimeoutRef.current = setTimeout(() => {
             const currentBuffer = barcodeBuffer + e.key;
             if (currentBuffer.length >= 5) {
@@ -116,13 +123,32 @@ export default function POS() {
                 setBarcodeBuffer("");
               }
             }
-          }, 500); // Increased timeout for Bluetooth scanners
+          }, timeoutDuration);
         }
       };
-      
+
+      // Add input event listener for Android Bluetooth scanners
+      const handleInput = (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        if (target === searchInputRef.current && target.value.length >= 5) {
+          console.log("Input event triggered:", target.value);
+          processBarcode(target.value);
+          target.value = "";
+        }
+      };
+
       document.addEventListener('keydown', handleKeyDown);
+      
+      // Add input listener specifically for Android
+      if (isAndroid && searchInputRef.current) {
+        searchInputRef.current.addEventListener('input', handleInput);
+      }
+      
       return () => {
         document.removeEventListener('keydown', handleKeyDown);
+        if (isAndroid && searchInputRef.current) {
+          searchInputRef.current.removeEventListener('input', handleInput);
+        }
         if (barcodeTimeoutRef.current) {
           clearTimeout(barcodeTimeoutRef.current);
         }
