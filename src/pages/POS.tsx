@@ -80,6 +80,29 @@ export default function POS() {
     loadData();
   }, [toast]);
 
+  // Auto-focus search input for Bluetooth scanners
+  useEffect(() => {
+    const focusSearchInput = () => {
+      if (searchInputRef.current && !manualBarcodeMode) {
+        searchInputRef.current.focus();
+      }
+    };
+
+    // Focus on mount
+    focusSearchInput();
+
+    // Re-focus when clicking anywhere on the page (for Bluetooth scanners)
+    const handlePageClick = () => {
+      setTimeout(focusSearchInput, 100);
+    };
+
+    document.addEventListener('click', handlePageClick);
+    
+    return () => {
+      document.removeEventListener('click', handlePageClick);
+    };
+  }, [manualBarcodeMode]);
+
   useEffect(() => {
     if (!manualBarcodeMode) {
       // Detect Android
@@ -89,6 +112,12 @@ export default function POS() {
         const target = e.target as HTMLElement;
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
         const isSearchInput = target === searchInputRef.current;
+        
+        // For Bluetooth scanners, always direct input to search field
+        if (!isInput && searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+        
         if (isInput && !isSearchInput) return;
         
         console.log("Key pressed:", e.key, "Current buffer:", barcodeBuffer);
@@ -99,6 +128,12 @@ export default function POS() {
           console.log("External barcode scanned:", barcodeBuffer);
           processBarcode(barcodeBuffer);
           setBarcodeBuffer("");
+          // Re-focus search input after processing
+          setTimeout(() => {
+            if (searchInputRef.current) {
+              searchInputRef.current.focus();
+            }
+          }, 100);
           return;
         }
         
@@ -118,6 +153,12 @@ export default function POS() {
               console.log("Auto-processing barcode after timeout:", currentBuffer);
               processBarcode(currentBuffer);
               setBarcodeBuffer("");
+              // Re-focus search input after processing
+              setTimeout(() => {
+                if (searchInputRef.current) {
+                  searchInputRef.current.focus();
+                }
+              }, 100);
             } else {
               if (!isInput) {
                 setBarcodeBuffer("");
@@ -134,6 +175,12 @@ export default function POS() {
           console.log("Input event triggered:", target.value);
           processBarcode(target.value);
           target.value = "";
+          // Re-focus after processing
+          setTimeout(() => {
+            if (searchInputRef.current) {
+              searchInputRef.current.focus();
+            }
+          }, 100);
         }
       };
 
