@@ -80,31 +80,6 @@ export default function POS() {
     loadData();
   }, [toast]);
 
-  // Auto-focus search input for barcode scanners
-  useEffect(() => {
-    const ensureFocus = () => {
-      if (searchInputRef.current && !manualBarcodeMode) {
-        searchInputRef.current.focus();
-      }
-    };
-
-    // Focus on mount and after any interaction
-    ensureFocus();
-    
-    // Keep focus after clicks or any interaction
-    const handleClick = () => {
-      setTimeout(ensureFocus, 10);
-    };
-    
-    document.addEventListener('click', handleClick);
-    document.addEventListener('touchend', handleClick);
-    
-    return () => {
-      document.removeEventListener('click', handleClick);
-      document.removeEventListener('touchend', handleClick);
-    };
-  }, [manualBarcodeMode]);
-
   useEffect(() => {
     if (!manualBarcodeMode) {
       // Detect Android
@@ -114,14 +89,6 @@ export default function POS() {
         const target = e.target as HTMLElement;
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
         const isSearchInput = target === searchInputRef.current;
-        
-        // For Android, always focus search input for barcode scanning
-        if (isAndroid && !isInput) {
-          if (searchInputRef.current) {
-            searchInputRef.current.focus();
-          }
-        }
-        
         if (isInput && !isSearchInput) return;
         
         console.log("Key pressed:", e.key, "Current buffer:", barcodeBuffer);
@@ -171,12 +138,6 @@ export default function POS() {
           if (value.length >= 5) {
             processBarcode(value);
             target.value = "";
-            target.blur();
-            setTimeout(() => {
-              if (searchInputRef.current) {
-                searchInputRef.current.focus();
-              }
-            }, 100);
           }
         }
       };
