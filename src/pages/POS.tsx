@@ -87,6 +87,8 @@ export default function POS() {
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
         const isSearchInput = target === searchInputRef.current;
         if (isInput && !isSearchInput) return;
+        
+        // Handle Enter key - process current buffer
         if (e.key === 'Enter' && barcodeBuffer) {
           e.preventDefault();
           console.log("External barcode scanned:", barcodeBuffer);
@@ -94,18 +96,27 @@ export default function POS() {
           setBarcodeBuffer("");
           return;
         }
+        
+        // Handle alphanumeric characters
         if (/^[a-zA-Z0-9]$/.test(e.key)) {
           if (barcodeTimeoutRef.current) {
             clearTimeout(barcodeTimeoutRef.current);
           }
           setBarcodeBuffer(prev => prev + e.key);
+          
+          // Auto-process after timeout (for Bluetooth scanners that don't send Enter)
           barcodeTimeoutRef.current = setTimeout(() => {
-            if (barcodeBuffer.length < 5) {
+            const currentBuffer = barcodeBuffer + e.key;
+            if (currentBuffer.length >= 5) {
+              console.log("Auto-processing barcode after timeout:", currentBuffer);
+              processBarcode(currentBuffer);
+              setBarcodeBuffer("");
+            } else {
               if (!isInput) {
                 setBarcodeBuffer("");
               }
             }
-          }, 100);
+          }, 500); // Increased timeout for Bluetooth scanners
         }
       };
       
