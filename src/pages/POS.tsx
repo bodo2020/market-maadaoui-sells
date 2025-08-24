@@ -80,6 +80,31 @@ export default function POS() {
     loadData();
   }, [toast]);
 
+  // Auto-focus search input for barcode scanners
+  useEffect(() => {
+    const ensureFocus = () => {
+      if (searchInputRef.current && !manualBarcodeMode) {
+        searchInputRef.current.focus();
+      }
+    };
+
+    // Focus on mount and after any interaction
+    ensureFocus();
+    
+    // Keep focus after clicks or any interaction
+    const handleClick = () => {
+      setTimeout(ensureFocus, 10);
+    };
+    
+    document.addEventListener('click', handleClick);
+    document.addEventListener('touchend', handleClick);
+    
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('touchend', handleClick);
+    };
+  }, [manualBarcodeMode]);
+
   useEffect(() => {
     if (!manualBarcodeMode) {
       // Detect Android
@@ -89,6 +114,14 @@ export default function POS() {
         const target = e.target as HTMLElement;
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
         const isSearchInput = target === searchInputRef.current;
+        
+        // For Android, always focus search input for barcode scanning
+        if (isAndroid && !isInput) {
+          if (searchInputRef.current) {
+            searchInputRef.current.focus();
+          }
+        }
+        
         if (isInput && !isSearchInput) return;
         
         console.log("Key pressed:", e.key, "Current buffer:", barcodeBuffer);
@@ -110,7 +143,7 @@ export default function POS() {
           setBarcodeBuffer(prev => prev + e.key);
           
           // Different timeout for Android vs other platforms
-          const timeoutDuration = isAndroid ? 800 : 500;
+          const timeoutDuration = isAndroid ? 1000 : 500;
           
           barcodeTimeoutRef.current = setTimeout(() => {
             const currentBuffer = barcodeBuffer + e.key;
@@ -127,27 +160,65 @@ export default function POS() {
         }
       };
 
-      // Add input event listener for Android Bluetooth scanners
+      // Enhanced input event listener for Android Bluetooth scanners
       const handleInput = (e: Event) => {
         const target = e.target as HTMLInputElement;
-        if (target === searchInputRef.current && target.value.length >= 5) {
-          console.log("Input event triggered:", target.value);
-          processBarcode(target.value);
-          target.value = "";
+        if (target === searchInputRef.current) {
+          const value = target.value.trim();
+          console.log("Input event triggered:", value);
+          
+          // Process if it looks like a barcode (5+ characters)
+          if (value.length >= 5) {
+            processBarcode(value);
+            target.value = "";
+            target.blur();
+            setTimeout(() => {
+              if (searchInputRef.current) {
+                searchInputRef.current.focus();
+              }
+            }, 100);
+          }
+        }
+      };
+
+      // Enhanced change listener for Android
+      const handleChange = (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        if (target === searchInputRef.current) {
+          const value = target.value.trim();
+          if (value.length >= 8) { // Longer barcodes
+            console.log("Change event triggered:", value);
+            processBarcode(value);
+            target.value = "";
+          }
         }
       };
 
       document.addEventListener('keydown', handleKeyDown);
       
-      // Add input listener specifically for Android
+      // Add multiple listeners for Android compatibility
       if (isAndroid && searchInputRef.current) {
         searchInputRef.current.addEventListener('input', handleInput);
+        searchInputRef.current.addEventListener('change', handleChange);
+        
+        // Additional Android-specific handling
+        searchInputRef.current.addEventListener('keyup', (e) => {
+          if (e.key === 'Enter') {
+            const target = e.target as HTMLInputElement;
+            const value = target.value.trim();
+            if (value.length >= 5) {
+              processBarcode(value);
+              target.value = "";
+            }
+          }
+        });
       }
       
       return () => {
         document.removeEventListener('keydown', handleKeyDown);
         if (isAndroid && searchInputRef.current) {
           searchInputRef.current.removeEventListener('input', handleInput);
+          searchInputRef.current.removeEventListener('change', handleChange);
         }
         if (barcodeTimeoutRef.current) {
           clearTimeout(barcodeTimeoutRef.current);
