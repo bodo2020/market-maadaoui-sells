@@ -145,15 +145,19 @@ export default function SalesDashboard() {
   const fetchCurrentBalance = async (registerType: RegisterType) => {
     try {
       const balance = await getLatestCashBalance(registerType);
-      console.log(`${registerType} balance:`, balance);
+      console.log(`${registerType} balance:`, balance, "Type:", typeof balance);
+      
+      // تحويل الرصيد إلى رقم بشكل صحيح
+      const numericBalance = typeof balance === 'string' ? parseFloat(balance) : Number(balance);
+      console.log(`${registerType} converted balance:`, numericBalance);
       
       if (registerType === RegisterType.STORE) {
-        setStoreBalance(balance);
+        setStoreBalance(numericBalance || 0);
       } else {
-        setOnlineBalance(balance);
+        setOnlineBalance(numericBalance || 0);
       }
       
-      return balance;
+      return numericBalance || 0;
     } catch (error) {
       console.error(`Error fetching ${registerType} balance:`, error);
       toast.error(`حدث خطأ أثناء تحميل رصيد ${registerType === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
@@ -214,8 +218,10 @@ export default function SalesDashboard() {
       
       if (withdrawalRegister === RegisterType.STORE) {
         refetchStoreRecords();
+        await fetchCurrentBalance(RegisterType.STORE);
       } else {
         refetchOnlineRecords();
+        await fetchCurrentBalance(RegisterType.ONLINE);
       }
     } catch (error: any) {
       console.error("Error processing withdrawal:", error);
@@ -245,8 +251,10 @@ export default function SalesDashboard() {
       
       if (depositRegister === RegisterType.STORE) {
         refetchStoreRecords();
+        await fetchCurrentBalance(RegisterType.STORE);
       } else {
         refetchOnlineRecords();
+        await fetchCurrentBalance(RegisterType.ONLINE);
       }
     } catch (error: any) {
       console.error("Error processing deposit:", error);
