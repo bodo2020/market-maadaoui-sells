@@ -67,8 +67,10 @@ export default function CashTracking() {
 
       // Directly fetch the current balance using our improved function
       const balance = await getLatestCashBalance(RegisterType.STORE);
-      console.log("Got current balance:", balance);
-      setCurrentBalance(Number(balance) || 0);
+      console.log("Got current balance:", balance, "Type:", typeof balance);
+      const numericBalance = typeof balance === 'string' ? parseFloat(balance) : Number(balance);
+      console.log("Converted balance:", numericBalance);
+      setCurrentBalance(numericBalance || 0);
       
       // Fetch cash transactions
       const { data: transactionData, error: transactionError } = await supabase
@@ -180,7 +182,9 @@ export default function CashTracking() {
       
       // Update balance immediately after successful transaction
       const newBalance = await getLatestCashBalance(RegisterType.STORE);
-      setCurrentBalance(Number(newBalance) || 0);
+      console.log("New balance after deposit:", newBalance, "Type:", typeof newBalance);
+      const numericNewBalance = typeof newBalance === 'string' ? parseFloat(newBalance) : Number(newBalance);
+      setCurrentBalance(numericNewBalance || 0);
       
       // Then fetch all records
       fetchRecords();
@@ -239,7 +243,9 @@ export default function CashTracking() {
       
       // Update balance immediately after successful transaction
       const newBalance = await getLatestCashBalance(RegisterType.STORE);
-      setCurrentBalance(Number(newBalance) || 0);
+      console.log("New balance after withdrawal:", newBalance, "Type:", typeof newBalance);
+      const numericNewBalance = typeof newBalance === 'string' ? parseFloat(newBalance) : Number(newBalance);
+      setCurrentBalance(numericNewBalance || 0);
       
       // Then fetch all records
       fetchRecords();
