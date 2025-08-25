@@ -68,7 +68,7 @@ export default function CashTracking() {
       // Directly fetch the current balance using our improved function
       const balance = await getLatestCashBalance(RegisterType.STORE);
       console.log("Got current balance:", balance);
-      setCurrentBalance(balance);
+      setCurrentBalance(Number(balance) || 0);
       
       // Fetch cash transactions
       const { data: transactionData, error: transactionError } = await supabase
@@ -177,6 +177,12 @@ export default function CashTracking() {
       setIsAddCashOpen(false);
       setAmount("");
       setNotes("");
+      
+      // Update balance immediately after successful transaction
+      const newBalance = await getLatestCashBalance(RegisterType.STORE);
+      setCurrentBalance(Number(newBalance) || 0);
+      
+      // Then fetch all records
       fetchRecords();
     } catch (error) {
       console.error('Error adding cash:', error);
@@ -230,6 +236,12 @@ export default function CashTracking() {
       setIsWithdrawCashOpen(false);
       setAmount("");
       setNotes("");
+      
+      // Update balance immediately after successful transaction
+      const newBalance = await getLatestCashBalance(RegisterType.STORE);
+      setCurrentBalance(Number(newBalance) || 0);
+      
+      // Then fetch all records
       fetchRecords();
     } catch (error) {
       console.error('Error withdrawing cash:', error);
