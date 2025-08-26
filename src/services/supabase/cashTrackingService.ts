@@ -163,21 +163,41 @@ export async function recordCashTransaction(
   userId: string
 ) {
   try {
+    // التأكد من وجود branch_id
+    const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    
+    if (!branchId) {
+      console.warn('No branch ID found, attempting to get default branch');
+      // محاولة الحصول على أول فرع نشط إذا لم يكن هناك فرع محدد
+      const { data: branches } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('active', true)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      
+      if (branches && branches.length > 0) {
+        localStorage.setItem('currentBranchId', branches[0].id);
+      }
+    }
+    
+    const finalBranchId = branchId || (typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null);
+    
     console.log(`Recording ${transactionType} of ${amount} to ${registerType}:`, {
       amount,
       transaction_type: transactionType,
       register_type: registerType,
-      notes
+      notes,
+      branch_id: finalBranchId
     });
     
-    const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
     const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
       body: {
         amount,
         transaction_type: transactionType,
         register_type: registerType,
         notes,
-        branch_id: branchId || undefined
+        branch_id: finalBranchId
       }
     });
       
