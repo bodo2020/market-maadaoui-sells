@@ -73,14 +73,39 @@ export async function fetchCashRecords(registerType?: RegisterType, dateRange?: 
 }
 
 export async function createCashRecord(record: Omit<CashRecord, 'id' | 'created_at' | 'updated_at'>) {
+  // التأكد من وجود branch_id
+  let branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+  
+  if (!branchId) {
+    console.warn('No branch ID found, attempting to get default branch');
+    const { data: branches } = await supabase
+      .from('branches')
+      .select('id')
+      .eq('active', true)
+      .order('created_at', { ascending: true })
+      .limit(1);
+    
+    if (branches && branches.length > 0) {
+      branchId = branches[0].id;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('currentBranchId', branchId);
+      }
+    }
+  }
+
+  const recordWithBranch = {
+    ...record,
+    branch_id: branchId
+  };
+
   const { data, error } = await supabase
     .from('cash_tracking')
-    .insert([record])
+    .insert([recordWithBranch])
     .select()
     .single();
     
   if (error) throw error;
-  console.log('Created cash record:', data);
+  console.log('Created cash record with branch_id:', data);
   return data as CashRecord;
 }
 
