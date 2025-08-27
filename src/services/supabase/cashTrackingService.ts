@@ -31,6 +31,17 @@ export interface TransferRecord {
   created_at?: string;
 }
 
+export interface CashTransaction {
+  id: string;
+  transaction_date: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: 'deposit' | 'withdrawal' | 'transfer';
+  register_type: RegisterType;
+  notes?: string;
+  created_by?: string;
+  created_at?: string;
+}
 
 export async function fetchCashRecords(registerType?: RegisterType, dateRange?: { from: Date, to: Date }) {
   let query = supabase
@@ -112,33 +123,10 @@ export async function updateCashRecord(id: string, updates: Partial<CashRecord>)
 }
 
 export async function getLatestCashBalance(registerType: RegisterType) {
-  return await getLatestCashBalanceFromTracking(registerType);
-}
-
-
-export async function recordCashTransaction(
-  amount: number,
-  transactionType: 'deposit' | 'withdrawal',
-  registerType: RegisterType,
-  notes: string,
-  userId: string
-) {
   try {
-    // Get current balance
-    const currentBalance = await getLatestCashBalanceFromTracking(registerType);
+    console.log(`Fetching balance for register ${registerType} using new function`);
     
-    // Calculate new balance
-    let newBalance: number;
-    if (transactionType === 'deposit') {
-      newBalance = currentBalance + amount;
-    } else {
-      if (amount > currentBalance) {
-        throw new Error(`Insufficient funds. Current balance: ${currentBalance}`);
-      }
-      newBalance = currentBalance - amount;
-    }
-
-    // Get or set branch_id
+    // التأكد من وجود branch_id أولاً
     let branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
     
     if (!branchId) {
@@ -157,24 +145,105 @@ export async function recordCashTransaction(
         }
       }
     }
+    
+    // استخدم الدالة الجديدة لحساب الرصيد
+    const { data, error } = await supabase.rpc('get_current_cash_balance', {
+      p_register_type: registerType,
+      p_branch_id: branchId
+    });
+    
+    if (error) {
+      console.error('Error calling get_current_cash_balance:', error);
+      // عودة للطريقة القديمة في حالة وجود خطأ
+      return await getLatestCashBalanceFallback(registerType);
+    }
+    
+    const balance = data || 0;
+    console.log(`Balance from new function: ${balance} for branch: ${branchId}`);
+    return balance;
+  } catch (error) {
+    console.error(`Error getting latest cash balance for ${registerType}:`, error);
+    // عودة للطريقة القديمة في حالة وجود خطأ
+    return await getLatestCashBalanceFallback(registerType);
+  }
+}
 
-    // Create cash tracking record
-    const record = {
-      date: new Date().toISOString().split('T')[0],
+async function getLatestCashBalanceFallback(registerType: RegisterType) {
+  try {
+    // First check the transactions table, which is more reliable
+    console.log(`Fallback: Fetching balance for register ${registerType} from transactions table`);
+    const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    let txQuery = supabase
+      .from('cash_transactions')
+      .select('balance_after')
+      .eq('register_type', registerType)
+      .order('transaction_date', { ascending: false })
+      .limit(1);
+    // Only filter by branch if we have a branch ID, otherwise show all
+    if (branchId) {
+      txQuery = txQuery.eq('branch_id', branchId);
+    }
+    const { data: transactionData, error: transactionError } = await txQuery;
+      
+    if (!transactionError && transactionData && transactionData.length > 0) {
+      const balance = transactionData[0].balance_after || 0;
+      console.log(`Found balance in transactions table: ${balance}`);
+      return balance;
+    }
+    
+    console.log('No transactions found, returning 0');
+    return 0;
+  } catch (error) {
+    console.error(`Error in fallback method for ${registerType}:`, error);
+    return 0;
+  }
+}
+
+export async function recordCashTransaction(
+  amount: number,
+  transactionType: 'deposit' | 'withdrawal',
+  registerType: RegisterType,
+  notes: string,
+  userId: string
+) {
+  try {
+    // التأكد من وجود branch_id
+    const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    
+    if (!branchId) {
+      console.warn('No branch ID found, attempting to get default branch');
+      // محاولة الحصول على أول فرع نشط إذا لم يكن هناك فرع محدد
+      const { data: branches } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('active', true)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      
+      if (branches && branches.length > 0) {
+        localStorage.setItem('currentBranchId', branches[0].id);
+      }
+    }
+    
+    const finalBranchId = branchId || (typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null);
+    
+    console.log(`Recording ${transactionType} of ${amount} to ${registerType}:`, {
+      amount,
+      transaction_type: transactionType,
       register_type: registerType,
-      opening_balance: currentBalance,
-      closing_balance: newBalance,
-      difference: transactionType === 'deposit' ? amount : -amount,
       notes,
-      created_by: userId,
-      branch_id: branchId
-    };
-
-    const { data, error } = await supabase
-      .from('cash_tracking')
-      .insert([record])
-      .select()
-      .single();
+      branch_id: finalBranchId
+    });
+    
+    const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
+      body: {
+        amount,
+        transaction_type: transactionType,
+        register_type: registerType,
+        notes,
+        branch_id: finalBranchId
+      }
+    });
       
     if (error) {
       console.error(`Error during ${transactionType}:`, error);
@@ -189,6 +258,37 @@ export async function recordCashTransaction(
   }
 }
 
+// تم حذف دالات التحويل بين الخزن لأنها لا تنطبق على النظام الجديد بدون فروع
+// transferBetweenRegisters و fetchTransfers محذوفة
+
+export async function fetchCashTransactions(registerType?: RegisterType, dateRange?: { from: Date, to: Date }) {
+  let query = supabase
+    .from('cash_transactions')
+    .select('*')
+    .order('transaction_date', { ascending: false });
+    
+  if (registerType) {
+    query = query.eq('register_type', registerType);
+  }
+  
+  const branchIdTx = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+  // Only filter by branch if we have a branch ID, otherwise show all
+  if (branchIdTx) {
+    query = query.eq('branch_id', branchIdTx);
+  }
+  
+  if (dateRange?.from && dateRange?.to) {
+    const fromDate = dateRange.from.toISOString();
+    const toDate = dateRange.to.toISOString();
+    query = query.gte('transaction_date', fromDate).lte('transaction_date', toDate);
+  }
+  
+  const { data, error } = await query;
+    
+  if (error) throw error;
+  console.log('Fetched cash transactions:', data);
+  return data as CashTransaction[];
+}
 
 export async function getLatestCashBalanceFromTracking(registerType: RegisterType) {
   try {

@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RegisterType, getLatestCashBalance, recordCashTransaction, fetchCashRecords, CashRecord } from "@/services/supabase/cashTrackingService";
+import { RegisterType, getLatestCashBalanceFromTracking } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -21,9 +21,35 @@ import { Wallet, Plus, Minus, Download } from "lucide-react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
+interface CashRecord {
+  id: string;
+  date: string;
+  opening_balance: number;
+  closing_balance: number;
+  difference: number | null;
+  notes: string | null;
+  created_by: string;
+  verified_by: string | null;
+  register_type: RegisterType;
+}
+
+interface CashTransaction {
+  id: string;
+  transaction_date: string;
+  amount: number;
+  balance_after: number;
+  transaction_type: 'deposit' | 'withdrawal';
+  register_type: RegisterType;
+  notes?: string;
+  created_by?: string;
+  created_by_name?: string;
+  created_at?: string;
+}
+
 export default function CashTracking() {
   const { user } = useAuth();
   const [records, setRecords] = useState<CashRecord[]>([]);
+  const [transactions, setTransactions] = useState<CashTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [isAddCashOpen, setIsAddCashOpen] = useState(false);
@@ -40,19 +66,31 @@ export default function CashTracking() {
       console.log("Fetching cash records for register:", RegisterType.STORE);
 
       // Directly fetch the current balance using our improved function
-      const balance = await getLatestCashBalance(RegisterType.STORE);
+      const balance = await getLatestCashBalanceFromTracking(RegisterType.STORE);
       console.log("Got current balance:", balance, "Type:", typeof balance);
       const numericBalance = typeof balance === 'string' ? parseFloat(balance) : Number(balance);
       console.log("Converted balance:", numericBalance);
       setCurrentBalance(numericBalance || 0);
       
-      // Fetch cash tracking records with user names
-      const records = await fetchCashRecords(RegisterType.STORE);
+      // Fetch cash transactions
+      const { data: transactionData, error: transactionError } = await supabase
+        .from('cash_transactions')
+        .select('*')
+        .eq('register_type', RegisterType.STORE)
+        .order('transaction_date', { ascending: false });
       
+      if (transactionError) {
+        console.error('Error fetching cash transactions:', transactionError);
+        throw transactionError;
+      }
+      
+      console.log("Cash transactions fetched:", transactionData);
+      const tx = (transactionData as CashTransaction[]) || [];
+
       // Fetch user names for creators
       const creatorIds = Array.from(
         new Set(
-          records.map((r) => r.created_by).filter((id): id is string => Boolean(id))
+          tx.map((t) => t.created_by).filter((id): id is string => Boolean(id))
         )
       );
 
@@ -63,23 +101,37 @@ export default function CashTracking() {
           .in('id', creatorIds);
 
         if (usersError) {
-          console.error('Error fetching users for records:', usersError);
-          setRecords(records);
+          console.error('Error fetching users for transactions:', usersError);
+          setTransactions(tx);
         } else {
           const nameMap = new Map<string, string>(
             usersData?.map((u: any) => [u.id, u.name || u.username || 'غير معروف']) || []
           );
-          setRecords(
-            records.map((r) => ({
-              ...r,
-              created_by_name: r.created_by ? (nameMap.get(r.created_by) || 'غير معروف') : '-'
+          setTransactions(
+            tx.map((t) => ({
+              ...t,
+              created_by_name: t.created_by ? (nameMap.get(t.created_by) || 'غير معروف') : '-'
             }))
           );
         }
       } else {
-        setRecords(records);
+        setTransactions(tx);
       }
       
+      // Also fetch the cash tracking records
+      const { data: cashData, error: cashError } = await supabase
+        .from('cash_tracking')
+        .select('*')
+        .eq('register_type', RegisterType.STORE)
+        .order('date', { ascending: false });
+      
+      if (cashError) {
+        console.error('Error fetching cash records:', cashError);
+        throw cashError;
+      }
+      
+      console.log("Cash records fetched:", cashData);
+      setRecords(cashData as unknown as CashRecord[]);
     } catch (error) {
       console.error('Error in fetchRecords:', error);
       toast.error("حدث خطأ أثناء تحميل سجلات النقدية");
@@ -104,15 +156,24 @@ export default function CashTracking() {
         notes: notes || "إيداع نقدي"
       });
       
-      await recordCashTransaction(
-        parseFloat(amount),
-        'deposit',
-        RegisterType.STORE,
-        notes || "إيداع نقدي",
-        user?.id || ''
-      );
+      const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+      const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
+        body: {
+          amount: parseFloat(amount),
+          transaction_type: 'deposit',
+          register_type: RegisterType.STORE,
+          notes: notes || "إيداع نقدي",
+          created_by: user?.id || undefined,
+          branch_id: branchId || undefined
+        }
+      });
+
+      if (error) {
+        console.error("Error response from Edge Function:", error);
+        throw error;
+      }
       
-      console.log("Cash transaction recorded successfully");
+      console.log("Edge Function response:", data);
       
       toast.success("تم إضافة المبلغ بنجاح");
       setIsAddCashOpen(false);
@@ -120,7 +181,7 @@ export default function CashTracking() {
       setNotes("");
       
       // Update balance immediately after successful transaction
-      const newBalance = await getLatestCashBalance(RegisterType.STORE);
+      const newBalance = await getLatestCashBalanceFromTracking(RegisterType.STORE);
       console.log("New balance after deposit:", newBalance, "Type:", typeof newBalance);
       const numericNewBalance = typeof newBalance === 'string' ? parseFloat(newBalance) : Number(newBalance);
       setCurrentBalance(numericNewBalance || 0);
@@ -156,15 +217,24 @@ export default function CashTracking() {
         notes: notes || "سحب نقدي"
       });
       
-      await recordCashTransaction(
-        parseFloat(amount),
-        'withdrawal',
-        RegisterType.STORE,
-        notes || "سحب نقدي",
-        user?.id || ''
-      );
+      const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+      const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
+        body: {
+          amount: parseFloat(amount),
+          transaction_type: 'withdrawal',
+          register_type: RegisterType.STORE,
+          notes: notes || "سحب نقدي",
+          created_by: user?.id || undefined,
+          branch_id: branchId || undefined
+        }
+      });
+
+      if (error) {
+        console.error("Error response from Edge Function:", error);
+        throw error;
+      }
       
-      console.log("Cash transaction recorded successfully");
+      console.log("Edge Function response:", data);
       
       toast.success("تم سحب المبلغ بنجاح");
       setIsWithdrawCashOpen(false);
@@ -172,7 +242,7 @@ export default function CashTracking() {
       setNotes("");
       
       // Update balance immediately after successful transaction
-      const newBalance = await getLatestCashBalance(RegisterType.STORE);
+      const newBalance = await getLatestCashBalanceFromTracking(RegisterType.STORE);
       console.log("New balance after withdrawal:", newBalance, "Type:", typeof newBalance);
       const numericNewBalance = typeof newBalance === 'string' ? parseFloat(newBalance) : Number(newBalance);
       setCurrentBalance(numericNewBalance || 0);
@@ -200,22 +270,20 @@ export default function CashTracking() {
       worksheet.columns = [
         { header: 'التاريخ', key: 'date', width: 22 },
         { header: 'النوع', key: 'type', width: 12 },
-        { header: 'الرصيد الافتتاحي', key: 'opening_balance', width: 20 },
-        { header: 'الرصيد الختامي', key: 'closing_balance', width: 20 },
-        { header: 'الفرق', key: 'difference', width: 14 },
+        { header: 'المبلغ', key: 'amount', width: 14 },
+        { header: 'الرصيد بعد العملية', key: 'balance_after', width: 20 },
         { header: 'المستخدم', key: 'user', width: 22 },
         { header: 'ملاحظات', key: 'notes', width: 30 },
       ];
 
-      records.forEach((r) => {
+      transactions.forEach((t) => {
         worksheet.addRow({
-          date: new Date(r.date).toLocaleDateString('ar'),
-          type: r.difference && r.difference > 0 ? 'إيداع' : 'سحب',
-          opening_balance: Number(r.opening_balance).toFixed(2),
-          closing_balance: Number(r.closing_balance).toFixed(2),
-          difference: r.difference ? Math.abs(r.difference).toFixed(2) : '-',
-          user: (r as any).created_by_name || '-',
-          notes: r.notes || '',
+          date: new Date(t.transaction_date).toLocaleString('ar'),
+          type: t.transaction_type === 'deposit' ? 'إيداع' : 'سحب',
+          amount: Number(t.amount).toFixed(2),
+          balance_after: Number(t.balance_after).toFixed(2),
+          user: t.created_by_name || '-',
+          notes: t.notes || '',
         });
       });
 
@@ -275,6 +343,47 @@ export default function CashTracking() {
           </Card>
         </div>
 
+        <Card className="overflow-hidden mb-6">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>التاريخ</TableHead>
+                <TableHead>النوع</TableHead>
+                <TableHead>المبلغ</TableHead>
+                <TableHead>الرصيد بعد العملية</TableHead>
+                <TableHead>المستخدم</TableHead>
+                <TableHead>الملاحظات</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">
+                    جاري التحميل...
+                  </TableCell>
+                </TableRow>
+              ) : transactions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    لا توجد معاملات نقدية حتى الآن
+                  </TableCell>
+                </TableRow>
+              ) : (
+                transactions.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell>{new Date(t.transaction_date).toLocaleString('ar')}</TableCell>
+                    <TableCell>{t.transaction_type === 'deposit' ? 'إيداع' : 'سحب'}</TableCell>
+                    <TableCell>{t.amount.toFixed(2)}</TableCell>
+                    <TableCell>{t.balance_after.toFixed(2)}</TableCell>
+                    <TableCell>{t.created_by_name || '-'}</TableCell>
+                    <TableCell>{t.notes || '-'}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Card>
+
         <Card className="overflow-hidden">
           <Table>
             <TableHeader>
@@ -284,20 +393,19 @@ export default function CashTracking() {
                 <TableHead>الرصيد الافتتاحي</TableHead>
                 <TableHead>الرصيد الختامي</TableHead>
                 <TableHead>الفرق</TableHead>
-                <TableHead>المستخدم</TableHead>
                 <TableHead>الملاحظات</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center">
+                  <TableCell colSpan={6} className="text-center">
                     جاري التحميل...
                   </TableCell>
                 </TableRow>
               ) : records.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     لا توجد سجلات للنقدية حتى الآن
                   </TableCell>
                 </TableRow>
@@ -313,7 +421,6 @@ export default function CashTracking() {
                     <TableCell className={record.difference && record.difference > 0 ? 'text-green-600' : 'text-red-500'}>
                       {record.difference ? Math.abs(record.difference).toFixed(2) : '-'}
                     </TableCell>
-                    <TableCell>{(record as any).created_by_name || '-'}</TableCell>
                     <TableCell>{record.notes || '-'}</TableCell>
                   </TableRow>
                 ))
