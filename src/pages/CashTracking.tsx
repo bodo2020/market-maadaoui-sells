@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RegisterType, getLatestCashBalance } from "@/services/supabase/cashTrackingService";
+import { RegisterType, getLatestCashBalanceFromTracking } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -66,7 +66,7 @@ export default function CashTracking() {
       console.log("Fetching cash records for register:", RegisterType.STORE);
 
       // Directly fetch the current balance using our improved function
-      const balance = await getLatestCashBalance(RegisterType.STORE);
+      const balance = await getLatestCashBalanceFromTracking(RegisterType.STORE);
       console.log("Got current balance:", balance, "Type:", typeof balance);
       const numericBalance = typeof balance === 'string' ? parseFloat(balance) : Number(balance);
       console.log("Converted balance:", numericBalance);
@@ -181,7 +181,7 @@ export default function CashTracking() {
       setNotes("");
       
       // Update balance immediately after successful transaction
-      const newBalance = await getLatestCashBalance(RegisterType.STORE);
+      const newBalance = await getLatestCashBalanceFromTracking(RegisterType.STORE);
       console.log("New balance after deposit:", newBalance, "Type:", typeof newBalance);
       const numericNewBalance = typeof newBalance === 'string' ? parseFloat(newBalance) : Number(newBalance);
       setCurrentBalance(numericNewBalance || 0);
@@ -242,7 +242,7 @@ export default function CashTracking() {
       setNotes("");
       
       // Update balance immediately after successful transaction
-      const newBalance = await getLatestCashBalance(RegisterType.STORE);
+      const newBalance = await getLatestCashBalanceFromTracking(RegisterType.STORE);
       console.log("New balance after withdrawal:", newBalance, "Type:", typeof newBalance);
       const numericNewBalance = typeof newBalance === 'string' ? parseFloat(newBalance) : Number(newBalance);
       setCurrentBalance(numericNewBalance || 0);

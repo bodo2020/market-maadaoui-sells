@@ -289,3 +289,61 @@ export async function fetchCashTransactions(registerType?: RegisterType, dateRan
   console.log('Fetched cash transactions:', data);
   return data as CashTransaction[];
 }
+
+export async function getLatestCashBalanceFromTracking(registerType: RegisterType) {
+  try {
+    console.log(`Fetching balance for register ${registerType} from cash_tracking table`);
+    
+    // التأكد من وجود branch_id أولاً
+    let branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    
+    if (!branchId) {
+      console.warn('No branch ID found, attempting to get default branch');
+      const { data: branches } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('active', true)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      
+      if (branches && branches.length > 0) {
+        branchId = branches[0].id;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('currentBranchId', branchId);
+        }
+      }
+    }
+
+    let query = supabase
+      .from('cash_tracking')
+      .select('closing_balance')
+      .eq('register_type', registerType)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    // Filter by branch if available
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Error fetching balance from cash_tracking:', error);
+      return 0;
+    }
+    
+    if (data && data.length > 0) {
+      const balance = data[0].closing_balance || 0;
+      console.log(`Found balance in cash_tracking: ${balance} for branch: ${branchId}`);
+      return balance;
+    }
+    
+    console.log('No cash_tracking records found, returning 0');
+    return 0;
+  } catch (error) {
+    console.error(`Error getting balance from cash_tracking for ${registerType}:`, error);
+    return 0;
+  }
+}
