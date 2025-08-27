@@ -101,8 +101,27 @@ export async function getLatestCashBalance(registerType: RegisterType) {
   try {
     console.log(`Fetching balance for register ${registerType} using new function`);
     
+    // التأكد من وجود branch_id أولاً
+    let branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    
+    if (!branchId) {
+      console.warn('No branch ID found, attempting to get default branch');
+      const { data: branches } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('active', true)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      
+      if (branches && branches.length > 0) {
+        branchId = branches[0].id;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('currentBranchId', branchId);
+        }
+      }
+    }
+    
     // استخدم الدالة الجديدة لحساب الرصيد
-    const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
     const { data, error } = await supabase.rpc('get_current_cash_balance', {
       p_register_type: registerType,
       p_branch_id: branchId
@@ -115,7 +134,7 @@ export async function getLatestCashBalance(registerType: RegisterType) {
     }
     
     const balance = data || 0;
-    console.log(`Balance from new function: ${balance}`);
+    console.log(`Balance from new function: ${balance} for branch: ${branchId}`);
     return balance;
   } catch (error) {
     console.error(`Error getting latest cash balance for ${registerType}:`, error);
