@@ -52,6 +52,25 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
       throw error;
     }
 
+    // Update cash tracking if payment includes cash
+    if (saleData.cash_amount && saleData.cash_amount > 0) {
+      try {
+        // Import cash tracking service
+        const { recordCashTransaction, RegisterType } = await import('./cashTrackingService');
+        await recordCashTransaction(
+          saleData.cash_amount,
+          'deposit', // Sale is a deposit to cash register
+          RegisterType.STORE, // Sales are typically in store register
+          `مبيعات - فاتورة ${saleData.invoice_number}`,
+          cashierId || ''
+        );
+        console.log('Cash tracking updated for sale:', saleData.invoice_number);
+      } catch (cashError) {
+        console.error('Error updating cash tracking for sale:', cashError);
+        // Don't fail the sale if cash tracking fails
+      }
+    }
+
     // Update product quantities for each sold item
     if (sale.items && sale.items.length > 0) {
       for (const item of sale.items) {
