@@ -62,7 +62,8 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
           'deposit', // Sale is a deposit to cash register
           RegisterType.STORE, // Sales are typically in store register
           `مبيعات - فاتورة ${saleData.invoice_number}`,
-          cashierId || ''
+          cashierId || '',
+          branchId || undefined // Pass the resolved branch ID
         );
         console.log('Cash tracking updated for sale:', saleData.invoice_number);
       } catch (cashError) {

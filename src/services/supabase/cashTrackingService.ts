@@ -122,7 +122,8 @@ export async function recordCashTransaction(
   transactionType: 'deposit' | 'withdrawal',
   registerType: RegisterType,
   notes: string,
-  userId: string
+  userId: string,
+  branchId?: string
 ) {
   try {
     // Get current balance
@@ -139,10 +140,10 @@ export async function recordCashTransaction(
       newBalance = currentBalance - amount;
     }
 
-    // Get or set branch_id
-    let branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    // Get or set branch_id - use passed parameter or get from localStorage/default
+    let finalBranchId = branchId || (typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null);
     
-    if (!branchId) {
+    if (!finalBranchId) {
       console.warn('No branch ID found, attempting to get default branch');
       const { data: branches } = await supabase
         .from('branches')
@@ -152,9 +153,9 @@ export async function recordCashTransaction(
         .limit(1);
       
       if (branches && branches.length > 0) {
-        branchId = branches[0].id;
+        finalBranchId = branches[0].id;
         if (typeof window !== 'undefined') {
-          localStorage.setItem('currentBranchId', branchId);
+          localStorage.setItem('currentBranchId', finalBranchId);
         }
       }
     }
@@ -168,7 +169,7 @@ export async function recordCashTransaction(
       difference: transactionType === 'deposit' ? amount : -amount,
       notes,
       created_by: userId,
-      branch_id: branchId
+      branch_id: finalBranchId
     };
 
     const { data, error } = await supabase
