@@ -36,7 +36,8 @@ export async function fetchCashRecords(registerType?: RegisterType, dateRange?: 
   let query = supabase
     .from('cash_tracking')
     .select('*')
-    .order('date', { ascending: false });
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
     
   if (registerType) {
     query = query.eq('register_type', registerType);

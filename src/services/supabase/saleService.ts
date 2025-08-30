@@ -9,7 +9,25 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
     const cashierId = userData.user?.id;
 
     // Resolve current branch from localStorage (client-side)
-    const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    let branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    
+    // If no branch ID, try to get default active branch
+    if (!branchId) {
+      console.warn('No branch ID found, attempting to get default branch');
+      const { data: branches } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('active', true)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      
+      if (branches && branches.length > 0) {
+        branchId = branches[0].id;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('currentBranchId', branchId);
+        }
+      }
+    }
 
     // Ensure date is a string
     const saleData = {
