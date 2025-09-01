@@ -5,10 +5,7 @@ import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer, Bluetooth } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { useScannerInput } from "@/hooks/useScannerInput";
+import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer } from "lucide-react";
 import { CartItem, Product, Sale } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
@@ -44,30 +41,54 @@ export default function POS() {
   const [barcodeBuffer, setBarcodeBuffer] = useState<string>("");
   const [showInvoice, setShowInvoice] = useState(false);
   const [currentSale, setCurrentSale] = useState<Sale | null>(null);
-  const [bluetoothScannerMode, setBluetoothScannerMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('bluetoothScannerMode') === 'true';
-    }
-    return false;
-  });
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const hiddenScannerInputRef = useRef<HTMLInputElement>(null);
   const {
     toast
   } = useToast();
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      const isSearchInput = target === searchInputRef.current;
+      if (isInput && !isSearchInput) return;
+      if (e.key === 'Enter' && barcodeBuffer) {
+        e.preventDefault();
+        console.log("External barcode scanned:", barcodeBuffer);
+        processBarcode(barcodeBuffer);
+        setBarcodeBuffer("");
+        return;
+      }
+      if (/^[a-zA-Z0-9]$/.test(e.key)) {
+        if (barcodeTimeoutRef.current) {
+          clearTimeout(barcodeTimeoutRef.current);
+        }
+        setBarcodeBuffer(prev => prev + e.key);
+        barcodeTimeoutRef.current = setTimeout(() => {
+          if (barcodeBuffer.length < 5) {
+            if (!isInput) {
+              setBarcodeBuffer("");
+            }
+          }
+        }, 100);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (barcodeTimeoutRef.current) {
+        clearTimeout(barcodeTimeoutRef.current);
+      }
+    };
+  }, [barcodeBuffer]);
+
   const processBarcode = async (barcode: string) => {
-    console.log('Processing barcode:', barcode, 'length:', barcode.length);
     if (barcode.length < 5) return;
-    
     try {
       setSearch(barcode);
       const product = await fetchProductByBarcode(barcode);
-      console.log('Product found:', product);
-      
       if (product) {
-        console.log('Adding product to cart:', product.name);
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
         } else if (product.is_bulk_scan) {
@@ -105,53 +126,6 @@ export default function POS() {
       });
     }
   };
-
-  // Bluetooth scanner hook
-  const { buffer: scannerBuffer, isScanning } = useScannerInput({
-    onScan: processBarcode,
-    enabled: bluetoothScannerMode,
-    minLength: 8,
-    maxDelay: 50
-  });
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip if bluetooth scanner mode is enabled
-      if (bluetoothScannerMode) return;
-      
-      const target = e.target as HTMLElement;
-      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-      const isSearchInput = target === searchInputRef.current;
-      if (isInput && !isSearchInput) return;
-      if (e.key === 'Enter' && barcodeBuffer) {
-        e.preventDefault();
-        console.log("External barcode scanned:", barcodeBuffer);
-        processBarcode(barcodeBuffer);
-        setBarcodeBuffer("");
-        return;
-      }
-      if (/^[a-zA-Z0-9]$/.test(e.key)) {
-        if (barcodeTimeoutRef.current) {
-          clearTimeout(barcodeTimeoutRef.current);
-        }
-        setBarcodeBuffer(prev => prev + e.key);
-        barcodeTimeoutRef.current = setTimeout(() => {
-          if (barcodeBuffer.length < 5) {
-            if (!isInput) {
-              setBarcodeBuffer("");
-            }
-          }
-        }, 100);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      if (barcodeTimeoutRef.current) {
-        clearTimeout(barcodeTimeoutRef.current);
-      }
-    };
-  }, [barcodeBuffer, bluetoothScannerMode]);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -236,33 +210,25 @@ export default function POS() {
   };
 
   const handleAddToCart = (product: Product) => {
-    console.log('handleAddToCart called with product:', product.name);
-    console.log('Current cart items:', cartItems.length);
-    
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
-      console.log('Product already in cart, updating quantity');
       setCartItems(cartItems.map(item => item.product.id === product.id ? {
         ...item,
         quantity: item.quantity + 1,
         total: (item.quantity + 1) * (product.is_offer && product.offer_price ? product.offer_price : product.price)
       } : item));
     } else {
-      console.log('Adding new product to cart');
       const price = product.is_offer && product.offer_price ? product.offer_price : product.price;
-      const newItem = {
+      setCartItems([...cartItems, {
         product,
         quantity: 1,
         price,
         discount: product.is_offer && product.offer_price ? product.price - product.offer_price : 0,
         total: price,
         weight: null
-      };
-      console.log('New cart item:', newItem);
-      setCartItems([...cartItems, newItem]);
+      }]);
     }
     setSearchResults([]);
-    console.log('Cart updated, new length should be:', cartItems.length + 1);
   };
 
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
@@ -610,63 +576,26 @@ export default function POS() {
               <CardTitle>بحث المنتجات</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-4 mb-4">
-                <div className="relative flex-1">
-                  <Input 
-                    ref={searchInputRef}
-                    placeholder={bluetoothScannerMode ? "وضع الماسح الضوئي نشط" : "ابحث بالباركود أو اسم المنتج"} 
-                    value={search} 
-                    onChange={e => setSearch(e.target.value)} 
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleSearch();
-                    }} 
-                    className="flex-1" 
-                    disabled={bluetoothScannerMode}
-                  />
-                  {isScanning && (
-                    <Badge variant="secondary" className="absolute left-2 top-1/2 transform -translate-y-1/2">
-                      جاري المسح...
-                    </Badge>
-                  )}
-                </div>
-                
-                <Button 
-                  onClick={handleSearch}
-                  disabled={!search.trim() || bluetoothScannerMode}
-                >
+              <div className="flex gap-2 mb-4">
+                <Input 
+                  placeholder="ابحث بالباركود أو اسم المنتج" 
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)} 
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSearch();
+                  }} 
+                  className="flex-1" 
+                  ref={searchInputRef}
+                />
+                <Button onClick={handleSearch}>
                   <Search className="ml-2 h-4 w-4" />
                   بحث
                 </Button>
-                
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowBarcodeScanner(true)}
-                  disabled={bluetoothScannerMode}
-                >
+                <Button variant="outline" onClick={() => setShowBarcodeScanner(true)}>
                   <Barcode className="ml-2 h-4 w-4" />
                   مسح
                 </Button>
-
-                <div className="flex items-center gap-2 bg-card rounded-lg p-2 border">
-                  <Switch
-                    checked={bluetoothScannerMode}
-                    onCheckedChange={setBluetoothScannerMode}
-                    id="bluetooth-scanner"
-                  />
-                  <label htmlFor="bluetooth-scanner" className="text-sm font-medium cursor-pointer flex items-center gap-1">
-                    <Bluetooth className="h-4 w-4" />
-                    ماسح بلوتوث
-                  </label>
-                </div>
               </div>
-
-              {/* Hidden input for bluetooth scanner */}
-              <input
-                ref={hiddenScannerInputRef}
-                type="text"
-                className="scanner-input opacity-0 absolute -z-10 pointer-events-none"
-                tabIndex={-1}
-              />
               
               {showWeightDialog && currentScaleProduct && (
                 <div className="border rounded-lg p-4 mb-4 bg-muted/10">
