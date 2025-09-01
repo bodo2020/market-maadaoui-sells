@@ -58,11 +58,16 @@ export default function POS() {
   } = useToast();
 
   const processBarcode = async (barcode: string) => {
+    console.log('Processing barcode:', barcode, 'length:', barcode.length);
     if (barcode.length < 5) return;
+    
     try {
       setSearch(barcode);
       const product = await fetchProductByBarcode(barcode);
+      console.log('Product found:', product);
+      
       if (product) {
+        console.log('Adding product to cart:', product.name);
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
         } else if (product.is_bulk_scan) {
@@ -105,8 +110,8 @@ export default function POS() {
   const { buffer: scannerBuffer, isScanning } = useScannerInput({
     onScan: processBarcode,
     enabled: bluetoothScannerMode,
-    minLength: 3,
-    maxDelay: 100
+    minLength: 8,
+    maxDelay: 50
   });
 
   useEffect(() => {
@@ -231,25 +236,33 @@ export default function POS() {
   };
 
   const handleAddToCart = (product: Product) => {
+    console.log('handleAddToCart called with product:', product.name);
+    console.log('Current cart items:', cartItems.length);
+    
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
+      console.log('Product already in cart, updating quantity');
       setCartItems(cartItems.map(item => item.product.id === product.id ? {
         ...item,
         quantity: item.quantity + 1,
         total: (item.quantity + 1) * (product.is_offer && product.offer_price ? product.offer_price : product.price)
       } : item));
     } else {
+      console.log('Adding new product to cart');
       const price = product.is_offer && product.offer_price ? product.offer_price : product.price;
-      setCartItems([...cartItems, {
+      const newItem = {
         product,
         quantity: 1,
         price,
         discount: product.is_offer && product.offer_price ? product.price - product.offer_price : 0,
         total: price,
         weight: null
-      }]);
+      };
+      console.log('New cart item:', newItem);
+      setCartItems([...cartItems, newItem]);
     }
     setSearchResults([]);
+    console.log('Cart updated, new length should be:', cartItems.length + 1);
   };
 
   const handleAddScaleProductToCart = (product: Product, weight: number) => {

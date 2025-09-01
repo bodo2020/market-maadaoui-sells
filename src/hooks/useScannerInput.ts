@@ -9,8 +9,8 @@ interface UseScannerInputOptions {
 
 export const useScannerInput = ({
   onScan,
-  minLength = 3,
-  maxDelay = 100,
+  minLength = 8,
+  maxDelay = 50,
   enabled = false
 }: UseScannerInputOptions) => {
   const [buffer, setBuffer] = useState('');
@@ -18,26 +18,22 @@ export const useScannerInput = ({
   const timeoutRef = useRef<NodeJS.Timeout>();
   const lastInputTimeRef = useRef<number>(0);
   const inputSpeedRef = useRef<number[]>([]);
+  const processingRef = useRef(false);
 
   const clearBuffer = useCallback(() => {
+    console.log('Clearing buffer:', buffer);
     setBuffer('');
     setIsScanning(false);
     inputSpeedRef.current = [];
-  }, []);
+    processingRef.current = false;
+  }, [buffer]);
 
   const processBuffer = useCallback(() => {
-    if (buffer.length >= minLength) {
-      // Calculate average input speed
-      const avgSpeed = inputSpeedRef.current.length > 1 
-        ? inputSpeedRef.current.reduce((a, b) => a + b, 0) / inputSpeedRef.current.length
-        : 0;
-
-      // If input speed is fast (less than 50ms between characters on average), treat as scanner
-      if (avgSpeed < 50 && avgSpeed > 0) {
-        console.log('Scanner detected - processing barcode:', buffer);
-        onScan(buffer.trim());
-      }
-    }
+    if (processingRef.current || buffer.length < minLength) return;
+    
+    processingRef.current = true;
+    console.log('Processing complete barcode:', buffer);
+    onScan(buffer.trim());
     clearBuffer();
   }, [buffer, minLength, onScan, clearBuffer]);
 
@@ -56,7 +52,10 @@ export const useScannerInput = ({
     const currentTime = Date.now();
     const timeDiff = currentTime - lastInputTimeRef.current;
 
+    console.log('Key pressed:', event.key, 'Current buffer:', buffer + (event.key.length === 1 ? event.key : ''));
+
     if (event.key === 'Enter') {
+      event.preventDefault();
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -64,15 +63,21 @@ export const useScannerInput = ({
       return;
     }
 
-    // Only process printable characters
-    if (event.key.length === 1) {
-      // Track input speed for scanner detection
-      if (lastInputTimeRef.current > 0 && timeDiff < 200) {
+    // Only process printable characters and numbers
+    if (event.key.length === 1 && /[0-9a-zA-Z]/.test(event.key)) {
+      event.preventDefault();
+      
+      // If this is the first character or came quickly after previous (scanner behavior)
+      if (lastInputTimeRef.current > 0 && timeDiff < 100) {
         inputSpeedRef.current.push(timeDiff);
+        setIsScanning(true);
+      } else if (lastInputTimeRef.current === 0) {
+        // First character
         setIsScanning(true);
       }
 
-      setBuffer(prev => prev + event.key);
+      const newBuffer = buffer + event.key;
+      setBuffer(newBuffer);
       lastInputTimeRef.current = currentTime;
 
       // Clear existing timeout
@@ -85,7 +90,7 @@ export const useScannerInput = ({
         processBuffer();
       }, maxDelay);
     }
-  }, [enabled, processBuffer, maxDelay]);
+  }, [enabled, processBuffer, maxDelay, buffer]);
 
   useEffect(() => {
     if (enabled) {
