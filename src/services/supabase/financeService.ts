@@ -342,9 +342,9 @@ export const fetchProfitsSummary = async (
       }
     }
     
-    // Calculate net profits after returns (deduct profit impact from store and online profits)
-    const storeProfits = rawStoreProfits - returnsProfitImpact; // خصم أرباح المرتجعات من أرباح المحل
-    const netProfits = storeProfits + onlineProfits;
+    // Calculate net profits correctly (don't let store profits go negative due to returns)
+    const storeProfits = Math.max(0, rawStoreProfits); // أرباح المحل الخام
+    const netProfits = storeProfits + onlineProfits - returnsProfitImpact; // خصم تأثير المرتجعات من إجمالي الأرباح
     
     console.log("Profits summary results:", {
       storeProfits,

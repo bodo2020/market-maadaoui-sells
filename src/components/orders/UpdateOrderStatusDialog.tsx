@@ -117,28 +117,14 @@ export function UpdateOrderStatusDialog({
         }
       }
       
-      if (status === 'ready' && order.payment_status === 'pending') {
-        await supabase
-          .from('online_orders')
-          .update({ 
-            status,
-            payment_status: 'paid',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', order.id);
-          
-        toast.success('تم تحديث حالة الطلب بنجاح');
-        toast.info('تم تحديث حالة الدفع إلى "مدفوع"');
-      } else {
-        const { error } = await supabase
-          .from('online_orders')
-          .update(updates)
-          .eq('id', order.id);
-        
-        if (error) throw error;
-        
-        toast.success('تم تحديث حالة الطلب بنجاح');
-      }
+      const { error } = await supabase
+        .from('online_orders')
+        .update(updates)
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      toast.success('تم تحديث حالة الطلب بنجاح');
       
       onStatusUpdated();
       onOpenChange(false);
@@ -152,7 +138,6 @@ export function UpdateOrderStatusDialog({
 
   const statusOptions: {value: Order['status'], label: string, icon: JSX.Element}[] = [
     { value: 'waiting', label: 'في الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
-    { value: 'ready', label: 'جاهز للشحن', icon: <Package className="h-4 w-4 text-green-500" /> },
     { value: 'shipped', label: 'تم الشحن', icon: <Truck className="h-4 w-4 text-blue-500" /> },
     { value: 'done', label: 'مكتمل', icon: <Check className="h-4 w-4 text-green-600" /> },
     { value: 'cancelled', label: 'ملغي', icon: <X className="h-4 w-4 text-red-500" /> }
@@ -210,13 +195,6 @@ export function UpdateOrderStatusDialog({
               ))}
             </RadioGroup>
             
-            {status === 'ready' && order.payment_status === 'pending' && (
-              <div className="text-sm bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-2">
-                <p className="text-yellow-800">
-                  سيتم تحديث حالة الدفع تلقائيًا إلى "مدفوع" عند تحديث الحالة إلى "جاهز للشحن".
-                </p>
-              </div>
-            )}
 
             {status === 'done' && (
               <div className="text-sm bg-blue-50 border border-blue-200 rounded-md p-3 mt-2">
