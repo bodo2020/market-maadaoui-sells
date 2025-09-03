@@ -144,20 +144,21 @@ export function OrdersTable({
               {formatCompactDate(order.created_at)}
             </TableCell>
             <TableCell>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 justify-start" dir="rtl">
+                {(verifiedCustomers[order.customer_phone || ''] || verifiedCustomers[order.customer_email || '']) && (
+                  <ShieldCheck className="h-4 w-4 text-green-600 flex-shrink-0" />
+                )}
                 <Button
                   variant="link"
-                  className="p-0 h-auto text-right underline"
+                  className="p-0 h-auto text-right underline flex-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     onShowCustomer(order);
                   }}
+                  dir="rtl"
                 >
                   {order.customer_name || 'عميل غير معروف'}
                 </Button>
-                {(verifiedCustomers[order.customer_phone || ''] || verifiedCustomers[order.customer_email || '']) && (
-                  <ShieldCheck className="h-4 w-4 text-green-600" />
-                )}
               </div>
             </TableCell>
             <TableCell className="text-right">
