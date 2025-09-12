@@ -158,6 +158,33 @@ export default function OrderDetails() {
     }
   };
 
+  const handleCancelOrder = async () => {
+    if (!order || isProcessingOrder) return;
+    
+    try {
+      setIsProcessingOrder(true);
+      
+      const { error } = await supabase
+        .from('online_orders')
+        .update({ 
+          status: 'cancelled',
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      toast.success('تم إلغاء الطلب بنجاح');
+      fetchOrder();
+      
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      toast.error("حدث خطأ أثناء إلغاء الطلب");
+    } finally {
+      setIsProcessingOrder(false);
+    }
+  };
+
   const handlePaymentStatusChange = async (newStatus: Order['payment_status']) => {
     if (!order || isUpdatingPayment) return;
     
@@ -264,6 +291,19 @@ export default function OrderDetails() {
                 size="lg"
               >
                 {isUpdatingStatus || isProcessingOrder ? 'جاري المعالجة...' : getNextStatusLabel()}
+              </Button>
+            )}
+
+            {/* Cancel Order Button */}
+            {order?.status !== 'delivered' && order?.status !== 'cancelled' && (
+              <Button 
+                onClick={handleCancelOrder}
+                disabled={isUpdatingStatus || isProcessingOrder}
+                variant="destructive"
+                className="w-full"
+                size="lg"
+              >
+                {isUpdatingStatus || isProcessingOrder ? 'جاري الإلغاء...' : 'إلغاء الطلب'}
               </Button>
             )}
           </div>

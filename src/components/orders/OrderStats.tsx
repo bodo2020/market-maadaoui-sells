@@ -23,18 +23,18 @@ export function OrderStats({ orders, activeTab, onTabChange }: OrderStatsProps) 
         <Badge className="mr-2 bg-primary">{orders.length}</Badge>
       </button>
       <button
-        onClick={() => onTabChange("waiting")}
-        className={`relative font-semibold p-2 ${activeTab === "waiting" ? "bg-amber-500 text-white" : ""}`}
+        onClick={() => onTabChange("pending")}
+        className={`relative font-semibold p-2 ${activeTab === "pending" ? "bg-amber-500 text-white" : ""}`}
       >
         في الانتظار
-        <Badge className="mr-2 bg-amber-500">{getOrdersCount('waiting')}</Badge>
+        <Badge className="mr-2 bg-amber-500">{getOrdersCount('pending')}</Badge>
       </button>
       <button
-        onClick={() => onTabChange("done")}
-        className={`font-semibold p-2 ${activeTab === "done" ? "bg-green-500 text-white" : ""}`}
+        onClick={() => onTabChange("delivered")}
+        className={`font-semibold p-2 ${activeTab === "delivered" ? "bg-green-500 text-white" : ""}`}
       >
         مكتمل
-        <Badge className="mr-2 bg-green-500">{getOrdersCount('done')}</Badge>
+        <Badge className="mr-2 bg-green-500">{getOrdersCount('delivered')}</Badge>
       </button>
       <button
         onClick={() => onTabChange("cancelled")}
