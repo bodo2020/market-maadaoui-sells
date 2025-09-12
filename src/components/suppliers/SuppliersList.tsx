@@ -153,12 +153,12 @@ export default function SuppliersList() {
                           <div className="flex items-center">
                             <CreditCard className="h-4 w-4 mr-1" />
                             {supplier.balance > 0 ? (
-                              <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">
-                                علينا: {supplier.balance}
+                              <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
+                                لنا: {supplier.balance}
                               </Badge>
                             ) : supplier.balance < 0 ? (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
-                                لنا: {Math.abs(supplier.balance)}
+                              <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">
+                                علينا: {Math.abs(supplier.balance)}
                               </Badge>
                             ) : (
                               <Badge variant="outline">متوازن</Badge>
