@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Supplier } from "@/types";
 import { fetchSuppliers, deleteSupplier, fetchSupplierTransactions } from "@/services/supabase/supplierService";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -149,24 +150,10 @@ export default function SuppliersList() {
                         ) : "—"}
                       </TableCell>
                       <TableCell>
-                        {supplier.balance !== undefined ? (
-                          <div className="flex items-center">
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            {supplier.balance > 0 ? (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 hover:bg-green-50">
-                                لنا: {supplier.balance}
-                              </Badge>
-                            ) : supplier.balance < 0 ? (
-                              <Badge variant="outline" className="bg-red-50 text-red-700 hover:bg-red-50">
-                                علينا: {Math.abs(supplier.balance)}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline">متوازن</Badge>
-                            )}
-                          </div>
-                        ) : (
-                          <Badge variant="outline">0</Badge>
-                        )}
+                        <div className="flex items-center">
+                          <CreditCard className="h-4 w-4 mr-1" />
+                          <SupplierBalanceBadge supplierId={supplier.id} />
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">
@@ -228,6 +215,36 @@ export default function SuppliersList() {
       </Sheet>
     </Card>
   );
+}
+
+// Balance badge based on latest purchase
+function SupplierBalanceBadge({ supplierId }: { supplierId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["supplierLatestPurchase", supplierId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("purchases")
+        .select("total, paid")
+        .eq("supplier_id", supplierId)
+        .order("date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { total: number | string; paid: number | string } | null;
+    },
+  });
+
+  if (isLoading) return <Badge variant="outline">...</Badge>;
+  if (!data) return <Badge variant="outline">0</Badge>;
+
+  const total = typeof data.total === 'string' ? parseFloat(data.total) : data.total || 0;
+  const paid = typeof data.paid === 'string' ? parseFloat(data.paid) : data.paid || 0;
+  const delta = total - paid;
+  const format = (n: number) => new Intl.NumberFormat('ar-EG').format(Math.abs(n));
+
+  if (delta > 0) return <Badge variant="outline">علينا: {format(delta)}</Badge>;
+  if (delta < 0) return <Badge variant="outline">لنا: {format(delta)}</Badge>;
+  return <Badge variant="outline">متوازن</Badge>;
 }
 
 // Separate component for supplier transactions
