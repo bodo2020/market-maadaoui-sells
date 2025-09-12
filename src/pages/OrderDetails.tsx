@@ -7,6 +7,7 @@ import { CustomerInfoCards } from "@/components/orders/CustomerInfoCards";
 import { OrderStatusSelection } from "@/components/orders/OrderStatusSelection";
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
 import { PaymentStatusBadge } from "@/components/orders/PaymentStatusBadge";
+import { OrderStatusProgress } from "@/components/orders/OrderStatusProgress";
 import { useOrderDetails } from "@/hooks/orders/useOrderDetails";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -212,7 +213,7 @@ export default function OrderDetails() {
     <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
         <div className="flex justify-between items-center mb-6">
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold">تجهيز الطلب #{order?.id.slice(0, 8)}</h1>
               {order && (
@@ -223,6 +224,13 @@ export default function OrderDetails() {
                 />
               )}
             </div>
+            
+            {/* Visual Progress Line */}
+            <div className="bg-card p-4 rounded-lg border">
+              <h3 className="text-sm font-medium mb-3 text-muted-foreground">مراحل الطلب</h3>
+              <OrderStatusProgress status={order?.status || 'pending'} />
+            </div>
+            
             <OrderStatusSelection
               selectedStatus={selectedStatus}
               onStatusSelect={setSelectedStatus}
