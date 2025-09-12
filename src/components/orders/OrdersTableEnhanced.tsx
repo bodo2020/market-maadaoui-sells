@@ -229,15 +229,15 @@ export function OrdersTableEnhanced({
                 <TableCell>
                   <OrderActionsMenu
                     order={order}
-                    onShowCustomer={onShowCustomer}
-                    onArchive={onArchive}
-                    onCancel={onCancel}
-                    onProcess={onProcess}
-                    onComplete={onComplete}
-                    onPaymentConfirm={onPaymentConfirm}
-                    onAssignDelivery={onAssignDelivery}
-                    onReturn={onReturn}
-                    onPrintInvoice={onPrintInvoice}
+                    onShowCustomer={() => onShowCustomer(order)}
+                    onArchive={() => onArchive(order)}
+                    onCancel={() => onCancel(order)}
+                    onProcess={() => onProcess(order)}
+                    onComplete={() => onComplete(order)}
+                    onPaymentConfirm={() => onPaymentConfirm(order)}
+                    onAssignDelivery={() => onAssignDelivery(order)}
+                    onReturn={onReturn ? () => onReturn(order) : undefined}
+                    onPrintInvoice={onPrintInvoice ? () => onPrintInvoice(order) : undefined}
                   />
                 </TableCell>
               </TableRow>

@@ -44,7 +44,7 @@ export default function OrderDetails() {
     try {
       setIsProcessingOrder(true);
       
-      if (selectedStatus === 'done' && order.status !== 'done') {
+      if (selectedStatus === 'delivered' && order.status !== 'delivered') {
         if (order.customer_name || order.customer_phone) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
@@ -155,7 +155,7 @@ export default function OrderDetails() {
         newStatus === 'failed' ? 'فشل الدفع' : 'تم الاسترجاع'
       }`);
       
-      if (newStatus === 'paid' && order.status === 'done') {
+      if (newStatus === 'paid' && order.status === 'delivered') {
         try {
           await recordCashTransaction(
             order.total, 

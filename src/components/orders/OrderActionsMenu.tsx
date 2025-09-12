@@ -1,4 +1,5 @@
 
+import { Order } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,6 +12,8 @@ import {
 import { MoreHorizontal, Archive, X, Package, Check, CreditCard, Truck, RotateCcw, FileText } from "lucide-react";
 
 interface OrderActionsMenuProps {
+  order: Order;
+  onShowCustomer: (order: Order) => void;
   onArchive: () => void;
   onCancel: () => void;
   onProcess: () => void;
@@ -22,6 +25,8 @@ interface OrderActionsMenuProps {
 }
 
 export function OrderActionsMenu({ 
+  order,
+  onShowCustomer,
   onArchive, 
   onCancel, 
   onProcess, 

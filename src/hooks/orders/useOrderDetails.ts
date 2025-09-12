@@ -219,10 +219,13 @@ export function useOrderDetails(orderId: string) {
       setOrder(prev => prev ? { ...prev, status: selectedStatus } : null);
       
       toast.success(`تم تحديث حالة الطلب إلى ${
-        selectedStatus === 'waiting' ? 'في الانتظار' : 
+        selectedStatus === 'pending' ? 'قيد المراجعة' : 
+        selectedStatus === 'confirmed' ? 'تم التأكيد' :
+        selectedStatus === 'preparing' ? 'قيد التجهيز' :
         selectedStatus === 'ready' ? 'جاهز للشحن' : 
         selectedStatus === 'shipped' ? 'تم الشحن' : 
-        selectedStatus === 'cancelled' ? 'ملغي' : 'تم التسليم'
+        selectedStatus === 'delivered' ? 'تم التسليم' :
+        selectedStatus === 'cancelled' ? 'ملغي' : 'تم التحديث'
       }`);
       
       setSelectedStatus(null);

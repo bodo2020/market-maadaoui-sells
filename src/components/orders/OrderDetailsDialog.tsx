@@ -40,13 +40,13 @@ export function OrderDetailsDialog({
 
   if (!order) return null;
 
-  const updateShippingStatus = async (status: 'shipped' | 'done') => {
+  const updateShippingStatus = async (status: 'shipped' | 'delivered') => {
     if (!order) return;
     
     try {
       setIsUpdatingShipping(true);
       
-      if (status === 'done' && order.status !== 'done') {
+      if (status === 'delivered' && order.status !== 'delivered') {
         // If marking as done, process inventory and financial updates
         if (order.customer_name || order.customer_phone) {
           const customerInfo = {

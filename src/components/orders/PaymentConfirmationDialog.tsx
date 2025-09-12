@@ -55,7 +55,7 @@ export function PaymentConfirmationDialog({
       if (error) throw error;
       
       // If the order is already marked as done, add the amount to cash tracking
-      if (orderData.status === 'done') {
+      if (orderData.status === 'delivered') {
         try {
           await recordCashTransaction(
             orderData.total, 

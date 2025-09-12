@@ -123,7 +123,7 @@ export const fetchFinancialSummary = async (
     const { data: onlineOrdersData, error: onlineOrdersError } = await supabase
       .from("online_orders")
       .select("total")
-      .eq("status", "done")
+      .eq("status", "delivered")
       .eq("payment_status", "paid")
       .gte("created_at", dateRange.start.toISOString())
       .lte("created_at", dateRange.end.toISOString());
@@ -239,7 +239,7 @@ export const fetchProfitsSummary = async (
     const { data: onlineOrdersData, error: onlineOrdersError } = await supabase
       .from("online_orders")
       .select("id, total, items")
-      .eq("status", "done")
+      .eq("status", "delivered")
       .eq("payment_status", "paid")
       .gte("created_at", dateRange.start.toISOString())
       .lte("created_at", dateRange.end.toISOString());
@@ -391,7 +391,7 @@ export const fetchMonthlyRevenue = async (
     const { data: onlineData, error: onlineError } = await supabase
       .from("online_orders")
       .select("created_at, total")
-      .eq("status", "done")
+      .eq("status", "delivered")
       .eq("payment_status", "paid")
       .gte("created_at", dateRange.start.toISOString())
       .lte("created_at", dateRange.end.toISOString());

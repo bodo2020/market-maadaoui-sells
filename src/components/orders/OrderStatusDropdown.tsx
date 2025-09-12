@@ -1,14 +1,8 @@
-
-import { Check } from "lucide-react";
-import { Order } from "@/types";
-import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useState } from "react";
+import { Order } from "@/types";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -23,13 +17,16 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
 
   const getStatusBadge = (status: Order['status']) => {
     const variants: Record<string, { bg: string, text: string, label: string }> = {
-      waiting: { bg: "bg-amber-100", text: "text-amber-700", label: "في الانتظار" },
-      ready: { bg: "bg-green-100", text: "text-green-700", label: "جاهز" },
-      done: { bg: "bg-gray-100", text: "text-gray-700", label: "مكتمل" },
+      pending: { bg: "bg-amber-100", text: "text-amber-700", label: "قيد المراجعة" },
+      confirmed: { bg: "bg-blue-100", text: "text-blue-700", label: "تم التأكيد" },
+      preparing: { bg: "bg-orange-100", text: "text-orange-700", label: "قيد التجهيز" },
+      ready: { bg: "bg-green-100", text: "text-green-700", label: "جاهز للشحن" },
+      shipped: { bg: "bg-purple-100", text: "text-purple-700", label: "تم الشحن" },
+      delivered: { bg: "bg-gray-100", text: "text-gray-700", label: "تم التسليم" },
       cancelled: { bg: "bg-red-100", text: "text-red-700", label: "ملغي" }
     };
 
-    const style = variants[status] || variants.waiting;
+    const style = variants[status] || variants.pending;
     return (
       <Badge className={`${style.bg} ${style.text} border-none`}>
         {style.label}
@@ -42,16 +39,16 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
     
     try {
       setIsUpdating(true);
-      console.log("Updating order status to:", newStatus, "for order ID:", order.id);
+      console.log("Updating order status:", { orderId: order.id, from: currentStatus, to: newStatus });
       
       const { error } = await supabase
         .from('online_orders')
         .update({ 
-          status: newStatus,
+          status: newStatus, 
           updated_at: new Date().toISOString() 
         })
         .eq('id', order.id);
-      
+
       if (error) {
         console.error("Supabase update error:", error);
         throw error;
@@ -60,11 +57,17 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
       console.log("Status updated successfully in Supabase");
       setCurrentStatus(newStatus);
       
-      toast.success(`تم تحديث حالة الطلب إلى ${
-        newStatus === 'waiting' ? 'في الانتظار' : 
-        newStatus === 'ready' ? 'جاهز للشحن' : 
-        newStatus === 'cancelled' ? 'ملغي' : 'تم التسليم'
-      }`);
+      const statusLabels = {
+        pending: 'قيد المراجعة',
+        confirmed: 'تم التأكيد',
+        preparing: 'قيد التجهيز',
+        ready: 'جاهز للشحن',
+        shipped: 'تم الشحن',
+        delivered: 'تم التسليم',
+        cancelled: 'ملغي'
+      };
+      
+      toast.success(`تم تحديث حالة الطلب إلى ${statusLabels[newStatus]}`);
       
       if (onStatusChange) {
         onStatusChange();
@@ -87,11 +90,27 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
       <DropdownMenuContent align="end" className="w-[200px]">
         <DropdownMenuItem
           className="gap-2"
-          onClick={() => handleStatusChange('waiting')}
-          disabled={currentStatus === 'waiting' || isUpdating}
+          onClick={() => handleStatusChange('pending')}
+          disabled={currentStatus === 'pending' || isUpdating}
         >
-          {currentStatus === 'waiting' && <Check className="h-4 w-4" />}
-          في الانتظار
+          {currentStatus === 'pending' && <Check className="h-4 w-4" />}
+          قيد المراجعة
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="gap-2"
+          onClick={() => handleStatusChange('confirmed')}
+          disabled={currentStatus === 'confirmed' || isUpdating}
+        >
+          {currentStatus === 'confirmed' && <Check className="h-4 w-4" />}
+          تم التأكيد
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="gap-2"
+          onClick={() => handleStatusChange('preparing')}
+          disabled={currentStatus === 'preparing' || isUpdating}
+        >
+          {currentStatus === 'preparing' && <Check className="h-4 w-4" />}
+          قيد التجهيز
         </DropdownMenuItem>
         <DropdownMenuItem
           className="gap-2"
@@ -103,11 +122,19 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
         </DropdownMenuItem>
         <DropdownMenuItem
           className="gap-2"
-          onClick={() => handleStatusChange('done')}
-          disabled={currentStatus === 'done' || isUpdating}
+          onClick={() => handleStatusChange('shipped')}
+          disabled={currentStatus === 'shipped' || isUpdating}
         >
-          {currentStatus === 'done' && <Check className="h-4 w-4" />}
-          مكتمل
+          {currentStatus === 'shipped' && <Check className="h-4 w-4" />}
+          تم الشحن
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="gap-2"
+          onClick={() => handleStatusChange('delivered')}
+          disabled={currentStatus === 'delivered' || isUpdating}
+        >
+          {currentStatus === 'delivered' && <Check className="h-4 w-4" />}
+          تم التسليم
         </DropdownMenuItem>
         <DropdownMenuItem
           className="gap-2"

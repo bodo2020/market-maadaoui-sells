@@ -682,9 +682,12 @@ export default function SalesDashboard() {
                           <TableCell>{new Date(order.created_at).toLocaleDateString('ar-EG')}</TableCell>
                           <TableCell>{order.customer_id ? 'عميل' : 'غير محدد'}</TableCell>
                           <TableCell>
-                            {order.status === 'waiting' ? 'في الانتظار' :
-                             order.status === 'ready' ? 'جاهز' :
-                             order.status === 'shipped' ? 'تم الشحن' : 'تم التسليم'}
+                            {order.status === 'pending' ? 'قيد المراجعة' :
+                             order.status === 'confirmed' ? 'تم التأكيد' :
+                             order.status === 'preparing' ? 'قيد التجهيز' :
+                             order.status === 'ready' ? 'جاهز للشحن' :
+                             order.status === 'shipped' ? 'تم الشحن' :
+                             order.status === 'delivered' ? 'تم التسليم' : 'ملغي'}
                           </TableCell>
                           <TableCell>
                             {order.payment_status === 'paid' ? 'تم الدفع' :

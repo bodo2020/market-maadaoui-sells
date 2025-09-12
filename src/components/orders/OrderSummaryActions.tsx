@@ -10,7 +10,7 @@ interface OrderSummaryActionsProps {
   onUpdateStatus: () => void;
   onPaymentConfirm: () => void;
   onAssignDelivery: () => void;
-  onUpdateShipping: (status: 'shipped' | 'done') => void;
+  onUpdateShipping: (status: 'shipped' | 'delivered') => void;
   isUpdatingShipping: boolean;
 }
 
@@ -59,16 +59,16 @@ export function OrderSummaryActions({
           <Button 
             variant={order.status === 'shipped' ? 'default' : 'outline'}
             className="w-full"
-            disabled={isUpdatingShipping || order.status === 'shipped' || order.status === 'done'}
+            disabled={isUpdatingShipping || order.status === 'shipped' || order.status === 'delivered'}
             onClick={() => onUpdateShipping('shipped')}
           >
             خرج للتوصيل
           </Button>
           <Button 
-            variant={order.status === 'done' ? 'default' : 'outline'}
+            variant={order.status === 'delivered' ? 'default' : 'outline'}
             className="w-full"
-            disabled={isUpdatingShipping || order.status === 'done'}
-            onClick={() => onUpdateShipping('done')}
+            disabled={isUpdatingShipping || order.status === 'delivered'}
+            onClick={() => onUpdateShipping('delivered')}
           >
             تم التوصيل
           </Button>

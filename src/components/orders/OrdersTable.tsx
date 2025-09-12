@@ -180,16 +180,18 @@ export function OrdersTable({
               />
             </TableCell>
             <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-              <OrderActionsMenu
-                onArchive={() => onArchive(order)}
-                onCancel={() => onCancel(order)}
-                onProcess={() => onProcess(order)}
-                onComplete={() => onComplete(order)}
-                onPaymentConfirm={() => onPaymentConfirm(order)}
-                onAssignDelivery={() => onAssignDelivery(order)}
-                onReturn={onReturn ? () => onReturn(order) : undefined}
-                onPrintInvoice={onPrintInvoice ? () => onPrintInvoice(order) : undefined}
-              />
+                <OrderActionsMenu
+                  order={order}
+                  onShowCustomer={() => onShowCustomer(order)}
+                  onArchive={() => onArchive(order)}
+                  onCancel={() => onCancel(order)}
+                  onProcess={() => onProcess(order)}
+                  onComplete={() => onComplete(order)}
+                  onPaymentConfirm={() => onPaymentConfirm(order)}
+                  onAssignDelivery={() => onAssignDelivery(order)}
+                  onReturn={onReturn ? () => onReturn(order) : undefined}
+                  onPrintInvoice={onPrintInvoice ? () => onPrintInvoice(order) : undefined}
+                />
             </TableCell>
           </TableRow>
         ))}

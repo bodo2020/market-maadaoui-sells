@@ -1,15 +1,14 @@
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Check, Clock, Package, Truck, X } from "lucide-react";
+import { useState, useEffect } from 'react';
 import { Order } from "@/types";
-import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Check, Clock, Package, Truck, MapPin, X, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
-import { updateProduct } from "@/services/supabase/productService";
-import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
+import { recordCashTransaction, RegisterType } from "@/services/supabase/cashTrackingService";
 
 interface UpdateOrderStatusDialogProps {
   order: Order | null;
@@ -24,7 +23,7 @@ export function UpdateOrderStatusDialog({
   onOpenChange,
   onStatusUpdated
 }: UpdateOrderStatusDialogProps) {
-  const [status, setStatus] = useState<Order['status']>(order?.status || 'waiting');
+  const [status, setStatus] = useState<Order['status']>(order?.status || 'pending');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -44,7 +43,7 @@ export function UpdateOrderStatusDialog({
         updated_at: new Date().toISOString()
       };
 
-      if (status === 'done' && order.status !== 'done') {
+      if (status === 'delivered' && order.status !== 'delivered') {
         if (order.customer_name || order.customer_phone) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
@@ -54,59 +53,43 @@ export function UpdateOrderStatusDialog({
           const customer = await findOrCreateCustomer(customerInfo);
           if (customer) {
             console.log("Customer linked to order:", customer);
-            if (!order.customer_id) {
-              await supabase
-                .from('online_orders')
-                .update({ customer_id: customer.id })
-                .eq('id', order.id);
+          }
+        }
+
+        for (const item of order.items) {
+          try {
+            const quantityToDeduct = item.is_bulk && item.bulk_quantity 
+              ? Math.ceil(item.bulk_quantity) 
+              : item.quantity;
+
+            // Update inventory directly
+            const { error: inventoryError } = await supabase
+              .from('inventory')
+              .update({ 
+                quantity: quantityToDeduct * -1,
+                updated_at: new Date().toISOString()
+              })
+              .eq('product_id', item.product_id);
+
+            if (inventoryError) {
+              console.error(`Error updating inventory for product ${item.product_id}:`, inventoryError);
+              throw new Error(`فشل في تحديث المخزون للمنتج: ${item.product_name}`);
             }
-          }
-        }
-        
-        const orderItems = order.items || [];
-        console.log("Processing inventory for items:", orderItems);
-        
-        for (const item of orderItems) {
-          const { data: product, error: productError } = await supabase
-            .from('products')
-            .select('*')
-            .eq('id', item.product_id)
-            .single();
             
-          if (productError) {
-            console.error("Error fetching product:", productError);
-            continue;
+            console.log(`Updated inventory for ${item.product_name}: -${quantityToDeduct}`);
+          } catch (inventoryError) {
+            console.error(`Error updating inventory for product ${item.product_id}:`, inventoryError);
+            throw new Error(`فشل في تحديث المخزون للمنتج: ${item.product_name}`);
           }
-          
-          let quantityToDeduct = item.quantity;
-          
-          if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
-            quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
-          }
-          
-          let newQuantity: number;
-          
-          if (item.is_weight_based || product.barcode_type === 'scale') {
-            const currentQuantity = Math.floor(product.quantity || 0);
-            newQuantity = Math.max(0, currentQuantity - Math.floor(quantityToDeduct));
-          } else {
-            newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
-          }
-          
-          await updateProduct(product.id, {
-            quantity: newQuantity
-          });
-          
-          console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
         }
-        
+
         if (order.payment_status === 'paid') {
           try {
             await recordCashTransaction(
-              order.total, 
-              'deposit', 
-              RegisterType.ONLINE, 
-              `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
+              order.total,
+              'deposit',
+              RegisterType.ONLINE,
+              `إيداع من الطلب رقم ${order.id.slice(-8)} - ${order.customer_name || 'عميل غير معروف'}`,
               ''
             );
             console.log(`Added ${order.total} to online cash register`);
@@ -116,16 +99,15 @@ export function UpdateOrderStatusDialog({
           }
         }
       }
-      
+
       const { error } = await supabase
         .from('online_orders')
         .update(updates)
         .eq('id', order.id);
-      
+
       if (error) throw error;
-      
+
       toast.success('تم تحديث حالة الطلب بنجاح');
-      
       onStatusUpdated();
       onOpenChange(false);
     } catch (error) {
@@ -137,18 +119,23 @@ export function UpdateOrderStatusDialog({
   };
 
   const statusOptions: {value: Order['status'], label: string, icon: JSX.Element}[] = [
-    { value: 'waiting', label: 'في الانتظار', icon: <Clock className="h-4 w-4 text-amber-500" /> },
+    { value: 'pending', label: 'قيد المراجعة', icon: <Clock className="h-4 w-4 text-amber-500" /> },
+    { value: 'confirmed', label: 'تم التأكيد', icon: <Check className="h-4 w-4 text-blue-500" /> },
+    { value: 'preparing', label: 'قيد التجهيز', icon: <Package className="h-4 w-4 text-orange-500" /> },
+    { value: 'ready', label: 'جاهز للشحن', icon: <Check className="h-4 w-4 text-green-500" /> },
     { value: 'shipped', label: 'تم الشحن', icon: <Truck className="h-4 w-4 text-blue-500" /> },
-    { value: 'done', label: 'مكتمل', icon: <Check className="h-4 w-4 text-green-600" /> },
+    { value: 'delivered', label: 'تم التسليم', icon: <MapPin className="h-4 w-4 text-green-600" /> },
     { value: 'cancelled', label: 'ملغي', icon: <X className="h-4 w-4 text-red-500" /> }
   ];
 
   const getStatusClass = (statusValue: Order['status']) => {
     const classes: Record<Order['status'], string> = {
-      waiting: 'border-amber-500 hover:bg-amber-50',
+      pending: 'border-amber-500 hover:bg-amber-50',
+      confirmed: 'border-blue-500 hover:bg-blue-50',
+      preparing: 'border-orange-500 hover:bg-orange-50',
       ready: 'border-green-500 hover:bg-green-50',
       shipped: 'border-blue-500 hover:bg-blue-50',
-      done: 'border-gray-500 hover:bg-gray-50',
+      delivered: 'border-gray-500 hover:bg-gray-50',
       cancelled: 'border-red-500 hover:bg-red-50'
     };
     return classes[statusValue] || '';
@@ -158,35 +145,29 @@ export function UpdateOrderStatusDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">تحديث حالة الطلب</DialogTitle>
+          <DialogTitle>تحديث حالة الطلب</DialogTitle>
         </DialogHeader>
         
         {order && (
-          <div className="space-y-6 dir-rtl">
-            <div className="text-center space-y-2">
-              <p className="text-muted-foreground">#{order.id.slice(0, 8)}</p>
-              <p className="text-sm font-medium">اختر حالة الطلب الجديدة</p>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              الطلب رقم: <span className="font-mono">{order.id.slice(-8)}</span>
             </div>
             
-            <RadioGroup 
-              value={status} 
-              onValueChange={(value) => setStatus(value as Order['status'])}
-              className="grid gap-3"
-            >
+            <RadioGroup value={status} onValueChange={(value) => setStatus(value as Order['status'])}>
               {statusOptions.map((item) => (
-                <div 
-                  key={item.value}
-                  className={`flex items-center space-x-2 space-x-reverse rounded-lg border-2 p-3 transition-colors ${getStatusClass(item.value)} ${status === item.value ? 'border-primary' : ''}`}
-                >
-                  <RadioGroupItem value={item.value} id={item.value} />
+                <div key={item.value} className={`border-2 rounded-lg p-3 cursor-pointer transition-colors ${
+                  status === item.value ? getStatusClass(item.value) : 'border-gray-200 hover:border-gray-300'
+                }`}>
                   <Label 
                     htmlFor={item.value} 
-                    className="flex flex-1 items-center justify-between cursor-pointer"
+                    className="flex items-center space-x-3 space-x-reverse cursor-pointer w-full"
                   >
-                    <span className="flex items-center gap-2">
+                    <RadioGroupItem value={item.value} id={item.value} />
+                    <div className="flex items-center space-x-2 space-x-reverse flex-1">
                       {item.icon}
-                      {item.label}
-                    </span>
+                      <span className="font-medium">{item.label}</span>
+                    </div>
                     {status === item.value && (
                       <Check className="h-4 w-4 text-primary" />
                     )}
@@ -196,32 +177,30 @@ export function UpdateOrderStatusDialog({
             </RadioGroup>
             
 
-            {status === 'done' && (
+            {status === 'delivered' && (
               <div className="text-sm bg-blue-50 border border-blue-200 rounded-md p-3 mt-2">
-                <p className="text-blue-800">
-                  سيتم خصم المنتجات من المخزون وإضافة المبلغ إلى خزنة الأونلاين عند اكتمال الطلب.
-                </p>
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-blue-800">
+                    سيتم خصم المنتجات من المخزون وإضافة المبلغ إلى خزنة الأونلاين عند اكتمال الطلب.
+                  </p>
+                </div>
               </div>
             )}
           </div>
         )}
         
-        <DialogFooter className="gap-2 sm:gap-0 dir-rtl">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="w-full sm:w-auto"
-          >
+        <div className="flex gap-2 justify-end">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             إلغاء
           </Button>
           <Button 
             onClick={updateOrderStatus} 
-            disabled={isSubmitting || !order || status === order.status}
-            className="w-full sm:w-auto gap-2"
+            disabled={!order || status === order.status || isSubmitting}
           >
-            تحديث
+            {isSubmitting ? 'جاري التحديث...' : 'تحديث الحالة'}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
