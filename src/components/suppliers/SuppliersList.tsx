@@ -195,10 +195,6 @@ export default function SuppliersList() {
                           <AccordionItem value={supplier.id}>
                             <AccordionTrigger 
                               className="py-2 px-4 text-sm"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                toggleTransactionDetails(supplier.id);
-                              }}
                             >
                               عرض تفاصيل المعاملات المالية
                             </AccordionTrigger>
