@@ -1,13 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchOrderHeatmapData } from "@/services/supabase/analyticsService";
-import { Clock, Calendar } from "lucide-react";
+import { Clock, Calendar, TrendingUp } from "lucide-react";
+import { useEffect } from "react";
 
 export function OrderHeatmap() {
-  const { data: heatmapData = [], isLoading } = useQuery({
+  const { data: heatmapData = [], isLoading, error } = useQuery({
     queryKey: ["order-heatmap"],
     queryFn: fetchOrderHeatmapData,
+    refetchOnWindowFocus: false,
   });
+
+  // طباعة البيانات للتأكد من وجودها
+  useEffect(() => {
+    if (heatmapData.length > 0) {
+      console.log("Heatmap data loaded:", heatmapData.length, "points");
+      console.log("Sample data:", heatmapData.slice(0, 5));
+    }
+  }, [heatmapData]);
 
   const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
   const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -29,6 +39,10 @@ export function OrderHeatmap() {
 
   // العثور على أقصى عدد طلبات لتحديد شدة اللون
   const maxOrders = Math.max(...heatmapData.map(item => item.orderCount), 1);
+  const totalOrders = heatmapData.reduce((sum, item) => sum + item.orderCount, 0);
+
+  console.log("Max orders per time slot:", maxOrders);
+  console.log("Total orders:", totalOrders);
 
   // تحديد لون الخلية بناءً على عدد الطلبات
   const getCellColor = (orderCount: number) => {
@@ -75,18 +89,44 @@ export function OrderHeatmap() {
     );
   }
 
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-red-600">
+            <p>حدث خطأ في تحميل البيانات</p>
+            <p className="text-sm text-gray-500">{error.message}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* إحصائيات سريعة */}
+      {/* معلومات تشخيصية */}
+      {heatmapData.length === 0 && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center text-yellow-600">
+              <TrendingUp className="h-12 w-12 mx-auto mb-4" />
+              <p className="text-lg font-medium">لا توجد بيانات طلبات حالياً</p>
+              <p className="text-sm text-gray-500">سيتم عرض الخريطة الحرارية عند توفر بيانات الطلبات</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {heatmapData.length > 0 && (
+        <>
+          {/* إحصائيات سريعة */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center space-x-2">
               <Clock className="h-8 w-8 text-blue-600" />
               <div>
-                <p className="text-2xl font-bold">
-                  {heatmapData.reduce((sum, item) => sum + item.orderCount, 0)}
-                </p>
+                <p className="text-2xl font-bold">{totalOrders}</p>
                 <p className="text-sm text-muted-foreground">إجمالي الطلبات</p>
               </div>
             </div>
@@ -112,10 +152,8 @@ export function OrderHeatmap() {
             <div className="flex items-center space-x-2">
               <Clock className="h-8 w-8 text-purple-600" />
               <div>
-                <p className="text-2xl font-bold">
-                  {hourlyTotals.find(h => h.total === Math.max(...hourlyTotals.map(ht => ht.total)))?.hour || 0}:00
-                </p>
-                <p className="text-sm text-muted-foreground">أكثر الساعات نشاطاً</p>
+                <p className="text-2xl font-bold">{maxOrders}</p>
+                <p className="text-sm text-muted-foreground">أكثر الأوقات نشاطاً</p>
               </div>
             </div>
           </CardContent>
@@ -237,6 +275,8 @@ export function OrderHeatmap() {
           </CardContent>
         </Card>
       </div>
+      </>
+      )}
     </div>
   );
 }

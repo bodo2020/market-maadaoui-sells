@@ -203,43 +203,73 @@ export async function fetchCategorySalesAnalytics() {
 // جلب بيانات الخريطة الحرارية للطلبات
 export async function fetchOrderHeatmapData() {
   try {
-    // جلب المبيعات من المتجر
+    // جلب المبيعات من المتجر مع استخدام حقل date
     const { data: salesData, error: salesError } = await supabase
       .from("sales")
-      .select("created_at, date");
+      .select("date")
+      .not("date", "is", null);
 
-    if (salesError) throw salesError;
+    if (salesError) {
+      console.error("Error fetching sales data:", salesError);
+      throw salesError;
+    }
 
     // جلب الطلبات الإلكترونية
     const { data: ordersData, error: ordersError } = await supabase
       .from("online_orders")
-      .select("created_at");
+      .select("created_at")
+      .not("created_at", "is", null);
 
-    if (ordersError) throw ordersError;
+    if (ordersError) {
+      console.error("Error fetching orders data:", ordersError);
+      throw ordersError;
+    }
+
+    console.log("Sales data count:", salesData?.length || 0);
+    console.log("Orders data count:", ordersData?.length || 0);
 
     // تجميع جميع التواريخ
     const allDates: string[] = [];
     
+    // إضافة تواريخ المبيعات (استخدام حقل date)
     salesData?.forEach(sale => {
-      const date = sale.date || sale.created_at;
-      if (date) allDates.push(date);
+      if (sale.date) {
+        allDates.push(sale.date);
+      }
     });
 
+    // إضافة تواريخ الطلبات الإلكترونية
     ordersData?.forEach(order => {
-      if (order.created_at) allDates.push(order.created_at);
+      if (order.created_at) {
+        allDates.push(order.created_at);
+      }
     });
+
+    console.log("Total dates found:", allDates.length);
 
     // تجميع البيانات حسب اليوم والساعة
     const heatmapMap = new Map<string, number>();
 
     allDates.forEach(dateString => {
-      const date = new Date(dateString);
-      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      const hour = date.getHours();
-      const key = `${dayOfWeek}-${hour}`;
+      try {
+        const date = new Date(dateString);
+        // التأكد من صحة التاريخ
+        if (isNaN(date.getTime())) {
+          console.warn("Invalid date:", dateString);
+          return;
+        }
+        
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const hour = date.getHours();
+        const key = `${dayOfWeek}-${hour}`;
 
-      heatmapMap.set(key, (heatmapMap.get(key) || 0) + 1);
+        heatmapMap.set(key, (heatmapMap.get(key) || 0) + 1);
+      } catch (error) {
+        console.warn("Error parsing date:", dateString, error);
+      }
     });
+
+    console.log("Heatmap data points:", heatmapMap.size);
 
     // تحويل البيانات إلى مصفوفة
     const result = Array.from(heatmapMap.entries()).map(([key, orderCount]) => {
@@ -251,6 +281,8 @@ export async function fetchOrderHeatmapData() {
       };
     });
 
+    console.log("Final heatmap result:", result.length, "data points");
+    
     return result;
   } catch (error) {
     console.error("Error fetching order heatmap data:", error);
