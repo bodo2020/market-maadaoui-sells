@@ -156,17 +156,21 @@ export function ReturnOrderDialog({
             {items.map((item) => (
               <div key={item.product_id} className="flex items-center gap-4 border-b pb-2">
                 <div className="flex-1">
-                  <p className="font-medium">{item.product_name}</p>
+                  <p className="font-medium">{item.product_name || 'منتج غير معروف'}</p>
                   <p className="text-sm text-muted-foreground">الكمية الأصلية: {item.quantity}</p>
+                  <p className="text-sm text-muted-foreground">السعر: {item.price} ج.م</p>
                 </div>
-                <Input
-                  type="number"
-                  min="0"
-                  max={item.quantity}
-                  value={selectedItems[item.product_id] || 0}
-                  onChange={(e) => handleQuantityChange(item.product_id, parseInt(e.target.value) || 0)}
-                  className="w-24"
-                />
+                <div className="text-right">
+                  <label className="text-sm font-medium block mb-1">كمية الإرجاع</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max={item.quantity}
+                    value={selectedItems[item.product_id] || 0}
+                    onChange={(e) => handleQuantityChange(item.product_id, parseInt(e.target.value) || 0)}
+                    className="w-24 text-center"
+                  />
+                </div>
               </div>
             ))}
           </div>
