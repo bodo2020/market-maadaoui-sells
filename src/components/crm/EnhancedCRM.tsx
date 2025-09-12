@@ -10,6 +10,8 @@ import { CRMDashboard } from "./CRMDashboard";
 import CustomersList from "@/components/customers/CustomersList";
 import { CustomerInteractions } from "./CustomerInteractions";
 import { LeadsManagement } from "./LeadsManagement";
+import { ProductAnalytics } from "./ProductAnalytics";
+import { OrderHeatmap } from "./OrderHeatmap";
 import { fetchCustomers } from "@/services/supabase/customerService";
 import { fetchCustomerAnalytics } from "@/services/supabase/crmService";
 import { 
@@ -92,7 +94,7 @@ export function EnhancedCRM() {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-5 w-full">
+        <TabsList className="grid grid-cols-6 w-full">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             لوحة التحكم
@@ -113,6 +115,10 @@ export function EnhancedCRM() {
             <BarChart3 className="h-4 w-4" />
             التحليلات
           </TabsTrigger>
+          <TabsTrigger value="heatmap" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            خريطة الطلبات
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
@@ -132,51 +138,11 @@ export function EnhancedCRM() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>إحصائيات متقدمة</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span>معدل تفعيل العملاء:</span>
-                  <Badge variant="secondary">
-                    {analytics?.conversionRate?.toFixed(1) || 0}%
-                  </Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span>متوسط قيمة الطلب:</span>
-                  <Badge variant="secondary">
-                    {analytics?.averageOrderValue?.toFixed(0) || 0} ج.م
-                  </Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span>إجمالي الإيرادات:</span>
-                  <Badge variant="secondary">
-                    {analytics?.totalRevenue?.toFixed(0) || 0} ج.م
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
+          <ProductAnalytics />
+        </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>أهم العملاء</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {customers.slice(0, 5).map((customer) => (
-                    <div key={customer.id} className="flex items-center justify-between p-2 border rounded">
-                      <span className="font-medium">{customer.name}</span>
-                      <Badge variant={customer.phone_verified ? "default" : "secondary"}>
-                        {customer.phone_verified ? "مفعل" : "غير مفعل"}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="heatmap" className="space-y-4">
+          <OrderHeatmap />
         </TabsContent>
       </Tabs>
     </div>
