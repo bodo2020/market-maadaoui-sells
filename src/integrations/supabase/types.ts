@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean | null
+          message: string
+          metadata: Json | null
+          read_at: string | null
+          tenant_id: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          metadata?: Json | null
+          read_at?: string | null
+          tenant_id?: string | null
+          title: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          metadata?: Json | null
+          read_at?: string | null
+          tenant_id?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notifications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       areas: {
         Row: {
           active: boolean | null
@@ -2111,6 +2155,276 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tenant_analytics: {
+        Row: {
+          created_at: string
+          id: string
+          last_login_at: string | null
+          last_order_at: string | null
+          month_year: string
+          tenant_id: string
+          total_orders: number | null
+          total_products: number | null
+          total_revenue: number | null
+          total_users: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_login_at?: string | null
+          last_order_at?: string | null
+          month_year: string
+          tenant_id: string
+          total_orders?: number | null
+          total_products?: number | null
+          total_revenue?: number | null
+          total_users?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_login_at?: string | null
+          last_order_at?: string | null
+          month_year?: string
+          tenant_id?: string
+          total_orders?: number | null
+          total_products?: number | null
+          total_revenue?: number | null
+          total_users?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_analytics_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_applications: {
+        Row: {
+          business_address: string | null
+          business_description: string | null
+          business_name: string
+          business_type: string | null
+          created_at: string
+          expected_products_count: number | null
+          expected_users_count: number | null
+          id: string
+          owner_email: string
+          owner_name: string
+          owner_phone: string | null
+          rejection_reason: string | null
+          requested_subdomain: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          business_address?: string | null
+          business_description?: string | null
+          business_name: string
+          business_type?: string | null
+          created_at?: string
+          expected_products_count?: number | null
+          expected_users_count?: number | null
+          id?: string
+          owner_email: string
+          owner_name: string
+          owner_phone?: string | null
+          rejection_reason?: string | null
+          requested_subdomain: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          business_address?: string | null
+          business_description?: string | null
+          business_name?: string
+          business_type?: string | null
+          created_at?: string
+          expected_products_count?: number | null
+          expected_users_count?: number | null
+          id?: string
+          owner_email?: string
+          owner_name?: string
+          owner_phone?: string | null
+          rejection_reason?: string | null
+          requested_subdomain?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tenant_subscriptions: {
+        Row: {
+          billing_cycle: string
+          created_at: string
+          ends_at: string
+          id: string
+          last_payment_at: string | null
+          next_payment_at: string | null
+          payment_method: Json | null
+          plan_name: string
+          plan_price: number
+          starts_at: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          billing_cycle?: string
+          created_at?: string
+          ends_at: string
+          id?: string
+          last_payment_at?: string | null
+          next_payment_at?: string | null
+          payment_method?: Json | null
+          plan_name: string
+          plan_price?: number
+          starts_at: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          billing_cycle?: string
+          created_at?: string
+          ends_at?: string
+          id?: string
+          last_payment_at?: string | null
+          next_payment_at?: string | null
+          payment_method?: Json | null
+          plan_name?: string
+          plan_price?: number
+          starts_at?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_users: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          permissions: Json | null
+          role: string
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          permissions?: Json | null
+          role?: string
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          permissions?: Json | null
+          role?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_users_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          address: string | null
+          city: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          country: string | null
+          created_at: string
+          description: string | null
+          domain: string | null
+          features: Json | null
+          id: string
+          limits: Json | null
+          logo_url: string | null
+          name: string
+          settings: Json | null
+          status: string
+          subdomain: string
+          subscription_status: string
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          domain?: string | null
+          features?: Json | null
+          id?: string
+          limits?: Json | null
+          logo_url?: string | null
+          name: string
+          settings?: Json | null
+          status?: string
+          subdomain: string
+          subscription_status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          country?: string | null
+          created_at?: string
+          description?: string | null
+          domain?: string | null
+          features?: Json | null
+          id?: string
+          limits?: Json | null
+          logo_url?: string | null
+          name?: string
+          settings?: Json | null
+          status?: string
+          subdomain?: string
+          subscription_status?: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Relationships: []
