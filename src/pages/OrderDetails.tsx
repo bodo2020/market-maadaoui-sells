@@ -39,13 +39,32 @@ export default function OrderDetails() {
     setPaymentConfirmOpen(true);
   };
 
-  const handleStatusChange = async () => {
-    if (!order || isProcessingOrder || !selectedStatus) return;
+  const getNextStatus = () => {
+    const statusOrder = ['pending', 'confirmed', 'preparing', 'ready', 'shipped', 'delivered'];
+    const currentIndex = statusOrder.indexOf(order?.status || 'pending');
+    return currentIndex < statusOrder.length - 1 ? statusOrder[currentIndex + 1] : null;
+  };
+
+  const getNextStatusLabel = () => {
+    const nextStatus = getNextStatus();
+    const statusLabels = {
+      confirmed: 'تأكيد الطلب',
+      preparing: 'بدء التجهيز',
+      ready: 'جاهز للشحن',
+      shipped: 'شحن الطلب',
+      delivered: 'تم التسليم'
+    };
+    return nextStatus ? statusLabels[nextStatus as keyof typeof statusLabels] : '';
+  };
+
+  const handleNextStatus = async () => {
+    const nextStatus = getNextStatus();
+    if (!order || !nextStatus || isProcessingOrder) return;
     
     try {
       setIsProcessingOrder(true);
       
-      if (selectedStatus === 'delivered' && order.status !== 'delivered') {
+      if (nextStatus === 'delivered' && order.status !== 'delivered') {
         if (order.customer_name || order.customer_phone) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
@@ -79,23 +98,18 @@ export default function OrderDetails() {
             continue;
           }
           
-          // Calculate new quantity based on whether it's a bulk product
           let quantityToDeduct = item.quantity;
           
-          // If the item's barcode matches the product's bulk_barcode, handle it as bulk
           if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
             quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
           }
           
-          // Handle weight-based products by ensuring integer storage
           let newQuantity: number;
           
           if (item.is_weight_based || product.barcode_type === 'scale') {
-            // For weight-based products, ensure we're working with integers
             const currentQuantity = Math.floor(product.quantity || 0);
             newQuantity = Math.max(0, currentQuantity - Math.floor(quantityToDeduct));
           } else {
-            // For regular products
             newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
           }
           
@@ -123,11 +137,21 @@ export default function OrderDetails() {
         }
       }
       
-      await originalHandleStatusChange();
-      toast.success("تم تحديث حالة الطلب وتحديث المخزون بنجاح");
+      const { error } = await supabase
+        .from('online_orders')
+        .update({ 
+          status: nextStatus as Order['status'],
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', order.id);
+      
+      if (error) throw error;
+      
+      toast.success(`تم تحديث حالة الطلب إلى ${getNextStatusLabel()}`);
+      fetchOrder();
       
     } catch (error) {
-      console.error('Error processing order completion:', error);
+      console.error('Error processing order:', error);
       toast.error("حدث خطأ أثناء معالجة الطلب");
     } finally {
       setIsProcessingOrder(false);
@@ -231,13 +255,17 @@ export default function OrderDetails() {
               <OrderStatusProgress status={order?.status || 'pending'} />
             </div>
             
-            <OrderStatusSelection
-              selectedStatus={selectedStatus}
-              onStatusSelect={setSelectedStatus}
-              onStatusConfirm={handleStatusChange}
-              currentStatus={order?.status}
-              isUpdating={isUpdatingStatus || isProcessingOrder}
-            />
+            {/* Next Status Button */}
+            {order?.status !== 'delivered' && order?.status !== 'cancelled' && (
+              <Button 
+                onClick={handleNextStatus}
+                disabled={isUpdatingStatus || isProcessingOrder}
+                className="w-full"
+                size="lg"
+              >
+                {isUpdatingStatus || isProcessingOrder ? 'جاري المعالجة...' : getNextStatusLabel()}
+              </Button>
+            )}
           </div>
           <Button variant="outline" onClick={() => navigate('/online-orders')}>
             عودة
