@@ -133,7 +133,7 @@ export interface OnlineOrder {
   created_at: string;
   customer_id?: string;
   total: number;
-  status: 'waiting' | 'ready' | 'shipped' | 'delivered';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'shipped' | 'delivered' | 'cancelled';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   items: CartItem[];
   payment_method?: string;
@@ -231,7 +231,7 @@ export interface Order {
   id: string;
   created_at: string;
   total: number;
-  status: 'waiting' | 'ready' | 'shipped' | 'done' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'shipped' | 'delivered' | 'cancelled';
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   payment_method: string;
   shipping_address?: string;

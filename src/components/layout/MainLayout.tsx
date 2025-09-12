@@ -36,7 +36,7 @@ export default function MainLayout({
         } = await supabase.from('online_orders').select('*', {
           count: 'exact',
           head: true
-        }).eq('status', 'waiting');
+        }).eq('status', 'pending');
         if (error) throw error;
         setUnreadOrders(count || 0);
       } catch (error) {
@@ -55,7 +55,7 @@ export default function MainLayout({
     const fetchCounts = async () => {
       try {
         const [ordersRes, returnsRes] = await Promise.all([
-          supabase.from('online_orders').select('*', { count: 'exact', head: true }).eq('status', 'waiting'),
+          supabase.from('online_orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
           supabase.from('returns').select('*', { count: 'exact', head: true }).eq('status', 'pending')
         ]);
         if (ordersRes.error) console.error('Error counting waiting orders:', ordersRes.error);

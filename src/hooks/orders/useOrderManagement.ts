@@ -52,9 +52,9 @@ export const useOrderManagement = (activeTab: string) => {
   const fetchPendingOrdersCount = async () => {
     try {
       const { count, error } = await supabase
-        .from('online_orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'waiting');
+      .from('online_orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
       
       if (error) throw error;
       
@@ -102,9 +102,9 @@ export const useOrderManagement = (activeTab: string) => {
       }, payload => {
         console.log("Order updated:", payload);
         const newStatus = payload.new?.status;
-        if (newStatus === 'waiting') {
+        if (newStatus === 'pending') {
           toast.info("تحديث الطلب", {
-            description: "تم تحديث طلب إلى حالة الانتظار"
+            description: "تم تحديث طلب إلى حالة المراجعة"
           });
         }
         fetchOrders();
@@ -129,8 +129,8 @@ export const useOrderManagement = (activeTab: string) => {
   };
 
   const validateOrderStatus = (status: string): Order['status'] => {
-    const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done', 'cancelled'];
-    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
+    const validStatuses: Order['status'][] = ['pending', 'confirmed', 'preparing', 'ready', 'shipped', 'delivered', 'cancelled'];
+    return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
   };
 
   const validatePaymentStatus = (status: string): Order['payment_status'] => {
@@ -161,13 +161,13 @@ export const useOrderManagement = (activeTab: string) => {
         });
       
       if (activeTab === "waiting") {
-        query = query.eq('status', 'waiting');
+        query = query.eq('status', 'pending');
       } else if (activeTab === "ready") {
         query = query.eq('status', 'ready');
       } else if (activeTab === "shipped") {
         query = query.eq('status', 'shipped');
       } else if (activeTab === "done") {
-        query = query.eq('status', 'done');
+        query = query.eq('status', 'delivered');
       } else if (activeTab === "cancelled") {
         query = query.eq('status', 'cancelled');
       } else if (activeTab === "unpaid") {

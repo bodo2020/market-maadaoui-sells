@@ -48,8 +48,8 @@ export function useOrderDetails(orderId: string) {
       
       if (data) {
         const validateOrderStatus = (status: string): Order['status'] => {
-          const validStatuses: Order['status'][] = ['waiting', 'ready', 'shipped', 'done', 'cancelled'];
-          return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'waiting';
+          const validStatuses: Order['status'][] = ['pending', 'confirmed', 'preparing', 'ready', 'shipped', 'delivered', 'cancelled'];
+          return validStatuses.includes(status as Order['status']) ? status as Order['status'] : 'pending';
         };
         
         const validatePaymentStatus = (status: string): Order['payment_status'] => {

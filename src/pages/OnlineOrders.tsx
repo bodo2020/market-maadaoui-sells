@@ -82,7 +82,7 @@ export default function OnlineOrders() {
       const {
         error
       } = await supabase.from('online_orders').update({
-        status: 'done',
+        status: 'delivered',
         updated_at: new Date().toISOString()
       }).eq('id', order.id);
       if (error) throw error;

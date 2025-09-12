@@ -1383,6 +1383,44 @@ export type Database = {
           },
         ]
       }
+      order_status_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          id: string
+          new_status: Database["public"]["Enums"]["order_status"]
+          notes: string | null
+          old_status: Database["public"]["Enums"]["order_status"] | null
+          order_id: string
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_status: Database["public"]["Enums"]["order_status"]
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["order_status"] | null
+          order_id: string
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_status?: Database["public"]["Enums"]["order_status"]
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["order_status"] | null
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "online_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_settings: {
         Row: {
           account_number: string | null
@@ -2622,7 +2660,14 @@ export type Database = {
     }
     Enums: {
       order_payment_status: "pending" | "paid" | "failed" | "refunded"
-      order_status: "waiting" | "ready" | "shipped" | "done" | "cancelled"
+      order_status:
+        | "pending"
+        | "confirmed"
+        | "preparing"
+        | "ready"
+        | "shipped"
+        | "delivered"
+        | "cancelled"
       register_type: "store" | "online"
       return_request_status: "pending" | "approved" | "rejected"
     }
@@ -2753,7 +2798,15 @@ export const Constants = {
   public: {
     Enums: {
       order_payment_status: ["pending", "paid", "failed", "refunded"],
-      order_status: ["waiting", "ready", "shipped", "done", "cancelled"],
+      order_status: [
+        "pending",
+        "confirmed",
+        "preparing",
+        "ready",
+        "shipped",
+        "delivered",
+        "cancelled",
+      ],
       register_type: ["store", "online"],
       return_request_status: ["pending", "approved", "rejected"],
     },

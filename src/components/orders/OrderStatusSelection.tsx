@@ -20,10 +20,13 @@ export function OrderStatusSelection({
 }: OrderStatusSelectionProps) {
   const getStatusClass = (status: Order['status']) => {
     const classes = {
-      waiting: 'ring-2 ring-amber-500 bg-amber-100 text-amber-800',
+      pending: 'ring-2 ring-amber-500 bg-amber-100 text-amber-800',
+      confirmed: 'ring-2 ring-blue-500 bg-blue-100 text-blue-800',
+      preparing: 'ring-2 ring-orange-500 bg-orange-100 text-orange-800',
       ready: 'ring-2 ring-green-500 bg-green-100 text-green-800',
-      shipped: 'ring-2 ring-blue-500 bg-blue-100 text-blue-800',
-      done: 'ring-2 ring-gray-500 bg-gray-100 text-gray-800'
+      shipped: 'ring-2 ring-purple-500 bg-purple-100 text-purple-800',
+      delivered: 'ring-2 ring-gray-500 bg-gray-100 text-gray-800',
+      cancelled: 'ring-2 ring-red-500 bg-red-100 text-red-800'
     };
     return selectedStatus === status ? classes[status] : '';
   };
@@ -32,14 +35,14 @@ export function OrderStatusSelection({
     <div className="space-y-4">
       <div className="flex gap-2">
         <button 
-          onClick={() => onStatusSelect('waiting')} 
+          onClick={() => onStatusSelect('pending')} 
           className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-            selectedStatus === 'waiting' ? getStatusClass('waiting') : 
-            currentStatus === 'waiting' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            selectedStatus === 'pending' ? getStatusClass('pending') : 
+            currentStatus === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
           }`}
-          disabled={isUpdating || currentStatus === 'waiting'}
+          disabled={isUpdating || currentStatus === 'pending'}
         >
-          في الانتظار
+          قيد المراجعة
         </button>
         <button 
           onClick={() => onStatusSelect('ready')} 
@@ -62,12 +65,12 @@ export function OrderStatusSelection({
           تم الشحن
         </button>
         <button 
-          onClick={() => onStatusSelect('done')} 
+          onClick={() => onStatusSelect('delivered')} 
           className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-            selectedStatus === 'done' ? getStatusClass('done') : 
-            currentStatus === 'done' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            selectedStatus === 'delivered' ? getStatusClass('delivered') : 
+            currentStatus === 'delivered' ? 'bg-gray-100 text-gray-800' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
           }`}
-          disabled={isUpdating || currentStatus === 'done'}
+          disabled={isUpdating || currentStatus === 'delivered'}
         >
           تم التسليم
         </button>
