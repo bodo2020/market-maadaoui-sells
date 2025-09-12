@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,9 +28,37 @@ export function ReturnOrderDialog({
   const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [itemsWithNames, setItemsWithNames] = useState<OrderItem[]>([]);
+
+  useEffect(() => {
+    const fetchProductNames = async () => {
+      if (!items.length) return;
+      
+      const productIds = items.map(item => item.product_id);
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('id, name')
+        .in('id', productIds);
+        
+      if (error) {
+        console.error('Error fetching product names:', error);
+        setItemsWithNames(items);
+        return;
+      }
+      
+      const itemsWithProductNames = items.map(item => ({
+        ...item,
+        product_name: products?.find(p => p.id === item.product_id)?.name || item.product_name || "منتج غير معروف"
+      }));
+      
+      setItemsWithNames(itemsWithProductNames);
+    };
+    
+    fetchProductNames();
+  }, [items]);
 
   const handleQuantityChange = (productId: string, quantity: number) => {
-    const originalItem = items.find(item => item.product_id === productId);
+    const originalItem = itemsWithNames.find(item => item.product_id === productId);
     if (!originalItem || quantity > originalItem.quantity) return;
     
     setSelectedItems(prev => ({
@@ -46,7 +74,7 @@ export function ReturnOrderDialog({
       const returnItems = Object.entries(selectedItems)
         .filter(([_, quantity]) => quantity > 0)
         .map(([productId, quantity]) => {
-          const item = items.find(i => i.product_id === productId);
+          const item = itemsWithNames.find(i => i.product_id === productId);
           if (!item) return null;
           return {
             product_id: productId,
@@ -153,10 +181,10 @@ export function ReturnOrderDialog({
 
         <div className="space-y-4 dir-rtl">
           <div className="space-y-4">
-            {items.map((item) => (
+            {itemsWithNames.map((item) => (
               <div key={item.product_id} className="flex items-center gap-4 border-b pb-2">
                 <div className="flex-1">
-                  <p className="font-medium">{item.product_name || 'منتج غير معروف'}</p>
+                  <p className="font-medium">{item.product_name}</p>
                   <p className="text-sm text-muted-foreground">الكمية الأصلية: {item.quantity}</p>
                   <p className="text-sm text-muted-foreground">السعر: {item.price} ج.م</p>
                 </div>
