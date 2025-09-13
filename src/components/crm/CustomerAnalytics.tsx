@@ -34,34 +34,87 @@ export function CustomerAnalytics() {
     queryFn: fetchCustomers,
   });
 
-  const { data: analytics = {}, isLoading: analyticsLoading } = useQuery({
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ["customer-analytics"],
     queryFn: fetchCustomerAnalytics,
   });
 
-  // بيانات وهمية للرسوم البيانية
-  const monthlyCustomers = [
-    { month: 'يناير', customers: 45, sales: 12500 },
-    { month: 'فبراير', customers: 52, sales: 15200 },
-    { month: 'مارس', customers: 38, sales: 9800 },
-    { month: 'أبريل', customers: 61, sales: 18900 },
-    { month: 'مايو', customers: 55, sales: 16700 },
-    { month: 'يونيو', customers: 67, sales: 21300 },
-  ];
+  // التأكد من وجود البيانات
+  const safeAnalytics = analytics || {
+    totalCustomers: 0,
+    newCustomersThisMonth: 0,
+    verifiedCustomers: 0,
+    totalSales: 0,
+    totalRevenue: 0,
+    averageOrderValue: 0,
+    conversionRate: 0
+  };
 
-  const customerSegments = [
-    { name: 'عملاء VIP', value: 25, color: '#8884d8' },
-    { name: 'عملاء منتظمين', value: 45, color: '#82ca9d' },
-    { name: 'عملاء جدد', value: 30, color: '#ffc658' },
-  ];
+  // تحضير البيانات الحقيقية للرسوم البيانية
+  const getMonthlyCustomers = () => {
+    if (!customers.length) return [];
+    
+    const monthNames = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    const monthlyData = [];
+    
+    for (let i = 0; i < 6; i++) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - (5 - i));
+      const month = date.getMonth();
+      const year = date.getFullYear();
+      
+      const monthCustomers = customers.filter(customer => {
+        const customerDate = new Date(customer.created_at);
+        return customerDate.getMonth() === month && customerDate.getFullYear() === year;
+      });
+      
+      monthlyData.push({
+        month: monthNames[month],
+        customers: monthCustomers.length,
+        sales: Math.floor(Math.random() * 20000) + 10000 // بيانات وهمية للمبيعات حتى نربطها بجدول المبيعات
+      });
+    }
+    
+    return monthlyData;
+  };
 
-  const topCustomers = [
-    { name: 'أحمد محمد', orders: 45, total: 25600, status: 'VIP' },
-    { name: 'فاطمة أحمد', orders: 38, total: 19800, status: 'منتظم' },
-    { name: 'محمد علي', orders: 42, total: 22100, status: 'VIP' },
-    { name: 'نور الدين', orders: 29, total: 15400, status: 'منتظم' },
-    { name: 'سارة حسن', orders: 33, total: 18200, status: 'منتظم' },
-  ];
+  const getCustomerSegments = () => {
+    if (!customers.length) return [
+      { name: 'عملاء VIP', value: 0, color: '#8884d8' },
+      { name: 'عملاء منتظمين', value: 0, color: '#82ca9d' },
+      { name: 'عملاء جدد', value: 0, color: '#ffc658' },
+    ];
+
+    const verifiedCustomers = customers.filter(c => c.phone_verified).length;
+    const totalCustomers = customers.length;
+    const newCustomers = customers.filter(c => {
+      const customerDate = new Date(c.created_at);
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      return customerDate > oneMonthAgo;
+    }).length;
+
+    return [
+      { name: 'عملاء موثقين', value: verifiedCustomers, color: '#8884d8' },
+      { name: 'عملاء عاديين', value: totalCustomers - verifiedCustomers - newCustomers, color: '#82ca9d' },
+      { name: 'عملاء جدد', value: newCustomers, color: '#ffc658' },
+    ];
+  };
+
+  const getTopCustomers = () => {
+    if (!customers.length) return [];
+    
+    return customers.slice(0, 5).map((customer, index) => ({
+      name: customer.name || 'عميل غير معروف',
+      orders: Math.floor(Math.random() * 50) + 1, // بيانات وهمية حتى نربطها بجدول الطلبات
+      total: Math.floor(Math.random() * 30000) + 5000,
+      status: customer.phone_verified ? 'موثق' : 'عادي'
+    }));
+  };
+
+  const monthlyCustomers = getMonthlyCustomers();
+  const customerSegments = getCustomerSegments();
+  const topCustomers = getTopCustomers();
 
   if (isLoading || analyticsLoading) {
     return <div>جاري التحميل...</div>;
@@ -75,52 +128,52 @@ export function CustomerAnalytics() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">إجمالي العملاء</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{safeAnalytics.totalCustomers}</div>
+            <p className="text-xs text-muted-foreground">
+              عدد العملاء المسجلين
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">عملاء جدد هذا الشهر</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{safeAnalytics.newCustomersThisMonth}</div>
+            <p className="text-xs text-muted-foreground">
+              عملاء مسجلين حديثاً
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">عملاء موثقين</CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{safeAnalytics.verifiedCustomers}</div>
+            <p className="text-xs text-muted-foreground">
+              عملاء موثقين بالهاتف
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">متوسط قيمة الطلب</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">385 ج.م</div>
+            <div className="text-2xl font-bold">{safeAnalytics.averageOrderValue.toFixed(0)} ج.م</div>
             <p className="text-xs text-muted-foreground">
-              +12% من الشهر الماضي
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">متوسط الطلبات شهرياً</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">4.2</div>
-            <p className="text-xs text-muted-foreground">
-              +8% من الشهر الماضي
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">معدل الاحتفاظ</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">74%</div>
-            <p className="text-xs text-muted-foreground">
-              +5% من الشهر الماضي
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">مدة حياة العميل</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">18 شهر</div>
-            <p className="text-xs text-muted-foreground">
-              +2 شهر من العام الماضي
+              متوسط قيمة الطلب الواحد
             </p>
           </CardContent>
         </Card>
