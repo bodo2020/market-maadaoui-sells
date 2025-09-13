@@ -94,6 +94,7 @@ function App() {
               <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />
               <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
               <Route path="/banners/add" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
+              <Route path="/banners/edit" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
               <Route path="/delivery-locations" element={<ProtectedRoute><DeliveryLocationsPage /></ProtectedRoute>} />
               <Route path="/delivery-locations/:id" element={<ProtectedRoute><DeliveryLocations /></ProtectedRoute>} />
               <Route path="/sales-dashboard" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
