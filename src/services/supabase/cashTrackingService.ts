@@ -161,15 +161,15 @@ export async function recordCashTransaction(
     }
 
     // Create cash tracking record
-    const record = {
+    const record: any = {
       date: new Date().toISOString().split('T')[0],
       register_type: registerType,
       opening_balance: currentBalance,
       closing_balance: newBalance,
       difference: transactionType === 'deposit' ? amount : -amount,
       notes,
-      created_by: userId,
-      branch_id: finalBranchId
+      branch_id: finalBranchId,
+      ...(userId ? { created_by: userId } : {})
     };
 
     const { data, error } = await supabase

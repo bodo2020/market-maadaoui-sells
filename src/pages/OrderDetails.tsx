@@ -209,16 +209,16 @@ export default function OrderDetails() {
       
       if (newStatus === 'paid' && order.status === 'delivered') {
         try {
-          // Get current user ID or use a system user ID
+          // Get current user ID (may be null if not authenticated)
           const { data: { user } } = await supabase.auth.getUser();
-          const userId = user?.id || null;
+          const userId = user?.id ?? null;
           
           await recordCashTransaction(
             order.total, 
             'deposit', 
             RegisterType.ONLINE, 
             `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-            userId || 'system'
+            userId
           );
           console.log(`Added ${order.total} to online cash register`);
         } catch (cashError) {
