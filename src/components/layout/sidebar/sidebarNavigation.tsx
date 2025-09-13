@@ -24,6 +24,7 @@ import {
   Map,
   QrCode,
   UserCog,
+  Activity,
 } from "lucide-react";
 import { SidebarItemData, NavigationGroup } from "./types";
 
@@ -143,6 +144,11 @@ export const generalNavigation: NavigationGroup = {
       label: "المبيعات",
       href: "/sales-dashboard",
       icon: TrendingUp,
+    },
+    {
+      label: "التحليلات",
+      href: "/analytics",
+      icon: Activity,
     },
     {
       label: "المالية",

@@ -133,17 +133,9 @@ export function EnhancedCRM() {
           <CustomerInteractions />
         </TabsContent>
 
-        <TabsContent value="leads" className="space-y-4">
-          <LeadsManagement />
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-4">
-          <ProductAnalytics />
-        </TabsContent>
-
-        <TabsContent value="heatmap" className="space-y-4">
-          <OrderHeatmap />
-        </TabsContent>
+          <TabsContent value="leads" className="space-y-4">
+            <LeadsManagement />
+          </TabsContent>
       </Tabs>
     </div>
   );

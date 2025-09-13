@@ -37,6 +37,7 @@ import EditProductCollection from "@/pages/EditProductCollection";
 import Returns from "@/pages/Returns";
 import CustomerProfile from "@/pages/CustomerProfile";
 import CRM from "@/pages/CRM";
+import Analytics from "@/pages/Analytics";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
 import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
 
@@ -88,6 +89,7 @@ function App() {
               <Route path="/customer-profile/:customerId" element={<ProtectedRoute><CustomerProfile /></ProtectedRoute>} />
               <Route path="/suppliers-customers" element={<ProtectedRoute><SuppliersCustomers /></ProtectedRoute>} />
               <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
+              <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
               <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />
               <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
