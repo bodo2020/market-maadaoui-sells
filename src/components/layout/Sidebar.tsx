@@ -72,7 +72,7 @@ export default function Sidebar({
   // Original desktop sidebar with vertical scrolling
   return (
     <div className={cn(
-      "border-l bg-white h-screen flex flex-col transition-all duration-300",
+      "border-l bg-white h-full flex flex-col transition-all duration-300 fixed left-0 top-0 z-40 md:static md:z-auto",
       collapsed ? "w-20" : "w-64"
     )}>
       <SidebarLogo collapsed={collapsed} toggleSidebar={toggleSidebar} />

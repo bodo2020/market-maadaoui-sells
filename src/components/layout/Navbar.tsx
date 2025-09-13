@@ -83,7 +83,7 @@ export default function Navbar() {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <header className="border-b bg-white py-3 px-6 flex items-center justify-between">
+    <header className="border-b bg-white py-3 px-6 flex items-center justify-between sticky top-0 z-30 min-h-[60px]">
       <div className="flex items-center">
         <h2 className="text-lg font-medium">لوحة التحكم</h2>
       </div>

@@ -104,7 +104,7 @@ export default function MainLayout({
     setShowMobileSidebar(!showMobileSidebar);
   };
   return <TooltipProvider>
-      <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row fixed inset-0 overflow-hidden">
         {/* Mobile Menu Button - Only visible on mobile */}
         {isMobile && <div className="fixed top-2 right-2 z-50">
             <Button variant="outline" size="icon" className="bg-white shadow-md" onClick={toggleMobileSidebar}>
@@ -116,9 +116,9 @@ export default function MainLayout({
         {/* Sidebar - visible on desktop or when toggled on mobile */}
         <Sidebar isMobile={isMobile} showMobileSidebar={showMobileSidebar} toggleMobileSidebar={toggleMobileSidebar} />
         
-        <div className="flex-1 flex flex-col w-full">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <Navbar />
-          <main className="flex-1 p-3 md:p-6 rounded-lg px-0 py-[2px]">{children}</main>
+          <main className="flex-1 overflow-auto p-3 md:p-6">{children}</main>
         </div>
       </div>
     </TooltipProvider>;
