@@ -54,8 +54,8 @@ export const mainNavigation: NavigationGroup = {
   ],
 };
 
-export const adminNavigation: NavigationGroup = {
-  title: "الإدارة",
+export const productsNavigation: NavigationGroup = {
+  title: "المنتجات والمخزون",
   items: [
     {
       label: "المنتجات",
@@ -93,38 +93,6 @@ export const adminNavigation: NavigationGroup = {
       icon: Truck,
     },
     {
-      label: "العملاء والموردين",
-      href: "/suppliers-customers",
-      icon: Users,
-    },
-    {
-      label: "إدارة العملاء (CRM)",
-      href: "/crm",
-      icon: UserCog,
-    },
-    {
-      label: "إدارة الموظفين",
-      href: "/employees",
-      icon: UserCheck,
-      adminOnly: true,
-    },
-    {
-      label: "تتبع النقدية",
-      href: "/cash-tracking",
-      icon: Wallet,
-      adminOnly: true,
-    },
-    {
-      label: "الإعلانات",
-      href: "/banners",
-      icon: Image,
-    },
-    {
-      label: "أماكن التوصيل",
-      href: "/delivery-locations",
-      icon: MapPin,
-    },
-    {
       label: "مجموعات المنتجات",
       href: "/product-collections",
       icon: FolderOpen,
@@ -137,13 +105,39 @@ export const adminNavigation: NavigationGroup = {
   ],
 };
 
-export const generalNavigation: NavigationGroup = {
-  title: "عام",
+export const customersNavigation: NavigationGroup = {
+  title: "العملاء والتوصيل",
   items: [
     {
-      label: "المبيعات",
-      href: "/sales-dashboard",
-      icon: TrendingUp,
+      label: "العملاء والموردين",
+      href: "/suppliers-customers",
+      icon: Users,
+    },
+    {
+      label: "إدارة العملاء (CRM)",
+      href: "/crm",
+      icon: UserCog,
+    },
+    {
+      label: "أماكن التوصيل",
+      href: "/delivery-locations",
+      icon: MapPin,
+    },
+    {
+      label: "الإعلانات",
+      href: "/banners",
+      icon: Image,
+    },
+  ],
+};
+
+export const financeNavigation: NavigationGroup = {
+  title: "المالية والتحليلات",
+  items: [
+    {
+      label: "المالية",
+      href: "/finance",
+      icon: DollarSign,
     },
     {
       label: "التحليلات",
@@ -151,14 +145,32 @@ export const generalNavigation: NavigationGroup = {
       icon: Activity,
     },
     {
-      label: "المالية",
-      href: "/finance",
-      icon: DollarSign,
+      label: "المبيعات",
+      href: "/sales-dashboard",
+      icon: TrendingUp,
+    },
+    {
+      label: "تتبع النقدية",
+      href: "/cash-tracking",
+      icon: Wallet,
+      adminOnly: true,
     },
     {
       label: "المرتجعات",
       href: "/returns",
       icon: RefreshCw,
+    },
+  ],
+};
+
+export const adminNavigation: NavigationGroup = {
+  title: "الإدارة والإعدادات",
+  items: [
+    {
+      label: "إدارة الموظفين",
+      href: "/employees",
+      icon: UserCheck,
+      adminOnly: true,
     },
     {
       label: "الإعدادات",

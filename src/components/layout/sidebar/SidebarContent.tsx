@@ -3,7 +3,13 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { SidebarItem } from "./SidebarItem";
-import { mainNavigation, adminNavigation, generalNavigation } from "./sidebarNavigation";
+import { 
+  mainNavigation, 
+  productsNavigation, 
+  customersNavigation, 
+  financeNavigation, 
+  adminNavigation 
+} from "./sidebarNavigation";
 import { SidebarItemData } from "./types";
 import { UserRole } from "@/types";
 
@@ -69,11 +75,34 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
     });
   };
 
+  const renderSection = (title: string, items: SidebarItemData[]) => {
+    const renderedItems = renderItems(items).filter(item => item !== null);
+    
+    if (renderedItems.length === 0) return null;
+    
+    return (
+      <div className="space-y-1">
+        {!collapsed && (
+          <div className="px-4 py-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              {title}
+            </h3>
+          </div>
+        )}
+        <div className="space-y-1">
+          {renderedItems}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="flex-1 space-y-1 px-0 overflow-y-auto">
-      {renderItems(mainNavigation.items)}
-      {(isAdmin || isSuperAdmin) && renderItems(adminNavigation.items)}
-      {renderItems(generalNavigation.items)}
+    <div className="flex-1 space-y-4 px-0 py-2 overflow-y-auto">
+      {renderSection(mainNavigation.title, mainNavigation.items)}
+      {(isAdmin || isSuperAdmin) && renderSection(productsNavigation.title, productsNavigation.items)}
+      {renderSection(customersNavigation.title, customersNavigation.items)}
+      {renderSection(financeNavigation.title, financeNavigation.items)}
+      {(isAdmin || isSuperAdmin) && renderSection(adminNavigation.title, adminNavigation.items)}
     </div>
   );
 }
