@@ -236,13 +236,23 @@ export default function AddBanner() {
         return false;
       }
       
+      // Filter by category if selected
+      if (formData.category_id && product.main_category_id !== formData.category_id) {
+        return false;
+      }
+      
+      // Filter by company if selected
+      if (formData.company_id && product.company_id !== formData.company_id) {
+        return false;
+      }
+      
       if (searchTerm) {
         return product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
       }
       return true;
     });
-  }, [products, selectedProducts, searchTerm]);
+  }, [products, selectedProducts, searchTerm, formData.category_id, formData.company_id]);
 
   const uploadImage = async (file: File): Promise<string> => {
     setUploading(true);
