@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { fetchSales } from "@/services/supabase/saleService";
 import { fetchProducts } from "@/services/supabase/productService";
+import { supabase } from "@/integrations/supabase/client";
 import { CartItem, Product, Sale } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -70,6 +71,20 @@ export default function Dashboard() {
     queryFn: () => fetchSales()
   });
 
+  const { data: onlineOrders, isLoading: onlineOrdersLoading } = useQuery({
+    queryKey: ['onlineOrders'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('online_orders')
+        .select('id, total, created_at, status, payment_status')
+        .eq('status', 'delivered')
+        .eq('payment_status', 'paid');
+      
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ['products'],
     queryFn: fetchProducts
@@ -81,8 +96,17 @@ export default function Dashboard() {
     return saleDate.getTime() === today.getTime();
   }) || [];
   
-  const totalSalesToday = todaySales.reduce((sum, sale) => sum + sale.total, 0);
+  const todayOnlineOrders = onlineOrders?.filter(order => {
+    const orderDate = new Date(order.created_at);
+    orderDate.setHours(0, 0, 0, 0);
+    return orderDate.getTime() === today.getTime();
+  }) || [];
+  
+  const totalSalesToday = todaySales.reduce((sum, sale) => sum + sale.total, 0) + 
+                         todayOnlineOrders.reduce((sum, order) => sum + order.total, 0);
   const totalProfitToday = todaySales.reduce((sum, sale) => sum + sale.profit, 0);
+  
+  const totalTransactionsToday = todaySales.length + todayOnlineOrders.length;
   
   const lowStockProducts = products?.filter(product => product.quantity <= 5) || [];
   
@@ -128,8 +152,8 @@ export default function Dashboard() {
   const adminStats = [
     {
       title: "إجمالي المبيعات اليوم",
-      value: salesLoading ? `${siteConfig.currency} ...` : formatCurrency(totalSalesToday),
-      description: `${todaySales.length} معاملة اليوم`,
+      value: (salesLoading || onlineOrdersLoading) ? `${siteConfig.currency} ...` : formatCurrency(totalSalesToday),
+      description: `${totalTransactionsToday} معاملة اليوم (متجر + إلكتروني)`,
       icon: <ShoppingCart size={16} />,
       trend: "up" as const,
       trendValue: "15% من الأمس"
@@ -163,8 +187,8 @@ export default function Dashboard() {
   const cashierStats = [
     {
       title: "إجمالي المبيعات اليوم",
-      value: salesLoading ? `${siteConfig.currency} ...` : formatCurrency(totalSalesToday),
-      description: `${todaySales.length} معاملة اليوم`,
+      value: (salesLoading || onlineOrdersLoading) ? `${siteConfig.currency} ...` : formatCurrency(totalSalesToday),
+      description: `${totalTransactionsToday} معاملة اليوم (متجر + إلكتروني)`,
       icon: <ShoppingCart size={16} />,
       trend: "up" as const,
       trendValue: "15% من الأمس"
