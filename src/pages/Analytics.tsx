@@ -1,9 +1,10 @@
 import MainLayout from "@/components/layout/MainLayout";
+import { ProductAnalytics } from "@/components/crm/ProductAnalytics";
 import { CustomerAnalytics } from "@/components/crm/CustomerAnalytics";
 import { OrderHeatmap } from "@/components/crm/OrderHeatmap";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Activity } from "lucide-react";
+import { BarChart3, Activity, Package } from "lucide-react";
 
 export default function Analytics() {
   return (
@@ -13,13 +14,17 @@ export default function Analytics() {
           <div>
             <h1 className="text-3xl font-bold">التحليلات</h1>
             <p className="text-muted-foreground mt-2">
-              تحليلات العملاء والطلبات وإحصائيات المبيعات
+              تحليلات شاملة للمبيعات والعملاء والطلبات
             </p>
           </div>
         </div>
 
-        <Tabs defaultValue="customer-analytics" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue="product-analytics" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="product-analytics" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              تحليلات المنتجات
+            </TabsTrigger>
             <TabsTrigger value="customer-analytics" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               تحليلات العملاء
@@ -29,6 +34,20 @@ export default function Analytics() {
               خريطة الطلبات
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="product-analytics" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>تحليلات المنتجات والمبيعات</CardTitle>
+                <CardDescription>
+                  إحصائيات شاملة عن أداء المنتجات والفئات
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ProductAnalytics />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="customer-analytics" className="space-y-4">
             <Card>
