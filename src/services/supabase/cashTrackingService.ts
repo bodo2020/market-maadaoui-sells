@@ -122,7 +122,7 @@ export async function recordCashTransaction(
   transactionType: 'deposit' | 'withdrawal',
   registerType: RegisterType,
   notes: string,
-  userId: string,
+  userId: string | null,
   branchId?: string
 ) {
   try {
