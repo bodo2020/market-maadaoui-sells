@@ -14,39 +14,25 @@ import { ProductAnalytics } from "./ProductAnalytics";
 import { OrderHeatmap } from "./OrderHeatmap";
 import { fetchCustomers } from "@/services/supabase/customerService";
 import { fetchCustomerAnalytics } from "@/services/supabase/crmService";
-import { 
-  Users, 
-  Search, 
-  Plus, 
-  Filter, 
-  BarChart3, 
-  MessageSquare,
-  Target,
-  Download
-} from "lucide-react";
-
+import { Users, Search, Plus, Filter, BarChart3, MessageSquare, Target, Download } from "lucide-react";
 export function EnhancedCRM() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
-
-  const { data: customers = [], isLoading } = useQuery({
+  const {
+    data: customers = [],
+    isLoading
+  } = useQuery({
     queryKey: ["customers"],
-    queryFn: fetchCustomers,
+    queryFn: fetchCustomers
   });
-
-  const { data: analytics } = useQuery({
+  const {
+    data: analytics
+  } = useQuery({
     queryKey: ["customer-analytics"],
-    queryFn: fetchCustomerAnalytics,
+    queryFn: fetchCustomerAnalytics
   });
-
-  const filteredCustomers = customers.filter(customer =>
-    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (customer.phone && customer.phone.includes(searchTerm)) ||
-    (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  return (
-    <div className="space-y-6">
+  const filteredCustomers = customers.filter(customer => customer.name.toLowerCase().includes(searchTerm.toLowerCase()) || customer.phone && customer.phone.includes(searchTerm) || customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()));
+  return <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -79,12 +65,7 @@ export function EnhancedCRM() {
         <CardContent className="pt-6">
           <div className="flex items-center space-x-2">
             <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="ابحث عن عميل بالاسم أو رقم الهاتف أو البريد الإلكتروني..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
-            />
+            <Input placeholder="ابحث عن عميل بالاسم أو رقم الهاتف أو البريد الإلكتروني..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="max-w-sm" />
             <Badge variant="secondary" className="mr-2">
               {searchTerm ? `${filteredCustomers.length} نتيجة` : `${customers.length} عميل`}
             </Badge>
@@ -111,14 +92,8 @@ export function EnhancedCRM() {
             <Target className="h-4 w-4" />
             العملاء المحتملين
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            التحليلات
-          </TabsTrigger>
-          <TabsTrigger value="heatmap" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            خريطة الطلبات
-          </TabsTrigger>
+          
+          
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
@@ -137,6 +112,5 @@ export function EnhancedCRM() {
             <LeadsManagement />
           </TabsContent>
       </Tabs>
-    </div>
-  );
+    </div>;
 }
