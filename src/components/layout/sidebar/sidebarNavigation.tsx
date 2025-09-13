@@ -114,6 +114,11 @@ export const customersNavigation: NavigationGroup = {
       icon: Users,
     },
     {
+      label: "سلات العملاء",
+      href: "/customer-carts",
+      icon: ShoppingCart,
+    },
+    {
       label: "إدارة العملاء (CRM)",
       href: "/crm",
       icon: UserCog,

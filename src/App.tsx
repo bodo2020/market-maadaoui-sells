@@ -40,6 +40,7 @@ import CRM from "@/pages/CRM";
 import Analytics from "@/pages/Analytics";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
 import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
+import CustomerCartsPage from "@/pages/CustomerCartsPage";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
@@ -88,6 +89,7 @@ function App() {
               <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
               <Route path="/customer-profile/:customerId" element={<ProtectedRoute><CustomerProfile /></ProtectedRoute>} />
               <Route path="/suppliers-customers" element={<ProtectedRoute><SuppliersCustomers /></ProtectedRoute>} />
+              <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
               <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />

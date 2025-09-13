@@ -1,7 +1,8 @@
 
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
+import { fetchCustomerCarts, clearCustomerCart, removeCartItem, CustomerCart } from "@/services/supabase/customerCartService";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -15,65 +16,70 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, ShoppingCart, Calendar, User, Phone, Tag } from "lucide-react";
-
-// Mock data for customer carts
-const mockCustomerCarts = [
-  {
-    id: '1',
-    user_id: 'u1',
-    user_name: 'أحمد محمد',
-    user_phone: '0123456789',
-    items: [
-      { id: 'p1', name: 'منتج 1', price: 150, quantity: 2, total: 300 },
-      { id: 'p2', name: 'منتج 2', price: 75, quantity: 1, total: 75 },
-    ],
-    total: 375,
-    last_updated: '2023-05-15T14:30:00',
-    items_count: 2
-  },
-  {
-    id: '2',
-    user_id: 'u2',
-    user_name: 'سارة أحمد',
-    user_phone: '0123456790',
-    items: [
-      { id: 'p3', name: 'منتج 3', price: 200, quantity: 1, total: 200 },
-      { id: 'p4', name: 'منتج 4', price: 50, quantity: 3, total: 150 },
-      { id: 'p5', name: 'منتج 5', price: 120, quantity: 1, total: 120 },
-    ],
-    total: 470,
-    last_updated: '2023-05-16T09:15:00',
-    items_count: 3
-  },
-  {
-    id: '3',
-    user_id: 'u3',
-    user_name: 'محمد علي',
-    user_phone: '0123456791',
-    items: [
-      { id: 'p1', name: 'منتج 1', price: 150, quantity: 1, total: 150 },
-    ],
-    total: 150,
-    last_updated: '2023-05-16T10:45:00',
-    items_count: 1
-  },
-];
+import { Search, ShoppingCart, Calendar, User, Phone, Tag, Trash2, MessageCircle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function CustomerCartsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCart, setSelectedCart] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  // Fetch customer carts
+  const { data: customerCarts = [], isLoading, error } = useQuery({
+    queryKey: ['customer-carts'],
+    queryFn: fetchCustomerCarts,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Clear cart mutation
+  const clearCartMutation = useMutation({
+    mutationFn: clearCustomerCart,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-carts'] });
+      setSelectedCart(null);
+      toast.success("تم حذف السلة بنجاح");
+    },
+    onError: (error) => {
+      console.error("Error clearing cart:", error);
+      toast.error("حدث خطأ في حذف السلة");
+    },
+  });
+
+  // Remove item mutation
+  const removeItemMutation = useMutation({
+    mutationFn: removeCartItem,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-carts'] });
+      toast.success("تم حذف المنتج من السلة");
+    },
+    onError: (error) => {
+      console.error("Error removing item:", error);
+      toast.error("حدث خطأ في حذف المنتج");
+    },
+  });
 
   // Filter carts based on search term
-  const filteredCarts = mockCustomerCarts.filter(cart => 
-    cart.user_name.includes(searchTerm) || 
-    cart.user_phone.includes(searchTerm)
+  const filteredCarts = customerCarts.filter(cart => 
+    cart.customer_name.includes(searchTerm) || 
+    (cart.customer_phone && cart.customer_phone.includes(searchTerm))
   );
 
   // Get the selected cart details
   const selectedCartDetails = selectedCart 
-    ? mockCustomerCarts.find(cart => cart.id === selectedCart) 
+    ? customerCarts.find(cart => cart.customer_id === selectedCart) 
     : null;
+
+  const handleClearCart = (customerId: string) => {
+    if (window.confirm("هل أنت متأكد من حذف السلة بالكامل؟")) {
+      clearCartMutation.mutate(customerId);
+    }
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    if (window.confirm("هل أنت متأكد من حذف هذا المنتج من السلة؟")) {
+      removeItemMutation.mutate(itemId);
+    }
+  };
 
   return (
     <MainLayout>
@@ -105,7 +111,16 @@ export default function CustomerCartsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {filteredCarts.length === 0 ? (
+                  {isLoading ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <div className="animate-spin mx-auto h-8 w-8 border-2 border-primary border-t-transparent rounded-full mb-2" />
+                      <p>جاري تحميل السلات...</p>
+                    </div>
+                  ) : error ? (
+                    <div className="text-center py-8 text-red-500">
+                      <p>حدث خطأ في تحميل السلات</p>
+                    </div>
+                  ) : filteredCarts.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <ShoppingCart className="mx-auto h-12 w-12 opacity-20 mb-2" />
                       <p>لا توجد سلات تسوق نشطة</p>
@@ -113,27 +128,27 @@ export default function CustomerCartsPage() {
                   ) : (
                     filteredCarts.map(cart => (
                       <div 
-                        key={cart.id} 
+                        key={cart.customer_id} 
                         className={`p-3 border rounded-lg cursor-pointer transition-colors flex justify-between items-center ${
-                          selectedCart === cart.id ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
+                          selectedCart === cart.customer_id ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
                         }`}
-                        onClick={() => setSelectedCart(cart.id)}
+                        onClick={() => setSelectedCart(cart.customer_id)}
                       >
                         <div className="flex items-center gap-3">
                           <Avatar>
-                            <AvatarFallback>{cart.user_name.slice(0, 2)}</AvatarFallback>
+                            <AvatarFallback>{cart.customer_name.slice(0, 2)}</AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-medium">{cart.user_name}</div>
+                            <div className="font-medium">{cart.customer_name}</div>
                             <div className="text-sm text-muted-foreground flex items-center gap-1">
                               <Phone className="h-3 w-3" />
-                              {cart.user_phone}
+                              {cart.customer_phone || 'غير محدد'}
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <Badge className="mb-1">{cart.items_count} منتج</Badge>
-                          <div className="text-sm font-medium">{cart.total} ج.م</div>
+                          <Badge className="mb-1">{cart.total_items} منتج</Badge>
+                          <div className="text-sm font-medium">{cart.total_value.toFixed(2)} ج.م</div>
                         </div>
                       </div>
                     ))
@@ -154,7 +169,7 @@ export default function CustomerCartsPage() {
                         تفاصيل السلة
                       </CardTitle>
                       <CardDescription>
-                        تفاصيل سلة {selectedCartDetails.user_name}
+                        تفاصيل سلة {selectedCartDetails.customer_name}
                       </CardDescription>
                     </div>
                     <div className="text-left">
@@ -166,8 +181,18 @@ export default function CustomerCartsPage() {
                       </div>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <User className="h-4 w-4" />
-                        <span>{selectedCartDetails.user_name}</span>
+                        <span>{selectedCartDetails.customer_name}</span>
                       </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleClearCart(selectedCartDetails.customer_id)}
+                        className="mt-2"
+                        disabled={clearCartMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 ml-1" />
+                        حذف السلة
+                      </Button>
                     </div>
                   </div>
                 </CardHeader>
@@ -178,16 +203,33 @@ export default function CustomerCartsPage() {
                         <TableHead>المنتج</TableHead>
                         <TableHead className="text-center">الكمية</TableHead>
                         <TableHead className="text-center">السعر</TableHead>
-                        <TableHead className="text-left">المجموع</TableHead>
+                        <TableHead className="text-center">المجموع</TableHead>
+                        <TableHead className="text-center">إجراءات</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {selectedCartDetails.items.map(item => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell className="font-medium">
+                            {item.product?.name || 'منتج غير معروف'}
+                          </TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
-                          <TableCell className="text-center">{item.price} ج.م</TableCell>
-                          <TableCell className="text-left">{item.total} ج.م</TableCell>
+                          <TableCell className="text-center">
+                            {item.product?.price?.toFixed(2) || '0.00'} ج.م
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {((item.product?.price || 0) * item.quantity).toFixed(2)} ج.م
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveItem(item.id)}
+                              disabled={removeItemMutation.isPending}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -196,7 +238,11 @@ export default function CustomerCartsPage() {
                   <div className="mt-6 border-t pt-4">
                     <div className="flex justify-between text-lg font-medium">
                       <span>إجمالي السلة:</span>
-                      <span>{selectedCartDetails.total} ج.م</span>
+                      <span>{selectedCartDetails.total_value.toFixed(2)} ج.م</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                      <span>عدد المنتجات:</span>
+                      <span>{selectedCartDetails.total_items} منتج</span>
                     </div>
                   </div>
                   
@@ -205,10 +251,12 @@ export default function CustomerCartsPage() {
                       <Tag className="ml-2 h-4 w-4" />
                       إرسال تخفيض خاص
                     </Button>
-                    <Button>
-                      <Phone className="ml-2 h-4 w-4" />
-                      الاتصال بالعميل
-                    </Button>
+                    {selectedCartDetails.customer_phone && (
+                      <Button>
+                        <MessageCircle className="ml-2 h-4 w-4" />
+                        إرسال رسالة للعميل
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
