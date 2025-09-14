@@ -78,6 +78,8 @@ export async function createPurchase(purchaseData: any) {
 
     // Then add items to the purchase_items table if they were provided
     if (purchaseData.items && purchaseData.items.length > 0) {
+      console.log("Purchase items to insert:", purchaseData.items);
+      
       const purchaseItems = purchaseData.items.map((item: any) => ({
         purchase_id: purchase.id,
         product_id: item.product_id,
@@ -89,15 +91,21 @@ export async function createPurchase(purchaseData: any) {
         shelf_location: item.shelf_location || null,
         notes: item.notes || null
       }));
+      
+      console.log("Formatted purchase items:", purchaseItems);
 
-      const { error: itemsError } = await supabase
+      const { data: insertedItems, error: itemsError } = await supabase
         .from("purchase_items")
-        .insert(purchaseItems);
+        .insert(purchaseItems)
+        .select();
 
       if (itemsError) {
         console.error("Error adding purchase items:", itemsError);
+        toast.error("فشل في إضافة عناصر الفاتورة");
         // We don't return early here - we'll still update the product quantities even if
         // storing the line items fails
+      } else {
+        console.log("Successfully inserted purchase items:", insertedItems);
       }
 
       // Update product quantities and purchase prices
@@ -281,10 +289,12 @@ export async function getPurchaseWithItems(id: string) {
       toast.error("فشل في جلب عناصر فاتورة الشراء");
       return null;
     }
+    
+    console.log(`Found ${items?.length || 0} items for purchase ${id}:`, items);
 
     return {
       ...purchase,
-      items: items
+      items: items || []
     };
   } catch (error) {
     console.error("Unexpected error fetching purchase with items:", error);

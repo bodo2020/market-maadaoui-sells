@@ -462,6 +462,8 @@ const Invoices = () => {
                     <tr>
                       <td colSpan={4} className="p-4 text-center text-gray-500">
                         لا توجد منتجات مسجلة لهذه الفاتورة
+                        <br />
+                        <small className="text-xs">هذه الفاتورة قد تكون تم إنشاؤها قبل تحديث النظام</small>
                       </td>
                     </tr>
                   )}
