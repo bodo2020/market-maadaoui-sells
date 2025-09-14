@@ -113,8 +113,15 @@ export default function Purchases() {
       return;
     }
     
+    // Calculate total from purchase items
+    const calculatedTotal = purchaseItems.reduce((sum, item) => 
+      sum + (item.quantity * item.price), 0
+    );
+    
     createPurchaseMutation.mutate({
       ...formData,
+      total: calculatedTotal,
+      items: purchaseItems,
       invoice_file: invoiceFile
     });
   };
@@ -125,8 +132,16 @@ export default function Purchases() {
     }
   };
   
-  const handleViewPurchase = (purchase: Purchase) => {
-    setSelectedPurchase(purchase);
+  const handleViewPurchase = async (purchase: Purchase) => {
+    // Fetch purchase with items details
+    const { getPurchaseWithItems } = await import("@/services/supabase/purchaseService");
+    const purchaseWithItems = await getPurchaseWithItems(purchase.id);
+    
+    if (purchaseWithItems) {
+      setSelectedPurchase(purchaseWithItems);
+    } else {
+      setSelectedPurchase(purchase);
+    }
     setIsViewDialogOpen(true);
   };
   
@@ -447,6 +462,54 @@ export default function Purchases() {
                 <div className="space-y-1">
                   <Label className="text-muted-foreground">وصف</Label>
                   <p>{selectedPurchase.description}</p>
+                </div>
+              )}
+              
+              {/* Purchase Items */}
+              {selectedPurchase.items && selectedPurchase.items.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">المنتجات المشتراة</Label>
+                  <div className="border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>المنتج</TableHead>
+                          <TableHead>الكمية</TableHead>
+                          <TableHead>السعر</TableHead>
+                          <TableHead>المجموع</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedPurchase.items.map((item: any, index: number) => (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <div>
+                                <p className="font-medium">{item.products?.name || 'منتج غير معروف'}</p>
+                                {item.batch_number && (
+                                  <p className="text-sm text-muted-foreground">
+                                    دفعة: {item.batch_number}
+                                  </p>
+                                )}
+                                {item.expiry_date && (
+                                  <p className="text-sm text-muted-foreground">
+                                    الصلاحية: {new Date(item.expiry_date).toLocaleDateString('ar-EG')}
+                                  </p>
+                                )}
+                                {item.shelf_location && (
+                                  <p className="text-sm text-muted-foreground">
+                                    الموقع: {item.shelf_location}
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell>{item.price}</TableCell>
+                            <TableCell>{item.total || (item.quantity * item.price)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               )}
               

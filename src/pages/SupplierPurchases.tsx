@@ -205,6 +205,16 @@ export default function SupplierPurchases() {
       return;
     }
     
+    // Check if products requiring expiry date have it
+    const missingExpiryProducts = cart.filter(item => 
+      item.product.track_expiry && !item.expiryDate
+    );
+    
+    if (missingExpiryProducts.length > 0) {
+      toast.error("يرجى إدخال تاريخ الصلاحية للمنتجات التي تتطلب ذلك");
+      return;
+    }
+    
     setIsConfirmDialogOpen(true);
   };
   
