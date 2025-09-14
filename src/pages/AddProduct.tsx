@@ -306,6 +306,37 @@ export default function AddProduct() {
                   onChange={(e) => setProduct((prev) => ({ ...prev, description: e.target.value }))}
                 />
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="shelf_location">موقع الرف</Label>
+                  <Input
+                    id="shelf_location"
+                    placeholder="مثال: A1, B2, C3"
+                    value={product?.shelf_location || ""}
+                    onChange={(e) => setProduct((prev) => ({ ...prev, shelf_location: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="expiry_date">تاريخ انتهاء الصلاحية</Label>
+                  <Input
+                    id="expiry_date"
+                    type="date"
+                    value={product?.expiry_date || ""}
+                    onChange={(e) => setProduct((prev) => ({ ...prev, expiry_date: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <Switch
+                  id="track-expiry"
+                  checked={product?.track_expiry || false}
+                  onCheckedChange={(checked) => setProduct((prev) => ({ ...prev, track_expiry: checked }))}
+                />
+                <Label htmlFor="track-expiry">تتبع تاريخ الصلاحية لهذا المنتج</Label>
+              </div>
             </CardContent>
           </Card>
 

@@ -75,6 +75,26 @@ export default function ProductsGrid({ products, onRefresh }: ProductsGridProps)
                   {product.quantity} وحدة
                 </Badge>
               </div>
+              {product.shelf_location && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">موقع الرف</span>
+                  <Badge variant="outline">{product.shelf_location}</Badge>
+                </div>
+              )}
+              {product.expiry_date && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">تاريخ الصلاحية</span>
+                  <Badge 
+                    variant={
+                      new Date(product.expiry_date) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) ? "destructive" :
+                      new Date(product.expiry_date) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? "secondary" : 
+                      "default"
+                    }
+                  >
+                    {new Date(product.expiry_date).toLocaleDateString('ar-EG')}
+                  </Badge>
+                </div>
+              )}
             </div>
           </CardContent>
           <CardFooter className="mt-auto p-4 pt-0">

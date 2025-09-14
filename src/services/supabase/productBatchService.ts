@@ -1,0 +1,138 @@
+import { supabase } from "@/integrations/supabase/client";
+import { ProductBatch } from "@/types";
+
+export async function fetchProductBatches(productId?: string): Promise<ProductBatch[]> {
+  try {
+    let query = supabase
+      .from("product_batches")
+      .select("*")
+      .order("expiry_date", { ascending: true });
+
+    if (productId) {
+      query = query.eq("product_id", productId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Error fetching product batches:", error);
+      throw error;
+    }
+
+    return data as ProductBatch[];
+  } catch (error) {
+    console.error("Error in fetchProductBatches:", error);
+    return [];
+  }
+}
+
+export async function createProductBatch(batch: Omit<ProductBatch, "id" | "created_at" | "updated_at">): Promise<ProductBatch> {
+  try {
+    const { data, error } = await supabase
+      .from("product_batches")
+      .insert(batch)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error creating product batch:", error);
+      throw error;
+    }
+
+    return data as ProductBatch;
+  } catch (error) {
+    console.error("Error in createProductBatch:", error);
+    throw error;
+  }
+}
+
+export async function updateProductBatch(id: string, updates: Partial<ProductBatch>): Promise<ProductBatch> {
+  try {
+    const { data, error } = await supabase
+      .from("product_batches")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating product batch:", error);
+      throw error;
+    }
+
+    return data as ProductBatch;
+  } catch (error) {
+    console.error("Error in updateProductBatch:", error);
+    throw error;
+  }
+}
+
+export async function deleteProductBatch(id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from("product_batches")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error deleting product batch:", error);
+      throw error;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error in deleteProductBatch:", error);
+    return false;
+  }
+}
+
+export async function getExpiringProducts(daysAhead: number = 7): Promise<ProductBatch[]> {
+  try {
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + daysAhead);
+
+    const { data, error } = await supabase
+      .from("product_batches")
+      .select(`
+        *,
+        products!inner(name, shelf_location)
+      `)
+      .lte("expiry_date", futureDate.toISOString().split('T')[0])
+      .gt("quantity", 0)
+      .order("expiry_date", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching expiring products:", error);
+      throw error;
+    }
+
+    return data as ProductBatch[];
+  } catch (error) {
+    console.error("Error in getExpiringProducts:", error);
+    return [];
+  }
+}
+
+export async function getProductsByShelfLocation(shelfLocation: string): Promise<ProductBatch[]> {
+  try {
+    const { data, error } = await supabase
+      .from("product_batches")
+      .select(`
+        *,
+        products!inner(name, price)
+      `)
+      .eq("shelf_location", shelfLocation)
+      .gt("quantity", 0)
+      .order("expiry_date", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching products by shelf location:", error);
+      throw error;
+    }
+
+    return data as ProductBatch[];
+  } catch (error) {
+    console.error("Error in getProductsByShelfLocation:", error);
+    return [];
+  }
+}

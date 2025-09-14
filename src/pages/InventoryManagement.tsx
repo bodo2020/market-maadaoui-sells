@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { 
   Search, 
   Plus, 
@@ -256,6 +257,7 @@ export default function InventoryManagement() {
                     <TableHead className="w-[80px]">صورة</TableHead>
                     <TableHead>المنتج</TableHead>
                     <TableHead>الباركود</TableHead>
+                    <TableHead>موقع الرف</TableHead>
                     <TableHead>المخزون الحالي</TableHead>
                     <TableHead>الإجراء</TableHead>
                   </TableRow>
@@ -274,6 +276,13 @@ export default function InventoryManagement() {
                       </TableCell>
                       <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell>{product.barcode}</TableCell>
+                      <TableCell>
+                        {product.shelf_location ? (
+                          <Badge variant="outline">{product.shelf_location}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">غير محدد</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
                           {product.quantity || 0} وحدة
@@ -348,9 +357,11 @@ export default function InventoryManagement() {
                     <TableHead className="w-[80px]">صورة</TableHead>
                     <TableHead>المنتج</TableHead>
                     <TableHead>الباركود</TableHead>
+                    <TableHead>موقع الرف</TableHead>
                     <TableHead>سعر الشراء</TableHead>
                     <TableHead>المخزون</TableHead>
                     <TableHead>القيمة</TableHead>
+                    <TableHead>تاريخ الصلاحية</TableHead>
                     <TableHead>آخر تحديث</TableHead>
                     <TableHead className="text-left">الإجراء</TableHead>
                   </TableRow>
@@ -358,7 +369,7 @@ export default function InventoryManagement() {
                 <TableBody>
                   {filteredInventory.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         لا توجد منتجات مطابقة للبحث
                       </TableCell>
                     </TableRow>
@@ -376,6 +387,13 @@ export default function InventoryManagement() {
                         </TableCell>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.barcode}</TableCell>
+                        <TableCell>
+                          {product.shelf_location ? (
+                            <Badge variant="outline">{product.shelf_location}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">غير محدد</span>
+                          )}
+                        </TableCell>
                         <TableCell>{product.purchase_price} {siteConfig.currency}</TableCell>
                          <TableCell>
                            {(() => {
@@ -414,9 +432,25 @@ export default function InventoryManagement() {
                              );
                            })()}
                          </TableCell>
-                        <TableCell>
-                          {(product.purchase_price * (product.quantity || 0)).toFixed(2)} {siteConfig.currency}
-                        </TableCell>
+                         <TableCell>
+                           {(product.purchase_price * (product.quantity || 0)).toFixed(2)} {siteConfig.currency}
+                         </TableCell>
+                         <TableCell>
+                           {product.expiry_date ? (
+                             <Badge 
+                               variant={
+                                 new Date(product.expiry_date) < new Date() ? "destructive" :
+                                 new Date(product.expiry_date) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) ? "secondary" :
+                                 new Date(product.expiry_date) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? "default" : 
+                                 "outline"
+                               }
+                             >
+                               {new Date(product.expiry_date).toLocaleDateString('ar-EG')}
+                             </Badge>
+                           ) : (
+                             <span className="text-muted-foreground text-sm">غير محدد</span>
+                           )}
+                         </TableCell>
                         <TableCell>
                           {typeof product.updated_at === 'string' 
                             ? new Date(product.updated_at).toLocaleDateString('ar-EG')

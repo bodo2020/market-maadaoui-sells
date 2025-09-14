@@ -95,6 +95,23 @@ export interface Product {
   is_bulk_scan?: boolean;
   track_inventory?: boolean;
   min_stock_level?: number;
+  expiry_date?: string | null;
+  shelf_location?: string | null;
+  track_expiry?: boolean;
+}
+
+export interface ProductBatch {
+  id: string;
+  product_id: string;
+  batch_number: string;
+  expiry_date: string;
+  quantity: number;
+  shelf_location?: string | null;
+  purchase_date?: string | null;
+  supplier_id?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CartItem {
@@ -225,6 +242,7 @@ export interface OrderItem {
   is_bulk?: boolean;
   is_weight_based?: boolean;
   bulk_quantity?: number;
+  shelf_location?: string;
 }
 
 export interface Order {

@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Box, Scale, Trash2, Check, Barcode, Edit, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ProductConfirmationDialog } from "./ProductConfirmationDialog";
@@ -170,6 +171,7 @@ export function OrderItemsList({
             <TableRow>
               <TableHead className="text-right">المنتج</TableHead>
               <TableHead className="text-center">الباركود</TableHead>
+              <TableHead className="text-center">موقع الرف</TableHead>
               <TableHead className="text-center">النوع</TableHead>
               <TableHead className="text-center">الكمية</TableHead>
               <TableHead className="text-center">السعر</TableHead>
@@ -211,6 +213,15 @@ export function OrderItemsList({
                         </Button>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {item.shelf_location ? (
+                      <Badge variant="outline" className="text-xs">
+                        {item.shelf_location}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">غير محدد</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex justify-center gap-2">

@@ -1466,6 +1466,63 @@ export type Database = {
         }
         Relationships: []
       }
+      product_batches: {
+        Row: {
+          batch_number: string
+          created_at: string
+          expiry_date: string
+          id: string
+          notes: string | null
+          product_id: string
+          purchase_date: string | null
+          quantity: number
+          shelf_location: string | null
+          supplier_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          batch_number: string
+          created_at?: string
+          expiry_date: string
+          id?: string
+          notes?: string | null
+          product_id: string
+          purchase_date?: string | null
+          quantity?: number
+          shelf_location?: string | null
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          batch_number?: string
+          created_at?: string
+          expiry_date?: string
+          id?: string
+          notes?: string | null
+          product_id?: string
+          purchase_date?: string | null
+          quantity?: number
+          shelf_location?: string | null
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_collections: {
         Row: {
           active: boolean | null
@@ -1510,6 +1567,7 @@ export type Database = {
           company_id: string | null
           created_at: string | null
           description: string | null
+          expiry_date: string | null
           id: string
           image_urls: string[] | null
           is_bulk: boolean | null
@@ -1521,7 +1579,9 @@ export type Database = {
           price: number
           purchase_price: number
           quantity: number | null
+          shelf_location: string | null
           subcategory_id: string | null
+          track_expiry: boolean | null
           unit_of_measure: string | null
           updated_at: string | null
         }
@@ -1535,6 +1595,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string | null
           description?: string | null
+          expiry_date?: string | null
           id?: string
           image_urls?: string[] | null
           is_bulk?: boolean | null
@@ -1546,7 +1607,9 @@ export type Database = {
           price: number
           purchase_price: number
           quantity?: number | null
+          shelf_location?: string | null
           subcategory_id?: string | null
+          track_expiry?: boolean | null
           unit_of_measure?: string | null
           updated_at?: string | null
         }
@@ -1560,6 +1623,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string | null
           description?: string | null
+          expiry_date?: string | null
           id?: string
           image_urls?: string[] | null
           is_bulk?: boolean | null
@@ -1571,7 +1635,9 @@ export type Database = {
           price?: number
           purchase_price?: number
           quantity?: number | null
+          shelf_location?: string | null
           subcategory_id?: string | null
+          track_expiry?: boolean | null
           unit_of_measure?: string | null
           updated_at?: string | null
         }
