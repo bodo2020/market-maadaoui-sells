@@ -119,14 +119,8 @@ export default function CashTracking() {
       setAmount("");
       setNotes("");
       
-      // Update balance immediately after successful transaction
-      const newBalance = await getLatestCashBalance(RegisterType.MERGED);
-      console.log("New balance after deposit:", newBalance, "Type:", typeof newBalance);
-      const numericNewBalance = typeof newBalance === 'string' ? parseFloat(newBalance) : Number(newBalance);
-      setCurrentBalance(numericNewBalance || 0);
-      
-      // Then fetch all records
-      fetchRecords();
+      // Update balance and fetch all records again
+      await fetchRecords();
     } catch (error) {
       console.error('Error adding cash:', error);
       toast.error("حدث خطأ أثناء إضافة المبلغ");
@@ -171,14 +165,8 @@ export default function CashTracking() {
       setAmount("");
       setNotes("");
       
-      // Update balance immediately after successful transaction
-      const newBalance = await getLatestCashBalance(RegisterType.MERGED);
-      console.log("New balance after withdrawal:", newBalance, "Type:", typeof newBalance);
-      const numericNewBalance = typeof newBalance === 'string' ? parseFloat(newBalance) : Number(newBalance);
-      setCurrentBalance(numericNewBalance || 0);
-      
-      // Then fetch all records
-      fetchRecords();
+      // Update balance and fetch all records again
+      await fetchRecords();
     } catch (error) {
       console.error('Error withdrawing cash:', error);
       toast.error("حدث خطأ أثناء سحب المبلغ");
