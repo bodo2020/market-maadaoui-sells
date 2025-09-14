@@ -5,7 +5,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Plus, Trash2, Save, ShoppingCart, FileText, BadgeDollarSign, ScanLine } from "lucide-react";
+import { Search, Plus, Trash2, Save, ShoppingCart, FileText, BadgeDollarSign, ScanLine, CalendarIcon } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -22,6 +22,10 @@ import { Product, Supplier } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface CartItem {
   product: Product;
@@ -53,7 +57,7 @@ export default function SupplierPurchases() {
   const [scannerMode, setScannerMode] = useState(false);
   
   const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [invoiceDate, setInvoiceDate] = useState<Date>(new Date());
   const [description, setDescription] = useState("");
   
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -221,8 +225,9 @@ export default function SupplierPurchases() {
   const confirmPurchase = () => {
     const purchaseData = {
       supplier_id: selectedSupplierId,
+      supplier_name: selectedSupplierName, // Add supplier name for cash transaction notes
       invoice_number: invoiceNumber,
-      date: invoiceDate,
+      date: invoiceDate.toISOString().split('T')[0],
       total: subtotal,
       paid: paid,
       description: description,
@@ -250,7 +255,7 @@ export default function SupplierPurchases() {
     setSelectedSupplierName("");
     setSelectedSupplierBalance(null);
     setInvoiceNumber("");
-    setInvoiceDate(new Date().toISOString().split('T')[0]);
+    setInvoiceDate(new Date());
     setDescription("");
     setScannerMode(false);
     setBarcodeInput("");
@@ -449,15 +454,32 @@ export default function SupplierPurchases() {
                   </div>
                   
                   <div className="space-y-2">
-                    <label htmlFor="invoice-date" className="text-sm font-medium">
+                    <label className="text-sm font-medium">
                       تاريخ الفاتورة
                     </label>
-                    <Input
-                      id="invoice-date"
-                      type="date"
-                      value={invoiceDate}
-                      onChange={(e) => setInvoiceDate(e.target.value)}
-                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !invoiceDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {invoiceDate ? format(invoiceDate, "dd/MM/yyyy") : "اختر تاريخ"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={invoiceDate}
+                          onSelect={(date) => date && setInvoiceDate(date)}
+                          initialFocus
+                          className="p-3 pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   
                   <div className="space-y-2 md:col-span-2">
@@ -570,17 +592,34 @@ export default function SupplierPurchases() {
                                       <label className="text-sm font-medium text-muted-foreground">
                                         تاريخ الصلاحية {item.product.track_expiry && <span className="text-destructive">*</span>}
                                       </label>
-                                      <Input
-                                        type="date"
-                                        value={item.expiryDate || ''}
-                                        onChange={(e) => {
-                                          const newCart = [...cart];
-                                          newCart[index].expiryDate = e.target.value;
-                                          setCart(newCart);
-                                        }}
-                                        className="mt-1"
-                                        required={item.product.track_expiry}
-                                      />
+                                       <Popover>
+                                         <PopoverTrigger asChild>
+                                           <Button
+                                             variant="outline"
+                                             className={cn(
+                                               "w-full justify-start text-left font-normal mt-1",
+                                               !item.expiryDate && "text-muted-foreground"
+                                             )}
+                                           >
+                                             <CalendarIcon className="mr-2 h-4 w-4" />
+                                             {item.expiryDate ? format(new Date(item.expiryDate), "dd/MM/yyyy") : "اختر تاريخ الصلاحية"}
+                                           </Button>
+                                         </PopoverTrigger>
+                                         <PopoverContent className="w-auto p-0" align="start">
+                                           <Calendar
+                                             mode="single"
+                                             selected={item.expiryDate ? new Date(item.expiryDate) : undefined}
+                                             onSelect={(date) => {
+                                               const newCart = [...cart];
+                                               newCart[index].expiryDate = date ? date.toISOString().split('T')[0] : '';
+                                               setCart(newCart);
+                                             }}
+                                             disabled={(date) => date < new Date()}
+                                             initialFocus
+                                             className="p-3 pointer-events-auto"
+                                           />
+                                         </PopoverContent>
+                                       </Popover>
                                     </div>
                                     <div>
                                       <label className="text-sm font-medium text-muted-foreground">موقع الرف</label>
