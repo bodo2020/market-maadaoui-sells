@@ -231,12 +231,12 @@ export default function SupplierPurchases() {
       total: subtotal,
       paid: paid,
       description: description,
-      items: cart.map(item => ({
+      items: cart.map((item, index) => ({
         product_id: item.product.id,
         quantity: item.quantity,
         price: item.price,
         total: item.total,
-        batch_number: item.batchNumber,
+        batch_number: item.batchNumber || `BATCH-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(index + 1).padStart(3, '0')}`,
         expiry_date: item.expiryDate,
         shelf_location: item.shelfLocation,
         notes: item.notes
@@ -574,20 +574,25 @@ export default function SupplierPurchases() {
                               <TableRow key={`details-${index}`} className="bg-muted/30">
                                 <TableCell colSpan={5} className="p-4">
                                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div>
-                                      <label className="text-sm font-medium text-muted-foreground">رقم الدفعة</label>
-                                      <Input
-                                        type="text"
-                                        placeholder="BATCH-001"
-                                        value={item.batchNumber || ''}
-                                        onChange={(e) => {
-                                          const newCart = [...cart];
-                                          newCart[index].batchNumber = e.target.value;
-                                          setCart(newCart);
-                                        }}
-                                        className="mt-1"
-                                      />
-                                    </div>
+                                     <div>
+                                       <label className="text-sm font-medium text-muted-foreground">رقم الدفعة</label>
+                                       <Input
+                                         type="text"
+                                         placeholder="سيتم إنشاؤه تلقائياً"
+                                         value={item.batchNumber || ''}
+                                         onChange={(e) => {
+                                           const newCart = [...cart];
+                                           newCart[index].batchNumber = e.target.value;
+                                           setCart(newCart);
+                                         }}
+                                         className="mt-1"
+                                       />
+                                       {!item.batchNumber && (
+                                         <p className="text-xs text-muted-foreground mt-1">
+                                           اتركه فارغاً لإنشاء رقم تلقائي: BATCH-{new Date().getFullYear()}{String(new Date().getMonth() + 1).padStart(2, '0')}{String(new Date().getDate()).padStart(2, '0')}-{String(index + 1).padStart(3, '0')}
+                                         </p>
+                                       )}
+                                     </div>
                                     <div>
                                       <label className="text-sm font-medium text-muted-foreground">
                                         تاريخ الصلاحية {item.product.track_expiry && <span className="text-destructive">*</span>}

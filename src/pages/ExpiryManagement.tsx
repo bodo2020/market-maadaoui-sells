@@ -354,7 +354,7 @@ export default function ExpiryManagement() {
                       return (
                         <TableRow key={batch.id}>
                           <TableCell className="font-medium">
-                            {(batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`}
+                            {(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`}
                           </TableCell>
                           <TableCell>{batch.batch_number}</TableCell>
                           <TableCell>

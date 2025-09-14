@@ -95,7 +95,7 @@ export async function getExpiringProducts(daysAhead: number = 7): Promise<Produc
       .from("product_batches")
       .select(`
         *,
-        products!inner(name, shelf_location)
+        products!inner(name, shelf_location, barcode)
       `)
       .lte("expiry_date", futureDate.toISOString().split('T')[0])
       .gt("quantity", 0)
