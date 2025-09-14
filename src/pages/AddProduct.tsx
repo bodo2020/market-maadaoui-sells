@@ -102,28 +102,27 @@ export default function AddProduct() {
     try {
       const data = await fetchProductById(id);
       
-      // إصلاح مشكلة الفئة الفرعية: تحديد الفئة الرئيسية والفرعية قبل تحديث الـ state
-      let productData = { ...data };
-      
+      // تحميل الفئات الفرعية إذا كان هناك فئة رئيسية
       if (data.main_category_id) {
         await loadSubcategories(data.main_category_id);
-      } else if (data.subcategory_id) {
-        // إذا كان هناك فئة فرعية ولكن لا توجد فئة رئيسية، ابحث عن الفئة الرئيسية من الفئة الفرعية
+      }
+      // إذا كان هناك فئة فرعية فقط، ابحث عن الفئة الرئيسية
+      else if (data.subcategory_id) {
         try {
-          const allSubcategories = await fetchSubcategories(); // تحميل جميع الفئات الفرعية
+          const allSubcategories = await fetchSubcategories();
           const currentSubcategory = allSubcategories.find(sub => sub.id === data.subcategory_id);
-          if (currentSubcategory && currentSubcategory.category_id) {
+          if (currentSubcategory?.category_id) {
             await loadSubcategories(currentSubcategory.category_id);
-            // تحديث الفئة الرئيسية في البيانات
-            productData.main_category_id = currentSubcategory.category_id;
+            // تحديث الفئة الرئيسية
+            data.main_category_id = currentSubcategory.category_id;
           }
         } catch (error) {
           console.error("Error loading subcategory data:", error);
         }
       }
 
-      // تحديث الـ state بالبيانات المحدثة
-      setProduct(productData);
+      // تحديث المنتج بعد تحميل الفئات
+      setProduct(data);
       
       // تحميل إعدادات التنبيه
       try {
@@ -482,9 +481,13 @@ export default function AddProduct() {
                       }));
                       if (categoryId) {
                         loadSubcategories(categoryId);
+                        // احتفظ بالفئة الفرعية إذا كانت تنتمي للفئة الجديدة
+                        const currentSubcat = subcategories.find(sub => sub.id === product.subcategory_id);
+                        if (!currentSubcat || currentSubcat.category_id !== categoryId) {
+                          setProduct((prev) => ({ ...prev, subcategory_id: "" }));
+                        }
                       } else {
                         setSubcategories([]);
-                        // فقط امسح الفئة الفرعية إذا لم تكن هناك فئة رئيسية
                         setProduct((prev) => ({ ...prev, subcategory_id: "" }));
                       }
                     }}
@@ -511,7 +514,7 @@ export default function AddProduct() {
                       ...prev, 
                       subcategory_id: value === "none" ? "" : value 
                     }))}
-                    disabled={!product?.main_category_id}
+                    disabled={!product?.main_category_id || subcategories.length === 0}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الفئة الفرعية" />
