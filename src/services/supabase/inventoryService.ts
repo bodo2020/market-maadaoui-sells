@@ -196,6 +196,19 @@ export const completeInventorySession = async (sessionId: string) => {
   return data[0];
 };
 
+// إكمال جلسة جرد بناءً على التاريخ
+export const completeInventorySessionByDate = async (date: string) => {
+  const { data, error } = await supabase
+    .from('inventory_sessions')
+    .update({ status: 'completed' })
+    .eq('session_date', date)
+    .eq('status', 'active')
+    .select();
+
+  if (error) throw error;
+  return data[0];
+};
+
 // جلب إحصائيات الجرد
 export const fetchInventoryStats = async () => {
   const { data: sessions, error } = await supabase

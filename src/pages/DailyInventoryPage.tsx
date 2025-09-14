@@ -32,6 +32,7 @@ import {
   updateInventoryRecord,
   fetchInventoryRecordsByDate,
   completeInventorySession,
+  completeInventorySessionByDate,
   InventoryRecord
 } from "@/services/supabase/inventoryService";
 import { Product } from "@/types";
@@ -48,6 +49,7 @@ export default function DailyInventoryPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [inventoryType, setInventoryType] = useState<'daily' | 'full'>('daily');
   const [scannerOpen, setScannerOpen] = useState(false);
   const [searchBarcode, setSearchBarcode] = useState('');
@@ -230,6 +232,43 @@ export default function DailyInventoryPage() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCompleteInventory = async () => {
+    setCompleting(true);
+    try {
+      // التحقق من أن جميع العناصر تم جردها
+      const pendingItems = inventoryRecords.filter(record => record.status === 'pending').length;
+      
+      if (pendingItems > 0) {
+        toast({
+          title: "لا يمكن إكمال الجرد",
+          description: `يوجد ${pendingItems} منتج لم يتم جرده بعد`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // إكمال الجرد بناءً على التاريخ
+      await completeInventorySessionByDate(currentDate);
+      
+      toast({
+        title: "تم إكمال الجرد",
+        description: "تم تحديد الجرد كمكتمل ومتاح للموافقة",
+      });
+
+      // إعادة تحميل البيانات لتحديث الحالة
+      await loadInventoryData();
+    } catch (error) {
+      console.error("Error completing inventory:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء إكمال الجرد",
+        variant: "destructive"
+      });
+    } finally {
+      setCompleting(false);
     }
   };
 
@@ -424,6 +463,9 @@ export default function DailyInventoryPage() {
   const discrepancyValue = inventoryRecords
     .filter(record => record.status === 'discrepancy')
     .reduce((sum, record) => sum + Math.abs(record.difference_value), 0);
+  
+  // التحقق من إكمال الجرد
+  const allItemsCompleted = totalItems > 0 && completedItems === totalItems;
 
   return (
     <MainLayout>
@@ -466,9 +508,22 @@ export default function DailyInventoryPage() {
               جرد كامل
             </Button>
             
+            {/* زر إكمال الجرد */}
+            {allItemsCompleted && (
+              <Button 
+                onClick={handleCompleteInventory}
+                disabled={completing}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <CheckCircle className={`ml-2 h-4 w-4 ${completing ? 'animate-spin' : ''}`} />
+                {completing ? 'جاري الإكمال...' : 'إكمال الجرد'}
+              </Button>
+            )}
+            
             <Button 
               onClick={exportToExcel}
               disabled={exporting || completedItems === 0}
+              variant="outline"
             >
               <FileDown className="ml-2 h-4 w-4" />
               {exporting ? 'جاري التصدير...' : 'تصدير لملف Excel'}
@@ -497,28 +552,67 @@ export default function DailyInventoryPage() {
             </CardContent>
           </Card>
           
-            <Card>
+          <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">مطابق</CardTitle>
+              <CardTitle className="text-sm font-medium">تم الجرد</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{matchedItems}</div>
-              <p className="text-xs text-muted-foreground">منتج مطابق للنظام</p>
+              <div className="text-2xl font-bold text-blue-600">{completedItems}</div>
+              <p className="text-xs text-muted-foreground">من {totalItems} منتج</p>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all" 
+                  style={{ width: `${totalItems ? (completedItems / totalItems) * 100 : 0}%` }}
+                ></div>
+              </div>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">يحتاج مراجعة</CardTitle>
+              <CardTitle className="text-sm font-medium">مطابق</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{matchedItems}</div>
+              <p className="text-xs text-muted-foreground">منتج مطابق</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">يوجد اختلاف</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">{discrepancyItems}</div>
-              <p className="text-xs text-muted-foreground">
-                قيمة الفروقات: {discrepancyValue.toFixed(2)} ج.م
-              </p>
+              <p className="text-xs text-muted-foreground">قيمة الفروقات: {discrepancyValue.toFixed(2)} ج.م</p>
             </CardContent>
           </Card>
         </div>
+
+        {/* تنبيه إكمال الجرد */}
+        {allItemsCompleted && (
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3 space-x-reverse">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium text-green-800">تم الانتهاء من جرد جميع المنتجات</p>
+                    <p className="text-sm text-green-600">يمكنك الآن إكمال الجرد لإتاحته للموافقة</p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleCompleteInventory}
+                  disabled={completing}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <CheckCircle className={`ml-2 h-4 w-4 ${completing ? 'animate-spin' : ''}`} />
+                  {completing ? 'جاري الإكمال...' : 'إكمال الجرد'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
