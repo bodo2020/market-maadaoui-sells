@@ -132,12 +132,13 @@ export async function recordCashTransaction(
       return { balance_after: data };
     } else {
       // Use per-register function for store/online
-      const { data, error } = await supabase.rpc('add_cash_transaction', {
+      const { data, error } = await supabase.rpc('add_cash_transaction_api', {
         p_amount: amount,
         p_transaction_type: transactionType,
         p_register_type: registerType,
         p_notes: notes || '',
-        p_created_by: userId
+        p_created_by: userId,
+        p_branch_id: null
       });
       if (error) {
         console.error(`Error during ${transactionType} (${registerType}):`, error);
@@ -229,12 +230,13 @@ export async function recordSmartWithdrawal(amount: number, notes: string, userI
 
   const storeBalance = await getLatestCashBalanceFromTracking(RegisterType.STORE);
   if (amount <= storeBalance) {
-    const { error } = await supabase.rpc('add_cash_transaction', {
+    const { error } = await supabase.rpc('add_cash_transaction_api', {
       p_amount: amount,
       p_transaction_type: 'withdrawal',
       p_register_type: 'store',
       p_notes: notes || '',
-      p_created_by: userId
+      p_created_by: userId,
+      p_branch_id: null
     });
     if (error) throw error;
     return true;
@@ -246,23 +248,25 @@ export async function recordSmartWithdrawal(amount: number, notes: string, userI
 
   // Withdraw store balance if any
   if (storeBalance > 0) {
-    const { error: err1 } = await supabase.rpc('add_cash_transaction', {
+    const { error: err1 } = await supabase.rpc('add_cash_transaction_api', {
       p_amount: storeBalance,
       p_transaction_type: 'withdrawal',
       p_register_type: 'store',
       p_notes: notes ? `${notes} (من خزنة المحل)` : '(من خزنة المحل)',
-      p_created_by: userId
+      p_created_by: userId,
+      p_branch_id: null
     });
     if (err1) throw err1;
   }
 
   if (remainder <= onlineBalance) {
-    const { error: err2 } = await supabase.rpc('add_cash_transaction', {
+    const { error: err2 } = await supabase.rpc('add_cash_transaction_api', {
       p_amount: remainder,
       p_transaction_type: 'withdrawal',
       p_register_type: 'online',
       p_notes: notes ? `${notes} (تكملة من الأونلاين)` : '(تكملة من الأونلاين)',
-      p_created_by: userId
+      p_created_by: userId,
+      p_branch_id: null
     });
     if (err2) throw err2;
     return true;

@@ -2696,6 +2696,17 @@ export type Database = {
             }
         Returns: number
       }
+      add_cash_transaction_api: {
+        Args: {
+          p_amount: number
+          p_branch_id?: string
+          p_created_by?: string
+          p_notes: string
+          p_register_type: string
+          p_transaction_type: string
+        }
+        Returns: number
+      }
       create_bucket_if_not_exists: {
         Args: { bucket_name: string }
         Returns: undefined
