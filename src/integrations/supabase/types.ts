@@ -2716,6 +2716,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_merged_cash_balance: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       has_branch_access: {
         Args: { _branch: string; _user: string }
         Returns: boolean
@@ -2727,6 +2731,15 @@ export type Database = {
       is_super_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      record_merged_cash_transaction: {
+        Args: {
+          p_amount: number
+          p_created_by?: string
+          p_notes: string
+          p_transaction_type: string
+        }
+        Returns: number
       }
       sales_summary_by_branch: {
         Args: { p_end?: string; p_start?: string }

@@ -37,17 +37,17 @@ export default function CashTracking() {
     try {
       setLoading(true);
       
-      console.log("Fetching cash records for register:", RegisterType.STORE);
+      console.log("Fetching merged cash records");
 
-      // Directly fetch the current balance using our improved function
-      const balance = await getLatestCashBalance(RegisterType.STORE);
+      // Directly fetch the merged balance
+      const balance = await getLatestCashBalance(RegisterType.MERGED);
       console.log("Got current balance:", balance, "Type:", typeof balance);
       const numericBalance = typeof balance === 'string' ? parseFloat(balance) : Number(balance);
       console.log("Converted balance:", numericBalance);
       setCurrentBalance(numericBalance || 0);
       
-      // Fetch cash tracking records with user names
-      const records = await fetchCashRecords(RegisterType.STORE);
+      // Fetch all cash tracking records (merged view)
+      const records = await fetchCashRecords();
       
       // Fetch user names for creators
       const creatorIds = Array.from(
@@ -107,7 +107,7 @@ export default function CashTracking() {
       await recordCashTransaction(
         parseFloat(amount),
         'deposit',
-        RegisterType.STORE,
+        RegisterType.MERGED,
         notes || "إيداع نقدي",
         user?.id || ''
       );
@@ -120,7 +120,7 @@ export default function CashTracking() {
       setNotes("");
       
       // Update balance immediately after successful transaction
-      const newBalance = await getLatestCashBalance(RegisterType.STORE);
+      const newBalance = await getLatestCashBalance(RegisterType.MERGED);
       console.log("New balance after deposit:", newBalance, "Type:", typeof newBalance);
       const numericNewBalance = typeof newBalance === 'string' ? parseFloat(newBalance) : Number(newBalance);
       setCurrentBalance(numericNewBalance || 0);
@@ -159,7 +159,7 @@ export default function CashTracking() {
       await recordCashTransaction(
         parseFloat(amount),
         'withdrawal',
-        RegisterType.STORE,
+        RegisterType.MERGED,
         notes || "سحب نقدي",
         user?.id || ''
       );
@@ -172,7 +172,7 @@ export default function CashTracking() {
       setNotes("");
       
       // Update balance immediately after successful transaction
-      const newBalance = await getLatestCashBalance(RegisterType.STORE);
+      const newBalance = await getLatestCashBalance(RegisterType.MERGED);
       console.log("New balance after withdrawal:", newBalance, "Type:", typeof newBalance);
       const numericNewBalance = typeof newBalance === 'string' ? parseFloat(newBalance) : Number(newBalance);
       setCurrentBalance(numericNewBalance || 0);
@@ -263,7 +263,7 @@ export default function CashTracking() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">الرصيد الحالي</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">الرصيد الإجمالي (مدمج)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center">
@@ -271,6 +271,9 @@ export default function CashTracking() {
                 <span className="text-2xl font-bold">{currentBalance.toFixed(2)}</span>
                 <span className="mr-1 text-sm text-muted-foreground">جنيه</span>
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                يشمل مبيعات الفرع والمبيعات الإلكترونية
+              </p>
             </CardContent>
           </Card>
         </div>

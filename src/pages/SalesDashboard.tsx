@@ -239,23 +239,21 @@ export default function SalesDashboard() {
       await recordCashTransaction(
         Number(depositAmount),
         'deposit',
-        depositRegister,
+        RegisterType.MERGED,
         depositNote,
         user?.id || ''
       );
       
-      toast.success(`تم إيداع ${depositAmount} بنجاح إلى خزنة ${depositRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
+      toast.success(`تم إيداع ${depositAmount} بنجاح إلى الخزنة المدمجة`);
       setDepositAmount("");
       setDepositNote("");
       setIsDepositDialogOpen(false);
       
-      if (depositRegister === RegisterType.STORE) {
-        refetchStoreRecords();
-        await fetchCurrentBalance(RegisterType.STORE);
-      } else {
-        refetchOnlineRecords();
-        await fetchCurrentBalance(RegisterType.ONLINE);
-      }
+      // Refresh both store and online records
+      refetchStoreRecords();
+      await fetchCurrentBalance(RegisterType.STORE);
+      refetchOnlineRecords();
+      await fetchCurrentBalance(RegisterType.ONLINE);
     } catch (error: any) {
       console.error("Error processing deposit:", error);
       toast.error(error.message || "حدث خطأ أثناء عملية الإيداع");

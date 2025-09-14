@@ -317,6 +317,55 @@ export async function getShifts(employeeId: string) {
   }
 }
 
+export async function getUserById(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, username, email, phone, role, active')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return null;
+  }
+}
+
+export async function getUsersByIds(userIds: string[]) {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, username, email, phone, role, active')
+      .in('id', userIds);
+
+    if (error) {
+      console.error('Error fetching users:', error);
+      return new Map();
+    }
+
+    const userMap = new Map();
+    data.forEach((user: any) => {
+      userMap.set(user.id, user);
+    });
+
+    return userMap;
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return new Map();
+  }
+}
+
+export async function getUserName(userId: string): Promise<string> {
+  const user = await getUserById(userId);
+  return user?.name || user?.username || 'غير معروف';
+}
+
 export async function exportEmployeesToExcel(): Promise<void> {
   try {
     const users = await fetchUsers();

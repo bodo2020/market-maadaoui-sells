@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 export enum RegisterType {
   STORE = 'store',
-  ONLINE = 'online'
+  ONLINE = 'online',
+  MERGED = 'merged'
 }
 
 export interface CashRecord {
@@ -39,14 +40,9 @@ export async function fetchCashRecords(registerType?: RegisterType, dateRange?: 
     .order('date', { ascending: false })
     .order('created_at', { ascending: false });
     
+  // Show merged records or all records if no specific type requested
   if (registerType) {
     query = query.eq('register_type', registerType);
-  }
-  
-  // Filter by current branch if available, otherwise show all data
-  const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
-  if (branchId) {
-    query = query.eq('branch_id', branchId);
   }
   
   if (dateRange?.from && dateRange?.to) {
@@ -63,39 +59,14 @@ export async function fetchCashRecords(registerType?: RegisterType, dateRange?: 
 }
 
 export async function createCashRecord(record: Omit<CashRecord, 'id' | 'created_at' | 'updated_at'>) {
-  // التأكد من وجود branch_id
-  let branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
-  
-  if (!branchId) {
-    console.warn('No branch ID found, attempting to get default branch');
-    const { data: branches } = await supabase
-      .from('branches')
-      .select('id')
-      .eq('active', true)
-      .order('created_at', { ascending: true })
-      .limit(1);
-    
-    if (branches && branches.length > 0) {
-      branchId = branches[0].id;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('currentBranchId', branchId);
-      }
-    }
-  }
-
-  const recordWithBranch = {
-    ...record,
-    branch_id: branchId
-  };
-
   const { data, error } = await supabase
     .from('cash_tracking')
-    .insert([recordWithBranch])
+    .insert([record])
     .select()
     .single();
     
   if (error) throw error;
-  console.log('Created cash record with branch_id:', data);
+  console.log('Created cash record:', data);
   return data as CashRecord;
 }
 
@@ -113,7 +84,24 @@ export async function updateCashRecord(id: string, updates: Partial<CashRecord>)
 }
 
 export async function getLatestCashBalance(registerType: RegisterType) {
+  if (registerType === RegisterType.MERGED) {
+    return await getMergedCashBalance();
+  }
   return await getLatestCashBalanceFromTracking(registerType);
+}
+
+export async function getMergedCashBalance() {
+  try {
+    const { data, error } = await supabase.rpc('get_merged_cash_balance');
+    if (error) {
+      console.error('Error getting merged balance:', error);
+      return 0;
+    }
+    return data || 0;
+  } catch (error) {
+    console.error('Error getting merged balance:', error);
+    return 0;
+  }
 }
 
 
@@ -126,10 +114,27 @@ export async function recordCashTransaction(
   branchId?: string
 ) {
   try {
-    // Get current balance
+    // Use merged register type for all transactions
+    if (registerType === RegisterType.MERGED || registerType === RegisterType.STORE || registerType === RegisterType.ONLINE) {
+      const { data, error } = await supabase.rpc('record_merged_cash_transaction', {
+        p_amount: amount,
+        p_transaction_type: transactionType,
+        p_notes: notes || '',
+        p_created_by: userId
+      });
+      
+      if (error) {
+        console.error(`Error during ${transactionType}:`, error);
+        throw error;
+      }
+      
+      console.log(`Successfully recorded ${transactionType}:`, data);
+      return { balance_after: data };
+    }
+
+    // Fallback for other register types (should not be used)
     const currentBalance = await getLatestCashBalanceFromTracking(registerType);
     
-    // Calculate new balance
     let newBalance: number;
     if (transactionType === 'deposit') {
       newBalance = currentBalance + amount;
@@ -140,27 +145,6 @@ export async function recordCashTransaction(
       newBalance = currentBalance - amount;
     }
 
-    // Get or set branch_id - use passed parameter or get from localStorage/default
-    let finalBranchId = branchId || (typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null);
-    
-    if (!finalBranchId) {
-      console.warn('No branch ID found, attempting to get default branch');
-      const { data: branches } = await supabase
-        .from('branches')
-        .select('id')
-        .eq('active', true)
-        .order('created_at', { ascending: true })
-        .limit(1);
-      
-      if (branches && branches.length > 0) {
-        finalBranchId = branches[0].id;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('currentBranchId', finalBranchId);
-        }
-      }
-    }
-
-    // Create cash tracking record
     const record: any = {
       date: new Date().toISOString().split('T')[0],
       register_type: registerType,
@@ -168,7 +152,6 @@ export async function recordCashTransaction(
       closing_balance: newBalance,
       difference: transactionType === 'deposit' ? amount : -amount,
       notes,
-      branch_id: finalBranchId,
       ...(userId ? { created_by: userId } : {})
     };
 
@@ -196,26 +179,6 @@ export async function getLatestCashBalanceFromTracking(registerType: RegisterTyp
   try {
     console.log(`Fetching balance for register ${registerType} from cash_tracking table`);
     
-    // التأكد من وجود branch_id أولاً
-    let branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
-    
-    if (!branchId) {
-      console.warn('No branch ID found, attempting to get default branch');
-      const { data: branches } = await supabase
-        .from('branches')
-        .select('id')
-        .eq('active', true)
-        .order('created_at', { ascending: true })
-        .limit(1);
-      
-      if (branches && branches.length > 0) {
-        branchId = branches[0].id;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('currentBranchId', branchId);
-        }
-      }
-    }
-
     let query = supabase
       .from('cash_tracking')
       .select('closing_balance')
@@ -223,11 +186,6 @@ export async function getLatestCashBalanceFromTracking(registerType: RegisterTyp
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(1);
-    
-    // Filter by branch if available
-    if (branchId) {
-      query = query.eq('branch_id', branchId);
-    }
     
     const { data, error } = await query;
     
@@ -238,7 +196,7 @@ export async function getLatestCashBalanceFromTracking(registerType: RegisterTyp
     
     if (data && data.length > 0) {
       const balance = data[0].closing_balance || 0;
-      console.log(`Found balance in cash_tracking: ${balance} for branch: ${branchId}`);
+      console.log(`Found balance in cash_tracking: ${balance}`);
       return balance;
     }
     
