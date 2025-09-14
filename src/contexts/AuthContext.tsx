@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isAdmin: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
   isLoading: true,
+  isAdmin: false,
   login: async () => {},
   logout: () => {},
 });
@@ -30,6 +32,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+
+  // Check if user is admin
+  const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN;
 
   useEffect(() => {
     // Check for saved user in local storage on initialization
@@ -94,6 +99,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         user,
         isAuthenticated: !!user,
         isLoading,
+        isAdmin,
         login,
         logout,
       }}

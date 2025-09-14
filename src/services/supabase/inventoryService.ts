@@ -311,6 +311,22 @@ export const approveInventorySession = async (sessionId: string) => {
   console.log(`Approving inventory session: ${sessionId}`);
   
   try {
+    // التحقق من صلاحيات المستخدم
+    const { data: currentUser } = await supabase.auth.getUser();
+    if (!currentUser.user) {
+      throw new Error('غير مسموح بالوصول');
+    }
+
+    // التحقق من كون المستخدم أدمن
+    const { data: userRecord, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', currentUser.user.id)
+      .single();
+
+    if (userError || !userRecord || !['admin', 'super_admin'].includes(userRecord.role)) {
+      throw new Error('ليس لديك صلاحية للموافقة على الجرد');
+    }
     // جلب session details أولاً
     const { data: session, error: sessionError } = await supabase
       .from('inventory_sessions')

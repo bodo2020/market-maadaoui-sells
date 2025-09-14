@@ -34,6 +34,7 @@ import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import * as XLSX from 'exceljs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function InventoryHistoryPage() {
   const [sessions, setSessions] = useState<InventorySession[]>([]);
@@ -46,6 +47,7 @@ export default function InventoryHistoryPage() {
   const [approving, setApproving] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
 
   useEffect(() => {
     loadSessions();
@@ -467,7 +469,8 @@ export default function InventoryHistoryPage() {
                                 عرض
                               </Button>
                               
-                              {session.status === 'completed' && (
+                              {/* زر الموافقة للأدمن فقط */}
+                              {isAdmin && session.status === 'completed' && (
                                 <Button
                                   size="sm"
                                   variant="default"
