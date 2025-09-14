@@ -5,7 +5,10 @@ export async function fetchProductBatches(productId?: string): Promise<ProductBa
   try {
     let query = supabase
       .from("product_batches")
-      .select("*")
+      .select(`
+        *,
+        products(name, shelf_location, barcode)
+      `)
       .order("expiry_date", { ascending: true });
 
     if (productId) {

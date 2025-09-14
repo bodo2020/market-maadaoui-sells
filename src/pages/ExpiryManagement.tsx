@@ -353,9 +353,9 @@ export default function ExpiryManagement() {
                       const status = getExpiryStatus(batch.expiry_date);
                       return (
                         <TableRow key={batch.id}>
-                           <TableCell className="font-medium">
-                             {(batch as any).products?.name || (batch as any).product_name || 'غير محدد'}
-                           </TableCell>
+                          <TableCell className="font-medium">
+                            {(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`}
+                          </TableCell>
                           <TableCell>{batch.batch_number}</TableCell>
                           <TableCell>
                             <Badge variant="outline">
