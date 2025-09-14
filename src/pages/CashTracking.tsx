@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RegisterType, getLatestCashBalance, recordCashTransaction, fetchCashRecords, CashRecord } from "@/services/supabase/cashTrackingService";
+import { RegisterType, getLatestCashBalance, recordCashTransaction, fetchCashRecords, CashRecord, recordSmartWithdrawal } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -150,10 +150,8 @@ export default function CashTracking() {
         notes: notes || "سحب نقدي"
       });
       
-      await recordCashTransaction(
+      await recordSmartWithdrawal(
         parseFloat(amount),
-        'withdrawal',
-        RegisterType.MERGED,
         notes || "سحب نقدي",
         user?.id || ''
       );

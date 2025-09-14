@@ -22,7 +22,8 @@ import {
   RegisterType, 
   fetchCashRecords, 
   getLatestCashBalance, 
-  recordCashTransaction
+  recordCashTransaction,
+  recordSmartWithdrawal
 } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -203,26 +204,22 @@ export default function SalesDashboard() {
     }
     
     try {
-      await recordCashTransaction(
+      await recordSmartWithdrawal(
         Number(withdrawalAmount),
-        'withdrawal',
-        withdrawalRegister,
         withdrawalNote,
         user?.id || ''
       );
       
-      toast.success(`تم سحب ${withdrawalAmount} بنجاح من خزنة ${withdrawalRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
+      toast.success(`تم سحب ${withdrawalAmount} بنجاح (سحب ذكي من المحل ثم الأونلاين)`);
       setWithdrawalAmount("");
       setWithdrawalNote("");
       setIsWithdrawalDialogOpen(false);
       
-      if (withdrawalRegister === RegisterType.STORE) {
-        refetchStoreRecords();
-        await fetchCurrentBalance(RegisterType.STORE);
-      } else {
-        refetchOnlineRecords();
-        await fetchCurrentBalance(RegisterType.ONLINE);
-      }
+      // Refresh both balances and records
+      refetchStoreRecords();
+      await fetchCurrentBalance(RegisterType.STORE);
+      refetchOnlineRecords();
+      await fetchCurrentBalance(RegisterType.ONLINE);
     } catch (error: any) {
       console.error("Error processing withdrawal:", error);
       toast.error(error.message || "حدث خطأ أثناء عملية السحب");
@@ -239,21 +236,23 @@ export default function SalesDashboard() {
       await recordCashTransaction(
         Number(depositAmount),
         'deposit',
-        RegisterType.MERGED,
+        depositRegister,
         depositNote,
         user?.id || ''
       );
       
-      toast.success(`تم إيداع ${depositAmount} بنجاح إلى الخزنة المدمجة`);
+      toast.success(`تم إيداع ${depositAmount} بنجاح إلى خزنة ${depositRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);
       setDepositAmount("");
       setDepositNote("");
       setIsDepositDialogOpen(false);
       
-      // Refresh both store and online records
-      refetchStoreRecords();
-      await fetchCurrentBalance(RegisterType.STORE);
-      refetchOnlineRecords();
-      await fetchCurrentBalance(RegisterType.ONLINE);
+      if (depositRegister === RegisterType.STORE) {
+        refetchStoreRecords();
+        await fetchCurrentBalance(RegisterType.STORE);
+      } else {
+        refetchOnlineRecords();
+        await fetchCurrentBalance(RegisterType.ONLINE);
+      }
     } catch (error: any) {
       console.error("Error processing deposit:", error);
       toast.error(error.message || "حدث خطأ أثناء عملية الإيداع");

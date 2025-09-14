@@ -114,8 +114,8 @@ export async function recordCashTransaction(
   branchId?: string
 ) {
   try {
-    // Use merged register type for all transactions
-    if (registerType === RegisterType.MERGED || registerType === RegisterType.STORE || registerType === RegisterType.ONLINE) {
+    // Route by register type
+    if (registerType === RegisterType.MERGED) {
       const { data, error } = await supabase.rpc('record_merged_cash_transaction', {
         p_amount: amount,
         p_transaction_type: transactionType,
@@ -124,11 +124,26 @@ export async function recordCashTransaction(
       });
       
       if (error) {
-        console.error(`Error during ${transactionType}:`, error);
+        console.error(`Error during ${transactionType} (merged):`, error);
         throw error;
       }
       
-      console.log(`Successfully recorded ${transactionType}:`, data);
+      console.log(`Successfully recorded ${transactionType} (merged):`, data);
+      return { balance_after: data };
+    } else {
+      // Use per-register function for store/online
+      const { data, error } = await supabase.rpc('add_cash_transaction', {
+        p_amount: amount,
+        p_transaction_type: transactionType,
+        p_register_type: registerType,
+        p_notes: notes || '',
+        p_created_by: userId
+      });
+      if (error) {
+        console.error(`Error during ${transactionType} (${registerType}):`, error);
+        throw error;
+      }
+      console.log(`Successfully recorded ${transactionType} (${registerType}):`, data);
       return { balance_after: data };
     }
 
@@ -206,4 +221,53 @@ export async function getLatestCashBalanceFromTracking(registerType: RegisterTyp
     console.error(`Error getting balance from cash_tracking for ${registerType}:`, error);
     return 0;
   }
+}
+
+// سحب ذكي: يسحب من خزنة المحل أولاً ثم يكمل من خزنة الأونلاين عند الحاجة
+export async function recordSmartWithdrawal(amount: number, notes: string, userId: string | null) {
+  if (amount <= 0) throw new Error('المبلغ غير صالح');
+
+  const storeBalance = await getLatestCashBalanceFromTracking(RegisterType.STORE);
+  if (amount <= storeBalance) {
+    const { error } = await supabase.rpc('add_cash_transaction', {
+      p_amount: amount,
+      p_transaction_type: 'withdrawal',
+      p_register_type: 'store',
+      p_notes: notes || '',
+      p_created_by: userId
+    });
+    if (error) throw error;
+    return true;
+  }
+
+  // Otherwise, withdraw all store balance then the remainder from online
+  const onlineBalance = await getLatestCashBalanceFromTracking(RegisterType.ONLINE);
+  const remainder = amount - storeBalance;
+
+  // Withdraw store balance if any
+  if (storeBalance > 0) {
+    const { error: err1 } = await supabase.rpc('add_cash_transaction', {
+      p_amount: storeBalance,
+      p_transaction_type: 'withdrawal',
+      p_register_type: 'store',
+      p_notes: notes ? `${notes} (من خزنة المحل)` : '(من خزنة المحل)',
+      p_created_by: userId
+    });
+    if (err1) throw err1;
+  }
+
+  if (remainder <= onlineBalance) {
+    const { error: err2 } = await supabase.rpc('add_cash_transaction', {
+      p_amount: remainder,
+      p_transaction_type: 'withdrawal',
+      p_register_type: 'online',
+      p_notes: notes ? `${notes} (تكملة من الأونلاين)` : '(تكملة من الأونلاين)',
+      p_created_by: userId
+    });
+    if (err2) throw err2;
+    return true;
+  }
+
+  // If not enough funds overall, rollback is manual; inform the user
+  throw new Error('الرصيد غير كافٍ في الخزنتين');
 }
