@@ -381,3 +381,32 @@ export const approveInventorySession = async (sessionId: string) => {
     throw error;
   }
 };
+
+// حذف جلسة جرد
+export const deleteInventorySession = async (sessionId: string, sessionDate: string) => {
+  console.log(`Deleting inventory session: ${sessionId} for date: ${sessionDate}`);
+  
+  try {
+    // حذف جميع inventory records أولاً
+    const { error: recordsError } = await supabase
+      .from('inventory_records')
+      .delete()
+      .eq('inventory_date', sessionDate);
+
+    if (recordsError) throw recordsError;
+
+    // حذف الجلسة
+    const { error: sessionError } = await supabase
+      .from('inventory_sessions')
+      .delete()
+      .eq('id', sessionId);
+
+    if (sessionError) throw sessionError;
+
+    console.log(`Successfully deleted inventory session ${sessionId}`);
+    return true;
+  } catch (error) {
+    console.error('Error deleting inventory session:', error);
+    throw error;
+  }
+};

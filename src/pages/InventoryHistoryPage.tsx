@@ -20,12 +20,14 @@ import {
   TrendingUp,
   TrendingDown,
   Eye,
-  CheckSquare
+  CheckSquare,
+  Trash2
 } from "lucide-react";
 import { 
   fetchInventorySessions,
   fetchInventoryRecordsByDate,
   approveInventorySession,
+  deleteInventorySession,
   InventorySession,
   InventoryRecord
 } from "@/services/supabase/inventoryService";
@@ -45,6 +47,7 @@ export default function InventoryHistoryPage() {
   const [exporting, setExporting] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [approving, setApproving] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
@@ -283,6 +286,52 @@ export default function InventoryHistoryPage() {
     }
   };
 
+  const handleDeleteSession = async (session: InventorySession) => {
+    if (!isAdmin) {
+      toast({
+        title: "خطأ",
+        description: "ليس لديك صلاحية لحذف الجرد",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (session.status === 'approved') {
+      toast({
+        title: "خطأ",
+        description: "لا يمكن حذف جرد تم اعتماده",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!confirm('هل أنت متأكد من حذف هذا الجرد؟ لا يمكن التراجع عن هذا الإجراء.')) {
+      return;
+    }
+
+    setDeleting(session.id);
+    try {
+      await deleteInventorySession(session.id, session.session_date);
+      
+      // تحديث قائمة الجلسات
+      await loadSessions();
+      
+      toast({
+        title: "تم الحذف",
+        description: "تم حذف الجرد بنجاح",
+      });
+    } catch (error) {
+      console.error("Error deleting session:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء حذف الجرد",
+        variant: "destructive"
+      });
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved': return 'text-purple-600';
@@ -499,6 +548,19 @@ export default function InventoryHistoryPage() {
                                 </div>
                               )}
                               
+                              {/* زر حذف الجرد للأدمن فقط */}
+                              {isAdmin && session.status !== 'approved' && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleDeleteSession(session)}
+                                  disabled={deleting === session.id}
+                                >
+                                  <Trash2 className={`ml-2 h-4 w-4 ${deleting === session.id ? 'animate-spin' : ''}`} />
+                                  {deleting === session.id ? 'جاري الحذف...' : 'حذف'}
+                                </Button>
+                              )}
+                              
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -507,7 +569,7 @@ export default function InventoryHistoryPage() {
                               >
                                 <FileDown className="ml-2 h-4 w-4" />
                                 تصدير
-                               </Button>
+                              </Button>
                              </div>
                           </TableCell>
                         </TableRow>
