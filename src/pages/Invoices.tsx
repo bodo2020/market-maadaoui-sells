@@ -138,6 +138,18 @@ const Invoices = () => {
     setIsPurchaseDetailsOpen(false);
   };
 
+  const handleRefreshPurchaseItems = async () => {
+    if (!selectedPurchase?.id) return;
+    try {
+      const refreshed = await getPurchaseWithItems(selectedPurchase.id);
+      if (refreshed) {
+        setSelectedPurchase(refreshed);
+      }
+    } catch (e) {
+      console.error('Failed to refresh purchase items', e);
+    }
+  };
+
   const handleInvoiceTypeChange = (value: 'sales' | 'purchases') => {
     setInvoiceType(value);
   };
@@ -420,7 +432,12 @@ const Invoices = () => {
             </div>
             
             <div className="mb-6">
-              <h3 className="font-semibold mb-2">المنتجات</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold">المنتجات</h3>
+                <Button variant="outline" size="sm" onClick={handleRefreshPurchaseItems}>
+                  تحديث العناصر
+                </Button>
+              </div>
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="bg-gray-100">
