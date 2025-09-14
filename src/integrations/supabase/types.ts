@@ -1023,6 +1023,8 @@ export type Database = {
       }
       inventory_sessions: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           completed_products: number
           created_at: string
           created_by: string | null
@@ -1036,6 +1038,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           completed_products?: number
           created_at?: string
           created_by?: string | null
@@ -1049,6 +1053,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           completed_products?: number
           created_at?: string
           created_by?: string | null
