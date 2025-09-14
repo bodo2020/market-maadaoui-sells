@@ -1482,6 +1482,7 @@ export type Database = {
           product_id: string
           purchase_date: string | null
           purchase_item_id: string | null
+          purchase_price: number | null
           quantity: number
           shelf_location: string | null
           supplier_id: string | null
@@ -1496,6 +1497,7 @@ export type Database = {
           product_id: string
           purchase_date?: string | null
           purchase_item_id?: string | null
+          purchase_price?: number | null
           quantity?: number
           shelf_location?: string | null
           supplier_id?: string | null
@@ -1510,6 +1512,7 @@ export type Database = {
           product_id?: string
           purchase_date?: string | null
           purchase_item_id?: string | null
+          purchase_price?: number | null
           quantity?: number
           shelf_location?: string | null
           supplier_id?: string | null

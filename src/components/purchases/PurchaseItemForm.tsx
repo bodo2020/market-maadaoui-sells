@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { Product } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { fetchProducts } from "@/services/supabase/productService";
+import { fetchProductBatches } from "@/services/supabase/productBatchService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PurchaseItem {
   product_id: string;
@@ -32,6 +34,11 @@ export default function PurchaseItemForm({ items, onItemsChange }: PurchaseItemF
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: fetchProducts
+  });
+
+  const { data: productBatches = [] } = useQuery({
+    queryKey: ["product-batches"],
+    queryFn: () => fetchProductBatches()
   });
 
   const addItem = () => {
@@ -116,6 +123,21 @@ export default function PurchaseItemForm({ items, onItemsChange }: PurchaseItemF
                       ))}
                     </SelectContent>
                   </Select>
+                  
+                  {/* Show existing batches for this product */}
+                  {item.product_id && productBatches.filter(batch => batch.product_id === item.product_id).length > 0 && (
+                    <div className="mt-2 p-2 bg-muted rounded text-sm">
+                      <p className="font-medium mb-1">باتشات موجودة:</p>
+                      {productBatches
+                        .filter(batch => batch.product_id === item.product_id)
+                        .slice(0, 3)
+                        .map((batch, idx) => (
+                          <div key={idx} className="text-xs text-muted-foreground">
+                            {batch.batch_number} - {batch.expiry_date ? new Date(batch.expiry_date).toLocaleDateString('ar-EG') : 'بدون تاريخ'} - الكمية: {batch.quantity}
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Quantity */}
@@ -159,7 +181,25 @@ export default function PurchaseItemForm({ items, onItemsChange }: PurchaseItemF
                   <Input
                     type="date"
                     value={item.expiry_date || ""}
-                    onChange={(e) => updateItem(index, 'expiry_date', e.target.value)}
+                    onChange={(e) => {
+                      const dateValue = e.target.value;
+                      updateItem(index, 'expiry_date', dateValue);
+                      
+                      // Auto-enable expiry tracking when expiry date is added
+                      if (dateValue && item.product_id) {
+                        const updateProductTracking = async () => {
+                          try {
+                            await supabase
+                              .from('products')
+                              .update({ track_expiry: true })
+                              .eq('id', item.product_id);
+                          } catch (error) {
+                            console.error('Error updating product expiry tracking:', error);
+                          }
+                        };
+                        updateProductTracking();
+                      }
+                    }}
                     required={selectedProduct?.track_expiry}
                     min={new Date().toISOString().split('T')[0]}
                   />
@@ -173,6 +213,11 @@ export default function PurchaseItemForm({ items, onItemsChange }: PurchaseItemF
                     onChange={(e) => updateItem(index, 'shelf_location', e.target.value)}
                     placeholder="مثل: A1, B2, C3"
                   />
+                  {item.shelf_location && (
+                    <p className="text-sm text-muted-foreground">
+                      المكان: {item.shelf_location}
+                    </p>
+                  )}
                 </div>
               </div>
 
