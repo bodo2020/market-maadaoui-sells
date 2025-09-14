@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, isAfter, differenceInDays, parseISO } from "date-fns";
 import { ar } from "date-fns/locale";
 import { getExpiringProducts, fetchProductBatches } from "@/services/supabase/productBatchService";
+import { fetchProducts } from "@/services/supabase/productService";
 import { ProductBatch } from "@/types";
 import { ExpiryAlertCard } from "@/components/inventory/ExpiryAlertCard";
 
@@ -40,6 +41,46 @@ export default function ExpiryManagement() {
   const [filterDays, setFilterDays] = useState(7);
   const { toast } = useToast();
 
+  // دالة لجلب المنتجات منتهية الصلاحية من جدول products مباشرة
+  const getExpiringProductsFromProducts = async (daysAhead: number = 7) => {
+    try {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + daysAhead);
+      
+      const products = await fetchProducts();
+      
+      return products
+        .filter(product => 
+          product.expiry_date && 
+          product.track_expiry &&
+          new Date(product.expiry_date) <= futureDate &&
+          product.quantity > 0
+        )
+        .map(product => ({
+          id: product.id,
+          product_id: product.id,
+          batch_number: `MAIN-${product.id.slice(-6)}`,
+          expiry_date: product.expiry_date!,
+          quantity: product.quantity,
+          shelf_location: product.shelf_location || null,
+          purchase_date: null,
+          supplier_id: null,
+          notes: 'من المخزون الرئيسي',
+          created_at: typeof product.created_at === 'string' ? product.created_at : new Date(product.created_at).toISOString(),
+          updated_at: (() => {
+            const updateTime = product.updated_at || product.created_at;
+            return typeof updateTime === 'string' ? updateTime : new Date(updateTime).toISOString();
+          })(),
+          // إضافة بيانات المنتج للعرض
+          product_name: product.name,
+          product_barcode: product.barcode
+        } as ProductBatch & { product_name: string; product_barcode?: string }));
+    } catch (error) {
+      console.error("Error fetching expiring products from products table:", error);
+      return [];
+    }
+  };
+
   useEffect(() => {
     loadExpiryData();
   }, []);
@@ -51,13 +92,19 @@ export default function ExpiryManagement() {
   const loadExpiryData = async () => {
     setLoading(true);
     try {
-      const [expiring, all] = await Promise.all([
+      // جلب المنتجات منتهية الصلاحية من جدول product_batches
+      const [expiringBatches, allBatches, expiringProducts] = await Promise.all([
         getExpiringProducts(7),
-        fetchProductBatches()
+        fetchProductBatches(),
+        getExpiringProductsFromProducts(7) // دالة جديدة لجلب المنتجات من جدول products
       ]);
       
-      setExpiringProducts(expiring);
-      setAllBatches(all);
+      // دمج النتائج من الجدولين
+      const combinedExpiring = [...expiringBatches, ...expiringProducts];
+      const combinedAll = [...allBatches, ...expiringProducts];
+      
+      setExpiringProducts(combinedExpiring);
+      setAllBatches(combinedAll);
     } catch (error) {
       console.error("Error loading expiry data:", error);
       toast({
@@ -77,7 +124,8 @@ export default function ExpiryManagement() {
     if (searchTerm) {
       filtered = filtered.filter(batch => 
         batch.batch_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        batch.shelf_location?.toLowerCase().includes(searchTerm.toLowerCase())
+        batch.shelf_location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (batch as any).product_name?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -306,7 +354,7 @@ export default function ExpiryManagement() {
                       return (
                         <TableRow key={batch.id}>
                           <TableCell className="font-medium">
-                            منتج #{batch.product_id.slice(-6)}
+                            {(batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`}
                           </TableCell>
                           <TableCell>{batch.batch_number}</TableCell>
                           <TableCell>
