@@ -251,6 +251,15 @@ export default function InventoryHistoryPage() {
       return;
     }
 
+    if (!isAdmin) {
+      toast({
+        title: "خطأ",
+        description: "ليس لديك صلاحية للموافقة على الجرد",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setApproving(session.id);
     try {
       await approveInventorySession(session.id);
