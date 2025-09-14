@@ -476,11 +476,18 @@ export default function InventoryHistoryPage() {
                                   variant="default"
                                   onClick={() => handleApproveSession(session)}
                                   disabled={approving === session.id}
-                                  className="bg-purple-600 hover:bg-purple-700"
+                                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold"
                                 >
                                   <CheckSquare className={`ml-2 h-4 w-4 ${approving === session.id ? 'animate-spin' : ''}`} />
-                                  {approving === session.id ? 'جاري الموافقة...' : 'موافقة'}
+                                  {approving === session.id ? 'جاري الموافقة...' : 'موافقة على الجرد'}
                                 </Button>
+                              )}
+
+                              {/* معلومات للمساعدة في التصحيح */}
+                              {!isAdmin && (
+                                <div className="text-xs text-gray-500 px-2 py-1 bg-gray-100 rounded">
+                                  زر الموافقة للأدمن فقط
+                                </div>
                               )}
                               
                               <Button
@@ -491,8 +498,8 @@ export default function InventoryHistoryPage() {
                               >
                                 <FileDown className="ml-2 h-4 w-4" />
                                 تصدير
-                              </Button>
-                            </div>
+                               </Button>
+                             </div>
                           </TableCell>
                         </TableRow>
                       ))
