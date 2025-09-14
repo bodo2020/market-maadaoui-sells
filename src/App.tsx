@@ -40,6 +40,7 @@ import CRM from "@/pages/CRM";
 import Analytics from "@/pages/Analytics";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
 import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
+import ExpiryManagement from "@/pages/ExpiryManagement";
 import CustomerCartsPage from "@/pages/CustomerCartsPage";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -76,6 +77,7 @@ function App() {
               <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
               <Route path="/daily-inventory" element={<ProtectedRoute><DailyInventoryPage /></ProtectedRoute>} />
               <Route path="/inventory-history" element={<ProtectedRoute><InventoryHistoryPage /></ProtectedRoute>} />
+              <Route path="/expiry-management" element={<ProtectedRoute><ExpiryManagement /></ProtectedRoute>} />
               <Route path="/supplier-purchases" element={<ProtectedRoute><SupplierPurchases /></ProtectedRoute>} />
               <Route path="/companies" element={<ProtectedRoute><Companies /></ProtectedRoute>} />
               <Route path="/companies/:id" element={<ProtectedRoute><CompanyDetails /></ProtectedRoute>} />

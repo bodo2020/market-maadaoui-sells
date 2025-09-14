@@ -25,6 +25,7 @@ import {
   QrCode,
   UserCog,
   Activity,
+  Calendar,
 } from "lucide-react";
 import { SidebarItemData, NavigationGroup } from "./types";
 
@@ -86,6 +87,11 @@ export const productsNavigation: NavigationGroup = {
       label: "الجرد اليومي",
       href: "/daily-inventory",
       icon: ClipboardList,
+    },
+    {
+      label: "إدارة الصلاحيات",
+      href: "/expiry-management",
+      icon: Calendar,
     },
     {
       label: "مشتريات الموردين",

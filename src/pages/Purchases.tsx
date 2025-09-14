@@ -15,6 +15,7 @@ import { fetchPurchases, createPurchase, deletePurchase } from "@/services/supab
 import { fetchSuppliers } from "@/services/supabase/supplierService";
 import { Textarea } from "@/components/ui/textarea";
 import { Purchase } from "@/types";
+import PurchaseItemForm from "@/components/purchases/PurchaseItemForm";
 
 export default function Purchases() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -30,6 +31,7 @@ export default function Purchases() {
     description: "",
     items: []
   });
+  const [purchaseItems, setPurchaseItems] = useState<any[]>([]);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   
   const queryClient = useQueryClient();
@@ -80,6 +82,7 @@ export default function Purchases() {
       description: "",
       items: []
     });
+    setPurchaseItems([]);
     setInvoiceFile(null);
   };
   
@@ -358,6 +361,12 @@ export default function Purchases() {
               />
             </div>
             
+            {/* Purchase Items Form */}
+            <PurchaseItemForm 
+              items={purchaseItems} 
+              onItemsChange={setPurchaseItems}
+            />
+
             <div className="space-y-2">
               <Label htmlFor="invoice_file">صورة الفاتورة</Label>
               <div className="flex items-center gap-2">

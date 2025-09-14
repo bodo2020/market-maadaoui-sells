@@ -564,6 +564,7 @@ export default function DailyInventoryPage() {
                     <TableRow>
                       <TableHead>المنتج</TableHead>
                       <TableHead>الباركود</TableHead>
+                      <TableHead>موقع الرف</TableHead>
                       <TableHead>الكمية المتوقعة</TableHead>
                       <TableHead>الكمية الفعلية</TableHead>
                       <TableHead>الفرق</TableHead>
@@ -591,6 +592,11 @@ export default function DailyInventoryPage() {
                           </div>
                         </TableCell>
                         <TableCell>{record.products?.barcode || '-'}</TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-md">
+                            {record.products?.shelf_location || 'غير محدد'}
+                          </span>
+                        </TableCell>
                         <TableCell>
                           <span className="font-medium">{record.expected_quantity}</span>
                         </TableCell>
