@@ -34,8 +34,10 @@ export interface InventorySession {
   matched_products: number;
   discrepancy_products: number;
   total_difference_value: number;
-  status: 'active' | 'completed';
+  status: 'active' | 'completed' | 'approved';
   created_by?: string;
+  approved_by?: string;
+  approved_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -302,4 +304,63 @@ export const getInventoryAlert = async (productId: string) => {
 
   if (error) throw error;
   return data;
+};
+
+// الموافقة على الجرد وتحديث الكميات
+export const approveInventorySession = async (sessionId: string) => {
+  console.log(`Approving inventory session: ${sessionId}`);
+  
+  try {
+    // جلب session details أولاً
+    const { data: session, error: sessionError } = await supabase
+      .from('inventory_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+
+    if (sessionError) throw sessionError;
+
+    // جلب جميع inventory records للجلسة
+    const { data: records, error: recordsError } = await supabase
+      .from('inventory_records')
+      .select('*')
+      .eq('inventory_date', session.session_date)
+      .neq('status', 'pending');
+
+    if (recordsError) throw recordsError;
+
+    // تحديث الكميات في جدول inventory
+    for (const record of records) {
+      // تحديث الكمية في جدول inventory
+      await supabase
+        .from('inventory')
+        .update({ 
+          quantity: record.actual_quantity,
+          updated_at: new Date().toISOString()
+        })
+        .eq('product_id', record.product_id);
+        
+      console.log(`Updated inventory for product ${record.product_id}: ${record.actual_quantity}`);
+    }
+
+    // تحديث حالة session إلى approved
+    const { data: updatedSession, error: updateError } = await supabase
+      .from('inventory_sessions')
+      .update({ 
+        status: 'approved',
+        approved_by: (await supabase.auth.getUser()).data.user?.id,
+        approved_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    console.log(`Successfully approved inventory session ${sessionId}`);
+    return updatedSession;
+  } catch (error) {
+    console.error('Error approving inventory session:', error);
+    throw error;
+  }
 };

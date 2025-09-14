@@ -19,11 +19,13 @@ import {
   AlertCircle,
   TrendingUp,
   TrendingDown,
-  Eye
+  Eye,
+  CheckSquare
 } from "lucide-react";
 import { 
   fetchInventorySessions,
   fetchInventoryRecordsByDate,
+  approveInventorySession,
   InventorySession,
   InventoryRecord
 } from "@/services/supabase/inventoryService";
@@ -41,6 +43,7 @@ export default function InventoryHistoryPage() {
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [approving, setApproving] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -236,8 +239,42 @@ export default function InventoryHistoryPage() {
     }
   };
 
+  const handleApproveSession = async (session: InventorySession) => {
+    if (session.status !== 'completed') {
+      toast({
+        title: "خطأ",
+        description: "لا يمكن الموافقة على جرد غير مكتمل",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setApproving(session.id);
+    try {
+      await approveInventorySession(session.id);
+      
+      // تحديث قائمة الجلسات
+      await loadSessions();
+      
+      toast({
+        title: "تمت الموافقة",
+        description: "تم الموافقة على الجرد وتحديث الكميات في النظام",
+      });
+    } catch (error) {
+      console.error("Error approving session:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء الموافقة على الجرد",
+        variant: "destructive"
+      });
+    } finally {
+      setApproving(null);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'approved': return 'text-purple-600';
       case 'completed': return 'text-green-600';
       case 'active': return 'text-blue-600';
       default: return 'text-gray-500';
@@ -246,14 +283,25 @@ export default function InventoryHistoryPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case 'approved': return <CheckSquare className="h-4 w-4 text-purple-600" />;
       case 'completed': return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'active': return <AlertCircle className="h-4 w-4 text-blue-600" />;
       default: return null;
     }
   };
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'approved': return 'معتمد';
+      case 'completed': return 'مكتمل';
+      case 'active': return 'نشط';
+      default: return status;
+    }
+  };
+
   const totalSessions = sessions.length;
   const completedSessions = sessions.filter(s => s.status === 'completed').length;
+  const approvedSessions = sessions.filter(s => s.status === 'approved').length;
   const totalDiscrepancyValue = sessions.reduce((sum, s) => sum + s.total_difference_value, 0);
 
   return (
@@ -277,7 +325,7 @@ export default function InventoryHistoryPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">إجمالي الجرد</CardTitle>
@@ -294,7 +342,17 @@ export default function InventoryHistoryPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">{completedSessions}</div>
-              <p className="text-xs text-muted-foreground">عملية جرد مكتملة</p>
+              <p className="text-xs text-muted-foreground">في انتظار الموافقة</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">الجرد المعتمد</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">{approvedSessions}</div>
+              <p className="text-xs text-muted-foreground">تم اعتماده وتحديث الكميات</p>
             </CardContent>
           </Card>
           
@@ -393,7 +451,7 @@ export default function InventoryHistoryPage() {
                             <div className="flex items-center space-x-2 space-x-reverse">
                               {getStatusIcon(session.status)}
                               <span className={`text-sm ${getStatusColor(session.status)}`}>
-                                {session.status === 'completed' ? 'مكتمل' : 'نشط'}
+                                {getStatusText(session.status)}
                               </span>
                             </div>
                           </TableCell>
@@ -408,6 +466,20 @@ export default function InventoryHistoryPage() {
                                 <Eye className="ml-2 h-4 w-4" />
                                 عرض
                               </Button>
+                              
+                              {session.status === 'completed' && (
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={() => handleApproveSession(session)}
+                                  disabled={approving === session.id}
+                                  className="bg-purple-600 hover:bg-purple-700"
+                                >
+                                  <CheckSquare className={`ml-2 h-4 w-4 ${approving === session.id ? 'animate-spin' : ''}`} />
+                                  {approving === session.id ? 'جاري الموافقة...' : 'موافقة'}
+                                </Button>
+                              )}
+                              
                               <Button
                                 size="sm"
                                 variant="outline"
