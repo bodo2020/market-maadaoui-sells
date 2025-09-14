@@ -87,6 +87,7 @@ export default function AddProduct() {
     try {
       const subs = await fetchSubcategories(categoryId);
       setSubcategories(subs);
+      return subs;
     } catch (error) {
       console.error("Error loading subcategories:", error);
       toast({
@@ -473,17 +474,17 @@ export default function AddProduct() {
                   <Label htmlFor="main_category">الفئة الرئيسية</Label>
                   <Select
                     value={product?.main_category_id || "none"}
-                    onValueChange={(value) => {
+                    onValueChange={async (value) => {
                       const categoryId = value === "none" ? "" : value;
                       setProduct((prev) => ({ 
                         ...prev, 
                         main_category_id: categoryId
                       }));
                       if (categoryId) {
-                        loadSubcategories(categoryId);
-                        // احتفظ بالفئة الفرعية إذا كانت تنتمي للفئة الجديدة
-                        const currentSubcat = subcategories.find(sub => sub.id === product.subcategory_id);
-                        if (!currentSubcat || currentSubcat.category_id !== categoryId) {
+                        const subs = await loadSubcategories(categoryId);
+                        const currentSubId = product?.subcategory_id;
+                        const belongs = subs?.some((sub) => sub.id === currentSubId);
+                        if (!belongs) {
                           setProduct((prev) => ({ ...prev, subcategory_id: "" }));
                         }
                       } else {
