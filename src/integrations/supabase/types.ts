@@ -1481,6 +1481,7 @@ export type Database = {
           notes: string | null
           product_id: string
           purchase_date: string | null
+          purchase_item_id: string | null
           quantity: number
           shelf_location: string | null
           supplier_id: string | null
@@ -1494,6 +1495,7 @@ export type Database = {
           notes?: string | null
           product_id: string
           purchase_date?: string | null
+          purchase_item_id?: string | null
           quantity?: number
           shelf_location?: string | null
           supplier_id?: string | null
@@ -1507,6 +1509,7 @@ export type Database = {
           notes?: string | null
           product_id?: string
           purchase_date?: string | null
+          purchase_item_id?: string | null
           quantity?: number
           shelf_location?: string | null
           supplier_id?: string | null
@@ -1518,6 +1521,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_batches_purchase_item_id_fkey"
+            columns: ["purchase_item_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_items"
             referencedColumns: ["id"]
           },
           {
@@ -1680,32 +1690,44 @@ export type Database = {
       }
       purchase_items: {
         Row: {
+          batch_number: string | null
           created_at: string
+          expiry_date: string | null
           id: string
+          notes: string | null
           price: number
           product_id: string
           purchase_id: string
           quantity: number
+          shelf_location: string | null
           total: number
           updated_at: string | null
         }
         Insert: {
+          batch_number?: string | null
           created_at?: string
+          expiry_date?: string | null
           id?: string
+          notes?: string | null
           price: number
           product_id: string
           purchase_id: string
           quantity: number
+          shelf_location?: string | null
           total: number
           updated_at?: string | null
         }
         Update: {
+          batch_number?: string | null
           created_at?: string
+          expiry_date?: string | null
           id?: string
+          notes?: string | null
           price?: number
           product_id?: string
           purchase_id?: string
           quantity?: number
+          shelf_location?: string | null
           total?: number
           updated_at?: string | null
         }
