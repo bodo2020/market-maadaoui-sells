@@ -22,6 +22,7 @@ export interface InventoryRecord {
     barcode?: string;
     image_urls?: string[];
     unit_of_measure?: string;
+    shelf_location?: string;
   };
 }
 
@@ -125,7 +126,8 @@ export const fetchInventoryRecordsByDate = async (date: string, branchId?: strin
         name,
         barcode,
         image_urls,
-        unit_of_measure
+        unit_of_measure,
+        shelf_location
       )
     `)
     .eq('inventory_date', date)
