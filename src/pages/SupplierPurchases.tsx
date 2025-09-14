@@ -18,10 +18,22 @@ import { Badge } from "@/components/ui/badge";
 import { fetchSuppliers } from "@/services/supabase/supplierService";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 import { createPurchase } from "@/services/supabase/purchaseService";
-import { Product, Supplier, CartItem } from "@/types";
+import { Product, Supplier } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+
+interface CartItem {
+  product: Product;
+  quantity: number;
+  price: number;
+  discount: number;
+  total: number;
+  batchNumber?: string;
+  expiryDate?: string;
+  shelfLocation?: string;
+  notes?: string;
+}
 
 export default function SupplierPurchases() {
   const queryClient = useQueryClient();
@@ -208,7 +220,11 @@ export default function SupplierPurchases() {
         product_id: item.product.id,
         quantity: item.quantity,
         price: item.price,
-        total: item.total
+        total: item.total,
+        batch_number: item.batchNumber,
+        expiry_date: item.expiryDate,
+        shelf_location: item.shelfLocation,
+        notes: item.notes
       }))
     };
     
@@ -484,39 +500,110 @@ export default function SupplierPurchases() {
                         </TableHeader>
                         <TableBody>
                           {cart.map((item, index) => (
-                            <TableRow key={index}>
-                              <TableCell className="font-medium">
-                                {item.product.name}
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={item.quantity}
-                                  onChange={(e) => updateItemQuantity(index, parseInt(e.target.value))}
-                                  min="1"
-                                  className="w-16 h-8 p-1 text-center"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={item.price}
-                                  onChange={(e) => updateItemPrice(index, parseFloat(e.target.value))}
-                                  min="0"
-                                  className="w-20 h-8 p-1 text-center"
-                                />
-                              </TableCell>
-                              <TableCell>{item.total.toFixed(2)}</TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => removeFromCart(index)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
+                            <>
+                              <TableRow key={index}>
+                                <TableCell className="font-medium">
+                                  {item.product.name}
+                                  {item.product.track_expiry && (
+                                    <Badge variant="outline" className="ml-2 text-xs">
+                                      يتطلب صلاحية
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={item.quantity}
+                                    onChange={(e) => updateItemQuantity(index, parseInt(e.target.value))}
+                                    min="1"
+                                    className="w-16 h-8 p-1 text-center"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={item.price}
+                                    onChange={(e) => updateItemPrice(index, parseFloat(e.target.value))}
+                                    min="0"
+                                    className="w-20 h-8 p-1 text-center"
+                                  />
+                                </TableCell>
+                                <TableCell>{item.total.toFixed(2)}</TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeFromCart(index)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                              <TableRow key={`details-${index}`} className="bg-muted/30">
+                                <TableCell colSpan={5} className="p-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                      <label className="text-sm font-medium text-muted-foreground">رقم الدفعة</label>
+                                      <Input
+                                        type="text"
+                                        placeholder="BATCH-001"
+                                        value={item.batchNumber || ''}
+                                        onChange={(e) => {
+                                          const newCart = [...cart];
+                                          newCart[index].batchNumber = e.target.value;
+                                          setCart(newCart);
+                                        }}
+                                        className="mt-1"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-sm font-medium text-muted-foreground">
+                                        تاريخ الصلاحية {item.product.track_expiry && <span className="text-destructive">*</span>}
+                                      </label>
+                                      <Input
+                                        type="date"
+                                        value={item.expiryDate || ''}
+                                        onChange={(e) => {
+                                          const newCart = [...cart];
+                                          newCart[index].expiryDate = e.target.value;
+                                          setCart(newCart);
+                                        }}
+                                        className="mt-1"
+                                        required={item.product.track_expiry}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-sm font-medium text-muted-foreground">موقع الرف</label>
+                                      <Input
+                                        type="text"
+                                        placeholder="A1-B2"
+                                        value={item.shelfLocation || ''}
+                                        onChange={(e) => {
+                                          const newCart = [...cart];
+                                          newCart[index].shelfLocation = e.target.value;
+                                          setCart(newCart);
+                                        }}
+                                        className="mt-1"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-sm font-medium text-muted-foreground">ملاحظات</label>
+                                      <Input
+                                        type="text"
+                                        placeholder="ملاحظات إضافية"
+                                        value={item.notes || ''}
+                                        onChange={(e) => {
+                                          const newCart = [...cart];
+                                          newCart[index].notes = e.target.value;
+                                          setCart(newCart);
+                                        }}
+                                        className="mt-1"
+                                      />
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            </>
                           ))}
                         </TableBody>
                       </Table>

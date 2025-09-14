@@ -8,8 +8,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarIcon, Plus, X } from "lucide-react";
-import { format } from "date-fns";
-import { ar } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Product } from "@/types";
 import { useQuery } from "@tanstack/react-query";
@@ -19,7 +17,7 @@ interface PurchaseItem {
   product_id: string;
   quantity: number;
   price: number;
-  expiry_date?: Date;
+  expiry_date?: string;
   batch_number?: string;
   shelf_location?: string;
   notes?: string;
@@ -156,38 +154,16 @@ export default function PurchaseItemForm({ items, onItemsChange }: PurchaseItemF
                 </div>
 
                 {/* Expiry Date */}
-                {selectedProduct?.track_expiry && (
-                  <div className="space-y-2">
-                    <Label>تاريخ انتهاء الصلاحية</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !item.expiry_date && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {item.expiry_date 
-                            ? format(item.expiry_date, "dd/MM/yyyy", { locale: ar })
-                            : "اختر تاريخ الصلاحية"
-                          }
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={item.expiry_date}
-                          onSelect={(date) => updateItem(index, 'expiry_date', date)}
-                          disabled={(date) => date < new Date()}
-                          initialFocus
-                          className={cn("p-3 pointer-events-auto")}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label>تاريخ انتهاء الصلاحية {selectedProduct?.track_expiry && <span className="text-destructive">*</span>}</Label>
+                  <Input
+                    type="date"
+                    value={item.expiry_date || ""}
+                    onChange={(e) => updateItem(index, 'expiry_date', e.target.value)}
+                    required={selectedProduct?.track_expiry}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
 
                 {/* Shelf Location */}
                 <div className="space-y-2">

@@ -83,7 +83,11 @@ export async function createPurchase(purchaseData: any) {
         product_id: item.product_id,
         quantity: item.quantity,
         price: item.price,
-        total: item.total
+        total: item.total,
+        batch_number: item.batch_number || null,
+        expiry_date: item.expiry_date || null,
+        shelf_location: item.shelf_location || null,
+        notes: item.notes || null
       }));
 
       const { error: itemsError } = await supabase
@@ -259,10 +263,10 @@ export async function getPurchaseWithItems(id: string) {
       return null;
     }
 
-    // Then get the purchase items
+    // Then get the purchase items with batch information
     const { data: items, error: itemsError } = await supabase
       .from("purchase_items")
-      .select("*, products(name)")
+      .select("*, products(name, track_expiry)")
       .eq("purchase_id", id);
 
     if (itemsError) {
