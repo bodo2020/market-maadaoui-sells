@@ -172,7 +172,7 @@ const Invoices = () => {
 
   return (
     <MainLayout>
-      <div className="container mx-auto py-6 space-y-6">
+      <div className="container mx-auto py-6 space-y-6 pb-20">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">إدارة الفواتير</h1>
         </div>
