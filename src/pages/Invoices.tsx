@@ -105,13 +105,23 @@ const Invoices = () => {
 
   const handleViewPurchase = async (purchase: Purchase) => {
     try {
+      console.log("Loading purchase details for:", purchase.id);
       const purchaseWithItems = await getPurchaseWithItems(purchase.id);
+      console.log("Purchase with items:", purchaseWithItems);
+      
       if (purchaseWithItems) {
         setSelectedPurchase(purchaseWithItems);
+        setIsPurchaseDetailsOpen(true);
+      } else {
+        console.log("No items found, showing basic purchase info");
+        setSelectedPurchase(purchase);
         setIsPurchaseDetailsOpen(true);
       }
     } catch (error) {
       console.error("Error fetching purchase details:", error);
+      // Show basic purchase info in case of error
+      setSelectedPurchase(purchase);
+      setIsPurchaseDetailsOpen(true);
     }
   };
 
@@ -421,14 +431,40 @@ const Invoices = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedPurchase.items?.map((item, index) => (
-                    <tr key={index} className="border-b">
-                      <td className="p-2 border">{item.products?.name || 'منتج غير معروف'}</td>
-                      <td className="p-2 border">{item.quantity}</td>
-                      <td className="p-2 border">{item.price.toFixed(2)}</td>
-                      <td className="p-2 border">{item.total.toFixed(2)}</td>
+                  {selectedPurchase.items && selectedPurchase.items.length > 0 ? (
+                    selectedPurchase.items.map((item, index) => (
+                      <tr key={index} className="border-b">
+                        <td className="p-2 border">
+                          <div>
+                            <p className="font-medium">{item.products?.name || 'منتج غير معروف'}</p>
+                            {item.batch_number && (
+                              <p className="text-sm text-gray-500">دفعة: {item.batch_number}</p>
+                            )}
+                            {item.expiry_date && (
+                              <p className="text-sm text-gray-500">
+                                الصلاحية: {new Date(item.expiry_date).toLocaleDateString('ar-EG')}
+                              </p>
+                            )}
+                            {item.shelf_location && (
+                              <p className="text-sm text-gray-500">الموقع: {item.shelf_location}</p>
+                            )}
+                            {item.notes && (
+                              <p className="text-sm text-gray-500">ملاحظات: {item.notes}</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-2 border">{item.quantity}</td>
+                        <td className="p-2 border">{Number(item.price).toFixed(2)}</td>
+                        <td className="p-2 border">{Number(item.total || item.quantity * item.price).toFixed(2)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="p-4 text-center text-gray-500">
+                        لا توجد منتجات مسجلة لهذه الفاتورة
+                      </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>

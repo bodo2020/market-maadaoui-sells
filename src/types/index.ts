@@ -228,7 +228,16 @@ export interface PurchaseItem {
   quantity: number;
   price: number;
   total: number;
-  products?: { name: string };
+  batch_number?: string;
+  expiry_date?: string;
+  shelf_location?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  products?: { 
+    name: string;
+    track_expiry?: boolean;
+  };
 }
 
 export interface OrderItem {
