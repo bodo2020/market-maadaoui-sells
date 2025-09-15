@@ -696,6 +696,45 @@ export type Database = {
         }
         Relationships: []
       }
+      damaged_products: {
+        Row: {
+          batch_number: string
+          created_at: string
+          created_by: string | null
+          damage_cost: number
+          damage_date: string
+          damaged_quantity: number
+          id: string
+          notes: string | null
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          batch_number: string
+          created_at?: string
+          created_by?: string | null
+          damage_cost: number
+          damage_date?: string
+          damaged_quantity: number
+          id?: string
+          notes?: string | null
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          batch_number?: string
+          created_at?: string
+          created_by?: string | null
+          damage_cost?: number
+          damage_date?: string
+          damaged_quantity?: number
+          id?: string
+          notes?: string | null
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       delivery_type_pricing: {
         Row: {
           created_at: string | null

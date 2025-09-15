@@ -9,7 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ProductBatch } from "@/types";
 import { updateProductBatch, createProductBatch } from "@/services/supabase/productBatchService";
 import { fetchProducts, updateProductQuantity } from "@/services/supabase/productService";
-import { createDamageExpense } from "@/services/supabase/expenseService";
+import { createExpense } from "@/services/supabase/expenseService";
+import { recordDamagedProduct } from "@/services/supabase/damageService";
 
 interface ExpiredProductActionsDialogProps {
   open: boolean;
@@ -117,9 +118,20 @@ export function ExpiredProductActionsDialog({
         // Decrease inventory quantity by damaged amount
         await updateProductQuantity(batch.product_id, damagedQuantity, 'decrease');
 
-        // Add damage expense (no cash deduction, just record)
+        // Record damage and add expense
         try {
-          await createDamageExpense({
+          // تسجيل التلف في جدول التوالف
+          await recordDamagedProduct({
+            product_id: batch.product_id,
+            batch_number: batch.batch_number,
+            damaged_quantity: damagedQuantity,
+            damage_cost: damageCost,
+            damage_date: new Date().toISOString().split('T')[0],
+            notes: `منتج تالف منتهي الصلاحية - ${notes || 'بدون ملاحظات إضافية'}`,
+          });
+
+          // إضافة المصروف (والذي سيخصم من الخزنة تلقائياً)
+          await createExpense({
             type: "منتج تالف",
             amount: damageCost,
             description: `منتج تالف منتهي الصلاحية - ${(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`} - الكمية: ${damagedQuantity}`,
@@ -128,15 +140,34 @@ export function ExpiredProductActionsDialog({
           
           toast({
             title: "تم بنجاح",
-            description: `تم تمييز ${damagedQuantity} من المنتج كتالف وتسجيل مصروف ${damageCost.toFixed(2)} ج.م`,
+            description: `تم تمييز ${damagedQuantity} من المنتج كتالف وتسجيل مصروف ${damageCost.toFixed(2)} ج.م وخصمه من الخزنة`,
           });
-        } catch (expenseError) {
-          console.error("Could not create damage expense record:", expenseError);
-          toast({
-            title: "تم جزئياً",
-            description: `تم تمييز ${damagedQuantity} من المنتج كتالف لكن فشل في تسجيل المصروف`,
-            variant: "destructive"
-          });
+        } catch (error: any) {
+          console.error("Error recording damage:", error);
+          
+          // Try to record damage without expense if expense creation fails
+          try {
+            await recordDamagedProduct({
+              product_id: batch.product_id,
+              batch_number: batch.batch_number,
+              damaged_quantity: damagedQuantity,
+              damage_cost: damageCost,
+              damage_date: new Date().toISOString().split('T')[0],
+              notes: `منتج تالف منتهي الصلاحية - ${notes || 'بدون ملاحظات إضافية'} - (فشل في تسجيل المصروف)`,
+            });
+            
+            toast({
+              title: "تم جزئياً",
+              description: `تم تمييز ${damagedQuantity} من المنتج كتالف لكن فشل في تسجيل المصروف في الخزنة`,
+              variant: "destructive"
+            });
+          } catch (damageError) {
+            toast({
+              title: "خطأ",
+              description: "فشل في تسجيل التلف والمصروف",
+              variant: "destructive"
+            });
+          }
         }
       } else if (actionType === 'replace') {
         if (!newExpiryDate) {
