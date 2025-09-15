@@ -31,6 +31,7 @@ import { getExpiringProducts, fetchProductBatches } from "@/services/supabase/pr
 import { fetchProducts } from "@/services/supabase/productService";
 import { ProductBatch } from "@/types";
 import { ExpiryAlertCard } from "@/components/inventory/ExpiryAlertCard";
+import { ExpiredProductActionsDialog } from "@/components/inventory/ExpiredProductActionsDialog";
 
 export default function ExpiryManagement() {
   const [expiringProducts, setExpiringProducts] = useState<ProductBatch[]>([]);
@@ -39,6 +40,8 @@ export default function ExpiryManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDays, setFilterDays] = useState(7);
+  const [selectedBatch, setSelectedBatch] = useState<ProductBatch | null>(null);
+  const [actionsDialogOpen, setActionsDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // دالة لجلب المنتجات منتهية الصلاحية من جدول products مباشرة
@@ -190,6 +193,15 @@ export default function ExpiryManagement() {
     }, 0);
 
     return { expired, expiringSoon, totalValue };
+  };
+
+  const handleActionClick = (batch: ProductBatch) => {
+    setSelectedBatch(batch);
+    setActionsDialogOpen(true);
+  };
+
+  const handleActionComplete = () => {
+    loadExpiryData(); // Reload data after action
   };
 
   const stats = getStatsData();
@@ -346,6 +358,7 @@ export default function ExpiryManagement() {
                       <TableHead>تاريخ الصلاحية</TableHead>
                       <TableHead>الحالة</TableHead>
                       <TableHead>الملاحظات</TableHead>
+                      <TableHead>الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -374,6 +387,16 @@ export default function ExpiryManagement() {
                           <TableCell className="text-sm text-muted-foreground">
                             {batch.notes || '-'}
                           </TableCell>
+                          <TableCell>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleActionClick(batch)}
+                              disabled={batch.quantity === 0}
+                            >
+                              إجراء
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
@@ -383,6 +406,14 @@ export default function ExpiryManagement() {
             )}
           </CardContent>
         </Card>
+
+        {/* Actions Dialog */}
+        <ExpiredProductActionsDialog
+          open={actionsDialogOpen}
+          onClose={() => setActionsDialogOpen(false)}
+          batch={selectedBatch}
+          onActionComplete={handleActionComplete}
+        />
       </div>
     </MainLayout>
   );
