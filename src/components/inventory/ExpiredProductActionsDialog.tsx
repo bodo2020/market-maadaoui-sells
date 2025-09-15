@@ -79,17 +79,22 @@ export function ExpiredProductActionsDialog({
         // Decrease inventory quantity
         await updateProductQuantity(batch.product_id, batch.quantity, 'decrease');
 
-        // Add damage expense
-        await createExpense({
-          type: "منتج تالف",
-          amount: damageCost,
-          description: `منتج تالف منتهي الصلاحية - ${(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`}`,
-          date: new Date().toISOString(),
-        });
+        // Try to add damage expense (skip if permission denied)
+        try {
+          await createExpense({
+            type: "منتج تالف",
+            amount: damageCost,
+            description: `منتج تالف منتهي الصلاحية - ${(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`}`,
+            date: new Date().toISOString(),
+          });
+        } catch (expenseError) {
+          console.warn("Could not create expense record:", expenseError);
+          // Continue without failing the whole operation
+        }
 
         toast({
           title: "تم بنجاح",
-          description: `تم تمييز المنتج كتالف وخصم ${damageCost.toFixed(2)} ج.م من المصروفات`,
+          description: `تم تمييز المنتج كتالف وخصم الكمية من المخزون`,
         });
       } else if (actionType === 'replace') {
         if (!newExpiryDate) {

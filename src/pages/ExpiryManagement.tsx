@@ -41,6 +41,7 @@ export default function ExpiryManagement() {
   const [damagedProducts, setDamagedProducts] = useState<ProductBatch[]>([]);
   const [allBatches, setAllBatches] = useState<ProductBatch[]>([]);
   const [filteredBatches, setFilteredBatches] = useState<ProductBatch[]>([]);
+  const [showDamagedOnly, setShowDamagedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDays, setFilterDays] = useState(7);
@@ -134,7 +135,7 @@ export default function ExpiryManagement() {
 
   useEffect(() => {
     filterBatches();
-  }, [searchTerm, filterDays, allBatches]);
+  }, [searchTerm, filterDays, allBatches, showDamagedOnly]);
 
   const loadExpiryData = async () => {
     setLoading(true);
@@ -178,14 +179,22 @@ export default function ExpiryManagement() {
       );
     }
 
-    // Filter by expiry date
-    const futureDate = new Date();
-    futureDate.setDate(futureDate.getDate() + filterDays);
-    
-    filtered = filtered.filter(batch => {
-      const expiryDate = parseISO(batch.expiry_date);
-      return expiryDate <= futureDate && batch.quantity > 0;
-    });
+    if (!showDamagedOnly) {
+      // Show only products that are not damaged and approaching expiry
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + filterDays);
+      
+      filtered = filtered.filter(batch => {
+        const expiryDate = parseISO(batch.expiry_date);
+        const isNotDamaged = batch.quantity > 0 && !batch.notes?.includes('تالف');
+        return expiryDate <= futureDate && isNotDamaged;
+      });
+    } else {
+      // Show only damaged products
+      filtered = filtered.filter(batch => 
+        batch.quantity === 0 && batch.notes?.includes('تالف')
+      );
+    }
 
     // Sort by expiry date (nearest first)
     filtered.sort((a, b) => {
@@ -246,76 +255,45 @@ export default function ExpiryManagement() {
     try {
       const workbook = new XLSX.Workbook();
       
-      // إنشاء ورقة للمنتجات منتهية الصلاحية
-      const expirySheet = workbook.addWorksheet('المنتجات منتهية الصلاحية');
-      
-      // إضافة العناوين
-      expirySheet.addRow([
-        'اسم المنتج',
-        'رقم الدفعة', 
-        'موقع الرف',
-        'الكمية',
-        'تاريخ الصلاحية',
-        'الحالة',
-        'الملاحظات'
-      ]);
-      
-      // تنسيق العناوين
-      expirySheet.getRow(1).font = { bold: true };
-      expirySheet.getRow(1).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE6F3FF' }
-      };
-      
-      // إضافة البيانات
-      filteredBatches.forEach((batch) => {
-        const status = getExpiryStatus(batch.expiry_date);
+      if (!showDamagedOnly) {
+        // إنشاء ورقة للمنتجات منتهية الصلاحية
+        const expirySheet = workbook.addWorksheet('المنتجات منتهية الصلاحية');
+        
+        // إضافة العناوين
         expirySheet.addRow([
-          (batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`,
-          batch.batch_number,
-          batch.shelf_location || 'غير محدد',
-          batch.quantity,
-          format(parseISO(batch.expiry_date), 'dd/MM/yyyy', { locale: ar }),
-          status.text,
-          batch.notes || '-'
+          'اسم المنتج',
+          'رقم الدفعة', 
+          'موقع الرف',
+          'الكمية',
+          'تاريخ الصلاحية',
+          'الحالة',
+          'الملاحظات'
         ]);
-      });
-      
-      // إنشاء ورقة للمنتجات التالفة
-      const damagedSheet = workbook.addWorksheet('المنتجات التالفة');
-      
-      // إضافة العناوين للتوالف
-      damagedSheet.addRow([
-        'اسم المنتج',
-        'رقم الدفعة',
-        'موقع الرف', 
-        'تاريخ التلف',
-        'الملاحظات'
-      ]);
-      
-      // تنسيق العناوين
-      damagedSheet.getRow(1).font = { bold: true };
-      damagedSheet.getRow(1).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFFFE6E6' }
-      };
-      
-      // إضافة بيانات التوالف
-      damagedProducts.forEach((batch) => {
-        damagedSheet.addRow([
-          (batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`,
-          batch.batch_number,
-          batch.shelf_location || 'غير محدد',
-          format(parseISO(batch.updated_at), 'dd/MM/yyyy', { locale: ar }),
-          batch.notes || '-'
-        ]);
-      });
-      
-      // ضبط عرض الأعمدة
-      [expirySheet, damagedSheet].forEach(sheet => {
-        sheet.columns.forEach((column, index) => {
+        
+        // تنسيق العناوين
+        expirySheet.getRow(1).font = { bold: true };
+        expirySheet.getRow(1).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFE6F3FF' }
+        };
+        
+        // إضافة البيانات
+        filteredBatches.forEach((batch) => {
+          const status = getExpiryStatus(batch.expiry_date);
+          expirySheet.addRow([
+            (batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`,
+            batch.batch_number,
+            batch.shelf_location || 'غير محدد',
+            batch.quantity,
+            format(parseISO(batch.expiry_date), 'dd/MM/yyyy', { locale: ar }),
+            status.text,
+            batch.notes || '-'
+          ]);
+        });
+        
+        // ضبط عرض الأعمدة
+        expirySheet.columns.forEach((column) => {
           let maxLength = 0;
           column.eachCell({ includeEmpty: true }, (cell) => {
             const columnLength = cell.value ? cell.value.toString().length : 10;
@@ -325,7 +303,50 @@ export default function ExpiryManagement() {
           });
           column.width = Math.min(Math.max(maxLength + 2, 10), 50);
         });
-      });
+      } else {
+        // إنشاء ورقة للمنتجات التالفة
+        const damagedSheet = workbook.addWorksheet('المنتجات التالفة');
+        
+        // إضافة العناوين للتوالف
+        damagedSheet.addRow([
+          'اسم المنتج',
+          'رقم الدفعة',
+          'موقع الرف', 
+          'تاريخ التلف',
+          'الملاحظات'
+        ]);
+        
+        // تنسيق العناوين
+        damagedSheet.getRow(1).font = { bold: true };
+        damagedSheet.getRow(1).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFE6E6' }
+        };
+        
+        // إضافة بيانات التوالف
+        filteredBatches.forEach((batch) => {
+          damagedSheet.addRow([
+            (batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`,
+            batch.batch_number,
+            batch.shelf_location || 'غير محدد',
+            format(parseISO(batch.updated_at), 'dd/MM/yyyy', { locale: ar }),
+            batch.notes || '-'
+          ]);
+        });
+        
+        // ضبط عرض الأعمدة
+        damagedSheet.columns.forEach((column) => {
+          let maxLength = 0;
+          column.eachCell({ includeEmpty: true }, (cell) => {
+            const columnLength = cell.value ? cell.value.toString().length : 10;
+            if (columnLength > maxLength) {
+              maxLength = columnLength;
+            }
+          });
+          column.width = Math.min(Math.max(maxLength + 2, 10), 50);
+        });
+      }
       
       // تصدير الملف
       const buffer = await workbook.xlsx.writeBuffer();
@@ -333,7 +354,8 @@ export default function ExpiryManagement() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `تقرير_الصلاحيات_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      const fileName = showDamagedOnly ? 'المنتجات_التالفة' : 'تقرير_الصلاحيات';
+      a.download = `${fileName}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -457,6 +479,33 @@ export default function ExpiryManagement() {
           </Card>
         </div>
 
+        {/* View Toggle */}
+        <Card>
+          <CardHeader>
+            <CardTitle>نوع العرض</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              <Button
+                variant={!showDamagedOnly ? "default" : "outline"}
+                onClick={() => setShowDamagedOnly(false)}
+                className="flex items-center gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                المنتجات منتهية الصلاحية
+              </Button>
+              <Button
+                variant={showDamagedOnly ? "default" : "outline"}
+                onClick={() => setShowDamagedOnly(true)}
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                المنتجات التالفة
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Filters */}
         <Card>
           <CardHeader>
@@ -478,21 +527,23 @@ export default function ExpiryManagement() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="filterDays">عرض المنتجات التي تنتهي خلال</Label>
-                <select
-                  id="filterDays"
-                  value={filterDays}
-                  onChange={(e) => setFilterDays(Number(e.target.value))}
-                  className="w-full px-3 py-2 border rounded-md"
-                >
-                  <option value={3}>3 أيام</option>
-                  <option value={7}>7 أيام</option>
-                  <option value={14}>14 يوم</option>
-                  <option value={30}>30 يوم</option>
-                  <option value={90}>90 يوم</option>
-                </select>
-              </div>
+              {!showDamagedOnly && (
+                <div className="space-y-2">
+                  <Label htmlFor="filterDays">عرض المنتجات التي تنتهي خلال</Label>
+                  <select
+                    id="filterDays"
+                    value={filterDays}
+                    onChange={(e) => setFilterDays(Number(e.target.value))}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value={3}>3 أيام</option>
+                    <option value={7}>7 أيام</option>
+                    <option value={14}>14 يوم</option>
+                    <option value={30}>30 يوم</option>
+                    <option value={90}>90 يوم</option>
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>إجمالي النتائج</Label>
@@ -505,15 +556,22 @@ export default function ExpiryManagement() {
         {/* Products Table */}
         <Card>
           <CardHeader>
-            <CardTitle>قائمة المنتجات حسب تاريخ الصلاحية</CardTitle>
+            <CardTitle>
+              {showDamagedOnly ? 'قائمة المنتجات التالفة' : 'قائمة المنتجات حسب تاريخ الصلاحية'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {filteredBatches.length === 0 ? (
               <div className="text-center py-8">
                 <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">لا توجد منتجات منتهية الصلاحية</h3>
+                <h3 className="text-lg font-medium mb-2">
+                  {showDamagedOnly ? 'لا توجد منتجات تالفة' : 'لا توجد منتجات منتهية الصلاحية'}
+                </h3>
                 <p className="text-muted-foreground">
-                  جميع المنتجات ضمن الفترة المحددة لا تواجه مشاكل في الصلاحية
+                  {showDamagedOnly 
+                    ? 'جميع المنتجات في حالة جيدة' 
+                    : 'جميع المنتجات ضمن الفترة المحددة لا تواجه مشاكل في الصلاحية'
+                  }
                 </p>
               </div>
             ) : (
@@ -525,10 +583,10 @@ export default function ExpiryManagement() {
                       <TableHead>رقم الدفعة</TableHead>
                       <TableHead>موقع الرف</TableHead>
                       <TableHead>الكمية</TableHead>
-                      <TableHead>تاريخ الصلاحية</TableHead>
-                      <TableHead>الحالة</TableHead>
+                      <TableHead>{showDamagedOnly ? 'تاريخ التلف' : 'تاريخ الصلاحية'}</TableHead>
+                      {!showDamagedOnly && <TableHead>الحالة</TableHead>}
                       <TableHead>الملاحظات</TableHead>
-                      <TableHead>الإجراءات</TableHead>
+                      {!showDamagedOnly && <TableHead>الإجراءات</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -547,85 +605,36 @@ export default function ExpiryManagement() {
                           </TableCell>
                           <TableCell>{batch.quantity}</TableCell>
                           <TableCell>
-                            {format(parseISO(batch.expiry_date), 'dd/MM/yyyy', { locale: ar })}
+                            {showDamagedOnly 
+                              ? format(parseISO(batch.updated_at), 'dd/MM/yyyy', { locale: ar })
+                              : format(parseISO(batch.expiry_date), 'dd/MM/yyyy', { locale: ar })
+                            }
                           </TableCell>
-                          <TableCell>
-                            <Badge className={`text-white ${status.color}`}>
-                              {status.text}
-                            </Badge>
-                          </TableCell>
+                          {!showDamagedOnly && (
+                            <TableCell>
+                              <Badge className={`text-white ${status.color}`}>
+                                {status.text}
+                              </Badge>
+                            </TableCell>
+                          )}
                           <TableCell className="text-sm text-muted-foreground">
                             {batch.notes || '-'}
                           </TableCell>
-                          <TableCell>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleActionClick(batch)}
-                              disabled={batch.quantity === 0}
-                            >
-                              إجراء
-                            </Button>
-                          </TableCell>
+                          {!showDamagedOnly && (
+                            <TableCell>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleActionClick(batch)}
+                                disabled={batch.quantity === 0}
+                              >
+                                إجراء
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       );
                     })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Damaged Products Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-gray-500" />
-              المنتجات التالفة
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {damagedProducts.length === 0 ? (
-              <div className="text-center py-8">
-                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">لا توجد منتجات تالفة</h3>
-                <p className="text-muted-foreground">
-                  جميع المنتجات في حالة جيدة
-                </p>
-              </div>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>اسم المنتج</TableHead>
-                      <TableHead>رقم الدفعة</TableHead>
-                      <TableHead>موقع الرف</TableHead>
-                      <TableHead>تاريخ التلف</TableHead>
-                      <TableHead>الملاحظات</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {damagedProducts.map((batch) => (
-                      <TableRow key={batch.id}>
-                        <TableCell className="font-medium">
-                          {(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`}
-                        </TableCell>
-                        <TableCell>{batch.batch_number}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {batch.shelf_location || 'غير محدد'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {format(parseISO(batch.updated_at), 'dd/MM/yyyy', { locale: ar })}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {batch.notes || '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
                   </TableBody>
                 </Table>
               </div>
