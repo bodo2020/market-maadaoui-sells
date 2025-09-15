@@ -22,7 +22,9 @@ import {
   CheckCircle,
   Search,
   Filter,
-  Download
+  Download,
+  Trash2,
+  FileSpreadsheet
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, isAfter, differenceInDays, parseISO } from "date-fns";
@@ -32,9 +34,11 @@ import { fetchProducts } from "@/services/supabase/productService";
 import { ProductBatch } from "@/types";
 import { ExpiryAlertCard } from "@/components/inventory/ExpiryAlertCard";
 import { ExpiredProductActionsDialog } from "@/components/inventory/ExpiredProductActionsDialog";
+import * as XLSX from 'exceljs';
 
 export default function ExpiryManagement() {
   const [expiringProducts, setExpiringProducts] = useState<ProductBatch[]>([]);
+  const [damagedProducts, setDamagedProducts] = useState<ProductBatch[]>([]);
   const [allBatches, setAllBatches] = useState<ProductBatch[]>([]);
   const [filteredBatches, setFilteredBatches] = useState<ProductBatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +88,46 @@ export default function ExpiryManagement() {
     }
   };
 
+  // دالة لجلب المنتجات التالفة
+  const fetchDamagedProducts = async () => {
+    try {
+      const [damagedBatches, allProducts] = await Promise.all([
+        fetchProductBatches(),
+        fetchProducts()
+      ]);
+      
+      // البحث عن الدفعات التالفة (كمية = 0 وتحتوي على "تالف" في الملاحظات)
+      const damaged = damagedBatches.filter(batch => 
+        batch.quantity === 0 && 
+        batch.notes?.includes('تالف')
+      );
+      
+      // البحث عن المنتجات التالفة من المخزون الرئيسي (استخدام الوصف بدلاً من notes)
+      const damagedMainProducts = allProducts
+        .filter(product => product.description?.includes('تالف'))
+        .map(product => ({
+          id: product.id,
+          product_id: product.id,
+          batch_number: `MAIN-${product.id.slice(-6)}`,
+          expiry_date: product.expiry_date || new Date().toISOString().split('T')[0],
+          quantity: 0,
+          shelf_location: product.shelf_location || null,
+          purchase_date: null,
+          supplier_id: null,
+          notes: product.description || 'تالف من المخزون الرئيسي',
+          created_at: typeof product.created_at === 'string' ? product.created_at : new Date(product.created_at).toISOString(),
+          updated_at: typeof product.updated_at === 'string' ? product.updated_at : new Date(product.updated_at || product.created_at).toISOString(),
+          product_name: product.name,
+          product_barcode: product.barcode
+        } as ProductBatch & { product_name: string; product_barcode?: string }));
+      
+      return [...damaged, ...damagedMainProducts];
+    } catch (error) {
+      console.error("Error fetching damaged products:", error);
+      return [];
+    }
+  };
+
   useEffect(() => {
     loadExpiryData();
   }, []);
@@ -96,10 +140,11 @@ export default function ExpiryManagement() {
     setLoading(true);
     try {
       // جلب المنتجات منتهية الصلاحية من جدول product_batches
-      const [expiringBatches, allBatches, expiringProducts] = await Promise.all([
+      const [expiringBatches, allBatches, expiringProducts, damagedProducts] = await Promise.all([
         getExpiringProducts(7),
         fetchProductBatches(),
-        getExpiringProductsFromProducts(7) // دالة جديدة لجلب المنتجات من جدول products
+        getExpiringProductsFromProducts(7), // دالة جديدة لجلب المنتجات من جدول products
+        fetchDamagedProducts()
       ]);
       
       // دمج النتائج من الجدولين
@@ -107,6 +152,7 @@ export default function ExpiryManagement() {
       const combinedAll = [...allBatches, ...expiringProducts];
       
       setExpiringProducts(combinedExpiring);
+      setDamagedProducts(damagedProducts);
       setAllBatches(combinedAll);
     } catch (error) {
       console.error("Error loading expiry data:", error);
@@ -195,6 +241,118 @@ export default function ExpiryManagement() {
     return { expired, expiringSoon, totalValue };
   };
 
+  // دالة تصدير تقرير Excel
+  const exportToExcel = async () => {
+    try {
+      const workbook = new XLSX.Workbook();
+      
+      // إنشاء ورقة للمنتجات منتهية الصلاحية
+      const expirySheet = workbook.addWorksheet('المنتجات منتهية الصلاحية');
+      
+      // إضافة العناوين
+      expirySheet.addRow([
+        'اسم المنتج',
+        'رقم الدفعة', 
+        'موقع الرف',
+        'الكمية',
+        'تاريخ الصلاحية',
+        'الحالة',
+        'الملاحظات'
+      ]);
+      
+      // تنسيق العناوين
+      expirySheet.getRow(1).font = { bold: true };
+      expirySheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE6F3FF' }
+      };
+      
+      // إضافة البيانات
+      filteredBatches.forEach((batch) => {
+        const status = getExpiryStatus(batch.expiry_date);
+        expirySheet.addRow([
+          (batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`,
+          batch.batch_number,
+          batch.shelf_location || 'غير محدد',
+          batch.quantity,
+          format(parseISO(batch.expiry_date), 'dd/MM/yyyy', { locale: ar }),
+          status.text,
+          batch.notes || '-'
+        ]);
+      });
+      
+      // إنشاء ورقة للمنتجات التالفة
+      const damagedSheet = workbook.addWorksheet('المنتجات التالفة');
+      
+      // إضافة العناوين للتوالف
+      damagedSheet.addRow([
+        'اسم المنتج',
+        'رقم الدفعة',
+        'موقع الرف', 
+        'تاريخ التلف',
+        'الملاحظات'
+      ]);
+      
+      // تنسيق العناوين
+      damagedSheet.getRow(1).font = { bold: true };
+      damagedSheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFE6E6' }
+      };
+      
+      // إضافة بيانات التوالف
+      damagedProducts.forEach((batch) => {
+        damagedSheet.addRow([
+          (batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`,
+          batch.batch_number,
+          batch.shelf_location || 'غير محدد',
+          format(parseISO(batch.updated_at), 'dd/MM/yyyy', { locale: ar }),
+          batch.notes || '-'
+        ]);
+      });
+      
+      // ضبط عرض الأعمدة
+      [expirySheet, damagedSheet].forEach(sheet => {
+        sheet.columns.forEach((column, index) => {
+          let maxLength = 0;
+          column.eachCell({ includeEmpty: true }, (cell) => {
+            const columnLength = cell.value ? cell.value.toString().length : 10;
+            if (columnLength > maxLength) {
+              maxLength = columnLength;
+            }
+          });
+          column.width = Math.min(Math.max(maxLength + 2, 10), 50);
+        });
+      });
+      
+      // تصدير الملف
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `تقرير_الصلاحيات_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "تم بنجاح",
+        description: "تم تصدير التقرير بصيغة Excel",
+      });
+    } catch (error) {
+      console.error("Error exporting to Excel:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء تصدير التقرير",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleActionClick = (batch: ProductBatch) => {
     setSelectedBatch(batch);
     setActionsDialogOpen(true);
@@ -205,6 +363,7 @@ export default function ExpiryManagement() {
   };
 
   const stats = getStatsData();
+  const damagedCount = damagedProducts.length;
 
   if (loading) {
     return (
@@ -235,9 +394,9 @@ export default function ExpiryManagement() {
           </div>
           
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => window.print()}>
-              <Download className="ml-2 h-4 w-4" />
-              طباعة التقرير
+            <Button variant="outline" onClick={exportToExcel}>
+              <FileSpreadsheet className="ml-2 h-4 w-4" />
+              تصدير Excel
             </Button>
             <Button onClick={loadExpiryData}>
               <Package className="ml-2 h-4 w-4" />
@@ -252,7 +411,7 @@ export default function ExpiryManagement() {
         )}
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">منتهية الصلاحية</CardTitle>
@@ -272,6 +431,17 @@ export default function ExpiryManagement() {
             <CardContent>
               <div className="text-2xl font-bold text-orange-600">{stats.expiringSoon}</div>
               <p className="text-xs text-muted-foreground">منتج ينتهي خلال 7 أيام</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">المنتجات التالفة</CardTitle>
+              <Trash2 className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-600">{damagedCount}</div>
+              <p className="text-xs text-muted-foreground">منتج تالف</p>
             </CardContent>
           </Card>
 
@@ -400,6 +570,62 @@ export default function ExpiryManagement() {
                         </TableRow>
                       );
                     })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Damaged Products Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-gray-500" />
+              المنتجات التالفة
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {damagedProducts.length === 0 ? (
+              <div className="text-center py-8">
+                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">لا توجد منتجات تالفة</h3>
+                <p className="text-muted-foreground">
+                  جميع المنتجات في حالة جيدة
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>اسم المنتج</TableHead>
+                      <TableHead>رقم الدفعة</TableHead>
+                      <TableHead>موقع الرف</TableHead>
+                      <TableHead>تاريخ التلف</TableHead>
+                      <TableHead>الملاحظات</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {damagedProducts.map((batch) => (
+                      <TableRow key={batch.id}>
+                        <TableCell className="font-medium">
+                          {(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`}
+                        </TableCell>
+                        <TableCell>{batch.batch_number}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {batch.shelf_location || 'غير محدد'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {format(parseISO(batch.updated_at), 'dd/MM/yyyy', { locale: ar })}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {batch.notes || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
