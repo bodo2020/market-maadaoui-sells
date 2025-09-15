@@ -97,10 +97,9 @@ export default function ExpiryManagement() {
         fetchProducts()
       ]);
       
-      // البحث عن الدفعات التالفة (كمية = 0 وتحتوي على "تالف" في الملاحظات)
+      // البحث عن الدفعات التالفة (تحتوي على "تالف" في الملاحظات أو تبدأ برقم دفعة DAMAGED)
       const damaged = damagedBatches.filter(batch => 
-        batch.quantity === 0 && 
-        batch.notes?.includes('تالف')
+        (batch.notes?.includes('تالف') || batch.batch_number.startsWith('DAMAGED-'))
       );
       
       // البحث عن المنتجات التالفة من المخزون الرئيسي (استخدام الوصف بدلاً من notes)
@@ -186,13 +185,13 @@ export default function ExpiryManagement() {
       
       filtered = filtered.filter(batch => {
         const expiryDate = parseISO(batch.expiry_date);
-        const isNotDamaged = batch.quantity > 0 && !batch.notes?.includes('تالف');
-        return expiryDate <= futureDate && isNotDamaged;
+        const isNotDamaged = !batch.notes?.includes('تالف') && !batch.batch_number.startsWith('DAMAGED-');
+        return expiryDate <= futureDate && batch.quantity > 0 && isNotDamaged;
       });
     } else {
-      // Show only damaged products
+      // Show only damaged products (contains "تالف" in notes or batch number starts with DAMAGED)
       filtered = filtered.filter(batch => 
-        batch.quantity === 0 && batch.notes?.includes('تالف')
+        batch.notes?.includes('تالف') || batch.batch_number.startsWith('DAMAGED-')
       );
     }
 
@@ -603,7 +602,7 @@ export default function ExpiryManagement() {
                               {batch.shelf_location || 'غير محدد'}
                             </Badge>
                           </TableCell>
-                          <TableCell>{batch.quantity}</TableCell>
+                          <TableCell>{showDamagedOnly ? batch.quantity : batch.quantity}</TableCell>
                           <TableCell>
                             {showDamagedOnly 
                               ? format(parseISO(batch.updated_at), 'dd/MM/yyyy', { locale: ar })

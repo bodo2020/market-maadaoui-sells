@@ -25,6 +25,7 @@ export function ExpiredProductActionsDialog({
   onActionComplete
 }: ExpiredProductActionsDialogProps) {
   const [actionType, setActionType] = useState<'damaged' | 'replace' | ''>('');
+  const [damagedQuantity, setDamagedQuantity] = useState(0);
   const [newExpiryDate, setNewExpiryDate] = useState('');
   const [newBatchNumber, setNewBatchNumber] = useState('');
   const [notes, setNotes] = useState('');
@@ -49,42 +50,79 @@ export function ExpiredProductActionsDialog({
   const handleSubmit = async () => {
     if (!batch || !actionType) return;
 
+    if (actionType === 'damaged') {
+      if (!damagedQuantity || damagedQuantity <= 0) {
+        toast({
+          title: "خطأ",
+          description: "يرجى إدخال كمية صحيحة للتلف",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (damagedQuantity > batch.quantity) {
+        toast({
+          title: "خطأ",
+          description: "الكمية التالفة لا يمكن أن تتجاوز الكمية المتوفرة",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const isMainProd = isMainProduct(batch);
 
       if (actionType === 'damaged') {
-        // Calculate damage cost (purchase price * quantity)
+        // Calculate damage cost (purchase price * damaged quantity)
         const purchasePrice = batch.purchase_price || (batch as any).products?.purchase_price || 10; // fallback
-        const damageCost = batch.quantity * purchasePrice;
+        const damageCost = damagedQuantity * purchasePrice;
 
+        // Create new batch entry for damaged quantity
+        await createProductBatch({
+          product_id: batch.product_id,
+          batch_number: `DAMAGED-${generateBatchNumber()}`,
+          quantity: damagedQuantity,
+          expiry_date: batch.expiry_date,
+          shelf_location: batch.shelf_location,
+          purchase_price: purchasePrice,
+          notes: `تالف - ${notes || 'منتج منتهي الصلاحية'} - الكمية التالفة: ${damagedQuantity}`,
+        });
+
+        // Update original batch to reduce quantity
+        const remainingQuantity = batch.quantity - damagedQuantity;
         if (isMainProd) {
-          // Create new batch entry for main product marked as damaged
-          await createProductBatch({
-            product_id: batch.product_id,
-            batch_number: generateBatchNumber(),
-            quantity: 0,
-            expiry_date: batch.expiry_date,
-            shelf_location: batch.shelf_location,
-            notes: `تالف - ${notes || 'منتج منتهي الصلاحية'}`,
-          });
+          // For main products, we can't directly update, so we'll handle it differently
+          // Create a new batch for remaining quantity if needed
+          if (remainingQuantity > 0) {
+            await createProductBatch({
+              product_id: batch.product_id,
+              batch_number: `REMAINING-${generateBatchNumber()}`,
+              quantity: remainingQuantity,
+              expiry_date: batch.expiry_date,
+              shelf_location: batch.shelf_location,
+              purchase_price: purchasePrice,
+              notes: `الكمية المتبقية بعد التلف`,
+            });
+          }
         } else {
-          // Update existing batch
+          // Update existing batch with remaining quantity
           await updateProductBatch(batch.id, {
-            quantity: 0,
-            notes: `تالف - ${notes || 'منتج منتهي الصلاحية'}`,
+            quantity: remainingQuantity,
+            notes: `تم خصم ${damagedQuantity} كتالف - ${batch.notes || ''}`,
           });
         }
 
-        // Decrease inventory quantity
-        await updateProductQuantity(batch.product_id, batch.quantity, 'decrease');
+        // Decrease inventory quantity by damaged amount
+        await updateProductQuantity(batch.product_id, damagedQuantity, 'decrease');
 
         // Try to add damage expense (skip if permission denied)
         try {
           await createExpense({
             type: "منتج تالف",
             amount: damageCost,
-            description: `منتج تالف منتهي الصلاحية - ${(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`}`,
+            description: `منتج تالف منتهي الصلاحية - ${(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`} - الكمية: ${damagedQuantity}`,
             date: new Date().toISOString(),
           });
         } catch (expenseError) {
@@ -94,7 +132,7 @@ export function ExpiredProductActionsDialog({
 
         toast({
           title: "تم بنجاح",
-          description: `تم تمييز المنتج كتالف وخصم الكمية من المخزون`,
+          description: `تم تمييز ${damagedQuantity} من المنتج كتالف وخصم الكمية من المخزون`,
         });
       } else if (actionType === 'replace') {
         if (!newExpiryDate) {
@@ -153,6 +191,7 @@ export function ExpiredProductActionsDialog({
 
   const handleClose = () => {
     setActionType('');
+    setDamagedQuantity(0);
     setNewExpiryDate('');
     setNewBatchNumber('');
     setNotes('');
@@ -164,6 +203,9 @@ export function ExpiredProductActionsDialog({
     setActionType(value);
     if (value === 'replace' && !newBatchNumber) {
       setNewBatchNumber(generateBatchNumber());
+    }
+    if (value === 'damaged' && batch) {
+      setDamagedQuantity(batch.quantity); // Default to full quantity
     }
   };
 
@@ -197,6 +239,24 @@ export function ExpiredProductActionsDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {actionType === 'damaged' && (
+            <div className="space-y-2">
+              <Label htmlFor="damagedQuantity">الكمية التالفة</Label>
+              <Input
+                id="damagedQuantity"
+                type="number"
+                min="1"
+                max={batch?.quantity || 1}
+                value={damagedQuantity}
+                onChange={(e) => setDamagedQuantity(Number(e.target.value))}
+                placeholder="أدخل الكمية التالفة"
+              />
+              <p className="text-sm text-muted-foreground">
+                الكمية المتوفرة: {batch?.quantity || 0}
+              </p>
+            </div>
+          )}
 
           {actionType === 'replace' && (
             <>
