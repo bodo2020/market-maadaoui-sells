@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { ProductBatch } from "@/types";
 import { updateProductBatch, createProductBatch } from "@/services/supabase/productBatchService";
-import { fetchProducts } from "@/services/supabase/productService";
+import { fetchProducts, updateProductQuantity } from "@/services/supabase/productService";
+import { createExpense } from "@/services/supabase/expenseService";
 
 interface ExpiredProductActionsDialogProps {
   open: boolean;
@@ -53,6 +54,10 @@ export function ExpiredProductActionsDialog({
       const isMainProd = isMainProduct(batch);
 
       if (actionType === 'damaged') {
+        // Calculate damage cost (purchase price * quantity)
+        const purchasePrice = batch.purchase_price || (batch as any).products?.purchase_price || 10; // fallback
+        const damageCost = batch.quantity * purchasePrice;
+
         if (isMainProd) {
           // Create new batch entry for main product marked as damaged
           await createProductBatch({
@@ -71,9 +76,20 @@ export function ExpiredProductActionsDialog({
           });
         }
 
+        // Decrease inventory quantity
+        await updateProductQuantity(batch.product_id, batch.quantity, 'decrease');
+
+        // Add damage expense
+        await createExpense({
+          type: "منتج تالف",
+          amount: damageCost,
+          description: `منتج تالف منتهي الصلاحية - ${(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`}`,
+          date: new Date().toISOString(),
+        });
+
         toast({
           title: "تم بنجاح",
-          description: "تم تمييز المنتج كتالف",
+          description: `تم تمييز المنتج كتالف وخصم ${damageCost.toFixed(2)} ج.م من المصروفات`,
         });
       } else if (actionType === 'replace') {
         if (!newExpiryDate) {

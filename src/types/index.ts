@@ -110,8 +110,17 @@ export interface ProductBatch {
   purchase_date?: string | null;
   supplier_id?: string | null;
   notes?: string | null;
+  purchase_price?: number;
   created_at: string;
   updated_at: string;
+  // Optional product data when joined
+  products?: {
+    name: string;
+    purchase_price?: number;
+    shelf_location?: string;
+    barcode?: string;
+    price?: number;
+  };
 }
 
 export interface CartItem {
