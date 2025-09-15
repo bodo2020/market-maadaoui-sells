@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ProductBatch } from "@/types";
-import { updateProductBatch } from "@/services/supabase/productBatchService";
+import { updateProductBatch, createProductBatch } from "@/services/supabase/productBatchService";
+import { fetchProducts } from "@/services/supabase/productService";
 
 interface ExpiredProductActionsDialogProps {
   open: boolean;
@@ -29,38 +30,81 @@ export function ExpiredProductActionsDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  // Generate automatic batch number
+  const generateBatchNumber = () => {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `B${year}${month}${day}${random}`;
+  };
+
+  // Check if this is a product from main products table (not product_batches)
+  const isMainProduct = (batch: ProductBatch) => {
+    return batch.notes === 'من المخزون الرئيسي' || batch.batch_number.startsWith('MAIN-');
+  };
+
   const handleSubmit = async () => {
     if (!batch || !actionType) return;
 
     setLoading(true);
     try {
+      const isMainProd = isMainProduct(batch);
+
       if (actionType === 'damaged') {
-        // Mark as damaged - set quantity to 0 and add note
-        await updateProductBatch(batch.id, {
-          quantity: 0,
-          notes: `تالف - ${notes || 'منتج منتهي الصلاحية'}`,
-        });
+        if (isMainProd) {
+          // Create new batch entry for main product marked as damaged
+          await createProductBatch({
+            product_id: batch.product_id,
+            batch_number: generateBatchNumber(),
+            quantity: 0,
+            expiry_date: batch.expiry_date,
+            shelf_location: batch.shelf_location,
+            notes: `تالف - ${notes || 'منتج منتهي الصلاحية'}`,
+          });
+        } else {
+          // Update existing batch
+          await updateProductBatch(batch.id, {
+            quantity: 0,
+            notes: `تالف - ${notes || 'منتج منتهي الصلاحية'}`,
+          });
+        }
 
         toast({
           title: "تم بنجاح",
           description: "تم تمييز المنتج كتالف",
         });
       } else if (actionType === 'replace') {
-        if (!newExpiryDate || !newBatchNumber) {
+        if (!newExpiryDate) {
           toast({
             title: "خطأ",
-            description: "يرجى إدخال تاريخ الصلاحية الجديد ورقم الدفعة",
+            description: "يرجى إدخال تاريخ الصلاحية الجديد",
             variant: "destructive"
           });
           return;
         }
 
-        // Replace with new batch
-        await updateProductBatch(batch.id, {
-          expiry_date: newExpiryDate,
-          batch_number: newBatchNumber,
-          notes: `تم التبديل - ${notes || 'استبدال منتج منتهي الصلاحية'}`,
-        });
+        const batchNumber = newBatchNumber || generateBatchNumber();
+
+        if (isMainProd) {
+          // Create new batch entry for main product with new expiry
+          await createProductBatch({
+            product_id: batch.product_id,
+            batch_number: batchNumber,
+            quantity: batch.quantity,
+            expiry_date: newExpiryDate,
+            shelf_location: batch.shelf_location,
+            notes: `تم التبديل - ${notes || 'استبدال منتج منتهي الصلاحية'}`,
+          });
+        } else {
+          // Update existing batch
+          await updateProductBatch(batch.id, {
+            expiry_date: newExpiryDate,
+            batch_number: batchNumber,
+            notes: `تم التبديل - ${notes || 'استبدال منتج منتهي الصلاحية'}`,
+          });
+        }
 
         toast({
           title: "تم بنجاح",
@@ -94,6 +138,14 @@ export function ExpiredProductActionsDialog({
     onClose();
   };
 
+  // Auto-generate batch number when replace is selected
+  const handleActionTypeChange = (value: 'damaged' | 'replace') => {
+    setActionType(value);
+    if (value === 'replace' && !newBatchNumber) {
+      setNewBatchNumber(generateBatchNumber());
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md dir-rtl">
@@ -114,7 +166,7 @@ export function ExpiredProductActionsDialog({
 
           <div className="space-y-2">
             <Label>نوع الإجراء</Label>
-            <Select value={actionType} onValueChange={(value: 'damaged' | 'replace') => setActionType(value)}>
+            <Select value={actionType} onValueChange={handleActionTypeChange}>
               <SelectTrigger>
                 <SelectValue placeholder="اختر الإجراء" />
               </SelectTrigger>
@@ -129,12 +181,22 @@ export function ExpiredProductActionsDialog({
             <>
               <div className="space-y-2">
                 <Label htmlFor="newBatchNumber">رقم الدفعة الجديدة</Label>
-                <Input
-                  id="newBatchNumber"
-                  value={newBatchNumber}
-                  onChange={(e) => setNewBatchNumber(e.target.value)}
-                  placeholder="أدخل رقم الدفعة الجديدة"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="newBatchNumber"
+                    value={newBatchNumber}
+                    onChange={(e) => setNewBatchNumber(e.target.value)}
+                    placeholder="رقم الدفعة التلقائي"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setNewBatchNumber(generateBatchNumber())}
+                  >
+                    توليد تلقائي
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-2">
