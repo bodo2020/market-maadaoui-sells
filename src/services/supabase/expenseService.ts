@@ -152,3 +152,34 @@ export async function deleteExpense(id: string) {
 
   return true;
 }
+
+// دالة خاصة لتسجيل مصروف التوالف دون خصم من الخزنة
+export async function createDamageExpense(expense: Omit<Expense, "id" | "created_at" | "updated_at">) {
+  try {
+    // Ensure date is always a string format for Supabase
+    const formattedDate = typeof expense.date === 'string' 
+    ? expense.date 
+    : (expense.date as Date).toISOString();
+
+    const { data, error } = await supabase
+      .from("expenses")
+      .insert([{
+        type: expense.type,
+        amount: expense.amount,
+        description: expense.description,
+        date: formattedDate,
+        receipt_url: expense.receipt_url || null,
+      }])
+      .select();
+
+    if (error) {
+      console.error("Error creating damage expense:", error);
+      throw error;
+    }
+
+    return data[0] as Expense;
+  } catch (error) {
+    console.error("Error in createDamageExpense:", error);
+    throw error;
+  }
+}

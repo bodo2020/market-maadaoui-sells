@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ProductBatch } from "@/types";
 import { updateProductBatch, createProductBatch } from "@/services/supabase/productBatchService";
 import { fetchProducts, updateProductQuantity } from "@/services/supabase/productService";
-import { createExpense } from "@/services/supabase/expenseService";
+import { createDamageExpense } from "@/services/supabase/expenseService";
 
 interface ExpiredProductActionsDialogProps {
   open: boolean;
@@ -117,23 +117,27 @@ export function ExpiredProductActionsDialog({
         // Decrease inventory quantity by damaged amount
         await updateProductQuantity(batch.product_id, damagedQuantity, 'decrease');
 
-        // Try to add damage expense (skip if permission denied)
+        // Add damage expense (no cash deduction, just record)
         try {
-          await createExpense({
+          await createDamageExpense({
             type: "منتج تالف",
             amount: damageCost,
             description: `منتج تالف منتهي الصلاحية - ${(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`} - الكمية: ${damagedQuantity}`,
             date: new Date().toISOString(),
           });
+          
+          toast({
+            title: "تم بنجاح",
+            description: `تم تمييز ${damagedQuantity} من المنتج كتالف وتسجيل مصروف ${damageCost.toFixed(2)} ج.م`,
+          });
         } catch (expenseError) {
-          console.warn("Could not create expense record:", expenseError);
-          // Continue without failing the whole operation
+          console.error("Could not create damage expense record:", expenseError);
+          toast({
+            title: "تم جزئياً",
+            description: `تم تمييز ${damagedQuantity} من المنتج كتالف لكن فشل في تسجيل المصروف`,
+            variant: "destructive"
+          });
         }
-
-        toast({
-          title: "تم بنجاح",
-          description: `تم تمييز ${damagedQuantity} من المنتج كتالف وخصم الكمية من المخزون`,
-        });
       } else if (actionType === 'replace') {
         if (!newExpiryDate) {
           toast({
