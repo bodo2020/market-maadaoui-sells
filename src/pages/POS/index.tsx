@@ -43,6 +43,9 @@ export default function POS() {
   const [currentSale, setCurrentSale] = useState<Sale | null>(null);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Cache for faster barcode lookups
+  const barcodeCache = useRef<Map<string, Product | null>>(new Map());
+  const productsIndexRef = useRef<Map<string, Product>>(new Map());
   const {
     toast
   } = useToast();
@@ -85,32 +88,48 @@ export default function POS() {
 
   const processBarcode = async (barcode: string) => {
     if (barcode.length < 5) return;
+    
     try {
       setSearch(barcode);
-      const product = await fetchProductByBarcode(barcode);
+      
+      // Check cache first for instant results
+      if (barcodeCache.current.has(barcode)) {
+        const cachedProduct = barcodeCache.current.get(barcode);
+        if (cachedProduct) {
+          addProductToCart(cachedProduct, barcode);
+          return;
+        }
+      }
+
+      // Check local products index for scale products first (faster)
+      if (barcode.startsWith("2") && barcode.length === 13) {
+        const productCode = barcode.substring(1, 7);
+        const scaleProduct = productsIndexRef.current.get(productCode);
+        if (scaleProduct && scaleProduct.barcode_type === "scale") {
+          const weightInGrams = parseInt(barcode.substring(7, 12));
+          const weightInKg = weightInGrams / 1000;
+          handleAddScaleProductToCart(scaleProduct, weightInKg);
+          barcodeCache.current.set(barcode, scaleProduct);
+          return;
+        }
+      }
+
+      // Fast database lookup with timeout
+      const timeoutPromise = new Promise<null>((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 3000)
+      );
+      
+      const product = await Promise.race([
+        fetchProductByBarcode(barcode),
+        timeoutPromise
+      ]) as Product | null;
+
+      // Cache the result (even if null)
+      barcodeCache.current.set(barcode, product);
+      
       if (product) {
-        if (product.calculated_weight) {
-          handleAddScaleProductToCart(product, product.calculated_weight);
-        } else if (product.is_bulk_scan) {
-          handleAddBulkToCart(product);
-        } else {
-          handleAddToCart(product);
-        }
-        toast({
-          title: "تم المسح بنجاح",
-          description: `${barcode} - ${product.name}`
-        });
+        addProductToCart(product, barcode);
       } else {
-        if (barcode.startsWith("2") && barcode.length === 13) {
-          const productCode = barcode.substring(1, 7);
-          const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
-          if (scaleProduct) {
-            const weightInGrams = parseInt(barcode.substring(7, 12));
-            const weightInKg = weightInGrams / 1000;
-            handleAddScaleProductToCart(scaleProduct, weightInKg);
-            return;
-          }
-        }
         toast({
           title: "لم يتم العثور على المنتج",
           description: `لم يتم العثور على منتج بالباركود ${barcode}`,
@@ -121,10 +140,25 @@ export default function POS() {
       console.error("Error processing barcode:", error);
       toast({
         title: "خطأ في معالجة الباركود",
-        description: "حدث خطأ أثناء معالجة الباركود. يرجى المحاولة مرة أخرى.",
+        description: "فشل البحث. يرجى المحاولة مرة أخرى.",
         variant: "destructive"
       });
     }
+  };
+
+  // Helper function to add product to cart with different types
+  const addProductToCart = (product: Product, barcode: string) => {
+    if (product.calculated_weight) {
+      handleAddScaleProductToCart(product, product.calculated_weight);
+    } else if (product.is_bulk_scan) {
+      handleAddBulkToCart(product);
+    } else {
+      handleAddToCart(product);
+    }
+    toast({
+      title: "تم المسح بنجاح",
+      description: `${barcode} - ${product.name}`
+    });
   };
 
   useEffect(() => {
@@ -133,6 +167,19 @@ export default function POS() {
         setIsLoading(true);
         const data = await fetchProducts();
         setProducts(data);
+        
+        // Build barcode index for faster lookups
+        const barcodeIndex = new Map<string, Product>();
+        data.forEach(product => {
+          if (product.barcode) {
+            barcodeIndex.set(product.barcode, product);
+          }
+          // For scale products, also index by 6-digit code
+          if (product.barcode_type === "scale" && product.barcode) {
+            barcodeIndex.set(product.barcode, product);
+          }
+        });
+        productsIndexRef.current = barcodeIndex;
       } catch (error) {
         console.error("Error loading products:", error);
         toast({
@@ -150,55 +197,69 @@ export default function POS() {
   const handleSearch = async () => {
     if (!search) return;
 
-    try {
-      const product = await fetchProductByBarcode(search);
-      if (product) {
-        if (product.calculated_weight) {
-          handleAddScaleProductToCart(product, product.calculated_weight);
-          setSearch("");
-          return;
-        } else if (product.is_bulk_scan) {
-          handleAddBulkToCart(product);
-          setSearch("");
-          return;
-        } else {
-          handleAddToCart(product);
-          setSearch("");
-          return;
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching product by barcode:", error);
-    }
-
-    if (search.startsWith("2") && search.length === 13) {
-      try {
-        const product = await fetchProductByBarcode(search);
-        if (product) {
-          if (product.calculated_weight) {
-            handleAddScaleProductToCart(product, product.calculated_weight);
-            setSearch("");
-            return;
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching product by scale barcode:", error);
-      }
-      const productCode = search.substring(1, 7);
-      const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
-      if (scaleProduct) {
-        const weightInGrams = parseInt(search.substring(7, 12));
-        const weightInKg = weightInGrams / 1000;
-        handleAddScaleProductToCart(scaleProduct, weightInKg);
+    // Check cache first
+    if (barcodeCache.current.has(search)) {
+      const cachedProduct = barcodeCache.current.get(search);
+      if (cachedProduct) {
+        addProductToCart(cachedProduct, search);
         setSearch("");
         return;
       }
     }
 
-    const results = products.filter(product => product.barcode === search || product.name.includes(search));
+    // Check local index first (much faster)
+    const localProduct = productsIndexRef.current.get(search);
+    if (localProduct) {
+      barcodeCache.current.set(search, localProduct);
+      addProductToCart(localProduct, search);
+      setSearch("");
+      return;
+    }
+
+    // Handle scale products with local index
+    if (search.startsWith("2") && search.length === 13) {
+      const productCode = search.substring(1, 7);
+      const scaleProduct = productsIndexRef.current.get(productCode);
+      if (scaleProduct && scaleProduct.barcode_type === "scale") {
+        const weightInGrams = parseInt(search.substring(7, 12));
+        const weightInKg = weightInGrams / 1000;
+        handleAddScaleProductToCart(scaleProduct, weightInKg);
+        barcodeCache.current.set(search, scaleProduct);
+        setSearch("");
+        return;
+      }
+    }
+
+    // Fast database lookup with timeout as fallback
+    try {
+      const timeoutPromise = new Promise<null>((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 2000)
+      );
+      
+      const product = await Promise.race([
+        fetchProductByBarcode(search),
+        timeoutPromise
+      ]) as Product | null;
+
+      if (product) {
+        barcodeCache.current.set(search, product);
+        addProductToCart(product, search);
+        setSearch("");
+        return;
+      }
+    } catch (error) {
+      console.error("Database search timeout or error:", error);
+    }
+
+    // Fallback to local text search
+    const results = products.filter(product => 
+      product.barcode === search || product.name.includes(search)
+    );
     setSearchResults(results);
 
-    const exactMatch = products.find(p => p.barcode === search && p.barcode_type === "normal" && !p.bulk_enabled);
+    const exactMatch = results.find(p => 
+      p.barcode === search && p.barcode_type === "normal" && !p.bulk_enabled
+    );
     if (exactMatch) {
       handleAddToCart(exactMatch);
       setSearch("");
