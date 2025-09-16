@@ -58,14 +58,14 @@ interface SalaryData {
   payment_date?: string;
 }
 
-export function ExpenseAnalytics() {
+  const selectedDateRange = getDateRangeFromPeriod(selectedPeriod);
   const [expenses, setExpenses] = useState<ExpenseData[]>([]);
   const [salaries, setSalaries] = useState<SalaryData[]>([]);
   const [damageStats, setDamageStats] = useState({ totalCost: 0, totalQuantity: 0, recordsCount: 0 });
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
+    from: selectedDateRange.from || startOfMonth(new Date()),
+    to: selectedDateRange.to || endOfMonth(new Date())
   });
 
   const loadData = async () => {

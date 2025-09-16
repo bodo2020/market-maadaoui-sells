@@ -20,7 +20,12 @@ interface PaymentMethodData {
   color: string;
 }
 
-export function RevenueAnalytics() {
+interface RevenueAnalyticsProps {
+  selectedPeriod: PeriodType;
+}
+
+export function RevenueAnalytics({ selectedPeriod }: RevenueAnalyticsProps) {
+  const dateRange = getDateRangeFromPeriod(selectedPeriod);
   const [monthlyData, setMonthlyData] = useState<RevenueData[]>([]);
   const [paymentMethodsData, setPaymentMethodsData] = useState<PaymentMethodData[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
