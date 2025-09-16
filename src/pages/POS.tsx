@@ -56,23 +56,6 @@ export default function POS() {
   } = useToast();
   const { user } = useAuth();
 
-  // Auto-focus search input
-  useEffect(() => {
-    const focusSearchInput = () => {
-      if (searchInputRef.current && !isCheckoutOpen && !showWeightDialog && !showBarcodeScanner) {
-        searchInputRef.current.focus();
-      }
-    };
-
-    // Focus on mount
-    focusSearchInput();
-
-    // Re-focus after any interaction
-    const timer = setInterval(focusSearchInput, 100);
-
-    return () => clearInterval(timer);
-  }, [isCheckoutOpen, showWeightDialog, showBarcodeScanner]);
-
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -412,18 +395,6 @@ export default function POS() {
       }]);
     }
     setSearchResults([]);
-    // Re-focus search input after adding product
-    setTimeout(() => {
-      if (searchInputRef.current) {
-        searchInputRef.current.focus();
-      }
-    }, 100);
-    // Re-focus search input after adding product
-    setTimeout(() => {
-      if (searchInputRef.current) {
-        searchInputRef.current.focus();
-      }
-    }, 100);
   };
 
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
@@ -450,12 +421,6 @@ export default function POS() {
       description: `${product.name} - ${weight} كجم`
     });
     setSearchResults([]);
-    // Re-focus search input after adding product
-    setTimeout(() => {
-      if (searchInputRef.current) {
-        searchInputRef.current.focus();
-      }
-    }, 100);
     setShowWeightDialog(false);
     setCurrentScaleProduct(null);
     setWeightInput("");
@@ -791,20 +756,11 @@ export default function POS() {
                   onKeyDown={e => {
                     if (e.key === 'Enter') handleSearch();
                   }} 
-                  onBlur={() => {
-                    // Auto re-focus after a short delay if no modal is open
-                    setTimeout(() => {
-                      if (!isCheckoutOpen && !showWeightDialog && !showBarcodeScanner && searchInputRef.current) {
-                        searchInputRef.current.focus();
-                      }
-                    }, 200);
-                  }}
                   className="flex-1" 
                   ref={searchInputRef}
                   inputMode="text"
                   autoComplete="off"
                   enterKeyHint="search"
-                  autoFocus
                 />
                 <Button onClick={handleSearch}>
                   <Search className="ml-2 h-4 w-4" />
