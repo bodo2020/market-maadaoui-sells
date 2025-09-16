@@ -4,7 +4,7 @@ import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer, User, Wallet } from "lucide-react";
+import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer, User, Wallet, Pin, PinOff, MoreHorizontal } from "lucide-react";
 import { CartItem, Product, Sale, Customer } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
@@ -47,6 +47,8 @@ export default function POS() {
   const [showInvoice, setShowInvoice] = useState(false);
   const [currentSale, setCurrentSale] = useState<Sale | null>(null);
   const [manualBarcodeMode, setManualBarcodeMode] = useState(false);
+  const [pinnedProducts, setPinnedProducts] = useState<string[]>([]);
+  const [showAllProducts, setShowAllProducts] = useState(false);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const {
@@ -576,6 +578,27 @@ export default function POS() {
     }
   };
 
+  const togglePinProduct = (productId: string) => {
+    setPinnedProducts(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  const getDisplayedProducts = () => {
+    const sortedProducts = [...products].sort((a, b) => {
+      const aIsPinned = pinnedProducts.includes(a.id);
+      const bIsPinned = pinnedProducts.includes(b.id);
+      
+      if (aIsPinned && !bIsPinned) return -1;
+      if (!aIsPinned && bIsPinned) return 1;
+      return 0;
+    });
+    
+    return showAllProducts ? sortedProducts : sortedProducts.slice(0, 8);
+  };
+
   const recordSaleToCashRegister = async (amount: number, paymentMethod: string) => {
     if (paymentMethod !== 'cash' && paymentMethod !== 'mixed') return;
     const amountToRecord = paymentMethod === 'cash' ? amount : parseFloat(cashAmount || "0");
@@ -882,14 +905,24 @@ export default function POS() {
                 </div>}
               
               <div className="mt-6">
-                <h3 className="font-semibold mb-4">المنتجات المقترحة</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-semibold">المنتجات المقترحة</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAllProducts(!showAllProducts)}
+                  >
+                    <MoreHorizontal className="ml-2 h-4 w-4" />
+                    {showAllProducts ? "عرض أقل" : "عرض الكل"}
+                  </Button>
+                </div>
                 
                 {isLoading ? <div className="flex justify-center items-center h-40">
                     <p className="text-muted-foreground">جاري تحميل المنتجات...</p>
                   </div> : products.length === 0 ? <div className="text-center py-6 text-muted-foreground">
                     <p>لا توجد منتجات متاحة</p>
                   </div> : <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {products.slice(0, 8).map(product => <Card key={product.id} className="cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => {
+                    {getDisplayedProducts().map(product => <Card key={product.id} className="cursor-pointer hover:bg-gray-50 transition-colors relative group" onClick={() => {
                   if (product.barcode_type === "scale") {
                     setCurrentScaleProduct(product);
                     setShowWeightDialog(true);
@@ -898,8 +931,41 @@ export default function POS() {
                   }
                 }}>
                         <CardContent className="p-3">
-                          <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
+                          <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2 relative">
                             <img src={product.image_urls?.[0] || "/placeholder.svg"} alt={product.name} className="h-16 w-16 object-contain" />
+                            
+                            {/* Pin Button */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute top-1 right-1 h-6 w-6 bg-white/90 hover:bg-white opacity-70 hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePinProduct(product.id);
+                              }}
+                            >
+                              {pinnedProducts.includes(product.id) ? (
+                                <Pin className="h-3 w-3 text-primary" />
+                              ) : (
+                                <PinOff className="h-3 w-3" />
+                              )}
+                            </Button>
+                            
+                            {/* Bulk Purchase Button */}
+                            {product.bulk_enabled && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="absolute bottom-1 left-1 h-6 px-2 text-xs bg-amber-500/90 hover:bg-amber-600 text-white opacity-80 hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddBulkToCart(product);
+                                }}
+                              >
+                                <Box className="h-3 w-3 ml-1" />
+                                جملة
+                              </Button>
+                            )}
                           </div>
                           <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
                           
@@ -911,6 +977,10 @@ export default function POS() {
                             {product.bulk_enabled && <span className="bg-amber-100 text-amber-800 text-xs rounded px-1.5 py-0.5 flex items-center">
                                 <Box className="h-3 w-3 ml-1" />
                                 جملة
+                              </span>}
+                            {pinnedProducts.includes(product.id) && <span className="bg-green-100 text-green-800 text-xs rounded px-1.5 py-0.5 flex items-center">
+                                <Pin className="h-3 w-3 ml-1" />
+                                مثبت
                               </span>}
                           </div>
                           
