@@ -75,8 +75,8 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'environment', // Use back camera if available
-          width: { ideal: 640 }, // Reduced resolution for faster processing
-          height: { ideal: 480 }
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         } 
       });
       
@@ -110,10 +110,10 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
 
     setScanning(true);
 
-    // Start scanning at regular intervals (optimized for faster scanning)
+    // Start scanning at regular intervals (adjust timing for performance)
     scanIntervalRef.current = window.setInterval(() => {
       scanBarcode();
-    }, 100) as unknown as number; // Scan more frequently (every 100ms for faster detection)
+    }, 200) as unknown as number; // Scan more frequently (every 200ms)
   };
 
   const scanBarcode = async () => {
@@ -163,7 +163,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
         setTimeout(() => {
           onScan(barcode);
           onClose();
-        }, 300); // Reduced delay for faster response
+        }, 800);
       }
     } catch (err) {
       console.error("Error scanning barcode:", err);
