@@ -76,8 +76,22 @@ export function ExpiredProductActionsDialog({
       const isMainProd = isMainProduct(batch);
 
       if (actionType === 'damaged') {
-        // Calculate damage cost (purchase price * damaged quantity)
-        const purchasePrice = batch.purchase_price || (batch as any).products?.purchase_price || 10; // fallback
+        // Get the actual purchase price from the product
+        let purchasePrice = batch.purchase_price || (batch as any).products?.purchase_price;
+        
+        // If no purchase price in batch, fetch from products table
+        if (!purchasePrice) {
+          try {
+            const products = await fetchProducts();
+            const product = products.find(p => p.id === batch.product_id);
+            purchasePrice = product?.purchase_price || 0;
+          } catch (error) {
+            console.error("Error fetching product purchase price:", error);
+            purchasePrice = 0;
+          }
+        }
+        
+        // Calculate damage cost using actual purchase price
         const damageCost = damagedQuantity * purchasePrice;
 
         // Create new batch entry for damaged quantity
