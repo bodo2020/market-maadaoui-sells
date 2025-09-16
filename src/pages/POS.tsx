@@ -563,6 +563,19 @@ export default function POS() {
     }
   };
 
+  const handleCustomerPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const phone = e.target.value;
+    setCustomerPhone(phone);
+    
+    // البحث عن العميل الموجود برقم الهاتف
+    if (phone.length >= 10) {
+      const existingCustomer = customers.find(c => c.phone === phone);
+      if (existingCustomer) {
+        setCustomerName(existingCustomer.name);
+      }
+    }
+  };
+
   const recordSaleToCashRegister = async (amount: number, paymentMethod: string) => {
     if (paymentMethod !== 'cash' && paymentMethod !== 'mixed') return;
     const amountToRecord = paymentMethod === 'cash' ? amount : parseFloat(cashAmount || "0");
@@ -598,7 +611,7 @@ export default function POS() {
     setIsProcessing(true);
     try {
       let customerData = null;
-      if (customerName || customerPhone) {
+      if (customerPhone || customerName) {
         customerData = await findOrCreateCustomer({
           name: customerName,
           phone: customerPhone
@@ -1018,7 +1031,7 @@ export default function POS() {
                       <SelectItem key={customer.id} value={customer.id}>
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4" />
-                          {customer.name} {customer.phone && `- ${customer.phone}`}
+                          {customer.phone ? `${customer.phone} - ${customer.name}` : customer.name}
                         </div>
                       </SelectItem>
                     ))}
@@ -1066,12 +1079,17 @@ export default function POS() {
                   <h3 className="font-semibold">معلومات العميل (اختياري)</h3>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <Label htmlFor="customerName">اسم العميل</Label>
-                      <Input id="customerName" value={customerName} onChange={e => setCustomerName(e.target.value)} />
+                      <Label htmlFor="customerPhone">رقم الهاتف</Label>
+                      <Input 
+                        id="customerPhone" 
+                        value={customerPhone} 
+                        onChange={handleCustomerPhoneChange} 
+                        placeholder="01xxxxxxxxx"
+                      />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="customerPhone">رقم الهاتف</Label>
-                      <Input id="customerPhone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} />
+                      <Label htmlFor="customerName">اسم العميل</Label>
+                      <Input id="customerName" value={customerName} onChange={e => setCustomerName(e.target.value)} />
                     </div>
                   </div>
                 </div>
