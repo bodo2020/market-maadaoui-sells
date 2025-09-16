@@ -1,12 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 
-// جلب تحليلات مبيعات المنتجات
+// جلب تحليلات مبيعات المنتجات مع الربح الحقيقي
 export async function fetchProductSalesAnalytics() {
   try {
-    // جلب المبيعات من المتجر
+    // جلب المبيعات من المتجر مع بيانات الربح
     const { data: salesData, error: salesError } = await supabase
       .from("sales")
-      .select("items");
+      .select("items, profit");
 
     if (salesError) throw salesError;
 
@@ -20,7 +20,7 @@ export async function fetchProductSalesAnalytics() {
     // جلب بيانات المنتجات
     const { data: productsData, error: productsError } = await supabase
       .from("products")
-      .select("id, name, price");
+      .select("id, name, price, purchase_price");
 
     if (productsError) throw productsError;
 
@@ -40,20 +40,26 @@ export async function fetchProductSalesAnalytics() {
           const productId = item.product?.id || item.productId;
           const quantity = item.quantity || item.weight || 0;
           const total = item.total || 0;
+          const product = productsMap.get(productId);
 
-          if (productId && productsMap.has(productId)) {
+          if (productId && product) {
             if (!productSalesMap.has(productId)) {
               productSalesMap.set(productId, {
                 id: productId,
-                name: productsMap.get(productId).name,
+                name: product.name,
                 totalQuantity: 0,
-                totalRevenue: 0
+                totalRevenue: 0,
+                totalProfit: 0
               });
             }
 
             const productSales = productSalesMap.get(productId);
             productSales.totalQuantity += Number(quantity);
             productSales.totalRevenue += Number(total);
+            
+            // حساب الربح الحقيقي لكل منتج
+            const itemProfit = (item.price - product.purchase_price) * quantity;
+            productSales.totalProfit += itemProfit;
           }
         });
       }
@@ -66,20 +72,26 @@ export async function fetchProductSalesAnalytics() {
           const productId = item.product?.id || item.productId;
           const quantity = item.quantity || item.weight || 0;
           const total = item.total || 0;
+          const product = productsMap.get(productId);
 
-          if (productId && productsMap.has(productId)) {
+          if (productId && product) {
             if (!productSalesMap.has(productId)) {
               productSalesMap.set(productId, {
                 id: productId,
-                name: productsMap.get(productId).name,
+                name: product.name,
                 totalQuantity: 0,
-                totalRevenue: 0
+                totalRevenue: 0,
+                totalProfit: 0
               });
             }
 
             const productSales = productSalesMap.get(productId);
             productSales.totalQuantity += Number(quantity);
             productSales.totalRevenue += Number(total);
+            
+            // حساب الربح الحقيقي لكل منتج
+            const itemProfit = (item.price - product.purchase_price) * quantity;
+            productSales.totalProfit += itemProfit;
           }
         });
       }

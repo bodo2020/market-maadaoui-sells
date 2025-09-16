@@ -218,7 +218,7 @@ export function ProductAnalytics() {
           ) : (
             <div className="space-y-4">
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={productSales.slice(0, 10).sort((a, b) => (b.totalRevenue - b.totalQuantity * (b.totalRevenue / b.totalQuantity) * 0.7) - (a.totalRevenue - a.totalQuantity * (a.totalRevenue / a.totalQuantity) * 0.7))}>
+                <BarChart data={productSales.slice(0, 10).sort((a, b) => (b.totalProfit || 0) - (a.totalProfit || 0))}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis 
                     dataKey="name" 
@@ -232,14 +232,14 @@ export function ProductAnalytics() {
                   <Tooltip 
                     formatter={(value: number, name) => [
                       `${(value || 0).toFixed(0)} ج.م`,
-                      'الربح المقدر'
+                      'الربح الحقيقي'
                     ]}
                     labelFormatter={(label) => `المنتج: ${label}`}
                   />
                   <Bar 
-                    dataKey={(entry) => entry.totalRevenue - (entry.totalQuantity * (entry.totalRevenue / entry.totalQuantity) * 0.7)}
+                    dataKey="totalProfit"
                     fill="#10b981" 
-                    name="الربح المقدر"
+                    name="الربح الحقيقي"
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -247,14 +247,10 @@ export function ProductAnalytics() {
               {/* قائمة تفصيلية للأرباح */}
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {productSales
-                  .sort((a, b) => {
-                    const profitA = a.totalRevenue - (a.totalQuantity * (a.totalRevenue / a.totalQuantity) * 0.7);
-                    const profitB = b.totalRevenue - (b.totalQuantity * (b.totalRevenue / b.totalQuantity) * 0.7);
-                    return profitB - profitA;
-                  })
+                  .sort((a, b) => (b.totalProfit || 0) - (a.totalProfit || 0))
                   .slice(0, 10)
                   .map((product, index) => {
-                    const estimatedProfit = product.totalRevenue - (product.totalQuantity * (product.totalRevenue / product.totalQuantity) * 0.7);
+                    const realProfit = product.totalProfit || 0;
                     return (
                       <div key={product.id} className="flex items-center justify-between p-6 border rounded-lg min-h-[80px] bg-gradient-to-r from-green-50 to-green-100">
                         <div className="flex items-center gap-3">
@@ -265,9 +261,9 @@ export function ProductAnalytics() {
                           </div>
                         </div>
                         <div className="text-left">
-                          <div className="font-bold text-lg text-green-600">{estimatedProfit.toFixed(0)} ج.م</div>
+                          <div className="font-bold text-lg text-green-600">{realProfit.toFixed(0)} ج.م</div>
                           <div className="text-sm text-muted-foreground">
-                            ربح مقدر
+                            ربح حقيقي
                           </div>
                         </div>
                       </div>

@@ -57,9 +57,9 @@ export function RevenueAnalytics() {
         return;
       }
 
-      // Calculate totals
+      // Calculate totals using actual profit from sales table
       const revenue = sales.reduce((sum, sale) => sum + sale.total, 0);
-      const profit = sales.reduce((sum, sale) => sum + sale.profit, 0);
+      const profit = sales.reduce((sum, sale) => sum + (sale.profit || 0), 0); // Use actual profit
       const salesCount = sales.length;
       const avgOrder = salesCount > 0 ? revenue / salesCount : 0;
 
@@ -86,7 +86,7 @@ export function RevenueAnalytics() {
         }
         
         monthlyRevenue[monthKey].revenue += sale.total;
-        monthlyRevenue[monthKey].profit += sale.profit;
+        monthlyRevenue[monthKey].profit += (sale.profit || 0); // Use actual profit from sales table
         monthlyRevenue[monthKey].sales_count += 1;
       });
 
