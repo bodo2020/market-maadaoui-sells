@@ -102,28 +102,37 @@ export default function AddProduct() {
     setLoading(true);
     try {
       const data = await fetchProductById(id);
-      
-      // تحميل جميع الفئات الفرعية أولاً
-      const allSubcategories = await fetchSubcategories();
-      setSubcategories(allSubcategories);
-      
-      // تحديد الفئة الرئيسية من الفئة الفرعية إذا لزم الأمر
-      if (data.subcategory_id && !data.main_category_id) {
-        const currentSubcategory = allSubcategories.find(sub => sub.id === data.subcategory_id);
-        if (currentSubcategory?.category_id) {
-          data.main_category_id = currentSubcategory.category_id;
+
+      // تأكد من جلب الفئة الفرعية والفئة الرئيسية من قاعدة البيانات
+      let mainCategoryId = data.main_category_id || "";
+      let subcategoryId = data.subcategory_id || "";
+
+      // إذا لم تكن الفئة الرئيسية موجودة لكن هناك فئة فرعية، اجلبها واعرف الفئة الرئيسية
+      if (!mainCategoryId && subcategoryId) {
+        try {
+          const allSubs = await fetchSubcategories();
+          const currentSub = allSubs.find((s) => s.id === subcategoryId);
+          if (currentSub?.category_id) {
+            mainCategoryId = currentSub.category_id;
+          }
+        } catch (e) {
+          console.warn("Failed to resolve main category from subcategory", e);
         }
       }
-      
-      // إذا كان هناك فئة رئيسية، فلتر الفئات الفرعية
-      if (data.main_category_id) {
-        const filteredSubs = allSubcategories.filter(sub => sub.category_id === data.main_category_id);
-        setSubcategories(filteredSubs);
+
+      // إذا توفر لدينا فئة رئيسية، اجلب الفئات الفرعية الخاصة بها من قاعدة البيانات
+      if (mainCategoryId) {
+        const subsForMain = await fetchSubcategories(mainCategoryId);
+        setSubcategories(subsForMain);
+      } else {
+        // كحل احتياطي اجلب كل الفئات الفرعية
+        const allSubs = await fetchSubcategories();
+        setSubcategories(allSubs);
       }
 
-      // تحديث المنتج
-      setProduct(data);
-      
+      // حدث المنتج بعد التأكد من قيم الفئات
+      setProduct({ ...data, main_category_id: mainCategoryId || undefined, subcategory_id: subcategoryId || undefined });
+
       // تحميل إعدادات التنبيه
       try {
         const alert = await getInventoryAlert(id);

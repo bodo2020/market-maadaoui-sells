@@ -219,6 +219,21 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
         updateData.subcategory_id = null;
       } else {
         updateData.subcategory_id = product.subcategory_id;
+        // الحفاظ على التناسق: إذا تم تحديد فئة فرعية، حدث الفئة الرئيسية تلقائيًا بناءً عليها
+        try {
+          const { data: subcat, error: subErr } = await supabase
+            .from("subcategories")
+            .select("category_id")
+            .eq("id", product.subcategory_id as string)
+            .single();
+          if (subErr) {
+            console.warn("Could not fetch subcategory for main_category sync", subErr);
+          } else if (subcat?.category_id) {
+            updateData.main_category_id = subcat.category_id;
+          }
+        } catch (e) {
+          console.warn("Failed to sync main_category_id from subcategory_id", e);
+        }
       }
     }
 
