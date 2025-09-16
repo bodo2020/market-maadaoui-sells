@@ -151,6 +151,11 @@ export const financeNavigation: NavigationGroup = {
       icon: DollarSign,
     },
     {
+      label: "المصروفات والرواتب",
+      href: "/expenses-salaries",
+      icon: FileText,
+    },
+    {
       label: "التحليلات",
       href: "/analytics",
       icon: Activity,

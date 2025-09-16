@@ -41,6 +41,7 @@ import Analytics from "@/pages/Analytics";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
 import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
 import ExpiryManagement from "@/pages/ExpiryManagement";
+import ExpensesAndSalaries from "@/pages/ExpensesAndSalaries";
 import CustomerCartsPage from "@/pages/CustomerCartsPage";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -85,6 +86,7 @@ function App() {
               <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
               <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
               <Route path="/expenses" element={<ProtectedRoute><ExpenseManagement /></ProtectedRoute>} />
+              <Route path="/expenses-salaries" element={<ProtectedRoute><ExpensesAndSalaries /></ProtectedRoute>} />
               <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
