@@ -89,44 +89,21 @@ export default function POS() {
         const target = e.target as HTMLElement;
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
         const isSearchInput = target === searchInputRef.current;
-        
-        // Skip if typing in other inputs, dialogs are open, or specific keys are pressed
-        if ((isInput && !isSearchInput) || 
-            isCheckoutOpen || 
-            showWeightDialog || 
-            showInvoice || 
-            showBarcodeScanner ||
-            ['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-          return;
-        }
+        if (isInput && !isSearchInput) return;
         
         console.log("Key pressed:", e.key, "Current buffer:", barcodeBuffer);
         
-        // Handle Enter key - process current buffer or search
-        if (e.key === 'Enter') {
+        // Handle Enter key - process current buffer
+        if (e.key === 'Enter' && barcodeBuffer) {
           e.preventDefault();
-          if (barcodeBuffer) {
-            console.log("External barcode scanned:", barcodeBuffer);
-            processBarcode(barcodeBuffer);
-            setBarcodeBuffer("");
-          } else if (search) {
-            handleSearch();
-          }
+          console.log("External barcode scanned:", barcodeBuffer);
+          processBarcode(barcodeBuffer);
+          setBarcodeBuffer("");
           return;
         }
         
-        // Handle alphanumeric characters and common symbols
-        if (/^[a-zA-Z0-9\u0600-\u06FF\s\-\.]$/.test(e.key)) {
-          // Direct typing to search box
-          if (!isSearchInput && searchInputRef.current) {
-            e.preventDefault();
-            const newValue = search + e.key;
-            setSearch(newValue);
-            searchInputRef.current.focus();
-            searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
-          }
-          
-          // Barcode scanning logic
+        // Handle alphanumeric characters
+        if (/^[a-zA-Z0-9]$/.test(e.key)) {
           if (barcodeTimeoutRef.current) {
             clearTimeout(barcodeTimeoutRef.current);
           }
@@ -142,20 +119,11 @@ export default function POS() {
               processBarcode(currentBuffer);
               setBarcodeBuffer("");
             } else {
-              setBarcodeBuffer("");
+              if (!isInput) {
+                setBarcodeBuffer("");
+              }
             }
           }, timeoutDuration);
-        }
-        
-        // Handle backspace for search
-        if (e.key === 'Backspace' && !isSearchInput && search.length > 0) {
-          e.preventDefault();
-          const newValue = search.slice(0, -1);
-          setSearch(newValue);
-          if (searchInputRef.current) {
-            searchInputRef.current.focus();
-            searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
-          }
         }
       };
 
@@ -239,8 +207,6 @@ export default function POS() {
           title: "تم المسح بنجاح",
           description: `${barcode} - ${product.name}`
         });
-        setSearch(""); // Clear search after successful addition
-        return;
       } else {
         const bulkProduct = products.find(p => p.bulk_barcode === barcode && p.bulk_enabled);
         
@@ -250,7 +216,6 @@ export default function POS() {
             title: "تم المسح بنجاح",
             description: `${barcode} - ${bulkProduct.name} (جملة)`
           });
-          setSearch(""); // Clear search after successful addition
           return;
         }
         
@@ -261,7 +226,6 @@ export default function POS() {
             const weightInGrams = parseInt(barcode.substring(7, 12));
             const weightInKg = weightInGrams / 1000;
             handleAddScaleProductToCart(scaleProduct, weightInKg);
-            setSearch(""); // Clear search after successful addition
             return;
           }
         }
@@ -291,23 +255,27 @@ export default function POS() {
       if (product) {
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
+          setSearch("");
+          return;
         } else if (product.is_bulk_scan) {
           handleAddBulkToCart(product);
+          setSearch("");
+          return;
         } else {
           handleAddToCart(product);
+          setSearch("");
+          return;
         }
-        setSearch(""); // Clear search after successful addition
-        return;
       }
 
       const bulkProduct = products.find(p => p.bulk_barcode === search && p.bulk_enabled);
       if (bulkProduct) {
         handleAddBulkToCart(bulkProduct);
+        setSearch("");
         toast({
           title: "تم إضافة منتج جملة",
           description: `${bulkProduct.name} - ${bulkProduct.bulk_quantity} وحدة`
         });
-        setSearch(""); // Clear search after successful addition
         return;
       }
 
@@ -319,7 +287,7 @@ export default function POS() {
           const weightInGrams = parseInt(search.substring(7, 12));
           const weightInKg = weightInGrams / 1000;
           handleAddScaleProductToCart(scaleProduct, weightInKg);
-          setSearch(""); // Clear search after successful addition
+          setSearch("");
           return;
         }
       }
@@ -338,16 +306,11 @@ export default function POS() {
 
       if (exactMatch) {
         handleAddToCart(exactMatch);
-        setSearch(""); // Clear search after successful addition
+        setSearch("");
       } else if (results.length === 1 && results[0].barcode_type === "scale") {
         setCurrentScaleProduct(results[0]);
         setShowWeightDialog(true);
-        setSearch(""); // Clear search when opening weight dialog
-      } else if (results.length === 1) {
-        // Auto-add single result
-        handleAddToCart(results[0]);
-        setSearch(""); // Clear search after successful addition
-        setSearchResults([]); // Clear results
+        setSearch("");
       }
     } catch (error) {
       console.error("Error searching for product:", error);
@@ -378,8 +341,7 @@ export default function POS() {
         weight: null
       }]);
     }
-    setSearchResults([]); // Clear search results
-    setSearch(""); // Clear search box
+    setSearchResults([]);
   };
 
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
@@ -441,8 +403,7 @@ export default function POS() {
       title: "تم إضافة عبوة جملة",
       description: `${product.name} - ${product.bulk_quantity} وحدة`
     });
-    setSearchResults([]); // Clear search results
-    setSearch(""); // Clear search box
+    setSearchResults([]);
   };
 
   const handleWeightSubmit = () => {
@@ -735,24 +696,9 @@ export default function POS() {
             </CardHeader>
             <CardContent>
               <div className="flex gap-2 mb-4">
-                <div className="relative flex-1">
-                  <Input 
-                    placeholder={manualBarcodeMode ? "ابحث بالباركود أو اسم المنتج" : "ابدأ الكتابة من أي مكان للبحث..."} 
-                    value={search} 
-                    onChange={e => setSearch(e.target.value)} 
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleSearch();
-                    }} 
-                    className="flex-1" 
-                    ref={searchInputRef} 
-                  />
-                  {!manualBarcodeMode && search === "" && (
-                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center text-muted-foreground text-sm">
-                      <div className="animate-pulse mr-2">⌨️</div>
-                      جاهز للكتابة
-                    </div>
-                  )}
-                </div>
+                <Input placeholder="ابحث بالباركود أو اسم المنتج" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => {
+                if (e.key === 'Enter') handleSearch();
+              }} className="flex-1" ref={searchInputRef} />
                 <Button onClick={handleSearch}>
                   <Search className="ml-2 h-4 w-4" />
                   بحث
