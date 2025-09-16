@@ -124,7 +124,7 @@ export function ProductAnalytics() {
                 {/* قائمة تفصيلية */}
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {productSales.map((product, index) => (
-                    <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div key={product.id} className="flex items-center justify-between p-6 border rounded-lg min-h-[80px]">
                       <div className="flex items-center gap-3">
                         <Badge variant="outline">#{index + 1}</Badge>
                         <span className="font-medium">{product.name}</span>
@@ -203,6 +203,81 @@ export function ProductAnalytics() {
           </CardContent>
         </Card>
       </div>
+
+      {/* أكثر المنتجات تحقيقاً للأرباح */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            أكثر المنتجات تحقيقاً للأرباح
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {productSales.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">لا توجد مبيعات</p>
+          ) : (
+            <div className="space-y-4">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={productSales.slice(0, 10).sort((a, b) => (b.totalRevenue - b.totalQuantity * (b.totalRevenue / b.totalQuantity) * 0.7) - (a.totalRevenue - a.totalQuantity * (a.totalRevenue / a.totalQuantity) * 0.7))}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    tick={{ fontSize: 12 }}
+                    interval={0}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value: number, name) => [
+                      `${(value || 0).toFixed(0)} ج.م`,
+                      'الربح المقدر'
+                    ]}
+                    labelFormatter={(label) => `المنتج: ${label}`}
+                  />
+                  <Bar 
+                    dataKey={(entry) => entry.totalRevenue - (entry.totalQuantity * (entry.totalRevenue / entry.totalQuantity) * 0.7)}
+                    fill="#10b981" 
+                    name="الربح المقدر"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+
+              {/* قائمة تفصيلية للأرباح */}
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {productSales
+                  .sort((a, b) => {
+                    const profitA = a.totalRevenue - (a.totalQuantity * (a.totalRevenue / a.totalQuantity) * 0.7);
+                    const profitB = b.totalRevenue - (b.totalQuantity * (b.totalRevenue / b.totalQuantity) * 0.7);
+                    return profitB - profitA;
+                  })
+                  .slice(0, 10)
+                  .map((product, index) => {
+                    const estimatedProfit = product.totalRevenue - (product.totalQuantity * (product.totalRevenue / product.totalQuantity) * 0.7);
+                    return (
+                      <div key={product.id} className="flex items-center justify-between p-6 border rounded-lg min-h-[80px] bg-gradient-to-r from-green-50 to-green-100">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="bg-green-100 text-green-800">#{index + 1}</Badge>
+                          <div>
+                            <span className="font-medium block">{product.name}</span>
+                            <span className="text-sm text-muted-foreground">{product.totalQuantity} قطعة مباعة</span>
+                          </div>
+                        </div>
+                        <div className="text-left">
+                          <div className="font-bold text-lg text-green-600">{estimatedProfit.toFixed(0)} ج.م</div>
+                          <div className="text-sm text-muted-foreground">
+                            ربح مقدر
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
