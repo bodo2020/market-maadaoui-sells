@@ -21,6 +21,7 @@ import {
 import { CalendarIcon, TrendingDown, DollarSign, FileText, AlertTriangle } from "lucide-react";
 import { fetchExpenses } from "@/services/supabase/expenseService";
 import { getDamageStatistics } from "@/services/supabase/damageService";
+import { fetchSalaries } from "@/services/supabase/salaryService";
 import { DateRange } from "react-day-picker";
 import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -44,11 +45,22 @@ interface MonthlyExpenseData {
   month: string;
   expenses: number;
   damages: number;
+  salaries: number;
   total: number;
+}
+
+interface SalaryData {
+  id: string;
+  amount: number;
+  month: number;
+  year: number;
+  status: string;
+  payment_date?: string;
 }
 
 export function ExpenseAnalytics() {
   const [expenses, setExpenses] = useState<ExpenseData[]>([]);
+  const [salaries, setSalaries] = useState<SalaryData[]>([]);
   const [damageStats, setDamageStats] = useState({ totalCost: 0, totalQuantity: 0, recordsCount: 0 });
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -59,8 +71,9 @@ export function ExpenseAnalytics() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [expensesData, damageData] = await Promise.all([
+      const [expensesData, salariesData, damageData] = await Promise.all([
         fetchExpenses(),
+        fetchSalaries(),
         getDamageStatistics(
           dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined,
           dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined
@@ -76,7 +89,18 @@ export function ExpenseAnalytics() {
         });
       }
 
+      // Filter salaries by date range (using payment_date or created_at)
+      let filteredSalaries = salariesData;
+      if (dateRange?.from && dateRange?.to) {
+        filteredSalaries = salariesData.filter(salary => {
+          // Convert month/year to a comparable date
+          const salaryDate = new Date(salary.year, salary.month - 1, 1);
+          return salaryDate >= dateRange.from! && salaryDate <= dateRange.to!;
+        });
+      }
+
       setExpenses(filteredExpenses);
+      setSalaries(filteredSalaries);
       setDamageStats(damageData);
     } catch (error) {
       console.error("Error loading expense analytics:", error);
@@ -91,10 +115,12 @@ export function ExpenseAnalytics() {
 
   // Calculate expense statistics
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const totalSalaries = salaries.reduce((sum, salary) => sum + salary.amount, 0);
+  const grandTotal = totalExpenses + totalSalaries;
   const expenseCount = expenses.length;
   const avgExpense = expenseCount > 0 ? totalExpenses / expenseCount : 0;
 
-  // Group expenses by type
+  // Group expenses by type and include salaries
   const expensesByType = expenses.reduce((acc, expense) => {
     const existing = acc.find(item => item.type === expense.type);
     if (existing) {
@@ -111,6 +137,16 @@ export function ExpenseAnalytics() {
     return acc;
   }, [] as ExpenseTypeData[]);
 
+  // Add salaries as a separate category
+  if (salaries.length > 0) {
+    expensesByType.push({
+      type: "رواتب",
+      amount: totalSalaries,
+      count: salaries.length,
+      color: getTypeColor("رواتب")
+    });
+  }
+
   // Generate monthly data for the last 6 months
   const monthlyData: MonthlyExpenseData[] = [];
   for (let i = 5; i >= 0; i--) {
@@ -123,16 +159,23 @@ export function ExpenseAnalytics() {
       return expenseDate >= monthStart && expenseDate <= monthEnd;
     });
 
+    const monthSalaries = salaries.filter(salary => {
+      const salaryDate = new Date(salary.year, salary.month - 1, 1);
+      return salaryDate >= monthStart && salaryDate <= monthEnd;
+    });
+
     const monthlyExpenseTotal = monthExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     const monthlyDamageTotal = monthExpenses
       .filter(expense => expense.type === "منتج تالف")
       .reduce((sum, expense) => sum + expense.amount, 0);
+    const monthlySalariesTotal = monthSalaries.reduce((sum, salary) => sum + salary.amount, 0);
 
     monthlyData.push({
       month: format(date, 'MMM yyyy', { locale: ar }),
       expenses: monthlyExpenseTotal - monthlyDamageTotal,
       damages: monthlyDamageTotal,
-      total: monthlyExpenseTotal
+      salaries: monthlySalariesTotal,
+      total: monthlyExpenseTotal + monthlySalariesTotal
     });
   }
 
@@ -141,6 +184,7 @@ export function ExpenseAnalytics() {
       "منتج تالف": "#ef4444",
       "صيانة": "#f97316", 
       "مرافق": "#eab308",
+      "رواتب": "#06b6d4",
       "راتب": "#06b6d4",
       "أخرى": "#8b5cf6"
     };
@@ -169,7 +213,7 @@ export function ExpenseAnalytics() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي المصروفات</CardTitle>
@@ -185,13 +229,26 @@ export function ExpenseAnalytics() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">متوسط المصروف</CardTitle>
+            <CardTitle className="text-sm font-medium">إجمالي الرواتب</CardTitle>
+            <DollarSign className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{totalSalaries.toFixed(2)} ج.م</div>
+            <p className="text-xs text-muted-foreground">
+              {salaries.length} راتب
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">المجموع الكلي</CardTitle>
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{avgExpense.toFixed(2)} ج.م</div>
+            <div className="text-2xl font-bold text-purple-600">{grandTotal.toFixed(2)} ج.م</div>
             <p className="text-xs text-muted-foreground">
-              لكل مصروف
+              مصروفات + رواتب
             </p>
           </CardContent>
         </Card>
@@ -234,8 +291,8 @@ export function ExpenseAnalytics() {
         <TabsContent value="monthly" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>تطور المصروفات الشهرية</CardTitle>
-              <CardDescription>مقارنة المصروفات العادية مع التوالف</CardDescription>
+              <CardTitle>تطور المصروفات والرواتب الشهرية</CardTitle>
+              <CardDescription>مقارنة المصروفات العادية مع التوالف والرواتب</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -247,11 +304,13 @@ export function ExpenseAnalytics() {
                     formatter={(value, name) => [
                       `${Number(value).toFixed(2)} ج.م`,
                       name === 'expenses' ? 'مصروفات عادية' : 
-                      name === 'damages' ? 'توالف' : 'المجموع'
+                      name === 'damages' ? 'توالف' : 
+                      name === 'salaries' ? 'رواتب' : 'المجموع'
                     ]}
                   />
                   <Bar dataKey="expenses" fill="#3b82f6" name="مصروفات عادية" />
                   <Bar dataKey="damages" fill="#ef4444" name="توالف" />
+                  <Bar dataKey="salaries" fill="#06b6d4" name="رواتب" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -326,7 +385,7 @@ export function ExpenseAnalytics() {
                     <div className="text-left">
                       <p className="font-bold">{typeData.amount.toFixed(2)} ج.م</p>
                       <p className="text-sm text-muted-foreground">
-                        {((typeData.amount / totalExpenses) * 100).toFixed(1)}%
+                        {((typeData.amount / grandTotal) * 100).toFixed(1)}%
                       </p>
                     </div>
                   </div>

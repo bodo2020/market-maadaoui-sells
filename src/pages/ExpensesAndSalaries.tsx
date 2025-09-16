@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { ExpenseAnalytics } from "@/components/analytics/ExpenseAnalytics";
 import { 
   Plus, 
   Edit, 
@@ -732,67 +733,7 @@ export default function ExpensesAndSalaries() {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>توزيع المصروفات حسب النوع</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {expenseTypes.map((type) => {
-                      const typeExpenses = expenses.filter(e => e.type === type);
-                      const typeTotal = typeExpenses.reduce((sum, e) => sum + e.amount, 0);
-                      const percentage = totalExpenses > 0 ? (typeTotal / totalExpenses) * 100 : 0;
-                      
-                      return typeTotal > 0 ? (
-                        <div key={type} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-primary"></div>
-                            <span className="text-sm">{type}</span>
-                          </div>
-                          <div className="text-left">
-                            <div className="text-sm font-medium">{typeTotal.toFixed(2)} ج.م</div>
-                            <div className="text-xs text-muted-foreground">
-                              {percentage.toFixed(1)}%
-                            </div>
-                          </div>
-                        </div>
-                      ) : null;
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>إحصائيات الرواتب</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span>عدد الموظفين</span>
-                      <span className="font-medium">{salaries.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>متوسط الراتب</span>
-                      <span className="font-medium">
-                        {salaries.length > 0 ? (totalSalaries / salaries.length).toFixed(2) : 0} ج.م
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>رواتب مدفوعة</span>
-                      <span className="font-medium text-green-600">
-                        {salaries.filter(s => s.status === 'paid').length}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>رواتب معلقة</span>
-                      <span className="font-medium text-orange-600">{pendingSalaries}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <ExpenseAnalytics />
           </TabsContent>
         </Tabs>
       </div>
