@@ -10,7 +10,7 @@ import { CRMDashboard } from "./CRMDashboard";
 import CustomersList from "@/components/customers/CustomersList";
 import { CustomerInteractions } from "./CustomerInteractions";
 import { LeadsManagement } from "./LeadsManagement";
-import { ProductAnalytics } from "./ProductAnalytics";
+import { ProductAnalytics } from "@/components/analytics/ProductAnalytics";
 import { OnlineOrdersHeatmap } from "../analytics/OnlineOrdersHeatmap";
 import { fetchCustomers } from "@/services/supabase/customerService";
 import { fetchCustomerAnalytics } from "@/services/supabase/crmService";

@@ -2,11 +2,18 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchPOSSalesHeatmapData } from "@/services/supabase/analyticsService";
 import { Clock, Calendar, TrendingUp, CreditCard } from "lucide-react";
+import { PeriodType, getDateRangeFromPeriod } from "@/components/analytics/PeriodFilter";
 
-export function POSSalesHeatmap() {
+interface POSSalesHeatmapProps {
+  selectedPeriod: PeriodType;
+}
+
+export function POSSalesHeatmap({ selectedPeriod }: POSSalesHeatmapProps) {
+  const dateRange = getDateRangeFromPeriod(selectedPeriod);
+  
   const { data: heatmapData = [], isLoading, error } = useQuery({
-    queryKey: ["pos-sales-heatmap"],
-    queryFn: fetchPOSSalesHeatmapData,
+    queryKey: ["pos-sales-heatmap", selectedPeriod],
+    queryFn: () => fetchPOSSalesHeatmapData(),
     refetchOnWindowFocus: false,
   });
 
