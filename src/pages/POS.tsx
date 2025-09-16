@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
@@ -47,8 +47,10 @@ export default function POS() {
   const [showInvoice, setShowInvoice] = useState(false);
   const [currentSale, setCurrentSale] = useState<Sale | null>(null);
   const [manualBarcodeMode, setManualBarcodeMode] = useState(false);
+  const [searchDebounceTimeoutRef, setSearchDebounceTimeoutRef] = useState<NodeJS.Timeout | null>(null);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const lastSearchRef = useRef<string>("");
   const {
     toast
   } = useToast();
@@ -79,6 +81,53 @@ export default function POS() {
     };
     loadData();
   }, [toast]);
+
+  // Smart search effect
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchDebounceTimeoutRef) {
+      clearTimeout(searchDebounceTimeoutRef);
+    }
+
+    // Don't search if empty or same as last search
+    if (!search.trim() || search.trim() === lastSearchRef.current) {
+      return;
+    }
+
+    const isNumeric = /^\d+$/.test(search.trim());
+    const searchValue = search.trim();
+
+    if (isNumeric && searchValue.length >= 3) {
+      // Immediate search for numbers (barcodes)
+      const timeoutId = setTimeout(() => {
+        handleSearchInternal(searchValue);
+        lastSearchRef.current = searchValue;
+      }, 200);
+      setSearchDebounceTimeoutRef(timeoutId);
+    } else if (!isNumeric && searchValue.length >= 2) {
+      // Delayed search for text (product names)
+      const timeoutId = setTimeout(() => {
+        handleSearchInternal(searchValue);
+        lastSearchRef.current = searchValue;
+      }, 800);
+      setSearchDebounceTimeoutRef(timeoutId);
+    }
+
+    return () => {
+      if (searchDebounceTimeoutRef) {
+        clearTimeout(searchDebounceTimeoutRef);
+      }
+    };
+  }, [search]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceTimeoutRef) {
+        clearTimeout(searchDebounceTimeoutRef);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!manualBarcodeMode) {
@@ -246,11 +295,11 @@ export default function POS() {
     }
   };
 
-  const handleSearch = async () => {
-    if (!search) return;
+  const handleSearchInternal = async (searchValue: string) => {
+    if (!searchValue) return;
     
     try {
-      const product = await fetchProductByBarcode(search);
+      const product = await fetchProductByBarcode(searchValue);
       
       if (product) {
         if (product.calculated_weight) {
@@ -268,7 +317,7 @@ export default function POS() {
         }
       }
 
-      const bulkProduct = products.find(p => p.bulk_barcode === search && p.bulk_enabled);
+      const bulkProduct = products.find(p => p.bulk_barcode === searchValue && p.bulk_enabled);
       if (bulkProduct) {
         handleAddBulkToCart(bulkProduct);
         setSearch("");
@@ -279,12 +328,12 @@ export default function POS() {
         return;
       }
 
-      if (search.startsWith("2") && search.length === 13) {
-        const productCode = search.substring(1, 7);
+      if (searchValue.startsWith("2") && searchValue.length === 13) {
+        const productCode = searchValue.substring(1, 7);
         const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
         
         if (scaleProduct) {
-          const weightInGrams = parseInt(search.substring(7, 12));
+          const weightInGrams = parseInt(searchValue.substring(7, 12));
           const weightInKg = weightInGrams / 1000;
           handleAddScaleProductToCart(scaleProduct, weightInKg);
           setSearch("");
@@ -293,13 +342,13 @@ export default function POS() {
       }
 
       const results = products.filter(product => 
-        product.barcode === search || 
-        product.name.toLowerCase().includes(search.toLowerCase())
+        product.barcode === searchValue || 
+        product.name.toLowerCase().includes(searchValue.toLowerCase())
       );
       setSearchResults(results);
 
       const exactMatch = products.find(p => 
-        p.barcode === search && 
+        p.barcode === searchValue && 
         p.barcode_type === "normal" && 
         !p.bulk_enabled
       );
@@ -320,6 +369,10 @@ export default function POS() {
         variant: "destructive"
       });
     }
+  };
+
+  const handleSearch = () => {
+    handleSearchInternal(search);
   };
 
   const handleAddToCart = (product: Product) => {
@@ -696,9 +749,19 @@ export default function POS() {
             </CardHeader>
             <CardContent>
               <div className="flex gap-2 mb-4">
-                <Input placeholder="ابحث بالباركود أو اسم المنتج" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => {
-                if (e.key === 'Enter') handleSearch();
-              }} className="flex-1" ref={searchInputRef} />
+                <Input 
+                  placeholder="ابحث بالباركود أو اسم المنتج (اكتب مباشرة)" 
+                  value={search} 
+                  onChange={e => setSearch(e.target.value)} 
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSearch();
+                  }} 
+                  className="flex-1" 
+                  ref={searchInputRef}
+                  inputMode="text"
+                  autoComplete="off"
+                  enterKeyHint="search"
+                />
                 <Button onClick={handleSearch}>
                   <Search className="ml-2 h-4 w-4" />
                   بحث
