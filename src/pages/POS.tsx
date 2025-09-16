@@ -239,6 +239,8 @@ export default function POS() {
           title: "تم المسح بنجاح",
           description: `${barcode} - ${product.name}`
         });
+        setSearch(""); // Clear search after successful addition
+        return;
       } else {
         const bulkProduct = products.find(p => p.bulk_barcode === barcode && p.bulk_enabled);
         
@@ -248,6 +250,7 @@ export default function POS() {
             title: "تم المسح بنجاح",
             description: `${barcode} - ${bulkProduct.name} (جملة)`
           });
+          setSearch(""); // Clear search after successful addition
           return;
         }
         
@@ -258,6 +261,7 @@ export default function POS() {
             const weightInGrams = parseInt(barcode.substring(7, 12));
             const weightInKg = weightInGrams / 1000;
             handleAddScaleProductToCart(scaleProduct, weightInKg);
+            setSearch(""); // Clear search after successful addition
             return;
           }
         }
@@ -287,27 +291,23 @@ export default function POS() {
       if (product) {
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
-          setSearch("");
-          return;
         } else if (product.is_bulk_scan) {
           handleAddBulkToCart(product);
-          setSearch("");
-          return;
         } else {
           handleAddToCart(product);
-          setSearch("");
-          return;
         }
+        setSearch(""); // Clear search after successful addition
+        return;
       }
 
       const bulkProduct = products.find(p => p.bulk_barcode === search && p.bulk_enabled);
       if (bulkProduct) {
         handleAddBulkToCart(bulkProduct);
-        setSearch("");
         toast({
           title: "تم إضافة منتج جملة",
           description: `${bulkProduct.name} - ${bulkProduct.bulk_quantity} وحدة`
         });
+        setSearch(""); // Clear search after successful addition
         return;
       }
 
@@ -319,7 +319,7 @@ export default function POS() {
           const weightInGrams = parseInt(search.substring(7, 12));
           const weightInKg = weightInGrams / 1000;
           handleAddScaleProductToCart(scaleProduct, weightInKg);
-          setSearch("");
+          setSearch(""); // Clear search after successful addition
           return;
         }
       }
@@ -338,11 +338,16 @@ export default function POS() {
 
       if (exactMatch) {
         handleAddToCart(exactMatch);
-        setSearch("");
+        setSearch(""); // Clear search after successful addition
       } else if (results.length === 1 && results[0].barcode_type === "scale") {
         setCurrentScaleProduct(results[0]);
         setShowWeightDialog(true);
-        setSearch("");
+        setSearch(""); // Clear search when opening weight dialog
+      } else if (results.length === 1) {
+        // Auto-add single result
+        handleAddToCart(results[0]);
+        setSearch(""); // Clear search after successful addition
+        setSearchResults([]); // Clear results
       }
     } catch (error) {
       console.error("Error searching for product:", error);
@@ -373,7 +378,8 @@ export default function POS() {
         weight: null
       }]);
     }
-    setSearchResults([]);
+    setSearchResults([]); // Clear search results
+    setSearch(""); // Clear search box
   };
 
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
@@ -435,7 +441,8 @@ export default function POS() {
       title: "تم إضافة عبوة جملة",
       description: `${product.name} - ${product.bulk_quantity} وحدة`
     });
-    setSearchResults([]);
+    setSearchResults([]); // Clear search results
+    setSearch(""); // Clear search box
   };
 
   const handleWeightSubmit = () => {
