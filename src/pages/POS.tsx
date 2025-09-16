@@ -89,21 +89,44 @@ export default function POS() {
         const target = e.target as HTMLElement;
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
         const isSearchInput = target === searchInputRef.current;
-        if (isInput && !isSearchInput) return;
         
-        console.log("Key pressed:", e.key, "Current buffer:", barcodeBuffer);
-        
-        // Handle Enter key - process current buffer
-        if (e.key === 'Enter' && barcodeBuffer) {
-          e.preventDefault();
-          console.log("External barcode scanned:", barcodeBuffer);
-          processBarcode(barcodeBuffer);
-          setBarcodeBuffer("");
+        // Skip if typing in other inputs, dialogs are open, or specific keys are pressed
+        if ((isInput && !isSearchInput) || 
+            isCheckoutOpen || 
+            showWeightDialog || 
+            showInvoice || 
+            showBarcodeScanner ||
+            ['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
           return;
         }
         
-        // Handle alphanumeric characters
-        if (/^[a-zA-Z0-9]$/.test(e.key)) {
+        console.log("Key pressed:", e.key, "Current buffer:", barcodeBuffer);
+        
+        // Handle Enter key - process current buffer or search
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (barcodeBuffer) {
+            console.log("External barcode scanned:", barcodeBuffer);
+            processBarcode(barcodeBuffer);
+            setBarcodeBuffer("");
+          } else if (search) {
+            handleSearch();
+          }
+          return;
+        }
+        
+        // Handle alphanumeric characters and common symbols
+        if (/^[a-zA-Z0-9\u0600-\u06FF\s\-\.]$/.test(e.key)) {
+          // Direct typing to search box
+          if (!isSearchInput && searchInputRef.current) {
+            e.preventDefault();
+            const newValue = search + e.key;
+            setSearch(newValue);
+            searchInputRef.current.focus();
+            searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
+          }
+          
+          // Barcode scanning logic
           if (barcodeTimeoutRef.current) {
             clearTimeout(barcodeTimeoutRef.current);
           }
@@ -119,11 +142,20 @@ export default function POS() {
               processBarcode(currentBuffer);
               setBarcodeBuffer("");
             } else {
-              if (!isInput) {
-                setBarcodeBuffer("");
-              }
+              setBarcodeBuffer("");
             }
           }, timeoutDuration);
+        }
+        
+        // Handle backspace for search
+        if (e.key === 'Backspace' && !isSearchInput && search.length > 0) {
+          e.preventDefault();
+          const newValue = search.slice(0, -1);
+          setSearch(newValue);
+          if (searchInputRef.current) {
+            searchInputRef.current.focus();
+            searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
+          }
         }
       };
 
@@ -696,9 +728,24 @@ export default function POS() {
             </CardHeader>
             <CardContent>
               <div className="flex gap-2 mb-4">
-                <Input placeholder="ابحث بالباركود أو اسم المنتج" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => {
-                if (e.key === 'Enter') handleSearch();
-              }} className="flex-1" ref={searchInputRef} />
+                <div className="relative flex-1">
+                  <Input 
+                    placeholder={manualBarcodeMode ? "ابحث بالباركود أو اسم المنتج" : "ابدأ الكتابة من أي مكان للبحث..."} 
+                    value={search} 
+                    onChange={e => setSearch(e.target.value)} 
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleSearch();
+                    }} 
+                    className="flex-1" 
+                    ref={searchInputRef} 
+                  />
+                  {!manualBarcodeMode && search === "" && (
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center text-muted-foreground text-sm">
+                      <div className="animate-pulse mr-2">⌨️</div>
+                      جاهز للكتابة
+                    </div>
+                  )}
+                </div>
                 <Button onClick={handleSearch}>
                   <Search className="ml-2 h-4 w-4" />
                   بحث
