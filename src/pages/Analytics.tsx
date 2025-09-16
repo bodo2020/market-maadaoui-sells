@@ -7,9 +7,23 @@ import { ExpenseAnalytics } from "@/components/analytics/ExpenseAnalytics";
 import { RevenueAnalytics } from "@/components/analytics/RevenueAnalytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, ShoppingCart, Package, Receipt, DollarSign, CreditCard } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { BarChart3, ShoppingCart, Package, Receipt, DollarSign, CreditCard, Download } from "lucide-react";
+import { exportComprehensiveAnalyticsReport } from "@/services/excelExportService";
+import { toast } from "sonner";
 
 export default function Analytics() {
+  const handleExportReport = async () => {
+    try {
+      toast.loading("جاري إنشاء التقرير...");
+      await exportComprehensiveAnalyticsReport();
+      toast.success("تم تصدير التقرير بنجاح!");
+    } catch (error) {
+      console.error("Error exporting report:", error);
+      toast.error("حدث خطأ في تصدير التقرير");
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -20,6 +34,10 @@ export default function Analytics() {
               تحليلات شاملة للمبيعات والعملاء والطلبات
             </p>
           </div>
+          <Button onClick={handleExportReport} className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            تصدير تقرير شامل
+          </Button>
         </div>
 
         <Tabs defaultValue="product-analytics" className="space-y-4">
