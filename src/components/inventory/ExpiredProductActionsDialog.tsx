@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ProductBatch } from "@/types";
 import { updateProductBatch, createProductBatch } from "@/services/supabase/productBatchService";
 import { fetchProducts, updateProductQuantity } from "@/services/supabase/productService";
-import { createExpense } from "@/services/supabase/expenseService";
+import { createDamageExpense } from "@/services/supabase/expenseService";
 import { recordDamagedProduct } from "@/services/supabase/damageService";
 
 interface ExpiredProductActionsDialogProps {
@@ -130,8 +130,8 @@ export function ExpiredProductActionsDialog({
             notes: `منتج تالف منتهي الصلاحية - ${notes || 'بدون ملاحظات إضافية'}`,
           });
 
-          // إضافة المصروف (والذي سيخصم من الخزنة تلقائياً)
-          await createExpense({
+          // إضافة المصروف (بدون خصم من الخزنة للتوالف)
+          await createDamageExpense({
             type: "منتج تالف",
             amount: damageCost,
             description: `منتج تالف منتهي الصلاحية - ${(batch as any).products?.name || (batch as any).product_name || `منتج #${batch.product_id.slice(-6)}`} - الكمية: ${damagedQuantity}`,
@@ -140,7 +140,7 @@ export function ExpiredProductActionsDialog({
           
           toast({
             title: "تم بنجاح",
-            description: `تم تمييز ${damagedQuantity} من المنتج كتالف وتسجيل مصروف ${damageCost.toFixed(2)} ج.م وخصمه من الخزنة`,
+            description: `تم تمييز ${damagedQuantity} من المنتج كتالف وتسجيل مصروف ${damageCost.toFixed(2)} ج.م (بدون خصم من الخزنة)`,
           });
         } catch (error: any) {
           console.error("Error recording damage:", error);

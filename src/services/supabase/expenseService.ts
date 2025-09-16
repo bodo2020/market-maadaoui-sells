@@ -183,3 +183,65 @@ export async function createDamageExpense(expense: Omit<Expense, "id" | "created
     throw error;
   }
 }
+
+// دوال تحليلات المصروفات
+export async function getExpensesByDateRange(startDate?: string, endDate?: string) {
+  let query = supabase
+    .from("expenses")
+    .select("*")
+    .order("date", { ascending: false });
+
+  if (startDate) {
+    query = query.gte("date", startDate);
+  }
+  if (endDate) {
+    query = query.lte("date", endDate);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("Error fetching expenses by date range:", error);
+    throw error;
+  }
+
+  return data as Expense[];
+}
+
+export async function getExpensesByType() {
+  const { data, error } = await supabase
+    .from("expenses")
+    .select("type, amount")
+    .order("amount", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching expenses by type:", error);
+    throw error;
+  }
+
+  // Group by type
+  const grouped = data.reduce((acc: any, expense) => {
+    if (!acc[expense.type]) {
+      acc[expense.type] = { type: expense.type, amount: 0, count: 0 };
+    }
+    acc[expense.type].amount += expense.amount;
+    acc[expense.type].count += 1;
+    return acc;
+  }, {});
+
+  return Object.values(grouped);
+}
+
+export async function getMonthlyExpensesTrend(months: number = 6) {
+  const { data, error } = await supabase
+    .from("expenses")
+    .select("amount, date, type")
+    .gte("date", new Date(Date.now() - months * 30 * 24 * 60 * 60 * 1000).toISOString());
+
+  if (error) {
+    console.error("Error fetching monthly expenses trend:", error);
+    throw error;
+  }
+
+  return data as Expense[];
+}
