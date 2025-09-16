@@ -5,27 +5,23 @@ import { OnlineOrdersHeatmap } from "@/components/analytics/OnlineOrdersHeatmap"
 import { POSSalesHeatmap } from "@/components/analytics/POSSalesHeatmap";
 import { ExpenseAnalytics } from "@/components/analytics/ExpenseAnalytics";
 import { RevenueAnalytics } from "@/components/analytics/RevenueAnalytics";
+import { PeriodFilter, PeriodType, getDateRangeFromPeriod, getPeriodLabel } from "@/components/analytics/PeriodFilter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { BarChart3, ShoppingCart, Package, Receipt, DollarSign, CreditCard, Download, Filter } from "lucide-react";
+import { BarChart3, ShoppingCart, Package, Receipt, DollarSign, CreditCard, Download } from "lucide-react";
 import { exportComprehensiveAnalyticsReport } from "@/services/excelExportService";
 import { toast } from "sonner";
 import { useState } from "react";
-import { DateRange } from "react-day-picker";
-import { startOfMonth, endOfMonth } from "date-fns";
 
 export default function Analytics() {
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
-  });
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>("month");
 
   const handleExportReport = async () => {
     try {
       toast.loading("جاري إنشاء التقرير...");
-      await exportComprehensiveAnalyticsReport(dateRange);
+      const dateRange = getDateRangeFromPeriod(selectedPeriod);
+      await exportComprehensiveAnalyticsReport(dateRange, selectedPeriod);
       toast.success("تم تصدير التقرير بنجاح!");
     } catch (error) {
       console.error("Error exporting report:", error);
@@ -50,24 +46,10 @@ export default function Analytics() {
             </Button>
           </div>
           
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                فلتر الفترة الزمنية
-              </CardTitle>
-              <CardDescription>
-                اختر الفترة الزمنية للحصول على تحليلات مخصصة
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DateRangePicker
-                from={dateRange?.from || startOfMonth(new Date())}
-                to={dateRange?.to || endOfMonth(new Date())}
-                onSelect={setDateRange}
-              />
-            </CardContent>
-          </Card>
+          <PeriodFilter 
+            selectedPeriod={selectedPeriod}
+            onPeriodChange={setSelectedPeriod}
+          />
         </div>
 
         <Tabs defaultValue="product-analytics" className="space-y-4">

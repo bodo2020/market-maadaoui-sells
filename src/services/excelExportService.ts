@@ -9,6 +9,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
+import { PeriodType, getPeriodLabel } from "@/components/analytics/PeriodFilter";
 
 // دالة لجلب تحليلات الإيرادات مع فلتر التاريخ
 async function fetchRevenueAnalytics(dateRange?: DateRange) {
@@ -88,7 +89,7 @@ async function fetchExpenseAnalytics(dateRange?: DateRange) {
   return { byType };
 }
 
-export async function exportComprehensiveAnalyticsReport(dateRange?: DateRange) {
+export async function exportComprehensiveAnalyticsReport(dateRange?: DateRange, period?: PeriodType) {
   try {
     const workbook = new ExcelJS.Workbook();
     
@@ -98,7 +99,7 @@ export async function exportComprehensiveAnalyticsReport(dateRange?: DateRange) 
     workbook.created = new Date();
     workbook.modified = new Date();
 
-    // جلب جميع البيانات
+    // جلب جميع البيانات مع تطبيق فلتر التاريخ
     const [
       productSales,
       categorySales,
@@ -308,7 +309,9 @@ export async function exportComprehensiveAnalyticsReport(dateRange?: DateRange) 
     
     // اسم الملف مع الفترة الزمنية
     let fileName = `تقرير_شامل_${format(new Date(), 'yyyy-MM-dd')}`;
-    if (dateRange?.from && dateRange?.to) {
+    if (period) {
+      fileName += `_${getPeriodLabel(period).replace(/\s/g, '_')}`;
+    } else if (dateRange?.from && dateRange?.to) {
       fileName += `_${format(dateRange.from, 'yyyy-MM-dd')}_الى_${format(dateRange.to, 'yyyy-MM-dd')}`;
     }
     fileName += '.xlsx';
