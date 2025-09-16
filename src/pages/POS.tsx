@@ -1085,6 +1085,8 @@ export default function POS() {
                         value={customerPhone} 
                         onChange={handleCustomerPhoneChange} 
                         placeholder="01xxxxxxxxx"
+                        autoFocus={false}
+                        tabIndex={-1}
                       />
                     </div>
                     <div className="space-y-1">
