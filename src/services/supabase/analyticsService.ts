@@ -212,76 +212,44 @@ export async function fetchCategorySalesAnalytics() {
   }
 }
 
-// جلب بيانات الخريطة الحرارية للطلبات
-export async function fetchOrderHeatmapData() {
+// جلب بيانات ساعات العمل للطلبات الأونلاين
+export async function fetchOnlineOrdersHeatmapData() {
   try {
-    // جلب المبيعات من المتجر مع استخدام حقل date
-    const { data: salesData, error: salesError } = await supabase
-      .from("sales")
-      .select("date")
-      .not("date", "is", null);
-
-    if (salesError) {
-      console.error("Error fetching sales data:", salesError);
-      throw salesError;
-    }
-
-    // جلب الطلبات الإلكترونية
+    // جلب الطلبات الإلكترونية فقط
     const { data: ordersData, error: ordersError } = await supabase
       .from("online_orders")
       .select("created_at")
       .not("created_at", "is", null);
 
     if (ordersError) {
-      console.error("Error fetching orders data:", ordersError);
+      console.error("Error fetching online orders data:", ordersError);
       throw ordersError;
     }
 
-    console.log("Sales data count:", salesData?.length || 0);
-    console.log("Orders data count:", ordersData?.length || 0);
-
-    // تجميع جميع التواريخ
-    const allDates: string[] = [];
-    
-    // إضافة تواريخ المبيعات (استخدام حقل date)
-    salesData?.forEach(sale => {
-      if (sale.date) {
-        allDates.push(sale.date);
-      }
-    });
-
-    // إضافة تواريخ الطلبات الإلكترونية
-    ordersData?.forEach(order => {
-      if (order.created_at) {
-        allDates.push(order.created_at);
-      }
-    });
-
-    console.log("Total dates found:", allDates.length);
+    console.log("Online orders data count:", ordersData?.length || 0);
 
     // تجميع البيانات حسب اليوم والساعة
     const heatmapMap = new Map<string, number>();
 
-    allDates.forEach(dateString => {
-      try {
-        const date = new Date(dateString);
-        // التأكد من صحة التاريخ
-        if (isNaN(date.getTime())) {
-          console.warn("Invalid date:", dateString);
-          return;
-        }
-        
-        const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        const hour = date.getHours();
-        const key = `${dayOfWeek}-${hour}`;
+    ordersData?.forEach(order => {
+      if (order.created_at) {
+        try {
+          const date = new Date(order.created_at);
+          if (isNaN(date.getTime())) {
+            console.warn("Invalid date:", order.created_at);
+            return;
+          }
+          
+          const dayOfWeek = date.getDay();
+          const hour = date.getHours();
+          const key = `${dayOfWeek}-${hour}`;
 
-        heatmapMap.set(key, (heatmapMap.get(key) || 0) + 1);
-      } catch (error) {
-        console.warn("Error parsing date:", dateString, error);
+          heatmapMap.set(key, (heatmapMap.get(key) || 0) + 1);
+        } catch (error) {
+          console.warn("Error parsing date:", order.created_at, error);
+        }
       }
     });
-
-    console.log("Heatmap data points:", heatmapMap.size);
 
     // تحويل البيانات إلى مصفوفة
     const result = Array.from(heatmapMap.entries()).map(([key, orderCount]) => {
@@ -293,11 +261,65 @@ export async function fetchOrderHeatmapData() {
       };
     });
 
-    console.log("Final heatmap result:", result.length, "data points");
-    
     return result;
   } catch (error) {
-    console.error("Error fetching order heatmap data:", error);
+    console.error("Error fetching online orders heatmap data:", error);
+    throw error;
+  }
+}
+
+// جلب بيانات ساعات العمل لمبيعات الكاشير
+export async function fetchPOSSalesHeatmapData() {
+  try {
+    // جلب المبيعات من الكاشير فقط
+    const { data: salesData, error: salesError } = await supabase
+      .from("sales")
+      .select("date")
+      .not("date", "is", null);
+
+    if (salesError) {
+      console.error("Error fetching POS sales data:", salesError);
+      throw salesError;
+    }
+
+    console.log("POS sales data count:", salesData?.length || 0);
+
+    // تجميع البيانات حسب اليوم والساعة
+    const heatmapMap = new Map<string, number>();
+
+    salesData?.forEach(sale => {
+      if (sale.date) {
+        try {
+          const date = new Date(sale.date);
+          if (isNaN(date.getTime())) {
+            console.warn("Invalid date:", sale.date);
+            return;
+          }
+          
+          const dayOfWeek = date.getDay();
+          const hour = date.getHours();
+          const key = `${dayOfWeek}-${hour}`;
+
+          heatmapMap.set(key, (heatmapMap.get(key) || 0) + 1);
+        } catch (error) {
+          console.warn("Error parsing date:", sale.date, error);
+        }
+      }
+    });
+
+    // تحويل البيانات إلى مصفوفة
+    const result = Array.from(heatmapMap.entries()).map(([key, orderCount]) => {
+      const [dayOfWeek, hour] = key.split('-').map(Number);
+      return {
+        dayOfWeek,
+        hour,
+        orderCount
+      };
+    });
+
+    return result;
+  } catch (error) {
+    console.error("Error fetching POS sales heatmap data:", error);
     throw error;
   }
 }

@@ -11,7 +11,7 @@ import CustomersList from "@/components/customers/CustomersList";
 import { CustomerInteractions } from "./CustomerInteractions";
 import { LeadsManagement } from "./LeadsManagement";
 import { ProductAnalytics } from "./ProductAnalytics";
-import { OrderHeatmap } from "./OrderHeatmap";
+import { OnlineOrdersHeatmap } from "../analytics/OnlineOrdersHeatmap";
 import { fetchCustomers } from "@/services/supabase/customerService";
 import { fetchCustomerAnalytics } from "@/services/supabase/crmService";
 import { Users, Search, Plus, Filter, BarChart3, MessageSquare, Target, Download } from "lucide-react";
