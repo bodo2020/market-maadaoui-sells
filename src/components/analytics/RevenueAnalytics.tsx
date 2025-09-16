@@ -1,30 +1,16 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PeriodType, getDateRangeFromPeriod } from "@/components/analytics/PeriodFilter";
-import { 
-  LineChart, 
-  Line, 
-  BarChart, 
-  Bar, 
-  PieChart, 
-  Pie, 
-  Cell, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { DollarSign, TrendingUp, TrendingDown, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Sale } from "@/types";
 
-// Data interfaces
 interface RevenueData {
   month: string;
   revenue: number;
   profit: number;
-  salesCount: number;
+  sales_count: number;
 }
 
 interface PaymentMethodData {
@@ -34,12 +20,7 @@ interface PaymentMethodData {
   color: string;
 }
 
-interface RevenueAnalyticsProps {
-  selectedPeriod: PeriodType;
-}
-
-export function RevenueAnalytics({ selectedPeriod }: RevenueAnalyticsProps) {
-  const dateRange = getDateRangeFromPeriod(selectedPeriod);
+export function RevenueAnalytics() {
   const [monthlyData, setMonthlyData] = useState<RevenueData[]>([]);
   const [paymentMethodsData, setPaymentMethodsData] = useState<PaymentMethodData[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
@@ -48,226 +29,243 @@ export function RevenueAnalytics({ selectedPeriod }: RevenueAnalyticsProps) {
   const [avgOrderValue, setAvgOrderValue] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    fetchRevenueData();
+  }, []);
+
   const fetchRevenueData = async () => {
-    setLoading(true);
     try {
-      // Fetch sales data
-      let salesQuery = supabase
+      setLoading(true);
+      
+      // Fetch sales data from the last 6 months
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const { data: sales, error } = await supabase
         .from("sales")
-        .select("total, profit, payment_method, date");
-        
-      if (dateRange?.from && dateRange?.to) {
-        salesQuery = salesQuery
-          .gte('date', dateRange.from.toISOString().split('T')[0])
-          .lte('date', dateRange.to.toISOString().split('T')[0]);
+        .select("*")
+        .gte("date", sixMonthsAgo.toISOString())
+        .order("date", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching sales data:", error);
+        return;
       }
-      
-      const { data: salesData, error: salesError } = await salesQuery;
-      if (salesError) throw salesError;
 
-      // Fetch online orders data
-      let ordersQuery = supabase
-        .from("online_orders")
-        .select("total, created_at");
-        
-      if (dateRange?.from && dateRange?.to) {
-        ordersQuery = ordersQuery
-          .gte('created_at', dateRange.from.toISOString())
-          .lte('created_at', dateRange.to.toISOString());
+      if (!sales) {
+        setLoading(false);
+        return;
       }
+
+      // Calculate totals using actual profit from sales table
+      const revenue = sales.reduce((sum, sale) => sum + sale.total, 0);
+      const profit = sales.reduce((sum, sale) => sum + (sale.profit || 0), 0); // Use actual profit
+      const salesCount = sales.length;
+      const avgOrder = salesCount > 0 ? revenue / salesCount : 0;
+
+      setTotalRevenue(revenue);
+      setTotalProfit(profit);
+      setTotalSales(salesCount);
+      setAvgOrderValue(avgOrder);
+
+      // Group by month
+      const monthlyRevenue: { [key: string]: RevenueData } = {};
       
-      const { data: ordersData, error: ordersError } = await ordersQuery;
-      if (ordersError) throw ordersError;
-
-      // Process monthly data
-      const monthlyMap = new Map<string, { revenue: number; profit: number; salesCount: number }>();
-      const paymentMethodMap = new Map<string, { amount: number; count: number }>();
-
-      // Process sales
-      salesData?.forEach(sale => {
-        const monthKey = getMonthName(new Date(sale.date));
-        const existing = monthlyMap.get(monthKey) || { revenue: 0, profit: 0, salesCount: 0 };
-        monthlyMap.set(monthKey, {
-          revenue: existing.revenue + (sale.total || 0),
-          profit: existing.profit + (sale.profit || 0),
-          salesCount: existing.salesCount + 1
-        });
-
-        // Process payment methods
-        const paymentMethod = getPaymentMethodLabel(sale.payment_method);
-        const paymentExisting = paymentMethodMap.get(paymentMethod) || { amount: 0, count: 0 };
-        paymentMethodMap.set(paymentMethod, {
-          amount: paymentExisting.amount + (sale.total || 0),
-          count: paymentExisting.count + 1
-        });
+      sales.forEach(sale => {
+        const date = new Date(sale.date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthName = getMonthName(date.getMonth() + 1);
+        
+        if (!monthlyRevenue[monthKey]) {
+          monthlyRevenue[monthKey] = {
+            month: monthName,
+            revenue: 0,
+            profit: 0,
+            sales_count: 0
+          };
+        }
+        
+        monthlyRevenue[monthKey].revenue += sale.total;
+        monthlyRevenue[monthKey].profit += (sale.profit || 0); // Use actual profit from sales table
+        monthlyRevenue[monthKey].sales_count += 1;
       });
 
-      // Process online orders
-      ordersData?.forEach(order => {
-        const monthKey = getMonthName(new Date(order.created_at));
-        const existing = monthlyMap.get(monthKey) || { revenue: 0, profit: 0, salesCount: 0 };
-        monthlyMap.set(monthKey, {
-          revenue: existing.revenue + (order.total || 0),
-          profit: existing.profit, // Online orders profit calculation would need product data
-          salesCount: existing.salesCount + 1
-        });
+      const monthlyArray = Object.values(monthlyRevenue).reverse();
+      setMonthlyData(monthlyArray);
 
-        // Add to online payment methods
-        const paymentMethod = "الدفع الإلكتروني";
-        const paymentExisting = paymentMethodMap.get(paymentMethod) || { amount: 0, count: 0 };
-        paymentMethodMap.set(paymentMethod, {
-          amount: paymentExisting.amount + (order.total || 0),
-          count: paymentExisting.count + 1
-        });
+      // Group by payment method
+      const paymentMethods: { [key: string]: { amount: number; count: number } } = {};
+      
+      sales.forEach(sale => {
+        const method = getPaymentMethodLabel(sale.payment_method);
+        if (!paymentMethods[method]) {
+          paymentMethods[method] = { amount: 0, count: 0 };
+        }
+        paymentMethods[method].amount += sale.total;
+        paymentMethods[method].count += 1;
       });
 
-      // Convert to arrays
-      const monthlyArray = Array.from(monthlyMap.entries()).map(([month, data]) => ({
-        month,
-        revenue: data.revenue,
-        profit: data.profit,
-        salesCount: data.salesCount
-      }));
+      const paymentColors = {
+        'نقدي': '#10b981',
+        'كارت': '#3b82f6',
+        'مختلط': '#f59e0b'
+      };
 
-      const paymentColors = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', '#8884d8', '#82ca9d'];
-      const paymentArray = Array.from(paymentMethodMap.entries()).map(([method, data], index) => ({
+      const paymentArray = Object.entries(paymentMethods).map(([method, data]) => ({
         method,
         amount: data.amount,
         count: data.count,
-        color: paymentColors[index % paymentColors.length]
+        color: paymentColors[method as keyof typeof paymentColors] || '#6b7280'
       }));
 
-      // Calculate totals
-      const totalRev = monthlyArray.reduce((sum, item) => sum + item.revenue, 0);
-      const totalProf = monthlyArray.reduce((sum, item) => sum + item.profit, 0);
-      const totalSalesCount = monthlyArray.reduce((sum, item) => sum + item.salesCount, 0);
-      const avgOrder = totalSalesCount > 0 ? totalRev / totalSalesCount : 0;
-
-      setMonthlyData(monthlyArray);
       setPaymentMethodsData(paymentArray);
-      setTotalRevenue(totalRev);
-      setTotalProfit(totalProf);
-      setTotalSales(totalSalesCount);
-      setAvgOrderValue(avgOrder);
+      setLoading(false);
     } catch (error) {
-      console.error('Error fetching revenue data:', error);
-    } finally {
+      console.error("Error in fetchRevenueData:", error);
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchRevenueData();
-  }, [selectedPeriod, dateRange]);
-
-  const getMonthName = (date: Date): string => {
-    return date.toLocaleDateString('ar-EG', { 
-      month: 'short', 
-      year: 'numeric' 
-    });
+  const getMonthName = (month: number) => {
+    const months = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    return months[month - 1];
   };
 
-  const getPaymentMethodLabel = (method: string): string => {
-    const labels: { [key: string]: string } = {
+  const getPaymentMethodLabel = (method: string) => {
+    const labels = {
       'cash': 'نقدي',
-      'card': 'بطاقة',
-      'mixed': 'مختلط',
-      'online': 'إلكتروني'
+      'card': 'كارت',
+      'mixed': 'مختلط'
     };
-    return labels[method] || method || 'غير محدد';
+    return labels[method as keyof typeof labels] || method;
   };
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('ar-EG', {
       style: 'currency',
       currency: 'EGP',
       minimumFractionDigits: 0,
-    }).format(value);
+      maximumFractionDigits: 0,
+    }).format(amount);
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-lg">جاري تحميل بيانات الإيرادات...</div>
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
+
+  const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
 
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي الإيرادات</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{formatCurrency(totalRevenue)}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {formatCurrency(totalRevenue)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              آخر 6 أشهر
+            </p>
           </CardContent>
         </Card>
-        
+
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">إجمالي الأرباح</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(totalProfit)}</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {formatCurrency(totalProfit)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              هامش ربح {profitMargin.toFixed(1)}%
+            </p>
           </CardContent>
         </Card>
-        
+
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي المبيعات</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">عدد المبيعات</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{totalSales}</div>
+            <div className="text-2xl font-bold">
+              {totalSales.toLocaleString('ar-EG')}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              معاملة
+            </p>
           </CardContent>
         </Card>
-        
+
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">متوسط قيمة الطلب</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{formatCurrency(avgOrderValue)}</div>
+            <div className="text-2xl font-bold text-purple-600">
+              {formatCurrency(avgOrderValue)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              لكل معاملة
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
-      <Tabs defaultValue="monthly" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="monthly">الاتجاه الشهري</TabsTrigger>
+      <Tabs defaultValue="monthly-trend" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="monthly-trend">الاتجاه الشهري</TabsTrigger>
           <TabsTrigger value="payment-methods">طرق الدفع</TabsTrigger>
           <TabsTrigger value="profit-analysis">تحليل الأرباح</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="monthly" className="space-y-6">
+        <TabsContent value="monthly-trend">
           <Card>
             <CardHeader>
-              <CardTitle>الاتجاه الشهري للإيرادات</CardTitle>
+              <CardTitle>الإيرادات والأرباح الشهرية</CardTitle>
+              <CardDescription>تتبع الإيرادات والأرباح عبر الأشهر</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <BarChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Legend />
-                  <Bar dataKey="revenue" fill="hsl(var(--primary))" name="الإيرادات" />
-                  <Bar dataKey="profit" fill="hsl(var(--secondary))" name="الأرباح" />
+                  <Tooltip 
+                    formatter={(value: number, name: string) => [
+                      formatCurrency(value),
+                      name === 'revenue' ? 'الإيرادات' : 'الأرباح'
+                    ]}
+                  />
+                  <Bar dataKey="revenue" fill="#10b981" name="الإيرادات" />
+                  <Bar dataKey="profit" fill="#3b82f6" name="الأرباح" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="payment-methods" className="space-y-6">
+        <TabsContent value="payment-methods">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>توزيع الإيرادات حسب طريقة الدفع</CardTitle>
+                <CardTitle>توزيع طرق الدفع</CardTitle>
+                <CardDescription>نسبة الإيرادات حسب طريقة الدفع</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -276,11 +274,11 @@ export function RevenueAnalytics({ selectedPeriod }: RevenueAnalyticsProps) {
                       data={paymentMethodsData}
                       cx="50%"
                       cy="50%"
-                      labelLine={false}
-                      label={({ method, amount }) => `${method}: ${formatCurrency(amount)}`}
-                      outerRadius={80}
-                      fill="#8884d8"
+                      innerRadius={60}
+                      outerRadius={120}
+                      paddingAngle={5}
                       dataKey="amount"
+                      label={({ method, percent }) => `${method} (${(percent * 100).toFixed(1)}%)`}
                     >
                       {paymentMethodsData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -295,21 +293,29 @@ export function RevenueAnalytics({ selectedPeriod }: RevenueAnalyticsProps) {
             <Card>
               <CardHeader>
                 <CardTitle>تفاصيل طرق الدفع</CardTitle>
+                <CardDescription>المبالغ وعدد المعاملات</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {paymentMethodsData.map((method, index) => (
-                    <div key={method.method} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                  {paymentMethodsData.map((methodData, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
                         <div 
-                          className="w-3 h-3 rounded" 
-                          style={{ backgroundColor: method.color }}
-                        />
-                        <span>{method.method}</span>
+                          className="w-4 h-4 rounded-full" 
+                          style={{ backgroundColor: methodData.color }}
+                        ></div>
+                        <div>
+                          <p className="font-medium">{methodData.method}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {methodData.count} معاملة
+                          </p>
+                        </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold">{formatCurrency(method.amount)}</div>
-                        <div className="text-sm text-muted-foreground">{method.count} معاملة</div>
+                        <p className="font-bold">{formatCurrency(methodData.amount)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {((methodData.amount / totalRevenue) * 100).toFixed(1)}%
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -319,31 +325,36 @@ export function RevenueAnalytics({ selectedPeriod }: RevenueAnalyticsProps) {
           </div>
         </TabsContent>
 
-        <TabsContent value="profit-analysis" className="space-y-6">
+        <TabsContent value="profit-analysis">
           <Card>
             <CardHeader>
-              <CardTitle>مقارنة الإيرادات والأرباح</CardTitle>
+              <CardTitle>تحليل الأرباح الشهرية</CardTitle>
+              <CardDescription>اتجاه الأرباح ومقارنة بالإيرادات</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  <Legend />
+                  <Tooltip 
+                    formatter={(value: number, name: string) => [
+                      formatCurrency(value),
+                      name === 'revenue' ? 'الإيرادات' : 'الأرباح'
+                    ]}
+                  />
                   <Line 
                     type="monotone" 
                     dataKey="revenue" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
+                    stroke="#10b981" 
+                    strokeWidth={3}
                     name="الإيرادات"
                   />
                   <Line 
                     type="monotone" 
                     dataKey="profit" 
-                    stroke="hsl(var(--secondary))" 
-                    strokeWidth={2}
+                    stroke="#3b82f6" 
+                    strokeWidth={3}
                     name="الأرباح"
                   />
                 </LineChart>

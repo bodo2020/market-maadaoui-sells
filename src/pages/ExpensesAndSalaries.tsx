@@ -736,7 +736,7 @@ export default function ExpensesAndSalaries() {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-4">
-            <ExpenseAnalytics selectedPeriod="month" />
+            <ExpenseAnalytics />
           </TabsContent>
         </Tabs>
       </div>

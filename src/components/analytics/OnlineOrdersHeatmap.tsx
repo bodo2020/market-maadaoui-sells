@@ -2,18 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchOnlineOrdersHeatmapData } from "@/services/supabase/analyticsService";
 import { Clock, Calendar, TrendingUp, ShoppingCart } from "lucide-react";
-import { PeriodType, getDateRangeFromPeriod } from "@/components/analytics/PeriodFilter";
 
-interface OnlineOrdersHeatmapProps {
-  selectedPeriod: PeriodType;
-}
-
-export function OnlineOrdersHeatmap({ selectedPeriod }: OnlineOrdersHeatmapProps) {
-  const dateRange = getDateRangeFromPeriod(selectedPeriod);
-  
+export function OnlineOrdersHeatmap() {
   const { data: heatmapData = [], isLoading, error } = useQuery({
-    queryKey: ["online-orders-heatmap", selectedPeriod],
-    queryFn: () => fetchOnlineOrdersHeatmapData(),
+    queryKey: ["online-orders-heatmap"],
+    queryFn: fetchOnlineOrdersHeatmapData,
     refetchOnWindowFocus: false,
   });
 

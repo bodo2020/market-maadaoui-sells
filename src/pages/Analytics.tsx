@@ -1,6 +1,6 @@
 import MainLayout from "@/components/layout/MainLayout";
-import { ProductAnalytics } from "@/components/analytics/ProductAnalytics";
-import { CustomerAnalytics } from "@/components/analytics/CustomerAnalytics";
+import { ProductAnalytics } from "@/components/crm/ProductAnalytics";
+import { CustomerAnalytics } from "@/components/crm/CustomerAnalytics";
 import { OnlineOrdersHeatmap } from "@/components/analytics/OnlineOrdersHeatmap";
 import { POSSalesHeatmap } from "@/components/analytics/POSSalesHeatmap";
 import { ExpenseAnalytics } from "@/components/analytics/ExpenseAnalytics";
@@ -89,7 +89,7 @@ export default function Analytics() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ProductAnalytics selectedPeriod={selectedPeriod} />
+                <ProductAnalytics />
               </CardContent>
             </Card>
           </TabsContent>
@@ -103,7 +103,7 @@ export default function Analytics() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <CustomerAnalytics selectedPeriod={selectedPeriod} />
+                <CustomerAnalytics />
               </CardContent>
             </Card>
           </TabsContent>
@@ -117,7 +117,7 @@ export default function Analytics() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <OnlineOrdersHeatmap selectedPeriod={selectedPeriod} />
+                <OnlineOrdersHeatmap />
               </CardContent>
             </Card>
           </TabsContent>
@@ -131,7 +131,7 @@ export default function Analytics() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <POSSalesHeatmap selectedPeriod={selectedPeriod} />
+                <POSSalesHeatmap />
               </CardContent>
             </Card>
           </TabsContent>
@@ -145,7 +145,7 @@ export default function Analytics() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ExpenseAnalytics selectedPeriod={selectedPeriod} />
+                <ExpenseAnalytics />
               </CardContent>
             </Card>
           </TabsContent>
@@ -159,7 +159,7 @@ export default function Analytics() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <RevenueAnalytics selectedPeriod={selectedPeriod} />
+                <RevenueAnalytics />
               </CardContent>
             </Card>
           </TabsContent>

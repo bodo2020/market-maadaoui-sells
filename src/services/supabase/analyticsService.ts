@@ -1,35 +1,19 @@
 import { supabase } from "@/integrations/supabase/client";
 
 // جلب تحليلات مبيعات المنتجات مع الربح الحقيقي
-export async function fetchProductSalesAnalytics(dateRange?: { from: Date; to: Date }) {
+export async function fetchProductSalesAnalytics() {
   try {
     // جلب المبيعات من المتجر مع بيانات الربح
-    let salesQuery = supabase
+    const { data: salesData, error: salesError } = await supabase
       .from("sales")
-      .select("items, profit, date");
-    
-    if (dateRange) {
-      salesQuery = salesQuery
-        .gte('date', dateRange.from.toISOString().split('T')[0])
-        .lte('date', dateRange.to.toISOString().split('T')[0]);
-    }
-    
-    const { data: salesData, error: salesError } = await salesQuery;
+      .select("items, profit");
 
     if (salesError) throw salesError;
 
     // جلب الطلبات الإلكترونية
-    let ordersQuery = supabase
+    const { data: ordersData, error: ordersError } = await supabase
       .from("online_orders")
-      .select("items, created_at");
-    
-    if (dateRange) {
-      ordersQuery = ordersQuery
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString());
-    }
-    
-    const { data: ordersData, error: ordersError } = await ordersQuery;
+      .select("items");
 
     if (ordersError) throw ordersError;
 
@@ -125,34 +109,18 @@ export async function fetchProductSalesAnalytics(dateRange?: { from: Date; to: D
 }
 
 // جلب تحليلات مبيعات الفئات
-export async function fetchCategorySalesAnalytics(dateRange?: { from: Date; to: Date }) {
+export async function fetchCategorySalesAnalytics() {
   try {
     // جلب المبيعات والطلبات
-    let salesQuery = supabase
+    const { data: salesData, error: salesError } = await supabase
       .from("sales")
-      .select("items, date");
-    
-    if (dateRange) {
-      salesQuery = salesQuery
-        .gte('date', dateRange.from.toISOString().split('T')[0])
-        .lte('date', dateRange.to.toISOString().split('T')[0]);
-    }
-    
-    const { data: salesData, error: salesError } = await salesQuery;
+      .select("items");
 
     if (salesError) throw salesError;
 
-    let ordersQuery = supabase
+    const { data: ordersData, error: ordersError } = await supabase
       .from("online_orders")
-      .select("items, created_at");
-    
-    if (dateRange) {
-      ordersQuery = ordersQuery
-        .gte('created_at', dateRange.from.toISOString())
-        .lte('created_at', dateRange.to.toISOString());
-    }
-    
-    const { data: ordersData, error: ordersError } = await ordersQuery;
+      .select("items");
 
     if (ordersError) throw ordersError;
 
