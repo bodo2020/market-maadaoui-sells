@@ -17,8 +17,7 @@ export interface User {
   created_at: string;
   active?: boolean;
   shifts?: Shift[];
-  salary?: number;
-  salary_type?: string;
+  // ملاحظة: salary و salary_type تم نقلها إلى جدول salaries منفصل
 }
 
 export interface MainCategory {

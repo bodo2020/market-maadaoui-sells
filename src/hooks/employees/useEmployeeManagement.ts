@@ -31,9 +31,7 @@ export function useEmployeeManagement() {
     password: "",
     email: "",
     username: "",
-    active: true,
-    salary: 0,
-    salary_type: "monthly"
+    active: true
   });
 
   const queryClient = useQueryClient();
@@ -118,9 +116,7 @@ export function useEmployeeManagement() {
       password: "",
       email: "",
       username: "",
-      active: true,
-      salary: 0,
-      salary_type: "monthly"
+      active: true
     });
   };
 
@@ -154,9 +150,7 @@ export function useEmployeeManagement() {
       password: formData.password,
       email: formData.email,
       username: username,
-      active: formData.active,
-      salary: formData.salary,
-      salary_type: formData.salary_type
+      active: formData.active
     });
   };
 
@@ -172,8 +166,6 @@ export function useEmployeeManagement() {
         email: formData.email,
         username: formData.username,
         active: formData.active,
-        salary: formData.salary,
-        salary_type: formData.salary_type,
         ...(formData.password ? { password: formData.password } : {})
       }
     });
@@ -193,9 +185,7 @@ export function useEmployeeManagement() {
       password: "",
       email: employee.email || "",
       username: employee.username,
-      active: employee.active !== false,
-      salary: employee.salary || 0,
-      salary_type: employee.salary_type || "monthly"
+      active: employee.active !== false
     });
     setIsEditDialogOpen(true);
   };

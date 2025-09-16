@@ -29,8 +29,6 @@ type FormData = {
   email: string;
   username: string;
   active: boolean;
-  salary: number;
-  salary_type: string;
 };
 
 type EmployeeFormDialogProps = {
@@ -137,35 +135,6 @@ export function EmployeeFormDialog({
                 value={formData.email}
                 onChange={handleInputChange}
               />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="salary">الراتب</Label>
-              <Input 
-                id="salary" 
-                type="number" 
-                placeholder="الراتب" 
-                value={formData.salary}
-                onChange={(e) => handleSelectChange(e.target.value, "salary")}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="salary_type">نوع الراتب</Label>
-              <Select 
-                defaultValue={formData.salary_type}
-                onValueChange={(value) => handleSelectChange(value, "salary_type")}
-              >
-                <SelectTrigger id="salary_type">
-                  <SelectValue placeholder="اختر نوع الراتب" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">شهري</SelectItem>
-                  <SelectItem value="daily">يومي</SelectItem>
-                  <SelectItem value="hourly">بالساعة</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
         </div>

@@ -152,8 +152,11 @@ export async function updateUser(id: string, user: Partial<User>) {
   try {
     const updateData: any = {};
     
+    // استبعاد الحقول التي لا توجد في جدول users
+    const excludedFields = ['shifts', 'salary', 'salary_type'];
+    
     Object.keys(user).forEach(key => {
-      if (user[key as keyof User] !== undefined && key !== 'shifts') {
+      if (user[key as keyof User] !== undefined && !excludedFields.includes(key)) {
         updateData[key] = user[key as keyof User];
       }
     });
@@ -426,8 +429,8 @@ export async function exportEmployeesToExcel(): Promise<void> {
         user.username,
         user.phone || '',
         user.email || '',
-        user.salary || 0,
-        getSalaryTypeInArabic(user.salary_type),
+        0, // الراتب متوفر الآن في جدول منفصل
+        'شهري', // نوع الراتب
         user.active !== false ? 'نشط' : 'غير نشط',
         totalHours.toFixed(1),
         new Date(user.created_at).toLocaleDateString('ar-EG')
