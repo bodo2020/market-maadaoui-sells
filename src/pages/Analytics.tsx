@@ -8,15 +8,24 @@ import { RevenueAnalytics } from "@/components/analytics/RevenueAnalytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, ShoppingCart, Package, Receipt, DollarSign, CreditCard, Download } from "lucide-react";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { BarChart3, ShoppingCart, Package, Receipt, DollarSign, CreditCard, Download, Filter } from "lucide-react";
 import { exportComprehensiveAnalyticsReport } from "@/services/excelExportService";
 import { toast } from "sonner";
+import { useState } from "react";
+import { DateRange } from "react-day-picker";
+import { startOfMonth, endOfMonth } from "date-fns";
 
 export default function Analytics() {
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
+  });
+
   const handleExportReport = async () => {
     try {
       toast.loading("جاري إنشاء التقرير...");
-      await exportComprehensiveAnalyticsReport();
+      await exportComprehensiveAnalyticsReport(dateRange);
       toast.success("تم تصدير التقرير بنجاح!");
     } catch (error) {
       console.error("Error exporting report:", error);
@@ -27,17 +36,38 @@ export default function Analytics() {
   return (
     <MainLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">التحليلات</h1>
-            <p className="text-muted-foreground mt-2">
-              تحليلات شاملة للمبيعات والعملاء والطلبات
-            </p>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">التحليلات</h1>
+              <p className="text-muted-foreground mt-2">
+                تحليلات شاملة للمبيعات والعملاء والطلبات
+              </p>
+            </div>
+            <Button onClick={handleExportReport} className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              تصدير تقرير شامل
+            </Button>
           </div>
-          <Button onClick={handleExportReport} className="flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            تصدير تقرير شامل
-          </Button>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                فلتر الفترة الزمنية
+              </CardTitle>
+              <CardDescription>
+                اختر الفترة الزمنية للحصول على تحليلات مخصصة
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DateRangePicker
+                from={dateRange?.from || startOfMonth(new Date())}
+                to={dateRange?.to || endOfMonth(new Date())}
+                onSelect={setDateRange}
+              />
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs defaultValue="product-analytics" className="space-y-4">

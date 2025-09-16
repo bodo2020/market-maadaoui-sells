@@ -7,17 +7,30 @@ import {
   fetchPOSSalesHeatmapData
 } from './supabase/analyticsService';
 import { supabase } from "@/integrations/supabase/client";
+import { DateRange } from "react-day-picker";
+import { format } from "date-fns";
 
-// دالة لجلب تحليلات الإيرادات
-async function fetchRevenueAnalytics() {
-  const { data: salesData, error } = await supabase
+// دالة لجلب تحليلات الإيرادات مع فلتر التاريخ
+async function fetchRevenueAnalytics(dateRange?: DateRange) {
+  let query = supabase
     .from('sales')
     .select('date, total, profit');
+  
+  // تطبيق فلتر التاريخ إذا كان متوفرًا
+  if (dateRange?.from) {
+    query = query.gte('date', dateRange.from.toISOString());
+  }
+  if (dateRange?.to) {
+    query = query.lte('date', dateRange.to.toISOString());
+  }
+  
+  const { data: salesData, error } = await query;
   
   if (error) throw error;
   
   const monthlyData = salesData?.reduce((acc: any[], sale) => {
-    const month = new Date(sale.date).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long' });
+    // استخدام التقويم الميلادي بدلاً من الهجري
+    const month = format(new Date(sale.date), 'MMMM yyyy');
     const existing = acc.find(item => item.month === month);
     
     if (existing) {
@@ -38,11 +51,21 @@ async function fetchRevenueAnalytics() {
   return { monthlyData };
 }
 
-// دالة لجلب تحليلات المصروفات
-async function fetchExpenseAnalytics() {
-  const { data: expenseData, error } = await supabase
+// دالة لجلب تحليلات المصروفات مع فلتر التاريخ
+async function fetchExpenseAnalytics(dateRange?: DateRange) {
+  let query = supabase
     .from('expenses')
-    .select('type, amount');
+    .select('type, amount, date');
+  
+  // تطبيق فلتر التاريخ إذا كان متوفرًا
+  if (dateRange?.from) {
+    query = query.gte('date', dateRange.from.toISOString());
+  }
+  if (dateRange?.to) {
+    query = query.lte('date', dateRange.to.toISOString());
+  }
+  
+  const { data: expenseData, error } = await query;
   
   if (error) throw error;
   
@@ -65,7 +88,7 @@ async function fetchExpenseAnalytics() {
   return { byType };
 }
 
-export async function exportComprehensiveAnalyticsReport() {
+export async function exportComprehensiveAnalyticsReport(dateRange?: DateRange) {
   try {
     const workbook = new ExcelJS.Workbook();
     
@@ -88,8 +111,8 @@ export async function exportComprehensiveAnalyticsReport() {
       fetchCategorySalesAnalytics(),
       fetchOnlineOrdersHeatmapData(),
       fetchPOSSalesHeatmapData(),
-      fetchRevenueAnalytics(),
-      fetchExpenseAnalytics()
+      fetchRevenueAnalytics(dateRange),
+      fetchExpenseAnalytics(dateRange)
     ]);
 
     // 1. شيت تحليلات المنتجات
@@ -283,7 +306,13 @@ export async function exportComprehensiveAnalyticsReport() {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
     });
     
-    const fileName = `تقرير_شامل_${new Date().toISOString().split('T')[0]}.xlsx`;
+    // اسم الملف مع الفترة الزمنية
+    let fileName = `تقرير_شامل_${format(new Date(), 'yyyy-MM-dd')}`;
+    if (dateRange?.from && dateRange?.to) {
+      fileName += `_${format(dateRange.from, 'yyyy-MM-dd')}_الى_${format(dateRange.to, 'yyyy-MM-dd')}`;
+    }
+    fileName += '.xlsx';
+    
     saveAs(blob, fileName);
     
     return true;
