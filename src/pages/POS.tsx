@@ -51,6 +51,8 @@ export default function POS() {
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const lastSearchRef = useRef<string>("");
+  const globalKeyHandlerRef = useRef<(e: KeyboardEvent) => void>();
+  const [isSearchActive, setIsSearchActive] = useState(true);
   const {
     toast
   } = useToast();
@@ -129,17 +131,52 @@ export default function POS() {
     };
   }, []);
 
+  // Enhanced Global Key Handler
   useEffect(() => {
-    if (!manualBarcodeMode) {
-      // Detect Android
-      const isAndroid = /Android/i.test(navigator.userAgent);
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      const isSearchInput = target === searchInputRef.current;
+      const isDialog = target.closest('[role="dialog"]') !== null;
       
-      const handleKeyDown = (e: KeyboardEvent) => {
-        const target = e.target as HTMLElement;
-        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-        const isSearchInput = target === searchInputRef.current;
-        if (isInput && !isSearchInput) return;
-        
+      // Don't interfere with other inputs or dialogs
+      if ((isInput && !isSearchInput) || isDialog) return;
+      
+      // Handle special keys
+      if (e.key === 'Escape') {
+        setSearch("");
+        setSearchResults([]);
+        setBarcodeBuffer("");
+        searchInputRef.current?.focus();
+        return;
+      }
+      
+      if (e.key === 'F2') {
+        e.preventDefault();
+        setManualBarcodeMode(prev => !prev);
+        toast({
+          title: manualBarcodeMode ? "تفعيل الباركود التلقائي" : "تفعيل الباركود اليدوي",
+          description: manualBarcodeMode ? "تم تفعيل مسح الباركود التلقائي" : "تم تفعيل مسح الباركود اليدوي"
+        });
+        return;
+      }
+      
+      if (e.key === 'F3') {
+        e.preventDefault();
+        setShowBarcodeScanner(true);
+        return;
+      }
+      
+      if (e.key === 'F1') {
+        e.preventDefault();
+        if (cartItems.length > 0) {
+          setIsCheckoutOpen(true);
+        }
+        return;
+      }
+      
+      // Handle barcode scanning mode
+      if (!manualBarcodeMode) {
         console.log("Key pressed:", e.key, "Current buffer:", barcodeBuffer);
         
         // Handle Enter key - process current buffer
@@ -148,94 +185,113 @@ export default function POS() {
           console.log("External barcode scanned:", barcodeBuffer);
           processBarcode(barcodeBuffer);
           setBarcodeBuffer("");
+          setSearch("");
           return;
         }
         
-        // Handle alphanumeric characters
+        // Handle alphanumeric characters for barcode
         if (/^[a-zA-Z0-9]$/.test(e.key)) {
+          e.preventDefault();
+          
           if (barcodeTimeoutRef.current) {
             clearTimeout(barcodeTimeoutRef.current);
           }
-          setBarcodeBuffer(prev => prev + e.key);
           
-          // Different timeout for Android vs other platforms
-          const timeoutDuration = isAndroid ? 1000 : 500;
+          const newBuffer = barcodeBuffer + e.key;
+          setBarcodeBuffer(newBuffer);
           
+          // Auto-process barcode after timeout
           barcodeTimeoutRef.current = setTimeout(() => {
-            const currentBuffer = barcodeBuffer + e.key;
-            if (currentBuffer.length >= 5) {
-              console.log("Auto-processing barcode after timeout:", currentBuffer);
-              processBarcode(currentBuffer);
+            if (newBuffer.length >= 5) {
+              console.log("Auto-processing barcode after timeout:", newBuffer);
+              processBarcode(newBuffer);
               setBarcodeBuffer("");
+              setSearch("");
             } else {
-              if (!isInput) {
-                setBarcodeBuffer("");
-              }
+              setBarcodeBuffer("");
             }
-          }, timeoutDuration);
+          }, 500);
+          return;
         }
-      };
-
-      // Enhanced input event listener for Android Bluetooth scanners
-      const handleInput = (e: Event) => {
-        const target = e.target as HTMLInputElement;
-        if (target === searchInputRef.current) {
-          const value = target.value.trim();
-          console.log("Input event triggered:", value);
-          
-          // Process if it looks like a barcode (5+ characters)
-          if (value.length >= 5) {
-            processBarcode(value);
-            target.value = "";
+      } else {
+        // Manual mode - direct typing to search input
+        if (/^[a-zA-Z0-9\u0600-\u06FF\s]$/.test(e.key)) {
+          e.preventDefault();
+          if (searchInputRef.current) {
+            searchInputRef.current.focus();
+            const newValue = search + e.key;
+            setSearch(newValue);
           }
+          return;
         }
-      };
-
-      // Enhanced change listener for Android
-      const handleChange = (e: Event) => {
-        const target = e.target as HTMLInputElement;
-        if (target === searchInputRef.current) {
-          const value = target.value.trim();
-          if (value.length >= 8) { // Longer barcodes
-            console.log("Change event triggered:", value);
-            processBarcode(value);
-            target.value = "";
-          }
-        }
-      };
-
-      document.addEventListener('keydown', handleKeyDown);
-      
-      // Add multiple listeners for Android compatibility
-      if (isAndroid && searchInputRef.current) {
-        searchInputRef.current.addEventListener('input', handleInput);
-        searchInputRef.current.addEventListener('change', handleChange);
         
-        // Additional Android-specific handling
-        searchInputRef.current.addEventListener('keyup', (e) => {
-          if (e.key === 'Enter') {
-            const target = e.target as HTMLInputElement;
-            const value = target.value.trim();
-            if (value.length >= 5) {
-              processBarcode(value);
-              target.value = "";
-            }
+        if (e.key === 'Backspace') {
+          e.preventDefault();
+          if (searchInputRef.current) {
+            searchInputRef.current.focus();
+            setSearch(prev => prev.slice(0, -1));
           }
-        });
+          return;
+        }
+        
+        if (e.key === 'Enter' && search) {
+          e.preventDefault();
+          handleSearch();
+          return;
+        }
       }
-      
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-        if (isAndroid && searchInputRef.current) {
-          searchInputRef.current.removeEventListener('input', handleInput);
-          searchInputRef.current.removeEventListener('change', handleChange);
+    };
+
+    // Enhanced input handling for Android Bluetooth scanners
+    const handleInput = (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      if (target === searchInputRef.current) {
+        const value = target.value.trim();
+        console.log("Input event triggered:", value);
+        
+        // Process if it looks like a barcode (5+ characters)
+        if (value.length >= 5 && /^\d+$/.test(value)) {
+          processBarcode(value);
+          target.value = "";
+          setSearch("");
         }
-        if (barcodeTimeoutRef.current) {
-          clearTimeout(barcodeTimeoutRef.current);
-        }
-      };
+      }
+    };
+
+    globalKeyHandlerRef.current = handleGlobalKeyDown;
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    
+    // Add input listener for Android compatibility
+    if (searchInputRef.current) {
+      searchInputRef.current.addEventListener('input', handleInput);
     }
-  }, [barcodeBuffer, manualBarcodeMode]);
+    
+    return () => {
+      document.removeEventListener('keydown', handleGlobalKeyDown);
+      if (searchInputRef.current) {
+        searchInputRef.current.removeEventListener('input', handleInput);
+      }
+      if (barcodeTimeoutRef.current) {
+        clearTimeout(barcodeTimeoutRef.current);
+      }
+    };
+  }, [barcodeBuffer, manualBarcodeMode, search, cartItems]);
+
+  // Auto-focus search input
+  useEffect(() => {
+    if (searchInputRef.current && !isCheckoutOpen && !showWeightDialog) {
+      searchInputRef.current.focus();
+    }
+  }, [isCheckoutOpen, showWeightDialog]);
+
+  // Visual indicator effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsSearchActive(prev => !prev);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const processBarcode = async (barcode: string) => {
     if (barcode.length < 5) return;
@@ -356,6 +412,10 @@ export default function POS() {
       if (exactMatch) {
         handleAddToCart(exactMatch);
         setSearch("");
+        // Auto-focus search input after adding product
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 100);
       } else if (results.length === 1 && results[0].barcode_type === "scale") {
         setCurrentScaleProduct(results[0]);
         setShowWeightDialog(true);
@@ -395,6 +455,10 @@ export default function POS() {
       }]);
     }
     setSearchResults([]);
+    // Auto-focus search input after adding product
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
   };
 
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
@@ -676,6 +740,10 @@ export default function POS() {
     setCustomerPhone("");
     setCurrentInvoiceNumber("");
     setCurrentSale(null);
+    // Auto-focus search input after reset
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
   };
 
   const handleViewInvoice = () => {
@@ -727,17 +795,18 @@ export default function POS() {
       </div>
       
       <div className="relative mb-4 bg-muted/30 p-3 rounded-lg border border-muted flex items-center">
+        <div className={`h-3 w-3 rounded-full ml-3 ${isSearchActive ? 'bg-green-500' : 'bg-muted'} transition-colors duration-300`} />
         <ScanLine className="h-5 w-5 text-primary ml-3" />
         <div className="flex-1">
           <h3 className="font-medium">وضع مسح الباركود {manualBarcodeMode ? "يدوي" : "تلقائي"}</h3>
           <p className="text-sm text-muted-foreground">
             {manualBarcodeMode 
-              ? "اكتب الباركود يدوياً ثم اضغط على Enter أو زر البحث"
-              : "قم بتوصيل قارئ الباركود واستخدامه لمسح المنتجات مباشرة، أو اضغط على زر \"مسح\" لاستخدام الكاميرا"}
+              ? "اكتب الباركود يدوياً ثم اضغط على Enter أو زر البحث - اختصارات: F1 (الدفع), F2 (تبديل الوضع), F3 (كاميرا), ESC (مسح)"
+              : "النظام جاهز لاستقبال قارئ الباركود أو اكتب مباشرة - اختصارات: F1 (الدفع), F2 (تبديل الوضع), F3 (كاميرا), ESC (مسح)"}
           </p>
         </div>
         <Button variant="outline" onClick={() => setManualBarcodeMode(!manualBarcodeMode)} className="mr-2">
-          تبديل الوضع {manualBarcodeMode ? "تلقائي" : "يدوي"}
+          تبديل الوضع {manualBarcodeMode ? "تلقائي" : "يدوي"} (F2)
         </Button>
       </div>
       
@@ -750,13 +819,13 @@ export default function POS() {
             <CardContent>
               <div className="flex gap-2 mb-4">
                 <Input 
-                  placeholder="ابحث بالباركود أو اسم المنتج (اكتب مباشرة)" 
+                  placeholder={manualBarcodeMode ? "ابحث بالباركود أو اسم المنتج (اكتب مباشرة)" : "جاهز لاستقبال الباركود..."} 
                   value={search} 
                   onChange={e => setSearch(e.target.value)} 
                   onKeyDown={e => {
                     if (e.key === 'Enter') handleSearch();
                   }} 
-                  className="flex-1" 
+                  className={`flex-1 transition-all duration-300 ${!manualBarcodeMode && isSearchActive ? 'ring-2 ring-green-500/50' : ''}`}
                   ref={searchInputRef}
                   inputMode="text"
                   autoComplete="off"
