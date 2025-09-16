@@ -2041,6 +2041,63 @@ export type Database = {
           },
         ]
       }
+      salaries: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          employee_id: string
+          id: string
+          month: number
+          notes: string | null
+          payment_date: string | null
+          status: string
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          month: number
+          notes?: string | null
+          payment_date?: string | null
+          status?: string
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          month?: number
+          notes?: string | null
+          payment_date?: string | null
+          status?: string
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salaries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salaries_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           branch_id: string | null

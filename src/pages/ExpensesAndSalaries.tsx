@@ -29,7 +29,8 @@ import {
   Calendar,
   FileText,
   Download,
-  Filter
+  Filter,
+  Check
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -39,6 +40,17 @@ import {
   deleteExpense,
   createDamageExpense 
 } from "@/services/supabase/expenseService";
+import { 
+  fetchSalaries, 
+  createSalary, 
+  updateSalary, 
+  deleteSalary, 
+  markSalaryAsPaid,
+  createMonthlyPayroll,
+  getSalaryStatistics,
+  Salary
+} from "@/services/supabase/salaryService";
+import { fetchUsers } from "@/services/supabase/userService";
 import { DateRange } from "react-day-picker";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -53,25 +65,15 @@ interface Expense {
   created_at: string;
 }
 
-interface Salary {
-  id: string;
-  employee_name: string;
-  amount: number;
-  month: string;
-  year: number;
-  status: 'paid' | 'pending';
-  payment_date?: string;
-  notes?: string;
-}
-
 export default function ExpensesAndSalaries() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [salaries, setSalaries] = useState<Salary[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showAddSalary, setShowAddSalary] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [editingSalary, setSEditingalary] = useState<Salary | null>(null);
+  const [editingSalary, setEditingSalary] = useState<Salary | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
@@ -90,9 +92,9 @@ export default function ExpensesAndSalaries() {
   });
 
   const [salaryForm, setSalaryForm] = useState({
-    employee_name: '',
+    employee_id: '',
     amount: 0,
-    month: format(new Date(), 'MM'),
+    month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
     status: 'pending' as 'paid' | 'pending',
     notes: ''
@@ -105,7 +107,11 @@ export default function ExpensesAndSalaries() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const expensesData = await fetchExpenses();
+      const [expensesData, salariesData, employeesData] = await Promise.all([
+        fetchExpenses(),
+        fetchSalaries(),
+        fetchUsers()
+      ]);
       
       // Filter expenses by date range and type
       let filteredExpenses = expensesData;
@@ -121,30 +127,8 @@ export default function ExpensesAndSalaries() {
       }
 
       setExpenses(filteredExpenses);
-      
-      // Mock salaries data - replace with actual API call
-      const mockSalaries: Salary[] = [
-        {
-          id: '1',
-          employee_name: 'أحمد محمد',
-          amount: 5000,
-          month: '12',
-          year: 2024,
-          status: 'paid',
-          payment_date: '2024-12-01',
-          notes: 'راتب شهر ديسمبر'
-        },
-        {
-          id: '2',
-          employee_name: 'فاطمة علي',
-          amount: 4500,
-          month: '12',
-          year: 2024,
-          status: 'pending',
-          notes: 'راتب شهر ديسمبر'
-        }
-      ];
-      setSalaries(mockSalaries);
+      setSalaries(salariesData);
+      setEmployees(employeesData.filter(emp => emp.active));
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
@@ -237,9 +221,91 @@ export default function ExpensesAndSalaries() {
     }
   };
 
+  const handleAddSalary = async () => {
+    try {
+      if (!salaryForm.employee_id || !salaryForm.amount || salaryForm.amount <= 0) {
+        toast({
+          title: "خطأ",
+          description: "يرجى ملء جميع الحقول المطلوبة",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      await createSalary(salaryForm);
+
+      toast({
+        title: "تم بنجاح",
+        description: "تم إضافة الراتب بنجاح"
+      });
+
+      setShowAddSalary(false);
+      setSalaryForm({
+        employee_id: '',
+        amount: 0,
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+        status: 'pending',
+        notes: ''
+      });
+      loadData();
+    } catch (error) {
+      console.error("Error adding salary:", error);
+      toast({
+        title: "خطأ",
+        description: "فشل في إضافة الراتب",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handlePaySalary = async (id: string) => {
+    try {
+      await markSalaryAsPaid(id);
+      toast({
+        title: "تم بنجاح",
+        description: "تم تسجيل الراتب كمدفوع"
+      });
+      loadData();
+    } catch (error) {
+      console.error("Error marking salary as paid:", error);
+      toast({
+        title: "خطأ",
+        description: "فشل في تسجيل دفع الراتب",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteSalary = async (id: string) => {
+    try {
+      await deleteSalary(id);
+      toast({
+        title: "تم بنجاح",
+        description: "تم حذف الراتب بنجاح"
+      });
+      loadData();
+    } catch (error) {
+      console.error("Error deleting salary:", error);
+      toast({
+        title: "خطأ",
+        description: "فشل في حذف الراتب",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const getMonthName = (month: number) => {
+    const months = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    return months[month - 1];
+  };
+
   const expenseTypes = [
     "راتب",
-    "صيانة",
+    "صيانة", 
     "مرافق",
     "منتج تالف",
     "إيجار",
@@ -504,10 +570,101 @@ export default function ExpensesAndSalaries() {
                     <CardTitle>إدارة الرواتب</CardTitle>
                     <CardDescription>تتبع ودفع رواتب الموظفين</CardDescription>
                   </div>
-                  <Button>
-                    <Plus className="h-4 w-4 ml-2" />
-                    إضافة راتب
-                  </Button>
+                  <Dialog open={showAddSalary} onOpenChange={setShowAddSalary}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="h-4 w-4 ml-2" />
+                        إضافة راتب
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>إضافة راتب جديد</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>الموظف</Label>
+                          <Select value={salaryForm.employee_id} onValueChange={(value) => setSalaryForm({...salaryForm, employee_id: value})}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="اختر الموظف" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {employees.map(employee => (
+                                <SelectItem key={employee.id} value={employee.id}>
+                                  {employee.name} ({employee.role})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>المبلغ</Label>
+                          <Input
+                            type="number"
+                            value={salaryForm.amount}
+                            onChange={(e) => setSalaryForm({...salaryForm, amount: Number(e.target.value)})}
+                            placeholder="أدخل مبلغ الراتب"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-2">
+                            <Label>الشهر</Label>
+                            <Select value={String(salaryForm.month)} onValueChange={(value) => setSalaryForm({...salaryForm, month: Number(value)})}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.from({length: 12}, (_, i) => i + 1).map(month => (
+                                  <SelectItem key={month} value={String(month)}>
+                                    {getMonthName(month)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>السنة</Label>
+                            <Input
+                              type="number"
+                              value={salaryForm.year}
+                              onChange={(e) => setSalaryForm({...salaryForm, year: Number(e.target.value)})}
+                              min="2020"
+                              max="2030"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>الحالة</Label>
+                          <Select value={salaryForm.status} onValueChange={(value: 'paid' | 'pending') => setSalaryForm({...salaryForm, status: value})}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">معلق</SelectItem>
+                              <SelectItem value="paid">مدفوع</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>ملاحظات</Label>
+                          <Textarea
+                            value={salaryForm.notes}
+                            onChange={(e) => setSalaryForm({...salaryForm, notes: e.target.value})}
+                            placeholder="ملاحظات إضافية..."
+                            rows={3}
+                          />
+                        </div>
+                        <div className="flex gap-2 pt-4">
+                          <Button onClick={handleAddSalary} className="flex-1">
+                            إضافة الراتب
+                          </Button>
+                          <Button variant="outline" onClick={() => setShowAddSalary(false)}>
+                            إلغاء
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
@@ -525,9 +682,11 @@ export default function ExpensesAndSalaries() {
                   <TableBody>
                     {salaries.map((salary) => (
                       <TableRow key={salary.id}>
-                        <TableCell className="font-medium">{salary.employee_name}</TableCell>
+                        <TableCell className="font-medium">
+                          {salary.employee?.name || 'غير محدد'}
+                        </TableCell>
                         <TableCell>{salary.amount.toFixed(2)} ج.م</TableCell>
-                        <TableCell>{salary.month}/{salary.year}</TableCell>
+                        <TableCell>{getMonthName(salary.month)}/{salary.year}</TableCell>
                         <TableCell>
                           <Badge variant={salary.status === 'paid' ? 'default' : 'secondary'}>
                             {salary.status === 'paid' ? 'مدفوع' : 'معلق'}
@@ -542,13 +701,24 @@ export default function ExpensesAndSalaries() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {salary.status === 'pending' && (
-                              <Button variant="outline" size="sm">
-                                <DollarSign className="h-4 w-4" />
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handlePaySalary(salary.id)}
+                              >
+                                <Check className="h-4 w-4" />
                                 دفع
                               </Button>
                             )}
                             <Button variant="outline" size="sm">
                               <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleDeleteSalary(salary.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
