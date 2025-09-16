@@ -102,7 +102,7 @@ export default function ProductManagement() {
 
   const loadSubcategories = async () => {
     try {
-      const data = await fetchSubcategories();
+      const data = await fetchSubcategories(); // تحميل جميع الفئات الفرعية
       setSubcategories(data);
     } catch (error) {
       console.error("Error loading subcategories:", error);

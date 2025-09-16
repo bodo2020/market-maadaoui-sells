@@ -103,26 +103,25 @@ export default function AddProduct() {
     try {
       const data = await fetchProductById(id);
       
-      // تحميل الفئات الفرعية إذا كان هناك فئة رئيسية
-      if (data.main_category_id) {
-        await loadSubcategories(data.main_category_id);
-      }
-      // إذا كان هناك فئة فرعية فقط، ابحث عن الفئة الرئيسية
-      else if (data.subcategory_id) {
-        try {
-          const allSubcategories = await fetchSubcategories();
-          const currentSubcategory = allSubcategories.find(sub => sub.id === data.subcategory_id);
-          if (currentSubcategory?.category_id) {
-            await loadSubcategories(currentSubcategory.category_id);
-            // تحديث الفئة الرئيسية
-            data.main_category_id = currentSubcategory.category_id;
-          }
-        } catch (error) {
-          console.error("Error loading subcategory data:", error);
+      // تحميل جميع الفئات الفرعية أولاً
+      const allSubcategories = await fetchSubcategories();
+      setSubcategories(allSubcategories);
+      
+      // تحديد الفئة الرئيسية من الفئة الفرعية إذا لزم الأمر
+      if (data.subcategory_id && !data.main_category_id) {
+        const currentSubcategory = allSubcategories.find(sub => sub.id === data.subcategory_id);
+        if (currentSubcategory?.category_id) {
+          data.main_category_id = currentSubcategory.category_id;
         }
       }
+      
+      // إذا كان هناك فئة رئيسية، فلتر الفئات الفرعية
+      if (data.main_category_id) {
+        const filteredSubs = allSubcategories.filter(sub => sub.category_id === data.main_category_id);
+        setSubcategories(filteredSubs);
+      }
 
-      // تحديث المنتج بعد تحميل الفئات
+      // تحديث المنتج
       setProduct(data);
       
       // تحميل إعدادات التنبيه
@@ -474,24 +473,19 @@ export default function AddProduct() {
                   <Label htmlFor="main_category">الفئة الرئيسية</Label>
                   <Select
                     value={product?.main_category_id || "none"}
-                    onValueChange={async (value) => {
-                      const categoryId = value === "none" ? "" : value;
-                      setProduct((prev) => ({ 
-                        ...prev, 
-                        main_category_id: categoryId
-                      }));
-                      if (categoryId) {
-                        const subs = await loadSubcategories(categoryId);
-                        const currentSubId = product?.subcategory_id;
-                        const belongs = subs?.some((sub) => sub.id === currentSubId);
-                        if (!belongs) {
-                          setProduct((prev) => ({ ...prev, subcategory_id: "" }));
-                        }
-                      } else {
-                        setSubcategories([]);
-                        setProduct((prev) => ({ ...prev, subcategory_id: "" }));
-                      }
-                    }}
+                     onValueChange={async (value) => {
+                       const categoryId = value === "none" ? "" : value;
+                       setProduct((prev) => ({ 
+                         ...prev, 
+                         main_category_id: categoryId,
+                         subcategory_id: "" // إعادة تعيين الفئة الفرعية عند تغيير الفئة الرئيسية
+                       }));
+                       if (categoryId) {
+                         await loadSubcategories(categoryId);
+                       } else {
+                         setSubcategories([]);
+                       }
+                     }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الفئة الرئيسية" />
