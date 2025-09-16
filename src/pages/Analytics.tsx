@@ -3,9 +3,10 @@ import { ProductAnalytics } from "@/components/crm/ProductAnalytics";
 import { CustomerAnalytics } from "@/components/crm/CustomerAnalytics";
 import { OrderHeatmap } from "@/components/crm/OrderHeatmap";
 import { ExpenseAnalytics } from "@/components/analytics/ExpenseAnalytics";
+import { RevenueAnalytics } from "@/components/analytics/RevenueAnalytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Activity, Package, Receipt } from "lucide-react";
+import { BarChart3, Activity, Package, Receipt, DollarSign } from "lucide-react";
 
 export default function Analytics() {
   return (
@@ -21,7 +22,7 @@ export default function Analytics() {
         </div>
 
         <Tabs defaultValue="product-analytics" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="product-analytics" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
               تحليلات المنتجات
@@ -37,6 +38,10 @@ export default function Analytics() {
             <TabsTrigger value="expense-analytics" className="flex items-center gap-2">
               <Receipt className="h-4 w-4" />
               تحليلات المصروفات
+            </TabsTrigger>
+            <TabsTrigger value="revenue-analytics" className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              تحليلات الإيرادات
             </TabsTrigger>
           </TabsList>
 
@@ -92,6 +97,20 @@ export default function Analytics() {
               </CardHeader>
               <CardContent>
                 <ExpenseAnalytics />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="revenue-analytics" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>تحليلات الإيرادات والأرباح</CardTitle>
+                <CardDescription>
+                  إحصائيات شاملة للإيرادات والأرباح ومقارنات شهرية
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RevenueAnalytics />
               </CardContent>
             </Card>
           </TabsContent>
