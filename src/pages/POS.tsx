@@ -20,6 +20,7 @@ import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
 import { useAuth } from "@/contexts/AuthContext";
+import { getFavoriteProducts, addFavoriteProduct, removeFavoriteProduct } from "@/services/supabase/favoritesService";
 
 export default function POS() {
   const [search, setSearch] = useState("");
@@ -86,14 +87,16 @@ export default function POS() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [productsData, customersData, balance] = await Promise.all([
+        const [productsData, customersData, balance, favorites] = await Promise.all([
           fetchProducts(),
           fetchCustomers(),
-          getLatestCashBalance(RegisterType.STORE)
+          getLatestCashBalance(RegisterType.STORE),
+          user ? getFavoriteProducts(user.id) : Promise.resolve([])
         ]);
         setProducts(productsData);
         setCustomers(customersData);
         setCashBalance(balance);
+        setPinnedProducts(favorites);
       } catch (error) {
         console.error("Error loading data:", error);
         toast({
@@ -578,12 +581,48 @@ export default function POS() {
     }
   };
 
-  const togglePinProduct = (productId: string) => {
-    setPinnedProducts(prev => 
-      prev.includes(productId) 
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    );
+  const togglePinProduct = async (productId: string) => {
+    if (!user) return;
+
+    const isCurrentlyPinned = pinnedProducts.includes(productId);
+    
+    try {
+      let success = false;
+      if (isCurrentlyPinned) {
+        success = await removeFavoriteProduct(user.id, productId);
+        if (success) {
+          setPinnedProducts(prev => prev.filter(id => id !== productId));
+          toast({
+            title: "تم إلغاء تثبيت المنتج",
+            variant: "default",
+          });
+        }
+      } else {
+        success = await addFavoriteProduct(user.id, productId);
+        if (success) {
+          setPinnedProducts(prev => [...prev, productId]);
+          toast({
+            title: "تم تثبيت المنتج",
+            variant: "default",
+          });
+        }
+      }
+      
+      if (!success) {
+        toast({
+          title: "خطأ في حفظ التثبيت",
+          description: "حاول مرة أخرى",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error toggling pin:", error);
+      toast({
+        title: "خطأ في حفظ التثبيت",
+        description: "حاول مرة أخرى",
+        variant: "destructive",
+      });
+    }
   };
 
   const getDisplayedProducts = () => {
