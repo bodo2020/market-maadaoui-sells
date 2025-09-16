@@ -467,7 +467,7 @@ export default function AddProduct() {
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الشركة" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-50 bg-background">
                       <SelectItem value="none">بدون شركة</SelectItem>
                       {companies.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
@@ -499,7 +499,7 @@ export default function AddProduct() {
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الفئة الرئيسية" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-50 bg-background">
                       <SelectItem value="none">بدون فئة</SelectItem>
                       {categories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
@@ -523,7 +523,7 @@ export default function AddProduct() {
                     <SelectTrigger>
                       <SelectValue placeholder="اختر الفئة الفرعية" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="z-50 bg-background">
                       <SelectItem value="none">بدون فئة فرعية</SelectItem>
                       {subcategories.map((subcategory) => (
                         <SelectItem key={subcategory.id} value={subcategory.id}>
