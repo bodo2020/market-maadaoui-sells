@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,32 @@ export default function POS() {
     toast
   } = useToast();
   const { user } = useAuth();
+
+  // Debounce hook for auto-search
+  const useDebounce = (value: string, delay: number) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+      const handler = setTimeout(() => {
+        setDebouncedValue(value);
+      }, delay);
+
+      return () => {
+        clearTimeout(handler);
+      };
+    }, [value, delay]);
+
+    return debouncedValue;
+  };
+
+  const debouncedSearch = useDebounce(search, 500);
+
+  // Auto search effect for numbers only
+  useEffect(() => {
+    if (debouncedSearch && shouldAutoSearch(debouncedSearch)) {
+      handleSearch();
+    }
+  }, [debouncedSearch]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -276,6 +302,11 @@ export default function POS() {
         variant: "destructive"
       });
     }
+  };
+
+  // Auto search for numbers, manual search for text
+  const shouldAutoSearch = (value: string) => {
+    return /^\d/.test(value); // Starts with a number
   };
 
   const handleSearch = async () => {
@@ -730,11 +761,21 @@ export default function POS() {
               <div className="flex gap-2 mb-4">
                 <div className="relative flex-1">
                   <Input 
-                    placeholder={manualBarcodeMode ? "ابحث بالباركود أو اسم المنتج" : "ابدأ الكتابة من أي مكان للبحث..."} 
+                    placeholder={
+                      manualBarcodeMode 
+                        ? "ابحث بالباركود أو اسم المنتج" 
+                        : search && shouldAutoSearch(search)
+                          ? "بحث تلقائي للباركود..."
+                          : "ابدأ الكتابة من أي مكان للبحث..."
+                    } 
                     value={search} 
                     onChange={e => setSearch(e.target.value)} 
                     onKeyDown={e => {
-                      if (e.key === 'Enter') handleSearch();
+                      if (e.key === 'Enter' && search) {
+                        if (!shouldAutoSearch(search)) {
+                          handleSearch();
+                        }
+                      }
                     }} 
                     className="flex-1" 
                     ref={searchInputRef} 
@@ -743,6 +784,11 @@ export default function POS() {
                     <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center text-muted-foreground text-sm">
                       <div className="animate-pulse mr-2">⌨️</div>
                       جاهز للكتابة
+                    </div>
+                  )}
+                  {!manualBarcodeMode && search && !shouldAutoSearch(search) && (
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center text-xs text-orange-500 bg-background px-1 rounded">
+                      اضغط Enter للبحث
                     </div>
                   )}
                 </div>
