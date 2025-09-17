@@ -103,14 +103,15 @@ const AssignProductsToSubcategoryDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh]">
-        <DialogHeader>
-          <DialogTitle>
-            إضافة منتجات للقسم الفرعي: {subcategory.name}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="w-screen h-screen max-w-none max-h-none m-0 p-0 rounded-none">
+        <div className="flex flex-col h-full">
+          <DialogHeader className="p-6 pb-4 border-b">
+            <DialogTitle>
+              إضافة منتجات للقسم الفرعي: {subcategory.name}
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-4">
+          <div className="flex-1 overflow-hidden p-6 space-y-4">
           {/* Search and info */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -238,8 +239,10 @@ const AssignProductsToSubcategoryDialog = ({
             </>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3 border-t pt-4">
+          </div>
+
+          {/* Action Buttons - Fixed at bottom */}
+          <div className="flex justify-end gap-3 border-t p-6 bg-background">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
