@@ -103,7 +103,7 @@ const AssignProductsToSubcategoryDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh]">
+      <DialogContent className="max-w-none max-h-none h-screen w-screen m-0 rounded-none">
         <DialogHeader>
           <DialogTitle>
             إضافة منتجات للقسم الفرعي: {subcategory.name}
