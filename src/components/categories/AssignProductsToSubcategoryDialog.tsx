@@ -103,14 +103,15 @@ const AssignProductsToSubcategoryDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-none max-h-none h-screen w-screen m-0 rounded-none p-6 flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogHeader>
           <DialogTitle>
             إضافة منتجات للقسم الفرعي: {subcategory.name}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col gap-4 min-h-0">
+        <div className="space-y-4">
+          {/* Search and info */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -126,66 +127,73 @@ const AssignProductsToSubcategoryDialog = ({
             </Badge>
           </div>
 
+          {/* Products count */}
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">
+              المنتجات المتاحة: {availableProducts.length}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              المنتجات المحددة: {filteredSelectedProducts.length}
+            </p>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
               <span className="mr-2">جاري تحميل المنتجات...</span>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0">
+            <>
               {/* Selected Products */}
-              <div className="border rounded-lg p-4 flex flex-col h-full">
-                <h3 className="font-semibold mb-3 flex items-center gap-2 flex-shrink-0">
-                  <Badge variant="default">{filteredSelectedProducts.length}</Badge>
-                  المنتجات المحددة
-                </h3>
-                <div className="border rounded-lg flex-1 overflow-y-auto">
-                  <div className="p-4 space-y-2">
-                    {filteredSelectedProducts.map((product) => (
-                      <div
-                        key={product.id}
-                        className="flex items-center justify-between p-3 border rounded-lg bg-muted/50"
-                      >
-                        <div className="flex items-center gap-3">
-                          {product.image_urls && product.image_urls.length > 0 && (
-                            <img
-                              src={product.image_urls[0]}
-                              alt={product.name}
-                              className="w-10 h-10 rounded object-cover"
-                            />
-                          )}
-                          <div>
-                            <div className="font-medium">{product.name}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {product.price} ج.م
+              {selectedProducts.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Badge variant="default">{filteredSelectedProducts.length}</Badge>
+                    المنتجات المحددة
+                  </h3>
+                  <div className="border rounded-lg max-h-48 overflow-y-auto">
+                    <div className="p-4 space-y-2">
+                      {filteredSelectedProducts.map((product) => (
+                        <div
+                          key={product.id}
+                          className="flex items-center justify-between p-3 border rounded-lg bg-muted/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            {product.image_urls && product.image_urls.length > 0 && (
+                              <img
+                                src={product.image_urls[0]}
+                                alt={product.name}
+                                className="w-10 h-10 rounded object-cover"
+                              />
+                            )}
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {product.price} ج.م
+                              </div>
                             </div>
                           </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRemove(product)}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleRemove(product)}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    {filteredSelectedProducts.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        لم يتم تحديد أي منتجات
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Available Products */}
-              <div className="border rounded-lg p-4 flex flex-col h-full">
-                <h3 className="font-semibold mb-3 flex items-center gap-2 flex-shrink-0">
+              <div className="space-y-2">
+                <h3 className="font-semibold flex items-center gap-2">
                   <Badge variant="outline">{availableProducts.length}</Badge>
                   المنتجات المتاحة
                 </h3>
-                <div className="border rounded-lg flex-1 overflow-y-auto">
+                <div className="border rounded-lg max-h-96 overflow-y-auto">
                   <div className="p-4 space-y-2">
                     {availableProducts.map((product) => (
                       <div
@@ -227,10 +235,11 @@ const AssignProductsToSubcategoryDialog = ({
                   </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
-          <div className="flex justify-end gap-3 border-t pt-4 mt-4 flex-shrink-0">
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 border-t pt-4">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
