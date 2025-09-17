@@ -82,6 +82,7 @@ function App() {
               <Route path="/supplier-purchases" element={<ProtectedRoute><SupplierPurchases /></ProtectedRoute>} />
               <Route path="/companies" element={<ProtectedRoute><Companies /></ProtectedRoute>} />
               <Route path="/companies/:id" element={<ProtectedRoute><CompanyDetails /></ProtectedRoute>} />
+              <Route path="/company/:id" element={<ProtectedRoute><CompanyDetails /></ProtectedRoute>} />
               <Route path="/purchases/:id" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
               <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
               <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
