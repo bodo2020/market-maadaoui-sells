@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, X } from "lucide-react";
@@ -54,6 +53,38 @@ export function ImageUpload({ value, onChange, onRemove }: ImageUploadProps) {
     }
   };
 
+  const handleRemove = async (url: string) => {
+    if (!url) return;
+    
+    try {
+      // Extract file path from the URL
+      const urlObj = new URL(url);
+      const pathParts = urlObj.pathname.split('/');
+      const filePath = pathParts.slice(pathParts.indexOf('object') + 2).join('/');
+      
+      console.log(`Attempting to delete file: ${filePath} from bucket: products`);
+      
+      // Delete the file from Supabase storage
+      const { error } = await supabase.storage
+        .from('products')
+        .remove([filePath]);
+      
+      if (error) {
+        console.error('Error deleting file from storage:', error);
+        toast.error('حدث خطأ أثناء حذف الصورة من التخزين');
+        return;
+      }
+      
+      // Update the UI state
+      onRemove(url);
+      toast.success('تم حذف الصورة بنجاح');
+      
+    } catch (error) {
+      console.error('Error removing image:', error);
+      toast.error('حدث خطأ أثناء حذف الصورة');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-4">
@@ -66,7 +97,7 @@ export function ImageUpload({ value, onChange, onRemove }: ImageUploadProps) {
             />
             <button
               type="button"
-              onClick={() => onRemove(url)}
+              onClick={() => handleRemove(url)}
               className="absolute top-1 right-1 bg-white rounded-full p-1 shadow-md hover:bg-gray-100"
             >
               <X className="h-4 w-4 text-red-500" />

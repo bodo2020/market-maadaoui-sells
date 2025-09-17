@@ -126,8 +126,36 @@ export function DragDropImage({ value, onChange, bucketName = "images" }: DragDr
     }
   };
 
-  const handleRemove = () => {
-    onChange(null);
+  const handleRemove = async () => {
+    if (!value) return;
+    
+    try {
+      // Extract file path from the URL
+      const url = new URL(value);
+      const pathParts = url.pathname.split('/');
+      const filePath = pathParts.slice(pathParts.indexOf('object') + 2).join('/');
+      
+      console.log(`Attempting to delete file: ${filePath} from bucket: ${bucketName}`);
+      
+      // Delete the file from Supabase storage
+      const { error } = await supabase.storage
+        .from(bucketName)
+        .remove([filePath]);
+      
+      if (error) {
+        console.error('Error deleting file from storage:', error);
+        toast.error('حدث خطأ أثناء حذف الصورة من التخزين');
+        return;
+      }
+      
+      // Update the UI state
+      onChange(null);
+      toast.success('تم حذف الصورة بنجاح');
+      
+    } catch (error) {
+      console.error('Error removing image:', error);
+      toast.error('حدث خطأ أثناء حذف الصورة');
+    }
   };
 
   return (
