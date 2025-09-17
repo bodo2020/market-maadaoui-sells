@@ -103,14 +103,14 @@ const AssignProductsToSubcategoryDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle>
             إضافة منتجات للقسم الفرعي: {subcategory.name}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 flex-1 overflow-hidden">
+        <div className="space-y-4">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -132,15 +132,15 @@ const AssignProductsToSubcategoryDialog = ({
               <span className="mr-2">جاري تحميل المنتجات...</span>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Selected Products */}
-              <div className="border rounded-lg p-4 flex flex-col">
+              <div className="border rounded-lg p-4">
                 <h3 className="font-semibold mb-3 flex items-center gap-2">
                   <Badge variant="default">{filteredSelectedProducts.length}</Badge>
                   المنتجات المحددة
                 </h3>
-                <ScrollArea className="flex-1">
-                  <div className="space-y-2">
+                <div className="border rounded-lg max-h-96 overflow-y-auto">
+                  <div className="p-4 space-y-2">
                     {filteredSelectedProducts.map((product) => (
                       <div
                         key={product.id}
@@ -176,17 +176,17 @@ const AssignProductsToSubcategoryDialog = ({
                       </div>
                     )}
                   </div>
-                </ScrollArea>
+                </div>
               </div>
 
               {/* Available Products */}
-              <div className="border rounded-lg p-4 flex flex-col">
+              <div className="border rounded-lg p-4">
                 <h3 className="font-semibold mb-3 flex items-center gap-2">
                   <Badge variant="outline">{availableProducts.length}</Badge>
                   المنتجات المتاحة
                 </h3>
-                <ScrollArea className="flex-1">
-                  <div className="space-y-2">
+                <div className="border rounded-lg max-h-96 overflow-y-auto">
+                  <div className="p-4 space-y-2">
                     {availableProducts.map((product) => (
                       <div
                         key={product.id}
@@ -225,7 +225,7 @@ const AssignProductsToSubcategoryDialog = ({
                       </div>
                     )}
                   </div>
-                </ScrollArea>
+                </div>
               </div>
             </div>
           )}
