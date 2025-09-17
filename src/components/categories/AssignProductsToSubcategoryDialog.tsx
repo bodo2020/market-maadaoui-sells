@@ -103,14 +103,14 @@ const AssignProductsToSubcategoryDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-none max-h-none h-screen w-screen m-0 rounded-none">
-        <DialogHeader>
+      <DialogContent className="max-w-none max-h-none h-screen w-screen m-0 rounded-none p-6 flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>
             إضافة منتجات للقسم الفرعي: {subcategory.name}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 flex flex-col gap-4 min-h-0">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -132,14 +132,14 @@ const AssignProductsToSubcategoryDialog = ({
               <span className="mr-2">جاري تحميل المنتجات...</span>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0">
               {/* Selected Products */}
-              <div className="border rounded-lg p-4">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <div className="border rounded-lg p-4 flex flex-col h-full">
+                <h3 className="font-semibold mb-3 flex items-center gap-2 flex-shrink-0">
                   <Badge variant="default">{filteredSelectedProducts.length}</Badge>
                   المنتجات المحددة
                 </h3>
-                <div className="border rounded-lg max-h-96 overflow-y-auto">
+                <div className="border rounded-lg flex-1 overflow-y-auto">
                   <div className="p-4 space-y-2">
                     {filteredSelectedProducts.map((product) => (
                       <div
@@ -180,12 +180,12 @@ const AssignProductsToSubcategoryDialog = ({
               </div>
 
               {/* Available Products */}
-              <div className="border rounded-lg p-4">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <div className="border rounded-lg p-4 flex flex-col h-full">
+                <h3 className="font-semibold mb-3 flex items-center gap-2 flex-shrink-0">
                   <Badge variant="outline">{availableProducts.length}</Badge>
                   المنتجات المتاحة
                 </h3>
-                <div className="border rounded-lg max-h-96 overflow-y-auto">
+                <div className="border rounded-lg flex-1 overflow-y-auto">
                   <div className="p-4 space-y-2">
                     {availableProducts.map((product) => (
                       <div
@@ -230,7 +230,7 @@ const AssignProductsToSubcategoryDialog = ({
             </div>
           )}
 
-          <div className="flex justify-end gap-3 border-t pt-4">
+          <div className="flex justify-end gap-3 border-t pt-4 mt-4 flex-shrink-0">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
