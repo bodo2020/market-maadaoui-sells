@@ -13,11 +13,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
-import { Image as ImageIcon, Save, Trash, Loader2, Building, Package } from "lucide-react";
+import { Image as ImageIcon, Save, Trash, Loader2, Building, Package, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { fetchProductsByCompany } from "@/services/supabase/productService";
 import { Product } from "@/types";
+import { AssignProductsDialog } from "@/components/companies/AssignProductsDialog";
+import { Company } from "@/services/supabase/companyService";
 
 export default function CompanyDetails() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +28,8 @@ export default function CompanyDetails() {
   const [saving, setSaving] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [companyData, setCompanyData] = useState<Company | null>(null);
   
   // Form state
   const [name, setName] = useState("");
@@ -57,6 +61,9 @@ export default function CompanyDetails() {
         .single();
         
       if (error) throw error;
+      
+      // Store company data for dialog
+      setCompanyData(data);
       
       setName(data.name || "");
       setDescription(data.description || "");
@@ -363,6 +370,22 @@ export default function CompanyDetails() {
           </TabsContent>
           
           <TabsContent value="products">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-xl font-semibold">المنتجات</h2>
+                <p className="text-muted-foreground">
+                  إجمالي المنتجات: {products.length}
+                </p>
+              </div>
+              <Button 
+                onClick={() => setAssignDialogOpen(true)}
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                إضافة منتجات من المخزن
+              </Button>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {products.length > 0 ? products.map(product => (
                 <Card key={product.id} className="overflow-hidden">
@@ -416,6 +439,18 @@ export default function CompanyDetails() {
             </div>
           </TabsContent>
         </Tabs>
+        
+        {/* Assign Products Dialog */}
+        {companyData && (
+          <AssignProductsDialog
+            open={assignDialogOpen}
+            onOpenChange={setAssignDialogOpen}
+            company={companyData}
+            onSuccess={() => {
+              fetchCompanyProducts();
+            }}
+          />
+        )}
       </div>
     </MainLayout>
   );
