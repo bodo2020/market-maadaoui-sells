@@ -408,6 +408,73 @@ export async function fetchProductsBySubcategory(subcategoryId: string) {
   }
 }
 
+export async function fetchProductsWithoutSubcategory() {
+  console.log("Fetching products without subcategory");
+  
+  try {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .is("subcategory_id", null)
+      .order("name");
+
+    if (error) {
+      console.error("Error fetching products without subcategory:", error);
+      throw error;
+    }
+    
+    console.log(`Found ${data?.length || 0} products without subcategory`);
+    return data as Product[];
+  } catch (error) {
+    console.error("Error in fetchProductsWithoutSubcategory:", error);
+    return [];
+  }
+}
+
+export async function getProductsWithoutSubcategoryCount() {
+  try {
+    const { count, error } = await supabase
+      .from("products")
+      .select("id", { count: "exact" })
+      .is("subcategory_id", null);
+
+    if (error) {
+      console.error("Error counting products without subcategory:", error);
+      throw error;
+    }
+    
+    return count || 0;
+  } catch (error) {
+    console.error("Error in getProductsWithoutSubcategoryCount:", error);
+    return 0;
+  }
+}
+
+export async function assignProductsToSubcategory(subcategoryId: string, mainCategoryId: string, productIds: string[]) {
+  console.log("Assigning products to subcategory:", { subcategoryId, mainCategoryId, productIds });
+  
+  try {
+    const { error } = await supabase
+      .from("products")
+      .update({ 
+        subcategory_id: subcategoryId,
+        main_category_id: mainCategoryId
+      })
+      .in("id", productIds);
+
+    if (error) {
+      console.error("Error assigning products to subcategory:", error);
+      throw error;
+    }
+    
+    console.log(`Successfully assigned ${productIds.length} products to subcategory ${subcategoryId}`);
+    return true;
+  } catch (error) {
+    console.error("Error in assignProductsToSubcategory:", error);
+    throw error;
+  }
+}
+
 // Inventory management functions
 export async function updateInventoryQuantity(productId: string, quantityChange: number, branchId?: string) {
   try {

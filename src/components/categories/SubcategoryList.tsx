@@ -2,12 +2,16 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Edit, FolderPlus, Package } from "lucide-react";
+import { Plus, Trash2, Edit, FolderPlus, Package, ShoppingCart } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AddSubcategoryDialog from "./AddSubcategoryDialog";
 import EditSubcategoryDialog from "./EditSubcategoryDialog";
+import AssignProductsToSubcategoryDialog from "./AssignProductsToSubcategoryDialog";
 import { fetchSubcategories, deleteSubcategory } from "@/services/supabase/categoryService";
-import { fetchProductsBySubcategory } from "@/services/supabase/productService";
+import { 
+  fetchProductsBySubcategory, 
+  getProductsWithoutSubcategoryCount 
+} from "@/services/supabase/productService";
 import { Subcategory } from "@/types";
 import { toast } from "sonner";
 
@@ -17,7 +21,14 @@ export default function SubcategoryList() {
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [selectedSubcategory, setSelectedSubcategory] = useState<Subcategory | null>(null);
+  const [selectedAssignSubcategory, setSelectedAssignSubcategory] = useState<{
+    id: string;
+    name: string;
+    category_id: string;
+  } | null>(null);
+  const [productsWithoutSubcategoryCount, setProductsWithoutSubcategoryCount] = useState(0);
 
   useEffect(() => {
     if (categoryId) {
@@ -29,6 +40,10 @@ export default function SubcategoryList() {
     try {
       setLoading(true);
       const data = await fetchSubcategories(categoryId);
+      
+      // Load products without subcategory count
+      const withoutSubcategoryCount = await getProductsWithoutSubcategoryCount();
+      setProductsWithoutSubcategoryCount(withoutSubcategoryCount);
       
       if (!data || data.length === 0) {
         setSubcategories([]);
@@ -78,10 +93,29 @@ export default function SubcategoryList() {
     }
   };
 
+  const handleAssignProducts = (subcategory: Subcategory) => {
+    setSelectedAssignSubcategory({
+      id: subcategory.id,
+      name: subcategory.name,
+      category_id: subcategory.category_id
+    });
+    setIsAssignDialogOpen(true);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">الأقسام الفرعية</h2>
+        <div>
+          <h2 className="text-2xl font-bold">الأقسام الفرعية</h2>
+          {productsWithoutSubcategoryCount > 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="outline" className="flex items-center gap-1">
+                <ShoppingCart className="h-3 w-3" />
+                {productsWithoutSubcategoryCount} منتج بدون قسم فرعي
+              </Badge>
+            </div>
+          )}
+        </div>
         <Button onClick={() => setIsAddDialogOpen(true)}>
           <Plus className="h-4 w-4 ml-2" />
           إضافة قسم فرعي
@@ -124,7 +158,7 @@ export default function SubcategoryList() {
                   {subcategory.description && (
                     <p className="text-gray-500 text-sm line-clamp-2">{subcategory.description}</p>
                   )}
-                  <div className="flex justify-between items-center mt-3">
+                  <div className="flex flex-wrap gap-2 mt-3">
                     <Button
                       variant="outline"
                       size="sm"
@@ -135,6 +169,18 @@ export default function SubcategoryList() {
                     >
                       <Edit className="h-4 w-4 ml-1" />
                       تعديل
+                    </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAssignProducts(subcategory);
+                      }}
+                      disabled={productsWithoutSubcategoryCount === 0}
+                    >
+                      <Plus className="h-4 w-4 ml-1" />
+                      إضافة منتجات
                     </Button>
                     <Button
                       variant="destructive"
@@ -175,6 +221,15 @@ export default function SubcategoryList() {
         subcategory={selectedSubcategory}
         onSuccess={loadSubcategories}
       />
+
+      {selectedAssignSubcategory && (
+        <AssignProductsToSubcategoryDialog
+          open={isAssignDialogOpen}
+          onOpenChange={setIsAssignDialogOpen}
+          subcategory={selectedAssignSubcategory}
+          onSuccess={loadSubcategories}
+        />
+      )}
 
     </div>
   );
