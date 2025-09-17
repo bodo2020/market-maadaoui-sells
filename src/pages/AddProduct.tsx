@@ -218,12 +218,31 @@ export default function AddProduct() {
     }
   };
 
-  const handleImageUpload = (url: string | null) => {
-    if (url) {
-      setProduct(prev => ({
-        ...prev,
-        image_urls: [url], // استبدال الصورة بدلاً من إضافة
-      }));
+  const handleImageUpload = async (url: string | null) => {
+    try {
+      if (url) {
+        // Set locally
+        setProduct(prev => ({
+          ...prev,
+          image_urls: [url],
+        }));
+        // Persist to DB when editing existing product
+        if (productId) {
+          await updateProduct(productId, { image_urls: [url] } as Partial<Product>);
+        }
+      } else {
+        // Clear locally
+        setProduct(prev => ({
+          ...prev,
+          image_urls: [],
+        }));
+        // Also clear in DB
+        if (productId) {
+          await updateProduct(productId, { image_urls: [] } as Partial<Product>);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to persist image change:", err);
     }
   };
 
