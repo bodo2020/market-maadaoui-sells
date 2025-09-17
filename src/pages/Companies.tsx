@@ -7,9 +7,11 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Building2, Plus, PenSquare, Trash2, Search } from "lucide-react";
+import { Building2, Plus, PenSquare, Trash2, Search, Package } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import CompanyForm from "@/components/companies/CompanyForm";
+import { AssignProductsDialog } from "@/components/companies/AssignProductsDialog";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -20,26 +22,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Company, fetchCompanies, deleteCompany } from "@/services/supabase/companyService";
+import { 
+  Company, 
+  fetchCompaniesWithProductCount, 
+  deleteCompany,
+  getProductsWithoutCompanyCount 
+} from "@/services/supabase/companyService";
 
 export default function Companies() {
   const navigate = useNavigate();
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companies, setCompanies] = useState<(Company & { products_count: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [productsWithoutCompanyCount, setProductsWithoutCompanyCount] = useState(0);
 
   useEffect(() => {
     fetchCompaniesList();
+    loadProductsWithoutCompanyCount();
   }, []);
 
   const fetchCompaniesList = async () => {
     try {
       setLoading(true);
-      const data = await fetchCompanies();
+      const data = await fetchCompaniesWithProductCount();
       console.log("Companies data:", data);
       setCompanies(data || []);
     } catch (error) {
@@ -47,6 +57,15 @@ export default function Companies() {
       toast.error("حدث خطأ أثناء تحميل بيانات الشركات");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProductsWithoutCompanyCount = async () => {
+    try {
+      const count = await getProductsWithoutCompanyCount();
+      setProductsWithoutCompanyCount(count);
+    } catch (error) {
+      console.error('Error loading products without company count:', error);
     }
   };
 
@@ -58,6 +77,7 @@ export default function Companies() {
       await deleteCompany(selectedCompany.id);
       toast.success("تم حذف الشركة بنجاح");
       fetchCompaniesList();
+      loadProductsWithoutCompanyCount();
     } catch (error) {
       console.error('Error deleting company:', error);
       toast.error("حدث خطأ أثناء حذف الشركة");
@@ -118,56 +138,109 @@ export default function Companies() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCompanies.map((company) => (
-              <Card key={company.id} className="overflow-hidden">
-                <CardContent className="p-6 cursor-pointer" onClick={() => handleCompanyClick(company)}>
-                  <div className="aspect-square w-full relative mb-4">
-                    {company.logo_url ? (
-                      <img 
-                        src={company.logo_url}
-                        alt={company.name}
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
-                        <Building2 className="w-16 h-16 text-gray-400" />
+          <div>
+            {/* منتجات بدون شركة */}
+            {productsWithoutCompanyCount > 0 && (
+              <Card className="mb-6 border-dashed border-2 border-orange-300 bg-orange-50/50">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-orange-100 rounded-lg">
+                        <Package className="w-8 h-8 text-orange-600" />
                       </div>
-                    )}
-                  </div>
-                  <h3 className="text-xl font-semibold text-center">{company.name}</h3>
-                  {company.description && (
-                    <p className="text-gray-500 text-center mt-2 line-clamp-2">{company.description}</p>
-                  )}
-                  <div className="flex justify-center mt-4 gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCompany(company);
-                        setIsEditDialogOpen(true);
-                      }}
-                    >
-                      <PenSquare className="h-4 w-4 mr-1" />
-                      تعديل
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCompany(company);
-                        setIsDeleteDialogOpen(true);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      حذف
-                    </Button>
+                      <div>
+                        <h3 className="text-lg font-semibold text-orange-800">
+                          منتجات بدون شركة
+                        </h3>
+                        <p className="text-orange-600">
+                          {productsWithoutCompanyCount} منتج غير مرتبط بأي شركة
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="bg-orange-200 text-orange-800">
+                      {productsWithoutCompanyCount} منتج
+                    </Badge>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            )}
+
+            {/* الشركات */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredCompanies.map((company) => (
+                <Card key={company.id} className="overflow-hidden">
+                  <CardContent className="p-6 cursor-pointer" onClick={() => handleCompanyClick(company)}>
+                    <div className="aspect-square w-full relative mb-4">
+                      {company.logo_url ? (
+                        <img 
+                          src={company.logo_url}
+                          alt={company.name}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
+                          <Building2 className="w-16 h-16 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="text-xl font-semibold text-center">{company.name}</h3>
+                    {company.description && (
+                      <p className="text-gray-500 text-center mt-2 line-clamp-2">{company.description}</p>
+                    )}
+                    
+                    {/* عرض عدد المنتجات */}
+                    <div className="flex justify-center mt-3">
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                        {company.products_count} منتج
+                      </Badge>
+                    </div>
+
+                    <div className="flex justify-center mt-4 gap-2 flex-wrap">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCompany(company);
+                          setIsEditDialogOpen(true);
+                        }}
+                      >
+                        <PenSquare className="h-4 w-4 mr-1" />
+                        تعديل
+                      </Button>
+                      
+                      {productsWithoutCompanyCount > 0 && (
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCompany(company);
+                            setIsAssignDialogOpen(true);
+                          }}
+                        >
+                          <Package className="h-4 w-4 mr-1" />
+                          إضافة منتجات
+                        </Button>
+                      )}
+                      
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedCompany(company);
+                          setIsDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        حذف
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -182,6 +255,7 @@ export default function Companies() {
             onSaved={() => {
               setIsAddDialogOpen(false);
               fetchCompaniesList();
+              loadProductsWithoutCompanyCount();
             }}
             onCancel={() => setIsAddDialogOpen(false)}
           />
@@ -201,6 +275,7 @@ export default function Companies() {
                 setIsEditDialogOpen(false);
                 setSelectedCompany(null);
                 fetchCompaniesList();
+                loadProductsWithoutCompanyCount();
               }}
               onCancel={() => {
                 setIsEditDialogOpen(false);
@@ -210,6 +285,19 @@ export default function Companies() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Assign Products Dialog */}
+      {selectedCompany && (
+        <AssignProductsDialog
+          open={isAssignDialogOpen}
+          onOpenChange={setIsAssignDialogOpen}
+          company={selectedCompany}
+          onSuccess={() => {
+            fetchCompaniesList();
+            loadProductsWithoutCompanyCount();
+          }}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

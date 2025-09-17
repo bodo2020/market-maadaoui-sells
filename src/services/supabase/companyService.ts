@@ -82,3 +82,70 @@ export async function deleteCompany(id: string) {
 
   return true;
 }
+
+// جلب عدد المنتجات لكل شركة
+export async function fetchCompaniesWithProductCount() {
+  const { data, error } = await supabase
+    .from("companies")
+    .select(`
+      *,
+      products_count:products(count)
+    `)
+    .order("name");
+
+  if (error) {
+    console.error("Error fetching companies with product count:", error);
+    throw error;
+  }
+
+  return data?.map(company => ({
+    ...company,
+    products_count: company.products_count[0]?.count || 0
+  }));
+}
+
+// جلب عدد المنتجات التي ليس لها شركة
+export async function getProductsWithoutCompanyCount() {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id", { count: 'exact' })
+    .is("company_id", null);
+
+  if (error) {
+    console.error("Error fetching products without company:", error);
+    throw error;
+  }
+
+  return data?.length || 0;
+}
+
+// تحديث منتجات بدون شركة لتنتمي لشركة معينة
+export async function assignProductsToCompany(companyId: string, productIds: string[]) {
+  const { error } = await supabase
+    .from("products")
+    .update({ company_id: companyId })
+    .in("id", productIds);
+
+  if (error) {
+    console.error("Error assigning products to company:", error);
+    throw error;
+  }
+
+  return true;
+}
+
+// جلب المنتجات التي ليس لها شركة
+export async function fetchProductsWithoutCompany() {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .is("company_id", null)
+    .order("name");
+
+  if (error) {
+    console.error("Error fetching products without company:", error);
+    throw error;
+  }
+
+  return data;
+}
