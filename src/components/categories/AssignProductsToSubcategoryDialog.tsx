@@ -111,7 +111,7 @@ const AssignProductsToSubcategoryDialog = ({
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 overflow-hidden p-6 space-y-4">
+          <div className="flex-1 overflow-auto p-4 space-y-3">
           {/* Search and info */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -241,8 +241,8 @@ const AssignProductsToSubcategoryDialog = ({
 
           </div>
 
-          {/* Action Buttons - Fixed at bottom */}
-          <div className="flex justify-end gap-3 border-t p-4 bg-background sticky bottom-0">
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 border-t p-4 bg-background">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
