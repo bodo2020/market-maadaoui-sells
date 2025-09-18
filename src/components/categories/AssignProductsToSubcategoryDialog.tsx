@@ -157,7 +157,7 @@ const AssignProductsToSubcategoryDialog = ({
                       {filteredSelectedProducts.map((product) => (
                         <div
                           key={product.id}
-                          className="flex items-center justify-between p-3 border rounded-lg bg-muted/50"
+                          className="flex items-center justify-between p-2 border rounded-lg bg-muted/50"
                         >
                           <div className="flex items-center gap-3">
                             {product.image_urls && product.image_urls.length > 0 && (
@@ -197,10 +197,10 @@ const AssignProductsToSubcategoryDialog = ({
                 <div className="border rounded-lg max-h-96 overflow-y-auto">
                   <div className="p-4 space-y-2">
                     {availableProducts.map((product) => (
-                      <div
-                        key={product.id}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                      >
+                        <div
+                          key={product.id}
+                          className="flex items-center justify-between p-2 border rounded-lg hover:bg-muted/50 transition-colors"
+                        >
                         <div className="flex items-center gap-3">
                           {product.image_urls && product.image_urls.length > 0 && (
                             <img
@@ -242,7 +242,7 @@ const AssignProductsToSubcategoryDialog = ({
           </div>
 
           {/* Action Buttons - Fixed at bottom */}
-          <div className="flex justify-end gap-3 border-t p-6 bg-background">
+          <div className="flex justify-end gap-3 border-t p-6 bg-background sticky bottom-0">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
