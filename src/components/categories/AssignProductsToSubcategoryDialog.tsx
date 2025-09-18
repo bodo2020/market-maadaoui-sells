@@ -152,9 +152,9 @@ const AssignProductsToSubcategoryDialog = ({
                     <Badge variant="default">{filteredSelectedProducts.length}</Badge>
                     المنتجات المحددة
                   </h3>
-                  <div className="border rounded-lg max-h-48 overflow-y-auto">
+                  <div className="border rounded-lg max-h-40 overflow-y-auto">
                   <div className="p-2 space-y-1">
-                    {filteredSelectedProducts.slice(0, 3).map((product) => (
+                    {filteredSelectedProducts.map((product) => (
                       <div
                         key={product.id}
                         className="flex items-center justify-between p-1 border rounded-lg bg-muted/50"
@@ -194,9 +194,9 @@ const AssignProductsToSubcategoryDialog = ({
                   <Badge variant="outline">{availableProducts.length}</Badge>
                   المنتجات المتاحة
                 </h3>
-                <div className="border rounded-lg">
+                <div className="border rounded-lg max-h-40 overflow-y-auto">
                   <div className="p-2 space-y-1">
-                    {availableProducts.slice(0, 3).map((product) => (
+                    {availableProducts.map((product) => (
                         <div
                           key={product.id}
                           className="flex items-center justify-between p-1 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -241,8 +241,8 @@ const AssignProductsToSubcategoryDialog = ({
 
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-end gap-3 border-t p-4 bg-background mt-4">
+          {/* Action Buttons - Fixed at bottom */}
+          <div className="flex justify-end gap-3 border-t p-4 bg-background sticky bottom-0">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
