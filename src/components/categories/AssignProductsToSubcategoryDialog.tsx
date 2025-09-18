@@ -153,12 +153,12 @@ const AssignProductsToSubcategoryDialog = ({
                     المنتجات المحددة
                   </h3>
                   <div className="border rounded-lg max-h-48 overflow-y-auto">
-                    <div className="p-4 space-y-2">
-                      {filteredSelectedProducts.map((product) => (
-                        <div
-                          key={product.id}
-                          className="flex items-center justify-between p-2 border rounded-lg bg-muted/50"
-                        >
+                  <div className="p-2 space-y-1">
+                    {filteredSelectedProducts.slice(0, 3).map((product) => (
+                      <div
+                        key={product.id}
+                        className="flex items-center justify-between p-1 border rounded-lg bg-muted/50"
+                      >
                           <div className="flex items-center gap-3">
                             {product.image_urls && product.image_urls.length > 0 && (
                               <img
@@ -194,12 +194,12 @@ const AssignProductsToSubcategoryDialog = ({
                   <Badge variant="outline">{availableProducts.length}</Badge>
                   المنتجات المتاحة
                 </h3>
-                <div className="border rounded-lg max-h-96 overflow-y-auto">
-                  <div className="p-4 space-y-2">
-                    {availableProducts.map((product) => (
+                <div className="border rounded-lg">
+                  <div className="p-2 space-y-1">
+                    {availableProducts.slice(0, 3).map((product) => (
                         <div
                           key={product.id}
-                          className="flex items-center justify-between p-2 border rounded-lg hover:bg-muted/50 transition-colors"
+                          className="flex items-center justify-between p-1 border rounded-lg hover:bg-muted/50 transition-colors"
                         >
                         <div className="flex items-center gap-3">
                           {product.image_urls && product.image_urls.length > 0 && (
@@ -226,7 +226,7 @@ const AssignProductsToSubcategoryDialog = ({
                       </div>
                     ))}
                     {availableProducts.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
+                      <div className="text-center py-4 text-muted-foreground">
                         {allProducts.length === 0 ? 
                           "لا توجد منتجات بدون أقسام فرعية" : 
                           "لا توجد نتائج للبحث"
@@ -241,8 +241,8 @@ const AssignProductsToSubcategoryDialog = ({
 
           </div>
 
-          {/* Action Buttons - Fixed at bottom */}
-          <div className="flex justify-end gap-3 border-t p-6 bg-background sticky bottom-0">
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 border-t p-4 bg-background mt-4">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
