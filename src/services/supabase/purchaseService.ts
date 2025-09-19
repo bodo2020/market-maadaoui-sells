@@ -113,7 +113,7 @@ export async function createPurchase(purchaseData: any) {
         // Get current product
         const { data: product, error: productError } = await supabase
           .from("products")
-          .select("quantity, purchase_price")
+          .select("quantity, purchase_price, price")
           .eq("id", item.product_id)
           .single();
 
@@ -129,6 +129,11 @@ export async function createPurchase(purchaseData: any) {
         // Update purchase price if it's different from current price
         if (item.price !== product.purchase_price) {
           updateData.purchase_price = item.price;
+        }
+        
+        // Update sale price if provided
+        if (item.sale_price && item.sale_price !== product.price) {
+          updateData.price = item.sale_price;
         }
         
         const { error: updateError } = await supabase

@@ -214,12 +214,63 @@ export default function CustomerCartsPage() {
                             {item.product?.name || 'منتج غير معروف'}
                           </TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
-                          <TableCell className="text-center">
-                            {item.product?.price?.toFixed(2) || '0.00'} ج.م
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {((item.product?.price || 0) * item.quantity).toFixed(2)} ج.م
-                          </TableCell>
+                           <TableCell className="text-center">
+                             {(() => {
+                               if (!item.product) return '0.00 ج.م';
+                               
+                               let effectivePrice = item.product.price;
+                               
+                               // Check for bulk pricing
+                               if (item.metadata && typeof item.metadata === 'object') {
+                                 const metadata = item.metadata as any;
+                                 if (metadata.isBulk && item.product.bulk_price && item.product.bulk_quantity) {
+                                   effectivePrice = item.product.bulk_price / item.product.bulk_quantity;
+                                 }
+                                 // Check for scale/weight pricing
+                                 else if (metadata.weight && metadata.price_per_kg) {
+                                   effectivePrice = metadata.price_per_kg;
+                                 }
+                               }
+                               // Check for offer pricing
+                               if (item.product.is_offer && item.product.offer_price) {
+                                 effectivePrice = item.product.offer_price;
+                               }
+                               
+                               return `${effectivePrice.toFixed(2)} ج.م`;
+                             })()}
+                           </TableCell>
+                           <TableCell className="text-center">
+                             {(() => {
+                               if (!item.product) return '0.00 ج.م';
+                               
+                               let effectivePrice = item.product.price;
+                               let totalPrice = 0;
+                               
+                               // Check for bulk pricing
+                               if (item.metadata && typeof item.metadata === 'object') {
+                                 const metadata = item.metadata as any;
+                                 if (metadata.isBulk && item.product.bulk_price) {
+                                   totalPrice = item.product.bulk_price;
+                                 }
+                                 // Check for scale/weight pricing
+                                 else if (metadata.weight && metadata.price_per_kg) {
+                                   totalPrice = metadata.price_per_kg * metadata.weight;
+                                 }
+                                 else {
+                                   totalPrice = item.product.price * item.quantity;
+                                 }
+                               }
+                               // Check for offer pricing
+                               else if (item.product.is_offer && item.product.offer_price) {
+                                 totalPrice = item.product.offer_price * item.quantity;
+                               }
+                               else {
+                                 totalPrice = item.product.price * item.quantity;
+                               }
+                               
+                               return `${totalPrice.toFixed(2)} ج.م`;
+                             })()}
+                           </TableCell>
                           <TableCell className="text-center">
                             <Button
                               variant="ghost"

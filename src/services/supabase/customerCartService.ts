@@ -12,6 +12,12 @@ export interface CartItem {
   product?: {
     name: string;
     price: number;
+    offer_price?: number;
+    is_offer?: boolean;
+    bulk_price?: number;
+    bulk_quantity?: number;
+    bulk_enabled?: boolean;
+    barcode_type?: string;
     image_url?: string;
   };
   customer?: {
@@ -39,7 +45,7 @@ export const fetchCustomerCarts = async (): Promise<CustomerCart[]> => {
       .from('cart_items')
       .select(`
         *,
-        product:products(name, price),
+        product:products(name, price, offer_price, is_offer, bulk_price, bulk_quantity, bulk_enabled, barcode_type),
         customer:customers(name, phone, email)
       `)
       .order('updated_at', { ascending: false });
@@ -78,7 +84,29 @@ export const fetchCustomerCarts = async (): Promise<CustomerCart[]> => {
       cart.total_items += item.quantity;
       
       if (item.product) {
-        cart.total_value += item.product.price * item.quantity;
+        // Check if product has offer price or bulk pricing
+        let effectivePrice = item.product.price;
+        
+        // Check product metadata for bulk or scale information
+        if (item.metadata && typeof item.metadata === 'object') {
+          const metadata = item.metadata as any;
+          if (metadata.isBulk && metadata.bulk_price) {
+            effectivePrice = metadata.bulk_price / (metadata.bulk_quantity || 1);
+          } else if (metadata.weight && metadata.price_per_kg) {
+            effectivePrice = metadata.price_per_kg * metadata.weight;
+          } else if (metadata.offer_price) {
+            effectivePrice = metadata.offer_price;
+          }
+        }
+        
+        // Also check product properties directly
+        if (item.product.is_offer && item.product.offer_price) {
+          effectivePrice = item.product.offer_price;
+        } else if (item.product.bulk_enabled && item.product.bulk_price && item.product.bulk_quantity) {
+          effectivePrice = item.product.bulk_price / item.product.bulk_quantity;
+        }
+        
+        cart.total_value += effectivePrice * item.quantity;
       }
 
       // Update last updated time if this item is newer

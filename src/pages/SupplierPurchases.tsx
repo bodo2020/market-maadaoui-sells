@@ -31,6 +31,7 @@ interface CartItem {
   product: Product;
   quantity: number;
   price: number;
+  salePrice: number;
   discount: number;
   total: number;
   batchNumber?: string;
@@ -134,6 +135,7 @@ export default function SupplierPurchases() {
         product: product,
         quantity: 1,
         price: product.purchase_price,
+        salePrice: product.price,
         discount: 0,
         total: product.purchase_price
       };
@@ -191,6 +193,14 @@ export default function SupplierPurchases() {
     updatedCart[index].total = price * updatedCart[index].quantity;
     setCart(updatedCart);
   };
+
+  const updateItemSalePrice = (index: number, salePrice: number) => {
+    if (salePrice < 0) return;
+    
+    const updatedCart = [...cart];
+    updatedCart[index].salePrice = salePrice;
+    setCart(updatedCart);
+  };
   
   const removeFromCart = (index: number) => {
     const updatedCart = [...cart];
@@ -235,6 +245,7 @@ export default function SupplierPurchases() {
         product_id: item.product.id,
         quantity: item.quantity,
         price: item.price,
+        sale_price: item.salePrice,
         total: item.total,
         batch_number: item.batchNumber || `BATCH-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(index + 1).padStart(3, '0')}`,
         expiry_date: item.expiryDate,
@@ -394,35 +405,37 @@ export default function SupplierPurchases() {
                     {filteredProducts.length > 0 && (
                       <div className="mt-4 border rounded-md overflow-hidden">
                         <Table>
-                          <TableHeader>
+                           <TableHeader>
                             <TableRow>
                               <TableHead>المنتج</TableHead>
                               <TableHead>الباركود</TableHead>
                               <TableHead>الكمية الحالية</TableHead>
                               <TableHead>سعر الشراء</TableHead>
+                              <TableHead>سعر البيع</TableHead>
                               <TableHead>الإجراء</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {filteredProducts.map((product) => (
-                              <TableRow key={product.id}>
-                                <TableCell>{product.name}</TableCell>
-                                <TableCell>{product.barcode || "—"}</TableCell>
-                                <TableCell>{product.quantity || 0}</TableCell>
-                                <TableCell>{product.purchase_price}</TableCell>
-                                <TableCell>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    onClick={() => addProductToCart(product)}
-                                    className="text-primary hover:text-primary/80"
-                                  >
-                                    <Plus className="h-4 w-4 ml-1" />
-                                    إضافة
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                             {filteredProducts.map((product) => (
+                               <TableRow key={product.id}>
+                                 <TableCell>{product.name}</TableCell>
+                                 <TableCell>{product.barcode || "—"}</TableCell>
+                                 <TableCell>{product.quantity || 0}</TableCell>
+                                 <TableCell>{product.purchase_price}</TableCell>
+                                 <TableCell>{product.price}</TableCell>
+                                 <TableCell>
+                                   <Button 
+                                     variant="ghost" 
+                                     size="sm" 
+                                     onClick={() => addProductToCart(product)}
+                                     className="text-primary hover:text-primary/80"
+                                   >
+                                     <Plus className="h-4 w-4 ml-1" />
+                                     إضافة
+                                   </Button>
+                                 </TableCell>
+                               </TableRow>
+                             ))}
                           </TableBody>
                         </Table>
                       </div>
@@ -522,13 +535,14 @@ export default function SupplierPurchases() {
                     <div className="border rounded-md overflow-hidden">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>المنتج</TableHead>
-                            <TableHead>الكمية</TableHead>
-                            <TableHead>السعر</TableHead>
-                            <TableHead>المجموع</TableHead>
-                            <TableHead></TableHead>
-                          </TableRow>
+                           <TableRow>
+                             <TableHead>المنتج</TableHead>
+                             <TableHead>الكمية</TableHead>
+                             <TableHead>سعر الشراء</TableHead>
+                             <TableHead>سعر البيع</TableHead>
+                             <TableHead>المجموع</TableHead>
+                             <TableHead></TableHead>
+                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {cart.map((item, index) => (
@@ -551,16 +565,25 @@ export default function SupplierPurchases() {
                                     className="w-16 h-8 p-1 text-center"
                                   />
                                 </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.price}
-                                    onChange={(e) => updateItemPrice(index, parseFloat(e.target.value))}
-                                    min="0"
-                                    className="w-20 h-8 p-1 text-center"
-                                  />
-                                </TableCell>
-                                <TableCell>{item.total.toFixed(2)}</TableCell>
+                                 <TableCell>
+                                   <Input
+                                     type="number"
+                                     value={item.price}
+                                     onChange={(e) => updateItemPrice(index, parseFloat(e.target.value))}
+                                     min="0"
+                                     className="w-20 h-8 p-1 text-center"
+                                   />
+                                 </TableCell>
+                                 <TableCell>
+                                   <Input
+                                     type="number"
+                                     value={item.salePrice}
+                                     onChange={(e) => updateItemSalePrice(index, parseFloat(e.target.value))}
+                                     min="0"
+                                     className="w-20 h-8 p-1 text-center"
+                                   />
+                                 </TableCell>
+                                 <TableCell>{item.total.toFixed(2)}</TableCell>
                                 <TableCell>
                                   <Button
                                     variant="ghost"
@@ -572,7 +595,7 @@ export default function SupplierPurchases() {
                                 </TableCell>
                               </TableRow>
                               <TableRow key={`details-${index}`} className="bg-muted/30">
-                                <TableCell colSpan={5} className="p-4">
+                                <TableCell colSpan={6} className="p-4">
                                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                      <div>
                                        <label className="text-sm font-medium text-muted-foreground">رقم الدفعة</label>

@@ -110,6 +110,7 @@ export default function POS() {
           const weightInKg = weightInGrams / 1000;
           handleAddScaleProductToCart(scaleProduct, weightInKg);
           barcodeCache.current.set(barcode, scaleProduct);
+          setSearch("");
           return;
         }
       }
@@ -129,6 +130,7 @@ export default function POS() {
       
       if (product) {
         addProductToCart(product, barcode);
+        setSearch("");
       } else {
         toast({
           title: "لم يتم العثور على المنتج",
@@ -148,13 +150,17 @@ export default function POS() {
 
   // Helper function to add product to cart with different types
   const addProductToCart = (product: Product, barcode: string) => {
+    // Check if the product is already in cart to avoid duplicate addition
+    const existingItem = cartItems.find(item => item.product.id === product.id);
+    
     if (product.calculated_weight) {
       handleAddScaleProductToCart(product, product.calculated_weight);
-    } else if (product.is_bulk_scan) {
+    } else if (product.is_bulk_scan && !existingItem) {
       handleAddBulkToCart(product);
-    } else {
+    } else if (!existingItem?.isBulk) {
       handleAddToCart(product);
     }
+    
     toast({
       title: "تم المسح بنجاح",
       description: `${barcode} - ${product.name}`
