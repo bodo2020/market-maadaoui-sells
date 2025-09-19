@@ -1741,6 +1741,7 @@ export type Database = {
           product_id: string
           purchase_id: string
           quantity: number
+          sale_price: number | null
           shelf_location: string | null
           total: number
           updated_at: string | null
@@ -1755,6 +1756,7 @@ export type Database = {
           product_id: string
           purchase_id: string
           quantity: number
+          sale_price?: number | null
           shelf_location?: string | null
           total: number
           updated_at?: string | null
@@ -1769,6 +1771,7 @@ export type Database = {
           product_id?: string
           purchase_id?: string
           quantity?: number
+          sale_price?: number | null
           shelf_location?: string | null
           total?: number
           updated_at?: string | null
