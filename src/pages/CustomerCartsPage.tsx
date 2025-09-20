@@ -364,7 +364,7 @@ export default function CustomerCartsPage() {
                                   
                                   // Handle bulk products
                                   if (metadata.isBulk && item.product.bulk_price) {
-                                    totalPrice = item.product.bulk_price;
+                                    totalPrice = item.product.bulk_price * item.quantity;
                                   }
                                   // Handle scale/weight products
                                   else if (metadata.isScale && metadata.weight && metadata.price_per_kg) {
@@ -387,7 +387,7 @@ export default function CustomerCartsPage() {
                                   if (item.product.is_offer && item.product.offer_price) {
                                     totalPrice = item.product.offer_price * item.quantity;
                                   } else if (item.product.bulk_enabled && item.product.bulk_price) {
-                                    totalPrice = item.product.bulk_price;
+                                    totalPrice = item.product.bulk_price * item.quantity;
                                   } else {
                                     totalPrice = item.product.price * item.quantity;
                                   }
@@ -416,10 +416,43 @@ export default function CustomerCartsPage() {
                       <span>إجمالي السلة:</span>
                       <span>{selectedCartDetails.total_value.toFixed(2)} ج.م</span>
                     </div>
-                    <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                      <span>عدد المنتجات:</span>
-                      <span>{selectedCartDetails.total_items} منتج</span>
-                    </div>
+                    {(() => {
+                      let totalPieces = 0;
+                      let totalWeightKg = 0;
+                      selectedCartDetails.items.forEach((item) => {
+                        const md = item.metadata as any;
+                        if (md && typeof md === 'object') {
+                          if (md.isBulk && item.product?.bulk_quantity) {
+                            totalPieces += item.quantity * item.product.bulk_quantity;
+                          } else if (md.weight) {
+                            totalWeightKg += Number(md.weight) || 0;
+                          } else {
+                            totalPieces += item.quantity;
+                          }
+                        } else {
+                          totalPieces += item.quantity;
+                        }
+                      });
+
+                      const weightLabel = totalWeightKg >= 1
+                        ? `${totalWeightKg.toFixed(3)} كيلو`
+                        : `${(totalWeightKg * 1000).toFixed(0)} جرام`;
+
+                      return (
+                        <>
+                          <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                            <span>عدد القطع:</span>
+                            <span>{totalPieces} قطعة</span>
+                          </div>
+                          {totalWeightKg > 0 && (
+                            <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                              <span>إجمالي الوزن:</span>
+                              <span>{weightLabel}</span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   
                   <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-end">
