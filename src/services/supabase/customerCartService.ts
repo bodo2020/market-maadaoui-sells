@@ -95,13 +95,17 @@ export const fetchCustomerCarts = async (): Promise<CustomerCart[]> => {
       if (item.metadata && typeof item.metadata === 'object') {
         const metadata = item.metadata as any;
         // For bulk products, multiply by bulk quantity
-        if (metadata.isBulk && item.product && item.product.bulk_quantity) {
-          actualQuantity = item.quantity * item.product.bulk_quantity;
+        if ((metadata.isBulk || item.product?.bulk_enabled || (item.product?.bulk_price && item.product?.bulk_quantity)) && (metadata.bulk_quantity || item.product?.bulk_quantity)) {
+          const bundleQty = metadata.bulk_quantity || item.product?.bulk_quantity || 1;
+          actualQuantity = item.quantity * bundleQty;
         }
-        // For weight products, use the actual weight or quantity as is
-        else if (metadata.isScale || metadata.weight) {
-          actualQuantity = item.quantity; // Keep as is for weight products
+        // For weight products, keep quantity as is (counting orders not pieces)
+        else if (metadata.isScale || metadata.weight !== undefined) {
+          actualQuantity = item.quantity;
         }
+      } else if (item.product?.bulk_quantity && (item.product.bulk_enabled || item.product.bulk_price)) {
+        // No metadata but product marked as/acts like bulk
+        actualQuantity = item.quantity * item.product.bulk_quantity;
       }
       cart.total_items += actualQuantity;
       
@@ -119,7 +123,8 @@ export const fetchCustomerCarts = async (): Promise<CustomerCart[]> => {
           } 
           // Handle scale/weight products
           else if (metadata.isScale && metadata.weight && metadata.price_per_kg) {
-            effectivePrice = metadata.price_per_kg * metadata.weight;
+            // Use per-kg price here; we'll multiply by weight when adding to total
+            effectivePrice = metadata.price_per_kg;
           }
           // Handle custom offer price from metadata
           else if (metadata.offer_price) {
@@ -127,7 +132,8 @@ export const fetchCustomerCarts = async (): Promise<CustomerCart[]> => {
           }
           // Handle weight-based pricing with metadata price_per_kg
           else if (metadata.weight && metadata.price_per_kg) {
-            effectivePrice = metadata.price_per_kg * metadata.weight;
+            // Use per-kg price; weight will be applied in total calculation
+            effectivePrice = metadata.price_per_kg;
           }
         }
         
@@ -140,7 +146,25 @@ export const fetchCustomerCarts = async (): Promise<CustomerCart[]> => {
           }
         }
         
-        cart.total_value += effectivePrice * item.quantity;
+        // Add to total considering special cases (weight, bulk)
+        const md = item.metadata as any;
+        if (md && typeof md === 'object' && md.price_per_kg && md.weight !== undefined) {
+          const raw = Number(md.weight) || 0;
+          let kg = 0;
+          if (md.weight_unit) {
+            kg = String(md.weight_unit).toLowerCase().startsWith('g') ? raw / 1000 : raw;
+          } else {
+            kg = raw > 10 ? raw / 1000 : raw; // infer grams when value looks like grams
+          }
+          cart.total_value += Number(md.price_per_kg) * kg;
+        } else if (item.product?.barcode_type === 'scale') {
+          const raw = Number(item.quantity) || 0;
+          const kg = raw > 10 ? raw / 1000 : raw; // if quantity looks like grams
+          const pricePerKg = item.product.price;
+          cart.total_value += pricePerKg * kg;
+        } else {
+          cart.total_value += effectivePrice * item.quantity;
+        }
       }
 
       // Update last updated time if this item is newer

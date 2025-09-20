@@ -238,8 +238,9 @@ export default function CustomerCartsPage() {
                                  <div className="text-xs text-muted-foreground">
                                    {(() => {
                                      const metadata = item.metadata as any;
-                                     if (metadata.isBulk && item.product?.bulk_quantity) {
-                                       return `منتج جملة (${item.product.bulk_quantity} قطعة/جملة)`;
+                                     if ((metadata.isBulk || item.product?.bulk_enabled) && (item.product?.bulk_quantity || metadata.bulk_quantity)) {
+                                       const bundleQty = item.product?.bulk_quantity || metadata.bulk_quantity;
+                                       return `منتج جملة (${bundleQty} قطعة/جملة)`;
                                      }
                                      if (metadata.isScale || metadata.weight) {
                                        const weight = metadata.weight || 0;
@@ -263,38 +264,34 @@ export default function CustomerCartsPage() {
                                if (item.metadata && typeof item.metadata === 'object') {
                                  const metadata = item.metadata as any;
                                  
-                                 // For bulk products
-                                 if (metadata.isBulk && item.product?.bulk_quantity) {
-                                   const totalPieces = item.quantity * item.product.bulk_quantity;
-                                   return (
-                                     <div>
-                                       <div>{item.quantity} جملة</div>
-                                       <div className="text-xs text-muted-foreground">
-                                         ({totalPieces} قطعة)
-                                       </div>
-                                     </div>
-                                   );
-                                 }
+                                  // For bulk products
+                                  if ((metadata.isBulk || item.product?.bulk_enabled) && item.product?.bulk_quantity) {
+                                    const totalPieces = item.quantity * item.product.bulk_quantity;
+                                    return (
+                                      <div>
+                                        <div>{item.quantity} جملة</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          ({totalPieces} قطعة)
+                                        </div>
+                                      </div>
+                                    );
+                                  }
                                  
-                                 // For weight products - show weight in grams/kg properly
-                                 if (metadata.isScale && metadata.weight) {
-                                   const weight = metadata.weight;
-                                   if (weight >= 1) {
-                                     return `${weight} كيلو`;
-                                   } else {
-                                     return `${(weight * 1000).toFixed(0)} جرام`;
-                                   }
-                                 }
+                                  // For weight products - show weight in grams/kg properly
+                                  if (metadata.weight) {
+                                    const raw = Number(metadata.weight) || 0;
+                                    const isGrams = metadata.weight_unit
+                                      ? String(metadata.weight_unit).toLowerCase().startsWith('g')
+                                      : raw > 10;
+                                    if (isGrams) {
+                                      return `${raw.toFixed(0)} جرام`;
+                                    } else if (raw < 1) {
+                                      return `${(raw * 1000).toFixed(0)} جرام`;
+                                    } else {
+                                      return `${raw} كيلو`;
+                                    }
+                                  }
                                  
-                                 // For other weight products
-                                 if (metadata.weight) {
-                                   const weight = metadata.weight;
-                                   if (weight >= 1) {
-                                     return `${weight} كيلو`;
-                                   } else {
-                                     return `${(weight * 1000).toFixed(0)} جرام`;
-                                   }
-                                 }
                                }
                                
                                return `${item.quantity} قطعة`;
@@ -317,13 +314,8 @@ export default function CustomerCartsPage() {
                                     productType = 'جملة';
                                   }
                                   // Handle scale/weight products
-                                  else if (metadata.isScale && metadata.weight && metadata.price_per_kg) {
-                                    effectivePrice = metadata.price_per_kg;
-                                    productType = 'ميزان';
-                                  }
-                                  // Handle weight-based pricing with metadata price_per_kg
-                                  else if (metadata.weight && metadata.price_per_kg) {
-                                    effectivePrice = metadata.price_per_kg;
+                                  else if (metadata.weight) {
+                                    effectivePrice = (metadata.price_per_kg ?? item.product.price);
                                     productType = 'ميزان';
                                   }
                                   // Handle custom offer price from metadata
@@ -368,11 +360,27 @@ export default function CustomerCartsPage() {
                                   }
                                   // Handle scale/weight products
                                   else if (metadata.isScale && metadata.weight && metadata.price_per_kg) {
-                                    totalPrice = metadata.price_per_kg * metadata.weight;
+                                    const raw = Number(metadata.weight) || 0;
+                                    const kg = metadata.weight_unit
+                                      ? String(metadata.weight_unit).toLowerCase().startsWith('g')
+                                        ? raw / 1000
+                                        : raw
+                                      : raw > 10
+                                      ? raw / 1000
+                                      : raw;
+                                    totalPrice = metadata.price_per_kg * kg;
                                   }
                                   // Handle weight-based pricing with metadata price_per_kg
                                   else if (metadata.weight && metadata.price_per_kg) {
-                                    totalPrice = metadata.price_per_kg * metadata.weight;
+                                    const raw = Number(metadata.weight) || 0;
+                                    const kg = metadata.weight_unit
+                                      ? String(metadata.weight_unit).toLowerCase().startsWith('g')
+                                        ? raw / 1000
+                                        : raw
+                                      : raw > 10
+                                      ? raw / 1000
+                                      : raw;
+                                    totalPrice = metadata.price_per_kg * kg;
                                   }
                                   // Handle custom offer price from metadata
                                   else if (metadata.offer_price) {
