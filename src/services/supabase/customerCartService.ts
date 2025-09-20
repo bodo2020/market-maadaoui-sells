@@ -18,7 +18,6 @@ export interface CartItem {
     bulk_quantity?: number;
     bulk_enabled?: boolean;
     barcode_type?: string;
-    image_url?: string;
   };
   customer?: {
     name: string;
@@ -45,7 +44,16 @@ export const fetchCustomerCarts = async (): Promise<CustomerCart[]> => {
       .from('cart_items')
       .select(`
         *,
-        product:products(name, price, offer_price, is_offer, bulk_price, bulk_quantity, bulk_enabled, barcode_type),
+        product:products(
+          name, 
+          price, 
+          offer_price, 
+          is_offer, 
+          bulk_price, 
+          bulk_quantity, 
+          bulk_enabled, 
+          barcode_type
+        ),
         customer:customers(name, phone, email)
       `)
       .order('updated_at', { ascending: false });
@@ -90,20 +98,32 @@ export const fetchCustomerCarts = async (): Promise<CustomerCart[]> => {
         // Check product metadata for bulk or scale information
         if (item.metadata && typeof item.metadata === 'object') {
           const metadata = item.metadata as any;
-          if (metadata.isBulk && metadata.bulk_price) {
-            effectivePrice = metadata.bulk_price / (metadata.bulk_quantity || 1);
-          } else if (metadata.weight && metadata.price_per_kg) {
+          
+          // Handle bulk products
+          if (metadata.isBulk && item.product.bulk_price && item.product.bulk_quantity) {
+            effectivePrice = item.product.bulk_price;
+          } 
+          // Handle scale/weight products
+          else if (metadata.isScale && metadata.weight && metadata.price_per_kg) {
             effectivePrice = metadata.price_per_kg * metadata.weight;
-          } else if (metadata.offer_price) {
+          }
+          // Handle custom offer price from metadata
+          else if (metadata.offer_price) {
             effectivePrice = metadata.offer_price;
+          }
+          // Handle weight-based pricing with metadata price_per_kg
+          else if (metadata.weight && metadata.price_per_kg) {
+            effectivePrice = metadata.price_per_kg * metadata.weight;
           }
         }
         
-        // Also check product properties directly
-        if (item.product.is_offer && item.product.offer_price) {
-          effectivePrice = item.product.offer_price;
-        } else if (item.product.bulk_enabled && item.product.bulk_price && item.product.bulk_quantity) {
-          effectivePrice = item.product.bulk_price / item.product.bulk_quantity;
+        // Check product properties directly if no metadata overrides
+        if (!item.metadata || typeof item.metadata !== 'object') {
+          if (item.product.is_offer && item.product.offer_price) {
+            effectivePrice = item.product.offer_price;
+          } else if (item.product.bulk_enabled && item.product.bulk_price && item.product.bulk_quantity) {
+            effectivePrice = item.product.bulk_price;
+          }
         }
         
         cart.total_value += effectivePrice * item.quantity;

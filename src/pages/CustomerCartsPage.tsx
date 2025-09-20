@@ -210,67 +210,119 @@ export default function CustomerCartsPage() {
                     <TableBody>
                       {selectedCartDetails.items.map(item => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">
-                            {item.product?.name || 'منتج غير معروف'}
-                          </TableCell>
+                           <TableCell className="font-medium">
+                             <div>
+                               <div>{item.product?.name || 'منتج غير معروف'}</div>
+                               {item.metadata && typeof item.metadata === 'object' && (
+                                 <div className="text-xs text-muted-foreground">
+                                   {(() => {
+                                     const metadata = item.metadata as any;
+                                     if (metadata.isBulk) return 'منتج جملة';
+                                     if (metadata.isScale || metadata.weight) return `وزن: ${metadata.weight || 0} كيلو`;
+                                     if (metadata.offer_price) return 'منتج بعرض خاص';
+                                     return '';
+                                   })()}
+                                 </div>
+                               )}
+                             </div>
+                           </TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
                            <TableCell className="text-center">
-                             {(() => {
-                               if (!item.product) return '0.00 ج.م';
-                               
-                               let effectivePrice = item.product.price;
-                               
-                               // Check for bulk pricing
-                               if (item.metadata && typeof item.metadata === 'object') {
-                                 const metadata = item.metadata as any;
-                                 if (metadata.isBulk && item.product.bulk_price && item.product.bulk_quantity) {
-                                   effectivePrice = item.product.bulk_price / item.product.bulk_quantity;
-                                 }
-                                 // Check for scale/weight pricing
-                                 else if (metadata.weight && metadata.price_per_kg) {
-                                   effectivePrice = metadata.price_per_kg;
-                                 }
-                               }
-                               // Check for offer pricing
-                               if (item.product.is_offer && item.product.offer_price) {
-                                 effectivePrice = item.product.offer_price;
-                               }
-                               
-                               return `${effectivePrice.toFixed(2)} ج.م`;
-                             })()}
-                           </TableCell>
-                           <TableCell className="text-center">
-                             {(() => {
-                               if (!item.product) return '0.00 ج.م';
-                               
-                               let effectivePrice = item.product.price;
-                               let totalPrice = 0;
-                               
-                               // Check for bulk pricing
-                               if (item.metadata && typeof item.metadata === 'object') {
-                                 const metadata = item.metadata as any;
-                                 if (metadata.isBulk && item.product.bulk_price) {
-                                   totalPrice = item.product.bulk_price;
-                                 }
-                                 // Check for scale/weight pricing
-                                 else if (metadata.weight && metadata.price_per_kg) {
-                                   totalPrice = metadata.price_per_kg * metadata.weight;
-                                 }
-                                 else {
-                                   totalPrice = item.product.price * item.quantity;
-                                 }
-                               }
-                               // Check for offer pricing
-                               else if (item.product.is_offer && item.product.offer_price) {
-                                 totalPrice = item.product.offer_price * item.quantity;
-                               }
-                               else {
-                                 totalPrice = item.product.price * item.quantity;
-                               }
-                               
-                               return `${totalPrice.toFixed(2)} ج.م`;
-                             })()}
-                           </TableCell>
+                              {(() => {
+                                if (!item.product) return '0.00 ج.م';
+                                
+                                let effectivePrice = item.product.price;
+                                let productType = 'عادي';
+                                
+                                // Check metadata first for specific pricing
+                                if (item.metadata && typeof item.metadata === 'object') {
+                                  const metadata = item.metadata as any;
+                                  
+                                  // Handle bulk products
+                                  if (metadata.isBulk && item.product.bulk_price && item.product.bulk_quantity) {
+                                    effectivePrice = item.product.bulk_price / item.product.bulk_quantity;
+                                    productType = 'جملة';
+                                  }
+                                  // Handle scale/weight products
+                                  else if (metadata.isScale && metadata.weight && metadata.price_per_kg) {
+                                    effectivePrice = metadata.price_per_kg;
+                                    productType = 'ميزان';
+                                  }
+                                  // Handle weight-based pricing with metadata price_per_kg
+                                  else if (metadata.weight && metadata.price_per_kg) {
+                                    effectivePrice = metadata.price_per_kg;
+                                    productType = 'ميزان';
+                                  }
+                                  // Handle custom offer price from metadata
+                                  else if (metadata.offer_price) {
+                                    effectivePrice = metadata.offer_price;
+                                    productType = 'عرض';
+                                  }
+                                }
+                                
+                                // Check product properties directly if no metadata overrides
+                                if (productType === 'عادي') {
+                                  if (item.product.is_offer && item.product.offer_price) {
+                                    effectivePrice = item.product.offer_price;
+                                    productType = 'عرض';
+                                  } else if (item.product.bulk_enabled && item.product.bulk_price && item.product.bulk_quantity) {
+                                    effectivePrice = item.product.bulk_price / item.product.bulk_quantity;
+                                    productType = 'جملة';
+                                  }
+                                }
+                                
+                                return (
+                                  <div>
+                                    <div>{effectivePrice.toFixed(2)} ج.م</div>
+                                    <Badge variant="outline" className="text-xs">{productType}</Badge>
+                                  </div>
+                                );
+                              })()}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {(() => {
+                                if (!item.product) return '0.00 ج.م';
+                                
+                                let totalPrice = 0;
+                                
+                                // Check metadata first for specific pricing
+                                if (item.metadata && typeof item.metadata === 'object') {
+                                  const metadata = item.metadata as any;
+                                  
+                                  // Handle bulk products
+                                  if (metadata.isBulk && item.product.bulk_price) {
+                                    totalPrice = item.product.bulk_price;
+                                  }
+                                  // Handle scale/weight products
+                                  else if (metadata.isScale && metadata.weight && metadata.price_per_kg) {
+                                    totalPrice = metadata.price_per_kg * metadata.weight;
+                                  }
+                                  // Handle weight-based pricing with metadata price_per_kg
+                                  else if (metadata.weight && metadata.price_per_kg) {
+                                    totalPrice = metadata.price_per_kg * metadata.weight;
+                                  }
+                                  // Handle custom offer price from metadata
+                                  else if (metadata.offer_price) {
+                                    totalPrice = metadata.offer_price * item.quantity;
+                                  }
+                                  else {
+                                    totalPrice = item.product.price * item.quantity;
+                                  }
+                                }
+                                // Check product properties directly if no metadata
+                                else {
+                                  if (item.product.is_offer && item.product.offer_price) {
+                                    totalPrice = item.product.offer_price * item.quantity;
+                                  } else if (item.product.bulk_enabled && item.product.bulk_price) {
+                                    totalPrice = item.product.bulk_price;
+                                  } else {
+                                    totalPrice = item.product.price * item.quantity;
+                                  }
+                                }
+                                
+                                return `${totalPrice.toFixed(2)} ج.م`;
+                              })()}
+                            </TableCell>
                           <TableCell className="text-center">
                             <Button
                               variant="ghost"
