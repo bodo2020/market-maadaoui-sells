@@ -89,7 +89,17 @@ export const fetchCustomerCarts = async (): Promise<CustomerCart[]> => {
 
       const cart = customerCartsMap.get(customerId)!;
       cart.items.push(item);
-      cart.total_items += item.quantity;
+      
+      // Calculate actual items count based on product type
+      let actualQuantity = item.quantity;
+      if (item.metadata && typeof item.metadata === 'object') {
+        const metadata = item.metadata as any;
+        // For bulk products, multiply by bulk quantity
+        if (metadata.isBulk && item.product && item.product.bulk_quantity) {
+          actualQuantity = item.quantity * item.product.bulk_quantity;
+        }
+      }
+      cart.total_items += actualQuantity;
       
       if (item.product) {
         // Check if product has offer price or bulk pricing

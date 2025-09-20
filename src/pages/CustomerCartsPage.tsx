@@ -146,10 +146,28 @@ export default function CustomerCartsPage() {
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <Badge className="mb-1">{cart.total_items} منتج</Badge>
-                          <div className="text-sm font-medium">{cart.total_value.toFixed(2)} ج.م</div>
-                        </div>
+                         <div className="text-right">
+                           <Badge className="mb-1">
+                             {(() => {
+                               // Calculate total items including bulk quantities
+                               let totalItems = 0;
+                               cart.items.forEach(item => {
+                                 if (item.metadata && typeof item.metadata === 'object') {
+                                   const metadata = item.metadata as any;
+                                   if (metadata.isBulk && item.product?.bulk_quantity) {
+                                     totalItems += item.quantity * item.product.bulk_quantity;
+                                   } else {
+                                     totalItems += item.quantity;
+                                   }
+                                 } else {
+                                   totalItems += item.quantity;
+                                 }
+                               });
+                               return `${totalItems} منتج`;
+                             })()}
+                           </Badge>
+                           <div className="text-sm font-medium">{cart.total_value.toFixed(2)} ج.م</div>
+                         </div>
                       </div>
                     ))
                   )}
@@ -217,16 +235,55 @@ export default function CustomerCartsPage() {
                                  <div className="text-xs text-muted-foreground">
                                    {(() => {
                                      const metadata = item.metadata as any;
-                                     if (metadata.isBulk) return 'منتج جملة';
-                                     if (metadata.isScale || metadata.weight) return `وزن: ${metadata.weight || 0} كيلو`;
-                                     if (metadata.offer_price) return 'منتج بعرض خاص';
+                                     if (metadata.isBulk && item.product?.bulk_quantity) {
+                                       return `منتج جملة (${item.product.bulk_quantity} قطعة/جملة)`;
+                                     }
+                                     if (metadata.isScale || metadata.weight) {
+                                       return `وزن: ${metadata.weight || 0} كيلو`;
+                                     }
+                                     if (metadata.offer_price) {
+                                       return 'منتج بعرض خاص';
+                                     }
                                      return '';
                                    })()}
                                  </div>
                                )}
                              </div>
                            </TableCell>
-                          <TableCell className="text-center">{item.quantity}</TableCell>
+                           <TableCell className="text-center">
+                             {(() => {
+                               let displayQuantity = item.quantity;
+                               let quantityLabel = 'قطعة';
+                               
+                               if (item.metadata && typeof item.metadata === 'object') {
+                                 const metadata = item.metadata as any;
+                                 
+                                 // For bulk products
+                                 if (metadata.isBulk && item.product?.bulk_quantity) {
+                                   const totalPieces = item.quantity * item.product.bulk_quantity;
+                                   return (
+                                     <div>
+                                       <div>{item.quantity} جملة</div>
+                                       <div className="text-xs text-muted-foreground">
+                                         ({totalPieces} قطعة)
+                                       </div>
+                                     </div>
+                                   );
+                                 }
+                                 
+                                 // For weight products
+                                 if (metadata.isScale || metadata.weight) {
+                                   return (
+                                     <div>
+                                       <div>{metadata.weight || item.quantity} كيلو</div>
+                                     </div>
+                                   );
+                                 }
+                               }
+                               
+                               return `${displayQuantity} ${quantityLabel}`;
+                             })()}
+                           </TableCell>
                            <TableCell className="text-center">
                               {(() => {
                                 if (!item.product) return '0.00 ج.م';
