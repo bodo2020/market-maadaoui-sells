@@ -151,6 +151,8 @@ export default function CustomerCartsPage() {
                              {(() => {
                                // Calculate total items including bulk quantities
                                let totalItems = 0;
+                               let displayText = '';
+                               
                                cart.items.forEach(item => {
                                  if (item.metadata && typeof item.metadata === 'object') {
                                    const metadata = item.metadata as any;
@@ -163,6 +165,7 @@ export default function CustomerCartsPage() {
                                    totalItems += item.quantity;
                                  }
                                });
+                               
                                return `${totalItems} منتج`;
                              })()}
                            </Badge>
@@ -239,7 +242,12 @@ export default function CustomerCartsPage() {
                                        return `منتج جملة (${item.product.bulk_quantity} قطعة/جملة)`;
                                      }
                                      if (metadata.isScale || metadata.weight) {
-                                       return `وزن: ${metadata.weight || 0} كيلو`;
+                                       const weight = metadata.weight || 0;
+                                       if (weight >= 1) {
+                                         return `منتج بالوزن: ${weight} كيلو`;
+                                       } else {
+                                         return `منتج بالوزن: ${(weight * 1000).toFixed(0)} جرام`;
+                                       }
                                      }
                                      if (metadata.offer_price) {
                                        return 'منتج بعرض خاص';
@@ -252,9 +260,6 @@ export default function CustomerCartsPage() {
                            </TableCell>
                            <TableCell className="text-center">
                              {(() => {
-                               let displayQuantity = item.quantity;
-                               let quantityLabel = 'قطعة';
-                               
                                if (item.metadata && typeof item.metadata === 'object') {
                                  const metadata = item.metadata as any;
                                  
@@ -271,17 +276,28 @@ export default function CustomerCartsPage() {
                                    );
                                  }
                                  
-                                 // For weight products
-                                 if (metadata.isScale || metadata.weight) {
-                                   return (
-                                     <div>
-                                       <div>{metadata.weight || item.quantity} كيلو</div>
-                                     </div>
-                                   );
+                                 // For weight products - show weight in grams/kg properly
+                                 if (metadata.isScale && metadata.weight) {
+                                   const weight = metadata.weight;
+                                   if (weight >= 1) {
+                                     return `${weight} كيلو`;
+                                   } else {
+                                     return `${(weight * 1000).toFixed(0)} جرام`;
+                                   }
+                                 }
+                                 
+                                 // For other weight products
+                                 if (metadata.weight) {
+                                   const weight = metadata.weight;
+                                   if (weight >= 1) {
+                                     return `${weight} كيلو`;
+                                   } else {
+                                     return `${(weight * 1000).toFixed(0)} جرام`;
+                                   }
                                  }
                                }
                                
-                               return `${displayQuantity} ${quantityLabel}`;
+                               return `${item.quantity} قطعة`;
                              })()}
                            </TableCell>
                            <TableCell className="text-center">

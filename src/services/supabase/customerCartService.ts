@@ -98,6 +98,10 @@ export const fetchCustomerCarts = async (): Promise<CustomerCart[]> => {
         if (metadata.isBulk && item.product && item.product.bulk_quantity) {
           actualQuantity = item.quantity * item.product.bulk_quantity;
         }
+        // For weight products, use the actual weight or quantity as is
+        else if (metadata.isScale || metadata.weight) {
+          actualQuantity = item.quantity; // Keep as is for weight products
+        }
       }
       cart.total_items += actualQuantity;
       
