@@ -166,10 +166,17 @@ export default function DailyInventoryPage() {
     setSearchBarcode(barcode);
     setScannerOpen(false);
     
-    // البحث عن المنتج والتمرير إليه
-    const foundRecord = inventoryRecords.find(record => 
-      record.products?.barcode === barcode
-    );
+    // البحث عن المنتج والتمرير إليه - البحث بدقة أكبر
+    const foundRecord = inventoryRecords.find(record => {
+      const productBarcode = record.products?.barcode;
+      // البحث الدقيق أولاً
+      if (productBarcode === barcode) return true;
+      // ثم البحث الجزئي
+      if (productBarcode && productBarcode.includes(barcode)) return true;
+      // أو إذا كان الباركود المطلوب جزء من باركود المنتج
+      if (barcode.includes(productBarcode || '')) return true;
+      return false;
+    });
     
     if (foundRecord) {
       // التمرير إلى العنصر
@@ -177,10 +184,21 @@ export default function DailyInventoryPage() {
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         element.style.backgroundColor = '#fef3c7';
+        element.style.border = '2px solid #f59e0b';
         setTimeout(() => {
           element.style.backgroundColor = '';
-        }, 2000);
+          element.style.border = '';
+        }, 3000);
       }
+      
+      // تركيز على حقل الإدخال للكمية الفعلية
+      setTimeout(() => {
+        const quantityInput = document.getElementById(`quantity-${foundRecord.id}`);
+        if (quantityInput) {
+          quantityInput.focus();
+          (quantityInput as HTMLInputElement).select();
+        }
+      }, 500);
       
       toast({
         title: "تم العثور على المنتج",
@@ -622,28 +640,26 @@ export default function DailyInventoryPage() {
                 منتجات الجرد {inventoryType === 'full' ? 'الكامل' : 'اليومي'}
               </div>
               
-              {inventoryType === 'full' && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setScannerOpen(true)}
+                >
+                  <Scan className="ml-2 h-4 w-4" />
+                  مسح باركود
+                </Button>
+                
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setScannerOpen(true)}
-                  >
-                    <Scan className="ml-2 h-4 w-4" />
-                    مسح باركود
-                  </Button>
-                  
-                  <div className="flex items-center gap-2">
-                    <Search className="h-4 w-4" />
-                    <Input
-                      placeholder="البحث بالباركود أو اسم المنتج..."
-                      value={searchBarcode}
-                      onChange={(e) => setSearchBarcode(e.target.value)}
-                      className="w-64"
-                    />
-                  </div>
+                  <Search className="h-4 w-4" />
+                  <Input
+                    placeholder="البحث بالباركود أو اسم المنتج..."
+                    value={searchBarcode}
+                    onChange={(e) => setSearchBarcode(e.target.value)}
+                    className="w-64"
+                  />
                 </div>
-              )}
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -697,6 +713,7 @@ export default function DailyInventoryPage() {
                         <TableCell>
                           <div className="w-20">
                             <Input
+                              id={`quantity-${record.id}`}
                               type="number"
                               min="0"
                               placeholder="الكمية"
