@@ -18,6 +18,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
   const [scanning, setScanning] = useState(false);
   const scanIntervalRef = useRef<number | null>(null);
   const barcodeDetectorRef = useRef<any>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Check if BarcodeDetector is supported
   const isBarcodeDetectorSupported = 'BarcodeDetector' in window;
@@ -48,6 +49,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
 
   useEffect(() => {
     if (isOpen) {
+      setIsProcessing(false);
       startCamera();
     } else {
       stopCamera();
@@ -58,6 +60,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
         scanIntervalRef.current = null;
         setScanning(false);
       }
+      setIsProcessing(false);
     }
     
     return () => {
@@ -67,6 +70,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
       if (scanIntervalRef.current) {
         clearInterval(scanIntervalRef.current);
       }
+      setIsProcessing(false);
     };
   }, [isOpen]);
 
@@ -117,7 +121,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
   };
 
   const scanBarcode = async () => {
-    if (!videoRef.current || !canvasRef.current || !barcodeDetectorRef.current) return;
+    if (!videoRef.current || !canvasRef.current || !barcodeDetectorRef.current || isProcessing) return;
 
     try {
       // Draw current video frame to canvas for processing
@@ -137,8 +141,10 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
       // Detect barcodes in the image
       const barcodes = await barcodeDetectorRef.current.detect(canvas);
 
-      if (barcodes.length > 0) {
-        // Stop scanning once a barcode is detected
+      if (barcodes.length > 0 && !isProcessing) {
+        setIsProcessing(true);
+        
+        // Stop scanning immediately once a barcode is detected
         if (scanIntervalRef.current) {
           clearInterval(scanIntervalRef.current);
           scanIntervalRef.current = null;
@@ -159,11 +165,9 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
           boundingBox.height
         );
         
-        // Delay a bit to show the highlight before closing
-        setTimeout(() => {
-          onScan(barcode);
-          onClose();
-        }, 800);
+        // Send barcode immediately and close
+        onScan(barcode);
+        onClose();
       }
     } catch (err) {
       console.error("Error scanning barcode:", err);
