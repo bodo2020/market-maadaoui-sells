@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Edit, FolderPlus, Package, ShoppingCart } from "lucide-react";
+import { Plus, Trash2, Edit, FolderPlus, Package, ShoppingCart, ArrowUpDown } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AddSubcategoryDialog from "./AddSubcategoryDialog";
 import EditSubcategoryDialog from "./EditSubcategoryDialog";
 import AssignProductsToSubcategoryDialog from "./AssignProductsToSubcategoryDialog";
+import SubcategoryOrderManager from "./SubcategoryOrderManager";
 import { fetchSubcategories, deleteSubcategory } from "@/services/supabase/categoryService";
 import { 
   fetchProductsBySubcategory, 
@@ -23,6 +24,7 @@ export default function SubcategoryList() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [isOrderManagerOpen, setIsOrderManagerOpen] = useState(false);
   const [selectedSubcategory, setSelectedSubcategory] = useState<Subcategory | null>(null);
   const [selectedAssignSubcategory, setSelectedAssignSubcategory] = useState<{
     id: string;
@@ -117,10 +119,16 @@ export default function SubcategoryList() {
             </div>
           )}
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)}>
-          <Plus className="h-4 w-4 ml-2" />
-          إضافة قسم فرعي
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsOrderManagerOpen(true)}>
+            <ArrowUpDown className="h-4 w-4 ml-2" />
+            ترتيب الأقسام الفرعية
+          </Button>
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <Plus className="h-4 w-4 ml-2" />
+            إضافة قسم فرعي
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -233,6 +241,14 @@ export default function SubcategoryList() {
         />
       )}
 
+      {categoryId && (
+        <SubcategoryOrderManager
+          open={isOrderManagerOpen}
+          onOpenChange={setIsOrderManagerOpen}
+          categoryId={categoryId}
+          onSuccess={loadSubcategories}
+        />
+      )}
     </div>
   );
 }

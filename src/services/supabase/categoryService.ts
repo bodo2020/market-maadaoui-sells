@@ -9,7 +9,7 @@ export async function fetchMainCategories() {
     const { data, error } = await supabase
       .from("main_categories")
       .select("*")
-      .order("name");
+      .order("position");
 
     if (error) {
       console.error("Error fetching main categories:", error);
@@ -40,9 +40,19 @@ export async function fetchMainCategoryById(id: string) {
 }
 
 export async function createMainCategory(category: Omit<MainCategory, "id" | "created_at" | "updated_at">) {
+  // Get the next position
+  const { data: lastCategory } = await supabase
+    .from("main_categories")
+    .select("position")
+    .order("position", { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextPosition = lastCategory ? (lastCategory.position || 0) + 1 : 0;
+
   const { data, error } = await supabase
     .from("main_categories")
-    .insert([category])
+    .insert([{ ...category, position: nextPosition }])
     .select();
 
   if (error) {
@@ -90,7 +100,7 @@ export async function fetchSubcategories(categoryId?: string) {
     let query = supabase
       .from("subcategories")
       .select("*")
-      .order('name');
+      .order('position');
     
     if (categoryId) {
       query = query.eq("category_id", categoryId);
@@ -127,9 +137,20 @@ export async function fetchSubcategoryById(id: string) {
 }
 
 export async function createSubcategory(subcategory: Omit<Subcategory, "id" | "created_at" | "updated_at">) {
+  // Get the next position for this category
+  const { data: lastSubcategory } = await supabase
+    .from("subcategories")
+    .select("position")
+    .eq("category_id", subcategory.category_id)
+    .order("position", { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextPosition = lastSubcategory ? (lastSubcategory.position || 0) + 1 : 0;
+
   const { data, error } = await supabase
     .from("subcategories")
-    .insert([subcategory])
+    .insert([{ ...subcategory, position: nextPosition }])
     .select();
 
   if (error) {
@@ -206,4 +227,73 @@ export async function getCategoryHierarchy() {
     console.error("Error building category hierarchy:", error);
     return [];
   }
+}
+
+// Position Management Functions
+export async function updateMainCategoryPosition(id: string, newPosition: number) {
+  const { data, error } = await supabase
+    .from("main_categories")
+    .update({ position: newPosition })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error updating main category position:", error);
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateSubcategoryPosition(id: string, newPosition: number) {
+  const { data, error } = await supabase
+    .from("subcategories")
+    .update({ position: newPosition })
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error updating subcategory position:", error);
+    throw error;
+  }
+
+  return data;
+}
+
+export async function reorderMainCategories(categoryPositions: { id: string; position: number }[]) {
+  const updates = categoryPositions.map(({ id, position }) =>
+    supabase
+      .from("main_categories")
+      .update({ position })
+      .eq("id", id)
+  );
+
+  const results = await Promise.all(updates);
+  
+  // Check for any errors
+  const errors = results.filter(result => result.error);
+  if (errors.length > 0) {
+    console.error("Error reordering main categories:", errors);
+    throw new Error("Failed to reorder categories");
+  }
+
+  return true;
+}
+
+export async function reorderSubcategories(subcategoryPositions: { id: string; position: number }[]) {
+  const updates = subcategoryPositions.map(({ id, position }) =>
+    supabase
+      .from("subcategories")
+      .update({ position })
+      .eq("id", id)
+  );
+
+  const results = await Promise.all(updates);
+  
+  // Check for any errors
+  const errors = results.filter(result => result.error);
+  if (errors.length > 0) {
+    console.error("Error reordering subcategories:", errors);
+    throw new Error("Failed to reorder subcategories");
+  }
+
+  return true;
 }

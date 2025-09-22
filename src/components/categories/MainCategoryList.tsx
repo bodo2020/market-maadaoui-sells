@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Loader2, FolderPlus, Trash, Edit, Package } from "lucide-react";
+import { Loader2, FolderPlus, Trash, Edit, Package, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
@@ -9,11 +9,13 @@ import { fetchMainCategories, deleteMainCategory } from "@/services/supabase/cat
 import { MainCategory } from "@/types";
 import { fetchProductsByCategory } from "@/services/supabase/productService";
 import AddMainCategoryDialog from "./AddMainCategoryDialog";
+import CategoryOrderManager from "./CategoryOrderManager";
 
 export default function MainCategoryList() {
   const [categories, setCategories] = useState<(MainCategory & { product_count?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [isOrderManagerOpen, setIsOrderManagerOpen] = useState(false);
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -91,10 +93,16 @@ export default function MainCategoryList() {
         <h2 className="text-lg font-semibold">
           الأقسام الرئيسية
         </h2>
-        <Button onClick={() => setShowAddDialog(true)}>
-          <FolderPlus className="h-4 w-4 ml-2" />
-          إضافة قسم جديد
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsOrderManagerOpen(true)}>
+            <ArrowUpDown className="h-4 w-4 ml-2" />
+            ترتيب الأقسام
+          </Button>
+          <Button onClick={() => setShowAddDialog(true)}>
+            <FolderPlus className="h-4 w-4 ml-2" />
+            إضافة قسم جديد
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
@@ -175,6 +183,12 @@ export default function MainCategoryList() {
       <AddMainCategoryDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
+        onSuccess={fetchCategories}
+      />
+
+      <CategoryOrderManager
+        open={isOrderManagerOpen}
+        onOpenChange={setIsOrderManagerOpen}
         onSuccess={fetchCategories}
       />
     </div>

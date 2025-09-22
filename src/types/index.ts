@@ -25,6 +25,7 @@ export interface MainCategory {
   name: string;
   description?: string | null;
   image_url?: string | null;
+  position?: number;
   created_at?: string;
   updated_at?: string;
   product_count?: number;
@@ -36,6 +37,7 @@ export interface Subcategory {
   description?: string | null;
   image_url?: string | null;
   category_id: string;
+  position?: number;
   created_at?: string;
   updated_at?: string;
 }
