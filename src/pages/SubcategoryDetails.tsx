@@ -3,13 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Edit, Trash2, Package } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash2, Package, PlusCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchSubcategoryById } from "@/services/supabase/categoryService";
-import { fetchProductsBySubcategory, deleteProduct } from "@/services/supabase/productService";
+import { fetchProductsBySubcategory, deleteProduct, updateProduct } from "@/services/supabase/productService";
 import { Subcategory, Product } from "@/types";
 import { toast } from "sonner";
-// Removed ProductGrid import as we'll build the grid inline
+import AddProductsToSubcategoryDialog from "@/components/categories/AddProductsToSubcategoryDialog";
 
 export default function SubcategoryDetails() {
   const { id: subcategoryId } = useParams<{ id: string }>();
@@ -17,6 +17,7 @@ export default function SubcategoryDetails() {
   const [subcategory, setSubcategory] = useState<Subcategory | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   useEffect(() => {
     if (subcategoryId) {
@@ -44,7 +45,11 @@ export default function SubcategoryDetails() {
     }
   };
 
-  const handleAddProduct = () => {
+  const handleAddProductsToSubcategory = () => {
+    setIsAddDialogOpen(true);
+  };
+
+  const handleCreateNewProduct = () => {
     navigate(`/add-product?subcategory=${subcategoryId}`);
   };
 
@@ -52,15 +57,16 @@ export default function SubcategoryDetails() {
     navigate(`/add-product?id=${product.id}`);
   };
 
-  const handleDeleteProduct = async (product: Product) => {
-    if (window.confirm(`هل أنت متأكد من حذف المنتج "${product.name}"؟`)) {
+  const handleRemoveFromSubcategory = async (product: Product) => {
+    if (window.confirm(`هل أنت متأكد من إزالة المنتج "${product.name}" من هذا القسم الفرعي؟`)) {
       try {
-        await deleteProduct(product.id);
-        toast.success("تم حذف المنتج بنجاح");
+        // Remove product from subcategory by setting subcategory_id to null
+        await updateProduct(product.id, { subcategory_id: null });
+        toast.success("تم إزالة المنتج من القسم الفرعي بنجاح");
         loadSubcategoryDetails(); // Reload to update the list
       } catch (error) {
-        console.error("Error deleting product:", error);
-        toast.error("حدث خطأ أثناء حذف المنتج");
+        console.error("Error removing product from subcategory:", error);
+        toast.error("حدث خطأ أثناء إزالة المنتج من القسم الفرعي");
       }
     }
   };
@@ -131,10 +137,16 @@ export default function SubcategoryDetails() {
             </div>
           </div>
           
-          <Button onClick={handleAddProduct}>
-            <Plus className="h-4 w-4 ml-2" />
-            إضافة منتج جديد
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleAddProductsToSubcategory}>
+              <Plus className="h-4 w-4 ml-2" />
+              إضافة منتجات للقسم
+            </Button>
+            <Button variant="outline" onClick={handleCreateNewProduct}>
+              <PlusCircle className="h-4 w-4 ml-2" />
+              إنشاء منتج جديد
+            </Button>
+          </div>
         </div>
 
         {/* Subcategory Image */}
@@ -160,10 +172,16 @@ export default function SubcategoryDetails() {
                 <Package className="h-5 w-5" />
                 منتجات القسم الفرعي ({products.length})
               </CardTitle>
-              <Button variant="outline" onClick={handleAddProduct}>
-                <Plus className="h-4 w-4 ml-2" />
-                إضافة منتج
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleAddProductsToSubcategory}>
+                  <Plus className="h-4 w-4 ml-2" />
+                  إضافة منتجات موجودة
+                </Button>
+                <Button onClick={handleCreateNewProduct}>
+                  <PlusCircle className="h-4 w-4 ml-2" />
+                  إنشاء منتج جديد
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -171,11 +189,17 @@ export default function SubcategoryDetails() {
               <div className="text-center py-10 bg-gray-50 rounded-md">
                 <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                 <h3 className="text-lg font-medium">لا توجد منتجات في هذا القسم الفرعي</h3>
-                <p className="text-gray-500 mb-4">يمكنك إضافة منتجات جديدة من خلال الزر أعلاه</p>
-                <Button onClick={handleAddProduct}>
-                  <Plus className="h-4 w-4 ml-2" />
-                  إضافة منتج الآن
-                </Button>
+                <p className="text-gray-500 mb-4">يمكنك إضافة منتجات موجودة أو إنشاء منتجات جديدة</p>
+                <div className="flex gap-2 justify-center">
+                  <Button onClick={handleAddProductsToSubcategory}>
+                    <Plus className="h-4 w-4 ml-2" />
+                    إضافة منتجات موجودة
+                  </Button>
+                  <Button variant="outline" onClick={handleCreateNewProduct}>
+                    <PlusCircle className="h-4 w-4 ml-2" />
+                    إنشاء منتج جديد
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -219,7 +243,8 @@ export default function SubcategoryDetails() {
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => handleDeleteProduct(product)}
+                        onClick={() => handleRemoveFromSubcategory(product)}
+                        title="إزالة من القسم الفرعي"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -230,6 +255,17 @@ export default function SubcategoryDetails() {
             )}
           </CardContent>
         </Card>
+
+        {/* Add Products Dialog */}
+        {subcategory && (
+          <AddProductsToSubcategoryDialog
+            open={isAddDialogOpen}
+            onOpenChange={setIsAddDialogOpen}
+            categoryId={subcategory.category_id}
+            subcategoryId={subcategory.id}
+            onSuccess={loadSubcategoryDetails}
+          />
+        )}
       </div>
     </MainLayout>
   );
