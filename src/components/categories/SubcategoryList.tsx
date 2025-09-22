@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Edit, FolderPlus, Package, ShoppingCart } from "lucide-react";
@@ -17,6 +17,7 @@ import { toast } from "sonner";
 
 export default function SubcategoryList() {
   const { id: categoryId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [subcategories, setSubcategories] = useState<(Subcategory & { product_count?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -131,6 +132,7 @@ export default function SubcategoryList() {
               <div 
                 key={subcategory.id} 
                 className="border rounded-lg overflow-hidden hover:border-primary transition-colors cursor-pointer"
+                onClick={() => navigate(`/subcategory/${subcategory.id}`)}
               >
                 <div className="h-40 bg-gray-100 relative">
                   {subcategory.image_url ? (
