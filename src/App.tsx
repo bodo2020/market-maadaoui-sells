@@ -44,6 +44,7 @@ import ExpiryManagement from "@/pages/ExpiryManagement";
 import ExpensesAndSalaries from "@/pages/ExpensesAndSalaries";
 import CustomerCartsPage from "@/pages/CustomerCartsPage";
 import SubcategoryDetails from "@/pages/SubcategoryDetails";
+import ProductDetails from "@/pages/ProductDetails";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
@@ -74,6 +75,7 @@ function App() {
               <Route path="/subcategory/:id" element={<ProtectedRoute><SubcategoryDetails /></ProtectedRoute>} />
               <Route path="/subsubcategories/:id" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
               <Route path="/products" element={<ProtectedRoute><ProductManagement /></ProtectedRoute>} />
+              <Route path="/product-details/:id" element={<ProtectedRoute><ProductDetails /></ProtectedRoute>} />
               <Route path="/products/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
               <Route path="/products/edit/:id" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
               <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Pencil, Trash2, Package, ArrowUpDown, MoreHorizontal, Tag, Barcode, Box, Loader2, ScanLine, Image as ImageIcon, FolderOpen, Building2, QrCode } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, Package, ArrowUpDown, MoreHorizontal, Tag, Barcode, Box, Loader2, ScanLine, Image as ImageIcon, FolderOpen, Building2, QrCode, Eye, Edit, ShoppingCart } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Product } from "@/types";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,64 +18,65 @@ import { fetchCompanies } from "@/services/supabase/companyService";
 import { fetchMainCategories, fetchSubcategories } from "@/services/supabase/categoryService";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button as ShadcnButton } from "@/components/ui/button";
-import { Dialog as ShadcnDialog } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Loader } from "lucide-react";
+import { createOfferForProduct } from "@/services/supabase/offerService";
+import { Company, MainCategory, Subcategory } from "@/types";
 import { useNavigate } from "react-router-dom";
-import ProductAssignmentDialog from "@/components/products/ProductAssignmentDialog";
-import { BarcodeGenerator } from "@/components/products/BarcodeGenerator";
-import { BrowserMultiFormatReader } from "@zxing/library";
+import { toast } from "sonner";
+import { ProductAssignmentDialog } from "@/components/categories/ProductAssignmentDialog";
+import BarcodeScanner from "@/components/POS/BarcodeScanner";
+
 export default function ProductManagement() {
   const navigate = useNavigate();
+  const { toast: showToast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
-  const [companies, setCompanies] = useState<any[]>([]);
-  const [mainCategories, setMainCategories] = useState<any[]>([]);
-  const [subcategories, setSubcategories] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [mainCategories, setMainCategories] = useState<MainCategory[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState<string>("all");
-  const [selectedMainCategory, setSelectedMainCategory] = useState<string>("all");
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("all");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState("all");
+  const [selectedMainCategory, setSelectedMainCategory] = useState("all");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const [newProduct, setNewProduct] = useState<Partial<Product>>({
-    barcode_type: "normal",
-    bulk_enabled: false,
-    is_offer: false,
-    image_urls: ["/placeholder.svg"],
-    quantity: 0
-  });
-  const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
-  const [scannedBarcode, setScannedBarcode] = useState("");
-  const [scannedWeight, setScannedWeight] = useState("");
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false);
-  const [productToAddOffer, setProductToAddOffer] = useState<Product | null>(null);
-  const [isAssignCategoryOpen, setIsAssignCategoryOpen] = useState(false);
-  const [isAssignCompanyOpen, setIsAssignCompanyOpen] = useState(false);
-  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
-  const {
-    toast
-  } = useToast();
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+
+  // Form state for offers
+  const [offerData, setOfferData] = useState({
+    title: "",
+    discount_type: "percentage",
+    discount_value: 0,
+    valid_from: "",
+    valid_to: "",
+    description: ""
+  });
+
   useEffect(() => {
     loadProducts();
     loadCompanies();
     loadMainCategories();
     loadSubcategories();
   }, []);
+
   const loadProducts = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       const data = await fetchProducts();
-      setProducts(data);
+      setProducts(data || []);
     } catch (error) {
-      console.error("Error loading products:", error);
-      toast({
+      console.error('Error loading products:', error);
+      showToast({
         title: "خطأ",
-        description: "حدث خطأ أثناء تحميل المنتجات",
-        variant: "destructive"
+        description: "فشل في تحميل المنتجات",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -85,398 +86,141 @@ export default function ProductManagement() {
   const loadCompanies = async () => {
     try {
       const data = await fetchCompanies();
-      setCompanies(data);
+      setCompanies(data || []);
     } catch (error) {
-      console.error("Error loading companies:", error);
+      console.error('Error loading companies:', error);
     }
   };
 
   const loadMainCategories = async () => {
     try {
       const data = await fetchMainCategories();
-      setMainCategories(data);
+      setMainCategories(data || []);
     } catch (error) {
-      console.error("Error loading main categories:", error);
+      console.error('Error loading main categories:', error);
     }
   };
 
   const loadSubcategories = async () => {
     try {
-      const data = await fetchSubcategories(); // تحميل جميع الفئات الفرعية
-      setSubcategories(data);
+      const data = await fetchSubcategories();
+      setSubcategories(data || []);
     } catch (error) {
-      console.error("Error loading subcategories:", error);
-    }
-  };
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase()) || 
-      (product.barcode && product.barcode.includes(search));
-    
-    const matchesCompany = selectedCompany === "all" || product.company_id === selectedCompany;
-    const matchesMainCategory = selectedMainCategory === "all" || product.main_category_id === selectedMainCategory;
-    const matchesSubcategory = selectedSubcategory === "all" || product.subcategory_id === selectedSubcategory;
-    
-    return matchesSearch && matchesCompany && matchesMainCategory && matchesSubcategory;
-  });
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const {
-      id,
-      value,
-      type
-    } = e.target;
-    if (id === "barcode" && newProduct.barcode_type === "scale") {
-      const cleanValue = value.replace(/\D/g, '').substring(0, 5);
-      setNewProduct({
-        ...newProduct,
-        [id]: cleanValue
-      });
-    } else {
-      setNewProduct({
-        ...newProduct,
-        [id]: type === "number" ? Number(value) : value
-      });
-    }
-  };
-  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const {
-      id,
-      value,
-      type
-    } = e.target;
-    if (id === "barcode" && productToEdit?.barcode_type === "scale") {
-      const cleanValue = value.replace(/\D/g, '').substring(0, 5);
-      setProductToEdit({
-        ...productToEdit,
-        [id]: cleanValue
-      } as Product);
-    } else {
-      setProductToEdit({
-        ...productToEdit,
-        [id]: type === "number" ? Number(value) : value
-      } as Product);
-    }
-  };
-  const handleSelectChange = (value: string, field: string) => {
-    setNewProduct({
-      ...newProduct,
-      [field]: value
-    });
-  };
-  const handleEditSelectChange = (value: string, field: string) => {
-    setProductToEdit({
-      ...productToEdit,
-      [field]: value
-    } as Product);
-  };
-  const handleCheckboxChange = (checked: boolean, field: string) => {
-    setNewProduct({
-      ...newProduct,
-      [field]: checked
-    });
-  };
-  const handleEditCheckboxChange = (checked: boolean, field: string) => {
-    setProductToEdit({
-      ...productToEdit,
-      [field]: checked
-    } as Product);
-  };
-  const handleSaveProduct = async () => {
-    if (!newProduct.name || !newProduct.price || !newProduct.purchase_price) {
-      toast({
-        title: "خطأ",
-        description: "يرجى ملء جميع الحقول المطلوبة",
-        variant: "destructive"
-      });
-      return;
-    }
-    setLoading(true);
-    try {
-      const productToAdd: Omit<Product, "id" | "created_at" | "updated_at"> = {
-        name: newProduct.name || "",
-        barcode: newProduct.barcode || null,
-        description: newProduct.description || null,
-        image_urls: newProduct.image_urls || ["/placeholder.svg"],
-        quantity: newProduct.quantity || 0,
-        price: newProduct.price || 0,
-        purchase_price: newProduct.purchase_price || 0,
-        is_offer: newProduct.is_offer || false,
-        offer_price: newProduct.is_offer ? newProduct.offer_price : null,
-        category_id: newProduct.category_id || null,
-        subcategory_id: null,
-        main_category_id: newProduct.main_category_id || null,
-        barcode_type: newProduct.barcode_type || "normal",
-        bulk_enabled: newProduct.bulk_enabled || false,
-        bulk_quantity: newProduct.bulk_enabled ? newProduct.bulk_quantity : null,
-        bulk_price: newProduct.bulk_enabled ? newProduct.bulk_price : null,
-        bulk_barcode: newProduct.bulk_enabled ? newProduct.bulk_barcode : null,
-        manufacturer_name: newProduct.manufacturer_name || null,
-        unit_of_measure: newProduct.unit_of_measure || null,
-        is_bulk: false
-      };
-      const addedProduct = await createProduct(productToAdd);
-      setProducts([...products, addedProduct]);
-      setNewProduct({
-        barcode_type: "normal",
-        bulk_enabled: false,
-        is_offer: false,
-        image_urls: ["/placeholder.svg"],
-        quantity: 0,
-        is_bulk: false
-      });
-      setIsAddDialogOpen(false);
-      toast({
-        title: "تم بنجاح",
-        description: "تم إضافة المنتج بنجاح"
-      });
-    } catch (error) {
-      console.error("Error adding product:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء إضافة المنتج",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handleEditProduct = async () => {
-    if (!productToEdit || !productToEdit.name || !productToEdit.price || !productToEdit.purchase_price) {
-      toast({
-        title: "خطأ",
-        description: "يرجى ملء جميع الحقول المطلوبة",
-        variant: "destructive"
-      });
-      return;
-    }
-    setLoading(true);
-    try {
-      const updatedProduct = await updateProduct(productToEdit.id, productToEdit);
-      setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-      setIsEditDialogOpen(false);
-      setProductToEdit(null);
-      toast({
-        title: "تم بنجاح",
-        description: "تم تحديث المنتج بنجاح"
-      });
-    } catch (error) {
-      console.error("Error updating product:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء تحديث المنتج",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handleDeleteProduct = async () => {
-    if (!productToDelete) return;
-    setLoading(true);
-    try {
-      await deleteProduct(productToDelete.id);
-      setProducts(products.filter(p => p.id !== productToDelete.id));
-      setIsDeleteConfirmOpen(false);
-      setProductToDelete(null);
-      toast({
-        title: "تم بنجاح",
-        description: "تم حذف المنتج بنجاح"
-      });
-    } catch (error) {
-      console.error("Error deleting product:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء حذف المنتج",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handleAddOffer = async () => {
-    if (!productToAddOffer || !productToAddOffer.offer_price) {
-      toast({
-        title: "خطأ",
-        description: "يرجى إدخال سعر العرض",
-        variant: "destructive"
-      });
-      return;
-    }
-    setLoading(true);
-    try {
-      const updatedProduct = await updateProduct(productToAddOffer.id, {
-        is_offer: true,
-        offer_price: productToAddOffer.offer_price
-      });
-      setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-      setIsOfferDialogOpen(false);
-      setProductToAddOffer(null);
-      toast({
-        title: "تم بنجاح",
-        description: "تم إضافة العرض بنجاح"
-      });
-    } catch (error) {
-      console.error("Error adding offer:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء إضافة العرض",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  const startCameraScanner = async () => {
-    try {
-      setIsCameraScannerOpen(true);
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-        
-        readerRef.current = new BrowserMultiFormatReader();
-        
-        readerRef.current.decodeFromVideoDevice(undefined, videoRef.current, (result, error) => {
-          if (result) {
-            const scannedText = result.getText();
-            setSearch(scannedText);
-            stopCameraScanner();
-            toast({
-              title: "تم مسح الباركود",
-              description: `الباركود: ${scannedText}`,
-            });
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error starting camera scanner:', error);
-      toast({
-        title: "خطأ",
-        description: "لا يمكن الوصول إلى الكاميرا",
-        variant: "destructive"
-      });
-      setIsCameraScannerOpen(false);
+      console.error('Error loading subcategories:', error);
     }
   };
 
-  const stopCameraScanner = () => {
-    if (readerRef.current) {
-      readerRef.current.reset();
-    }
+  // Filter products based on search and selected filters
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase()) ||
+                         (product.barcode && product.barcode.includes(search));
+    const matchesCompany = selectedCompany === "all" || product.company_id === selectedCompany;
+    const matchesMainCategory = selectedMainCategory === "all" || product.main_category_id === selectedMainCategory;
     
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
+    return matchesSearch && matchesCompany && matchesMainCategory;
+  });
+
+  const handleDeleteProduct = async () => {
+    if (!selectedProduct) return;
     
-    setIsCameraScannerOpen(false);
+    try {
+      await deleteProduct(selectedProduct.id);
+      setProducts(products.filter(p => p.id !== selectedProduct.id));
+      setIsDeleteConfirmOpen(false);
+      setSelectedProduct(null);
+      showToast({
+        title: "تم الحذف بنجاح",
+        description: "تم حذف المنتج بنجاح",
+      });
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      showToast({
+        title: "خطأ",
+        description: "فشل في حذف المنتج",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddOffer = async () => {
+    if (!selectedProduct) return;
+
+    try {
+      await createOfferForProduct(selectedProduct.id, offerData);
+      setIsOfferDialogOpen(false);
+      setOfferData({
+        title: "",
+        discount_type: "percentage",
+        discount_value: 0,
+        valid_from: "",
+        valid_to: "",
+        description: ""
+      });
+      showToast({
+        title: "تم إنشاء العرض بنجاح",
+        description: "تم إضافة العرض للمنتج بنجاح",
+      });
+    } catch (error) {
+      console.error('Error creating offer:', error);
+      showToast({
+        title: "خطأ",
+        description: "فشل في إنشاء العرض",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleBarcodeScanning = () => {
-    startCameraScanner();
+    setIsScannerOpen(true);
   };
-  const validateWeightBarcode = (barcode: string) => {
-    if (!/^\d{1,6}$/.test(barcode)) {
-      toast({
-        title: "خطأ",
-        description: "رمز منتج الميزان يجب أن يكون من 1 إلى 6 أرقام فقط.",
-        variant: "destructive"
-      });
-      return false;
-    }
-    let formattedBarcode = barcode;
-    while (formattedBarcode.length < 6) {
-      formattedBarcode = '0' + formattedBarcode;
-    }
-    setNewProduct(prev => ({
-      ...prev,
-      barcode_type: 'scale',
-      barcode: formattedBarcode,
-      unit_of_measure: 'كجم'
-    }));
-    toast({
-      title: "تم تعيين رمز المنتج",
-      description: `رمز المنتج: ${formattedBarcode}`
-    });
-    return true;
-  };
-  const handleBarcodeSubmit = () => {
-    if (scannedBarcode) {
-      if (scannedBarcode.startsWith('2') && scannedBarcode.length === 13) {
-        const productCode = scannedBarcode.substring(1, 7);
-        setNewProduct(prev => ({
-          ...prev,
-          barcode_type: 'scale',
-          barcode: productCode,
-          unit_of_measure: 'كجم'
-        }));
-        setIsBarcodeDialogOpen(false);
-        toast({
-          title: "تم قراءة باركود الميزان",
-          description: `رمز المنتج: ${productCode}`
-        });
-      } else {
-        setNewProduct(prev => ({
-          ...prev,
-          barcode_type: 'normal',
-          barcode: scannedBarcode
-        }));
-        setIsBarcodeDialogOpen(false);
-        toast({
-          title: "تم قراءة الباركود",
-          description: `الباركود: ${scannedBarcode}`
-        });
-      }
-      setScannedBarcode("");
+
+  const handleBarcodeScan = (barcode: string) => {
+    const foundProduct = products.find(p => p.barcode === barcode);
+    if (foundProduct) {
+      navigate(`/product-details/${foundProduct.id}`);
+      toast.success(`تم العثور على المنتج: ${foundProduct.name}`);
     } else {
-      toast({
-        title: "خطأ",
-        description: "يرجى إدخال الباركود أولاً",
-        variant: "destructive"
-      });
+      toast.error("لم يتم العثور على منتج بهذا الباركود");
     }
+    setIsScannerOpen(false);
   };
-  const handleEditClick = async (product: Product) => {
+
+  const handleEditClick = (product: Product) => {
     navigate(`/add-product?id=${product.id}`);
   };
+
   const handleAddOfferClick = (product: Product) => {
-    setProductToAddOffer({
-      ...product,
-      is_offer: true,
-      offer_price: product.offer_price || Math.round(product.price * 0.9) // Default to 10% off
-    });
+    setSelectedProduct(product);
     setIsOfferDialogOpen(true);
   };
-  return <MainLayout>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xs text-justify font-thin py-0">إدارة المنتجات</h1>
-        <Button onClick={() => navigate("/add-product")} disabled={loading}>
-          <Plus className="ml-2 h-4 w-4" />
-          إضافة منتج جديد
-        </Button>
-      </div>
-      
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle>المنتجات</CardTitle>
-              <CardDescription>إدارة مخزون وأسعار المنتجات</CardDescription>
-            </div>
-            <Package className="h-5 w-5 text-muted-foreground" />
+
+  return (
+    <MainLayout>
+      <div className="flex-1 space-y-4 p-4 pt-6">
+        <div className="flex items-center justify-between space-y-2">
+          <h2 className="text-3xl font-bold tracking-tight">إدارة المنتجات</h2>
+          <div className="flex items-center space-x-2 space-x-reverse">
+            <Button onClick={() => navigate("/add-product")}>
+              <Plus className="ml-2 h-4 w-4" />
+              إضافة منتج جديد
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4 mb-6">
-            <div className="flex gap-2">
-              <Input 
-                placeholder="ابحث بالاسم أو الباركود" 
-                value={search} 
-                onChange={e => setSearch(e.target.value)} 
-                className="max-w-sm" 
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>قائمة المنتجات</CardTitle>
+            <CardDescription>
+              إدارة وعرض جميع المنتجات في النظام
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-2 space-x-reverse mb-4">
+              <Input
+                placeholder="البحث عن منتج..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="max-w-sm"
               />
               <Button variant="outline">
                 <Search className="ml-2 h-4 w-4" />
@@ -503,15 +247,12 @@ export default function ProductManagement() {
                 </SelectContent>
               </Select>
 
-              <Select value={selectedMainCategory} onValueChange={(value) => {
-                setSelectedMainCategory(value);
-                setSelectedSubcategory("all"); // Reset subcategory when main category changes
-              }}>
+              <Select value={selectedMainCategory} onValueChange={setSelectedMainCategory}>
                 <SelectTrigger className="w-48">
-                  <SelectValue placeholder="فلترة بالقسم الرئيسي" />
+                  <SelectValue placeholder="فلترة بالفئة الرئيسية" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">جميع الأقسام الرئيسية</SelectItem>
+                  <SelectItem value="all">جميع الفئات</SelectItem>
                   {mainCategories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}
@@ -520,308 +261,257 @@ export default function ProductManagement() {
                 </SelectContent>
               </Select>
 
-              <Select 
-                value={selectedSubcategory} 
-                onValueChange={setSelectedSubcategory}
-                disabled={selectedMainCategory === "all"}
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="فلترة بالقسم الفرعي" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">جميع الأقسام الفرعية</SelectItem>
-                  {subcategories
-                    .filter(sub => selectedMainCategory === "all" || sub.category_id === selectedMainCategory)
-                    .map((subcategory) => (
-                    <SelectItem key={subcategory.id} value={subcategory.id}>
-                      {subcategory.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {(selectedCompany !== "all" || selectedMainCategory !== "all" || selectedSubcategory !== "all") && (
-                <Button 
-                  variant="ghost" 
-                  onClick={() => {
-                    setSelectedCompany("all");
-                    setSelectedMainCategory("all");
-                    setSelectedSubcategory("all");
-                  }}
-                  className="text-muted-foreground"
+              {selectedProducts.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAssignmentDialogOpen(true)}
                 >
-                  مسح الفلاتر
+                  <Tag className="ml-2 h-4 w-4" />
+                  تصنيف المنتجات المحددة ({selectedProducts.length})
                 </Button>
               )}
             </div>
-          </div>
-          
-          {loading ? <div className="flex justify-center items-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div> : <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[80px]">صورة</TableHead>
-                    <TableHead>
-                      <div className="flex items-center">
-                        المنتج
-                        <ArrowUpDown className="mr-2 h-4 w-4" />
-                      </div>
-                    </TableHead>
-                    <TableHead>الباركود</TableHead>
-                    <TableHead>نوع الباركود</TableHead>
-                    <TableHead className="text-left">السعر</TableHead>
-                    <TableHead>المخزون</TableHead>
-                    <TableHead>بيع بالجملة</TableHead>
-                    <TableHead className="text-left">الحالة</TableHead>
-                    <TableHead className="text-left">خيارات</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredProducts.length === 0 ? <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                        لا توجد منتجات مطابقة للبحث
-                      </TableCell>
-                    </TableRow> : filteredProducts.map(product => <TableRow key={product.id}>
-                        <TableCell>
-                          <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
-                            <img src={product.image_urls ? product.image_urls[0] : "/placeholder.svg"} alt={product.name} className="h-8 w-8 object-contain" />
+
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="mr-2">جاري تحميل المنتجات...</span>
+              </div>
+            ) : (
+              <div className="rounded-md border mt-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedProducts(filteredProducts.map(p => p.id));
+                            } else {
+                              setSelectedProducts([]);
+                            }
+                          }}
+                        />
+                      </TableHead>
+                      <TableHead>الصورة</TableHead>
+                      <TableHead>اسم المنتج</TableHead>
+                      <TableHead>الباركود</TableHead>
+                      <TableHead>السعر</TableHead>
+                      <TableHead>المخزون</TableHead>
+                      <TableHead>الإجراءات</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProducts.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <div className="flex flex-col items-center justify-center space-y-2">
+                            <Package className="h-8 w-8 text-muted-foreground" />
+                            <p className="text-muted-foreground">
+                              {products.length === 0 ? "لا توجد منتجات" : "لم يتم العثور على منتجات"}
+                            </p>
+                            {products.length === 0 && (
+                              <Button variant="outline" onClick={() => navigate("/add-product")}>
+                                <Plus className="ml-2 h-4 w-4" />
+                                إضافة منتج جديد
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>{product.barcode}</TableCell>
-                        <TableCell>
-                          {product.barcode_type === "scale" ? <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">ميزان</span> : <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">عادي</span>}
-                        </TableCell>
-                        <TableCell>
-                          {product.is_offer && product.offer_price ? <div>
-                              <span className="text-primary font-medium">{product.offer_price} {siteConfig.currency}</span>
-                              <span className="mr-2 text-xs text-muted-foreground line-through">{product.price} {siteConfig.currency}</span>
-                            </div> : <span>{product.price} {siteConfig.currency}</span>}
-                        </TableCell>
-                        <TableCell className="text-center">{product.quantity}</TableCell>
-                        <TableCell>
-                          {product.bulk_enabled ? <div className="flex items-center">
-                              <Box className="h-4 w-4 text-green-600 mr-1" />
-                              <span className="text-xs">
-                                {product.bulk_quantity} وحدة - {product.bulk_price} {siteConfig.currency}
-                              </span>
-                            </div> : <span className="text-xs text-muted-foreground">غير متاح</span>}
-                        </TableCell>
-                        <TableCell>
-                          {(product.quantity || 0) > 10 ? <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                              متوفر
-                            </span> : (product.quantity || 0) > 0 ? <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                              مخزون منخفض
-                            </span> : <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
-                              غير متوفر
-                            </span>}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>خيارات</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleEditClick(product)}>
-                                <Pencil className="ml-2 h-4 w-4" />
-                                تعديل
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => {
-                        setProductToDelete(product);
-                        setIsDeleteConfirmOpen(true);
-                      }}>
-                                <Trash2 className="ml-2 h-4 w-4" />
-                                حذف
-                              </DropdownMenuItem>
-                              {!product.is_offer && <DropdownMenuItem onClick={() => handleAddOfferClick(product)}>
-                                  <Tag className="ml-2 h-4 w-4" />
+                      </TableRow>
+                    ) : (
+                      filteredProducts.map((product) => (
+                        <TableRow 
+                          key={product.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => navigate(`/product-details/${product.id}`)}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedProducts.includes(product.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedProducts([...selectedProducts, product.id]);
+                                } else {
+                                  setSelectedProducts(selectedProducts.filter(id => id !== product.id));
+                                }
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {product.image_urls && product.image_urls.length > 0 ? (
+                              <img 
+                                src={product.image_urls[0]} 
+                                alt={product.name}
+                                className="w-10 h-10 object-cover rounded"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">
+                                <span className="text-xs text-gray-500">لا توجد صورة</span>
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">{product.name}</TableCell>
+                          <TableCell>{product.barcode || 'غير محدد'}</TableCell>
+                          <TableCell>{product.price} ج.م</TableCell>
+                          <TableCell>{product.quantity}</TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">فتح القائمة</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => navigate(`/product-details/${product.id}`)}>
+                                  <Eye className="ml-2 h-4 w-4" />
+                                  عرض التفاصيل
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditClick(product)}>
+                                  <Edit className="ml-2 h-4 w-4" />
+                                  تعديل
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleAddOfferClick(product)}>
+                                  <ShoppingCart className="ml-2 h-4 w-4" />
                                   إضافة عرض
-                                </DropdownMenuItem>}
-                              
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={e => {
-                        e.stopPropagation();
-                      }} className="p-0">
-                                <BarcodeGenerator product={product} />
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                        setProductToEdit(product);
-                        setIsAssignCategoryOpen(true);
-                      }}>
-                                <FolderOpen className="ml-2 h-4 w-4" />
-                                تغيير القسم
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => {
-                        setProductToEdit(product);
-                        setIsAssignCompanyOpen(true);
-                      }}>
-                                <Building2 className="ml-2 h-4 w-4" />
-                                تغيير الشركة
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>)}
-                </TableBody>
-              </Table>
-            </div>}
-        </CardContent>
-      </Card>
-      
-      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>تأكيد الحذف</DialogTitle>
-            <DialogDescription>
-              هل أنت متأكد من حذف المنتج؟ هذه العملية لا يمكن التراجع عنها.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            {productToDelete && <div className="flex items-center gap-3 p-3 border rounded-md">
-                <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
-                  <img src={productToDelete.image_urls ? productToDelete.image_urls[0] : "/placeholder.svg"} alt={productToDelete.name} className="h-8 w-8 object-contain" />
-                </div>
-                <div>
-                  <h4 className="font-medium">{productToDelete.name}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    الباركود: {productToDelete.barcode}
-                  </p>
-                </div>
-              </div>}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>
-              إلغاء
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteProduct} disabled={loading}>
-              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-              حذف
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={isOfferDialogOpen} onOpenChange={setIsOfferDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>إضافة عرض</DialogTitle>
-            <DialogDescription>
-              أدخل سعر العرض للمنتج.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            {productToAddOffer && <div className="space-y-4">
-                <div className="flex items-center gap-3 p-3 border rounded-md">
-                  <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
-                    <img src={productToAddOffer.image_urls ? productToAddOffer.image_urls[0] : "/placeholder.svg"} alt={productToAddOffer.name} className="h-8 w-8 object-contain" />
-                  </div>
-                  <div>
-                    <h4 className="font-medium">{productToAddOffer.name}</h4>
-                    <p className="text-sm">
-                      السعر الأصلي: <span className="font-medium">{productToAddOffer.price} {siteConfig.currency}</span>
-                    </p>
-                  </div>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    setSelectedProduct(product);
+                                    setIsDeleteConfirmOpen(true);
+                                  }}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="ml-2 h-4 w-4" />
+                                  حذف
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>تأكيد الحذف</DialogTitle>
+              <DialogDescription>
+                هل أنت متأكد من حذف المنتج "{selectedProduct?.name}"؟ هذا الإجراء لا يمكن التراجع عنه.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>
+                إلغاء
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteProduct}>
+                حذف
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Offer Dialog */}
+        <Dialog open={isOfferDialogOpen} onOpenChange={setIsOfferDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>إضافة عرض للمنتج</DialogTitle>
+              <DialogDescription>
+                إضافة عرض خاص للمنتج "{selectedProduct?.name}"
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="offer-title">عنوان العرض</Label>
+                <Input
+                  id="offer-title"
+                  value={offerData.title}
+                  onChange={(e) => setOfferData({...offerData, title: e.target.value})}
+                  placeholder="مثال: خصم 20% على المنتج"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>نوع الخصم</Label>
+                  <Select value={offerData.discount_type} onValueChange={(value) => setOfferData({...offerData, discount_type: value})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">نسبة مئوية</SelectItem>
+                      <SelectItem value="fixed">مبلغ ثابت</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="offer_price">سعر العرض</Label>
-                  <Input id="offer_price" type="number" placeholder="0.00" value={productToAddOffer.offer_price || ""} onChange={e => setProductToAddOffer({
-                ...productToAddOffer,
-                offer_price: Number(e.target.value)
-              })} />
+                  <Label>قيمة الخصم</Label>
+                  <Input
+                    type="number"
+                    value={offerData.discount_value}
+                    onChange={(e) => setOfferData({...offerData, discount_value: Number(e.target.value)})}
+                    placeholder="20"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>تاريخ البداية</Label>
+                  <Input
+                    type="date"
+                    value={offerData.valid_from}
+                    onChange={(e) => setOfferData({...offerData, valid_from: e.target.value})}
+                  />
                 </div>
                 
-                {productToAddOffer.offer_price && productToAddOffer.price && <div className="text-sm p-2 bg-muted rounded-md">
-                    نسبة الخصم: <span className="font-medium text-primary">
-                      {Math.round((1 - productToAddOffer.offer_price / productToAddOffer.price) * 100)}%
-                    </span>
-                  </div>}
-              </div>}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsOfferDialogOpen(false)}>
-              إلغاء
-            </Button>
-            <Button onClick={handleAddOffer} disabled={loading}>
-              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-              إضافة العرض
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <ShadcnDialog open={isBarcodeDialogOpen} onOpenChange={setIsBarcodeDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>مسح الباركود</DialogTitle>
-            <DialogDescription>
-              للمنتجات العادية: قم بمسح الباركود الخاص بالمنتج
-              <br />
-              لمنتجات الميزان: قم بوزن المنتج ومسح باركود الميزان
-              <br />
-              صيغة باركود الميزان: 2XXXXYYYYYYZ حيث:
-              <br />
-              XXXX = رمز منتج الميزان (6 أرقام)
-              <br />
-              YYYYYY = الوزن بالجرام (5 أرقام)
-              <br />
-              Z = رقم التحقق
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="barcode" className="text-right">
-                الباركود
-              </Label>
-              <Input id="barcode" value={scannedBarcode} onChange={e => setScannedBarcode(e.target.value)} className="col-span-3" placeholder="أدخل الباركود أو امسحه" autoFocus />
-            </div>
-          </div>
-          <DialogFooter>
-            <ShadcnButton type="button" onClick={handleBarcodeSubmit}>
-              تأكيد
-            </ShadcnButton>
-          </DialogFooter>
-        </DialogContent>
-      </ShadcnDialog>
-      
-      <ProductAssignmentDialog open={isAssignCategoryOpen} onOpenChange={setIsAssignCategoryOpen} product={productToEdit} onSaved={loadProducts} type="category" />
-      
-      <ProductAssignmentDialog open={isAssignCompanyOpen} onOpenChange={setIsAssignCompanyOpen} product={productToEdit} onSaved={loadProducts} type="company" />
-      
-      <Dialog open={isCameraScannerOpen} onOpenChange={stopCameraScanner}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>ماسح الباركود</DialogTitle>
-            <DialogDescription>
-              وجه الكاميرا نحو الباركود لمسحه تلقائياً
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover"
-                autoPlay
-                playsInline
-                muted
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="border-2 border-white border-dashed w-64 h-32 rounded-lg opacity-50"></div>
+                <div className="space-y-2">
+                  <Label>تاريخ النهاية</Label>
+                  <Input
+                    type="date"
+                    value={offerData.valid_to}
+                    onChange={(e) => setOfferData({...offerData, valid_to: e.target.value})}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={stopCameraScanner}>
-              إلغاء
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </MainLayout>;
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsOfferDialogOpen(false)}>
+                إلغاء
+              </Button>
+              <Button onClick={handleAddOffer}>إضافة العرض</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Product Assignment Dialog */}
+        <ProductAssignmentDialog
+          isOpen={isAssignmentDialogOpen}
+          onClose={() => setIsAssignmentDialogOpen(false)}
+          selectedProductIds={selectedProducts}
+          onAssignmentComplete={() => {
+            setSelectedProducts([]);
+            loadProducts();
+          }}
+        />
+
+        {/* Barcode Scanner */}
+        <BarcodeScanner
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScan={handleBarcodeScan}
+        />
+      </div>
+    </MainLayout>
+  );
 }

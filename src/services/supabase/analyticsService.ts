@@ -323,3 +323,34 @@ export async function fetchPOSSalesHeatmapData() {
     throw error;
   }
 }
+
+// Product sales analytics
+export const getProductSalesAnalytics = async (productId: string) => {
+  try {
+    // Mock data - in real implementation, you would query actual sales data
+    // This would require joining sales data with product information
+    
+    const mockAnalytics = {
+      totalSales: Math.floor(Math.random() * 10000) + 1000,
+      totalProfit: Math.floor(Math.random() * 5000) + 500,
+      totalQuantitySold: Math.floor(Math.random() * 500) + 50,
+      dailySales: [
+        { date: '2024-01-01', sales: 150, profit: 75, quantity: 10 },
+        { date: '2024-01-02', sales: 200, profit: 100, quantity: 15 },
+        { date: '2024-01-03', sales: 180, profit: 90, quantity: 12 },
+        { date: '2024-01-04', sales: 250, profit: 125, quantity: 18 },
+        { date: '2024-01-05', sales: 220, profit: 110, quantity: 16 },
+      ],
+      topCustomers: [
+        { customerName: 'أحمد محمد', totalPurchases: 15, totalSpent: 2500 },
+        { customerName: 'فاطمة علي', totalPurchases: 12, totalSpent: 2100 },
+        { customerName: 'محمد السيد', totalPurchases: 10, totalSpent: 1800 },
+      ]
+    };
+
+    return mockAnalytics;
+  } catch (error) {
+    console.error('Error fetching product sales analytics:', error);
+    throw error;
+  }
+};
