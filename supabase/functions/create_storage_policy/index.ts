@@ -49,8 +49,9 @@ serve(async (req) => {
       { headers: { 'Content-Type': 'application/json' }, status: 200 }
     )
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { headers: { 'Content-Type': 'application/json' }, status: 500 }
     )
   }

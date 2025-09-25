@@ -57,10 +57,8 @@ serve(async (req) => {
       console.log("Creating public policy for banners bucket...")
       // Add policy to make the bucket public for uploads and downloads
       try {
-        const { data, error: policyError } = await supabaseAdmin.storage.from('banners').getPublicUrl('test');
-        if (policyError) {
-          console.error("Error creating public URL (expected if bucket is new):", policyError);
-        }
+        const { data } = await supabaseAdmin.storage.from('banners').getPublicUrl('test');
+        // getPublicUrl doesn't return an error, it always returns data
         
         // Create policy for downloads
         const { error: downloadPolicyError } = await supabaseAdmin.rpc('create_storage_policy', {
@@ -155,8 +153,9 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error("Function error:", error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
