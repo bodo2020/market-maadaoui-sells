@@ -327,30 +327,152 @@ export async function fetchPOSSalesHeatmapData() {
 // Product sales analytics
 export const getProductSalesAnalytics = async (productId: string) => {
   try {
-    // Mock data - in real implementation, you would query actual sales data
-    // This would require joining sales data with product information
-    
-    const mockAnalytics = {
-      totalSales: Math.floor(Math.random() * 10000) + 1000,
-      totalProfit: Math.floor(Math.random() * 5000) + 500,
-      totalQuantitySold: Math.floor(Math.random() * 500) + 50,
-      dailySales: [
-        { date: '2024-01-01', sales: 150, profit: 75, quantity: 10 },
-        { date: '2024-01-02', sales: 200, profit: 100, quantity: 15 },
-        { date: '2024-01-03', sales: 180, profit: 90, quantity: 12 },
-        { date: '2024-01-04', sales: 250, profit: 125, quantity: 18 },
-        { date: '2024-01-05', sales: 220, profit: 110, quantity: 16 },
-      ],
-      topCustomers: [
-        { customerName: 'أحمد محمد', totalPurchases: 15, totalSpent: 2500 },
-        { customerName: 'فاطمة علي', totalPurchases: 12, totalSpent: 2100 },
-        { customerName: 'محمد السيد', totalPurchases: 10, totalSpent: 1800 },
-      ]
-    };
+    // جلب مبيعات المتجر التي تحتوي على هذا المنتج
+    const { data: salesData, error: salesError } = await supabase
+      .from("sales")
+      .select("items, profit, total, date, customer_id")
+      .not('items', 'is', null);
 
-    return mockAnalytics;
+    if (salesError) throw salesError;
+
+    // جلب الطلبات الإلكترونية التي تحتوي على هذا المنتج
+    const { data: ordersData, error: ordersError } = await supabase
+      .from("online_orders")
+      .select("items, total, created_at, customer_id")
+      .not('items', 'is', null);
+
+    if (ordersError) throw ordersError;
+
+    // جلب بيانات العملاء
+    const { data: customersData, error: customersError } = await supabase
+      .from("customers")
+      .select("id, name");
+
+    if (customersError) throw customersError;
+
+    // إنشاء خريطة للعملاء
+    const customersMap = new Map();
+    customersData?.forEach(customer => {
+      customersMap.set(customer.id, customer.name);
+    });
+
+    let totalSales = 0;
+    let totalProfit = 0;
+    let totalQuantitySold = 0;
+    const dailySalesMap = new Map();
+    const customerPurchasesMap = new Map();
+
+    // معالجة مبيعات المتجر
+    salesData?.forEach(sale => {
+      if (sale.items && Array.isArray(sale.items)) {
+        sale.items.forEach((item: any) => {
+          const itemProductId = item.product?.id || item.productId;
+          
+          if (itemProductId === productId) {
+            const quantity = item.quantity || item.weight || 0;
+            const itemTotal = item.total || 0;
+            const itemProfit = (item.profit || 0);
+            
+            totalSales += itemTotal;
+            totalProfit += itemProfit;
+            totalQuantitySold += quantity;
+
+            // إضافة البيانات اليومية
+            const dateKey = sale.date ? new Date(sale.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+            if (!dailySalesMap.has(dateKey)) {
+              dailySalesMap.set(dateKey, { date: dateKey, sales: 0, profit: 0, quantity: 0 });
+            }
+            const dayData = dailySalesMap.get(dateKey);
+            dayData.sales += itemTotal;
+            dayData.profit += itemProfit;
+            dayData.quantity += quantity;
+
+            // إضافة بيانات العملاء
+            if (sale.customer_id) {
+              const customerName = customersMap.get(sale.customer_id) || 'عميل غير معروف';
+              if (!customerPurchasesMap.has(sale.customer_id)) {
+                customerPurchasesMap.set(sale.customer_id, {
+                  customerName,
+                  totalPurchases: 0,
+                  totalSpent: 0
+                });
+              }
+              const customerData = customerPurchasesMap.get(sale.customer_id);
+              customerData.totalPurchases += 1;
+              customerData.totalSpent += itemTotal;
+            }
+          }
+        });
+      }
+    });
+
+    // معالجة الطلبات الإلكترونية
+    ordersData?.forEach(order => {
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach((item: any) => {
+          const itemProductId = item.product?.id || item.productId;
+          
+          if (itemProductId === productId) {
+            const quantity = item.quantity || item.weight || 0;
+            const itemTotal = item.total || 0;
+            
+            totalSales += itemTotal;
+            totalQuantitySold += quantity;
+
+            // إضافة البيانات اليومية
+            const dateKey = order.created_at ? new Date(order.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+            if (!dailySalesMap.has(dateKey)) {
+              dailySalesMap.set(dateKey, { date: dateKey, sales: 0, profit: 0, quantity: 0 });
+            }
+            const dayData = dailySalesMap.get(dateKey);
+            dayData.sales += itemTotal;
+            dayData.quantity += quantity;
+
+            // إضافة بيانات العملاء
+            if (order.customer_id) {
+              const customerName = customersMap.get(order.customer_id) || 'عميل غير معروف';
+              if (!customerPurchasesMap.has(order.customer_id)) {
+                customerPurchasesMap.set(order.customer_id, {
+                  customerName,
+                  totalPurchases: 0,
+                  totalSpent: 0
+                });
+              }
+              const customerData = customerPurchasesMap.get(order.customer_id);
+              customerData.totalPurchases += 1;
+              customerData.totalSpent += itemTotal;
+            }
+          }
+        });
+      }
+    });
+
+    // تحويل البيانات اليومية إلى مصفوفة مرتبة
+    const dailySales = Array.from(dailySalesMap.values())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .slice(-30); // آخر 30 يوم
+
+    // أهم العملاء (أعلى 5)
+    const topCustomers = Array.from(customerPurchasesMap.values())
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 5);
+
+    return {
+      totalSales,
+      totalProfit,
+      totalQuantitySold,
+      dailySales,
+      topCustomers
+    };
   } catch (error) {
-    console.error('Error fetching product sales analytics:', error);
-    throw error;
+    console.error("Error fetching product sales analytics:", error);
+    // في حالة الخطأ، إرجاع بيانات فارغة
+    return {
+      totalSales: 0,
+      totalProfit: 0,
+      totalQuantitySold: 0,
+      dailySales: [],
+      topCustomers: []
+    };
   }
 };
