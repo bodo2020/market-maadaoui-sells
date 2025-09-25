@@ -164,7 +164,7 @@ export default function POS() {
           setBarcodeBuffer(prev => prev + e.key);
           
           // Different timeout for Android vs other platforms
-          const timeoutDuration = isAndroid ? 800 : 600;
+          const timeoutDuration = 10000; // 10 seconds
           
           barcodeTimeoutRef.current = setTimeout(() => {
             const currentBuffer = barcodeBuffer + e.key;
