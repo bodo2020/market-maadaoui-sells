@@ -330,7 +330,7 @@ export const getProductSalesAnalytics = async (productId: string) => {
     // جلب مبيعات المتجر التي تحتوي على هذا المنتج
     const { data: salesData, error: salesError } = await supabase
       .from("sales")
-      .select("items, profit, total, date, customer_id")
+      .select("items, profit, total, date")
       .not('items', 'is', null);
 
     if (salesError) throw salesError;
@@ -387,20 +387,20 @@ export const getProductSalesAnalytics = async (productId: string) => {
             dayData.profit += itemProfit;
             dayData.quantity += quantity;
 
-            // إضافة بيانات العملاء
-            if (sale.customer_id) {
-              const customerName = customersMap.get(sale.customer_id) || 'عميل غير معروف';
-              if (!customerPurchasesMap.has(sale.customer_id)) {
-                customerPurchasesMap.set(sale.customer_id, {
-                  customerName,
-                  totalPurchases: 0,
-                  totalSpent: 0
-                });
-              }
-              const customerData = customerPurchasesMap.get(sale.customer_id);
-              customerData.totalPurchases += 1;
-              customerData.totalSpent += itemTotal;
-            }
+            // إضافة بيانات العملاء - تم تعطيلها لأن جدول sales لا يحتوي على customer_id
+            // if (sale.customer_id) {
+            //   const customerName = customersMap.get(sale.customer_id) || 'عميل غير معروف';
+            //   if (!customerPurchasesMap.has(sale.customer_id)) {
+            //     customerPurchasesMap.set(sale.customer_id, {
+            //       customerName,
+            //       totalPurchases: 0,
+            //       totalSpent: 0
+            //     });
+            //   }
+            //   const customerData = customerPurchasesMap.get(sale.customer_id);
+            //   customerData.totalPurchases += 1;
+            //   customerData.totalSpent += itemTotal;
+            // }
           }
         });
       }
