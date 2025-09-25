@@ -369,9 +369,11 @@ export const getProductSalesAnalytics = async (productId: string) => {
           const itemProductId = item.product?.id || item.productId;
           
           if (itemProductId === productId) {
-            const quantity = item.quantity || item.weight || 0;
-            const itemTotal = item.total || 0;
-            const itemProfit = (item.profit || 0);
+            const quantity = Number(item.quantity ?? item.weight ?? 0);
+            const unitSell = Number(item.price ?? item.product?.price ?? 0);
+            const unitCost = Number(item.product?.purchase_price ?? 0);
+            const itemTotal = Number(item.total ?? unitSell * quantity);
+            const itemProfit = (unitSell - unitCost) * quantity;
             
             totalSales += itemTotal;
             totalProfit += itemProfit;
@@ -413,10 +415,14 @@ export const getProductSalesAnalytics = async (productId: string) => {
           const itemProductId = item.product?.id || item.productId;
           
           if (itemProductId === productId) {
-            const quantity = item.quantity || item.weight || 0;
-            const itemTotal = item.total || 0;
+            const quantity = Number(item.quantity ?? item.weight ?? 0);
+            const unitSell = Number(item.price ?? item.product?.price ?? 0);
+            const unitCost = Number(item.product?.purchase_price ?? 0);
+            const itemTotal = Number(item.total ?? unitSell * quantity);
+            const itemProfit = (unitSell - unitCost) * quantity;
             
             totalSales += itemTotal;
+            totalProfit += itemProfit;
             totalQuantitySold += quantity;
 
             // إضافة البيانات اليومية
@@ -426,6 +432,7 @@ export const getProductSalesAnalytics = async (productId: string) => {
             }
             const dayData = dailySalesMap.get(dateKey);
             dayData.sales += itemTotal;
+            dayData.profit += itemProfit;
             dayData.quantity += quantity;
 
             // إضافة بيانات العملاء
