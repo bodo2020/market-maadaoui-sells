@@ -298,6 +298,9 @@ export default function POS() {
           description: `لم يتم العثور على منتج بالباركود ${barcode}`,
           variant: "destructive"
         });
+        
+        // مسح نص البحث عند عدم وجود المنتج
+        setSearch("");
       }
     } catch (error) {
       console.error("Error processing barcode:", error);
