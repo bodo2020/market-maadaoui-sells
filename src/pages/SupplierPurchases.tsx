@@ -5,7 +5,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Plus, Trash2, Save, ShoppingCart, FileText, BadgeDollarSign, ScanLine, CalendarIcon } from "lucide-react";
+import { Search, Plus, Trash2, Save, ShoppingCart, FileText, BadgeDollarSign, ScanLine, CalendarIcon, Camera } from "lucide-react";
 import { 
   Table, 
   TableBody, 
@@ -26,6 +26,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import BarcodeScanner from "@/components/POS/BarcodeScanner";
+import { fetchCompanies } from "@/services/supabase/companyService";
 
 interface CartItem {
   product: Product;
@@ -56,6 +58,8 @@ export default function SupplierPurchases() {
   const [barcodeInput, setBarcodeInput] = useState("");
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [scannerMode, setScannerMode] = useState(false);
+  const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState<Date>(new Date());
@@ -71,6 +75,11 @@ export default function SupplierPurchases() {
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: fetchProducts
+  });
+
+  const { data: companies = [] } = useQuery({
+    queryKey: ["companies"],
+    queryFn: fetchCompanies
   });
   
   const createPurchaseMutation = useMutation({
@@ -89,19 +98,26 @@ export default function SupplierPurchases() {
   });
   
   useEffect(() => {
+    let filtered = products;
+    
+    // Filter by company if selected
+    if (selectedCompanyId) {
+      filtered = filtered.filter(product => product.company_id === selectedCompanyId);
+    }
+    
     if (searchTerm.trim() === "") {
-      setFilteredProducts(products.slice(0, 10)); // Show first 10 products by default
+      setFilteredProducts(filtered.slice(0, 10)); // Show first 10 products by default
       return;
     }
     
-    const filtered = products.filter(product => 
+    const searchFiltered = filtered.filter(product => 
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     
-    setFilteredProducts(filtered);
-  }, [searchTerm, products]);
+    setFilteredProducts(searchFiltered);
+  }, [searchTerm, products, selectedCompanyId]);
   
   useEffect(() => {
     const total = cart.reduce((sum, item) => sum + item.total, 0);
@@ -163,6 +179,22 @@ export default function SupplierPurchases() {
     
     try {
       const product = await fetchProductByBarcode(barcodeInput);
+      
+      if (product) {
+        addProductToCart(product);
+        toast.success(`تم إضافة ${product.name} إلى السلة`);
+      } else {
+        toast.error("لم يتم العثور على المنتج بهذا الباركود");
+      }
+    } catch (error) {
+      console.error("Error fetching product by barcode:", error);
+      toast.error("حدث خطأ أثناء البحث عن المنتج");
+    }
+  };
+
+  const handleBarcodeScanned = async (barcode: string) => {
+    try {
+      const product = await fetchProductByBarcode(barcode);
       
       if (product) {
         addProductToCart(product);
@@ -358,14 +390,23 @@ export default function SupplierPurchases() {
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <CardTitle>بحث عن منتج</CardTitle>
-                  <Button 
-                    variant={scannerMode ? "default" : "outline"} 
-                    onClick={toggleScannerMode}
-                    className={`${scannerMode ? 'bg-primary text-white' : ''}`}
-                  >
-                    <ScanLine className="ml-2 h-4 w-4" />
-                    {scannerMode ? 'وضع الماسح نشط' : 'تفعيل الماسح الضوئي'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsBarcodeDialogOpen(true)}
+                    >
+                      <Camera className="ml-2 h-4 w-4" />
+                      كاميرا الباركود
+                    </Button>
+                    <Button 
+                      variant={scannerMode ? "default" : "outline"} 
+                      onClick={toggleScannerMode}
+                      className={`${scannerMode ? 'bg-primary text-white' : ''}`}
+                    >
+                      <ScanLine className="ml-2 h-4 w-4" />
+                      {scannerMode ? 'وضع الماسح نشط' : 'تفعيل الماسح الضوئي'}
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -388,19 +429,37 @@ export default function SupplierPurchases() {
                       قم بتوجيه الماسح الضوئي نحو الباركود للإضافة التلقائية، أو أدخل الكود يدوياً واضغط على إضافة
                     </p>
                   </form>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="ابحث باسم المنتج أو الباركود"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                      <Button variant="outline">
-                        <Search className="ml-2 h-4 w-4" />
-                        بحث
-                      </Button>
-                    </div>
+                 ) : (
+                   <div className="space-y-4">
+                     <div className="flex gap-2">
+                       <Input
+                         placeholder="ابحث باسم المنتج أو الباركود"
+                         value={searchTerm}
+                         onChange={(e) => setSearchTerm(e.target.value)}
+                       />
+                       <Button variant="outline">
+                         <Search className="ml-2 h-4 w-4" />
+                         بحث
+                       </Button>
+                     </div>
+
+                     {/* Company Filter */}
+                     <div className="space-y-2">
+                       <label className="text-sm font-medium">تصفية بالشركة</label>
+                       <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                         <SelectTrigger>
+                           <SelectValue placeholder="اختر الشركة (اختياري)" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="">جميع الشركات</SelectItem>
+                           {companies.map((company) => (
+                             <SelectItem key={company.id} value={company.id}>
+                               {company.name}
+                             </SelectItem>
+                           ))}
+                         </SelectContent>
+                       </Select>
+                     </div>
                     
                     {filteredProducts.length > 0 && (
                       <div className="mt-4 border rounded-md overflow-hidden">
@@ -409,6 +468,7 @@ export default function SupplierPurchases() {
                             <TableRow>
                               <TableHead>المنتج</TableHead>
                               <TableHead>الباركود</TableHead>
+                              <TableHead>الشركة</TableHead>
                               <TableHead>الكمية الحالية</TableHead>
                               <TableHead>سعر الشراء</TableHead>
                               <TableHead>سعر البيع</TableHead>
@@ -416,26 +476,30 @@ export default function SupplierPurchases() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                             {filteredProducts.map((product) => (
-                               <TableRow key={product.id}>
-                                 <TableCell>{product.name}</TableCell>
-                                 <TableCell>{product.barcode || "—"}</TableCell>
-                                 <TableCell>{product.quantity || 0}</TableCell>
-                                 <TableCell>{product.purchase_price}</TableCell>
-                                 <TableCell>{product.price}</TableCell>
-                                 <TableCell>
-                                   <Button 
-                                     variant="ghost" 
-                                     size="sm" 
-                                     onClick={() => addProductToCart(product)}
-                                     className="text-primary hover:text-primary/80"
-                                   >
-                                     <Plus className="h-4 w-4 ml-1" />
-                                     إضافة
-                                   </Button>
-                                 </TableCell>
-                               </TableRow>
-                             ))}
+                              {filteredProducts.map((product) => {
+                                const company = companies.find(c => c.id === product.company_id);
+                                return (
+                                  <TableRow key={product.id}>
+                                    <TableCell>{product.name}</TableCell>
+                                    <TableCell>{product.barcode || "—"}</TableCell>
+                                    <TableCell>{company?.name || "غير محدد"}</TableCell>
+                                    <TableCell>{product.quantity || 0}</TableCell>
+                                    <TableCell>{product.purchase_price}</TableCell>
+                                    <TableCell>{product.price}</TableCell>
+                                    <TableCell>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => addProductToCart(product)}
+                                        className="text-primary hover:text-primary/80"
+                                      >
+                                        <Plus className="h-4 w-4 ml-1" />
+                                        إضافة
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
                           </TableBody>
                         </Table>
                       </div>
@@ -784,6 +848,13 @@ export default function SupplierPurchases() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Barcode Scanner Dialog */}
+      <BarcodeScanner 
+        isOpen={isBarcodeDialogOpen}
+        onClose={() => setIsBarcodeDialogOpen(false)}
+        onScan={handleBarcodeScanned}
+      />
     </MainLayout>
   );
 }
