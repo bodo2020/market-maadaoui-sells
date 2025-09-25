@@ -51,6 +51,8 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, updateProduct } from "@/services/supabase/productService";
 import { checkLowStockProducts, showLowStockToasts } from "@/services/notificationService";
 import { fetchInventoryWithAlerts } from "@/services/supabase/inventoryService";
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 export default function InventoryManagement() {
   const [inventory, setInventory] = useState<any[]>([]);
@@ -154,6 +156,117 @@ export default function InventoryManagement() {
   const handleAddProduct = () => {
     navigate("/add-product");
   };
+
+  const exportToExcel = async () => {
+    try {
+      setLoading(true);
+      
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'نظام إدارة المتاجر';
+      workbook.created = new Date();
+      
+      const worksheet = workbook.addWorksheet('جرد المنتجات');
+      
+      // إضافة العناوين
+      worksheet.addRow([
+        'اسم المنتج',
+        'الباركود', 
+        'سعر البيع',
+        'سعر الشراء',
+        'الكمية المتاحة',
+        'القيمة الإجمالية',
+        'موقع الرف',
+        'تاريخ الصلاحية',
+        'حالة المخزون'
+      ]);
+      
+      // تنسيق العناوين
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '4472C4' } };
+      headerRow.alignment = { horizontal: 'center' };
+      
+      // إضافة البيانات
+      inventory.forEach(product => {
+        const quantity = product.quantity || 0;
+        const purchasePrice = product.purchase_price || 0;
+        const salePrice = product.price || 0;
+        const totalValue = quantity * purchasePrice;
+        
+        // تحديد حالة المخزون
+        let stockStatus = 'متوفر';
+        if (quantity === 0) {
+          stockStatus = 'غير متوفر';
+        } else if (product.inventory_alerts?.alert_enabled && 
+                   product.inventory_alerts?.min_stock_level && 
+                   quantity < product.inventory_alerts.min_stock_level) {
+          stockStatus = 'منخفض';
+        }
+        
+        worksheet.addRow([
+          product.name,
+          product.barcode || '',
+          salePrice,
+          purchasePrice,
+          quantity,
+          totalValue,
+          product.shelf_location || '',
+          product.expiry_date ? new Date(product.expiry_date).toLocaleDateString('ar-EG') : '',
+          stockStatus
+        ]);
+      });
+      
+      // تحديد عرض الأعمدة
+      worksheet.columns = [
+        { width: 30 }, // اسم المنتج
+        { width: 15 }, // الباركود
+        { width: 12 }, // سعر البيع
+        { width: 12 }, // سعر الشراء
+        { width: 12 }, // الكمية
+        { width: 15 }, // القيمة الإجمالية
+        { width: 15 }, // موقع الرف
+        { width: 15 }, // تاريخ الصلاحية
+        { width: 12 }  // حالة المخزون
+      ];
+      
+      // إضافة مجموع في النهاية
+      const totalProducts = inventory.length;
+      const totalQuantity = inventory.reduce((sum, product) => sum + (product.quantity || 0), 0);
+      const totalValue = inventory.reduce((sum, product) => sum + ((product.quantity || 0) * (product.purchase_price || 0)), 0);
+      
+      worksheet.addRow([]);
+      worksheet.addRow(['المجموع الكلي:', '', '', '', totalQuantity, totalValue, '', '', `${totalProducts} منتج`]);
+      
+      // تنسيق صف المجموع
+      const summaryRow = worksheet.getRow(worksheet.rowCount);
+      summaryRow.font = { bold: true };
+      summaryRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E7E6E6' } };
+      
+      // إنشاء الملف وحفظه
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      
+      const fileName = `جرد_المنتجات_${new Date().toISOString().split('T')[0]}.xlsx`;
+      saveAs(blob, fileName);
+      
+      toast({
+        title: "تم بنجاح",
+        description: "تم تصدير بيانات المخزون إلى ملف Excel",
+      });
+      
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء تصدير البيانات",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   
   return (
     <MainLayout>
@@ -165,9 +278,13 @@ export default function InventoryManagement() {
             تصفية
           </Button>
           {(user?.role === 'admin' || user?.role === 'super_admin') && (
-            <Button variant="outline">
+            <Button 
+              variant="outline" 
+              onClick={exportToExcel}
+              disabled={loading || inventory.length === 0}
+            >
               <Download className="ml-2 h-4 w-4" />
-              تصدير
+              تصدير Excel
             </Button>
           )}
           <Button 
