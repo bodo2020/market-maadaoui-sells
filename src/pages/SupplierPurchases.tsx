@@ -59,7 +59,7 @@ export default function SupplierPurchases() {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [scannerMode, setScannerMode] = useState(false);
   const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("all");
   
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState<Date>(new Date());
@@ -101,7 +101,7 @@ export default function SupplierPurchases() {
     let filtered = products;
     
     // Filter by company if selected
-    if (selectedCompanyId) {
+    if (selectedCompanyId && selectedCompanyId !== "all") {
       filtered = filtered.filter(product => product.company_id === selectedCompanyId);
     }
     
@@ -451,7 +451,7 @@ export default function SupplierPurchases() {
                            <SelectValue placeholder="اختر الشركة (اختياري)" />
                          </SelectTrigger>
                          <SelectContent>
-                           <SelectItem value="">جميع الشركات</SelectItem>
+                           <SelectItem value="all">جميع الشركات</SelectItem>
                            {companies.map((company) => (
                              <SelectItem key={company.id} value={company.id}>
                                {company.name}
