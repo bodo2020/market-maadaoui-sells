@@ -21,11 +21,11 @@ import { Button as ShadcnButton } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Loader } from "lucide-react";
-import { createOfferForProduct } from "@/services/supabase/offerService";
+// import { createOfferForProduct } from "@/services/supabase/offerService";
 import { Company, MainCategory, Subcategory } from "@/types";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ProductAssignmentDialog } from "@/components/categories/ProductAssignmentDialog";
+import ProductAssignmentDialog from "@/components/categories/ProductAssignmentDialog";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 
 export default function ProductManagement() {
@@ -146,7 +146,8 @@ export default function ProductManagement() {
     if (!selectedProduct) return;
 
     try {
-      await createOfferForProduct(selectedProduct.id, offerData);
+      // TODO: Implement createOfferForProduct function
+      console.log("Creating offer for product:", selectedProduct.id, offerData);
       setIsOfferDialogOpen(false);
       setOfferData({
         title: "",
@@ -496,13 +497,14 @@ export default function ProductManagement() {
 
         {/* Product Assignment Dialog */}
         <ProductAssignmentDialog
-          isOpen={isAssignmentDialogOpen}
-          onClose={() => setIsAssignmentDialogOpen(false)}
-          selectedProductIds={selectedProducts}
-          onAssignmentComplete={() => {
+          open={isAssignmentDialogOpen}
+          onOpenChange={setIsAssignmentDialogOpen}
+          product={selectedProduct}
+          onSaved={() => {
             setSelectedProducts([]);
             loadProducts();
           }}
+          type="category"
         />
 
         {/* Barcode Scanner */}
