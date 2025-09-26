@@ -297,12 +297,12 @@ export default function POS() {
           }
         }
         
-        // Check if barcode is 11 or 13 digits for scale products (منتج الميزان)
-        if ((barcode.length === 11 || barcode.length === 13) && /^\d+$/.test(barcode)) {
+        // Check if barcode is 13 digits for scale products (منتج الميزان)
+        if (barcode.length === 13 && /^\d+$/.test(barcode)) {
           // Try to find scale product for these specific lengths
           const scaleProduct = products.find(p => p.barcode_type === "scale" && barcode.includes(p.barcode || ""));
           if (scaleProduct) {
-            // For scale products with 11 or 13 digit barcodes, add directly
+            // For scale products with 13 digit barcodes, add directly
             handleAddToCart(scaleProduct);
             toast({
               title: "تم إضافة منتج الميزان",
