@@ -164,7 +164,7 @@ export default function POS() {
           setBarcodeBuffer(prev => prev + e.key);
           
           // Different timeout for Android vs other platforms
-          const timeoutDuration = 10000; // 10 seconds
+          const timeoutDuration = isAndroid ? 1000 : 500;
           
           barcodeTimeoutRef.current = setTimeout(() => {
             const currentBuffer = barcodeBuffer + e.key;
@@ -298,9 +298,6 @@ export default function POS() {
           description: `لم يتم العثور على منتج بالباركود ${barcode}`,
           variant: "destructive"
         });
-        
-        // مسح نص البحث عند عدم وجود المنتج
-        setSearch("");
       }
     } catch (error) {
       console.error("Error processing barcode:", error);
