@@ -270,6 +270,8 @@ export default function POS() {
           title: "تم المسح بنجاح",
           description: `${barcode} - ${product.name}`
         });
+        // Clear search input after successful scan
+        setSearch("");
       } else {
         const bulkProduct = products.find(p => p.bulk_barcode === barcode && p.bulk_enabled);
         
@@ -279,6 +281,7 @@ export default function POS() {
             title: "تم المسح بنجاح",
             description: `${barcode} - ${bulkProduct.name} (جملة)`
           });
+          setSearch("");
           return;
         }
         
@@ -289,6 +292,23 @@ export default function POS() {
             const weightInGrams = parseInt(barcode.substring(7, 12));
             const weightInKg = weightInGrams / 1000;
             handleAddScaleProductToCart(scaleProduct, weightInKg);
+            setSearch("");
+            return;
+          }
+        }
+        
+        // Check if barcode is 11 or 13 digits for scale products (منتج الميزان)
+        if ((barcode.length === 11 || barcode.length === 13) && /^\d+$/.test(barcode)) {
+          // Try to find scale product for these specific lengths
+          const scaleProduct = products.find(p => p.barcode_type === "scale" && barcode.includes(p.barcode || ""));
+          if (scaleProduct) {
+            // For scale products with 11 or 13 digit barcodes, add directly
+            handleAddToCart(scaleProduct);
+            toast({
+              title: "تم إضافة منتج الميزان",
+              description: `${scaleProduct.name} - ${barcode}`
+            });
+            setSearch("");
             return;
           }
         }
@@ -298,6 +318,8 @@ export default function POS() {
           description: `لم يتم العثور على منتج بالباركود ${barcode}`,
           variant: "destructive"
         });
+        // Clear search input when product not found
+        setSearch("");
       }
     } catch (error) {
       console.error("Error processing barcode:", error);
@@ -306,6 +328,8 @@ export default function POS() {
         description: "حدث خطأ أثناء معالجة الباركود. يرجى المحاولة مرة أخرى.",
         variant: "destructive"
       });
+      // Clear search input on error
+      setSearch("");
     }
   };
 
