@@ -69,22 +69,22 @@ export default function POS() {
         if (barcodeTimeoutRef.current) {
           clearTimeout(barcodeTimeoutRef.current);
         }
-        setBarcodeBuffer(prev => prev + e.key);
+        setBarcodeBuffer(prev => {
+          const newBuffer = prev + e.key;
+          return newBuffer;
+        });
         
-        // زيادة timeout لإعطاء وقت أكثر للباركود للاكتمال
+        // تأخير معالجة الباركود لإعطاء وقت كافي للاكتمال
         barcodeTimeoutRef.current = setTimeout(() => {
-          const currentBuffer = barcodeBuffer + e.key;
-          if (currentBuffer.length >= 5) {
-            // إذا كان الباركود طويل بما فيه الكفاية، قم بمعالجته
-            processBarcode(currentBuffer);
-            setBarcodeBuffer("");
-          } else {
-            // إذا كان قصير، امسح الـ buffer فقط
-            if (!isInput) {
-              setBarcodeBuffer("");
+          setBarcodeBuffer(current => {
+            // فقط ابحث إذا كان الباركود 10 أرقام أو أكثر
+            if (current.length >= 10) {
+              processBarcode(current);
             }
-          }
-        }, 200); // زيادة الوقت من 100ms إلى 200ms
+            // امسح الـ buffer في كل الحالات
+            return "";
+          });
+        }, 500); // زيادة الوقت إلى 500ms لإعطاء فرصة أكبر للباركود الطويل
       }
     };
     
