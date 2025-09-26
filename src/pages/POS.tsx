@@ -163,19 +163,19 @@ export default function POS() {
           }
           setBarcodeBuffer(prev => prev + e.key);
           
-          // Different timeout for Android vs other platforms
-          const timeoutDuration = isAndroid ? 1000 : 500;
-          
+          // Set timeout to auto-press Enter after 1 second
           barcodeTimeoutRef.current = setTimeout(() => {
             const currentBuffer = barcodeBuffer + e.key;
             if (currentBuffer.length >= 5) {
-              console.log("Auto-processing barcode after timeout:", currentBuffer);
-              processBarcode(currentBuffer);
+              console.log("Auto-pressing Enter after 1 second for:", currentBuffer);
+              // Simulate Enter key press
+              setSearch(currentBuffer);
+              handleSearch();
               setBarcodeBuffer("");
             } else {
               setBarcodeBuffer("");
             }
-          }, timeoutDuration);
+          }, 1000); // 1 second timeout
         }
         
         // Handle backspace for search
