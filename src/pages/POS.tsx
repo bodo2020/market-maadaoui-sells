@@ -149,45 +149,50 @@ export default function POS() {
         
         // Handle alphanumeric characters and common symbols
         if (/^[a-zA-Z0-9\u0600-\u06FF\s\-\.]$/.test(e.key)) {
-          // Direct typing to search box
-          if (!isSearchInput && searchInputRef.current) {
-            e.preventDefault();
-            const newValue = search + e.key;
-            setSearch(newValue);
-            searchInputRef.current.focus();
-            searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
-          }
-          
-          // Barcode scanning logic
+          // Clear previous timeout
           if (barcodeTimeoutRef.current) {
             clearTimeout(barcodeTimeoutRef.current);
           }
-          setBarcodeBuffer(prev => prev + e.key);
           
-          // Set timeout to auto-press Enter after 1.5 seconds
+          // Update barcode buffer immediately
+          const newBuffer = barcodeBuffer + e.key;
+          setBarcodeBuffer(newBuffer);
+          
+          // Direct typing to search box (simplified)
+          if (!isSearchInput) {
+            const newValue = search + e.key;
+            setSearch(newValue);
+            // Focus without preventing default to reduce lag
+            requestAnimationFrame(() => {
+              if (searchInputRef.current) {
+                searchInputRef.current.focus();
+                searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
+              }
+            });
+          }
+          
+          // Reduced timeout for faster processing
           barcodeTimeoutRef.current = setTimeout(() => {
-            const currentBuffer = barcodeBuffer + e.key;
-            if (currentBuffer.length >= 5) {
-              console.log("Auto-pressing Enter after 1.5 seconds for:", currentBuffer);
-              // Simulate Enter key press
-              setSearch(currentBuffer);
-              handleSearch();
+            if (newBuffer.length >= 5) {
+              console.log("Auto-processing barcode:", newBuffer);
+              processBarcode(newBuffer);
               setBarcodeBuffer("");
             } else {
               setBarcodeBuffer("");
             }
-          }, 1500); // 1.5 second timeout
+          }, 500); // Reduced from 1500ms to 500ms
         }
         
         // Handle backspace for search
         if (e.key === 'Backspace' && !isSearchInput && search.length > 0) {
-          e.preventDefault();
           const newValue = search.slice(0, -1);
           setSearch(newValue);
-          if (searchInputRef.current) {
-            searchInputRef.current.focus();
-            searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
-          }
+          requestAnimationFrame(() => {
+            if (searchInputRef.current) {
+              searchInputRef.current.focus();
+              searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
+            }
+          });
         }
       };
 
@@ -250,7 +255,7 @@ export default function POS() {
         }
       };
     }
-  }, [barcodeBuffer, manualBarcodeMode]);
+  }, [barcodeBuffer, manualBarcodeMode, search, isCheckoutOpen, showWeightDialog, showInvoice, showBarcodeScanner]);
 
   const processBarcode = async (barcode: string) => {
     if (barcode.length < 5) return;
