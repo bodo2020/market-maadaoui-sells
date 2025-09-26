@@ -56,6 +56,7 @@ export default function POS() {
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
       const isSearchInput = target === searchInputRef.current;
       if (isInput && !isSearchInput) return;
+      
       if (e.key === 'Enter' && barcodeBuffer) {
         e.preventDefault();
         console.log("External barcode scanned:", barcodeBuffer);
@@ -63,20 +64,30 @@ export default function POS() {
         setBarcodeBuffer("");
         return;
       }
+      
       if (/^[a-zA-Z0-9]$/.test(e.key)) {
         if (barcodeTimeoutRef.current) {
           clearTimeout(barcodeTimeoutRef.current);
         }
         setBarcodeBuffer(prev => prev + e.key);
+        
+        // زيادة timeout لإعطاء وقت أكثر للباركود للاكتمال
         barcodeTimeoutRef.current = setTimeout(() => {
-          if (barcodeBuffer.length < 5) {
+          const currentBuffer = barcodeBuffer + e.key;
+          if (currentBuffer.length >= 5) {
+            // إذا كان الباركود طويل بما فيه الكفاية، قم بمعالجته
+            processBarcode(currentBuffer);
+            setBarcodeBuffer("");
+          } else {
+            // إذا كان قصير، امسح الـ buffer فقط
             if (!isInput) {
               setBarcodeBuffer("");
             }
           }
-        }, 100);
+        }, 200); // زيادة الوقت من 100ms إلى 200ms
       }
     };
+    
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
@@ -132,19 +143,25 @@ export default function POS() {
         addProductToCart(product, barcode);
         setSearch("");
       } else {
-        toast({
-          title: "لم يتم العثور على المنتج",
-          description: `لم يتم العثور على منتج بالباركود ${barcode}`,
-          variant: "destructive"
-        });
+        // فقط أظهر رسالة الخطأ إذا كان الباركود طويل بما فيه الكفاية وليس ناقص
+        if (barcode.length >= 8) {
+          toast({
+            title: "لم يتم العثور على المنتج",
+            description: `لم يتم العثور على منتج بالباركود ${barcode}`,
+            variant: "destructive"
+          });
+        }
       }
     } catch (error) {
       console.error("Error processing barcode:", error);
-      toast({
-        title: "خطأ في معالجة الباركود",
-        description: "فشل البحث. يرجى المحاولة مرة أخرى.",
-        variant: "destructive"
-      });
+      // فقط أظهر رسالة خطأ المعالجة إذا كان الباركود طويل
+      if (barcode.length >= 8) {
+        toast({
+          title: "خطأ في معالجة الباركود",
+          description: "فشل البحث. يرجى المحاولة مرة أخرى.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
