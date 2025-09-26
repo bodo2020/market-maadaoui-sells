@@ -77,8 +77,8 @@ export default function POS() {
         // تأخير معالجة الباركود لإعطاء وقت كافي للاكتمال
         barcodeTimeoutRef.current = setTimeout(() => {
           setBarcodeBuffer(current => {
-            // فقط ابحث إذا كان الباركود 10 أرقام أو أكثر
-            if (current.length >= 10) {
+            // فقط ابحث إذا كان الباركود 12 رقم أو أكثر
+            if (current.length >= 12) {
               processBarcode(current);
             }
             // امسح الـ buffer في كل الحالات
