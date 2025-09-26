@@ -163,11 +163,11 @@ export default function POS() {
           }
           setBarcodeBuffer(prev => prev + e.key);
           
-          // Set timeout to auto-press Enter after 1.5 seconds
+          // Set timeout to auto-press Enter after 1.3 seconds
           barcodeTimeoutRef.current = setTimeout(() => {
             const currentBuffer = barcodeBuffer + e.key;
             if (currentBuffer.length >= 5) {
-              console.log("Auto-pressing Enter after 1.5 seconds for:", currentBuffer);
+              console.log("Auto-pressing Enter after 1.3 seconds for:", currentBuffer);
               // Simulate Enter key press
               setSearch(currentBuffer);
               handleSearch();
@@ -175,7 +175,7 @@ export default function POS() {
             } else {
               setBarcodeBuffer("");
             }
-          }, 1500); // 1.5 second timeout
+          }, 1300); // 1.3 second timeout
         }
         
         // Handle backspace for search
