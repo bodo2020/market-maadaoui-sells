@@ -730,10 +730,8 @@ export default function POS() {
         }, 1000);
       }
 
-      // Clear cart after successful sale
+      // Refresh balance only (don't reset or close the checkout dialog automatically)
       setTimeout(() => {
-        resetSale();
-        // Refresh cash balance
         getLatestCashBalance(RegisterType.STORE).then(setCashBalance);
       }, 2000);
     } catch (error) {
@@ -752,7 +750,8 @@ export default function POS() {
     setSearchResults([]);
     setSearch("");
     setSelectedCustomer("");
-    setIsCheckoutOpen(false);
+    // لا نغلق نافذة التأكيد تلقائياً
+    // setIsCheckoutOpen(false);
     setShowSuccess(false);
     setIsProcessing(false);
     setPaymentMethod('cash');
@@ -1136,7 +1135,7 @@ export default function POS() {
                   <Printer className="ml-2 h-4 w-4" />
                   عرض وطباعة الفاتورة
                 </Button>
-                <Button onClick={resetSale} className="w-full">
+                <Button onClick={() => { resetSale(); setIsCheckoutOpen(false); }} className="w-full">
                   عملية بيع جديدة
                 </Button>
               </div>
