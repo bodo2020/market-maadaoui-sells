@@ -156,7 +156,7 @@ export default function POS() {
 
           // Reduced timeout for faster processing
           barcodeTimeoutRef.current = setTimeout(() => {
-            if (newBuffer.length >= 5) {
+            if (newBuffer.length >= 13) {
               console.log("Auto-processing barcode:", newBuffer);
               processBarcode(newBuffer);
               setBarcodeBuffer("");
@@ -186,8 +186,8 @@ export default function POS() {
           const value = target.value.trim();
           console.log("Input event triggered:", value);
 
-          // Process if it looks like a barcode (5+ characters)
-          if (value.length >= 5) {
+          // Process if it looks like a barcode (13+ characters)
+          if (value.length >= 13) {
             processBarcode(value);
             target.value = "";
           }
@@ -219,7 +219,7 @@ export default function POS() {
           if (e.key === 'Enter') {
             const target = e.target as HTMLInputElement;
             const value = target.value.trim();
-            if (value.length >= 5) {
+            if (value.length >= 13) {
               processBarcode(value);
               target.value = "";
             }
@@ -239,7 +239,7 @@ export default function POS() {
     }
   }, [barcodeBuffer, manualBarcodeMode, search, isCheckoutOpen, showWeightDialog, showInvoice, showBarcodeScanner]);
   const processBarcode = async (barcode: string) => {
-    if (barcode.length < 5) return;
+    if (barcode.length < 13) return;
     try {
       setSearch(barcode);
       const product = await fetchProductByBarcode(barcode);
