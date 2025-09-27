@@ -1054,7 +1054,7 @@ export default function POS() {
                               {item.weight ? <span className="ml-1">
                                   {item.product.price} {siteConfig.currency}/كجم × {item.weight} كجم
                                 </span> : item.isBulk ? <span className="ml-1">
-                                  عبوة جملة {item.quantity} وحدة
+                                  كمية الجملة كرتونة - {item.quantity} وحدة
                                 </span> : <span className="ml-1">
                                   {item.product.is_offer && item.product.offer_price ? item.product.offer_price : item.product.price} {siteConfig.currency}
                                   {item.product.is_offer && item.product.offer_price && <span className="line-through mr-1">{item.product.price} {siteConfig.currency}</span>}
