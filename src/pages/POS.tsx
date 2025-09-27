@@ -747,6 +747,7 @@ export default function POS() {
     }
   };
   const resetSale = () => {
+    console.log("resetSale called - clearing all states");
     setCartItems([]);
     setSearchResults([]);
     setSearch("");
@@ -761,9 +762,12 @@ export default function POS() {
     setCustomerPhone("");
     setCurrentInvoiceNumber("");
     setCurrentSale(null);
+    // لا نريد إغلاق الفاتورة في resetSale
+    // setShowInvoice(false); - تم تعطيلها
   };
   const handleViewInvoice = () => {
     if (currentSale) {
+      console.log("Opening invoice dialog");
       setShowInvoice(true);
     }
   };
