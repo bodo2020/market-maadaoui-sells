@@ -539,7 +539,18 @@ export default function POS() {
     setCartItems(cartItems.map((item, i) => {
       if (i === index) {
         if (item.weight !== null && change > 0) return item;
-        const newQuantity = Math.max(1, item.quantity + change);
+        
+        let newQuantity;
+        if (item.isBulk) {
+          // للمنتجات السائبة، نتعامل مع عدد الكراتين
+          const currentBoxes = Math.round(item.quantity / item.product.bulk_quantity);
+          const newBoxes = Math.max(1, currentBoxes + change);
+          newQuantity = newBoxes * item.product.bulk_quantity;
+        } else {
+          // للمنتجات العادية، نتعامل مع الوحدات الفردية
+          newQuantity = Math.max(1, item.quantity + change);
+        }
+        
         if (change > 0 && newQuantity > (item.product.quantity || 0)) {
           toast({
             title: "الكمية غير متوفرة",
@@ -548,6 +559,7 @@ export default function POS() {
           });
           return item;
         }
+        
         let price = item.price;
         let total = item.weight !== null ? item.price : newQuantity * price;
         return {
@@ -1054,7 +1066,7 @@ export default function POS() {
                               {item.weight ? <span className="ml-1">
                                   {item.product.price} {siteConfig.currency}/كجم × {item.weight} كجم
                                 </span> : item.isBulk ? <span className="ml-1">
-                                  كمية الجملة كرتونة - {item.quantity} وحدة
+                                  كرتونة - {item.quantity / item.product.bulk_quantity} كرتونة
                                 </span> : <span className="ml-1">
                                   {item.product.is_offer && item.product.offer_price ? item.product.offer_price : item.product.price} {siteConfig.currency}
                                   {item.product.is_offer && item.product.offer_price && <span className="line-through mr-1">{item.product.price} {siteConfig.currency}</span>}
@@ -1068,22 +1080,21 @@ export default function POS() {
                         </div>
                         
                         <div className="flex justify-between items-center mt-2">
-                          {item.weight === null && !item.isBulk ? <div className="flex items-center space-x-2">
+                          {item.weight === null ? <div className="flex items-center space-x-2">
                               <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(index, -1)}>
                                 <Minus className="h-3 w-3" />
                               </Button>
                               
-                              <span className="w-8 text-center">{item.quantity}</span>
+                              <span className="w-8 text-center">
+                                {item.isBulk ? Math.round(item.quantity / item.product.bulk_quantity) : item.quantity}
+                              </span>
                               
                               <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(index, 1)}>
                                 <Plus className="h-3 w-3" />
                               </Button>
-                            </div> : item.weight ? <div className="flex items-center">
+                            </div> : <div className="flex items-center">
                               <Scale className="h-4 w-4 text-blue-500 ml-1" />
                               <span className="text-sm">{item.weight} كجم</span>
-                            </div> : <div className="flex items-center">
-                              <Box className="h-4 w-4 text-amber-500 ml-1" />
-                              <span className="text-sm">{item.quantity} وحدة</span>
                             </div>}
                           
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveFromCart(index)}>
