@@ -1108,8 +1108,8 @@ export default function POS() {
         </div>
         
         <div>
-          <Card className="sticky top-6">
-            <CardHeader className="pb-3">
+          <Card className="sticky top-6 h-[calc(100vh-8rem)] flex flex-col">
+            <CardHeader className="pb-3 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <CardTitle>سلة المشتريات</CardTitle>
                 <div className="flex items-center gap-2">
@@ -1121,12 +1121,12 @@ export default function POS() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {cartItems.length === 0 ? <div className="text-center py-6 text-muted-foreground">
+            <CardContent className="flex-1 flex flex-col overflow-hidden">
+              {cartItems.length === 0 ? <div className="text-center py-6 text-muted-foreground flex-1 flex flex-col justify-center">
                   <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-20" />
                   <p>السلة فارغة</p>
-                </div> : <>
-                  <div ref={cartScrollRef} className="space-y-4 max-h-[400px] overflow-y-auto">
+                </div> : <div className="flex flex-col h-full">
+                  <div ref={cartScrollRef} className="flex-1 space-y-4 overflow-y-auto pr-2">
                     {cartItems.map((item, index) => <div key={index} className="flex flex-col pb-3 border-b">
                         <div className="flex justify-between">
                           <div className="flex-1">
@@ -1174,7 +1174,7 @@ export default function POS() {
                       </div>)}
                   </div>
                   
-                  <div className="space-y-2 pt-2">
+                  <div className="space-y-2 pt-4 border-t mt-4 flex-shrink-0">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">المجموع الفرعي</span>
                       <span>{subtotal.toFixed(2)} {siteConfig.currency}</span>
@@ -1188,9 +1188,9 @@ export default function POS() {
                       <span>{total.toFixed(2)} {siteConfig.currency}</span>
                     </div>
                   </div>
-                </>}
+                </div>}
             </CardContent>
-            <CardFooter className="flex flex-col space-y-2 pt-0">
+            <CardFooter className="flex-shrink-0 flex flex-col space-y-2 pt-4 border-t">
               {/* Customer Selection */}
               <div className="w-full space-y-2">
                 <Label htmlFor="customer-select" className="text-sm font-medium">
