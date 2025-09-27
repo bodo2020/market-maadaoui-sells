@@ -469,21 +469,47 @@ export default function POS() {
       });
       return;
     }
-    setCartItems([...cartItems, {
-      product,
-      quantity: product.bulk_quantity,
-      price: product.bulk_price / product.bulk_quantity,
-      discount: 0,
-      total: product.bulk_price,
-      isBulk: true
-    }]);
+    // البحث عن المنتج في السلة للدمج
+    const existingItemIndex = cartItems.findIndex(item => 
+      item.product.id === product.id && item.isBulk === true
+    );
 
-    // Show success notification
-    toast({
-      title: "تم إضافة عبوة جملة ✅",
-      description: `${product.name} - ${product.bulk_quantity} وحدة`,
-      className: "bg-green-50 border-green-200 text-green-800"
-    });
+    if (existingItemIndex !== -1) {
+      // إذا وُجد المنتج، قم بزيادة الكمية
+      const updatedItems = [...cartItems];
+      const existingItem = updatedItems[existingItemIndex];
+      const newQuantity = existingItem.quantity + product.bulk_quantity;
+      
+      updatedItems[existingItemIndex] = {
+        ...existingItem,
+        quantity: newQuantity,
+        total: (product.bulk_price / product.bulk_quantity) * newQuantity
+      };
+      
+      setCartItems(updatedItems);
+      
+      toast({
+        title: "تم تحديث الكمية ✅",
+        description: `${product.name} - المجموع: ${newQuantity} وحدة`,
+        className: "bg-blue-50 border-blue-200 text-blue-800"
+      });
+    } else {
+      // إضافة منتج جديد للسلة
+      setCartItems([...cartItems, {
+        product,
+        quantity: product.bulk_quantity,
+        price: product.bulk_price / product.bulk_quantity,
+        discount: 0,
+        total: product.bulk_price,
+        isBulk: true
+      }]);
+
+      toast({
+        title: "تم إضافة عبوة جملة ✅",
+        description: `${product.name} - ${product.bulk_quantity} وحدة`,
+        className: "bg-green-50 border-green-200 text-green-800"
+      });
+    }
 
     // Auto-scroll to bottom of cart
     setTimeout(() => {
