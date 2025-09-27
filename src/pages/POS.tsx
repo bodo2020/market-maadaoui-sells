@@ -733,6 +733,7 @@ export default function POS() {
       // Clear cart after successful sale
       setTimeout(() => {
         resetSale();
+        setShowInvoice(false); // إغلاق صفحة الفاتورة تلقائياً
         // Refresh cash balance
         getLatestCashBalance(RegisterType.STORE).then(setCashBalance);
       }, 2000);
