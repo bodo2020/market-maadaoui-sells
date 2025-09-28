@@ -59,7 +59,7 @@ export const PrintOptionsDialog: React.FC<PrintOptionsDialogProps> = ({
                         <Smartphone className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div>
-                        <div className="font-medium">إيصال حراري 80 مم</div>
+                        <div className="font-medium">إيصال حراري 58 مم</div>
                         <div className="text-sm text-muted-foreground">
                           مناسب للطابعات الحرارية والأجهزة المحمولة
                         </div>
