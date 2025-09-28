@@ -4,10 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
 import { Sale } from "@/types";
-import { Printer, Save, FileText, Download } from "lucide-react";
+import { Printer, Save, FileText, Download, Share } from "lucide-react";
 import { printInvoice } from '@/services/supabase/saleService';
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
-import { downloadInvoicePDF, printInvoicePDF } from '@/services/pdfInvoiceService';
+import { downloadInvoicePDF, printInvoicePDF, generateInvoicePDF } from '@/services/pdfInvoiceService';
 
 interface InvoiceDialogProps {
   isOpen: boolean;
@@ -90,6 +90,45 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       await printInvoicePDF(sale, storeInfo);
     } catch (error) {
       console.error('Error printing PDF:', error);
+    }
+  };
+
+  const handleSharePDF = async () => {
+    const storeInfo = getStoreInfo();
+    try {
+      const pdfBlob = await generateInvoicePDF(sale, storeInfo);
+      const fileName = `invoice-${sale.invoice_number}.pdf`;
+      
+      // Check if Web Share API is supported
+      if (navigator.share) {
+        // Create a File object from the blob
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        
+        await navigator.share({
+          title: `فاتورة ${sale.invoice_number}`,
+          text: `فاتورة رقم ${sale.invoice_number} من ${storeInfo.name}`,
+          files: [file],
+        });
+      } else {
+        // Fallback: Download the file
+        const url = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        // Copy text to clipboard as fallback
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(`فاتورة رقم ${sale.invoice_number} من ${storeInfo.name}`);
+          alert('تم تحميل الفاتورة ونسخ المعلومات للحافظة');
+        }
+      }
+    } catch (error) {
+      console.error('Error sharing PDF:', error);
+      alert('حدث خطأ أثناء مشاركة الفاتورة');
     }
   };
 
@@ -236,6 +275,10 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
           <Button onClick={handlePrintPDF} className="gap-2">
             <FileText className="h-4 w-4" />
             طباعة PDF
+          </Button>
+          <Button onClick={handleSharePDF} variant="outline" className="gap-2">
+            <Share className="h-4 w-4" />
+            مشاركة PDF
           </Button>
           <Button onClick={handleDownloadPDF} variant="outline" className="gap-2">
             <Download className="h-4 w-4" />
