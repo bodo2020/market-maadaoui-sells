@@ -4,10 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
 import { Sale } from "@/types";
-import { Printer, Download, Share2 } from "lucide-react";
+import { Printer, Save, FileText } from "lucide-react";
 import { printInvoice } from '@/services/supabase/saleService';
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
-import { pdfInvoiceService } from '@/services/pdfInvoiceService';
 
 interface InvoiceDialogProps {
   isOpen: boolean;
@@ -43,46 +42,35 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
     ...(settings || {})
   };
 
-  const getStoreInfo = () => ({
-    name: siteConfig.name,
-    address: siteConfig.address || "العنوان غير متوفر",
-    phone: siteConfig.phone || "الهاتف غير متوفر",
-    vatNumber: siteConfig.vatNumber || "",
-    logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
-    website: invoiceSettings.website || "",
-    footer: invoiceSettings.footer || "شكراً لزيارتكم!",
-    fontSize: invoiceSettings.fontSize || "normal",
-    showVat: invoiceSettings.showVat ?? true,
-    template: invoiceSettings.template || "default",
-    notes: invoiceSettings.notes || "",
-    paymentInstructions: invoiceSettings.paymentInstructions || "",
-    logoChoice: invoiceSettings.logoChoice || "store",
-    customLogoUrl: invoiceSettings.customLogoUrl || null,
-    currency: siteConfig.currency || 'ج.م'
-  });
-
   const handlePrint = async () => {
-    const storeInfo = getStoreInfo();
+    // Get store info from site config, overriding with preview settings if any
+    const storeInfo = {
+      name: siteConfig.name,
+      address: siteConfig.address || "العنوان غير متوفر",
+      phone: siteConfig.phone || "الهاتف غير متوفر",
+      vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
+      logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
+      website: invoiceSettings.website || "",
+      footer: invoiceSettings.footer || "شكراً لزيارتكم!",
+      fontSize: invoiceSettings.fontSize || "normal",
+      showVat: invoiceSettings.showVat ?? true,
+      template: invoiceSettings.template || "default",
+      notes: invoiceSettings.notes || "",
+      paymentInstructions: invoiceSettings.paymentInstructions || "",
+      logoChoice: invoiceSettings.logoChoice || "store",
+      customLogoUrl: invoiceSettings.customLogoUrl || null,
+      currency: siteConfig.currency || 'ج.م'
+    };
     
-    // Try Bluetooth printer first, fallback to PDF print
+    // Try Bluetooth printer first, fallback to regular print
     if (bluetoothPrinterService.isConnected()) {
       const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
       const success = await bluetoothPrinterService.printText(invoiceText);
       if (success) return;
     }
     
-    // Fallback to PDF print
-    await pdfInvoiceService.printPDF(sale, storeInfo);
-  };
-
-  const handleDownloadPDF = async () => {
-    const storeInfo = getStoreInfo();
-    await pdfInvoiceService.downloadPDF(sale, storeInfo);
-  };
-
-  const handleSharePDF = async () => {
-    const storeInfo = getStoreInfo();
-    await pdfInvoiceService.sharePDF(sale, storeInfo);
+    // Fallback to regular print
+    printInvoice(sale, storeInfo);
   };
 
   // Format sale date
@@ -123,7 +111,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
           <div className="text-center mb-6">
             {logoUrl && (
               <div className="flex justify-center mb-3">
-                <img src={logoUrl} alt="شعار المتجر" className="h-10 object-contain" />
+                <img src={logoUrl} alt="شعار المتجر" className="h-16 object-contain" />
               </div>
             )}
             <h2 className="text-xl font-bold">{siteConfig.name}</h2>
@@ -228,14 +216,6 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
           <Button onClick={handlePrint} className="gap-2">
             <Printer className="h-4 w-4" />
             طباعة الفاتورة
-          </Button>
-          <Button onClick={handleDownloadPDF} variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            تحميل PDF
-          </Button>
-          <Button onClick={handleSharePDF} variant="outline" className="gap-2">
-            <Share2 className="h-4 w-4" />
-            مشاركة PDF
           </Button>
           <Button variant="outline" onClick={onClose}>
             إغلاق
