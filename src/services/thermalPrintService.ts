@@ -26,7 +26,7 @@ export class ThermalPrintService {
     storeInfo: any, 
     settings: ThermalPrintSettings = {}
   ): string {
-    const { width = '58mm', fontSize = 'small', showLogo = true, paperSaving = true } = settings;
+    const { width = '80mm', fontSize = 'small', showLogo = true, paperSaving = true } = settings;
     
     const saleDate = new Date(sale.date);
     const formattedDate = saleDate.toLocaleDateString('ar-EG', {
@@ -297,7 +297,7 @@ export class ThermalPrintService {
     storeName?: string,
     settings: ThermalPrintSettings = {}
   ): string {
-    const { width = '58mm' } = settings;
+    const { width = '80mm' } = settings;
     const paperWidth = width === '58mm' ? '58mm' : '80mm';
 
     return `
