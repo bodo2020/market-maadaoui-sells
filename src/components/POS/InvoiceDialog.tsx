@@ -99,36 +99,72 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       const pdfBlob = await generateInvoicePDF(sale, storeInfo);
       const fileName = `invoice-${sale.invoice_number}.pdf`;
       
-      // Check if Web Share API is supported
-      if (navigator.share) {
-        // Create a File object from the blob
+      // Check if Web Share API is supported and files can be shared
+      if (navigator.share && navigator.canShare) {
         const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
         
-        await navigator.share({
-          title: `فاتورة ${sale.invoice_number}`,
-          text: `فاتورة رقم ${sale.invoice_number} من ${storeInfo.name}`,
-          files: [file],
-        });
+        // Check if sharing files is supported
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              title: `فاتورة ${sale.invoice_number}`,
+              text: `فاتورة رقم ${sale.invoice_number} من ${storeInfo.name}`,
+              files: [file],
+            });
+            return; // Successfully shared
+          } catch (shareError) {
+            console.log('Web Share failed, trying fallback:', shareError);
+            // Fall through to fallback options
+          }
+        }
+      }
+      
+      // Fallback 1: Try to copy share link to clipboard
+      const url = URL.createObjectURL(pdfBlob);
+      const shareText = `فاتورة رقم ${sale.invoice_number} من ${storeInfo.name}\nيمكنك تحميل الفاتورة من الرابط أدناه.`;
+      
+      if (navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(shareText);
+          // Create temporary download
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          alert('تم نسخ معلومات الفاتورة إلى الحافظة وتحميل الملف. يمكنك الآن لصقها في أي تطبيق للمشاركة.');
+        } catch (clipboardError) {
+          console.log('Clipboard failed, using basic download:', clipboardError);
+          // Fallback 2: Simple download
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          alert('تم تحميل الفاتورة بنجاح. يمكنك الآن مشاركتها يدوياً من مجلد التحميلات.');
+        }
       } else {
-        // Fallback: Download the file
-        const url = URL.createObjectURL(pdfBlob);
+        // Fallback 3: Basic download only
         const link = document.createElement('a');
         link.href = url;
         link.download = fileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
         
-        // Copy text to clipboard as fallback
-        if (navigator.clipboard) {
-          await navigator.clipboard.writeText(`فاتورة رقم ${sale.invoice_number} من ${storeInfo.name}`);
-          alert('تم تحميل الفاتورة ونسخ المعلومات للحافظة');
-        }
+        alert('تم تحميل الفاتورة بنجاح. يمكنك مشاركتها من مجلد التحميلات.');
       }
+      
+      // Clean up
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      
     } catch (error) {
-      console.error('Error sharing PDF:', error);
-      alert('حدث خطأ أثناء مشاركة الفاتورة');
+      console.error('Error in handleSharePDF:', error);
+      alert('حدث خطأ أثناء إنشاء الفاتورة. الرجاء المحاولة مرة أخرى.');
     }
   };
 
