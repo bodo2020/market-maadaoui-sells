@@ -123,7 +123,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
           <div className="text-center mb-6">
             {logoUrl && (
               <div className="flex justify-center mb-3">
-                <img src={logoUrl} alt="شعار المتجر" className="h-16 object-contain" />
+                <img src={logoUrl} alt="شعار المتجر" className="h-10 object-contain" />
               </div>
             )}
             <h2 className="text-xl font-bold">{siteConfig.name}</h2>

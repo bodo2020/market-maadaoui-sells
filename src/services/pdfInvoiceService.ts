@@ -27,35 +27,35 @@ export const pdfInvoiceService = {
     let yPosition = 20;
     
     // Store Header
-    doc.setFontSize(16);
+    doc.setFontSize(12);
     doc.text(storeInfo.name, 105, yPosition, { align: 'center' });
-    yPosition += 10;
+    yPosition += 8;
     
     if (storeInfo.address) {
-      doc.setFontSize(10);
+      doc.setFontSize(8);
       doc.text(storeInfo.address, 105, yPosition, { align: 'center' });
-      yPosition += 8;
+      yPosition += 6;
     }
     
     if (storeInfo.phone) {
       doc.text(`Phone: ${storeInfo.phone}`, 105, yPosition, { align: 'center' });
-      yPosition += 8;
+      yPosition += 6;
     }
     
     if (storeInfo.website) {
       doc.text(storeInfo.website, 105, yPosition, { align: 'center' });
-      yPosition += 8;
+      yPosition += 6;
     }
     
     if (storeInfo.showVat && storeInfo.vatNumber) {
       doc.text(`VAT: ${storeInfo.vatNumber}`, 105, yPosition, { align: 'center' });
-      yPosition += 8;
+      yPosition += 6;
     }
     
-    yPosition += 10;
+    yPosition += 8;
     
     // Invoice Details
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.text(`Invoice #: ${sale.invoice_number}`, 20, yPosition);
     
     const saleDate = new Date(sale.date);
@@ -81,13 +81,13 @@ export const pdfInvoiceService = {
     }
     
     // Items Table Header
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.text('Item', 20, yPosition);
     doc.text('Qty', 100, yPosition);
     doc.text('Price', 130, yPosition);
     doc.text('Total', 160, yPosition);
     doc.line(20, yPosition + 2, 190, yPosition + 2);
-    yPosition += 10;
+    yPosition += 8;
     
     // Items
     sale.items.forEach((item) => {
@@ -100,29 +100,29 @@ export const pdfInvoiceService = {
       doc.text(item.weight ? `${item.weight} kg` : item.quantity.toString(), 100, yPosition);
       doc.text(item.price.toFixed(2), 130, yPosition);
       doc.text(`${item.total.toFixed(2)} ${storeInfo.currency}`, 160, yPosition);
-      yPosition += 8;
+      yPosition += 6;
     });
     
     yPosition += 5;
     doc.line(20, yPosition, 190, yPosition);
-    yPosition += 10;
+    yPosition += 8;
     
     // Totals
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.text(`Subtotal: ${sale.subtotal.toFixed(2)} ${storeInfo.currency}`, 130, yPosition);
-    yPosition += 8;
+    yPosition += 6;
     
     if (sale.discount > 0) {
       doc.text(`Discount: -${sale.discount.toFixed(2)} ${storeInfo.currency}`, 130, yPosition);
-      yPosition += 8;
+      yPosition += 6;
     }
     
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.text(`Total: ${sale.total.toFixed(2)} ${storeInfo.currency}`, 130, yPosition);
-    yPosition += 15;
+    yPosition += 12;
     
     // Payment Info
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     const paymentMethod = sale.payment_method === 'cash' ? 'Cash' : 
                          sale.payment_method === 'card' ? 'Card' : 'Mixed';
     doc.text(`Payment Method: ${paymentMethod}`, 20, yPosition);
