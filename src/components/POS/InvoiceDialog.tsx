@@ -4,9 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
 import { Sale } from "@/types";
-import { Printer, Save, FileText } from "lucide-react";
+import { Printer, Save, FileText, Download } from "lucide-react";
 import { printInvoice } from '@/services/supabase/saleService';
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
+import { downloadInvoicePDF, printInvoicePDF } from '@/services/pdfInvoiceService';
 
 interface InvoiceDialogProps {
   isOpen: boolean;
@@ -42,25 +43,26 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
     ...(settings || {})
   };
 
+  const getStoreInfo = () => ({
+    name: siteConfig.name,
+    address: siteConfig.address || "العنوان غير متوفر",
+    phone: siteConfig.phone || "الهاتف غير متوفر",
+    vatNumber: siteConfig.vatNumber || "",
+    logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
+    website: invoiceSettings.website || "",
+    footer: invoiceSettings.footer || "شكراً لزيارتكم!",
+    fontSize: invoiceSettings.fontSize || "normal",
+    showVat: invoiceSettings.showVat ?? true,
+    template: invoiceSettings.template || "default",
+    notes: invoiceSettings.notes || "",
+    paymentInstructions: invoiceSettings.paymentInstructions || "",
+    logoChoice: invoiceSettings.logoChoice || "store",
+    customLogoUrl: invoiceSettings.customLogoUrl || null,
+    currency: siteConfig.currency || 'ج.م'
+  });
+
   const handlePrint = async () => {
-    // Get store info from site config, overriding with preview settings if any
-    const storeInfo = {
-      name: siteConfig.name,
-      address: siteConfig.address || "العنوان غير متوفر",
-      phone: siteConfig.phone || "الهاتف غير متوفر",
-      vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
-      logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
-      website: invoiceSettings.website || "",
-      footer: invoiceSettings.footer || "شكراً لزيارتكم!",
-      fontSize: invoiceSettings.fontSize || "normal",
-      showVat: invoiceSettings.showVat ?? true,
-      template: invoiceSettings.template || "default",
-      notes: invoiceSettings.notes || "",
-      paymentInstructions: invoiceSettings.paymentInstructions || "",
-      logoChoice: invoiceSettings.logoChoice || "store",
-      customLogoUrl: invoiceSettings.customLogoUrl || null,
-      currency: siteConfig.currency || 'ج.م'
-    };
+    const storeInfo = getStoreInfo();
     
     // Try Bluetooth printer first, fallback to regular print
     if (bluetoothPrinterService.isConnected()) {
@@ -71,6 +73,24 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
     
     // Fallback to regular print
     printInvoice(sale, storeInfo);
+  };
+
+  const handleDownloadPDF = async () => {
+    const storeInfo = getStoreInfo();
+    try {
+      await downloadInvoicePDF(sale, storeInfo);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+    }
+  };
+
+  const handlePrintPDF = async () => {
+    const storeInfo = getStoreInfo();
+    try {
+      await printInvoicePDF(sale, storeInfo);
+    } catch (error) {
+      console.error('Error printing PDF:', error);
+    }
   };
 
   // Format sale date
@@ -213,9 +233,17 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
         </div>
         
         <DialogFooter className="sm:justify-start">
-          <Button onClick={handlePrint} className="gap-2">
+          <Button onClick={handlePrintPDF} className="gap-2">
+            <FileText className="h-4 w-4" />
+            طباعة PDF
+          </Button>
+          <Button onClick={handleDownloadPDF} variant="outline" className="gap-2">
+            <Download className="h-4 w-4" />
+            تحميل PDF
+          </Button>
+          <Button onClick={handlePrint} variant="outline" className="gap-2">
             <Printer className="h-4 w-4" />
-            طباعة الفاتورة
+            طباعة عادية
           </Button>
           <Button variant="outline" onClick={onClose}>
             إغلاق
