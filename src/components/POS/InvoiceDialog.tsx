@@ -4,10 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
 import { Sale } from "@/types";
-import { Printer, Save, FileText, Download, Share } from "lucide-react";
+import { Printer, Save, FileText } from "lucide-react";
 import { printInvoice } from '@/services/supabase/saleService';
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
-import { downloadInvoicePDF, printInvoicePDF, generateInvoicePDF } from '@/services/pdfInvoiceService';
 
 interface InvoiceDialogProps {
   isOpen: boolean;
@@ -43,26 +42,25 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
     ...(settings || {})
   };
 
-  const getStoreInfo = () => ({
-    name: siteConfig.name,
-    address: siteConfig.address || "العنوان غير متوفر",
-    phone: siteConfig.phone || "الهاتف غير متوفر",
-    vatNumber: siteConfig.vatNumber || "",
-    logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
-    website: invoiceSettings.website || "",
-    footer: invoiceSettings.footer || "شكراً لزيارتكم!",
-    fontSize: invoiceSettings.fontSize || "normal",
-    showVat: invoiceSettings.showVat ?? true,
-    template: invoiceSettings.template || "default",
-    notes: invoiceSettings.notes || "",
-    paymentInstructions: invoiceSettings.paymentInstructions || "",
-    logoChoice: invoiceSettings.logoChoice || "store",
-    customLogoUrl: invoiceSettings.customLogoUrl || null,
-    currency: siteConfig.currency || 'ج.م'
-  });
-
   const handlePrint = async () => {
-    const storeInfo = getStoreInfo();
+    // Get store info from site config, overriding with preview settings if any
+    const storeInfo = {
+      name: siteConfig.name,
+      address: siteConfig.address || "العنوان غير متوفر",
+      phone: siteConfig.phone || "الهاتف غير متوفر",
+      vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
+      logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
+      website: invoiceSettings.website || "",
+      footer: invoiceSettings.footer || "شكراً لزيارتكم!",
+      fontSize: invoiceSettings.fontSize || "normal",
+      showVat: invoiceSettings.showVat ?? true,
+      template: invoiceSettings.template || "default",
+      notes: invoiceSettings.notes || "",
+      paymentInstructions: invoiceSettings.paymentInstructions || "",
+      logoChoice: invoiceSettings.logoChoice || "store",
+      customLogoUrl: invoiceSettings.customLogoUrl || null,
+      currency: siteConfig.currency || 'ج.م'
+    };
     
     // Try Bluetooth printer first, fallback to regular print
     if (bluetoothPrinterService.isConnected()) {
@@ -73,99 +71,6 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
     
     // Fallback to regular print
     printInvoice(sale, storeInfo);
-  };
-
-  const handleDownloadPDF = async () => {
-    const storeInfo = getStoreInfo();
-    try {
-      await downloadInvoicePDF(sale, storeInfo);
-    } catch (error) {
-      console.error('Error downloading PDF:', error);
-    }
-  };
-
-  const handlePrintPDF = async () => {
-    const storeInfo = getStoreInfo();
-    try {
-      await printInvoicePDF(sale, storeInfo);
-    } catch (error) {
-      console.error('Error printing PDF:', error);
-    }
-  };
-
-  const handleSharePDF = async () => {
-    const storeInfo = getStoreInfo();
-    try {
-      const pdfBlob = await generateInvoicePDF(sale, storeInfo);
-      const fileName = `invoice-${sale.invoice_number}.pdf`;
-      
-      // Check if Web Share API is supported and files can be shared
-      if (navigator.share && navigator.canShare) {
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-        
-        // Check if sharing files is supported
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              title: `فاتورة ${sale.invoice_number}`,
-              text: `فاتورة رقم ${sale.invoice_number} من ${storeInfo.name}`,
-              files: [file],
-            });
-            return; // Successfully shared
-          } catch (shareError) {
-            console.log('Web Share failed, trying fallback:', shareError);
-            // Fall through to fallback options
-          }
-        }
-      }
-      
-      // Fallback 1: Try to copy share link to clipboard
-      const url = URL.createObjectURL(pdfBlob);
-      const shareText = `فاتورة رقم ${sale.invoice_number} من ${storeInfo.name}\nيمكنك تحميل الفاتورة من الرابط أدناه.`;
-      
-      if (navigator.clipboard) {
-        try {
-          await navigator.clipboard.writeText(shareText);
-          // Create temporary download
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-          alert('تم نسخ معلومات الفاتورة إلى الحافظة وتحميل الملف. يمكنك الآن لصقها في أي تطبيق للمشاركة.');
-        } catch (clipboardError) {
-          console.log('Clipboard failed, using basic download:', clipboardError);
-          // Fallback 2: Simple download
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-          alert('تم تحميل الفاتورة بنجاح. يمكنك الآن مشاركتها يدوياً من مجلد التحميلات.');
-        }
-      } else {
-        // Fallback 3: Basic download only
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        alert('تم تحميل الفاتورة بنجاح. يمكنك مشاركتها من مجلد التحميلات.');
-      }
-      
-      // Clean up
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      
-    } catch (error) {
-      console.error('Error in handleSharePDF:', error);
-      alert('حدث خطأ أثناء إنشاء الفاتورة. الرجاء المحاولة مرة أخرى.');
-    }
   };
 
   // Format sale date
@@ -308,21 +213,9 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
         </div>
         
         <DialogFooter className="sm:justify-start">
-          <Button onClick={handlePrintPDF} className="gap-2">
-            <FileText className="h-4 w-4" />
-            طباعة PDF
-          </Button>
-          <Button onClick={handleSharePDF} variant="outline" className="gap-2">
-            <Share className="h-4 w-4" />
-            مشاركة PDF
-          </Button>
-          <Button onClick={handleDownloadPDF} variant="outline" className="gap-2">
-            <Download className="h-4 w-4" />
-            تحميل PDF
-          </Button>
-          <Button onClick={handlePrint} variant="outline" className="gap-2">
+          <Button onClick={handlePrint} className="gap-2">
             <Printer className="h-4 w-4" />
-            طباعة عادية
+            طباعة الفاتورة
           </Button>
           <Button variant="outline" onClick={onClose}>
             إغلاق
