@@ -1,12 +1,14 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
 import { Sale } from "@/types";
-import { Printer, Save, FileText } from "lucide-react";
+import { Printer, Save, FileText, Receipt } from "lucide-react";
 import { printInvoice } from '@/services/supabase/saleService';
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
+import { PrintOptionsDialog, PrintType } from '@/components/printing/PrintOptionsDialog';
+import { thermalPrintService } from '@/services/thermalPrintService';
 
 interface InvoiceDialogProps {
   isOpen: boolean;
@@ -34,6 +36,8 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
   previewMode = false,
   settings 
 }) => {
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
+  
   if (!sale) return null;
 
   // Combine current site config with any preview settings
@@ -42,7 +46,11 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
     ...(settings || {})
   };
 
-  const handlePrint = async () => {
+  const handlePrint = () => {
+    setShowPrintOptions(true);
+  };
+
+  const handlePrintTypeSelected = async (printType: PrintType) => {
     // Get store info from site config, overriding with preview settings if any
     const storeInfo = {
       name: siteConfig.name,
@@ -62,15 +70,26 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       currency: siteConfig.currency || 'ج.م'
     };
     
-    // Try Bluetooth printer first, fallback to regular print
-    if (bluetoothPrinterService.isConnected()) {
-      const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
-      const success = await bluetoothPrinterService.printText(invoiceText);
-      if (success) return;
+    if (printType === 'thermal') {
+      // Use thermal printing service for 58mm receipts
+      thermalPrintService.printThermalInvoice(sale, storeInfo, {
+        width: '58mm',
+        fontSize: 'small',
+        showLogo: true,
+        paperSaving: true
+      });
+    } else {
+      // Standard printing
+      // Try Bluetooth printer first, fallback to regular print
+      if (bluetoothPrinterService.isConnected()) {
+        const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
+        const success = await bluetoothPrinterService.printText(invoiceText);
+        if (success) return;
+      }
+      
+      // Fallback to regular print
+      printInvoice(sale, storeInfo);
     }
-    
-    // Fallback to regular print
-    printInvoice(sale, storeInfo);
   };
 
   // Format sale date
@@ -222,6 +241,15 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
           </Button>
         </DialogFooter>
       </DialogContent>
+      
+      {/* Print Options Dialog */}
+      <PrintOptionsDialog
+        isOpen={showPrintOptions}
+        onClose={() => setShowPrintOptions(false)}
+        onPrintSelected={handlePrintTypeSelected}
+        title="اختيار نوع طباعة الفاتورة"
+        description="اختر نوع الطباعة المناسب للفاتورة"
+      />
     </Dialog>
   );
 };

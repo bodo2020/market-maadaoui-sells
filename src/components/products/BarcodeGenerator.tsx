@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Printer, QrCode, Copy } from 'lucide-react';
+import { Printer, QrCode, Copy, Receipt, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
 import { Product } from '@/types';
 import { fetchStoreSettings } from '@/services/supabase/storeService';
+import { PrintOptionsDialog, PrintType } from '@/components/printing/PrintOptionsDialog';
+import { thermalPrintService } from '@/services/thermalPrintService';
 
 interface BarcodeGeneratorProps {
   product: Product;
@@ -23,6 +25,7 @@ export const BarcodeGenerator: React.FC<BarcodeGeneratorProps> = ({
   const printCanvasRef = useRef<HTMLCanvasElement>(null);
   const [customBarcode, setCustomBarcode] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
   const [storeName, setStoreName] = useState(propStoreName);
 
   // Fetch store settings when component opens
@@ -121,67 +124,98 @@ export const BarcodeGenerator: React.FC<BarcodeGeneratorProps> = ({
     }
   }, [isOpen, barcodeValue, product, storeName]);
 
-  const handlePrint = async () => {
-    if (!printCanvasRef.current) return;
+  const handlePrint = () => {
+    setShowPrintOptions(true);
+  };
 
-    generateBarcode(printCanvasRef.current, true);
+  const handlePrintTypeSelected = async (printType: PrintType) => {
+    const barcodeToUse = customBarcode || product.barcode || generateProductBarcode();
     
-    // Try Bluetooth printer first
-    if (bluetoothPrinterService.isConnected()) {
-      const success = await bluetoothPrinterService.printBarcode(printCanvasRef.current);
-      if (success) return;
-    }
-    
-    // Fallback to regular print window
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('لا يمكن فتح نافذة الطباعة');
-      return;
-    }
+    if (printType === 'thermal') {
+      // Use thermal printing service for 58mm
+      try {
+        await thermalPrintService.printThermalBarcode(
+          barcodeToUse,
+          product.name,
+          product.price,
+          storeName,
+          { width: '58mm', fontSize: 'small' }
+        );
+        toast.success('تم إرسال الباركود للطباعة الحرارية');
+      } catch (error) {
+        console.error('Error printing thermal barcode:', error);
+        toast.error('خطأ في طباعة الباركود الحراري');
+      }
+    } else {
+      // Standard printing
+      if (!printCanvasRef.current) return;
 
-    const canvas = printCanvasRef.current;
-    const dataURL = canvas.toDataURL('image/png');
+      generateBarcode(printCanvasRef.current, true);
+      
+      // Try Bluetooth printer first
+      if (bluetoothPrinterService.isConnected()) {
+        const success = await bluetoothPrinterService.printBarcode(printCanvasRef.current);
+        if (success) {
+          toast.success('تم طباعة الباركود عبر البلوتوث');
+          return;
+        }
+      }
+      
+      // Fallback to regular print window
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast.error('لا يمكن فتح نافذة الطباعة');
+        return;
+      }
 
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>طباعة باركود - ${product.name}</title>
-          <style>
-            body {
-              margin: 0;
-              padding: 10px;
-              text-align: center;
-              font-family: Arial, sans-serif;
-            }
-            img {
-              max-width: 100%;
-              height: auto;
-            }
-            @media print {
-              body { margin: 0; padding: 0; }
-              img { 
-                width: 58mm; 
-                height: auto;
-                page-break-inside: avoid;
+      const canvas = printCanvasRef.current;
+      const dataURL = canvas.toDataURL('image/png');
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>طباعة باركود - ${product.name}</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 10px;
+                text-align: center;
+                font-family: Arial, sans-serif;
+                direction: rtl;
               }
-            }
-          </style>
-        </head>
-        <body>
-          <img src="${dataURL}" alt="Barcode for ${product.name}" />
-        </body>
-      </html>
-    `);
+              img {
+                max-width: 100%;
+                height: auto;
+              }
+              @media print {
+                body { margin: 0; padding: 0; }
+                img { 
+                  width: 80mm; 
+                  height: auto;
+                  page-break-inside: avoid;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <h3>${product.name}</h3>
+            <img src="${dataURL}" alt="Barcode for ${product.name}" />
+            <p>الباركود: ${barcodeToUse}</p>
+            ${product.price ? `<p>السعر: ${product.price} ج.م</p>` : ''}
+          </body>
+        </html>
+      `);
 
-    printWindow.document.close();
-    
-    // Wait for image to load then print
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 500);
+      printWindow.document.close();
+      
+      // Wait for image to load then print
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
 
-    toast.success('تم إرسال الباركود للطباعة');
+      toast.success('تم إرسال الباركود للطباعة');
+    }
   };
 
   const copyBarcode = () => {
@@ -249,6 +283,15 @@ export const BarcodeGenerator: React.FC<BarcodeGeneratorProps> = ({
         {/* Hidden canvas for printing */}
         <canvas ref={printCanvasRef} style={{ display: 'none' }} />
       </DialogContent>
+      
+      {/* Print Options Dialog */}
+      <PrintOptionsDialog
+        isOpen={showPrintOptions}
+        onClose={() => setShowPrintOptions(false)}
+        onPrintSelected={handlePrintTypeSelected}
+        title="اختيار نوع طباعة الباركود"
+        description="اختر نوع الطباعة المناسب للباركود"
+      />
     </Dialog>
   );
 };
