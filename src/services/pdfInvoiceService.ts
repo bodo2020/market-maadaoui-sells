@@ -37,9 +37,6 @@ export class PDFInvoiceService {
       unit: 'mm',
       format: 'a4'
     });
-
-    // Set RTL text direction and Arabic font support
-    this.doc.setLanguage('ar');
     
     let yPosition = 20;
     const pageWidth = this.doc.internal.pageSize.width;
@@ -48,38 +45,31 @@ export class PDFInvoiceService {
     // Store Header
     this.doc.setFontSize(20);
     this.doc.setFont('helvetica', 'bold');
-    const storeName = this.reverseArabicText(storeInfo.name);
-    this.doc.text(storeName, pageWidth - margin, yPosition, { align: 'right' });
+    this.doc.text(storeInfo.name, pageWidth - margin, yPosition, { align: 'right' });
     yPosition += 10;
 
     if (storeInfo.address) {
       this.doc.setFontSize(12);
       this.doc.setFont('helvetica', 'normal');
-      const address = this.reverseArabicText(storeInfo.address);
-      this.doc.text(address, pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text(storeInfo.address, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
     }
 
     if (storeInfo.phone) {
       this.doc.setFontSize(12);
-      const phone = `هاتف: ${storeInfo.phone}`;
-      const phoneText = this.reverseArabicText(phone);
-      this.doc.text(phoneText, pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text(`هاتف: ${storeInfo.phone}`, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
     }
 
     if (storeInfo.website) {
       this.doc.setFontSize(12);
-      const website = this.reverseArabicText(storeInfo.website);
-      this.doc.text(website, pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text(storeInfo.website, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
     }
 
     if (storeInfo.showVat && storeInfo.vatNumber) {
       this.doc.setFontSize(12);
-      const vatText = `الرقم الضريبي: ${storeInfo.vatNumber}`;
-      const vat = this.reverseArabicText(vatText);
-      this.doc.text(vat, pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text(`الرقم الضريبي: ${storeInfo.vatNumber}`, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
     }
 
@@ -90,9 +80,7 @@ export class PDFInvoiceService {
     this.doc.setFont('helvetica', 'bold');
     
     // Invoice Number
-    const invoiceText = `رقم الفاتورة: ${sale.invoice_number}`;
-    const invoiceNumber = this.reverseArabicText(invoiceText);
-    this.doc.text(invoiceNumber, pageWidth - margin, yPosition, { align: 'right' });
+    this.doc.text(`رقم الفاتورة: ${sale.invoice_number}`, pageWidth - margin, yPosition, { align: 'right' });
     yPosition += 10;
 
     // Date
@@ -104,25 +92,19 @@ export class PDFInvoiceService {
       hour: '2-digit',
       minute: '2-digit'
     });
-    const dateText = `التاريخ: ${formattedDate}`;
-    const dateFormatted = this.reverseArabicText(dateText);
-    this.doc.text(dateFormatted, pageWidth - margin, yPosition, { align: 'right' });
+    this.doc.text(`التاريخ: ${formattedDate}`, pageWidth - margin, yPosition, { align: 'right' });
     yPosition += 15;
 
     // Customer Info
     if (sale.customer_name) {
       this.doc.setFontSize(12);
       this.doc.setFont('helvetica', 'bold');
-      const customerText = `العميل: ${sale.customer_name}`;
-      const customer = this.reverseArabicText(customerText);
-      this.doc.text(customer, pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text(`العميل: ${sale.customer_name}`, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
 
       if (sale.customer_phone) {
         this.doc.setFont('helvetica', 'normal');
-        const phoneText = `هاتف: ${sale.customer_phone}`;
-        const phone = this.reverseArabicText(phoneText);
-        this.doc.text(phone, pageWidth - margin, yPosition, { align: 'right' });
+        this.doc.text(`هاتف: ${sale.customer_phone}`, pageWidth - margin, yPosition, { align: 'right' });
         yPosition += 8;
       }
       yPosition += 10;
@@ -142,10 +124,10 @@ export class PDFInvoiceService {
     const col3 = col2 - 30; // Price
     const col4 = col3 - 30; // Total
 
-    this.doc.text(this.reverseArabicText('الصنف'), col1, yPosition, { align: 'right' });
-    this.doc.text(this.reverseArabicText('الكمية'), col2, yPosition, { align: 'center' });
-    this.doc.text(this.reverseArabicText('السعر'), col3, yPosition, { align: 'center' });
-    this.doc.text(this.reverseArabicText('المجموع'), col4, yPosition, { align: 'center' });
+    this.doc.text('الصنف', col1, yPosition, { align: 'right' });
+    this.doc.text('الكمية', col2, yPosition, { align: 'center' });
+    this.doc.text('السعر', col3, yPosition, { align: 'center' });
+    this.doc.text('المجموع', col4, yPosition, { align: 'center' });
 
     yPosition += 5;
     this.doc.line(margin, yPosition, pageWidth - margin, yPosition); // Header bottom line
@@ -154,15 +136,14 @@ export class PDFInvoiceService {
     // Items
     this.doc.setFont('helvetica', 'normal');
     sale.items.forEach((item) => {
-      const productName = this.reverseArabicText(item.product.name);
       const quantity = item.weight ? `${item.weight} كجم` : item.quantity.toString();
       const price = item.price.toFixed(2);
       const total = `${item.total.toFixed(2)} ${storeInfo.currency}`;
 
-      this.doc.text(productName, col1, yPosition, { align: 'right' });
-      this.doc.text(this.reverseArabicText(quantity), col2, yPosition, { align: 'center' });
+      this.doc.text(item.product.name, col1, yPosition, { align: 'right' });
+      this.doc.text(quantity, col2, yPosition, { align: 'center' });
       this.doc.text(price, col3, yPosition, { align: 'center' });
-      this.doc.text(this.reverseArabicText(total), col4, yPosition, { align: 'center' });
+      this.doc.text(total, col4, yPosition, { align: 'center' });
 
       yPosition += 8;
     });
@@ -175,21 +156,18 @@ export class PDFInvoiceService {
     this.doc.setFont('helvetica', 'bold');
     
     // Subtotal
-    const subtotalText = `المجموع الفرعي: ${sale.subtotal.toFixed(2)} ${storeInfo.currency}`;
-    this.doc.text(this.reverseArabicText(subtotalText), pageWidth - margin, yPosition, { align: 'right' });
+    this.doc.text(`المجموع الفرعي: ${sale.subtotal.toFixed(2)} ${storeInfo.currency}`, pageWidth - margin, yPosition, { align: 'right' });
     yPosition += 8;
 
     // Discount
     if (sale.discount > 0) {
-      const discountText = `الخصم: -${sale.discount.toFixed(2)} ${storeInfo.currency}`;
-      this.doc.text(this.reverseArabicText(discountText), pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text(`الخصم: -${sale.discount.toFixed(2)} ${storeInfo.currency}`, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
     }
 
     // Total
     this.doc.setFontSize(14);
-    const totalText = `الإجمالي: ${sale.total.toFixed(2)} ${storeInfo.currency}`;
-    this.doc.text(this.reverseArabicText(totalText), pageWidth - margin, yPosition, { align: 'right' });
+    this.doc.text(`الإجمالي: ${sale.total.toFixed(2)} ${storeInfo.currency}`, pageWidth - margin, yPosition, { align: 'right' });
     yPosition += 15;
 
     // Payment Info
@@ -198,19 +176,16 @@ export class PDFInvoiceService {
     
     const paymentMethod = sale.payment_method === 'cash' ? 'نقدي' : 
                          sale.payment_method === 'card' ? 'بطاقة' : 'مختلط';
-    const paymentText = `طريقة الدفع: ${paymentMethod}`;
-    this.doc.text(this.reverseArabicText(paymentText), pageWidth - margin, yPosition, { align: 'right' });
+    this.doc.text(`طريقة الدفع: ${paymentMethod}`, pageWidth - margin, yPosition, { align: 'right' });
     yPosition += 8;
 
     if (sale.cash_amount) {
-      const cashText = `المبلغ النقدي: ${sale.cash_amount.toFixed(2)} ${storeInfo.currency}`;
-      this.doc.text(this.reverseArabicText(cashText), pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text(`المبلغ النقدي: ${sale.cash_amount.toFixed(2)} ${storeInfo.currency}`, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
     }
 
     if (sale.card_amount) {
-      const cardText = `مبلغ البطاقة: ${sale.card_amount.toFixed(2)} ${storeInfo.currency}`;
-      this.doc.text(this.reverseArabicText(cardText), pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text(`مبلغ البطاقة: ${sale.card_amount.toFixed(2)} ${storeInfo.currency}`, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
     }
 
@@ -218,10 +193,10 @@ export class PDFInvoiceService {
     if (storeInfo.notes) {
       yPosition += 10;
       this.doc.setFont('helvetica', 'bold');
-      this.doc.text(this.reverseArabicText('ملاحظات:'), pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text('ملاحظات:', pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
       this.doc.setFont('helvetica', 'normal');
-      this.doc.text(this.reverseArabicText(storeInfo.notes), pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text(storeInfo.notes, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
     }
 
@@ -229,10 +204,10 @@ export class PDFInvoiceService {
     if (storeInfo.paymentInstructions) {
       yPosition += 5;
       this.doc.setFont('helvetica', 'bold');
-      this.doc.text(this.reverseArabicText('تعليمات الدفع:'), pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text('تعليمات الدفع:', pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
       this.doc.setFont('helvetica', 'normal');
-      this.doc.text(this.reverseArabicText(storeInfo.paymentInstructions), pageWidth - margin, yPosition, { align: 'right' });
+      this.doc.text(storeInfo.paymentInstructions, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 8;
     }
 
@@ -241,21 +216,12 @@ export class PDFInvoiceService {
     this.doc.setFontSize(12);
     this.doc.setFont('helvetica', 'normal');
     const footer = storeInfo.footer || "شكراً لزيارتكم!";
-    this.doc.text(this.reverseArabicText(footer), pageWidth / 2, yPosition, { align: 'center' });
+    this.doc.text(footer, pageWidth / 2, yPosition, { align: 'center' });
 
     // Return the PDF as base64 string
     return this.doc.output('datauristring');
   }
 
-  private reverseArabicText(text: string): string {
-    // Simple Arabic text reversal for better RTL display
-    // This is a basic implementation - for complex text, consider using a proper RTL library
-    const arabicRegex = /[\u0600-\u06FF\u0750-\u077F]/;
-    if (arabicRegex.test(text)) {
-      return text.split('').reverse().join('');
-    }
-    return text;
-  }
 
   downloadPDF(sale: Sale, storeInfo: StoreInfo): void {
     this.generateInvoicePDF(sale, storeInfo).then((pdfData) => {
