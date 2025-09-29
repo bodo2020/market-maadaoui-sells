@@ -118,8 +118,12 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
   }
 }
 
-export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale[]> {
-  let query = supabase.from("sales").select("*").order("date", { ascending: false });
+export async function fetchSales(startDate?: Date, endDate?: Date, limit: number = 100): Promise<Sale[]> {
+  let query = supabase
+    .from("sales")
+    .select("id, invoice_number, date, customer_name, total, payment_method, created_at")
+    .order("date", { ascending: false })
+    .limit(limit);
   
   if (startDate && endDate) {
     const start = new Date(startDate);
@@ -140,8 +144,7 @@ export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale
     throw error;
   }
   
-  // Convert the items field from JSON to CartItem[] in each sale
-  // Also ensure payment_method is one of the allowed values
+  // Convert the data ensuring proper types for Sale interface
   return (data || []).map(sale => ({
     ...sale,
     // Ensure payment_method is one of the allowed values in the Sale type
@@ -150,10 +153,8 @@ export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale
                     sale.payment_method === 'mixed') 
                     ? sale.payment_method as 'cash' | 'card' | 'mixed'
                     : 'cash', // Default to 'cash' if invalid value
-    // Parse items properly
-    items: Array.isArray(sale.items) 
-      ? sale.items as unknown as CartItem[]  // If already an array
-      : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
+    // Add empty items array since we're only fetching basic info for performance
+    items: [] as CartItem[]
   })) as Sale[];
 }
 
@@ -178,7 +179,10 @@ export async function fetchSaleById(id: string) {
                     data.payment_method === 'mixed') 
                     ? data.payment_method as 'cash' | 'card' | 'mixed'
                     : 'cash', // Default to 'cash' if invalid value
-    items: data.items as unknown as CartItem[]
+    // Parse items properly for full sale details
+    items: Array.isArray(data.items) 
+      ? data.items as unknown as CartItem[]
+      : JSON.parse(typeof data.items === 'string' ? data.items : JSON.stringify(data.items)) as CartItem[]
   } as Sale;
 }
 
