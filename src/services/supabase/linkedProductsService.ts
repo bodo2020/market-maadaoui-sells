@@ -78,8 +78,6 @@ export async function createLinkedProduct(
       bulk_enabled: parentProduct.bulk_enabled,
       bulk_quantity: parentProduct.bulk_quantity,
       bulk_price: parentProduct.bulk_price,
-      track_inventory: parentProduct.track_inventory,
-      track_expiry: parentProduct.track_expiry,
       
       // البيانات المخصصة للمنتج المرتبط
       barcode: linkedProductData.barcode,
