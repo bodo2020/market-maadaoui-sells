@@ -1686,7 +1686,6 @@ export type Database = {
           bulk_price: number | null
           bulk_quantity: number | null
           company_id: string | null
-          conversion_factor: number | null
           created_at: string | null
           description: string | null
           expiry_date: string | null
@@ -1700,11 +1699,9 @@ export type Database = {
           manufacturer_name: string | null
           name: string
           offer_price: number | null
-          parent_product_id: string | null
           price: number
           purchase_price: number
           quantity: number | null
-          shared_inventory: boolean | null
           shelf_location: string | null
           subcategory_id: string | null
           track_expiry: boolean | null
@@ -1720,7 +1717,6 @@ export type Database = {
           bulk_price?: number | null
           bulk_quantity?: number | null
           company_id?: string | null
-          conversion_factor?: number | null
           created_at?: string | null
           description?: string | null
           expiry_date?: string | null
@@ -1734,11 +1730,9 @@ export type Database = {
           manufacturer_name?: string | null
           name: string
           offer_price?: number | null
-          parent_product_id?: string | null
           price: number
           purchase_price: number
           quantity?: number | null
-          shared_inventory?: boolean | null
           shelf_location?: string | null
           subcategory_id?: string | null
           track_expiry?: boolean | null
@@ -1754,7 +1748,6 @@ export type Database = {
           bulk_price?: number | null
           bulk_quantity?: number | null
           company_id?: string | null
-          conversion_factor?: number | null
           created_at?: string | null
           description?: string | null
           expiry_date?: string | null
@@ -1768,11 +1761,9 @@ export type Database = {
           manufacturer_name?: string | null
           name?: string
           offer_price?: number | null
-          parent_product_id?: string | null
           price?: number
           purchase_price?: number
           quantity?: number | null
-          shared_inventory?: boolean | null
           shelf_location?: string | null
           subcategory_id?: string | null
           track_expiry?: boolean | null
@@ -1806,13 +1797,6 @@ export type Database = {
             columns: ["main_category_id"]
             isOneToOne: false
             referencedRelation: "main_categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "products_parent_product_id_fkey"
-            columns: ["parent_product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
