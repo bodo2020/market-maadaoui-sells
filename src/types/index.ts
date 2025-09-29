@@ -99,6 +99,28 @@ export interface Product {
   expiry_date?: string | null;
   shelf_location?: string | null;
   track_expiry?: boolean;
+  // حقول نظام المنتجات المترابطة
+  has_variants?: boolean;
+  is_variant?: boolean;
+  base_unit?: string;
+  variants?: ProductVariant[];
+}
+
+export interface ProductVariant {
+  id?: string;
+  parent_product_id: string;
+  name: string;
+  variant_type: string;
+  price: number;
+  purchase_price: number;
+  conversion_factor: number;
+  barcode?: string;
+  bulk_barcode?: string;
+  image_url?: string;
+  active: boolean;
+  position: number;
+  created_at?: Date | string;
+  updated_at?: Date | string;
 }
 
 export interface ProductBatch {
