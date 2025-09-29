@@ -51,15 +51,13 @@ export default function MainLayout({
   // Realtime subscription for order/return counts
   useEffect(() => {
     if (!isAuthenticated) return;
+
     const fetchCounts = async () => {
       try {
-        const [ordersRes, returnsRes] = await Promise.all([supabase.from('online_orders').select('*', {
-          count: 'exact',
-          head: true
-        }).eq('status', 'pending'), supabase.from('returns').select('*', {
-          count: 'exact',
-          head: true
-        }).eq('status', 'pending')]);
+        const [ordersRes, returnsRes] = await Promise.all([
+          supabase.from('online_orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('returns').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+        ]);
         if (ordersRes.error) console.error('Error counting waiting orders:', ordersRes.error);
         if (returnsRes.error) console.error('Error counting pending returns:', returnsRes.error);
         setUnreadOrders(ordersRes.count || 0);
@@ -71,31 +69,23 @@ export default function MainLayout({
 
     // initial fetch
     fetchCounts();
-    const channel = supabase.channel('global-notifications').on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'online_orders'
-    }, () => {
-      fetchCounts();
-    }).on('postgres_changes', {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'online_orders'
-    }, () => {
-      fetchCounts();
-    }).on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'returns'
-    }, () => {
-      fetchCounts();
-    }).on('postgres_changes', {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'returns'
-    }, () => {
-      fetchCounts();
-    }).subscribe();
+
+    const channel = supabase
+      .channel('global-notifications')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'online_orders' }, () => {
+        fetchCounts();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'online_orders' }, () => {
+        fetchCounts();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'returns' }, () => {
+        fetchCounts();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'returns' }, () => {
+        fetchCounts();
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -128,7 +118,7 @@ export default function MainLayout({
         
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <Navbar />
-          <main className="flex-1 overflow-auto p-3 md:p-6 pb-20 py-0">{children}</main>
+          <main className="flex-1 overflow-auto p-3 md:p-6 pb-20">{children}</main>
         </div>
       </div>
     </TooltipProvider>;

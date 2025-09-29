@@ -98,10 +98,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       : null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      console.log("InvoiceDialog onOpenChange:", open);
-      if (!open) onClose();
-    }}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className={`sm:max-w-xl max-h-[90vh] overflow-y-auto ${fontSizeClass}`}>
         <DialogHeader>
           <DialogTitle>{previewMode ? "معاينة الفاتورة" : "فاتورة المبيعات"}</DialogTitle>

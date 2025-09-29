@@ -28,29 +28,25 @@ const Invoices = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  // Fetch sales with pagination and optimization
+  // Fetch all sales
   const { 
     data: sales, 
     isLoading: salesLoading, 
     isError: salesError, 
     refetch: refetchSales 
   } = useQuery({
-    queryKey: ['sales', selectedDate],
-    queryFn: () => fetchSales(selectedDate, selectedDate, 200),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    queryKey: ['sales'],
+    queryFn: () => fetchSales()
   });
 
-  // Fetch purchases with pagination and optimization
+  // Fetch all purchases
   const { 
     data: purchases, 
     isLoading: purchasesLoading, 
     isError: purchasesError 
   } = useQuery({
-    queryKey: ['purchases', selectedDate],
-    queryFn: () => fetchPurchases(200),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    queryKey: ['purchases'],
+    queryFn: fetchPurchases
   });
 
   // Filter by search query and date
@@ -238,21 +234,9 @@ const Invoices = () => {
 
           <div className="space-y-4">
             {isLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p>جاري تحميل الفواتير...</p>
-                <p className="text-sm text-gray-500 mt-2">يتم تحميل آخر 200 فاتورة فقط لتحسين الأداء</p>
-              </div>
+              <div className="text-center py-8">جاري التحميل...</div>
             ) : isError ? (
-              <div className="text-center py-8 text-red-500">
-                <p>حدث خطأ أثناء تحميل الفواتير</p>
-                <button 
-                  onClick={() => invoiceType === 'sales' ? refetchSales() : window.location.reload()}
-                  className="mt-2 text-blue-500 hover:underline"
-                >
-                  إعادة المحاولة
-                </button>
-              </div>
+              <div className="text-center py-8 text-red-500">حدث خطأ أثناء تحميل الفواتير</div>
             ) : (
               <div className="overflow-x-auto">
                 {invoiceType === 'sales' ? (
@@ -269,15 +253,7 @@ const Invoices = () => {
                     </thead>
                     <tbody>
                       {filteredSales && filteredSales.length > 0 ? (
-                        <>
-                          {filteredSales.length > 100 && (
-                            <tr>
-                              <td colSpan={6} className="p-3 text-center bg-blue-50 text-blue-800 text-sm">
-                                يتم عرض آخر 200 فاتورة فقط لتحسين الأداء. استخدم البحث أو التاريخ للعثور على فواتير معينة.
-                              </td>
-                            </tr>
-                          )}
-                          {filteredSales.map((sale) => {
+                        filteredSales.map((sale) => {
                           const saleDate = new Date(sale.date);
                           const formattedDate = saleDate.toLocaleDateString('ar-EG', {
                             year: 'numeric',
@@ -318,8 +294,7 @@ const Invoices = () => {
                               </td>
                             </tr>
                           );
-                          })}
-                        </>
+                        })
                       ) : (
                         <tr>
                           <td colSpan={6} className="p-3 text-center">
@@ -344,15 +319,7 @@ const Invoices = () => {
                     </thead>
                     <tbody>
                       {filteredPurchases && filteredPurchases.length > 0 ? (
-                        <>
-                          {filteredPurchases.length > 100 && (
-                            <tr>
-                              <td colSpan={7} className="p-3 text-center bg-yellow-50 text-yellow-800 text-sm">
-                                يتم عرض آخر 200 فاتورة فقط لتحسين الأداء. استخدم البحث أو التاريخ للعثور على فواتير معينة.
-                              </td>
-                            </tr>
-                          )}
-                          {filteredPurchases.map((purchase) => {
+                        filteredPurchases.map((purchase) => {
                           const purchaseDate = new Date(purchase.date);
                           const formattedDate = purchaseDate.toLocaleDateString('ar-EG', {
                             year: 'numeric',
@@ -393,8 +360,7 @@ const Invoices = () => {
                               </td>
                             </tr>
                           );
-                          })}
-                        </>
+                        })
                       ) : (
                         <tr>
                           <td colSpan={7} className="p-3 text-center">
