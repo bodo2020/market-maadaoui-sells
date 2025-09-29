@@ -204,9 +204,12 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
       updateData.unit_of_measure = product.barcode_type === 'scale' ? 'كيلوجرام' : 'قطعة';
     }
 
+    // إزالة الحقول غير الموجودة في جدول المنتجات لمنع أخطاء PostgREST
+    const { min_stock_level, created_at, updated_at, id: _id, ...cleanedData } = updateData;
+
     const { data, error } = await supabase
       .from("products")
-      .update(updateData)
+      .update(cleanedData)
       .eq("id", id)
       .select()
       .single();
