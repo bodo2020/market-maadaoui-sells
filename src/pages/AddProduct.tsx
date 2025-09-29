@@ -20,9 +20,6 @@ import { fetchSubcategories } from "@/services/supabase/categoryService";
 import { MainCategory, Subcategory, Company } from "@/types";
 import { DragDropImage } from "@/components/ui/drag-drop-image";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
-import { ProductVariantsManager } from "@/components/products/ProductVariantsManager";
-import { ProductVariant } from "@/types";
-import { createMultipleVariants, fetchProductVariants } from "@/services/supabase/productVariantService";
 
 export default function AddProduct() {
   const [product, setProduct] = useState<Partial<Product>>({
@@ -38,10 +35,6 @@ export default function AddProduct() {
   // إعدادات التنبيه
   const [alertEnabled, setAlertEnabled] = useState(false);
   const [minStockLevel, setMinStockLevel] = useState<number | null>(null);
-  
-  // إعدادات المنتجات المترابطة
-  const [hasVariants, setHasVariants] = useState(false);
-  const [variants, setVariants] = useState<ProductVariant[]>([]);
   
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<MainCategory[]>([]);
@@ -150,17 +143,6 @@ export default function AddProduct() {
       } catch (error) {
         console.log("No existing alert found, using defaults");
       }
-
-      // تحميل أصناف المنتج إذا كان له أصناف متعددة
-      if (data.has_variants) {
-        try {
-          const productVariants = await fetchProductVariants(id);
-          setVariants(productVariants);
-          setHasVariants(true);
-        } catch (error) {
-          console.error("Error loading product variants:", error);
-        }
-      }
     } catch (error) {
       console.error("Error loading product:", error);
       toast({
@@ -178,18 +160,11 @@ export default function AddProduct() {
     setLoading(true);
 
     try {
-      // تحديث المنتج ليشمل معلومات الأصناف
-      const productData = {
-        ...product,
-        has_variants: hasVariants,
-        base_unit: hasVariants ? (product.base_unit || 'قطعة') : product.base_unit
-      };
-
       let savedProduct;
       if (productId) {
-        savedProduct = await updateProduct(productId, productData as Product);
+        savedProduct = await updateProduct(productId, product as Product);
       } else {
-        savedProduct = await createProduct(productData as Product);
+        savedProduct = await createProduct(product as Product);
       }
 
       // حفظ إعدادات التنبيه
@@ -199,16 +174,6 @@ export default function AddProduct() {
           alertEnabled ? minStockLevel : null, 
           alertEnabled
         );
-
-        // حفظ الأصناف إذا كان المنتج له أصناف متعددة
-        if (hasVariants && variants.length > 0) {
-          const variantsToSave = variants.map(variant => ({
-            ...variant,
-            parent_product_id: savedProduct.id
-          }));
-          
-          await createMultipleVariants(variantsToSave);
-        }
       }
 
       toast({
@@ -687,50 +652,6 @@ export default function AddProduct() {
                     placeholder="سعر العرض"
                     value={product?.offer_price || ""}
                     onChange={(e) => setProduct((prev) => ({ ...prev, offer_price: parseFloat(e.target.value) || 0 }))}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* المنتجات المترابطة */}
-          <Card>
-            <CardHeader>
-              <CardTitle>المنتجات المترابطة (الأصناف المتعددة)</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2 space-x-reverse">
-                <Switch
-                  id="has_variants"
-                  checked={hasVariants}
-                  onCheckedChange={(checked) => {
-                    setHasVariants(checked);
-                    if (!checked) {
-                      setVariants([]);
-                    }
-                  }}
-                />
-                <Label htmlFor="has_variants">هذا المنتج له أصناف متعددة (مثل: كرتونة، نص كرتونة، قطعة)</Label>
-              </div>
-
-              {hasVariants && (
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="base_unit">الوحدة الأساسية للمنتج</Label>
-                    <Input
-                      id="base_unit"
-                      placeholder="مثل: قطعة، جرام، لتر"
-                      value={product?.base_unit || "قطعة"}
-                      onChange={(e) => setProduct((prev) => ({ ...prev, base_unit: e.target.value }))}
-                    />
-                  </div>
-                  
-                  <Separator />
-                  
-                  <ProductVariantsManager
-                    variants={variants}
-                    onVariantsChange={setVariants}
-                    parentProductId={productId || ""}
                   />
                 </div>
               )}
