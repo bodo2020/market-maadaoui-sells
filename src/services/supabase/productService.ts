@@ -24,7 +24,11 @@ export async function fetchProducts() {
   try {
     const { data, error } = await supabase
       .from("products")
-      .select("*")
+      .select(`
+        *,
+        parent_product:parent_product_id(name),
+        linked_products:products!parent_product_id(id, name, barcode, price)
+      `)
       .order("name");
 
     if (error) {
@@ -33,7 +37,7 @@ export async function fetchProducts() {
     }
 
     console.log(`Successfully fetched ${data.length} products`);
-    return data as Product[];
+    return data as any[];
   } catch (error) {
     console.error("Error in fetchProducts:", error);
     return [];

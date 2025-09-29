@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
 import AddProduct from "@/pages/AddProduct";
+import AddLinkedProduct from "@/pages/AddLinkedProduct";
 import ProductManagement from "@/pages/ProductManagement";
 import InventoryManagement from "@/pages/InventoryManagement";
 import SupplierPurchases from "@/pages/SupplierPurchases";
@@ -80,6 +81,7 @@ function App() {
               <Route path="/products/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
               <Route path="/products/edit/:id" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
               <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+              <Route path="/add-linked-product" element={<ProtectedRoute><AddLinkedProduct /></ProtectedRoute>} />
               <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
               <Route path="/daily-inventory" element={<ProtectedRoute><DailyInventoryPage /></ProtectedRoute>} />
               <Route path="/inventory-history" element={<ProtectedRoute><InventoryHistoryPage /></ProtectedRoute>} />

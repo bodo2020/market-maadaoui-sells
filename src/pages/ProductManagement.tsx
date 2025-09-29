@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Pencil, Trash2, Package, ArrowUpDown, MoreHorizontal, Tag, Barcode, Box, Loader2, ScanLine, Image as ImageIcon, FolderOpen, Building2, QrCode, Eye, Edit, ShoppingCart } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, Package, ArrowUpDown, MoreHorizontal, Tag, Barcode, Box, Loader2, ScanLine, Image as ImageIcon, FolderOpen, Building2, QrCode, Eye, Edit, ShoppingCart, LinkIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Product } from "@/types";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -205,6 +205,10 @@ export default function ProductManagement() {
               <Plus className="ml-2 h-4 w-4" />
               إضافة منتج جديد
             </Button>
+            <Button variant="outline" onClick={() => navigate("/add-linked-product")}>
+              <LinkIcon className="ml-2 h-4 w-4" />
+              إضافة منتج مرتبط
+            </Button>
           </div>
         </div>
 
@@ -353,10 +357,32 @@ export default function ProductManagement() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="font-medium">{product.name}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {product.name}
+                              {product.parent_product_id && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <LinkIcon className="h-3 w-3 mr-1" />
+                                  مرتبط
+                                </Badge>
+                              )}
+                              {!product.parent_product_id && product.linked_products && product.linked_products.length > 0 && (
+                                <Badge variant="outline" className="text-xs">
+                                  {product.linked_products.length} مرتبط
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>{product.barcode || 'غير محدد'}</TableCell>
                           <TableCell>{product.price} ج.م</TableCell>
-                          <TableCell>{product.quantity}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {product.quantity}
+                              {product.shared_inventory && (
+                                <Badge variant="secondary" className="text-xs">مشترك</Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
