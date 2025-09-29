@@ -80,7 +80,6 @@ function App() {
               <Route path="/products/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
               <Route path="/products/edit/:id" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
               <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-              
               <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
               <Route path="/daily-inventory" element={<ProtectedRoute><DailyInventoryPage /></ProtectedRoute>} />
               <Route path="/inventory-history" element={<ProtectedRoute><InventoryHistoryPage /></ProtectedRoute>} />

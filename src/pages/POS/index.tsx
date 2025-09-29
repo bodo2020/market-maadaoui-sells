@@ -143,27 +143,25 @@ export default function POS() {
         addProductToCart(product, barcode);
         setSearch("");
       } else {
-        // أظهر رسالة واضحة عند عدم العثور على المنتج
+        // فقط أظهر رسالة الخطأ إذا كان الباركود طويل بما فيه الكفاية وليس ناقص
         if (barcode.length >= 8) {
           toast({
-            title: "المنتج غير موجود",
-            description: `الباركود ${barcode} غير مسجل في النظام. تحقق من الباركود أو أضف المنتج أولاً.`,
+            title: "لم يتم العثور على المنتج",
+            description: `لم يتم العثور على منتج بالباركود ${barcode}`,
             variant: "destructive"
           });
         }
-        setSearch("");
       }
     } catch (error) {
-      console.error("Error processing barcode:", error, "for barcode:", barcode);
-      // أظهر رسالة خطأ واضحة
+      console.error("Error processing barcode:", error);
+      // فقط أظهر رسالة خطأ المعالجة إذا كان الباركود طويل
       if (barcode.length >= 8) {
         toast({
           title: "خطأ في معالجة الباركود",
-          description: `فشل في البحث عن الباركود ${barcode}. تحقق من الاتصال بالإنترنت وحاول مرة أخرى.`,
+          description: "فشل البحث. يرجى المحاولة مرة أخرى.",
           variant: "destructive"
         });
       }
-      setSearch("");
     }
   };
 

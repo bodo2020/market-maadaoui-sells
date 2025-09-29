@@ -15,23 +15,35 @@ export function DragDropImage({ value, onChange, bucketName = "images" }: DragDr
   const [dragging, setDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Check bucket exists when component mounts (no creation needed)
+  // Ensure bucket exists when component mounts
   useEffect(() => {
-    const checkBucketExists = async () => {
+    const ensureBucketExists = async () => {
       try {
         const { data: buckets } = await supabase.storage.listBuckets();
         const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
         
         if (!bucketExists) {
-          console.warn(`Bucket ${bucketName} does not exist. Make sure it's created in Supabase.`);
-          toast.error(`مجلد التخزين ${bucketName} غير موجود. تواصل مع المسؤول.`);
+          console.log(`Creating bucket: ${bucketName}`);
+          const { error } = await supabase.storage.createBucket(bucketName, {
+            public: true,
+            fileSizeLimit: 10485760, // 10MB
+          });
+          
+          if (error) {
+            // If there's an error creating the bucket, but it might already exist
+            // We'll proceed with the upload anyway
+            console.error(`Error creating ${bucketName} bucket:`, error);
+          } else {
+            console.log(`${bucketName} bucket created successfully`);
+          }
         }
       } catch (error) {
-        console.error("Error checking bucket:", error);
+        console.error("Error checking/creating bucket:", error);
+        // Continue with upload - it might still work if bucket exists but we can't check
       }
     };
 
-    checkBucketExists();
+    ensureBucketExists();
   }, [bucketName]);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -75,7 +87,19 @@ export function DragDropImage({ value, onChange, bucketName = "images" }: DragDr
 
       console.log(`Attempting to upload to bucket: ${bucketName}, file path: ${filePath}`);
 
-      // Upload the file directly (bucket should already exist)
+      // First, ensure the bucket exists again right before upload
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+      
+      if (!bucketExists) {
+        console.log(`Creating bucket before upload: ${bucketName}`);
+        await supabase.storage.createBucket(bucketName, {
+          public: true,
+          fileSizeLimit: 10485760, // 10MB
+        });
+      }
+
+      // Attempt to upload the file
       const { data, error } = await supabase.storage
         .from(bucketName)
         .upload(filePath, file);

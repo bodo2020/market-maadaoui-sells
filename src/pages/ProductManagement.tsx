@@ -353,16 +353,10 @@ export default function ProductManagement() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {product.name}
-                          </TableCell>
+                          <TableCell className="font-medium">{product.name}</TableCell>
                           <TableCell>{product.barcode || 'غير محدد'}</TableCell>
-                          <TableCell>
-                            {product.price} ج.م
-                          </TableCell>
-                          <TableCell>
-                            {product.quantity}
-                          </TableCell>
+                          <TableCell>{product.price} ج.م</TableCell>
+                          <TableCell>{product.quantity}</TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
