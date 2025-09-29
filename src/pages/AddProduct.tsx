@@ -20,7 +20,7 @@ import { fetchSubcategories } from "@/services/supabase/categoryService";
 import { MainCategory, Subcategory, Company } from "@/types";
 import { DragDropImage } from "@/components/ui/drag-drop-image";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
-import ProductVariantsManager from "@/components/products/ProductVariantsManager";
+import { ProductVariantsManager } from "@/components/products/ProductVariantsManager";
 import { ProductVariant } from "@/types";
 import { createMultipleVariants, fetchProductVariants } from "@/services/supabase/productVariantService";
 

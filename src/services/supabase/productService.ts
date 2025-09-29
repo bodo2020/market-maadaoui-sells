@@ -219,21 +219,13 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
     console.log("Product updated successfully:", data);
 
     // تحديث كمية المخزون إذا تم تحديدها
-    if (product.quantity !== undefined || product.min_stock_level !== undefined) {
+    if (product.quantity !== undefined) {
       const branchId = await getCurrentBranchId();
       
       if (branchId) {
-        const updateFields: any = {};
-        if (product.quantity !== undefined) {
-          updateFields.quantity = product.quantity;
-        }
-        if (product.min_stock_level !== undefined) {
-          updateFields.min_stock_level = product.min_stock_level;
-        }
-
         await supabase
           .from("inventory")
-          .update(updateFields)
+          .update({ quantity: product.quantity })
           .eq("product_id", id)
           .eq("branch_id", branchId);
       }
