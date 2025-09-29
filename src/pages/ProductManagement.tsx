@@ -358,44 +358,14 @@ export default function ProductManagement() {
                             )}
                           </TableCell>
                           <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              {product.name}
-                              {product.parent_product_id && (
-                                <Badge variant="secondary" className="text-xs">
-                                  <LinkIcon className="h-3 w-3 mr-1" />
-                                  مرتبط {product.conversion_factor && product.conversion_factor > 1 ? `(×${product.conversion_factor})` : ''}
-                                </Badge>
-                              )}
-                              {!product.parent_product_id && product.linked_products && product.linked_products.length > 0 && (
-                                <Badge variant="outline" className="text-xs">
-                                  {product.linked_products.length} مرتبط
-                                </Badge>
-                              )}
-                            </div>
+                            {product.name}
                           </TableCell>
                           <TableCell>{product.barcode || 'غير محدد'}</TableCell>
                           <TableCell>
-                            <div>
-                              {product.price} ج.م
-                              {product.conversion_factor && product.conversion_factor > 1 && (
-                                <div className="text-xs text-muted-foreground">
-                                  {(product.price / product.conversion_factor).toFixed(2)} ج.م/وحدة
-                                </div>
-                              )}
-                            </div>
+                            {product.price} ج.م
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              {product.quantity}
-                              {product.conversion_factor && product.conversion_factor > 1 && (
-                                <div className="text-xs text-muted-foreground">
-                                  ({(product.quantity * product.conversion_factor).toFixed(0)} وحدة أساسية)
-                                </div>
-                              )}
-                              {product.shared_inventory && (
-                                <Badge variant="secondary" className="text-xs">مشترك</Badge>
-                              )}
-                            </div>
+                            {product.quantity}
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>

@@ -37,9 +37,7 @@ export default function ProductSelectionDialog({
     try {
       setLoading(true);
       const data = await fetchProducts();
-      // Filter out products that are already linked to other products
-      const parentProducts = data.filter(p => !p.parent_product_id);
-      setProducts(parentProducts || []);
+      setProducts(data || []);
     } catch (error) {
       console.error('Error loading products:', error);
       toast({

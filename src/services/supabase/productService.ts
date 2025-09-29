@@ -24,11 +24,7 @@ export async function fetchProducts() {
   try {
     const { data, error } = await supabase
       .from("products")
-      .select(`
-        *,
-        parent_product:parent_product_id(name),
-        linked_products:products!parent_product_id(id, name, barcode, price)
-      `)
+      .select("*")
       .order("name");
 
     if (error) {
