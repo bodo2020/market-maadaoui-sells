@@ -363,7 +363,7 @@ export default function ProductManagement() {
                               {product.parent_product_id && (
                                 <Badge variant="secondary" className="text-xs">
                                   <LinkIcon className="h-3 w-3 mr-1" />
-                                  مرتبط
+                                  مرتبط {product.conversion_factor && product.conversion_factor > 1 ? `(×${product.conversion_factor})` : ''}
                                 </Badge>
                               )}
                               {!product.parent_product_id && product.linked_products && product.linked_products.length > 0 && (
@@ -374,10 +374,24 @@ export default function ProductManagement() {
                             </div>
                           </TableCell>
                           <TableCell>{product.barcode || 'غير محدد'}</TableCell>
-                          <TableCell>{product.price} ج.م</TableCell>
+                          <TableCell>
+                            <div>
+                              {product.price} ج.م
+                              {product.conversion_factor && product.conversion_factor > 1 && (
+                                <div className="text-xs text-muted-foreground">
+                                  {(product.price / product.conversion_factor).toFixed(2)} ج.م/وحدة
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               {product.quantity}
+                              {product.conversion_factor && product.conversion_factor > 1 && (
+                                <div className="text-xs text-muted-foreground">
+                                  ({(product.quantity * product.conversion_factor).toFixed(0)} وحدة أساسية)
+                                </div>
+                              )}
                               {product.shared_inventory && (
                                 <Badge variant="secondary" className="text-xs">مشترك</Badge>
                               )}

@@ -1686,6 +1686,7 @@ export type Database = {
           bulk_price: number | null
           bulk_quantity: number | null
           company_id: string | null
+          conversion_factor: number | null
           created_at: string | null
           description: string | null
           expiry_date: string | null
@@ -1719,6 +1720,7 @@ export type Database = {
           bulk_price?: number | null
           bulk_quantity?: number | null
           company_id?: string | null
+          conversion_factor?: number | null
           created_at?: string | null
           description?: string | null
           expiry_date?: string | null
@@ -1752,6 +1754,7 @@ export type Database = {
           bulk_price?: number | null
           bulk_quantity?: number | null
           company_id?: string | null
+          conversion_factor?: number | null
           created_at?: string | null
           description?: string | null
           expiry_date?: string | null

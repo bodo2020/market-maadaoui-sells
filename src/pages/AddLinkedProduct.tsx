@@ -24,6 +24,7 @@ export default function AddLinkedProduct() {
     image_urls: [] as string[],
     price: 0,
     shared_inventory: false,
+    conversion_factor: 1,
   });
   
   const [loading, setLoading] = useState(false);
@@ -127,6 +128,7 @@ export default function AddLinkedProduct() {
       image_urls: [],
       price: 0,
       shared_inventory: false,
+      conversion_factor: 1,
     });
     setIsProductSelectionOpen(true);
   };
@@ -252,6 +254,25 @@ export default function AddLinkedProduct() {
                     </div>
                   </div>
 
+                  {/* عامل التحويل */}
+                  <div className="space-y-2">
+                    <Label htmlFor="conversion_factor">عامل التحويل *</Label>
+                    <Input
+                      id="conversion_factor"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={linkedProductData.conversion_factor}
+                      onChange={(e) => setLinkedProductData(prev => ({ ...prev, conversion_factor: parseFloat(e.target.value) || 1 }))}
+                      placeholder="مثال: 30 (إذا كان المنتج يحتوي على 30 وحدة من المنتج الأساسي)"
+                      required
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      عدد الوحدات من المنتج الأساسي في هذا المنتج. مثال: إذا كان المنتج الأساسي "بيضة" وهذا المنتج "كرتونة بيض"، 
+                      فعامل التحويل هو 30 (30 بيضة في الكرتونة)
+                    </p>
+                  </div>
+
                   {/* سعر البيع */}
                   <div className="space-y-2">
                     <Label htmlFor="price">سعر البيع *</Label>
@@ -265,6 +286,12 @@ export default function AddLinkedProduct() {
                       placeholder="أدخل سعر البيع"
                       required
                     />
+                    {parentProduct && linkedProductData.conversion_factor > 1 && (
+                      <p className="text-sm text-muted-foreground">
+                        سعر الوحدة الواحدة: {(linkedProductData.price / linkedProductData.conversion_factor).toFixed(2)} ج.م
+                        (مقارنة بالمنتج الأساسي: {parentProduct.price} ج.م)
+                      </p>
+                    )}
                   </div>
 
                   {/* مشاركة المخزون */}
@@ -273,7 +300,8 @@ export default function AddLinkedProduct() {
                       <div>
                         <Label htmlFor="shared_inventory">مشاركة المخزون</Label>
                         <p className="text-sm text-muted-foreground">
-                          عند التفعيل، ستتم مشاركة الكمية مع المنتج الأساسي
+                          عند التفعيل، ستتم مشاركة الكمية مع المنتج الأساسي بناءً على عامل التحويل.
+                          مثال: بيع كرتونة واحدة = تقليل 30 بيضة من المخزون
                         </p>
                       </div>
                       <Switch

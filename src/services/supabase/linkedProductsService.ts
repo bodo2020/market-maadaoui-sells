@@ -61,6 +61,7 @@ export async function createLinkedProduct(
     image_urls?: string[];
     price: number;
     shared_inventory?: boolean;
+    conversion_factor?: number;
   }
 ): Promise<Product> {
   try {
@@ -89,6 +90,7 @@ export async function createLinkedProduct(
       // ربط بالمنتج الأساسي
       parent_product_id: parentProduct.id,
       shared_inventory: linkedProductData.shared_inventory || false,
+      conversion_factor: linkedProductData.conversion_factor || 1,
       
       // قيم افتراضية
       is_offer: false,

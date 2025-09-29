@@ -102,6 +102,7 @@ export interface Product {
   // المنتجات المترابطة
   parent_product_id?: string | null;
   shared_inventory?: boolean;
+  conversion_factor?: number;
   parent_product?: { name: string } | null;
   linked_products?: { id: string; name: string; barcode?: string; price: number }[];
 }
