@@ -15,7 +15,6 @@ export interface InventoryRecord {
   created_at: string;
   updated_at: string;
   branch_id?: string;
-  // بيانات المنتج المرتبط
   products?: {
     id: string;
     name: string;

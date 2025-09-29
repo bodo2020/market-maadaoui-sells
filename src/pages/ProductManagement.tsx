@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Pencil, Trash2, Package, ArrowUpDown, MoreHorizontal, Tag, Barcode, Box, Loader2, ScanLine, Image as ImageIcon, FolderOpen, Building2, QrCode, Eye, Edit, ShoppingCart, LinkIcon } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, Package, ArrowUpDown, MoreHorizontal, Tag, Barcode, Box, Loader2, ScanLine, Image as ImageIcon, FolderOpen, Building2, QrCode, Eye, Edit, ShoppingCart } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Product } from "@/types";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -204,10 +204,6 @@ export default function ProductManagement() {
             <Button onClick={() => navigate("/add-product")}>
               <Plus className="ml-2 h-4 w-4" />
               إضافة منتج جديد
-            </Button>
-            <Button variant="outline" onClick={() => navigate("/add-linked-product")}>
-              <LinkIcon className="ml-2 h-4 w-4" />
-              إضافة منتج مرتبط
             </Button>
           </div>
         </div>

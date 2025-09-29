@@ -99,7 +99,6 @@ export interface Product {
   expiry_date?: string | null;
   shelf_location?: string | null;
   track_expiry?: boolean;
-  linked_products?: { id: string; name: string; barcode?: string; price: number }[];
 }
 
 export interface ProductBatch {
