@@ -38,7 +38,7 @@ export default function Purchases() {
   
   const { data: purchases = [], isLoading } = useQuery({
     queryKey: ["purchases"],
-    queryFn: fetchPurchases
+    queryFn: () => fetchPurchases(200)
   });
   
   const { data: suppliers = [] } = useQuery({
