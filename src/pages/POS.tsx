@@ -21,7 +21,6 @@ import InvoiceDialog from "@/components/POS/InvoiceDialog";
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
 import { useAuth } from "@/contexts/AuthContext";
 import { getFavoriteProducts, addFavoriteProduct, removeFavoriteProduct } from "@/services/supabase/favoritesService";
-
 export default function POS() {
   const [search, setSearch] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -52,28 +51,27 @@ export default function POS() {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const cartScrollRef = useRef<HTMLDivElement>(null);
   const {
     toast
   } = useToast();
-  const { user } = useAuth();
+  const {
+    user
+  } = useAuth();
 
   // Debounce hook for auto-search
   const useDebounce = (value: string, delay: number) => {
     const [debouncedValue, setDebouncedValue] = useState(value);
-
     useEffect(() => {
       const handler = setTimeout(() => {
         setDebouncedValue(value);
       }, delay);
-
       return () => {
         clearTimeout(handler);
       };
     }, [value, delay]);
-
     return debouncedValue;
   };
-
   const debouncedSearch = useDebounce(search, 500);
 
   // Auto search effect for numbers only
@@ -82,17 +80,11 @@ export default function POS() {
       handleSearch();
     }
   }, [debouncedSearch]);
-
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [productsData, customersData, balance, favorites] = await Promise.all([
-          fetchProducts(),
-          fetchCustomers(),
-          getLatestCashBalance(RegisterType.STORE),
-          user ? getFavoriteProducts(user.id) : Promise.resolve([])
-        ]);
+        const [productsData, customersData, balance, favorites] = await Promise.all([fetchProducts(), fetchCustomers(), getLatestCashBalance(RegisterType.STORE), user ? getFavoriteProducts(user.id) : Promise.resolve([])]);
         setProducts(productsData);
         setCustomers(customersData);
         setCashBalance(balance);
@@ -110,29 +102,21 @@ export default function POS() {
     };
     loadData();
   }, [toast]);
-
   useEffect(() => {
     if (!manualBarcodeMode) {
       // Detect Android
       const isAndroid = /Android/i.test(navigator.userAgent);
-      
       const handleKeyDown = (e: KeyboardEvent) => {
         const target = e.target as HTMLElement;
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
         const isSearchInput = target === searchInputRef.current;
-        
+
         // Skip if typing in other inputs, dialogs are open, or specific keys are pressed
-        if ((isInput && !isSearchInput) || 
-            isCheckoutOpen || 
-            showWeightDialog || 
-            showInvoice || 
-            showBarcodeScanner ||
-            ['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (isInput && !isSearchInput || isCheckoutOpen || showWeightDialog || showInvoice || showBarcodeScanner || ['Tab', 'Shift', 'Control', 'Alt', 'Meta', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
           return;
         }
-        
         console.log("Key pressed:", e.key, "Current buffer:", barcodeBuffer);
-        
+
         // Handle Enter key - process current buffer or search
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -145,48 +129,53 @@ export default function POS() {
           }
           return;
         }
-        
+
         // Handle alphanumeric characters and common symbols
         if (/^[a-zA-Z0-9\u0600-\u06FF\s\-\.]$/.test(e.key)) {
-          // Direct typing to search box
-          if (!isSearchInput && searchInputRef.current) {
-            e.preventDefault();
-            const newValue = search + e.key;
-            setSearch(newValue);
-            searchInputRef.current.focus();
-            searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
-          }
-          
-          // Barcode scanning logic
+          // Clear previous timeout
           if (barcodeTimeoutRef.current) {
             clearTimeout(barcodeTimeoutRef.current);
           }
-          setBarcodeBuffer(prev => prev + e.key);
-          
-          // Set timeout to auto-press Enter after 1.5 seconds
+
+          // Update barcode buffer immediately
+          const newBuffer = barcodeBuffer + e.key;
+          setBarcodeBuffer(newBuffer);
+
+          // Direct typing to search box (simplified)
+          if (!isSearchInput) {
+            const newValue = search + e.key;
+            setSearch(newValue);
+            // Focus without preventing default to reduce lag
+            requestAnimationFrame(() => {
+              if (searchInputRef.current) {
+                searchInputRef.current.focus();
+                searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
+              }
+            });
+          }
+
+          // Reduced timeout for faster processing
           barcodeTimeoutRef.current = setTimeout(() => {
-            const currentBuffer = barcodeBuffer + e.key;
-            if (currentBuffer.length >= 5) {
-              console.log("Auto-pressing Enter after 1.5 seconds for:", currentBuffer);
-              // Simulate Enter key press
-              setSearch(currentBuffer);
-              handleSearch();
+            if (newBuffer.length >= 5) {
+              console.log("Auto-processing barcode:", newBuffer);
+              processBarcode(newBuffer);
               setBarcodeBuffer("");
             } else {
               setBarcodeBuffer("");
             }
-          }, 1500); // 1.5 second timeout
+          }, 500); // Reduced from 1500ms to 500ms
         }
-        
+
         // Handle backspace for search
         if (e.key === 'Backspace' && !isSearchInput && search.length > 0) {
-          e.preventDefault();
           const newValue = search.slice(0, -1);
           setSearch(newValue);
-          if (searchInputRef.current) {
-            searchInputRef.current.focus();
-            searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
-          }
+          requestAnimationFrame(() => {
+            if (searchInputRef.current) {
+              searchInputRef.current.focus();
+              searchInputRef.current.setSelectionRange(newValue.length, newValue.length);
+            }
+          });
         }
       };
 
@@ -196,7 +185,7 @@ export default function POS() {
         if (target === searchInputRef.current) {
           const value = target.value.trim();
           console.log("Input event triggered:", value);
-          
+
           // Process if it looks like a barcode (5+ characters)
           if (value.length >= 5) {
             processBarcode(value);
@@ -210,23 +199,23 @@ export default function POS() {
         const target = e.target as HTMLInputElement;
         if (target === searchInputRef.current) {
           const value = target.value.trim();
-          if (value.length >= 8) { // Longer barcodes
+          if (value.length >= 8) {
+            // Longer barcodes
             console.log("Change event triggered:", value);
             processBarcode(value);
             target.value = "";
           }
         }
       };
-
       document.addEventListener('keydown', handleKeyDown);
-      
+
       // Add multiple listeners for Android compatibility
       if (isAndroid && searchInputRef.current) {
         searchInputRef.current.addEventListener('input', handleInput);
         searchInputRef.current.addEventListener('change', handleChange);
-        
+
         // Additional Android-specific handling
-        searchInputRef.current.addEventListener('keyup', (e) => {
+        searchInputRef.current.addEventListener('keyup', e => {
           if (e.key === 'Enter') {
             const target = e.target as HTMLInputElement;
             const value = target.value.trim();
@@ -237,7 +226,6 @@ export default function POS() {
           }
         });
       }
-      
       return () => {
         document.removeEventListener('keydown', handleKeyDown);
         if (isAndroid && searchInputRef.current) {
@@ -249,15 +237,12 @@ export default function POS() {
         }
       };
     }
-  }, [barcodeBuffer, manualBarcodeMode]);
-
+  }, [barcodeBuffer, manualBarcodeMode, search, isCheckoutOpen, showWeightDialog, showInvoice, showBarcodeScanner]);
   const processBarcode = async (barcode: string) => {
     if (barcode.length < 5) return;
-    
     try {
       setSearch(barcode);
       const product = await fetchProductByBarcode(barcode);
-      
       if (product) {
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
@@ -274,7 +259,6 @@ export default function POS() {
         setSearch("");
       } else {
         const bulkProduct = products.find(p => p.bulk_barcode === barcode && p.bulk_enabled);
-        
         if (bulkProduct) {
           handleAddBulkToCart(bulkProduct);
           toast({
@@ -284,7 +268,6 @@ export default function POS() {
           setSearch("");
           return;
         }
-        
         if (barcode.startsWith("2") && barcode.length === 13) {
           const productCode = barcode.substring(1, 7);
           const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
@@ -296,7 +279,7 @@ export default function POS() {
             return;
           }
         }
-        
+
         // Check if barcode is 11 or 13 digits for scale products (منتج الميزان)
         if ((barcode.length === 11 || barcode.length === 13) && /^\d+$/.test(barcode)) {
           // Try to find scale product for these specific lengths
@@ -312,7 +295,6 @@ export default function POS() {
             return;
           }
         }
-        
         toast({
           title: "لم يتم العثور على المنتج",
           description: `لم يتم العثور على منتج بالباركود ${barcode}`,
@@ -337,13 +319,10 @@ export default function POS() {
   const shouldAutoSearch = (value: string) => {
     return /^\d/.test(value); // Starts with a number
   };
-
   const handleSearch = async () => {
     if (!search) return;
-    
     try {
       const product = await fetchProductByBarcode(search);
-      
       if (product) {
         if (product.calculated_weight) {
           handleAddScaleProductToCart(product, product.calculated_weight);
@@ -359,7 +338,6 @@ export default function POS() {
           return;
         }
       }
-
       const bulkProduct = products.find(p => p.bulk_barcode === search && p.bulk_enabled);
       if (bulkProduct) {
         handleAddBulkToCart(bulkProduct);
@@ -370,11 +348,9 @@ export default function POS() {
         });
         return;
       }
-
       if (search.startsWith("2") && search.length === 13) {
         const productCode = search.substring(1, 7);
         const scaleProduct = products.find(p => p.barcode_type === "scale" && p.barcode === productCode);
-        
         if (scaleProduct) {
           const weightInGrams = parseInt(search.substring(7, 12));
           const weightInKg = weightInGrams / 1000;
@@ -383,19 +359,9 @@ export default function POS() {
           return;
         }
       }
-
-      const results = products.filter(product => 
-        product.barcode === search || 
-        product.name.toLowerCase().includes(search.toLowerCase())
-      );
+      const results = products.filter(product => product.barcode === search || product.name.toLowerCase().includes(search.toLowerCase()));
       setSearchResults(results);
-
-      const exactMatch = products.find(p => 
-        p.barcode === search && 
-        p.barcode_type === "normal" && 
-        !p.bulk_enabled
-      );
-
+      const exactMatch = products.find(p => p.barcode === search && p.barcode_type === "normal" && !p.bulk_enabled);
       if (exactMatch) {
         handleAddToCart(exactMatch);
         setSearch("");
@@ -413,7 +379,6 @@ export default function POS() {
       });
     }
   };
-
   const handleAddToCart = (product: Product) => {
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
@@ -433,9 +398,22 @@ export default function POS() {
         weight: null
       }]);
     }
+
+    // Show success notification
+    toast({
+      title: "تم إضافة المنتج ✅",
+      description: `${product.name} - تم إضافته للسلة`,
+      className: "bg-green-50 border-green-200 text-green-800"
+    });
+
+    // Auto-scroll to bottom of cart
+    setTimeout(() => {
+      if (cartScrollRef.current) {
+        cartScrollRef.current.scrollTop = cartScrollRef.current.scrollHeight;
+      }
+    }, 100);
     setSearchResults([]);
   };
-
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
     if ((product.quantity || 0) <= 0) {
       toast({
@@ -455,16 +433,25 @@ export default function POS() {
       total: itemPrice,
       weight: weight
     }]);
+
+    // Show success notification
     toast({
-      title: "تم إضافة منتج بالوزن",
-      description: `${product.name} - ${weight} كجم`
+      title: "تم إضافة منتج بالوزن ✅",
+      description: `${product.name} - ${weight} كجم`,
+      className: "bg-green-50 border-green-200 text-green-800"
     });
+
+    // Auto-scroll to bottom of cart
+    setTimeout(() => {
+      if (cartScrollRef.current) {
+        cartScrollRef.current.scrollTop = cartScrollRef.current.scrollHeight;
+      }
+    }, 100);
     setSearchResults([]);
     setShowWeightDialog(false);
     setCurrentScaleProduct(null);
     setWeightInput("");
   };
-
   const handleAddBulkToCart = (product: Product) => {
     if ((product.quantity || 0) <= 0) {
       toast({
@@ -482,7 +469,6 @@ export default function POS() {
       });
       return;
     }
-    
     setCartItems([...cartItems, {
       product,
       quantity: product.bulk_quantity,
@@ -491,13 +477,22 @@ export default function POS() {
       total: product.bulk_price,
       isBulk: true
     }]);
+
+    // Show success notification
     toast({
-      title: "تم إضافة عبوة جملة",
-      description: `${product.name} - ${product.bulk_quantity} وحدة`
+      title: "تم إضافة عبوة جملة ✅",
+      description: `${product.name} - ${product.bulk_quantity} وحدة`,
+      className: "bg-green-50 border-green-200 text-green-800"
     });
+
+    // Auto-scroll to bottom of cart
+    setTimeout(() => {
+      if (cartScrollRef.current) {
+        cartScrollRef.current.scrollTop = cartScrollRef.current.scrollHeight;
+      }
+    }, 100);
     setSearchResults([]);
   };
-
   const handleWeightSubmit = () => {
     if (!currentScaleProduct || !weightInput) return;
     const weight = parseFloat(weightInput);
@@ -511,11 +506,9 @@ export default function POS() {
     }
     handleAddScaleProductToCart(currentScaleProduct, weight);
   };
-
   const handleRemoveFromCart = (index: number) => {
     setCartItems(cartItems.filter((_, i) => i !== index));
   };
-
   const handleQuantityChange = (index: number, change: number) => {
     setCartItems(cartItems.map((item, i) => {
       if (i === index) {
@@ -540,10 +533,9 @@ export default function POS() {
       return item;
     }));
   };
-
   const openCheckout = () => {
     if (cartItems.length === 0) return;
-    
+
     // Set customer data if selected
     if (selectedCustomer && selectedCustomer !== "none") {
       const customer = customers.find(c => c.id === selectedCustomer);
@@ -552,12 +544,10 @@ export default function POS() {
         setCustomerPhone(customer.phone || "");
       }
     }
-    
     setIsCheckoutOpen(true);
     setCashAmount(total.toFixed(2));
     setCardAmount("");
   };
-
   const handlePaymentMethodChange = (value: 'cash' | 'card' | 'mixed') => {
     setPaymentMethod(value);
     if (value === 'cash') {
@@ -571,13 +561,11 @@ export default function POS() {
       setCardAmount("");
     }
   };
-
   const calculateChange = () => {
     if (paymentMethod === 'card') return 0;
     const cashAmountNum = parseFloat(cashAmount || "0");
     return Math.max(0, cashAmountNum - total);
   };
-
   const validatePayment = () => {
     if (paymentMethod === 'cash') {
       const cashAmountNum = parseFloat(cashAmount || "0");
@@ -591,11 +579,10 @@ export default function POS() {
       return cashAmountNum + cardAmountNum === total;
     }
   };
-
   const handleCustomerPhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const phone = e.target.value;
     setCustomerPhone(phone);
-    
+
     // البحث عن العميل الموجود برقم الهاتف
     if (phone.length >= 10) {
       const existingCustomer = customers.find(c => c.phone === phone);
@@ -604,12 +591,9 @@ export default function POS() {
       }
     }
   };
-
   const togglePinProduct = async (productId: string) => {
     if (!user) return;
-
     const isCurrentlyPinned = pinnedProducts.includes(productId);
-    
     try {
       let success = false;
       if (isCurrentlyPinned) {
@@ -618,7 +602,7 @@ export default function POS() {
           setPinnedProducts(prev => prev.filter(id => id !== productId));
           toast({
             title: "تم إلغاء تثبيت المنتج",
-            variant: "default",
+            variant: "default"
           });
         }
       } else {
@@ -627,16 +611,15 @@ export default function POS() {
           setPinnedProducts(prev => [...prev, productId]);
           toast({
             title: "تم تثبيت المنتج",
-            variant: "default",
+            variant: "default"
           });
         }
       }
-      
       if (!success) {
         toast({
           title: "خطأ في حفظ التثبيت",
           description: "حاول مرة أخرى",
-          variant: "destructive",
+          variant: "destructive"
         });
       }
     } catch (error) {
@@ -644,24 +627,20 @@ export default function POS() {
       toast({
         title: "خطأ في حفظ التثبيت",
         description: "حاول مرة أخرى",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const getDisplayedProducts = () => {
     const sortedProducts = [...products].sort((a, b) => {
       const aIsPinned = pinnedProducts.includes(a.id);
       const bIsPinned = pinnedProducts.includes(b.id);
-      
       if (aIsPinned && !bIsPinned) return -1;
       if (!aIsPinned && bIsPinned) return 1;
       return 0;
     });
-    
     return showAllProducts ? sortedProducts : sortedProducts.slice(0, 8);
   };
-
   const recordSaleToCashRegister = async (amount: number, paymentMethod: string) => {
     if (paymentMethod !== 'cash' && paymentMethod !== 'mixed') return;
     const amountToRecord = paymentMethod === 'cash' ? amount : parseFloat(cashAmount || "0");
@@ -684,7 +663,6 @@ export default function POS() {
       console.error('Error recording sale to cash register:', error);
     }
   };
-
   const completeSale = async () => {
     if (!validatePayment()) {
       toast({
@@ -737,7 +715,7 @@ export default function POS() {
         description: `رقم الفاتورة: ${sale.invoice_number}`
       });
       setShowSuccess(true);
-      
+
       // طباعة الفاتورة تلقائياً إذا كانت الطابعة متصلة
       if (bluetoothPrinterService.isConnected()) {
         const storeInfo = {
@@ -746,17 +724,14 @@ export default function POS() {
           phone: siteConfig.phone || "الهاتف غير متوفر",
           currency: siteConfig.currency || 'ج.م'
         };
-        
         const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
         setTimeout(() => {
           bluetoothPrinterService.printText(invoiceText);
         }, 1000);
       }
-      
-      // Clear cart after successful sale
+
+      // Refresh balance only (don't reset or close the checkout dialog automatically)
       setTimeout(() => {
-        resetSale();
-        // Refresh cash balance
         getLatestCashBalance(RegisterType.STORE).then(setCashBalance);
       }, 2000);
     } catch (error) {
@@ -769,13 +744,14 @@ export default function POS() {
       setIsProcessing(false);
     }
   };
-
   const resetSale = () => {
+    console.log("resetSale called - clearing all states");
     setCartItems([]);
     setSearchResults([]);
     setSearch("");
     setSelectedCustomer("");
-    setIsCheckoutOpen(false);
+    // لا نغلق نافذة التأكيد تلقائياً
+    // setIsCheckoutOpen(false);
     setShowSuccess(false);
     setIsProcessing(false);
     setPaymentMethod('cash');
@@ -785,14 +761,15 @@ export default function POS() {
     setCustomerPhone("");
     setCurrentInvoiceNumber("");
     setCurrentSale(null);
+    // لا نريد إغلاق الفاتورة في resetSale
+    // setShowInvoice(false); - تم تعطيلها
   };
-
   const handleViewInvoice = () => {
     if (currentSale) {
+      console.log("Opening invoice dialog");
       setShowInvoice(true);
     }
   };
-
   const handlePreviewInvoice = () => {
     if (cartItems.length === 0) return;
     const tempSale: Sale = {
@@ -813,15 +790,12 @@ export default function POS() {
     setCurrentSale(tempSale);
     setShowInvoice(true);
   };
-
   const handleBarcodeScan = async (barcode: string) => {
     processBarcode(barcode);
   };
-
   const subtotal = cartItems.reduce((sum, item) => sum + item.total, 0);
   const discount = cartItems.reduce((sum, item) => sum + item.discount * item.quantity, 0);
   const total = subtotal;
-
   return <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">نقطة البيع</h1>
@@ -835,14 +809,12 @@ export default function POS() {
         </p>
       </div>
       
-      <div className="relative mb-4 bg-muted/30 p-3 rounded-lg border border-muted flex items-center">
+      <div className="relative mb-4 bg-muted/30 p-3 rounded-lg border border-muted flex items-center py-0 px-[12px]">
         <ScanLine className="h-5 w-5 text-primary ml-3" />
         <div className="flex-1">
           <h3 className="font-medium">وضع مسح الباركود {manualBarcodeMode ? "يدوي" : "تلقائي"}</h3>
           <p className="text-sm text-muted-foreground">
-            {manualBarcodeMode 
-              ? "اكتب الباركود يدوياً ثم اضغط على Enter أو زر البحث"
-              : "قم بتوصيل قارئ الباركود واستخدامه لمسح المنتجات مباشرة، أو اضغط على زر \"مسح\" لاستخدام الكاميرا"}
+            {manualBarcodeMode ? "اكتب الباركود يدوياً ثم اضغط على Enter أو زر البحث" : "قم بتوصيل قارئ الباركود واستخدامه لمسح المنتجات مباشرة، أو اضغط على زر \"مسح\" لاستخدام الكاميرا"}
           </p>
         </div>
         <Button variant="outline" onClick={() => setManualBarcodeMode(!manualBarcodeMode)} className="mr-2">
@@ -859,37 +831,20 @@ export default function POS() {
             <CardContent>
               <div className="flex gap-2 mb-4">
                 <div className="relative flex-1">
-                  <Input 
-                    placeholder={
-                      manualBarcodeMode 
-                        ? "ابحث بالباركود أو اسم المنتج" 
-                        : search && shouldAutoSearch(search)
-                          ? "بحث تلقائي للباركود..."
-                          : "ابدأ الكتابة من أي مكان للبحث..."
-                    } 
-                    value={search} 
-                    onChange={e => setSearch(e.target.value)} 
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && search) {
-                        if (!shouldAutoSearch(search)) {
-                          handleSearch();
-                        }
-                      }
-                    }} 
-                    className="flex-1" 
-                    ref={searchInputRef} 
-                  />
-                  {!manualBarcodeMode && search === "" && (
-                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center text-muted-foreground text-sm">
+                  <Input placeholder={manualBarcodeMode ? "ابحث بالباركود أو اسم المنتج" : search && shouldAutoSearch(search) ? "بحث تلقائي للباركود..." : "ابدأ الكتابة من أي مكان للبحث..."} value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => {
+                  if (e.key === 'Enter' && search) {
+                    if (!shouldAutoSearch(search)) {
+                      handleSearch();
+                    }
+                  }
+                }} className="flex-1" ref={searchInputRef} />
+                  {!manualBarcodeMode && search === "" && <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center text-muted-foreground text-sm">
                       <div className="animate-pulse mr-2">⌨️</div>
                       جاهز للكتابة
-                    </div>
-                  )}
-                  {!manualBarcodeMode && search && !shouldAutoSearch(search) && (
-                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center text-xs text-orange-500 bg-background px-1 rounded">
+                    </div>}
+                  {!manualBarcodeMode && search && !shouldAutoSearch(search) && <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center text-xs text-orange-500 bg-background px-1 rounded">
                       اضغط Enter للبحث
-                    </div>
-                  )}
+                    </div>}
                 </div>
                 <Button onClick={handleSearch}>
                   <Search className="ml-2 h-4 w-4" />
@@ -970,11 +925,7 @@ export default function POS() {
               <div className="mt-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-semibold">المنتجات المقترحة</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAllProducts(!showAllProducts)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setShowAllProducts(!showAllProducts)}>
                     <MoreHorizontal className="ml-2 h-4 w-4" />
                     {showAllProducts ? "عرض أقل" : "عرض الكل"}
                   </Button>
@@ -998,37 +949,21 @@ export default function POS() {
                             <img src={product.image_urls?.[0] || "/placeholder.svg"} alt={product.name} className="h-16 w-16 object-contain" />
                             
                             {/* Pin Button */}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="absolute top-1 right-1 h-6 w-6 bg-white/90 hover:bg-white opacity-70 hover:opacity-100 transition-opacity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                togglePinProduct(product.id);
-                              }}
-                            >
-                              {pinnedProducts.includes(product.id) ? (
-                                <Pin className="h-3 w-3 text-primary" />
-                              ) : (
-                                <PinOff className="h-3 w-3" />
-                              )}
+                            <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 bg-white/90 hover:bg-white opacity-70 hover:opacity-100 transition-opacity" onClick={e => {
+                        e.stopPropagation();
+                        togglePinProduct(product.id);
+                      }}>
+                              {pinnedProducts.includes(product.id) ? <Pin className="h-3 w-3 text-primary" /> : <PinOff className="h-3 w-3" />}
                             </Button>
                             
                             {/* Bulk Purchase Button */}
-                            {product.bulk_enabled && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                className="absolute bottom-1 left-1 h-6 px-2 text-xs bg-amber-500/90 hover:bg-amber-600 text-white opacity-80 hover:opacity-100 transition-opacity"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAddBulkToCart(product);
-                                }}
-                              >
+                            {product.bulk_enabled && <Button variant="secondary" size="sm" className="absolute bottom-1 left-1 h-6 px-2 text-xs bg-amber-500/90 hover:bg-amber-600 text-white opacity-80 hover:opacity-100 transition-opacity" onClick={e => {
+                        e.stopPropagation();
+                        handleAddBulkToCart(product);
+                      }}>
                                 <Box className="h-3 w-3 ml-1" />
                                 جملة
-                              </Button>
-                            )}
+                              </Button>}
                           </div>
                           <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
                           
@@ -1084,7 +1019,7 @@ export default function POS() {
                   <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-20" />
                   <p>السلة فارغة</p>
                 </div> : <>
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                  <div ref={cartScrollRef} className="space-y-4 max-h-[400px] overflow-y-auto">
                     {cartItems.map((item, index) => <div key={index} className="flex flex-col pb-3 border-b">
                         <div className="flex justify-between">
                           <div className="flex-1">
@@ -1160,14 +1095,12 @@ export default function POS() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">بدون عميل</SelectItem>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
+                    {customers.map(customer => <SelectItem key={customer.id} value={customer.id}>
                         <div className="flex items-center gap-2">
                           <User className="w-4 h-4" />
                           {customer.phone ? `${customer.phone} - ${customer.name}` : customer.name}
                         </div>
-                      </SelectItem>
-                    ))}
+                      </SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -1202,7 +1135,7 @@ export default function POS() {
                   <Printer className="ml-2 h-4 w-4" />
                   عرض وطباعة الفاتورة
                 </Button>
-                <Button onClick={resetSale} className="w-full">
+                <Button onClick={() => { resetSale(); setIsCheckoutOpen(false); }} className="w-full">
                   عملية بيع جديدة
                 </Button>
               </div>
@@ -1213,14 +1146,7 @@ export default function POS() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label htmlFor="customerPhone">رقم الهاتف</Label>
-                      <Input 
-                        id="customerPhone" 
-                        value={customerPhone} 
-                        onChange={handleCustomerPhoneChange} 
-                        placeholder="01xxxxxxxxx"
-                        autoFocus={false}
-                        tabIndex={-1}
-                      />
+                      <Input id="customerPhone" value={customerPhone} onChange={handleCustomerPhoneChange} placeholder="01xxxxxxxxx" autoFocus={false} tabIndex={-1} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="customerName">اسم العميل</Label>
