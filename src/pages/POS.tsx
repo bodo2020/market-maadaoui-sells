@@ -163,11 +163,11 @@ export default function POS() {
           }
           setBarcodeBuffer(prev => prev + e.key);
           
-          // Set timeout to auto-press Enter after 1.3 seconds
+          // Set timeout to auto-press Enter after 1.5 seconds
           barcodeTimeoutRef.current = setTimeout(() => {
             const currentBuffer = barcodeBuffer + e.key;
             if (currentBuffer.length >= 5) {
-              console.log("Auto-pressing Enter after 1.3 seconds for:", currentBuffer);
+              console.log("Auto-pressing Enter after 1.5 seconds for:", currentBuffer);
               // Simulate Enter key press
               setSearch(currentBuffer);
               handleSearch();
@@ -175,7 +175,7 @@ export default function POS() {
             } else {
               setBarcodeBuffer("");
             }
-          }, 1300); // 1.3 second timeout
+          }, 1500); // 1.5 second timeout
         }
         
         // Handle backspace for search
@@ -297,12 +297,12 @@ export default function POS() {
           }
         }
         
-        // Check if barcode is 13 digits for scale products (منتج الميزان)
-        if (barcode.length === 13 && /^\d+$/.test(barcode)) {
+        // Check if barcode is 11 or 13 digits for scale products (منتج الميزان)
+        if ((barcode.length === 11 || barcode.length === 13) && /^\d+$/.test(barcode)) {
           // Try to find scale product for these specific lengths
           const scaleProduct = products.find(p => p.barcode_type === "scale" && barcode.includes(p.barcode || ""));
           if (scaleProduct) {
-            // For scale products with 13 digit barcodes, add directly
+            // For scale products with 11 or 13 digit barcodes, add directly
             handleAddToCart(scaleProduct);
             toast({
               title: "تم إضافة منتج الميزان",
