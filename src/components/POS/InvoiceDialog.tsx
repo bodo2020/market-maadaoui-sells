@@ -98,10 +98,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       : null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      console.log("InvoiceDialog onOpenChange:", open);
-      if (!open) onClose();
-    }}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className={`sm:max-w-xl max-h-[90vh] overflow-y-auto ${fontSizeClass}`}>
         <DialogHeader>
           <DialogTitle>{previewMode ? "معاينة الفاتورة" : "فاتورة المبيعات"}</DialogTitle>
@@ -170,17 +167,17 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
           <div className="text-left space-y-1 mt-4">
             <div className="flex justify-between">
               <span className="font-medium">المجموع الفرعي:</span>
-              <span>{(sale.subtotal || 0).toFixed(2)} {siteConfig.currency}</span>
+              <span>{sale.subtotal.toFixed(2)} {siteConfig.currency}</span>
             </div>
-            {(sale.discount || 0) > 0 && (
+            {sale.discount > 0 && (
               <div className="flex justify-between text-primary">
                 <span className="font-medium">الخصم:</span>
-                <span>- {(sale.discount || 0).toFixed(2)} {siteConfig.currency}</span>
+                <span>- {sale.discount.toFixed(2)} {siteConfig.currency}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-lg pt-2 border-t">
               <span>الإجمالي:</span>
-              <span>{(sale.total || 0).toFixed(2)} {siteConfig.currency}</span>
+              <span>{sale.total.toFixed(2)} {siteConfig.currency}</span>
             </div>
             
             <div className="mt-4 text-sm text-muted-foreground">
@@ -188,8 +185,8 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
                 sale.payment_method === 'cash' ? 'نقدي' : 
                 sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'
               }</p>
-              {sale.cash_amount && <p>المبلغ النقدي: {(sale.cash_amount || 0).toFixed(2)} {siteConfig.currency}</p>}
-              {sale.card_amount && <p>مبلغ البطاقة: {(sale.card_amount || 0).toFixed(2)} {siteConfig.currency}</p>}
+              {sale.cash_amount && <p>المبلغ النقدي: {sale.cash_amount.toFixed(2)} {siteConfig.currency}</p>}
+              {sale.card_amount && <p>مبلغ البطاقة: {sale.card_amount.toFixed(2)} {siteConfig.currency}</p>}
             </div>
           </div>
           

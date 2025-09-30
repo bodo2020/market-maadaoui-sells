@@ -118,12 +118,8 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
   }
 }
 
-export async function fetchSales(startDate?: Date, endDate?: Date, limit: number = 100): Promise<Sale[]> {
-  let query = supabase
-    .from("sales")
-    .select("id, invoice_number, date, customer_name, total, payment_method, created_at")
-    .order("date", { ascending: false })
-    .limit(limit);
+export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale[]> {
+  let query = supabase.from("sales").select("*").order("date", { ascending: false });
   
   if (startDate && endDate) {
     const start = new Date(startDate);
@@ -144,7 +140,8 @@ export async function fetchSales(startDate?: Date, endDate?: Date, limit: number
     throw error;
   }
   
-  // Convert the data ensuring proper types for Sale interface
+  // Convert the items field from JSON to CartItem[] in each sale
+  // Also ensure payment_method is one of the allowed values
   return (data || []).map(sale => ({
     ...sale,
     // Ensure payment_method is one of the allowed values in the Sale type
@@ -153,8 +150,10 @@ export async function fetchSales(startDate?: Date, endDate?: Date, limit: number
                     sale.payment_method === 'mixed') 
                     ? sale.payment_method as 'cash' | 'card' | 'mixed'
                     : 'cash', // Default to 'cash' if invalid value
-    // Add empty items array since we're only fetching basic info for performance
-    items: [] as CartItem[]
+    // Parse items properly
+    items: Array.isArray(sale.items) 
+      ? sale.items as unknown as CartItem[]  // If already an array
+      : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
   })) as Sale[];
 }
 
@@ -179,10 +178,7 @@ export async function fetchSaleById(id: string) {
                     data.payment_method === 'mixed') 
                     ? data.payment_method as 'cash' | 'card' | 'mixed'
                     : 'cash', // Default to 'cash' if invalid value
-    // Parse items properly for full sale details
-    items: Array.isArray(data.items) 
-      ? data.items as unknown as CartItem[]
-      : JSON.parse(typeof data.items === 'string' ? data.items : JSON.stringify(data.items)) as CartItem[]
+    items: data.items as unknown as CartItem[]
   } as Sale;
 }
 
@@ -409,27 +405,27 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
               <tr>
                 <td>${item.product.name}</td>
                 <td>${item.weight ? `${item.weight} كجم` : item.quantity}</td>
-                <td>${(item.price || 0).toFixed(2)}</td>
-                <td class="item-total">${(item.total || 0).toFixed(2)}</td>
+                <td>${item.price.toFixed(2)}</td>
+                <td class="item-total">${item.total.toFixed(2)}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
         
-          <div class="totals">
-            <div>المجموع الفرعي: ${(sale.subtotal || 0).toFixed(2)}</div>
-            ${(sale.discount || 0) > 0 ? `<div>الخصم: ${(sale.discount || 0).toFixed(2)}</div>` : ''}
-            <div class="grand-total">الإجمالي: ${(sale.total || 0).toFixed(2)}</div>
-            
-            <div style="margin-top: 3mm; font-size: ${fontSizeBase};">
-              طريقة الدفع: 
-              ${sale.payment_method === 'cash' ? 'نقدي' : 
-                sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'}
-              ${sale.cash_amount ? `<br>المبلغ النقدي: ${(sale.cash_amount || 0).toFixed(2)}` : ''}
-              ${sale.card_amount ? `<br>مبلغ البطاقة: ${(sale.card_amount || 0).toFixed(2)}` : ''}
-            </div>
+        <div class="totals">
+          <div>المجموع الفرعي: ${sale.subtotal.toFixed(2)}</div>
+          ${sale.discount > 0 ? `<div>الخصم: ${sale.discount.toFixed(2)}</div>` : ''}
+          <div class="grand-total">الإجمالي: ${sale.total.toFixed(2)}</div>
+          
+          <div style="margin-top: 3mm; font-size: ${fontSizeBase};">
+            طريقة الدفع: 
+            ${sale.payment_method === 'cash' ? 'نقدي' : 
+              sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'}
+            ${sale.cash_amount ? `<br>المبلغ النقدي: ${sale.cash_amount.toFixed(2)}` : ''}
+            ${sale.card_amount ? `<br>مبلغ البطاقة: ${sale.card_amount.toFixed(2)}` : ''}
           </div>
-
+        </div>
+        
         ${storeInfo.notes ? `
         <div class="notes">
           <div style="font-weight: bold;">ملاحظات:</div>
@@ -480,49 +476,18 @@ export function printInvoice(sale: Sale, storeInfo: {
   customLogoUrl?: string | null;
 }) {
   const invoiceHTML = generateInvoiceHTML(sale, storeInfo);
-
-  const printViaIframe = (html: string) => {
-    try {
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = '0';
-      iframe.srcdoc = html;
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        const win = iframe.contentWindow;
-        if (win) {
-          setTimeout(() => {
-            win.focus();
-            win.print();
-            setTimeout(() => {
-              try { document.body.removeChild(iframe); } catch (_) {}
-            }, 1000);
-          }, 400);
-        }
-      };
-    } catch (e) {
-      console.error('Print fallback failed:', e);
-    }
-  };
-
-  // Prefer iframe-based printing for better reliability on mobile and to avoid about:blank issues
-  try {
-    printViaIframe(invoiceHTML);
-  } catch (e) {
-    console.warn('Iframe printing failed, attempting window.open fallback', e);
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    if (printWindow) {
-      printWindow.document.write(invoiceHTML);
-      printWindow.document.close();
-      setTimeout(() => {
-        try { printWindow.focus(); printWindow.print(); } catch (err) { console.error('Window print failed:', err); }
-      }, 400);
-    }
+  
+  // Open a new window with the invoice
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(invoiceHTML);
+    printWindow.document.close();
+    
+    // Automatically print when loaded
+    printWindow.onload = function() {
+      printWindow.print();
+    };
   }
-
+  
   return invoiceHTML;
 }
