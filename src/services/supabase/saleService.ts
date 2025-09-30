@@ -449,10 +449,19 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
         </div>
       </div>
       
-      <div class="no-print" style="text-align: center; margin-top: 20px;">
-        <button onclick="window.print()">طباعة الفاتورة</button>
-        <button onclick="window.close()">إغلاق</button>
+      <div class="no-print" style="text-align: center; margin-top: 20px; padding: 10px;">
+        <button onclick="window.print(); return false;" style="padding:10px 20px; margin:5px; font-size:14px; background:#10b981; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">طباعة الفاتورة</button>
+        <button onclick="window.close(); return false;" style="padding:10px 20px; margin:5px; font-size:14px; background:#6b7280; color:#fff; border:none; border-radius:6px; cursor:pointer;">إغلاق</button>
       </div>
+      <script>
+        (function(){
+          try {
+            window.addEventListener('load', function(){
+              setTimeout(function(){ try{ window.focus(); window.print(); }catch(e){} }, 300);
+            });
+          } catch(e) {}
+        })();
+      </script>
     </body>
     </html>
   `;
@@ -508,6 +517,13 @@ export function printInvoice(sale: Sale, storeInfo: {
       console.error('Print fallback failed:', e);
     }
   };
+
+  // Prefer iframe on mobile to avoid popup blockers
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (isMobile) {
+    printViaIframe(invoiceHTML);
+    return invoiceHTML;
+  }
 
   // Try opening a new tab/window (may be blocked on mobile/iframes)
   const printWindow = window.open('', '_blank', 'width=800,height=600');
