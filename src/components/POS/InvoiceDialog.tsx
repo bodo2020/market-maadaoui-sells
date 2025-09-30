@@ -43,14 +43,12 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
   };
 
   const handlePrint = async () => {
-    console.log('handlePrint called - printing via browser');
-    
     // Get store info from site config, overriding with preview settings if any
     const storeInfo = {
       name: siteConfig.name,
       address: siteConfig.address || "العنوان غير متوفر",
       phone: siteConfig.phone || "الهاتف غير متوفر",
-      vatNumber: siteConfig.vatNumber || "",
+      vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
       logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
       website: invoiceSettings.website || "",
       footer: invoiceSettings.footer || "شكراً لزيارتكم!",
@@ -64,13 +62,15 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       currency: siteConfig.currency || 'ج.م'
     };
     
-    // Print directly via browser
-    try {
-      printInvoice(sale, storeInfo);
-      console.log('printInvoice executed successfully');
-    } catch (error) {
-      console.error('Error printing invoice:', error);
+    // Try Bluetooth printer first, fallback to regular print
+    if (bluetoothPrinterService.isConnected()) {
+      const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
+      const success = await bluetoothPrinterService.printText(invoiceText);
+      if (success) return;
     }
+    
+    // Fallback to regular print
+    printInvoice(sale, storeInfo);
   };
 
   // Format sale date
