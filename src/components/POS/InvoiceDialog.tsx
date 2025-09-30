@@ -43,14 +43,12 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
   };
 
   const handlePrint = async () => {
-    console.log('handlePrint called - printing via browser');
-    
     // Get store info from site config, overriding with preview settings if any
     const storeInfo = {
       name: siteConfig.name,
       address: siteConfig.address || "العنوان غير متوفر",
       phone: siteConfig.phone || "الهاتف غير متوفر",
-      vatNumber: siteConfig.vatNumber || "",
+      vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
       logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
       website: invoiceSettings.website || "",
       footer: invoiceSettings.footer || "شكراً لزيارتكم!",
@@ -64,13 +62,15 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       currency: siteConfig.currency || 'ج.م'
     };
     
-    // Print directly via browser
-    try {
-      printInvoice(sale, storeInfo);
-      console.log('printInvoice executed successfully');
-    } catch (error) {
-      console.error('Error printing invoice:', error);
+    // Try Bluetooth printer first, fallback to regular print
+    if (bluetoothPrinterService.isConnected()) {
+      const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
+      const success = await bluetoothPrinterService.printText(invoiceText);
+      if (success) return;
     }
+    
+    // Fallback to regular print
+    printInvoice(sale, storeInfo);
   };
 
   // Format sale date
@@ -170,17 +170,17 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
           <div className="text-left space-y-1 mt-4">
             <div className="flex justify-between">
               <span className="font-medium">المجموع الفرعي:</span>
-              <span>{(sale.subtotal || 0).toFixed(2)} {siteConfig.currency}</span>
+              <span>{sale.subtotal.toFixed(2)} {siteConfig.currency}</span>
             </div>
-            {(sale.discount || 0) > 0 && (
+            {sale.discount > 0 && (
               <div className="flex justify-between text-primary">
                 <span className="font-medium">الخصم:</span>
-                <span>- {(sale.discount || 0).toFixed(2)} {siteConfig.currency}</span>
+                <span>- {sale.discount.toFixed(2)} {siteConfig.currency}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-lg pt-2 border-t">
               <span>الإجمالي:</span>
-              <span>{(sale.total || 0).toFixed(2)} {siteConfig.currency}</span>
+              <span>{sale.total.toFixed(2)} {siteConfig.currency}</span>
             </div>
             
             <div className="mt-4 text-sm text-muted-foreground">
@@ -188,8 +188,8 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
                 sale.payment_method === 'cash' ? 'نقدي' : 
                 sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'
               }</p>
-              {sale.cash_amount && <p>المبلغ النقدي: {(sale.cash_amount || 0).toFixed(2)} {siteConfig.currency}</p>}
-              {sale.card_amount && <p>مبلغ البطاقة: {(sale.card_amount || 0).toFixed(2)} {siteConfig.currency}</p>}
+              {sale.cash_amount && <p>المبلغ النقدي: {sale.cash_amount.toFixed(2)} {siteConfig.currency}</p>}
+              {sale.card_amount && <p>مبلغ البطاقة: {sale.card_amount.toFixed(2)} {siteConfig.currency}</p>}
             </div>
           </div>
           
