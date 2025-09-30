@@ -43,12 +43,14 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
   };
 
   const handlePrint = async () => {
+    console.log('handlePrint called - printing via browser');
+    
     // Get store info from site config, overriding with preview settings if any
     const storeInfo = {
       name: siteConfig.name,
       address: siteConfig.address || "العنوان غير متوفر",
       phone: siteConfig.phone || "الهاتف غير متوفر",
-      vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
+      vatNumber: siteConfig.vatNumber || "",
       logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
       website: invoiceSettings.website || "",
       footer: invoiceSettings.footer || "شكراً لزيارتكم!",
@@ -61,24 +63,13 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       customLogoUrl: invoiceSettings.customLogoUrl || null,
       currency: siteConfig.currency || 'ج.م'
     };
-
-    let printedViaBluetooth = false;
-
-    // Try Bluetooth printer first; never block fallback
-    try {
-      if (bluetoothPrinterService?.isConnected?.()) {
-        const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
-        const success = await bluetoothPrinterService.printText(invoiceText);
-        printedViaBluetooth = !!success;
-        console.log('Bluetooth print attempted. success =', success);
-      }
-    } catch (err) {
-      console.warn('Bluetooth print failed, falling back to browser print:', err);
-    }
     
-    // Always fallback to regular print if BT not successful
-    if (!printedViaBluetooth) {
+    // Print directly via browser
+    try {
       printInvoice(sale, storeInfo);
+      console.log('printInvoice executed successfully');
+    } catch (error) {
+      console.error('Error printing invoice:', error);
     }
   };
 
