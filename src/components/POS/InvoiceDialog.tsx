@@ -61,16 +61,25 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       customLogoUrl: invoiceSettings.customLogoUrl || null,
       currency: siteConfig.currency || 'ج.م'
     };
-    
-    // Try Bluetooth printer first, fallback to regular print
-    if (bluetoothPrinterService.isConnected()) {
-      const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
-      const success = await bluetoothPrinterService.printText(invoiceText);
-      if (success) return;
+
+    let printedViaBluetooth = false;
+
+    // Try Bluetooth printer first; never block fallback
+    try {
+      if (bluetoothPrinterService?.isConnected?.()) {
+        const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
+        const success = await bluetoothPrinterService.printText(invoiceText);
+        printedViaBluetooth = !!success;
+        console.log('Bluetooth print attempted. success =', success);
+      }
+    } catch (err) {
+      console.warn('Bluetooth print failed, falling back to browser print:', err);
     }
     
-    // Fallback to regular print
-    printInvoice(sale, storeInfo);
+    // Always fallback to regular print if BT not successful
+    if (!printedViaBluetooth) {
+      printInvoice(sale, storeInfo);
+    }
   };
 
   // Format sale date
