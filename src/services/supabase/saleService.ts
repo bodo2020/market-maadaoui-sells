@@ -482,14 +482,41 @@ export function printInvoice(sale: Sale, storeInfo: {
   const invoiceHTML = generateInvoiceHTML(sale, storeInfo);
   
   // Open a new window with the invoice
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open('', '_blank', 'width=800,height=600');
   if (printWindow) {
     printWindow.document.write(invoiceHTML);
     printWindow.document.close();
     
-    // Automatically print when loaded
+    // Wait for content and images to load before printing
     printWindow.onload = function() {
-      printWindow.print();
+      // Wait for all images to load
+      const images = printWindow.document.images;
+      if (images.length > 0) {
+        let loadedImages = 0;
+        const checkAllImagesLoaded = () => {
+          loadedImages++;
+          if (loadedImages === images.length) {
+            // Add small delay to ensure rendering is complete
+            setTimeout(() => {
+              printWindow.print();
+            }, 500);
+          }
+        };
+        
+        for (let i = 0; i < images.length; i++) {
+          if (images[i].complete) {
+            checkAllImagesLoaded();
+          } else {
+            images[i].onload = checkAllImagesLoaded;
+            images[i].onerror = checkAllImagesLoaded; // Continue even if image fails to load
+          }
+        }
+      } else {
+        // No images, print immediately with small delay
+        setTimeout(() => {
+          printWindow.print();
+        }, 300);
+      }
     };
   }
   
