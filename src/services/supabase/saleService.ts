@@ -409,27 +409,27 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
               <tr>
                 <td>${item.product.name}</td>
                 <td>${item.weight ? `${item.weight} كجم` : item.quantity}</td>
-                <td>${item.price.toFixed(2)}</td>
+                <td>${(item.price || 0).toFixed(2)}</td>
                 <td class="item-total">${item.total.toFixed(2)}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
         
-        <div class="totals">
-          <div>المجموع الفرعي: ${sale.subtotal.toFixed(2)}</div>
-          ${sale.discount > 0 ? `<div>الخصم: ${sale.discount.toFixed(2)}</div>` : ''}
-          <div class="grand-total">الإجمالي: ${sale.total.toFixed(2)}</div>
-          
-          <div style="margin-top: 3mm; font-size: ${fontSizeBase};">
-            طريقة الدفع: 
-            ${sale.payment_method === 'cash' ? 'نقدي' : 
-              sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'}
-            ${sale.cash_amount ? `<br>المبلغ النقدي: ${sale.cash_amount.toFixed(2)}` : ''}
-            ${sale.card_amount ? `<br>مبلغ البطاقة: ${sale.card_amount.toFixed(2)}` : ''}
+          <div class="totals">
+            <div>المجموع الفرعي: ${(sale.subtotal || 0).toFixed(2)}</div>
+            ${(sale.discount || 0) > 0 ? `<div>الخصم: ${(sale.discount || 0).toFixed(2)}</div>` : ''}
+            <div class="grand-total">الإجمالي: ${(sale.total || 0).toFixed(2)}</div>
+            
+            <div style="margin-top: 3mm; font-size: ${fontSizeBase};">
+              طريقة الدفع: 
+              ${sale.payment_method === 'cash' ? 'نقدي' : 
+                sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'}
+              ${sale.cash_amount ? `<br>المبلغ النقدي: ${(sale.cash_amount || 0).toFixed(2)}` : ''}
+              ${sale.card_amount ? `<br>مبلغ البطاقة: ${(sale.card_amount || 0).toFixed(2)}` : ''}
+            </div>
           </div>
-        </div>
-        
+
         ${storeInfo.notes ? `
         <div class="notes">
           <div style="font-weight: bold;">ملاحظات:</div>
@@ -480,45 +480,71 @@ export function printInvoice(sale: Sale, storeInfo: {
   customLogoUrl?: string | null;
 }) {
   const invoiceHTML = generateInvoiceHTML(sale, storeInfo);
-  
-  // Open a new window with the invoice
+
+  const printViaIframe = (html: string) => {
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.srcdoc = html;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        const win = iframe.contentWindow;
+        if (win) {
+          setTimeout(() => {
+            win.focus();
+            win.print();
+            setTimeout(() => {
+              try { document.body.removeChild(iframe); } catch (_) {}
+            }, 1000);
+          }, 400);
+        }
+      };
+    } catch (e) {
+      console.error('Print fallback failed:', e);
+    }
+  };
+
+  // Try opening a new tab/window (may be blocked on mobile/iframes)
   const printWindow = window.open('', '_blank', 'width=800,height=600');
   if (printWindow) {
     printWindow.document.write(invoiceHTML);
     printWindow.document.close();
-    
-    // Wait for content and images to load before printing
-    printWindow.onload = function() {
-      // Wait for all images to load
+
+    printWindow.onload = function () {
       const images = printWindow.document.images;
       if (images.length > 0) {
         let loadedImages = 0;
         const checkAllImagesLoaded = () => {
           loadedImages++;
           if (loadedImages === images.length) {
-            // Add small delay to ensure rendering is complete
             setTimeout(() => {
-              printWindow.print();
+              try { printWindow.print(); } catch (e) { console.warn('Print blocked, using iframe fallback', e); printViaIframe(invoiceHTML); }
             }, 500);
           }
         };
-        
         for (let i = 0; i < images.length; i++) {
           if (images[i].complete) {
             checkAllImagesLoaded();
           } else {
             images[i].onload = checkAllImagesLoaded;
-            images[i].onerror = checkAllImagesLoaded; // Continue even if image fails to load
+            images[i].onerror = checkAllImagesLoaded;
           }
         }
       } else {
-        // No images, print immediately with small delay
         setTimeout(() => {
-          printWindow.print();
+          try { printWindow.print(); } catch (e) { console.warn('Print blocked, using iframe fallback', e); printViaIframe(invoiceHTML); }
         }, 300);
       }
     };
+  } else {
+    // Popup blocked -> fallback
+    printViaIframe(invoiceHTML);
   }
-  
+
   return invoiceHTML;
 }
