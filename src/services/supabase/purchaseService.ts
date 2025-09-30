@@ -2,12 +2,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Purchase } from "@/types";
 
-export async function fetchPurchases() {
+export async function fetchPurchases(limit: number = 100) {
   try {
     const { data, error } = await supabase
       .from("purchases")
-      .select("*, suppliers(name)")
-      .order("date", { ascending: false });
+      .select("id, invoice_number, date, total, paid, suppliers(name)")
+      .order("date", { ascending: false })
+      .limit(limit);
 
     if (error) {
       console.error("Error fetching purchases:", error);

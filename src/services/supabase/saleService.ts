@@ -118,8 +118,12 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
   }
 }
 
-export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale[]> {
-  let query = supabase.from("sales").select("*").order("date", { ascending: false });
+export async function fetchSales(startDate?: Date, endDate?: Date, limit: number = 100): Promise<Sale[]> {
+  let query = supabase
+    .from("sales")
+    .select("id, invoice_number, date, customer_name, total, payment_method, created_at")
+    .order("date", { ascending: false })
+    .limit(limit);
   
   if (startDate && endDate) {
     const start = new Date(startDate);
@@ -140,8 +144,7 @@ export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale
     throw error;
   }
   
-  // Convert the items field from JSON to CartItem[] in each sale
-  // Also ensure payment_method is one of the allowed values
+  // Convert the data ensuring proper types for Sale interface
   return (data || []).map(sale => ({
     ...sale,
     // Ensure payment_method is one of the allowed values in the Sale type
@@ -150,10 +153,8 @@ export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale
                     sale.payment_method === 'mixed') 
                     ? sale.payment_method as 'cash' | 'card' | 'mixed'
                     : 'cash', // Default to 'cash' if invalid value
-    // Parse items properly
-    items: Array.isArray(sale.items) 
-      ? sale.items as unknown as CartItem[]  // If already an array
-      : JSON.parse(typeof sale.items === 'string' ? sale.items : JSON.stringify(sale.items)) as CartItem[]
+    // Add empty items array since we're only fetching basic info for performance
+    items: [] as CartItem[]
   })) as Sale[];
 }
 
@@ -178,7 +179,10 @@ export async function fetchSaleById(id: string) {
                     data.payment_method === 'mixed') 
                     ? data.payment_method as 'cash' | 'card' | 'mixed'
                     : 'cash', // Default to 'cash' if invalid value
-    items: data.items as unknown as CartItem[]
+    // Parse items properly for full sale details
+    items: Array.isArray(data.items) 
+      ? data.items as unknown as CartItem[]
+      : JSON.parse(typeof data.items === 'string' ? data.items : JSON.stringify(data.items)) as CartItem[]
   } as Sale;
 }
 
@@ -405,27 +409,27 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
               <tr>
                 <td>${item.product.name}</td>
                 <td>${item.weight ? `${item.weight} كجم` : item.quantity}</td>
-                <td>${item.price.toFixed(2)}</td>
-                <td class="item-total">${item.total.toFixed(2)}</td>
+                <td>${(item.price || 0).toFixed(2)}</td>
+                <td class="item-total">${(item.total || 0).toFixed(2)}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
         
-        <div class="totals">
-          <div>المجموع الفرعي: ${sale.subtotal.toFixed(2)}</div>
-          ${sale.discount > 0 ? `<div>الخصم: ${sale.discount.toFixed(2)}</div>` : ''}
-          <div class="grand-total">الإجمالي: ${sale.total.toFixed(2)}</div>
-          
-          <div style="margin-top: 3mm; font-size: ${fontSizeBase};">
-            طريقة الدفع: 
-            ${sale.payment_method === 'cash' ? 'نقدي' : 
-              sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'}
-            ${sale.cash_amount ? `<br>المبلغ النقدي: ${sale.cash_amount.toFixed(2)}` : ''}
-            ${sale.card_amount ? `<br>مبلغ البطاقة: ${sale.card_amount.toFixed(2)}` : ''}
+          <div class="totals">
+            <div>المجموع الفرعي: ${(sale.subtotal || 0).toFixed(2)}</div>
+            ${(sale.discount || 0) > 0 ? `<div>الخصم: ${(sale.discount || 0).toFixed(2)}</div>` : ''}
+            <div class="grand-total">الإجمالي: ${(sale.total || 0).toFixed(2)}</div>
+            
+            <div style="margin-top: 3mm; font-size: ${fontSizeBase};">
+              طريقة الدفع: 
+              ${sale.payment_method === 'cash' ? 'نقدي' : 
+                sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'}
+              ${sale.cash_amount ? `<br>المبلغ النقدي: ${(sale.cash_amount || 0).toFixed(2)}` : ''}
+              ${sale.card_amount ? `<br>مبلغ البطاقة: ${(sale.card_amount || 0).toFixed(2)}` : ''}
+            </div>
           </div>
-        </div>
-        
+
         ${storeInfo.notes ? `
         <div class="notes">
           <div style="font-weight: bold;">ملاحظات:</div>
@@ -445,10 +449,19 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
         </div>
       </div>
       
-      <div class="no-print" style="text-align: center; margin-top: 20px;">
-        <button onclick="window.print()">طباعة الفاتورة</button>
-        <button onclick="window.close()">إغلاق</button>
+      <div class="no-print" style="text-align: center; margin-top: 20px; padding: 10px;">
+        <button onclick="window.print(); return false;" style="padding:10px 20px; margin:5px; font-size:14px; background:#10b981; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">طباعة الفاتورة</button>
+        <button onclick="window.close(); return false;" style="padding:10px 20px; margin:5px; font-size:14px; background:#6b7280; color:#fff; border:none; border-radius:6px; cursor:pointer;">إغلاق</button>
       </div>
+      <script>
+        (function(){
+          try {
+            window.addEventListener('load', function(){
+              setTimeout(function(){ try{ window.focus(); window.print(); }catch(e){} }, 300);
+            });
+          } catch(e) {}
+        })();
+      </script>
     </body>
     </html>
   `;
@@ -476,18 +489,78 @@ export function printInvoice(sale: Sale, storeInfo: {
   customLogoUrl?: string | null;
 }) {
   const invoiceHTML = generateInvoiceHTML(sale, storeInfo);
-  
-  // Open a new window with the invoice
-  const printWindow = window.open('', '_blank');
+
+  const printViaIframe = (html: string) => {
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.srcdoc = html;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        const win = iframe.contentWindow;
+        if (win) {
+          setTimeout(() => {
+            win.focus();
+            win.print();
+            setTimeout(() => {
+              try { document.body.removeChild(iframe); } catch (_) {}
+            }, 1000);
+          }, 400);
+        }
+      };
+    } catch (e) {
+      console.error('Print fallback failed:', e);
+    }
+  };
+
+  // Prefer iframe on mobile to avoid popup blockers
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (isMobile) {
+    printViaIframe(invoiceHTML);
+    return invoiceHTML;
+  }
+
+  // Try opening a new tab/window (may be blocked on mobile/iframes)
+  const printWindow = window.open('', '_blank', 'width=800,height=600');
   if (printWindow) {
     printWindow.document.write(invoiceHTML);
     printWindow.document.close();
-    
-    // Automatically print when loaded
-    printWindow.onload = function() {
-      printWindow.print();
+
+    printWindow.onload = function () {
+      const images = printWindow.document.images;
+      if (images.length > 0) {
+        let loadedImages = 0;
+        const checkAllImagesLoaded = () => {
+          loadedImages++;
+          if (loadedImages === images.length) {
+            setTimeout(() => {
+              try { printWindow.print(); } catch (e) { console.warn('Print blocked, using iframe fallback', e); printViaIframe(invoiceHTML); }
+            }, 500);
+          }
+        };
+        for (let i = 0; i < images.length; i++) {
+          if (images[i].complete) {
+            checkAllImagesLoaded();
+          } else {
+            images[i].onload = checkAllImagesLoaded;
+            images[i].onerror = checkAllImagesLoaded;
+          }
+        }
+      } else {
+        setTimeout(() => {
+          try { printWindow.print(); } catch (e) { console.warn('Print blocked, using iframe fallback', e); printViaIframe(invoiceHTML); }
+        }, 300);
+      }
     };
+  } else {
+    // Popup blocked -> fallback
+    printViaIframe(invoiceHTML);
   }
-  
+
   return invoiceHTML;
 }

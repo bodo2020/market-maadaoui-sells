@@ -97,15 +97,15 @@ const InvoiceEditDialog: React.FC<InvoiceEditDialogProps> = ({ isOpen, onClose, 
             <div className="pt-2 border-t mt-4">
               <div className="flex justify-between text-sm mb-1">
                 <span>المجموع الفرعي:</span>
-                <span>{sale.subtotal.toFixed(2)} ج.م</span>
+                <span>{(sale.subtotal || 0).toFixed(2)} ج.م</span>
               </div>
               <div className="flex justify-between text-sm mb-1">
                 <span>الخصم:</span>
-                <span>{sale.discount.toFixed(2)} ج.م</span>
+                <span>{(sale.discount || 0).toFixed(2)} ج.م</span>
               </div>
               <div className="flex justify-between font-bold">
                 <span>الإجمالي:</span>
-                <span>{sale.total.toFixed(2)} ج.م</span>
+                <span>{(sale.total || 0).toFixed(2)} ج.م</span>
               </div>
             </div>
             
