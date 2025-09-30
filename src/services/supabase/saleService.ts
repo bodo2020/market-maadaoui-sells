@@ -410,7 +410,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
                 <td>${item.product.name}</td>
                 <td>${item.weight ? `${item.weight} كجم` : item.quantity}</td>
                 <td>${(item.price || 0).toFixed(2)}</td>
-                <td class="item-total">${item.total.toFixed(2)}</td>
+                <td class="item-total">${(item.total || 0).toFixed(2)}</td>
               </tr>
             `).join('')}
           </tbody>
