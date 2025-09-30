@@ -509,41 +509,19 @@ export function printInvoice(sale: Sale, storeInfo: {
     }
   };
 
-  // Try opening a new tab/window (may be blocked on mobile/iframes)
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
-  if (printWindow) {
-    printWindow.document.write(invoiceHTML);
-    printWindow.document.close();
-
-    printWindow.onload = function () {
-      const images = printWindow.document.images;
-      if (images.length > 0) {
-        let loadedImages = 0;
-        const checkAllImagesLoaded = () => {
-          loadedImages++;
-          if (loadedImages === images.length) {
-            setTimeout(() => {
-              try { printWindow.print(); } catch (e) { console.warn('Print blocked, using iframe fallback', e); printViaIframe(invoiceHTML); }
-            }, 500);
-          }
-        };
-        for (let i = 0; i < images.length; i++) {
-          if (images[i].complete) {
-            checkAllImagesLoaded();
-          } else {
-            images[i].onload = checkAllImagesLoaded;
-            images[i].onerror = checkAllImagesLoaded;
-          }
-        }
-      } else {
-        setTimeout(() => {
-          try { printWindow.print(); } catch (e) { console.warn('Print blocked, using iframe fallback', e); printViaIframe(invoiceHTML); }
-        }, 300);
-      }
-    };
-  } else {
-    // Popup blocked -> fallback
+  // Prefer iframe-based printing for better reliability on mobile and to avoid about:blank issues
+  try {
     printViaIframe(invoiceHTML);
+  } catch (e) {
+    console.warn('Iframe printing failed, attempting window.open fallback', e);
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (printWindow) {
+      printWindow.document.write(invoiceHTML);
+      printWindow.document.close();
+      setTimeout(() => {
+        try { printWindow.focus(); printWindow.print(); } catch (err) { console.error('Window print failed:', err); }
+      }, 400);
+    }
   }
 
   return invoiceHTML;
