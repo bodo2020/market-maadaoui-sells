@@ -275,3 +275,76 @@ export async function recordSmartWithdrawal(amount: number, notes: string, userI
   // If not enough funds overall, rollback is manual; inform the user
   throw new Error('الرصيد غير كافٍ في الخزنتين');
 }
+
+// تحويل بين الخزنات: سحب من خزنة وإيداع في خزنة أخرى مع تسجيل التحويل
+export async function recordCashTransfer(
+  amount: number,
+  fromRegister: RegisterType,
+  toRegister: RegisterType,
+  notes: string,
+  userId: string | null,
+  branchId?: string
+) {
+  try {
+    if (fromRegister === toRegister) {
+      throw new Error('لا يمكن التحويل إلى نفس الخزنة');
+    }
+
+    if (fromRegister === RegisterType.MERGED || toRegister === RegisterType.MERGED) {
+      throw new Error('لا يمكن التحويل من أو إلى الخزنة المدمجة');
+    }
+
+    // Get balance from source register
+    const fromBalance = await getLatestCashBalance(fromRegister);
+    
+    if (amount > fromBalance) {
+      const registerName = fromRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين';
+      throw new Error(`الرصيد غير كافٍ في خزنة ${registerName}. الرصيد الحالي: ${fromBalance}`);
+    }
+
+    // Withdraw from source
+    await recordCashTransaction(
+      amount,
+      'withdrawal',
+      fromRegister,
+      `تحويل إلى خزنة ${toRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}${notes ? ' - ' + notes : ''}`,
+      userId,
+      branchId
+    );
+
+    // Deposit to destination
+    await recordCashTransaction(
+      amount,
+      'deposit',
+      toRegister,
+      `تحويل من خزنة ${fromRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}${notes ? ' - ' + notes : ''}`,
+      userId,
+      branchId
+    );
+
+    // Record the transfer in cash_transfers table
+    const { data: transferData, error: transferError } = await supabase
+      .from('cash_transfers')
+      .insert({
+        amount,
+        from_register: fromRegister,
+        to_register: toRegister,
+        notes: notes || null,
+        created_by: userId,
+        branch_id: branchId || null
+      })
+      .select()
+      .single();
+
+    if (transferError) {
+      console.error('Error recording transfer:', transferError);
+      throw transferError;
+    }
+
+    console.log('Transfer recorded successfully:', transferData);
+    return transferData;
+  } catch (error) {
+    console.error('Error during cash transfer:', error);
+    throw error;
+  }
+}

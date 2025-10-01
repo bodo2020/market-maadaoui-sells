@@ -402,6 +402,51 @@ export type Database = {
           },
         ]
       }
+      cash_transfers: {
+        Row: {
+          amount: number
+          branch_id: string | null
+          created_at: string | null
+          created_by: string | null
+          from_register: string
+          from_transaction_id: string | null
+          id: string
+          notes: string | null
+          to_register: string
+          to_transaction_id: string | null
+          transfer_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          branch_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          from_register: string
+          from_transaction_id?: string | null
+          id?: string
+          notes?: string | null
+          to_register: string
+          to_transaction_id?: string | null
+          transfer_date?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          branch_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          from_register?: string
+          from_transaction_id?: string | null
+          id?: string
+          notes?: string | null
+          to_register?: string
+          to_transaction_id?: string | null
+          transfer_date?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       cities: {
         Row: {
           active: boolean | null
@@ -1617,10 +1662,70 @@ export type Database = {
         }
         Relationships: []
       }
+      product_variants: {
+        Row: {
+          active: boolean
+          barcode: string | null
+          bulk_barcode: string | null
+          conversion_factor: number
+          created_at: string
+          id: string
+          image_url: string | null
+          name: string
+          parent_product_id: string
+          position: number | null
+          price: number
+          purchase_price: number
+          updated_at: string
+          variant_type: string
+        }
+        Insert: {
+          active?: boolean
+          barcode?: string | null
+          bulk_barcode?: string | null
+          conversion_factor?: number
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          name: string
+          parent_product_id: string
+          position?: number | null
+          price?: number
+          purchase_price?: number
+          updated_at?: string
+          variant_type: string
+        }
+        Update: {
+          active?: boolean
+          barcode?: string | null
+          bulk_barcode?: string | null
+          conversion_factor?: number
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          name?: string
+          parent_product_id?: string
+          position?: number | null
+          price?: number
+          purchase_price?: number
+          updated_at?: string
+          variant_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_parent_product_id_fkey"
+            columns: ["parent_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           barcode: string | null
           barcode_type: string | null
+          base_unit: string | null
           bulk_barcode: string | null
           bulk_enabled: boolean | null
           bulk_price: number | null
@@ -1629,10 +1734,12 @@ export type Database = {
           created_at: string | null
           description: string | null
           expiry_date: string | null
+          has_variants: boolean | null
           id: string
           image_urls: string[] | null
           is_bulk: boolean | null
           is_offer: boolean | null
+          is_variant: boolean | null
           main_category_id: string | null
           manufacturer_name: string | null
           name: string
@@ -1649,6 +1756,7 @@ export type Database = {
         Insert: {
           barcode?: string | null
           barcode_type?: string | null
+          base_unit?: string | null
           bulk_barcode?: string | null
           bulk_enabled?: boolean | null
           bulk_price?: number | null
@@ -1657,10 +1765,12 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           expiry_date?: string | null
+          has_variants?: boolean | null
           id?: string
           image_urls?: string[] | null
           is_bulk?: boolean | null
           is_offer?: boolean | null
+          is_variant?: boolean | null
           main_category_id?: string | null
           manufacturer_name?: string | null
           name: string
@@ -1677,6 +1787,7 @@ export type Database = {
         Update: {
           barcode?: string | null
           barcode_type?: string | null
+          base_unit?: string | null
           bulk_barcode?: string | null
           bulk_enabled?: boolean | null
           bulk_price?: number | null
@@ -1685,10 +1796,12 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           expiry_date?: string | null
+          has_variants?: boolean | null
           id?: string
           image_urls?: string[] | null
           is_bulk?: boolean | null
           is_offer?: boolean | null
+          is_variant?: boolean | null
           main_category_id?: string | null
           manufacturer_name?: string | null
           name?: string

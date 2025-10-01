@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RegisterType, getLatestCashBalance, recordCashTransaction, fetchCashRecords, CashRecord, recordSmartWithdrawal } from "@/services/supabase/cashTrackingService";
+import { RegisterType, getLatestCashBalance, recordCashTransaction, fetchCashRecords, CashRecord, recordSmartWithdrawal, recordCashTransfer } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -191,29 +191,11 @@ export default function CashTracking() {
     try {
       setProcessingTransaction(true);
       
-      // Get balance from source register
-      const fromBalance = await getLatestCashBalance(fromRegister as RegisterType);
-      
-      if (parseFloat(amount) > fromBalance) {
-        toast.error(`الرصيد غير كافٍ في خزنة ${fromRegister === 'store' ? 'المحل' : 'الأونلاين'}`);
-        return;
-      }
-
-      // Withdraw from source
-      await recordCashTransaction(
+      await recordCashTransfer(
         parseFloat(amount),
-        'withdrawal',
         fromRegister as RegisterType,
-        `تحويل إلى خزنة ${toRegister === 'store' ? 'المحل' : 'الأونلاين'}${notes ? ' - ' + notes : ''}`,
-        user?.id || ''
-      );
-
-      // Deposit to destination
-      await recordCashTransaction(
-        parseFloat(amount),
-        'deposit',
         toRegister as RegisterType,
-        `تحويل من خزنة ${fromRegister === 'store' ? 'المحل' : 'الأونلاين'}${notes ? ' - ' + notes : ''}`,
+        notes || '',
         user?.id || ''
       );
 
@@ -225,9 +207,9 @@ export default function CashTracking() {
       setToRegister('online');
       
       await fetchRecords();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error transferring cash:', error);
-      toast.error("حدث خطأ أثناء التحويل");
+      toast.error(error.message || "حدث خطأ أثناء التحويل");
     } finally {
       setProcessingTransaction(false);
     }
