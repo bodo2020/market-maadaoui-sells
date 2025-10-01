@@ -17,7 +17,8 @@ import { RegisterType, getLatestCashBalance, recordCashTransaction, fetchCashRec
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Wallet, Plus, Minus, Download } from "lucide-react";
+import { Wallet, Plus, Minus, Download, ArrowLeftRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
@@ -28,8 +29,11 @@ export default function CashTracking() {
   const [currentBalance, setCurrentBalance] = useState<number>(0);
   const [isAddCashOpen, setIsAddCashOpen] = useState(false);
   const [isWithdrawCashOpen, setIsWithdrawCashOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [amount, setAmount] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [fromRegister, setFromRegister] = useState<'store' | 'online'>('store');
+  const [toRegister, setToRegister] = useState<'store' | 'online'>('online');
   const [processingTransaction, setProcessingTransaction] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -173,6 +177,62 @@ export default function CashTracking() {
     }
   };
 
+  const handleTransfer = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error("يرجى إدخال مبلغ صحيح");
+      return;
+    }
+
+    if (fromRegister === toRegister) {
+      toast.error("لا يمكن التحويل إلى نفس الخزنة");
+      return;
+    }
+
+    try {
+      setProcessingTransaction(true);
+      
+      // Get balance from source register
+      const fromBalance = await getLatestCashBalance(fromRegister as RegisterType);
+      
+      if (parseFloat(amount) > fromBalance) {
+        toast.error(`الرصيد غير كافٍ في خزنة ${fromRegister === 'store' ? 'المحل' : 'الأونلاين'}`);
+        return;
+      }
+
+      // Withdraw from source
+      await recordCashTransaction(
+        parseFloat(amount),
+        'withdrawal',
+        fromRegister as RegisterType,
+        `تحويل إلى خزنة ${toRegister === 'store' ? 'المحل' : 'الأونلاين'}${notes ? ' - ' + notes : ''}`,
+        user?.id || ''
+      );
+
+      // Deposit to destination
+      await recordCashTransaction(
+        parseFloat(amount),
+        'deposit',
+        toRegister as RegisterType,
+        `تحويل من خزنة ${fromRegister === 'store' ? 'المحل' : 'الأونلاين'}${notes ? ' - ' + notes : ''}`,
+        user?.id || ''
+      );
+
+      toast.success("تم التحويل بنجاح");
+      setIsTransferOpen(false);
+      setAmount("");
+      setNotes("");
+      setFromRegister('store');
+      setToRegister('online');
+      
+      await fetchRecords();
+    } catch (error) {
+      console.error('Error transferring cash:', error);
+      toast.error("حدث خطأ أثناء التحويل");
+    } finally {
+      setProcessingTransaction(false);
+    }
+  };
+
   useEffect(() => {
     fetchRecords();
   }, []);
@@ -230,6 +290,14 @@ export default function CashTracking() {
             <Button variant="outline" onClick={handleExportExcel} disabled={exporting}>
               <Download className="ml-2 h-4 w-4" />
               تصدير Excel
+            </Button>
+            <Button 
+              variant="outline" 
+              className="mr-2" 
+              onClick={() => setIsTransferOpen(true)}
+            >
+              <ArrowLeftRight className="ml-2 h-4 w-4" />
+              تحويل بين الخزن
             </Button>
             <Button 
               variant="outline" 
@@ -393,6 +461,78 @@ export default function CashTracking() {
               </Button>
               <Button type="submit" onClick={handleWithdrawCash} disabled={processingTransaction}>
                 {processingTransaction ? "جاري المعالجة..." : "سحب"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
+          <DialogContent className="sm:max-w-[500px]" dir="rtl">
+            <DialogHeader>
+              <DialogTitle>تحويل بين الخزن</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="from-register" className="text-right">
+                  من خزنة
+                </Label>
+                <Select value={fromRegister} onValueChange={(value: 'store' | 'online') => setFromRegister(value)}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="store">خزنة المحل</SelectItem>
+                    <SelectItem value="online">خزنة الأونلاين</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="to-register" className="text-right">
+                  إلى خزنة
+                </Label>
+                <Select value={toRegister} onValueChange={(value: 'store' | 'online') => setToRegister(value)}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="store">خزنة المحل</SelectItem>
+                    <SelectItem value="online">خزنة الأونلاين</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="transfer-amount" className="text-right">
+                  المبلغ
+                </Label>
+                <Input
+                  id="transfer-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="transfer-notes" className="text-right">
+                  ملاحظات
+                </Label>
+                <Input
+                  id="transfer-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="col-span-3"
+                  placeholder="اختياري"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsTransferOpen(false)}>
+                إلغاء
+              </Button>
+              <Button type="submit" onClick={handleTransfer} disabled={processingTransaction}>
+                {processingTransaction ? "جاري التحويل..." : "تحويل"}
               </Button>
             </DialogFooter>
           </DialogContent>
