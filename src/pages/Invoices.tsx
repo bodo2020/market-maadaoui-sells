@@ -27,16 +27,19 @@ const Invoices = () => {
   const [invoiceType, setInvoiceType] = useState<'sales' | 'purchases'>('sales');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const itemsPerPage = 50;
 
-  // Fetch all sales
+  // Fetch sales with pagination
   const { 
     data: sales, 
     isLoading: salesLoading, 
     isError: salesError, 
     refetch: refetchSales 
   } = useQuery({
-    queryKey: ['sales'],
-    queryFn: () => fetchSales()
+    queryKey: ['sales', page],
+    queryFn: () => fetchSales(undefined, undefined, itemsPerPage, page * itemsPerPage),
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 
   // Fetch all purchases
@@ -371,6 +374,31 @@ const Invoices = () => {
                     </tbody>
                   </table>
                 )}
+              </div>
+            )}
+            
+            {/* Pagination Controls */}
+            {!isLoading && !isError && (invoiceType === 'sales' ? filteredSales.length > 0 : filteredPurchases.length > 0) && (
+              <div className="flex justify-center items-center gap-4 mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                >
+                  السابق
+                </Button>
+                <span className="text-sm">
+                  صفحة {page + 1}
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={invoiceType === 'sales' 
+                    ? (filteredSales.length < itemsPerPage) 
+                    : (filteredPurchases.length < itemsPerPage)}
+                >
+                  التالي
+                </Button>
               </div>
             )}
           </div>

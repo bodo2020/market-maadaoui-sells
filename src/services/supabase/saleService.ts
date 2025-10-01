@@ -118,8 +118,12 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
   }
 }
 
-export async function fetchSales(startDate?: Date, endDate?: Date): Promise<Sale[]> {
-  let query = supabase.from("sales").select("*").order("date", { ascending: false });
+export async function fetchSales(startDate?: Date, endDate?: Date, limit: number = 100, offset: number = 0): Promise<Sale[]> {
+  let query = supabase
+    .from("sales")
+    .select("*", { count: 'exact' })
+    .order("date", { ascending: false })
+    .range(offset, offset + limit - 1);
   
   if (startDate && endDate) {
     const start = new Date(startDate);
