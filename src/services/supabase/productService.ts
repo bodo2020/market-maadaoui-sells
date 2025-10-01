@@ -79,7 +79,17 @@ export async function fetchProductByBarcode(barcode: string) {
     throw error;
   }
 
-  return data as Product | null;
+  if (!data) {
+    return { product: null, isBulkBarcode: false };
+  }
+
+  // Check if the scanned barcode matches the bulk_barcode
+  const isBulkBarcode = data.bulk_barcode === barcode;
+
+  return { 
+    product: data as Product, 
+    isBulkBarcode 
+  };
 }
 
 export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {

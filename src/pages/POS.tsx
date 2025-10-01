@@ -242,18 +242,18 @@ export default function POS() {
     if (barcode.length < 13) return;
     try {
       setSearch(barcode);
-      const product = await fetchProductByBarcode(barcode);
-      if (product) {
-        if (product.calculated_weight) {
-          handleAddScaleProductToCart(product, product.calculated_weight);
-        } else if (product.is_bulk_scan) {
-          handleAddBulkToCart(product);
+      const result = await fetchProductByBarcode(barcode);
+      if (result.product) {
+        if (result.product.calculated_weight) {
+          handleAddScaleProductToCart(result.product, result.product.calculated_weight);
+        } else if (result.isBulkBarcode) {
+          handleAddBulkToCart(result.product);
         } else {
-          handleAddToCart(product);
+          handleAddToCart(result.product);
         }
         toast({
           title: "تم المسح بنجاح",
-          description: `${barcode} - ${product.name}`
+          description: `${barcode} - ${result.product.name}`
         });
         // Clear search input after successful scan
         setSearch("");
@@ -322,18 +322,18 @@ export default function POS() {
   const handleSearch = async () => {
     if (!search) return;
     try {
-      const product = await fetchProductByBarcode(search);
-      if (product) {
-        if (product.calculated_weight) {
-          handleAddScaleProductToCart(product, product.calculated_weight);
+      const result = await fetchProductByBarcode(search);
+      if (result.product) {
+        if (result.product.calculated_weight) {
+          handleAddScaleProductToCart(result.product, result.product.calculated_weight);
           setSearch("");
           return;
-        } else if (product.is_bulk_scan) {
-          handleAddBulkToCart(product);
+        } else if (result.isBulkBarcode) {
+          handleAddBulkToCart(result.product);
           setSearch("");
           return;
         } else {
-          handleAddToCart(product);
+          handleAddToCart(result.product);
           setSearch("");
           return;
         }

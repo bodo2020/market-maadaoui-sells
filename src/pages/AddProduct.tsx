@@ -204,8 +204,8 @@ export default function AddProduct() {
       
       // البحث عن منتج موجود بنفس الباركود فقط للباركود العادي
       try {
-        const existingProduct = await fetchProductByBarcode(barcode);
-        if (existingProduct && existingProduct.id !== productId) {
+        const result = await fetchProductByBarcode(barcode);
+        if (result.product && result.product.id !== productId) {
           toast({
             title: "تحذير",
             description: "يوجد منتج آخر بنفس الباركود",

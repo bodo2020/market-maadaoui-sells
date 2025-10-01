@@ -138,19 +138,19 @@ export function ReturnDetailsDialog({
     }
     
     try {
-      const product = await fetchProductByBarcode(barcode);
+      const result = await fetchProductByBarcode(barcode);
       
-      if (!product) {
+      if (!result.product) {
         toast.error('لم يتم العثور على منتج بهذا الباركود');
         return;
       }
       
       await addProductToReturn({
-        product_id: product.id,
-        product_name: product.name,
+        product_id: result.product.id,
+        product_name: result.product.name,
         quantity: 1,
-        price: product.price,
-        total: product.price,
+        price: result.product.price,
+        total: result.product.price,
         reason: ''
       });
       

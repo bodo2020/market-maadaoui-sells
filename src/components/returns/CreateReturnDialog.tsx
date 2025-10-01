@@ -105,22 +105,22 @@ export function CreateReturnDialog({
     }
     
     try {
-      const product = await fetchProductByBarcode(barcode);
+      const result = await fetchProductByBarcode(barcode);
       
-      if (!product) {
+      if (!result.product) {
         toast.error('لم يتم العثور على منتج بهذا الباركود');
         return;
       }
       
-      const profitPerItem = product.price - (product.purchase_price || 0);
+      const profitPerItem = result.product.price - (result.product.purchase_price || 0);
       handleAddProduct({
-        product_id: product.id,
-        product_name: product.name,
+        product_id: result.product.id,
+        product_name: result.product.name,
         quantity: 1,
-        price: product.price,
-        purchase_price: product.purchase_price || 0,
+        price: result.product.price,
+        purchase_price: result.product.purchase_price || 0,
         profit_loss: profitPerItem,
-        total: product.price, // المبلغ المرتجع هو قيمة البيع الكاملة
+        total: result.product.price, // المبلغ المرتجع هو قيمة البيع الكاملة
         reason: itemReason
       });
       

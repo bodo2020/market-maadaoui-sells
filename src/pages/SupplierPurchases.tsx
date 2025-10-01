@@ -178,11 +178,11 @@ export default function SupplierPurchases() {
     if (!barcodeInput.trim()) return;
     
     try {
-      const product = await fetchProductByBarcode(barcodeInput);
+      const result = await fetchProductByBarcode(barcodeInput);
       
-      if (product) {
-        addProductToCart(product);
-        toast.success(`تم إضافة ${product.name} إلى السلة`);
+      if (result.product) {
+        addProductToCart(result.product);
+        toast.success(`تم إضافة ${result.product.name} إلى السلة`);
       } else {
         toast.error("لم يتم العثور على المنتج بهذا الباركود");
       }
@@ -194,11 +194,11 @@ export default function SupplierPurchases() {
 
   const handleBarcodeScanned = async (barcode: string) => {
     try {
-      const product = await fetchProductByBarcode(barcode);
+      const result = await fetchProductByBarcode(barcode);
       
-      if (product) {
-        addProductToCart(product);
-        toast.success(`تم إضافة ${product.name} إلى السلة`);
+      if (result.product) {
+        addProductToCart(result.product);
+        toast.success(`تم إضافة ${result.product.name} إلى السلة`);
       } else {
         toast.error("لم يتم العثور على المنتج بهذا الباركود");
       }
