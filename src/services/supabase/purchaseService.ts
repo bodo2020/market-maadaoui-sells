@@ -35,7 +35,7 @@ export async function createPurchase(purchaseData: any) {
       purchaseData.invoice_number = `P-${year}${month}${day}-${randomPart}`;
     }
 
-    // First, check if there's enough cash in the store register
+    // First, check if there's enough cash in the online register
     if (purchaseData.paid > 0) {
       const { data: deductionResult, error: deductionError } = await supabase.functions.invoke(
         'add-cash-transaction',
@@ -43,7 +43,7 @@ export async function createPurchase(purchaseData: any) {
           body: {
             amount: purchaseData.paid,
             transaction_type: 'withdrawal',
-            register_type: 'store',
+            register_type: 'online',
             notes: `دفع مستحقات المورد ${purchaseData.supplier_name || ''} - فاتورة رقم: ${purchaseData.invoice_number}`
           }
         }
