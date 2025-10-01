@@ -156,7 +156,7 @@ export default function POS() {
 
           // Reduced timeout for faster processing
           barcodeTimeoutRef.current = setTimeout(() => {
-            if (newBuffer.length >= 5) {
+            if (newBuffer.length >= 13) {
               console.log("Auto-processing barcode:", newBuffer);
               processBarcode(newBuffer);
               setBarcodeBuffer("");
@@ -186,8 +186,8 @@ export default function POS() {
           const value = target.value.trim();
           console.log("Input event triggered:", value);
 
-          // Process if it looks like a barcode (5+ characters)
-          if (value.length >= 5) {
+          // Process if it looks like a barcode (13+ characters)
+          if (value.length >= 13) {
             processBarcode(value);
             target.value = "";
           }
@@ -219,7 +219,7 @@ export default function POS() {
           if (e.key === 'Enter') {
             const target = e.target as HTMLInputElement;
             const value = target.value.trim();
-            if (value.length >= 5) {
+            if (value.length >= 13) {
               processBarcode(value);
               target.value = "";
             }
@@ -239,7 +239,7 @@ export default function POS() {
     }
   }, [barcodeBuffer, manualBarcodeMode, search, isCheckoutOpen, showWeightDialog, showInvoice, showBarcodeScanner]);
   const processBarcode = async (barcode: string) => {
-    if (barcode.length < 5) return;
+    if (barcode.length < 13) return;
     try {
       setSearch(barcode);
       const product = await fetchProductByBarcode(barcode);
@@ -469,21 +469,47 @@ export default function POS() {
       });
       return;
     }
-    setCartItems([...cartItems, {
-      product,
-      quantity: product.bulk_quantity,
-      price: product.bulk_price / product.bulk_quantity,
-      discount: 0,
-      total: product.bulk_price,
-      isBulk: true
-    }]);
+    // البحث عن المنتج في السلة للدمج
+    const existingItemIndex = cartItems.findIndex(item => 
+      item.product.id === product.id && item.isBulk === true
+    );
 
-    // Show success notification
-    toast({
-      title: "تم إضافة عبوة جملة ✅",
-      description: `${product.name} - ${product.bulk_quantity} وحدة`,
-      className: "bg-green-50 border-green-200 text-green-800"
-    });
+    if (existingItemIndex !== -1) {
+      // إذا وُجد المنتج، قم بزيادة الكمية
+      const updatedItems = [...cartItems];
+      const existingItem = updatedItems[existingItemIndex];
+      const newQuantity = existingItem.quantity + product.bulk_quantity;
+      
+      updatedItems[existingItemIndex] = {
+        ...existingItem,
+        quantity: newQuantity,
+        total: (product.bulk_price / product.bulk_quantity) * newQuantity
+      };
+      
+      setCartItems(updatedItems);
+      
+      toast({
+        title: "تم تحديث الكمية ✅",
+        description: `${product.name} - المجموع: ${newQuantity} وحدة`,
+        className: "bg-blue-50 border-blue-200 text-blue-800"
+      });
+    } else {
+      // إضافة منتج جديد للسلة
+      setCartItems([...cartItems, {
+        product,
+        quantity: product.bulk_quantity,
+        price: product.bulk_price / product.bulk_quantity,
+        discount: 0,
+        total: product.bulk_price,
+        isBulk: true
+      }]);
+
+      toast({
+        title: "تم إضافة عبوة جملة ✅",
+        description: `${product.name} - ${product.bulk_quantity} وحدة`,
+        className: "bg-green-50 border-green-200 text-green-800"
+      });
+    }
 
     // Auto-scroll to bottom of cart
     setTimeout(() => {
@@ -1028,7 +1054,7 @@ export default function POS() {
                               {item.weight ? <span className="ml-1">
                                   {item.product.price} {siteConfig.currency}/كجم × {item.weight} كجم
                                 </span> : item.isBulk ? <span className="ml-1">
-                                  عبوة جملة {item.quantity} وحدة
+                                  كمية الجملة كرتونة - {item.quantity} وحدة
                                 </span> : <span className="ml-1">
                                   {item.product.is_offer && item.product.offer_price ? item.product.offer_price : item.product.price} {siteConfig.currency}
                                   {item.product.is_offer && item.product.offer_price && <span className="line-through mr-1">{item.product.price} {siteConfig.currency}</span>}
