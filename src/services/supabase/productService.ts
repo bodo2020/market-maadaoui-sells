@@ -71,7 +71,7 @@ export async function fetchProductByBarcode(barcode: string) {
   const { data, error } = await supabase
     .from("products")
     .select("*")
-    .eq("barcode", barcode)
+    .or(`barcode.eq.${barcode},bulk_barcode.eq.${barcode}`)
     .maybeSingle();
 
   if (error) {
