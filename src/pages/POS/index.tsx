@@ -172,7 +172,8 @@ export default function POS() {
     
     if (product.calculated_weight) {
       handleAddScaleProductToCart(product, product.calculated_weight);
-    } else if (product.is_bulk_scan && !existingItem) {
+    } else if (product.bulk_barcode && barcode === product.bulk_barcode && !existingItem) {
+      // إذا كان الباركود الممسوح هو باركود الجملة، استخدم إعدادات الجملة
       handleAddBulkToCart(product);
     } else if (!existingItem?.isBulk) {
       handleAddToCart(product);
