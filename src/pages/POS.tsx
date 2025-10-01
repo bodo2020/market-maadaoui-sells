@@ -52,6 +52,7 @@ export default function POS() {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const cartScrollRef = useRef<HTMLDivElement>(null);
   const {
     toast
   } = useToast();
@@ -163,11 +164,11 @@ export default function POS() {
           }
           setBarcodeBuffer(prev => prev + e.key);
           
-          // Set timeout to auto-press Enter after 1.3 seconds
+          // Set timeout to auto-press Enter after 1.5 seconds
           barcodeTimeoutRef.current = setTimeout(() => {
             const currentBuffer = barcodeBuffer + e.key;
             if (currentBuffer.length >= 5) {
-              console.log("Auto-pressing Enter after 1.3 seconds for:", currentBuffer);
+              console.log("Auto-pressing Enter after 1.5 seconds for:", currentBuffer);
               // Simulate Enter key press
               setSearch(currentBuffer);
               handleSearch();
@@ -175,7 +176,7 @@ export default function POS() {
             } else {
               setBarcodeBuffer("");
             }
-          }, 1300); // 1.3 second timeout
+          }, 1500); // 1.5 second timeout
         }
         
         // Handle backspace for search
@@ -297,12 +298,12 @@ export default function POS() {
           }
         }
         
-        // Check if barcode is 13 digits for scale products (منتج الميزان)
-        if (barcode.length === 13 && /^\d+$/.test(barcode)) {
+        // Check if barcode is 11 or 13 digits for scale products (منتج الميزان)
+        if ((barcode.length === 11 || barcode.length === 13) && /^\d+$/.test(barcode)) {
           // Try to find scale product for these specific lengths
           const scaleProduct = products.find(p => p.barcode_type === "scale" && barcode.includes(p.barcode || ""));
           if (scaleProduct) {
-            // For scale products with 13 digit barcodes, add directly
+            // For scale products with 11 or 13 digit barcodes, add directly
             handleAddToCart(scaleProduct);
             toast({
               title: "تم إضافة منتج الميزان",
@@ -433,6 +434,21 @@ export default function POS() {
         weight: null
       }]);
     }
+    
+    // Show success notification
+    toast({
+      title: "تم إضافة المنتج ✅",
+      description: `${product.name} - تم إضافته للسلة`,
+      className: "bg-green-50 border-green-200 text-green-800"
+    });
+    
+    // Auto-scroll to bottom of cart
+    setTimeout(() => {
+      if (cartScrollRef.current) {
+        cartScrollRef.current.scrollTop = cartScrollRef.current.scrollHeight;
+      }
+    }, 100);
+    
     setSearchResults([]);
   };
 
@@ -455,10 +471,20 @@ export default function POS() {
       total: itemPrice,
       weight: weight
     }]);
+    
+    // Show success notification
     toast({
-      title: "تم إضافة منتج بالوزن",
-      description: `${product.name} - ${weight} كجم`
+      title: "تم إضافة منتج بالوزن ✅",
+      description: `${product.name} - ${weight} كجم`,
+      className: "bg-green-50 border-green-200 text-green-800"
     });
+    
+     // Auto-scroll to bottom of cart
+    setTimeout(() => {
+      if (cartScrollRef.current) {
+        cartScrollRef.current.scrollTop = cartScrollRef.current.scrollHeight;
+      }
+    }, 100);
     setSearchResults([]);
     setShowWeightDialog(false);
     setCurrentScaleProduct(null);
@@ -491,10 +517,21 @@ export default function POS() {
       total: product.bulk_price,
       isBulk: true
     }]);
+    
+    // Show success notification
     toast({
-      title: "تم إضافة عبوة جملة",
-      description: `${product.name} - ${product.bulk_quantity} وحدة`
+      title: "تم إضافة عبوة جملة ✅",
+      description: `${product.name} - ${product.bulk_quantity} وحدة`,
+      className: "bg-green-50 border-green-200 text-green-800"
     });
+    
+    // Auto-scroll to bottom of cart
+    setTimeout(() => {
+      if (cartScrollRef.current) {
+        cartScrollRef.current.scrollTop = cartScrollRef.current.scrollHeight;
+      }
+    }, 100);
+    
     setSearchResults([]);
   };
 
@@ -1084,7 +1121,7 @@ export default function POS() {
                   <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-20" />
                   <p>السلة فارغة</p>
                 </div> : <>
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                  <div ref={cartScrollRef} className="space-y-4 max-h-[400px] overflow-y-auto">
                     {cartItems.map((item, index) => <div key={index} className="flex flex-col pb-3 border-b">
                         <div className="flex justify-between">
                           <div className="flex-1">
