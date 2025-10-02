@@ -48,48 +48,85 @@ export default function Analytics() {
       let analysisType = '';
 
       if (activeTab === 'product-analytics') {
-        // Fetch product analytics data
+        // Fetch comprehensive product analytics data
         const { data: sales } = await supabase
           .from('sales')
-          .select('items, total, profit, date')
+          .select('items, total, profit, date, created_at')
           .gte('date', dateRange.from?.toISOString())
-          .lte('date', dateRange.to?.toISOString());
-        analyticsData = { sales };
+          .lte('date', dateRange.to?.toISOString())
+          .order('date', { ascending: false });
+        
+        const { data: products } = await supabase
+          .from('products')
+          .select('id, name, price, purchase_price, bulk_quantity, stock_quantity, barcode');
+        
+        const { data: inventory } = await supabase
+          .from('inventory')
+          .select('product_id, quantity');
+        
+        analyticsData = { sales, products, inventory, period: selectedPeriod };
         analysisType = 'products';
       } else if (activeTab === 'customer-analytics') {
-        // Fetch customer analytics data
+        // Fetch comprehensive customer analytics data
         const { data: customers } = await supabase
           .from('customers')
-          .select('*');
+          .select('id, name, phone, email, created_at');
+        
         const { data: orders } = await supabase
           .from('online_orders')
-          .select('*')
+          .select('customer_id, total, items, created_at, status')
           .gte('created_at', dateRange.from?.toISOString())
-          .lte('created_at', dateRange.to?.toISOString());
-        analyticsData = { customers, orders };
+          .lte('created_at', dateRange.to?.toISOString())
+          .order('created_at', { ascending: false });
+        
+        const { data: sales } = await supabase
+          .from('sales')
+          .select('items, total, date, customer_id')
+          .gte('date', dateRange.from?.toISOString())
+          .lte('date', dateRange.to?.toISOString());
+        
+        analyticsData = { customers, orders, sales, period: selectedPeriod };
         analysisType = 'customers';
       } else if (activeTab === 'revenue-analytics') {
-        // Fetch revenue data
+        // Fetch comprehensive revenue data
+        const { data: sales } = await supabase
+          .from('sales')
+          .select('total, profit, date, items, payment_method')
+          .gte('date', dateRange.from?.toISOString())
+          .lte('date', dateRange.to?.toISOString())
+          .order('date', { ascending: false });
+        
+        const { data: expenses } = await supabase
+          .from('expenses')
+          .select('amount, type, date, description')
+          .gte('date', dateRange.from?.toISOString())
+          .lte('date', dateRange.to?.toISOString())
+          .order('date', { ascending: false });
+        
+        const { data: onlineOrders } = await supabase
+          .from('online_orders')
+          .select('total, created_at, payment_method')
+          .gte('created_at', dateRange.from?.toISOString())
+          .lte('created_at', dateRange.to?.toISOString());
+        
+        analyticsData = { sales, expenses, onlineOrders, period: selectedPeriod };
+        analysisType = 'revenue';
+      } else if (activeTab === 'expense-analytics') {
+        // Fetch comprehensive expense data
+        const { data: expenses } = await supabase
+          .from('expenses')
+          .select('amount, type, date, description')
+          .gte('date', dateRange.from?.toISOString())
+          .lte('date', dateRange.to?.toISOString())
+          .order('amount', { ascending: false });
+        
         const { data: sales } = await supabase
           .from('sales')
           .select('total, profit, date')
           .gte('date', dateRange.from?.toISOString())
           .lte('date', dateRange.to?.toISOString());
-        const { data: expenses } = await supabase
-          .from('expenses')
-          .select('amount, type, date')
-          .gte('date', dateRange.from?.toISOString())
-          .lte('date', dateRange.to?.toISOString());
-        analyticsData = { sales, expenses };
-        analysisType = 'revenue';
-      } else if (activeTab === 'expense-analytics') {
-        // Fetch expense data
-        const { data: expenses } = await supabase
-          .from('expenses')
-          .select('*')
-          .gte('date', dateRange.from?.toISOString())
-          .lte('date', dateRange.to?.toISOString());
-        analyticsData = { expenses };
+        
+        analyticsData = { expenses, sales, period: selectedPeriod };
         analysisType = 'expenses';
       }
 
