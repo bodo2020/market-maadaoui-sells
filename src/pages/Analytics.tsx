@@ -9,13 +9,19 @@ import { PeriodFilter, PeriodType, getDateRangeFromPeriod, getPeriodLabel } from
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, ShoppingCart, Package, Receipt, DollarSign, CreditCard, Download } from "lucide-react";
+import { BarChart3, ShoppingCart, Package, Receipt, DollarSign, CreditCard, Download, Sparkles } from "lucide-react";
 import { exportComprehensiveAnalyticsReport } from "@/services/excelExportService";
 import { toast } from "sonner";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Analytics() {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>("month");
+  const [aiInsights, setAiInsights] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [activeTab, setActiveTab] = useState("product-analytics");
 
   const handleExportReport = async () => {
     try {
@@ -26,6 +32,80 @@ export default function Analytics() {
     } catch (error) {
       console.error("Error exporting report:", error);
       toast.error("حدث خطأ في تصدير التقرير");
+    }
+  };
+
+  const handleAIAnalysis = async () => {
+    setIsAnalyzing(true);
+    setAiInsights(null);
+    
+    try {
+      toast.loading("جاري تحليل البيانات بالذكاء الاصطناعي...");
+      
+      // Fetch relevant data based on active tab
+      const dateRange = getDateRangeFromPeriod(selectedPeriod);
+      let analyticsData: any = {};
+      let analysisType = '';
+
+      if (activeTab === 'product-analytics') {
+        // Fetch product analytics data
+        const { data: sales } = await supabase
+          .from('sales')
+          .select('items, total, profit, date')
+          .gte('date', dateRange.from?.toISOString())
+          .lte('date', dateRange.to?.toISOString());
+        analyticsData = { sales };
+        analysisType = 'products';
+      } else if (activeTab === 'customer-analytics') {
+        // Fetch customer analytics data
+        const { data: customers } = await supabase
+          .from('customers')
+          .select('*');
+        const { data: orders } = await supabase
+          .from('online_orders')
+          .select('*')
+          .gte('created_at', dateRange.from?.toISOString())
+          .lte('created_at', dateRange.to?.toISOString());
+        analyticsData = { customers, orders };
+        analysisType = 'customers';
+      } else if (activeTab === 'revenue-analytics') {
+        // Fetch revenue data
+        const { data: sales } = await supabase
+          .from('sales')
+          .select('total, profit, date')
+          .gte('date', dateRange.from?.toISOString())
+          .lte('date', dateRange.to?.toISOString());
+        const { data: expenses } = await supabase
+          .from('expenses')
+          .select('amount, type, date')
+          .gte('date', dateRange.from?.toISOString())
+          .lte('date', dateRange.to?.toISOString());
+        analyticsData = { sales, expenses };
+        analysisType = 'revenue';
+      } else if (activeTab === 'expense-analytics') {
+        // Fetch expense data
+        const { data: expenses } = await supabase
+          .from('expenses')
+          .select('*')
+          .gte('date', dateRange.from?.toISOString())
+          .lte('date', dateRange.to?.toISOString());
+        analyticsData = { expenses };
+        analysisType = 'expenses';
+      }
+
+      const { data, error } = await supabase.functions.invoke('analyze-data', {
+        body: { analyticsData, analysisType }
+      });
+
+      if (error) throw error;
+
+      setAiInsights(data.insights);
+      toast.success("تم التحليل بنجاح!");
+    } catch (error: any) {
+      console.error("Error analyzing data:", error);
+      toast.error(error.message || "حدث خطأ في التحليل");
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -40,10 +120,20 @@ export default function Analytics() {
                 تحليلات شاملة للمبيعات والعملاء والطلبات
               </p>
             </div>
-            <Button onClick={handleExportReport} className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              تصدير تقرير شامل
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={handleAIAnalysis} disabled={isAnalyzing} className="flex items-center gap-2">
+                {isAnalyzing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                تحليل بالذكاء الاصطناعي
+              </Button>
+              <Button onClick={handleExportReport} className="flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                تصدير تقرير شامل
+              </Button>
+            </div>
           </div>
           
           <PeriodFilter 
@@ -52,7 +142,16 @@ export default function Analytics() {
           />
         </div>
 
-        <Tabs defaultValue="product-analytics" className="space-y-4">
+        {aiInsights && (
+          <Alert className="bg-primary/5 border-primary/20">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <AlertDescription className="mt-2 text-sm leading-relaxed whitespace-pre-wrap">
+              {aiInsights}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Tabs defaultValue="product-analytics" className="space-y-4" onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="product-analytics" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
