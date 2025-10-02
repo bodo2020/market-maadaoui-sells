@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Plus, Search } from "lucide-react";
+import { Download, Plus, Search, Bell } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { useNotificationStore } from "@/stores/notificationStore";
@@ -33,6 +33,8 @@ export default function OnlineOrders() {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<Order | null>(null);
+  const [notificationEnabled, setNotificationEnabled] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const {
     orders,
     loading,
@@ -42,6 +44,52 @@ export default function OnlineOrders() {
     markOrdersAsRead
   } = useNotificationStore();
   const navigate = useNavigate();
+
+  // Initialize audio notification
+  useEffect(() => {
+    // Create audio element for notification sound
+    audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZQQ0PU6ni8bdjHwU2iNL00H0lBisz');
+  }, []);
+
+  // Listen for new orders using Realtime
+  useEffect(() => {
+    if (!notificationEnabled) return;
+
+    const channel = supabase
+      .channel('online-orders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'online_orders'
+        },
+        (payload) => {
+          console.log('New order received:', payload);
+          
+          // Play notification sound
+          if (audioRef.current) {
+            audioRef.current.play().catch(error => {
+              console.error('Error playing notification sound:', error);
+            });
+          }
+          
+          // Show toast notification
+          toast.success('طلب جديد وارد! 🔔', {
+            description: `طلب رقم: ${payload.new.id.slice(0, 8)}`,
+            duration: 5000,
+          });
+          
+          // Refresh orders list
+          handleOrderUpdate();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [notificationEnabled, handleOrderUpdate]);
   const handleArchive = (order: Order) => {
     toast.success("تم أرشفة الطلب");
   };
@@ -187,7 +235,15 @@ export default function OnlineOrders() {
       <div className="container p-6 dir-rtl mx-0 px-0 py-px">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">الطلبات</h1>
-          
+          <Button
+            variant={notificationEnabled ? "default" : "outline"}
+            size="sm"
+            onClick={() => setNotificationEnabled(!notificationEnabled)}
+            className="flex items-center gap-2"
+          >
+            <Bell className={`h-4 w-4 ${notificationEnabled ? 'animate-pulse' : ''}`} />
+            {notificationEnabled ? 'التنبيهات مفعلة' : 'التنبيهات معطلة'}
+          </Button>
         </div>
 
         <OrderStats orders={orders} activeTab={activeTab} onTabChange={setActiveTab} />
