@@ -135,77 +135,59 @@ export const BarcodeGenerator: React.FC<BarcodeGeneratorProps> = ({
       }
     }
     
-    // Use web-based printing (works on Android Chrome)
+    // Fallback to regular print window (same as invoice printing)
     const canvas = printCanvasRef.current;
     const dataURL = canvas.toDataURL('image/png');
-
-    // Create a temporary container for printing
-    const printContainer = document.createElement('div');
-    printContainer.style.position = 'fixed';
-    printContainer.style.left = '-9999px';
-    printContainer.style.top = '0';
     
-    printContainer.innerHTML = `
-      <div id="barcode-print-content" style="
-        width: 58mm;
-        max-width: 58mm;
-        margin: 0;
-        padding: 0;
-        font-family: Arial, sans-serif;
-        direction: rtl;
-      ">
-        <img src="${dataURL}" alt="Barcode" style="
-          width: 100%;
-          height: auto;
-          display: block;
-        " />
-      </div>
-    `;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('لا يمكن فتح نافذة الطباعة');
+      return;
+    }
 
-    document.body.appendChild(printContainer);
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>طباعة باركود - ${product.name}</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 10px;
+              text-align: center;
+              font-family: Arial, sans-serif;
+            }
+            img {
+              max-width: 100%;
+              height: auto;
+            }
+            @media print {
+              body { margin: 0; padding: 0; }
+              img { 
+                width: 58mm; 
+                height: auto;
+                page-break-inside: avoid;
+              }
+              @page {
+                size: 58mm auto;
+                margin: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <img src="${dataURL}" alt="Barcode for ${product.name}" />
+        </body>
+      </html>
+    `);
 
-    // Add print styles
-    const printStyle = document.createElement('style');
-    printStyle.id = 'barcode-print-styles';
-    printStyle.textContent = `
-      @media print {
-        body * {
-          visibility: hidden;
-        }
-        #barcode-print-content,
-        #barcode-print-content * {
-          visibility: visible;
-        }
-        #barcode-print-content {
-          position: absolute;
-          left: 0;
-          top: 0;
-          width: 58mm !important;
-          max-width: 58mm !important;
-        }
-        @page {
-          size: 58mm auto;
-          margin: 0;
-        }
-      }
-    `;
-    document.head.appendChild(printStyle);
+    printWindow.document.close();
+    
+    // Wait for image to load then print
+    printWindow.onload = function() {
+      printWindow.print();
+    };
 
-    // Trigger print
-    setTimeout(() => {
-      window.print();
-      
-      // Cleanup
-      setTimeout(() => {
-        document.body.removeChild(printContainer);
-        const styleElement = document.getElementById('barcode-print-styles');
-        if (styleElement) {
-          document.head.removeChild(styleElement);
-        }
-      }, 100);
-      
-      toast.success('تم إرسال الباركود للطباعة');
-    }, 100);
+    toast.success('تم إرسال الباركود للطباعة');
   };
 
   const copyBarcode = () => {
