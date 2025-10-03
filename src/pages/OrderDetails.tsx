@@ -1,53 +1,36 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { Order } from "@/types";
-import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { OrderItemsList } from "@/components/orders/OrderItemsList";
-import { CustomerInfoCards } from "@/components/orders/CustomerInfoCards";
-import { OrderStatusSelection } from "@/components/orders/OrderStatusSelection";
-import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
-import { PaymentStatusBadge } from "@/components/orders/PaymentStatusBadge";
-import { OrderStatusProgress } from "@/components/orders/OrderStatusProgress";
-import { useOrderDetails } from "@/hooks/orders/useOrderDetails";
-import { useState } from "react";
+import { ArrowRight, Printer, Check, X, Package, DollarSign, Truck, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useOrderDetails } from "@/hooks/orders/useOrderDetails";
+import { OrderItemsList } from "@/components/orders/OrderItemsList";
+import { CustomerInfoCards } from "@/components/orders/CustomerInfoCards";
+import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
+import { PaymentMethodBadge } from "@/components/orders/PaymentMethodBadge";
+import { OrderTimeline } from "@/components/orders/OrderTimeline";
+import { PaymentStatusBadge } from "@/components/orders/PaymentStatusBadge";
+import { Order } from "@/types";
+import { useState } from "react";
+import { format } from "date-fns";
+import { ar } from "date-fns/locale";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
 import { updateProduct } from "@/services/supabase/productService";
 import { RegisterType } from "@/services/supabase/cashTrackingService";
 import { recordCashTransaction } from "@/services/supabase/cashTrackingService";
-import { 
-  ArrowLeft, 
-  Package, 
-  CreditCard, 
-  CheckCircle2, 
-  XCircle, 
-  Clock,
-  TrendingUp
-} from "lucide-react";
 
 export default function OrderDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
-  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
-  const [isProcessingOrder, setIsProcessingOrder] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const {
     order,
     isLoading,
-    isUpdatingStatus,
-    selectedStatus,
-    setSelectedStatus,
-    handleStatusChange: originalHandleStatusChange,
     fetchOrder
   } = useOrderDetails(id as string);
-
-  const handlePaymentStatusUpdate = () => {
-    if (!order || order.payment_status === 'paid') return;
-    setPaymentConfirmOpen(true);
-  };
 
   const getNextStatus = () => {
     const statusOrder = ['pending', 'confirmed', 'preparing', 'ready', 'shipped', 'delivered'];
@@ -69,10 +52,10 @@ export default function OrderDetails() {
 
   const handleNextStatus = async () => {
     const nextStatus = getNextStatus();
-    if (!order || !nextStatus || isProcessingOrder) return;
+    if (!order || !nextStatus || isProcessing) return;
     
     try {
-      setIsProcessingOrder(true);
+      setIsProcessing(true);
       
       if (nextStatus === 'delivered' && order.status !== 'delivered') {
         if (order.customer_name || order.customer_phone) {
@@ -82,19 +65,15 @@ export default function OrderDetails() {
           };
           
           const customer = await findOrCreateCustomer(customerInfo);
-          if (customer) {
-            console.log("Customer linked to order:", customer);
-            if (!order.customer_id) {
-              await supabase
-                .from('online_orders')
-                .update({ customer_id: customer.id })
-                .eq('id', order.id);
-            }
+          if (customer && !order.customer_id) {
+            await supabase
+              .from('online_orders')
+              .update({ customer_id: customer.id })
+              .eq('id', order.id);
           }
         }
         
         const orderItems = order.items || [];
-        console.log("Processing inventory for items:", orderItems);
         
         for (const item of orderItems) {
           const { data: product, error: productError } = await supabase
@@ -103,10 +82,7 @@ export default function OrderDetails() {
             .eq('id', item.product_id)
             .single();
             
-          if (productError) {
-            console.error("Error fetching product:", productError);
-            continue;
-          }
+          if (productError) continue;
           
           let quantityToDeduct = item.quantity;
           
@@ -126,8 +102,6 @@ export default function OrderDetails() {
           await updateProduct(product.id, {
             quantity: newQuantity
           });
-          
-          console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
         }
         
         if (order.payment_status === 'paid') {
@@ -139,7 +113,6 @@ export default function OrderDetails() {
               `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
               ''
             );
-            console.log(`Added ${order.total} to online cash register`);
           } catch (cashError) {
             console.error("Error recording cash transaction:", cashError);
             toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
@@ -164,15 +137,15 @@ export default function OrderDetails() {
       console.error('Error processing order:', error);
       toast.error("حدث خطأ أثناء معالجة الطلب");
     } finally {
-      setIsProcessingOrder(false);
+      setIsProcessing(false);
     }
   };
 
   const handleCancelOrder = async () => {
-    if (!order || isProcessingOrder) return;
+    if (!order || isProcessing) return;
     
     try {
-      setIsProcessingOrder(true);
+      setIsProcessing(true);
       
       const { error } = await supabase
         .from('online_orders')
@@ -191,15 +164,15 @@ export default function OrderDetails() {
       console.error('Error cancelling order:', error);
       toast.error("حدث خطأ أثناء إلغاء الطلب");
     } finally {
-      setIsProcessingOrder(false);
+      setIsProcessing(false);
     }
   };
 
   const handlePaymentStatusChange = async (newStatus: Order['payment_status']) => {
-    if (!order || isUpdatingPayment) return;
+    if (!order || isProcessing) return;
     
     try {
-      setIsUpdatingPayment(true);
+      setIsProcessing(true);
       
       const { error } = await supabase
         .from('online_orders')
@@ -211,264 +184,289 @@ export default function OrderDetails() {
       
       if (error) throw error;
       
-      toast.success(`تم تحديث حالة الدفع إلى ${
-        newStatus === 'paid' ? 'مدفوع' : 
-        newStatus === 'pending' ? 'في انتظار الدفع' : 
-        newStatus === 'failed' ? 'فشل الدفع' : 'تم الاسترجاع'
-      }`);
+      toast.success(`تم تحديث حالة الدفع`);
       
       if (newStatus === 'paid' && order.status === 'delivered') {
         try {
-          // Get current user ID (may be null if not authenticated)
           const { data: { user } } = await supabase.auth.getUser();
-          const userId = user?.id ?? null;
-          
           await recordCashTransaction(
             order.total, 
             'deposit', 
             RegisterType.ONLINE, 
             `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-            userId
+            user?.id || ''
           );
-          console.log(`Added ${order.total} to online cash register`);
         } catch (cashError) {
           console.error("Error recording cash transaction:", cashError);
-          toast.error("تم تحديث حالة الدفع لكن حدث خطأ في تسجيل المعاملة المالية");
         }
       }
       
       fetchOrder();
+      setPaymentConfirmOpen(false);
     } catch (error) {
       console.error('Error updating payment status:', error);
       toast.error('حدث خطأ أثناء تحديث حالة الدفع');
     } finally {
-      setIsUpdatingPayment(false);
+      setIsProcessing(false);
     }
   };
 
-  const onPaymentConfirmed = () => {
+  const handleItemDeleted = () => {
+    fetchOrder();
+  };
+
+  const handleItemUpdated = () => {
     fetchOrder();
   };
 
   if (isLoading) {
     return (
-      <MainLayout>
-        <div className="container mx-auto p-6">
-          <div className="flex justify-center items-center h-[70vh]">
-            جاري التحميل...
-          </div>
+      <div className="container mx-auto p-4 md:p-6">
+        <div className="flex justify-center items-center h-[70vh]">
+          جاري التحميل...
         </div>
-      </MainLayout>
+      </div>
     );
   }
 
   if (!order) {
     return (
-      <MainLayout>
-        <div className="container mx-auto p-6">
-          <div className="flex justify-center items-center h-[70vh]">
-            لم يتم العثور على الطلب
-          </div>
+      <div className="container mx-auto p-4 md:p-6">
+        <div className="flex justify-center items-center h-[70vh]">
+          لم يتم العثور على الطلب
         </div>
-      </MainLayout>
+      </div>
     );
   }
 
   return (
-    <MainLayout>
-      <div className="container mx-auto p-6 dir-rtl">
-        {/* Header with Gradient Background */}
-        <Card className="mb-6 overflow-hidden">
-          <div className="bg-gradient-to-br from-primary to-primary/80 p-6 text-primary-foreground">
-            <div className="flex justify-between items-start">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <Package className="h-8 w-8" />
-                  <div>
-                    <h1 className="text-3xl font-bold">طلب #{order?.id.slice(0, 8)}</h1>
-                    <p className="text-primary-foreground/80 text-sm mt-1">
-                      {new Date(order?.created_at || '').toLocaleDateString('ar-EG', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </p>
-                  </div>
-                </div>
-                
-                {order && (
-                  <div className="flex items-center gap-2">
-                    <PaymentStatusBadge 
-                      status={order.payment_status} 
-                      onStatusChange={handlePaymentStatusChange} 
-                      editable 
-                    />
-                  </div>
-                )}
+    <div className="container mx-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6">
+      {/* Header Section - Enhanced */}
+      <Card className="bg-gradient-to-br from-primary/10 via-background to-background border-primary/20 animate-fade-in">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/online-orders")}
+                className="hover:bg-primary/10"
+              >
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+              <div>
+                <CardTitle className="text-2xl md:text-3xl font-bold">
+                  طلب #{order.id.slice(0, 8)}
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {format(new Date(order.created_at), "dd MMMM yyyy - HH:mm", { locale: ar })}
+                </p>
               </div>
-
-              <Button 
-                variant="secondary" 
-                onClick={() => navigate('/online-orders')}
+            </div>
+            
+            <div className="flex items-center gap-3 flex-wrap">
+              <PaymentStatusBadge 
+                status={order.payment_status}
+                editable={false}
+              />
+              <PaymentMethodBadge paymentMethod={order.payment_method} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
                 className="gap-2"
               >
-                <ArrowLeft className="h-4 w-4" />
-                عودة
+                <Printer className="h-4 w-4" />
+                طباعة
               </Button>
             </div>
-
-            {/* Order Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-              <Card className="bg-white/10 backdrop-blur border-white/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-primary-foreground/70 text-xs">إجمالي المنتجات</p>
-                      <p className="text-2xl font-bold mt-1">{((order?.total || 0) - (order?.shipping_cost || 0)).toFixed(2)} ج.م</p>
-                    </div>
-                    <Package className="h-8 w-8 text-primary-foreground/50" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/10 backdrop-blur border-white/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-primary-foreground/70 text-xs">رسوم الشحن</p>
-                      <p className="text-2xl font-bold mt-1">{order?.shipping_cost?.toFixed(2) || '0.00'} ج.م</p>
-                    </div>
-                    <CreditCard className="h-8 w-8 text-primary-foreground/50" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/10 backdrop-blur border-white/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-primary-foreground/70 text-xs">الإجمالي الكلي</p>
-                      <p className="text-2xl font-bold mt-1">{order?.total.toFixed(2)} ج.م</p>
-                    </div>
-                    <TrendingUp className="h-8 w-8 text-primary-foreground/50" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/10 backdrop-blur border-white/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-primary-foreground/70 text-xs">عدد الأصناف</p>
-                      <p className="text-2xl font-bold mt-1">{order?.items?.length || 0}</p>
-                    </div>
-                    <Package className="h-8 w-8 text-primary-foreground/50" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </div>
-        </Card>
+        </CardHeader>
+      </Card>
 
-        {/* Order Progress Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              <CardTitle>مراحل الطلب</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <OrderStatusProgress status={order?.status || 'pending'} />
-            
-            {/* Action Buttons */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
-              {order?.status !== 'delivered' && order?.status !== 'cancelled' && (
-                <>
-                  <Button 
-                    onClick={handleNextStatus}
-                    disabled={isUpdatingStatus || isProcessingOrder}
-                    className="w-full gap-2"
-                    size="lg"
-                  >
-                    <CheckCircle2 className="h-5 w-5" />
-                    {isUpdatingStatus || isProcessingOrder ? 'جاري المعالجة...' : getNextStatusLabel()}
-                  </Button>
-
-                  <Button 
-                    onClick={handleCancelOrder}
-                    disabled={isUpdatingStatus || isProcessingOrder}
-                    variant="destructive"
-                    className="w-full gap-2"
-                    size="lg"
-                  >
-                    <XCircle className="h-5 w-5" />
-                    {isUpdatingStatus || isProcessingOrder ? 'جاري الإلغاء...' : 'إلغاء الطلب'}
-                  </Button>
-                </>
-              )}
+      {/* Financial Summary - 4 Cards */}
+      <div className="grid gap-4 md:grid-cols-4 animate-fade-in">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-blue-500/10">
+                <Package className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">إجمالي المنتجات</p>
+                <p className="text-2xl font-bold">
+                  {((order?.total || 0) - (order?.shipping_cost || 0)).toFixed(2)} جنيه
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Products Section */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary" />
-                  <CardTitle>المنتجات المطلوبة</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <OrderItemsList 
-                  items={order?.items || []} 
-                  orderId={order?.id}
-                  onItemDeleted={fetchOrder}
-                  onItemUpdated={fetchOrder}
-                />
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-green-500/10">
+                <Truck className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">رسوم الشحن</p>
+                <p className="text-2xl font-bold">
+                  {order?.shipping_cost?.toFixed(2) || '0.00'} جنيه
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                <div className="mt-6 pt-6 border-t">
-                  <Button 
-                    variant="outline" 
-                    className="w-full gap-2" 
-                    onClick={handlePaymentStatusUpdate}
-                    disabled={order?.payment_status === 'paid' || isUpdatingStatus || isProcessingOrder}
-                  >
-                    <CreditCard className="h-4 w-4" />
-                    {order?.payment_status === 'pending' ? 'تأكيد الدفع' : 'تم الدفع'}
-                  </Button>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-purple-500/10">
+                <DollarSign className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">طريقة الدفع</p>
+                <div className="mt-1">
+                  <PaymentMethodBadge paymentMethod={order?.payment_method} />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Customer Info Section */}
-          <div className="lg:col-span-1">
-            <CustomerInfoCards
-              customerName={order?.customer_name}
-              customerEmail={order?.customer_email}
-              customerPhone={order?.customer_phone}
-              shippingAddress={order?.shipping_address}
-              notes={order?.notes}
-              governorate={order?.governorate}
-              city={order?.city}
-              area={order?.area}
-              neighborhood={order?.neighborhood}
-            />
-          </div>
+        <Card className="hover:shadow-md transition-shadow bg-primary/5 border-primary/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-primary/10">
+                <Receipt className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">الإجمالي الكلي</p>
+                <p className="text-2xl font-bold text-primary">
+                  {order?.total.toFixed(2)} جنيه
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Left Column - Timeline */}
+        <div className="space-y-6 md:col-span-1">
+          <OrderTimeline 
+            status={order.status}
+            createdAt={order.created_at}
+            updatedAt={order.created_at}
+          />
         </div>
 
-        <PaymentConfirmationDialog
-          open={paymentConfirmOpen}
-          onOpenChange={setPaymentConfirmOpen}
-          orderId={order?.id || ''}
-          onConfirm={onPaymentConfirmed}
+        {/* Right Column - Products */}
+        <div className="md:col-span-2 space-y-6">
+          <Card className="animate-fade-in">
+            <CardHeader>
+              <CardTitle className="text-lg">المنتجات ({order?.items?.length || 0} صنف)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <OrderItemsList
+                items={order.items}
+                orderId={order.id}
+                onItemDeleted={handleItemDeleted}
+                onItemUpdated={handleItemUpdated}
+                readOnly={false}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Customer Information - Full Width */}
+      <div className="animate-fade-in">
+        <h3 className="text-lg font-semibold mb-4">معلومات العميل</h3>
+        <CustomerInfoCards
+          customerName={order.customer_name}
+          customerEmail={order.customer_email}
+          customerPhone={order.customer_phone}
+          shippingAddress={order.shipping_address}
+          notes={order.notes}
+          governorate={order.governorate}
+          city={order.city}
+          area={order.area}
+          neighborhood={order.neighborhood}
         />
       </div>
-    </MainLayout>
+
+      {/* Floating Action Bar - Mobile */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:hidden z-50">
+        <div className="flex gap-2">
+          <Button
+            onClick={handleNextStatus}
+            disabled={isProcessing || order.status === 'delivered' || order.status === 'cancelled'}
+            className="flex-1 gap-2"
+          >
+            <Check className="h-4 w-4" />
+            {getNextStatusLabel()}
+          </Button>
+          
+          {order.status !== 'cancelled' && order.status !== 'delivered' && (
+            <Button
+              variant="destructive"
+              onClick={handleCancelOrder}
+              disabled={isProcessing}
+              size="icon"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Action Buttons - Desktop */}
+      <div className="hidden md:flex gap-4 justify-end animate-fade-in">
+        {order.status !== 'cancelled' && order.status !== 'delivered' && (
+          <>
+            <Button
+              onClick={handleNextStatus}
+              disabled={isProcessing}
+              size="lg"
+              className="gap-2"
+            >
+              <Check className="h-5 w-5" />
+              {getNextStatusLabel()}
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={() => setPaymentConfirmOpen(true)}
+              disabled={isProcessing}
+              size="lg"
+              className="gap-2"
+            >
+              <DollarSign className="h-5 w-5" />
+              تأكيد الدفع
+            </Button>
+            
+            <Button
+              variant="destructive"
+              onClick={handleCancelOrder}
+              disabled={isProcessing}
+              size="lg"
+              className="gap-2"
+            >
+              <X className="h-5 w-5" />
+              إلغاء الطلب
+            </Button>
+          </>
+        )}
+      </div>
+
+      {/* Payment Confirmation Dialog */}
+      <PaymentConfirmationDialog
+        open={paymentConfirmOpen}
+        onOpenChange={setPaymentConfirmOpen}
+        orderId={order.id}
+        onConfirm={fetchOrder}
+      />
+    </div>
   );
 }

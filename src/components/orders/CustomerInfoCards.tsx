@@ -1,6 +1,6 @@
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Mail, Phone, MapPin, FileText } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Mail, Phone, MapPin, FileText, User } from "lucide-react";
 import { ReactNode } from "react";
 
 interface CustomerInfoCardsProps {
@@ -24,93 +24,134 @@ export function CustomerInfoCards({
   governorate,
   city,
   area,
-  neighborhood
+  neighborhood,
 }: CustomerInfoCardsProps) {
   return (
-    <div className="space-y-4">
-      <h3 className="font-medium text-lg mb-2">معلومات العميل</h3>
-      
-      <Card>
-        <CardContent className="p-5">
-          <div className="space-y-4">
+    <div className="grid gap-4 md:grid-cols-3">
+      {/* Contact Information Card */}
+      <Card className="animate-fade-in">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <User className="h-4 w-4" />
+            معلومات الاتصال
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-start gap-3">
+            <User className="h-4 w-4 text-muted-foreground mt-0.5" />
             <div>
-              <h4 className="text-base font-medium text-gray-700 mb-1">الاسم</h4>
-              <div className="text-[15px]">{customerName}</div>
+              <p className="text-sm text-muted-foreground">اسم العميل</p>
+              <p className="font-medium">{customerName || "غير محدد"}</p>
             </div>
-            
-            {customerEmail && (
+          </div>
+
+          {customerEmail && (
+            <div className="flex items-start gap-3">
+              <Mail className="h-4 w-4 text-muted-foreground mt-0.5" />
               <div>
-                <h4 className="text-base font-medium text-gray-700 mb-1 flex items-center gap-1">
-                  <Mail className="w-4 h-4" />
-                  البريد الإلكتروني
-                </h4>
-                <a href={`mailto:${customerEmail}`} className="text-[15px] text-blue-600 hover:underline">
+                <p className="text-sm text-muted-foreground">البريد الإلكتروني</p>
+                <a href={`mailto:${customerEmail}`} className="font-medium text-primary hover:underline">
                   {customerEmail}
                 </a>
               </div>
-            )}
-            
-            {customerPhone && (
+            </div>
+          )}
+
+          {customerPhone && (
+            <div className="flex items-start gap-3">
+              <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
               <div>
-                <h4 className="text-base font-medium text-gray-700 mb-1 flex items-center gap-1">
-                  <Phone className="w-4 h-4" />
-                  رقم الهاتف
-                </h4>
-                <a href={`tel:${customerPhone}`} className="text-[15px] text-blue-600 hover:underline ltr:block">
+                <p className="text-sm text-muted-foreground">رقم الهاتف</p>
+                <a href={`tel:${customerPhone}`} className="font-medium text-primary hover:underline">
                   {customerPhone}
                 </a>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
-      
-      <Card>
-        <CardContent className="p-5">
-          <h4 className="text-base font-medium text-gray-700 mb-2 flex items-center gap-1">
-            <MapPin className="w-4 h-4" />
-            معلومات الموقع والعنوان
-          </h4>
-          <div className="space-y-3 text-[15px]">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-600 min-w-[70px]">المحافظة:</span>
-              <span className="text-gray-800">{governorate || 'غير محدد'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-600 min-w-[70px]">المدينة:</span>
-              <span className="text-gray-800">{city || 'غير محدد'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-600 min-w-[70px]">المنطقة:</span>
-              <span className="text-gray-800">{area || 'غير محدد'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-600 min-w-[70px]">الحي:</span>
-              <span className="text-gray-800">{neighborhood || 'غير محدد'}</span>
-            </div>
-            {shippingAddress && (
-              <div className="mt-4 pt-3 border-t border-gray-200">
-                <div className="flex items-start gap-2">
-                  <span className="font-medium text-gray-600 min-w-[70px] mt-0.5">العنوان:</span>
-                  <p className="text-gray-800 leading-relaxed">{shippingAddress}</p>
-                </div>
+
+      {/* Location Information Card */}
+      <Card className="animate-fade-in">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            معلومات الموقع
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {governorate && (
+            <div className="flex items-start gap-3">
+              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-sm text-muted-foreground">المحافظة</p>
+                <p className="font-medium">{governorate}</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
+          {city && (
+            <div className="flex items-start gap-3">
+              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-sm text-muted-foreground">المدينة</p>
+                <p className="font-medium">{city}</p>
+              </div>
+            </div>
+          )}
+
+          {area && (
+            <div className="flex items-start gap-3">
+              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-sm text-muted-foreground">المنطقة</p>
+                <p className="font-medium">{area}</p>
+              </div>
+            </div>
+          )}
+
+          {neighborhood && (
+            <div className="flex items-start gap-3">
+              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-sm text-muted-foreground">الحي</p>
+                <p className="font-medium">{neighborhood}</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
-      
-      {notes && (
-        <Card>
-          <CardContent className="p-5">
-            <h4 className="text-base font-medium text-gray-700 mb-2 flex items-center gap-1">
-              <FileText className="w-4 h-4" />
-              ملاحظات
-            </h4>
-            <p className="text-[15px]">{notes}</p>
-          </CardContent>
-        </Card>
-      )}
+
+      {/* Address and Notes Card */}
+      <Card className="animate-fade-in">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            العنوان والملاحظات
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {shippingAddress && (
+            <div className="flex items-start gap-3">
+              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-sm text-muted-foreground">عنوان الشحن</p>
+                <p className="font-medium">{shippingAddress}</p>
+              </div>
+            </div>
+          )}
+
+          {notes && (
+            <div className="flex items-start gap-3">
+              <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="text-sm text-muted-foreground">ملاحظات</p>
+                <p className="font-medium">{notes}</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
