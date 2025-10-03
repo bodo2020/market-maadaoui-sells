@@ -267,7 +267,8 @@ export default function OrderDetails() {
             <div className="flex items-center gap-3 flex-wrap">
               <PaymentStatusBadge 
                 status={order.payment_status}
-                editable={false}
+                editable={true}
+                onStatusChange={handlePaymentStatusChange}
               />
               <PaymentMethodBadge paymentMethod={order.payment_method} />
               <Button
