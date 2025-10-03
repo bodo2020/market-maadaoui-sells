@@ -320,25 +320,13 @@ export default function OrderDetails() {
             </div>
 
             {/* Order Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
               <Card className="bg-white/10 backdrop-blur border-white/20">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-primary-foreground/70 text-xs">إجمالي الطلب</p>
-                      <p className="text-2xl font-bold mt-1">{order?.total.toFixed(2)} ج.م</p>
-                    </div>
-                    <TrendingUp className="h-8 w-8 text-primary-foreground/50" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/10 backdrop-blur border-white/20">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-primary-foreground/70 text-xs">عدد المنتجات</p>
-                      <p className="text-2xl font-bold mt-1">{order?.items?.length || 0}</p>
+                      <p className="text-primary-foreground/70 text-xs">إجمالي المنتجات</p>
+                      <p className="text-2xl font-bold mt-1">{((order?.total || 0) - (order?.shipping_cost || 0)).toFixed(2)} ج.م</p>
                     </div>
                     <Package className="h-8 w-8 text-primary-foreground/50" />
                   </div>
@@ -353,6 +341,30 @@ export default function OrderDetails() {
                       <p className="text-2xl font-bold mt-1">{order?.shipping_cost?.toFixed(2) || '0.00'} ج.م</p>
                     </div>
                     <CreditCard className="h-8 w-8 text-primary-foreground/50" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/10 backdrop-blur border-white/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-primary-foreground/70 text-xs">الإجمالي الكلي</p>
+                      <p className="text-2xl font-bold mt-1">{order?.total.toFixed(2)} ج.م</p>
+                    </div>
+                    <TrendingUp className="h-8 w-8 text-primary-foreground/50" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/10 backdrop-blur border-white/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-primary-foreground/70 text-xs">عدد الأصناف</p>
+                      <p className="text-2xl font-bold mt-1">{order?.items?.length || 0}</p>
+                    </div>
+                    <Package className="h-8 w-8 text-primary-foreground/50" />
                   </div>
                 </CardContent>
               </Card>
