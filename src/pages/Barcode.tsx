@@ -191,25 +191,150 @@ export default function Barcode() {
       return;
     }
 
-    const selectedPrinter = printers.find(p => p.id === barcodePrinter);
-    if (!selectedPrinter || selectedPrinter.status === 'disconnected') {
-      toast.error('طابعة الباركود غير متصلة');
+    const items = products
+      .filter(p => selectedProducts.has(p.id))
+      .map(p => ({
+        name: p.name,
+        value: p.barcode || ''
+      }))
+      .filter(i => i.value);
+
+    if (items.length === 0) {
+      toast.error('لا توجد باركودات صالحة للطباعة');
       return;
     }
 
-    // Here you would implement the actual printing logic
-    toast.success(`تم إرسال ${selectedProducts.size} باركود للطباعة على ${selectedPrinter.name}`);
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('لا يمكن فتح نافذة الطباعة');
+      return;
+    }
+
+    const storeName = storeSettings?.name || '';
+
+    const generateDataURL = (value: string) => {
+      const canvas = document.createElement('canvas');
+      try {
+        JsBarcode(canvas, value, {
+          format: 'CODE128',
+          width: 2,
+          height: 60,
+          displayValue: false,
+          background: '#ffffff',
+          lineColor: '#000000',
+          margin: 0
+        });
+        return canvas.toDataURL('image/png');
+      } catch {
+        return '';
+      }
+    };
+
+    const labels = items.map(i => {
+      const url = generateDataURL(i.value);
+      return url ? `
+        <div class="label">
+          <img src="${url}" alt="${i.name}" />
+          <div class="meta">${i.name}${storeName ? ' — ' + storeName : ''}</div>
+        </div>
+      ` : '';
+    }).join('');
+
+    printWindow.document.write(`
+      <html dir="rtl" lang="ar">
+        <head>
+          <meta charSet="UTF-8" />
+          <title>طباعة باركود</title>
+          <style>
+            @page { size: 58mm auto; margin: 0; }
+            body { margin: 0; padding: 6px; font-family: Arial, sans-serif; }
+            .label { width: 58mm; max-width: 58mm; padding: 4px 0; text-align: center; page-break-inside: avoid; }
+            .label img { width: 100%; height: auto; display: block; }
+            .meta { font-size: 10px; margin-top: 4px; color: #111; }
+          </style>
+        </head>
+        <body>
+          ${labels}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.onload = () => printWindow.print();
+
+    toast.success(`تم تجهيز ${items.length} باركود للطباعة`);
     setSelectedProducts(new Set());
   };
 
   const printAllBarcodes = () => {
-    const selectedPrinter = printers.find(p => p.id === barcodePrinter);
-    if (!selectedPrinter || selectedPrinter.status === 'disconnected') {
-      toast.error('طابعة الباركود غير متصلة');
+    const items = filteredProducts
+      .map(p => ({ name: p.name, value: p.barcode || '' }))
+      .filter(i => i.value);
+
+    if (items.length === 0) {
+      toast.error('لا توجد باركودات للطباعة');
       return;
     }
 
-    toast.success(`تم إرسال جميع الباركودات (${filteredProducts.length}) للطباعة`);
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error('لا يمكن فتح نافذة الطباعة');
+      return;
+    }
+
+    const storeName = storeSettings?.name || '';
+
+    const generateDataURL = (value: string) => {
+      const canvas = document.createElement('canvas');
+      try {
+        JsBarcode(canvas, value, {
+          format: 'CODE128',
+          width: 2,
+          height: 60,
+          displayValue: false,
+          background: '#ffffff',
+          lineColor: '#000000',
+          margin: 0
+        });
+        return canvas.toDataURL('image/png');
+      } catch {
+        return '';
+      }
+    };
+
+    const labels = items.map(i => {
+      const url = generateDataURL(i.value);
+      return url ? `
+        <div class="label">
+          <img src="${url}" alt="${i.name}" />
+          <div class="meta">${i.name}${storeName ? ' — ' + storeName : ''}</div>
+        </div>
+      ` : '';
+    }).join('');
+
+    printWindow.document.write(`
+      <html dir="rtl" lang="ar">
+        <head>
+          <meta charSet="UTF-8" />
+          <title>طباعة جميع الباركود</title>
+          <style>
+            @page { size: 58mm auto; margin: 0; }
+            body { margin: 0; padding: 6px; font-family: Arial, sans-serif; }
+            .label { width: 58mm; max-width: 58mm; padding: 4px 0; text-align: center; page-break-inside: avoid; }
+            .label img { width: 100%; height: auto; display: block; }
+            .meta { font-size: 10px; margin-top: 4px; color: #111; }
+          </style>
+        </head>
+        <body>
+          ${labels}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.onload = () => printWindow.print();
+
+    toast.success(`تم تجهيز ${items.length} باركود للطباعة`);
   };
 
   return (
