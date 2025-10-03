@@ -2,6 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Order } from "@/types";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrderItemsList } from "@/components/orders/OrderItemsList";
 import { CustomerInfoCards } from "@/components/orders/CustomerInfoCards";
 import { OrderStatusSelection } from "@/components/orders/OrderStatusSelection";
@@ -16,6 +17,15 @@ import { findOrCreateCustomer } from "@/services/supabase/customerService";
 import { updateProduct } from "@/services/supabase/productService";
 import { RegisterType } from "@/services/supabase/cashTrackingService";
 import { recordCashTransaction } from "@/services/supabase/cashTrackingService";
+import { 
+  ArrowLeft, 
+  Package, 
+  CreditCard, 
+  CheckCircle2, 
+  XCircle, 
+  Clock,
+  TrendingUp
+} from "lucide-react";
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -267,82 +277,165 @@ export default function OrderDetails() {
   return (
     <MainLayout>
       <div className="container mx-auto p-6 dir-rtl">
-        <div className="flex justify-between items-center mb-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">تجهيز الطلب #{order?.id.slice(0, 8)}</h1>
-              {order && (
-                <PaymentStatusBadge 
-                  status={order.payment_status} 
-                  onStatusChange={handlePaymentStatusChange} 
-                  editable 
-                />
+        {/* Header with Gradient Background */}
+        <Card className="mb-6 overflow-hidden">
+          <div className="bg-gradient-to-br from-primary to-primary/80 p-6 text-primary-foreground">
+            <div className="flex justify-between items-start">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Package className="h-8 w-8" />
+                  <div>
+                    <h1 className="text-3xl font-bold">طلب #{order?.id.slice(0, 8)}</h1>
+                    <p className="text-primary-foreground/80 text-sm mt-1">
+                      {new Date(order?.created_at || '').toLocaleDateString('ar-EG', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                </div>
+                
+                {order && (
+                  <div className="flex items-center gap-2">
+                    <PaymentStatusBadge 
+                      status={order.payment_status} 
+                      onStatusChange={handlePaymentStatusChange} 
+                      editable 
+                    />
+                  </div>
+                )}
+              </div>
+
+              <Button 
+                variant="secondary" 
+                onClick={() => navigate('/online-orders')}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                عودة
+              </Button>
+            </div>
+
+            {/* Order Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+              <Card className="bg-white/10 backdrop-blur border-white/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-primary-foreground/70 text-xs">إجمالي الطلب</p>
+                      <p className="text-2xl font-bold mt-1">{order?.total.toFixed(2)} ج.م</p>
+                    </div>
+                    <TrendingUp className="h-8 w-8 text-primary-foreground/50" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/10 backdrop-blur border-white/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-primary-foreground/70 text-xs">عدد المنتجات</p>
+                      <p className="text-2xl font-bold mt-1">{order?.items?.length || 0}</p>
+                    </div>
+                    <Package className="h-8 w-8 text-primary-foreground/50" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/10 backdrop-blur border-white/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-primary-foreground/70 text-xs">رسوم الشحن</p>
+                      <p className="text-2xl font-bold mt-1">{order?.shipping_cost?.toFixed(2) || '0.00'} ج.م</p>
+                    </div>
+                    <CreditCard className="h-8 w-8 text-primary-foreground/50" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </Card>
+
+        {/* Order Progress Card */}
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              <CardTitle>مراحل الطلب</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <OrderStatusProgress status={order?.status || 'pending'} />
+            
+            {/* Action Buttons */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+              {order?.status !== 'delivered' && order?.status !== 'cancelled' && (
+                <>
+                  <Button 
+                    onClick={handleNextStatus}
+                    disabled={isUpdatingStatus || isProcessingOrder}
+                    className="w-full gap-2"
+                    size="lg"
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                    {isUpdatingStatus || isProcessingOrder ? 'جاري المعالجة...' : getNextStatusLabel()}
+                  </Button>
+
+                  <Button 
+                    onClick={handleCancelOrder}
+                    disabled={isUpdatingStatus || isProcessingOrder}
+                    variant="destructive"
+                    className="w-full gap-2"
+                    size="lg"
+                  >
+                    <XCircle className="h-5 w-5" />
+                    {isUpdatingStatus || isProcessingOrder ? 'جاري الإلغاء...' : 'إلغاء الطلب'}
+                  </Button>
+                </>
               )}
             </div>
-            
-            {/* Visual Progress Line */}
-            <div className="bg-card p-4 rounded-lg border">
-              <h3 className="text-sm font-medium mb-3 text-muted-foreground">مراحل الطلب</h3>
-              <OrderStatusProgress status={order?.status || 'pending'} />
-            </div>
-            
-            {/* Next Status Button */}
-            {order?.status !== 'delivered' && order?.status !== 'cancelled' && (
-              <Button 
-                onClick={handleNextStatus}
-                disabled={isUpdatingStatus || isProcessingOrder}
-                className="w-full"
-                size="lg"
-              >
-                {isUpdatingStatus || isProcessingOrder ? 'جاري المعالجة...' : getNextStatusLabel()}
-              </Button>
-            )}
+          </CardContent>
+        </Card>
 
-            {/* Cancel Order Button */}
-            {order?.status !== 'delivered' && order?.status !== 'cancelled' && (
-              <Button 
-                onClick={handleCancelOrder}
-                disabled={isUpdatingStatus || isProcessingOrder}
-                variant="destructive"
-                className="w-full"
-                size="lg"
-              >
-                {isUpdatingStatus || isProcessingOrder ? 'جاري الإلغاء...' : 'إلغاء الطلب'}
-              </Button>
-            )}
-          </div>
-          <Button variant="outline" onClick={() => navigate('/online-orders')}>
-            عودة
-          </Button>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Products Section */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" />
+                  <CardTitle>المنتجات المطلوبة</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <OrderItemsList 
+                  items={order?.items || []} 
+                  orderId={order?.id}
+                  onItemDeleted={fetchOrder}
+                  onItemUpdated={fetchOrder}
+                />
 
-        <div className="flex justify-between items-start flex-wrap md:flex-nowrap gap-6">
-          <div className="w-full md:w-3/5 space-y-6">
-            <div>
-              <h3 className="font-medium text-lg mb-3">المنتجات</h3>
-              <OrderItemsList 
-                items={order?.items || []} 
-                orderId={order?.id}
-                onItemDeleted={fetchOrder}
-                onItemUpdated={fetchOrder}
-              />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 mt-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
-                  onClick={handlePaymentStatusUpdate}
-                  disabled={order?.payment_status === 'paid' || isUpdatingStatus || isProcessingOrder}
-                >
-                  {order?.payment_status === 'pending' ? 'تأكيد الدفع' : 'تم الدفع'}
-                </Button>
-              </div>
-            </div>
+                <div className="mt-6 pt-6 border-t">
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2" 
+                    onClick={handlePaymentStatusUpdate}
+                    disabled={order?.payment_status === 'paid' || isUpdatingStatus || isProcessingOrder}
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    {order?.payment_status === 'pending' ? 'تأكيد الدفع' : 'تم الدفع'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          <div className="w-full md:w-2/5">
+          {/* Customer Info Section */}
+          <div className="lg:col-span-1">
             <CustomerInfoCards
               customerName={order?.customer_name}
               customerEmail={order?.customer_email}
