@@ -1,13 +1,8 @@
 import { useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2, Package, TrendingUp, DollarSign, Receipt } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { PeriodFilter, getDateRangeFromPeriod, PeriodType } from "@/components/analytics/PeriodFilter";
+import { Sparkles, Package, TrendingUp, DollarSign, Receipt } from "lucide-react";
+import { PeriodFilter, PeriodType } from "@/components/analytics/PeriodFilter";
 import ProductInsights from "@/components/analytics/ProductInsights";
 import SalesInsights from "@/components/analytics/SalesInsights";
 import ProfitInsights from "@/components/analytics/ProfitInsights";
