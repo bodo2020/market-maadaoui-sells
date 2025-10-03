@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2, TrendingUp } from "lucide-react";
+import { Sparkles, Loader2, TrendingUp, Download } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getDateRangeFromPeriod, PeriodType } from "./PeriodFilter";
+import jsPDF from "jspdf";
 
 interface SalesInsightsProps {
   selectedPeriod: PeriodType;
@@ -67,6 +68,26 @@ const SalesInsights = ({ selectedPeriod }: SalesInsightsProps) => {
     }
   };
 
+  const handleDownloadPDF = () => {
+    if (!insights) {
+      toast.error("لا توجد تحليلات لتحميلها");
+      return;
+    }
+
+    const doc = new jsPDF();
+    doc.setFont("helvetica");
+    doc.setR2L(true);
+    doc.setFontSize(18);
+    doc.text("تحليل المبيعات والعروض", 105, 20, { align: "center" });
+    doc.setFontSize(10);
+    doc.text(new Date().toLocaleDateString("ar-EG"), 105, 30, { align: "center" });
+    doc.setFontSize(12);
+    const lines = doc.splitTextToSize(insights, 180);
+    doc.text(lines, 15, 45);
+    doc.save(`تحليل-المبيعات-${new Date().toLocaleDateString("ar-EG")}.pdf`);
+    toast.success("تم تحميل الملف بنجاح");
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -97,12 +118,22 @@ const SalesInsights = ({ selectedPeriod }: SalesInsightsProps) => {
         </CardHeader>
         <CardContent>
           {insights ? (
-            <Alert className="bg-primary/5 border-primary/20">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <AlertDescription className="text-right whitespace-pre-wrap mt-2">
-                {insights}
-              </AlertDescription>
-            </Alert>
+            <div className="space-y-4">
+              <Alert className="bg-primary/5 border-primary/20">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-right whitespace-pre-wrap mt-2">
+                  {insights}
+                </AlertDescription>
+              </Alert>
+              <Button 
+                onClick={handleDownloadPDF} 
+                variant="outline" 
+                className="w-full flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                تحميل كملف PDF
+              </Button>
+            </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
               <TrendingUp className="h-16 w-16 mx-auto mb-4 opacity-20" />
