@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Printer, QrCode, Copy } from 'lucide-react';
 import { toast } from 'sonner';
-import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
+
 import { Product } from '@/types';
 import { fetchStoreSettings } from '@/services/supabase/storeService';
 
@@ -126,14 +126,6 @@ export const BarcodeGenerator: React.FC<BarcodeGeneratorProps> = ({
 
     generateBarcode(printCanvasRef.current, true);
     
-    // Try Bluetooth printer first
-    if (bluetoothPrinterService.isConnected()) {
-      const success = await bluetoothPrinterService.printBarcode(printCanvasRef.current);
-      if (success) {
-        toast.success('تم الطباعة عبر البلوتوث');
-        return;
-      }
-    }
     
     // Fallback to regular print window (same as invoice printing)
     const canvas = printCanvasRef.current;
