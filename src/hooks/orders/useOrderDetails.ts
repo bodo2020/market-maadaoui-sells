@@ -158,6 +158,7 @@ export function useOrderDetails(orderId: string) {
           payment_status: validatePaymentStatus(data.payment_status),
           payment_method: data.payment_method,
           shipping_address: data.shipping_address,
+          shipping_cost: data.shipping_cost,
           items: transformedItems,
           customer_id: data.customer_id,
           customer_name: customerName,
