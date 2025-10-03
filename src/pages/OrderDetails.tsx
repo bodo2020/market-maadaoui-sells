@@ -320,15 +320,29 @@ export default function OrderDetails() {
             </div>
 
             {/* Order Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
               <Card className="bg-white/10 backdrop-blur border-white/20">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-primary-foreground/70 text-xs">إجمالي الطلب</p>
-                      <p className="text-2xl font-bold mt-1">{order?.total.toFixed(2)} ج.م</p>
+                      <p className="text-primary-foreground/70 text-xs">إجمالي المنتجات</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {((order?.total || 0) - (order?.shipping_cost || 0)).toFixed(2)} ج.م
+                      </p>
                     </div>
-                    <TrendingUp className="h-8 w-8 text-primary-foreground/50" />
+                    <Package className="h-8 w-8 text-primary-foreground/50" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white/10 backdrop-blur border-white/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-primary-foreground/70 text-xs">رسوم الشحن</p>
+                      <p className="text-2xl font-bold mt-1">{order?.shipping_cost?.toFixed(2) || '0.00'} ج.م</p>
+                    </div>
+                    <CreditCard className="h-8 w-8 text-primary-foreground/50" />
                   </div>
                 </CardContent>
               </Card>
@@ -345,14 +359,14 @@ export default function OrderDetails() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/10 backdrop-blur border-white/20">
+              <Card className="bg-gradient-to-br from-green-500/20 to-green-600/20 backdrop-blur border-green-400/30">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-primary-foreground/70 text-xs">رسوم الشحن</p>
-                      <p className="text-2xl font-bold mt-1">{order?.shipping_cost?.toFixed(2) || '0.00'} ج.م</p>
+                      <p className="text-primary-foreground/90 text-xs font-semibold">المجموع الكلي</p>
+                      <p className="text-2xl font-bold mt-1 text-green-100">{order?.total.toFixed(2)} ج.م</p>
                     </div>
-                    <CreditCard className="h-8 w-8 text-primary-foreground/50" />
+                    <TrendingUp className="h-8 w-8 text-green-200/70" />
                   </div>
                 </CardContent>
               </Card>
