@@ -38,6 +38,7 @@ import Returns from "@/pages/Returns";
 import CustomerProfile from "@/pages/CustomerProfile";
 import CRM from "@/pages/CRM";
 import Analytics from "@/pages/Analytics";
+import AIInsights from "@/pages/AIInsights";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
 import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
 import ExpiryManagement from "@/pages/ExpiryManagement";
@@ -102,6 +103,7 @@ function App() {
               <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
               <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+              <Route path="/ai-insights" element={<ProtectedRoute><AIInsights /></ProtectedRoute>} />
               <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
               <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />
               <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />

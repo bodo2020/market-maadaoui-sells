@@ -26,6 +26,7 @@ import {
   UserCog,
   Activity,
   Calendar,
+  Sparkles,
 } from "lucide-react";
 import { SidebarItemData, NavigationGroup } from "./types";
 
@@ -159,6 +160,11 @@ export const financeNavigation: NavigationGroup = {
       label: "التحليلات",
       href: "/analytics",
       icon: Activity,
+    },
+    {
+      label: "تحليلات الذكاء الاصطناعي",
+      href: "/ai-insights",
+      icon: Sparkles,
     },
     {
       label: "المبيعات",
