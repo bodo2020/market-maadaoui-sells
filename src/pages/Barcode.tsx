@@ -5,10 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Printer, Settings, Bluetooth, Cable, RefreshCw, Plus, Wifi, Edit, Save, X } from "lucide-react";
+import { Search, Printer, Edit, Save, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
+
 import JsBarcode from "jsbarcode";
 import { fetchStoreSettings, StoreSettings } from "@/services/supabase/storeService";
 
@@ -27,14 +27,6 @@ interface Product {
   };
 }
 
-interface PrinterDevice {
-  id: string;
-  name: string;
-  type: 'bluetooth' | 'usb' | 'network';
-  status: 'connected' | 'disconnected';
-  device?: any; // BluetoothDevice | USBDevice
-  port?: any; // SerialPort
-}
 
 // Simple Barcode Display Component
 const SimpleBarcodeDisplay = ({ value, productName, storeName, className }: { 
@@ -79,132 +71,22 @@ export default function Barcode() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
-  const [printers, setPrinters] = useState<PrinterDevice[]>([]);
-  const [invoicePrinter, setInvoicePrinter] = useState<string>('');
-  const [barcodePrinter, setBarcodePrinter] = useState<string>('');
-  const [isScanning, setIsScanning] = useState(false);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editingBarcode, setEditingBarcode] = useState({ barcode: '', bulk_barcode: '' });
 
   useEffect(() => {
     fetchProducts();
-    scanForDevices();
     fetchStoreData();
   }, []);
 
-  const scanForDevices = async () => {
-    setIsScanning(true);
-    const foundDevices: PrinterDevice[] = [];
-
-    try {
-      // Check for USB Serial devices
-      if ('serial' in navigator) {
-        try {
-          const ports = await (navigator as any).serial.getPorts();
-          ports.forEach((port: any, index: number) => {
-            foundDevices.push({
-              id: `usb-${index}`,
-              name: `USB Serial Printer ${index + 1}`,
-              type: 'usb',
-              status: 'connected',
-              port: port
-            });
-          });
-        } catch (error) {
-          console.log('Serial API not available or no permission');
-        }
-      }
-
-      // Check for Bluetooth devices if available
-      if ('bluetooth' in navigator) {
-        try {
-          // Note: Bluetooth scanning requires user interaction
-          console.log('Bluetooth API available but requires user interaction to scan');
-        } catch (error) {
-          console.log('Bluetooth API not available');
-        }
-      }
-
-      // Check for network printers (placeholder - would need actual network discovery)
-      const networkPrinters = [
-        {
-          id: 'network-1',
-          name: 'Network Printer (192.168.1.100)',
-          type: 'network' as const,
-          status: 'connected' as const,
-        }
-      ];
-
-      foundDevices.push(...networkPrinters);
-      setPrinters(foundDevices);
-
-      if (foundDevices.length > 0 && !invoicePrinter) {
-        setInvoicePrinter(foundDevices[0].id);
-      }
-      if (foundDevices.length > 1 && !barcodePrinter) {
-        setBarcodePrinter(foundDevices[1]?.id || foundDevices[0].id);
-      }
-
-    } catch (error) {
-      console.error('Error scanning for devices:', error);
-      toast.error('حدث خطأ أثناء البحث عن الأجهزة');
-    } finally {
-      setIsScanning(false);
-    }
-  };
 
   const requestUSBDevice = async () => {
-    try {
-      if (!('serial' in navigator)) {
-        toast.error('متصفحك لا يدعم الوصول لأجهزة USB');
-        return;
-      }
-
-      const port = await (navigator as any).serial.requestPort();
-      
-      const newDevice: PrinterDevice = {
-        id: `usb-${Date.now()}`,
-        name: `USB Printer ${printers.length + 1}`,
-        type: 'usb',
-        status: 'connected',
-        port: port
-      };
-
-      setPrinters(prev => [...prev, newDevice]);
-      toast.success('تم إضافة جهاز USB بنجاح');
-      
-    } catch (error) {
-      console.error('Error requesting USB device:', error);
-      toast.error('تم إلغاء اختيار الجهاز أو حدث خطأ');
-    }
+    toast.info('تم تعطيل إعدادات الطابعة. الطباعة تتم عبر الويب.');
   };
 
   const requestBluetoothDevice = async () => {
-    try {
-      // استخدام خدمة الطباعة البلوتوث الجديدة
-      const success = await bluetoothPrinterService.connectPrinter();
-      
-      if (success) {
-        const savedPrinter = bluetoothPrinterService.getSavedPrinter();
-        if (savedPrinter) {
-          const newPrinter: PrinterDevice = {
-            id: `bluetooth-${Date.now()}`,
-            name: savedPrinter.name,
-            type: 'bluetooth',
-            status: 'connected'
-          };
-          
-          setPrinters(prev => [...prev, newPrinter]);
-          setInvoicePrinter(newPrinter.id);
-          setBarcodePrinter(newPrinter.id);
-          toast.success('تم ربط الطابعة للفواتير والباركود معاً');
-        }
-      }
-    } catch (error) {
-      console.error('Bluetooth connection failed:', error);
-      toast.error('فشل في الاتصال بطابعة البلوتوث');
-    }
+    toast.info('تم تعطيل إعدادات الطابعة. الطباعة تتم عبر الويب.');
   };
 
   const fetchProducts = async () => {
@@ -340,7 +222,6 @@ export default function Barcode() {
         <Tabs defaultValue="products" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="products">المنتجات والباركود</TabsTrigger>
-            <TabsTrigger value="devices">إعدادات الطابعات</TabsTrigger>
           </TabsList>
 
           <TabsContent value="products" className="space-y-4">
@@ -539,228 +420,6 @@ export default function Barcode() {
             )}
           </TabsContent>
 
-          <TabsContent value="devices" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  إعدادات الطابعات
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Printer Selection */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">طابعة الفواتير</label>
-                    <select 
-                      value={invoicePrinter} 
-                      onChange={(e) => setInvoicePrinter(e.target.value)}
-                      className="w-full p-2 border border-input rounded-md bg-background"
-                    >
-                      {printers.map(printer => (
-                        <option key={printer.id} value={printer.id}>
-                          {printer.name} ({printer.status === 'connected' ? 'متصل' : 'غير متصل'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">طابعة الباركود</label>
-                    <select 
-                      value={barcodePrinter} 
-                      onChange={(e) => setBarcodePrinter(e.target.value)}
-                      className="w-full p-2 border border-input rounded-md bg-background"
-                    >
-                      {printers.map(printer => (
-                        <option key={printer.id} value={printer.id}>
-                          {printer.name} ({printer.status === 'connected' ? 'متصل' : 'غير متصل'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Device Discovery */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">البحث عن الأجهزة</h3>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={scanForDevices}
-                        disabled={isScanning}
-                      >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${isScanning ? 'animate-spin' : ''}`} />
-                        {isScanning ? 'جاري البحث...' : 'إعادة البحث'}
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={requestUSBDevice}>
-                        <Cable className="h-4 w-4 mr-2" />
-                        إضافة USB
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={requestBluetoothDevice}>
-                        <Bluetooth className="h-4 w-4 mr-2" />
-                        إضافة بلوتوث
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Available Devices */}
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold">الأجهزة المتاحة ({printers.length})</h3>
-                  {printers.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Printer className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>لا توجد أجهزة متصلة</p>
-                      <p className="text-sm">اضغط على "إضافة USB" أو "إضافة بلوتوث" لإضافة جهاز</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {printers.map(printer => (
-                        <div key={printer.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            {printer.type === 'bluetooth' ? (
-                              <Bluetooth className="h-5 w-5 text-blue-500" />
-                            ) : printer.type === 'usb' ? (
-                              <Cable className="h-5 w-5 text-gray-500" />
-                            ) : (
-                              <Wifi className="h-5 w-5 text-green-500" />
-                            )}
-                            <div>
-                              <p className="font-medium">{printer.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {printer.type === 'bluetooth' ? 'بلوتوث' : 
-                                 printer.type === 'usb' ? 'USB' : 'شبكة'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge 
-                              variant={printer.status === 'connected' ? 'default' : 'secondary'}
-                            >
-                              {printer.status === 'connected' ? 'متصل' : 'غير متصل'}
-                            </Badge>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                setPrinters(prev => prev.filter(p => p.id !== printer.id));
-                                toast.success('تم حذف الجهاز');
-                              }}
-                            >
-                              حذف
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Test Print Buttons */}
-                <div className="flex gap-4">
-                  <Button variant="outline" className="flex-1">
-                    <Printer className="h-4 w-4 mr-2" />
-                    اختبار طابعة الفواتير
-                  </Button>
-                  <Button variant="outline" className="flex-1">
-                    <Printer className="h-4 w-4 mr-2" />
-                  اختبار طابعة الباركود
-                  </Button>
-                </div>
-
-                {/* Bluetooth Printer Manager */}
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-4">إدارة طابعة البلوتوث</h3>
-                  <div className="p-4 border rounded-lg bg-blue-50 mb-4">
-                    <div className="flex items-center gap-2 text-blue-800 mb-2">
-                      <Bluetooth className="h-5 w-5" />
-                      <span className="font-medium">طابعة واحدة للكل</span>
-                    </div>
-                    <p className="text-sm text-blue-700">
-                      يمكنك ربط طابعة بلوتوث واحدة تعمل للفواتير والباركود معاً. 
-                      ستطبع الفواتير تلقائياً بعد كل عملية بيع.
-                    </p>
-                  </div>
-
-                  {bluetoothPrinterService.isConnected() ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
-                        <div className="flex items-center gap-3">
-                          <Bluetooth className="h-5 w-5 text-green-600" />
-                          <div>
-                            <p className="font-medium text-green-800">
-                              {bluetoothPrinterService.getSavedPrinter()?.name || 'طابعة بلوتوث'}
-                            </p>
-                            <p className="text-sm text-green-600">متصلة وجاهزة</p>
-                          </div>
-                        </div>
-                        
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={async () => {
-                            await bluetoothPrinterService.disconnectPrinter();
-                            window.location.reload();
-                          }}
-                        >
-                          فصل الطابعة
-                        </Button>
-                      </div>
-                      
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={async () => {
-                          if (bluetoothPrinterService.isConnected()) {
-                            await bluetoothPrinterService.testPrint();
-                          } else {
-                            toast.error('الطابعة غير متصلة');
-                          }
-                        }}
-                      >
-                        <Printer className="h-4 w-4 mr-2" />
-                        اختبار الطباعة
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6">
-                      <Bluetooth className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p className="text-muted-foreground mb-4">لا توجد طابعة مربوطة</p>
-                      
-                      <Button 
-                        onClick={requestBluetoothDevice}
-                        className="gap-2"
-                      >
-                        <Bluetooth className="h-4 w-4" />
-                        ربط طابعة بلوتوث
-                      </Button>
-                      
-                      <div className="mt-4 text-xs text-muted-foreground space-y-1">
-                        <p>• تأكد من تشغيل البلوتوث في جهازك</p>
-                        <p>• اجعل الطابعة في وضع الاكتشاف</p>
-                        <p>• استخدم Chrome أو Edge للحصول على أفضل دعم</p>
-                        <p>• ستطبع الفواتير تلقائياً بعد كل عملية بيع</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* معلومات إضافية */}
-                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                    <h4 className="font-medium mb-2">نصائح للاستخدام:</h4>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• إذا فشل الاتصال، جرب إعادة تشغيل البلوتوث</li>
-                      <li>• بعض الطابعات تحتاج وضع "Pairing Mode"</li>
-                      <li>• إذا لم تعمل الطباعة المباشرة، ستفتح نافذة طباعة</li>
-                      <li>• يمكنك استخدام نفس الطابعة للفواتير والباركود</li>
-                    </ul>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
     </MainLayout>
