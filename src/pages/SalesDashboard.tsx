@@ -100,6 +100,7 @@ export default function SalesDashboard() {
         .select('*')
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString())
+        .eq('payment_status', 'paid')
         .order('created_at', { ascending: false });
         
       if (error) {
@@ -107,7 +108,7 @@ export default function SalesDashboard() {
         throw error;
       }
       
-      console.log(`Retrieved ${data?.length || 0} online orders records`);
+      console.log(`Retrieved ${data?.length || 0} paid online orders records`);
       return data;
     }
   });
@@ -181,7 +182,7 @@ export default function SalesDashboard() {
   }, [dateRange]);
 
   const storeSalesTotal = storeSales?.reduce((sum, sale) => sum + Number(sale.total), 0) || 0;
-  const onlineOrdersTotal = onlineOrders?.reduce((sum, order) => sum + Number(order.total), 0) || 0;
+  const onlineOrdersTotal = onlineOrders?.reduce((sum, order) => sum + (Number(order.total) - Number(order.shipping_cost || 0)), 0) || 0;
   const totalSales = storeSalesTotal + onlineOrdersTotal;
   
   const last7Days = Array.from({ length: 7 }, (_, i) => {
@@ -193,7 +194,7 @@ export default function SalesDashboard() {
         .reduce((sum, sale) => sum + Number(sale.total), 0),
       onlineSales: onlineOrders
         .filter(order => new Date(order.created_at).toDateString() === date.toDateString())
-        .reduce((sum, order) => sum + Number(order.total), 0)
+        .reduce((sum, order) => sum + (Number(order.total) - Number(order.shipping_cost || 0)), 0)
     };
   }).reverse();
   
