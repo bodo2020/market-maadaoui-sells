@@ -246,9 +246,9 @@ export default function Barcode() {
           <meta charSet="UTF-8" />
           <title>طباعة باركود</title>
           <style>
-            @page { size: 25mm auto; margin: 0; }
+            @page { size: 58mm auto; margin: 0; }
             body { margin: 0; padding: 6px; font-family: Arial, sans-serif; }
-            .label { width: 25mm; max-width: 25mm; padding: 4px 0; text-align: center; page-break-inside: avoid; }
+            .label { width: 58mm; max-width: 58mm; padding: 4px 0; text-align: center; page-break-inside: avoid; }
             .label img { width: 100%; height: auto; display: block; }
             .meta { font-size: 10px; margin-top: 4px; color: #111; }
           </style>
@@ -318,9 +318,9 @@ export default function Barcode() {
           <meta charSet="UTF-8" />
           <title>طباعة جميع الباركود</title>
           <style>
-            @page { size: 25mm auto; margin: 0; }
+            @page { size: 58mm auto; margin: 0; }
             body { margin: 0; padding: 6px; font-family: Arial, sans-serif; }
-            .label { width: 25mm; max-width: 25mm; padding: 4px 0; text-align: center; page-break-inside: avoid; }
+            .label { width: 58mm; max-width: 58mm; padding: 4px 0; text-align: center; page-break-inside: avoid; }
             .label img { width: 100%; height: auto; display: block; }
             .meta { font-size: 10px; margin-top: 4px; color: #111; }
           </style>
