@@ -34,6 +34,12 @@
     --ring: 222.2 84% 4.9%;
  
     --radius: 0.5rem;
+
+    /* Enhanced gradients for stats */
+    --gradient-primary: linear-gradient(135deg, hsl(159 98% 18%), hsl(159 98% 25%));
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 45%));
+    --gradient-warning: linear-gradient(135deg, hsl(38 92% 50%), hsl(38 92% 60%));
+    --gradient-danger: linear-gradient(135deg, hsl(0 84% 60%), hsl(0 84% 70%));
   }
  
   .dark {
