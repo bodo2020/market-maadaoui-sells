@@ -247,34 +247,11 @@ export default function Barcode() {
           <title>طباعة باركود</title>
           <style>
             @page { size: 25mm auto; margin: 0; }
-            html, body { margin: 0; padding: 6px; font-family: Arial, sans-serif; }
-            .label { width: 25mm; max-width: 25mm; padding: 4px 0; text-align: center; page-break-inside: avoid; break-inside: avoid; -webkit-column-break-inside: avoid; }
-            .label img { width: 100%; height: auto; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body { margin: 0; padding: 6px; font-family: Arial, sans-serif; }
+            .label { width: 25mm; max-width: 25mm; padding: 4px 0; text-align: center; page-break-inside: avoid; }
+            .label img { width: 100%; height: auto; display: block; }
             .meta { font-size: 10px; margin-top: 4px; color: #111; }
-            @media print { body { margin: 0; } }
           </style>
-          <script>
-            (function(){
-              function triggerPrint(){ try{ window.focus(); }catch(e){} setTimeout(function(){ window.print(); }, 50); }
-              function waitForImagesAndPrint(){
-                var images = Array.prototype.slice.call(document.images);
-                var pending = images.length;
-                if(pending === 0){ triggerPrint(); return; }
-                var done = false;
-                var finish = function(){ if(done) return; done = true; triggerPrint(); };
-                var timer = setTimeout(finish, 1500);
-                images.forEach(function(img){
-                  if(img.complete && img.naturalWidth > 0){ pending--; if(pending === 0){ clearTimeout(timer); finish(); } }
-                  else {
-                    img.addEventListener('load', function(){ pending--; if(pending === 0){ clearTimeout(timer); finish(); } });
-                    img.addEventListener('error', function(){ pending--; if(pending === 0){ clearTimeout(timer); finish(); } });
-                  }
-                });
-              }
-              window.addEventListener('load', waitForImagesAndPrint);
-              window.addEventListener('afterprint', function(){ window.close(); });
-            })();
-          </script>
         </head>
         <body>
           ${labels}
@@ -283,7 +260,7 @@ export default function Barcode() {
     `);
 
     printWindow.document.close();
-    try { printWindow.focus(); } catch {}
+    printWindow.onload = () => printWindow.print();
 
     toast.success(`تم تجهيز ${items.length} باركود للطباعة`);
     setSelectedProducts(new Set());
@@ -342,34 +319,11 @@ export default function Barcode() {
           <title>طباعة جميع الباركود</title>
           <style>
             @page { size: 25mm auto; margin: 0; }
-            html, body { margin: 0; padding: 6px; font-family: Arial, sans-serif; }
-            .label { width: 25mm; max-width: 25mm; padding: 4px 0; text-align: center; page-break-inside: avoid; break-inside: avoid; -webkit-column-break-inside: avoid; }
-            .label img { width: 100%; height: auto; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body { margin: 0; padding: 6px; font-family: Arial, sans-serif; }
+            .label { width: 25mm; max-width: 25mm; padding: 4px 0; text-align: center; page-break-inside: avoid; }
+            .label img { width: 100%; height: auto; display: block; }
             .meta { font-size: 10px; margin-top: 4px; color: #111; }
-            @media print { body { margin: 0; } }
           </style>
-          <script>
-            (function(){
-              function triggerPrint(){ try{ window.focus(); }catch(e){} setTimeout(function(){ window.print(); }, 50); }
-              function waitForImagesAndPrint(){
-                var images = Array.prototype.slice.call(document.images);
-                var pending = images.length;
-                if(pending === 0){ triggerPrint(); return; }
-                var done = false;
-                var finish = function(){ if(done) return; done = true; triggerPrint(); };
-                var timer = setTimeout(finish, 1500);
-                images.forEach(function(img){
-                  if(img.complete && img.naturalWidth > 0){ pending--; if(pending === 0){ clearTimeout(timer); finish(); } }
-                  else {
-                    img.addEventListener('load', function(){ pending--; if(pending === 0){ clearTimeout(timer); finish(); } });
-                    img.addEventListener('error', function(){ pending--; if(pending === 0){ clearTimeout(timer); finish(); } });
-                  }
-                });
-              }
-              window.addEventListener('load', waitForImagesAndPrint);
-              window.addEventListener('afterprint', function(){ window.close(); });
-            })();
-          </script>
         </head>
         <body>
           ${labels}
@@ -378,7 +332,7 @@ export default function Barcode() {
     `);
 
     printWindow.document.close();
-    try { printWindow.focus(); } catch {}
+    printWindow.onload = () => printWindow.print();
 
     toast.success(`تم تجهيز ${items.length} باركود للطباعة`);
   };
