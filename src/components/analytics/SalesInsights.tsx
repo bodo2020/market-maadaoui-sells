@@ -26,14 +26,20 @@ const SalesInsights = ({ selectedPeriod }: SalesInsightsProps) => {
         .gte('date', dateRange.from?.toISOString())
         .lte('date', dateRange.to?.toISOString());
 
-      if (salesError) throw salesError;
+      if (salesError) {
+        console.error('Sales error:', salesError);
+        throw salesError;
+      }
 
       const { data: offers, error: offersError } = await supabase
         .from('banners')
         .select('*')
         .eq('active', true);
 
-      if (offersError) throw offersError;
+      if (offersError) {
+        console.error('Offers error:', offersError);
+        throw offersError;
+      }
 
       const { data, error } = await supabase.functions.invoke('analyze-data', {
         body: {
@@ -46,13 +52,16 @@ const SalesInsights = ({ selectedPeriod }: SalesInsightsProps) => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Function error:', error);
+        throw error;
+      }
       
       setInsights(data.insights);
       toast.success("تم التحليل بنجاح!");
     } catch (error) {
       console.error('Error analyzing data:', error);
-      toast.error("حدث خطأ أثناء التحليل");
+      toast.error(error?.message || "حدث خطأ أثناء التحليل");
     } finally {
       setIsAnalyzing(false);
     }

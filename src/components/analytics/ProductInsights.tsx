@@ -23,12 +23,22 @@ const ProductInsights = ({ selectedPeriod }: ProductInsightsProps) => {
       // Fetch comprehensive product data
       const { data: products, error: productsError } = await supabase
         .from('products')
-        .select(`
-          *,
-          inventory(quantity, branch_id)
-        `);
+        .select('*');
 
-      if (productsError) throw productsError;
+      if (productsError) {
+        console.error('Products error:', productsError);
+        throw productsError;
+      }
+
+      // Fetch inventory data separately
+      const { data: inventory, error: inventoryError } = await supabase
+        .from('inventory')
+        .select('*');
+
+      if (inventoryError) {
+        console.error('Inventory error:', inventoryError);
+        throw inventoryError;
+      }
 
       // Fetch sales data
       const { data: sales, error: salesError } = await supabase
@@ -37,12 +47,16 @@ const ProductInsights = ({ selectedPeriod }: ProductInsightsProps) => {
         .gte('date', dateRange.from?.toISOString())
         .lte('date', dateRange.to?.toISOString());
 
-      if (salesError) throw salesError;
+      if (salesError) {
+        console.error('Sales error:', salesError);
+        throw salesError;
+      }
 
       const { data, error } = await supabase.functions.invoke('analyze-data', {
         body: {
           analyticsData: {
             products,
+            inventory,
             sales,
             period: selectedPeriod
           },
@@ -50,13 +64,16 @@ const ProductInsights = ({ selectedPeriod }: ProductInsightsProps) => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Function error:', error);
+        throw error;
+      }
       
       setInsights(data.insights);
       toast.success("تم التحليل بنجاح!");
     } catch (error) {
       console.error('Error analyzing data:', error);
-      toast.error("حدث خطأ أثناء التحليل");
+      toast.error(error?.message || "حدث خطأ أثناء التحليل");
     } finally {
       setIsAnalyzing(false);
     }
