@@ -286,20 +286,20 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
           font-size: ${fontSizeBase};
         }
         .invoice-container {
-          width: 80mm;
-          max-width: 80mm;
+          width: 58mm;
+          max-width: 58mm;
           margin: 0 auto;
-          padding: 5mm;
+          padding: 3mm;
         }
         .header {
           text-align: center;
           margin-bottom: 5mm;
         }
         .logo {
-          max-width: 60mm;
+          max-width: 50mm;
           height: auto;
-          max-height: 20mm;
-          margin-bottom: 3mm;
+          max-height: 15mm;
+          margin-bottom: 2mm;
         }
         .store-name {
           font-size: ${fontSizeHeader};
@@ -364,7 +364,7 @@ export function generateInvoiceHTML(sale: Sale, storeInfo: {
         }
         @media print {
           body {
-            width: 80mm;
+            width: 58mm;
             margin: 0;
             padding: 0;
           }
