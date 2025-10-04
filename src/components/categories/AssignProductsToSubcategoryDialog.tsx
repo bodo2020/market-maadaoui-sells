@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Search, Plus, Minus } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Product } from "@/types";
 import { 
   fetchProductsWithoutSubcategory, 
@@ -64,12 +65,21 @@ const AssignProductsToSubcategoryDialog = ({
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAdd = (product: Product) => {
-    setSelectedProducts([...selectedProducts, product]);
+  const handleProductToggle = (product: Product) => {
+    const isSelected = selectedProducts.find(p => p.id === product.id);
+    if (isSelected) {
+      setSelectedProducts(selectedProducts.filter(p => p.id !== product.id));
+    } else {
+      setSelectedProducts([...selectedProducts, product]);
+    }
   };
 
-  const handleRemove = (product: Product) => {
-    setSelectedProducts(selectedProducts.filter(p => p.id !== product.id));
+  const handleSelectAll = () => {
+    if (selectedProducts.length === allProducts.length) {
+      setSelectedProducts([]);
+    } else {
+      setSelectedProducts([...allProducts]);
+    }
   };
 
   const handleSave = async () => {
@@ -111,8 +121,8 @@ const AssignProductsToSubcategoryDialog = ({
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 overflow-auto p-4 space-y-3">
-          {/* Search and info */}
+          <div className="flex-1 overflow-auto p-4 space-y-4">
+          {/* Search and select all */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -123,19 +133,16 @@ const AssignProductsToSubcategoryDialog = ({
                 className="pl-10"
               />
             </div>
+            <Button
+              variant="outline"
+              onClick={handleSelectAll}
+              disabled={loading || allProducts.length === 0}
+            >
+              {selectedProducts.length === allProducts.length ? "إلغاء الكل" : "تحديد الكل"}
+            </Button>
             <Badge variant="secondary">
               المحددة: {selectedProducts.length}
             </Badge>
-          </div>
-
-          {/* Products count */}
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">
-              المنتجات المتاحة: {availableProducts.length}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              المنتجات المحددة: {filteredSelectedProducts.length}
-            </p>
           </div>
 
           {loading ? (
@@ -144,99 +151,56 @@ const AssignProductsToSubcategoryDialog = ({
               <span className="mr-2">جاري تحميل المنتجات...</span>
             </div>
           ) : (
-            <>
-              {/* Selected Products */}
-              {selectedProducts.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Badge variant="default">{filteredSelectedProducts.length}</Badge>
-                    المنتجات المحددة
-                  </h3>
-                  <div className="border rounded-lg max-h-40 overflow-y-auto">
-                  <div className="p-2 space-y-1">
-                    {filteredSelectedProducts.map((product) => (
+            <div className="space-y-2">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Badge variant="outline">{availableProducts.length}</Badge>
+                جميع المنتجات المتاحة
+              </h3>
+              <ScrollArea className="h-[calc(100vh-300px)] border rounded-lg">
+                <div className="p-3 space-y-2">
+                  {availableProducts.map((product) => {
+                    const isSelected = selectedProducts.find(p => p.id === product.id);
+                    return (
                       <div
                         key={product.id}
-                        className="flex items-center justify-between p-1 border rounded-lg bg-muted/50"
+                        className={`flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer ${
+                          isSelected ? 'bg-primary/5 border-primary' : ''
+                        }`}
+                        onClick={() => handleProductToggle(product)}
                       >
-                          <div className="flex items-center gap-3">
-                            {product.image_urls && product.image_urls.length > 0 && (
-                              <img
-                                src={product.image_urls[0]}
-                                alt={product.name}
-                                className="w-10 h-10 rounded object-cover"
-                              />
-                            )}
-                            <div>
-                              <div className="font-medium">{product.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {product.price} ج.م
-                              </div>
-                            </div>
+                        <Checkbox
+                          checked={!!isSelected}
+                          onCheckedChange={() => handleProductToggle(product)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        {product.image_urls && product.image_urls.length > 0 && (
+                          <img
+                            src={product.image_urls[0]}
+                            alt={product.name}
+                            className="w-12 h-12 rounded object-cover"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <div className="font-medium">{product.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {product.price} ج.م
+                            {product.barcode && ` • ${product.barcode}`}
                           </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRemove(product)}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
                         </div>
-                      ))}
+                      </div>
+                    );
+                  })}
+                  {availableProducts.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      {allProducts.length === 0 ? 
+                        "لا توجد منتجات بدون أقسام فرعية" : 
+                        "لا توجد نتائج للبحث"
+                      }
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
-
-              {/* Available Products */}
-              <div className="space-y-2">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <Badge variant="outline">{availableProducts.length}</Badge>
-                  المنتجات المتاحة
-                </h3>
-                <div className="border rounded-lg max-h-40 overflow-y-auto">
-                  <div className="p-2 space-y-1">
-                    {availableProducts.map((product) => (
-                        <div
-                          key={product.id}
-                          className="flex items-center justify-between p-1 border rounded-lg hover:bg-muted/50 transition-colors"
-                        >
-                        <div className="flex items-center gap-3">
-                          {product.image_urls && product.image_urls.length > 0 && (
-                            <img
-                              src={product.image_urls[0]}
-                              alt={product.name}
-                              className="w-10 h-10 rounded object-cover"
-                            />
-                          )}
-                          <div>
-                            <div className="font-medium">{product.name}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {product.price} ج.م
-                            </div>
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleAdd(product)}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    {availableProducts.length === 0 && (
-                      <div className="text-center py-4 text-muted-foreground">
-                        {allProducts.length === 0 ? 
-                          "لا توجد منتجات بدون أقسام فرعية" : 
-                          "لا توجد نتائج للبحث"
-                        }
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
+              </ScrollArea>
+            </div>
           )}
 
           </div>
