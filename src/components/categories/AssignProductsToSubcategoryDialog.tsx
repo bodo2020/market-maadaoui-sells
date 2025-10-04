@@ -56,12 +56,7 @@ const AssignProductsToSubcategoryDialog = ({
     }
   };
 
-  const availableProducts = allProducts.filter(product => 
-    !selectedProducts.find(selected => selected.id === product.id) &&
-    product.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredSelectedProducts = selectedProducts.filter(product =>
+  const filteredProducts = allProducts.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -153,12 +148,12 @@ const AssignProductsToSubcategoryDialog = ({
           ) : (
             <div className="space-y-2">
               <h3 className="font-semibold flex items-center gap-2">
-                <Badge variant="outline">{availableProducts.length}</Badge>
+                <Badge variant="outline">{filteredProducts.length}</Badge>
                 جميع المنتجات المتاحة
               </h3>
               <ScrollArea className="h-[calc(100vh-300px)] border rounded-lg">
                 <div className="p-3 space-y-2">
-                  {availableProducts.map((product) => {
+                  {filteredProducts.map((product) => {
                     const isSelected = selectedProducts.find(p => p.id === product.id);
                     return (
                       <div
@@ -190,7 +185,7 @@ const AssignProductsToSubcategoryDialog = ({
                       </div>
                     );
                   })}
-                  {availableProducts.length === 0 && (
+                  {filteredProducts.length === 0 && (
                     <div className="text-center py-8 text-muted-foreground">
                       {allProducts.length === 0 ? 
                         "لا توجد منتجات بدون أقسام فرعية" : 
