@@ -200,8 +200,11 @@ export async function recordCashTransaction(
   branchId?: string
 ) {
   try {
+    // ✅ تنظيف branch_id: تحويل string فارغة إلى null
+    const cleanBranchId = branchId && branchId.trim() !== '' ? branchId : null;
+    
     // ✅ للمحل: branch_id مطلوب
-    if (registerType === RegisterType.STORE && !branchId) {
+    if (registerType === RegisterType.STORE && !cleanBranchId) {
       throw new Error('يجب تحديد الفرع لخزنة المحل');
     }
 
@@ -212,7 +215,7 @@ export async function recordCashTransaction(
         p_transaction_type: transactionType,
         p_notes: notes || '',
         p_created_by: userId,
-        p_branch_id: branchId || null
+        p_branch_id: cleanBranchId
       });
       
       if (error) {
@@ -230,7 +233,7 @@ export async function recordCashTransaction(
         p_register_type: registerType,
         p_notes: notes || '',
         p_created_by: userId,
-        p_branch_id: branchId || null
+        p_branch_id: cleanBranchId
       });
       if (error) {
         console.error(`Error during ${transactionType} (${registerType}):`, error);

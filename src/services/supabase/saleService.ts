@@ -57,13 +57,16 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
       try {
         // Import cash tracking service
         const { recordCashTransaction, RegisterType } = await import('./cashTrackingService');
+        // ✅ تنظيف branchId قبل إرساله
+        const cleanBranchId = branchId && branchId.trim() !== '' ? branchId : null;
+        
         await recordCashTransaction(
           saleData.cash_amount,
           'deposit', // Sale is a deposit to cash register
           RegisterType.STORE, // Sales are typically in store register
           `مبيعات - فاتورة ${saleData.invoice_number}`,
           cashierId || '',
-          branchId || undefined // Pass the resolved branch ID
+          cleanBranchId || undefined // Pass the resolved branch ID
         );
         console.log('Cash tracking updated for sale:', saleData.invoice_number);
       } catch (cashError) {
