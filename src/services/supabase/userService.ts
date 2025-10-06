@@ -6,17 +6,74 @@ import * as FileSaver from 'file-saver';
 
 export async function fetchUsers() {
   try {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*");
+    // Get current user and branch from localStorage
+    const storedUser = localStorage.getItem("user");
+    const currentBranchId = localStorage.getItem("currentBranchId");
+    
+    let userRole = null;
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        userRole = user.role;
+      } catch (e) {
+        console.error("Error parsing user:", e);
+      }
+    }
 
-    if (error) {
-      console.error("Error fetching users:", error);
-      throw error;
+    // If super_admin, fetch all users
+    if (userRole === 'super_admin') {
+      const { data, error } = await supabase
+        .from("users")
+        .select("*");
+
+      if (error) {
+        console.error("Error fetching users:", error);
+        throw error;
+      }
+
+      const usersWithShifts = await Promise.all(
+        data.map(async (user) => {
+          const { data: shifts, error: shiftsError } = await supabase
+            .from("shifts")
+            .select("*")
+            .eq("employee_id", user.id);
+
+          if (shiftsError) {
+            console.error("Error fetching shifts for user:", shiftsError);
+            return { ...user, shifts: [] };
+          }
+
+          return { ...user, shifts: shifts || [] };
+        })
+      );
+
+      return usersWithShifts as User[];
+    }
+
+    // For other roles, fetch only users in the current branch
+    if (!currentBranchId) {
+      console.warn("No current branch ID found");
+      return [];
+    }
+
+    const { data: branchUsers, error: branchError } = await supabase
+      .from("user_branch_roles")
+      .select(`
+        user_id,
+        users:user_id (*)
+      `)
+      .eq("branch_id", currentBranchId);
+
+    if (branchError) {
+      console.error("Error fetching branch users:", branchError);
+      throw branchError;
     }
 
     const usersWithShifts = await Promise.all(
-      data.map(async (user) => {
+      (branchUsers || []).map(async (branchUser: any) => {
+        const user = branchUser.users;
+        if (!user) return null;
+
         const { data: shifts, error: shiftsError } = await supabase
           .from("shifts")
           .select("*")
@@ -31,7 +88,7 @@ export async function fetchUsers() {
       })
     );
 
-    return usersWithShifts as User[];
+    return usersWithShifts.filter(u => u !== null) as User[];
   } catch (error) {
     console.error("Error in fetchUsers:", error);
     throw error;
@@ -146,10 +203,10 @@ export async function authenticateUser(username: string, password: string, branc
       .eq("branch_id", branch.id)
       .maybeSingle();
 
-    // Allow super_admin and admin to access any branch
-    const isAdmin = data.role === 'super_admin' || data.role === 'admin';
+    // Only allow super_admin to access any branch
+    const isSuperAdmin = data.role === 'super_admin';
     
-    if (!isAdmin && !userBranchRole) {
+    if (!isSuperAdmin && !userBranchRole) {
       throw new Error("ليس لديك صلاحية للدخول لهذا الفرع");
     }
 
@@ -196,7 +253,29 @@ export async function createUser(user: Omit<User, "id" | "created_at" | "updated
       throw error;
     }
 
-    return { ...data[0], shifts: [] } as User;
+    const newUser = data[0];
+
+    // Add user to current branch (except super_admin)
+    if (newUser.role !== 'super_admin') {
+      const currentBranchId = localStorage.getItem("currentBranchId");
+      
+      if (currentBranchId) {
+        const { error: roleError } = await supabase
+          .from("user_branch_roles")
+          .insert({
+            user_id: newUser.id,
+            branch_id: currentBranchId,
+            role: newUser.role
+          });
+
+        if (roleError) {
+          console.error("Error adding user to branch:", roleError);
+          // Don't throw, user is created but not assigned to branch
+        }
+      }
+    }
+
+    return { ...newUser, shifts: [] } as User;
   } catch (error) {
     console.error("Error in createUser:", error);
     throw error;

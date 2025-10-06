@@ -57,7 +57,7 @@ export default function UsersManagement() {
     try {
       setLoading(true);
       
-      if (!currentUser || currentUser.role !== UserRole.ADMIN) {
+      if (!currentUser || (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUPER_ADMIN)) {
         toast({
           title: "خطأ في الصلاحيات",
           description: "ليس لديك صلاحية للوصول إلى هذه الصفحة",
