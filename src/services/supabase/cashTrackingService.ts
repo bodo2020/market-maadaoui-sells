@@ -19,6 +19,7 @@ export interface CashRecord {
   created_at?: string;
   updated_at?: string;
   register_type: RegisterType;
+  branch_id?: string;
 }
 
 export interface TransferRecord {
@@ -83,11 +84,63 @@ export async function updateCashRecord(id: string, updates: Partial<CashRecord>)
   return data as CashRecord;
 }
 
-export async function getLatestCashBalance(registerType: RegisterType) {
-  if (registerType === RegisterType.MERGED) {
-    return await getMergedCashBalance();
+export async function getLatestCashBalance(registerType: RegisterType, branchId?: string): Promise<number> {
+  try {
+    const currentBranchId = branchId || localStorage.getItem('currentBranchId');
+    
+    // Special handling for merged balance
+    if (registerType === RegisterType.MERGED) {
+      // Get store balance
+      const storeBalance = await getLatestCashBalance(RegisterType.STORE, currentBranchId);
+      // Get online balance
+      const onlineBalance = await getLatestCashBalance(RegisterType.ONLINE, currentBranchId);
+      return storeBalance + onlineBalance;
+    }
+
+    // For store and online, get from cash_transactions first
+    let txQuery = supabase
+      .from('cash_transactions')
+      .select('balance_after')
+      .eq('register_type', registerType)
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (currentBranchId) {
+      txQuery = txQuery.eq('branch_id', currentBranchId);
+    }
+
+    const { data: txData, error: txError } = await txQuery.maybeSingle();
+
+    if (!txError && txData) {
+      return txData.balance_after || 0;
+    }
+
+    // Fallback to cash_tracking
+    let trackingQuery = supabase
+      .from('cash_tracking')
+      .select('closing_balance')
+      .eq('register_type', registerType)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (currentBranchId) {
+      trackingQuery = trackingQuery.eq('branch_id', currentBranchId);
+    }
+
+    const { data: trackingData, error: trackingError } = await trackingQuery.maybeSingle();
+
+    if (trackingError) {
+      console.error('Error fetching balance from tracking:', trackingError);
+      return 0;
+    }
+
+    return trackingData?.closing_balance || 0;
+  } catch (error) {
+    console.error('Error in getLatestCashBalance:', error);
+    return 0;
   }
-  return await getLatestCashBalanceFromTracking(registerType);
 }
 
 export async function getMergedCashBalance() {
@@ -138,7 +191,7 @@ export async function recordCashTransaction(
         p_register_type: registerType,
         p_notes: notes || '',
         p_created_by: userId,
-        p_branch_id: null
+        p_branch_id: branchId || null
       });
       if (error) {
         console.error(`Error during ${transactionType} (${registerType}):`, error);

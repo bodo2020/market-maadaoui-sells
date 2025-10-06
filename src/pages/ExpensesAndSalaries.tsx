@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useBranchStore } from "@/stores/branchStore";
+import { supabase } from "@/integrations/supabase/client";
 import MainLayout from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,6 +69,7 @@ interface Expense {
 }
 
 export default function ExpensesAndSalaries() {
+  const { currentBranchId, currentBranchName } = useBranchStore();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [salaries, setSalaries] = useState<Salary[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -103,16 +106,37 @@ export default function ExpensesAndSalaries() {
 
   useEffect(() => {
     loadData();
-  }, [dateRange, filterType]);
+  }, [dateRange, filterType, currentBranchId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [expensesData, salariesData, employeesData] = await Promise.all([
-        fetchExpenses(),
-        fetchSalaries(),
-        fetchUsers()
-      ]);
+      // Fetch expenses for current branch
+      const expensesData = await fetchExpenses(currentBranchId || undefined);
+      
+      // Fetch salaries for current branch
+      const salariesData = await fetchSalaries(currentBranchId || undefined);
+      
+      // Fetch employees for current branch
+      let employeesQuery = supabase
+        .from('user_branch_roles')
+        .select(`
+          user_id,
+          users:user_id (
+            id,
+            name,
+            username,
+            role,
+            active
+          )
+        `);
+
+      if (currentBranchId) {
+        employeesQuery = employeesQuery.eq('branch_id', currentBranchId);
+      }
+
+      const { data: branchEmployees } = await employeesQuery;
+      const employeesData = branchEmployees?.map(be => be.users).filter(Boolean) || [];
       
       // Filter expenses by date range and type
       let filteredExpenses = expensesData;
@@ -344,6 +368,11 @@ export default function ExpensesAndSalaries() {
             <p className="text-muted-foreground mt-2">
               إدارة شاملة للمصروفات ورواتب الموظفين
             </p>
+            {currentBranchName && (
+              <p className="text-sm text-muted-foreground mt-1">
+                الفرع: {currentBranchName}
+              </p>
+            )}
           </div>
         </div>
 

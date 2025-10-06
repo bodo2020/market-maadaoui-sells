@@ -30,8 +30,10 @@ export interface CreateSalaryData {
 }
 
 // جلب جميع الرواتب مع بيانات الموظفين
-export async function fetchSalaries(): Promise<Salary[]> {
-  const { data, error } = await supabase
+export async function fetchSalaries(branchId?: string): Promise<Salary[]> {
+  const currentBranchId = branchId || localStorage.getItem('currentBranchId');
+  
+  let query = supabase
     .from("salaries")
     .select(`
       *,
@@ -42,6 +44,12 @@ export async function fetchSalaries(): Promise<Salary[]> {
       )
     `)
     .order("created_at", { ascending: false });
+
+  if (currentBranchId) {
+    query = query.eq('branch_id', currentBranchId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Error fetching salaries:", error);
@@ -101,10 +109,13 @@ export async function fetchSalariesByPeriod(month: number, year: number): Promis
 
 // إضافة راتب جديد
 export async function createSalary(salaryData: CreateSalaryData): Promise<Salary> {
+  const branchId = localStorage.getItem('currentBranchId');
+  
   const { data, error } = await supabase
     .from("salaries")
     .insert([{
       ...salaryData,
+      branch_id: branchId,
       created_by: (await supabase.auth.getUser()).data.user?.id
     }])
     .select(`
@@ -170,19 +181,38 @@ export async function markSalaryAsPaid(id: string): Promise<Salary> {
   });
 }
 
-// إنشاء رواتب شهر كامل لجميع الموظفين
+// إنشاء رواتب شهر كامل لجميع الموظفين في الفرع الحالي
 export async function createMonthlyPayroll(month: number, year: number, defaultAmount: number = 0): Promise<Salary[]> {
   try {
-    // جلب جميع الموظفين النشطين
-    const { data: employees, error: employeesError } = await supabase
-      .from("users")
-      .select("id, name, role")
-      .eq("active", true)
-      .in("role", ["employee", "cashier", "delivery", "admin"]);
+    const branchId = localStorage.getItem('currentBranchId');
+    
+    // جلب الموظفين النشطين في الفرع الحالي
+    let employeesQuery = supabase
+      .from("user_branch_roles")
+      .select(`
+        user_id,
+        users:user_id (
+          id,
+          name,
+          role,
+          active
+        )
+      `)
+      .eq("users.active", true);
+
+    if (branchId) {
+      employeesQuery = employeesQuery.eq("branch_id", branchId);
+    }
+
+    const { data: branchEmployees, error: employeesError } = await employeesQuery;
 
     if (employeesError) {
       throw employeesError;
     }
+
+    const employees = branchEmployees
+      ?.map(be => be.users)
+      .filter(Boolean) || [];
 
     // إنشاء رواتب لجميع الموظفين
     const salaryPromises = employees.map(employee => 
@@ -219,13 +249,16 @@ export async function createMonthlyPayroll(month: number, year: number, defaultA
 }
 
 // حصائيات الرواتب
-export async function getSalaryStatistics(month?: number, year?: number) {
+export async function getSalaryStatistics(month?: number, year?: number, branchId?: string) {
+  const currentBranchId = branchId || localStorage.getItem('currentBranchId');
+  
   let query = supabase
     .from("salaries")
     .select("amount, status");
 
   if (month) query = query.eq("month", month);
   if (year) query = query.eq("year", year);
+  if (currentBranchId) query = query.eq("branch_id", currentBranchId);
 
   const { data, error } = await query;
 

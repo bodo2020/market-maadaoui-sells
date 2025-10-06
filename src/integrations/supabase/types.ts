@@ -2163,6 +2163,7 @@ export type Database = {
       salaries: {
         Row: {
           amount: number
+          branch_id: string | null
           created_at: string | null
           created_by: string | null
           employee_id: string
@@ -2176,6 +2177,7 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          branch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           employee_id: string
@@ -2189,6 +2191,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          branch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           employee_id?: string
@@ -2201,6 +2204,13 @@ export type Database = {
           year?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "salaries_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "salaries_created_by_fkey"
             columns: ["created_by"]
