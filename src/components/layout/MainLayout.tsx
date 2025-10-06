@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Menu } from "lucide-react";
 import { Button } from "../ui/button";
+import { useBranchStore } from "@/stores/branchStore";
 interface MainLayoutProps {
   children: ReactNode;
 }
@@ -25,6 +26,12 @@ export default function MainLayout({
   } = useNotificationStore();
   const isMobile = useIsMobile();
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const { init } = useBranchStore();
+
+  // Initialize branch selection (loads from localStorage or first active branch)
+  useEffect(() => {
+    init().catch(() => {/* noop */});
+  }, [init]);
 
   // Fetch unread orders count when layout mounts
   useEffect(() => {
