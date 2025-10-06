@@ -130,7 +130,7 @@ export default function Navbar() {
       </div>
       
       <div className="flex items-center gap-4">
-        {(user?.role === 'admin' || user?.role === 'super_admin') && branches.length > 1 ? (
+        {user?.role === 'super_admin' && branches.length > 1 ? (
           <DropdownMenu open={branchDropdownOpen} onOpenChange={setBranchDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2 px-3 py-1.5">
@@ -158,10 +158,10 @@ export default function Navbar() {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : currentBranchName ? (
-          <Badge variant="outline" className="gap-2 px-3 py-1.5">
+          <div className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground">
             <Store className="h-4 w-4" />
             <span className="font-medium">{currentBranchName}</span>
-          </Badge>
+          </div>
         ) : null}
         
         {(user?.role === 'admin' || user?.role === 'super_admin') && (
