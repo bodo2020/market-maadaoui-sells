@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, BellDot, User, LogOut, X, Check } from "lucide-react";
+import { Bell, BellDot, User, LogOut, X, Check, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,7 +10,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBranchStore } from "@/stores/branchStore";
 import { useNavigate } from "react-router-dom";
 import { 
   getNotifications, 
@@ -25,6 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { currentBranchName } = useBranchStore();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<StockNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -89,6 +92,13 @@ export default function Navbar() {
       </div>
       
       <div className="flex items-center gap-4">
+        {currentBranchName && (
+          <Badge variant="outline" className="gap-2 px-3 py-1.5">
+            <Store className="h-4 w-4" />
+            <span className="font-medium">{currentBranchName}</span>
+          </Badge>
+        )}
+        
         {(user?.role === 'admin' || user?.role === 'super_admin') && (
           <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
             <DropdownMenuTrigger asChild>

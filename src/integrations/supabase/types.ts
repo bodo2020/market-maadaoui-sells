@@ -2949,6 +2949,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      get_next_invoice_number: {
+        Args: { p_branch_id: string }
+        Returns: string
+      }
       has_branch_access: {
         Args: { _branch: string; _user: string }
         Returns: boolean
