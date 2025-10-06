@@ -197,24 +197,64 @@ export async function generateInvoiceNumber() {
   const month = (now.getMonth() + 1).toString().padStart(2, '0');
   const day = now.getDate().toString().padStart(2, '0');
   
-  // Get count of today's invoices to increment
+  // Get current branch from localStorage
+  let branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+  let branchCode = 'MMG1'; // Default to main branch
+  
+  // If branch ID exists, get the branch code
+  if (branchId) {
+    const { data: branch } = await supabase
+      .from('branches')
+      .select('code')
+      .eq('id', branchId)
+      .single();
+    
+    if (branch?.code) {
+      branchCode = branch.code;
+    }
+  } else {
+    // If no branch ID, try to get default active branch
+    const { data: branches } = await supabase
+      .from('branches')
+      .select('id, code')
+      .eq('active', true)
+      .order('created_at', { ascending: true })
+      .limit(1);
+    
+    if (branches && branches.length > 0) {
+      branchId = branches[0].id;
+      branchCode = branches[0].code;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('currentBranchId', branchId);
+      }
+    }
+  }
+  
+  // Get count of today's invoices for this branch to increment
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
   
-  const { count, error } = await supabase
+  let query = supabase
     .from("sales")
     .select("*", { count: 'exact', head: true })
     .gte("date", startOfDay)
     .lt("date", endOfDay);
+  
+  // Filter by branch if available
+  if (branchId) {
+    query = query.eq("branch_id", branchId);
+  }
+  
+  const { count, error } = await query;
     
   if (error) {
     console.error("Error counting today's invoices:", error);
     throw error;
   }
   
-  // Format: YYMMDD-XXXX where XXXX is the sequential number for the day
+  // Format: {BRANCH_CODE}-YYMMDD-XXXX where XXXX is the sequential number for the day per branch
   const sequentialNumber = ((count || 0) + 1).toString().padStart(4, '0');
-  return `${year}${month}${day}-${sequentialNumber}`;
+  return `${branchCode}-${year}${month}${day}-${sequentialNumber}`;
 }
 
 /**
