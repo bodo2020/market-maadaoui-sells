@@ -142,6 +142,22 @@ export async function getLatestCashBalance(registerType: RegisterType, branchId?
       return txData.balance_after || 0;
     }
 
+    // If no transaction found for this branch (STORE), try legacy records with NULL branch_id
+    if (registerType === RegisterType.STORE) {
+      let txNullQuery = supabase
+        .from('cash_transactions')
+        .select('balance_after')
+        .eq('register_type', registerType)
+        .is('branch_id', null)
+        .order('transaction_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const { data: txNullData } = await txNullQuery.maybeSingle();
+      if (txNullData) {
+        return txNullData.balance_after || 0;
+      }
+    }
+
     // Fallback to cash_tracking
     let trackingQuery = supabase
       .from('cash_tracking')
@@ -166,7 +182,25 @@ export async function getLatestCashBalance(registerType: RegisterType, branchId?
       return 0;
     }
 
-    return trackingData?.closing_balance || 0;
+    if (trackingData?.closing_balance != null) {
+      return trackingData.closing_balance;
+    }
+
+    // If still not found for STORE, try legacy NULL branch_id
+    if (registerType === RegisterType.STORE) {
+      const { data: trackingNull } = await supabase
+        .from('cash_tracking')
+        .select('closing_balance')
+        .eq('register_type', registerType)
+        .is('branch_id', null)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return trackingNull?.closing_balance || 0;
+    }
+
+    return 0;
   } catch (error) {
     console.error('Error in getLatestCashBalance:', error);
     return 0;
