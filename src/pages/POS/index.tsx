@@ -18,11 +18,13 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
+import { useBranchStore } from "@/stores/branchStore";
 
 export default function POS() {
   const [search, setSearch] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const { currentBranchId } = useBranchStore();
   const [weightInput, setWeightInput] = useState<string>("");
   const [showWeightDialog, setShowWeightDialog] = useState(false);
   const [currentScaleProduct, setCurrentScaleProduct] = useState<Product | null>(null);
@@ -481,17 +483,17 @@ export default function POS() {
       console.log('Recording sale to cash register:', { 
         amount: amountToRecord, 
         transaction_type: 'deposit',
-        register_type: 'store'
+        register_type: 'store',
+        branch_id: currentBranchId
       });
       
-      const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
       const { data, error } = await supabase.functions.invoke('add-cash-transaction', {
         body: {
           amount: amountToRecord,
           transaction_type: 'deposit',
           register_type: 'store',
           notes: 'مبيعات نقطة البيع',
-          branch_id: branchId || undefined
+          branch_id: currentBranchId || undefined
         }
       });
       

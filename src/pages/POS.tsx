@@ -687,7 +687,8 @@ export default function POS() {
           amount: amountToRecord,
           transaction_type: 'deposit',
           register_type: 'store',
-          notes: 'مبيعات نقطة البيع'
+          notes: 'مبيعات نقطة البيع',
+          branch_id: currentBranchId || undefined
         }
       });
       if (error) throw error;
