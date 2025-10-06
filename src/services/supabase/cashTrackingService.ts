@@ -116,22 +116,6 @@ export async function getLatestCashBalance(registerType: RegisterType, branchId?
       return txData.balance_after || 0;
     }
 
-    // If no branch-specific transaction found, try without branch filter (legacy data)
-    if (currentBranchId) {
-      const { data: txAny, error: txAnyError } = await supabase
-        .from('cash_transactions')
-        .select('balance_after')
-        .eq('register_type', registerType)
-        .order('transaction_date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!txAnyError && txAny) {
-        return txAny.balance_after || 0;
-      }
-    }
-
     // Fallback to cash_tracking
     let trackingQuery = supabase
       .from('cash_tracking')
@@ -147,27 +131,12 @@ export async function getLatestCashBalance(registerType: RegisterType, branchId?
 
     const { data: trackingData, error: trackingError } = await trackingQuery.maybeSingle();
 
-    if (!trackingError && trackingData) {
-      return trackingData.closing_balance || 0;
+    if (trackingError) {
+      console.error('Error fetching balance from tracking:', trackingError);
+      return 0;
     }
 
-    // As a final fallback, read any tracking record regardless of branch (legacy)
-    if (currentBranchId) {
-      const { data: trackingAny, error: trackingAnyError } = await supabase
-        .from('cash_tracking')
-        .select('closing_balance')
-        .eq('register_type', registerType)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!trackingAnyError && trackingAny) {
-        return trackingAny.closing_balance || 0;
-      }
-    }
-
-    return 0;
+    return trackingData?.closing_balance || 0;
   } catch (error) {
     console.error('Error in getLatestCashBalance:', error);
     return 0;
