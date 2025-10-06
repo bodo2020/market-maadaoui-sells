@@ -50,7 +50,15 @@ export async function fetchCashRecords(
     query = query.eq('register_type', registerType);
   }
   
-  if (branchId) {
+  // ✅ للمحل: يجب تحديد branch_id
+  if (registerType === RegisterType.STORE) {
+    if (!branchId) {
+      console.warn('Fetching STORE records requires branchId');
+      return [];
+    }
+    query = query.eq('branch_id', branchId);
+  } else if (branchId) {
+    // لأنواع أخرى: فلتر اختياري
     query = query.eq('branch_id', branchId);
   }
   
@@ -96,6 +104,12 @@ export async function getLatestCashBalance(registerType: RegisterType, branchId?
   try {
     const currentBranchId = branchId || localStorage.getItem('currentBranchId');
     
+    // ✅ للمحل: branch_id مطلوب
+    if (registerType === RegisterType.STORE && !currentBranchId) {
+      console.warn('STORE register requires branchId');
+      return 0;
+    }
+    
     // Special handling for merged balance
     if (registerType === RegisterType.MERGED) {
       // Get store balance
@@ -114,7 +128,11 @@ export async function getLatestCashBalance(registerType: RegisterType, branchId?
       .order('created_at', { ascending: false })
       .limit(1);
 
-    if (currentBranchId) {
+    // ✅ للمحل: دائماً نفلتر بـ branch_id
+    if (registerType === RegisterType.STORE) {
+      txQuery = txQuery.eq('branch_id', currentBranchId);
+    } else if (currentBranchId) {
+      // لأنواع أخرى: فلتر اختياري
       txQuery = txQuery.eq('branch_id', currentBranchId);
     }
 
@@ -133,7 +151,11 @@ export async function getLatestCashBalance(registerType: RegisterType, branchId?
       .order('created_at', { ascending: false })
       .limit(1);
 
-    if (currentBranchId) {
+    // ✅ للمحل: دائماً نفلتر بـ branch_id
+    if (registerType === RegisterType.STORE) {
+      trackingQuery = trackingQuery.eq('branch_id', currentBranchId);
+    } else if (currentBranchId) {
+      // لأنواع أخرى: فلتر اختياري
       trackingQuery = trackingQuery.eq('branch_id', currentBranchId);
     }
 
@@ -178,6 +200,11 @@ export async function recordCashTransaction(
   branchId?: string
 ) {
   try {
+    // ✅ للمحل: branch_id مطلوب
+    if (registerType === RegisterType.STORE && !branchId) {
+      throw new Error('يجب تحديد الفرع لخزنة المحل');
+    }
+
     // Route by register type
     if (registerType === RegisterType.MERGED) {
       const { data, error } = await supabase.rpc('record_merged_cash_transaction', {
