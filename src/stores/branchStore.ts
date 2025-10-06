@@ -13,7 +13,17 @@ export const useBranchStore = create<BranchState>((set, get) => ({
   currentBranchId: null,
   currentBranchName: null,
   initialized: false,
-  setBranch: (id, name = null) => set({ currentBranchId: id, currentBranchName: name }),
+  setBranch: (id, name = null) => {
+    // Save to localStorage whenever branch is set
+    if (id) {
+      localStorage.setItem('currentBranchId', id);
+      localStorage.setItem('currentBranchName', name || '');
+    } else {
+      localStorage.removeItem('currentBranchId');
+      localStorage.removeItem('currentBranchName');
+    }
+    set({ currentBranchId: id, currentBranchName: name });
+  },
   init: async () => {
     if (get().initialized) return;
 
