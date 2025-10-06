@@ -460,10 +460,10 @@ export default function POS() {
     setWeightInput("");
   };
   const handleAddBulkToCart = (product: Product) => {
-    if ((product.quantity || 0) <= 0) {
+    if ((product.quantity || 0) < (product.bulk_quantity || 0)) {
       toast({
         title: "المنتج غير متوفر",
-        description: `عبوة الجملة للمنتج "${product.name}" غير متوفرة في المخزون`,
+        description: `عبوة الجملة للمنتج "${product.name}" غير متوفرة في المخزون (المتاح: ${product.quantity || 0})`,
         variant: "destructive"
       });
       return;
@@ -485,12 +485,12 @@ export default function POS() {
       // إذا وُجد المنتج، قم بزيادة الكمية
       const updatedItems = [...cartItems];
       const existingItem = updatedItems[existingItemIndex];
-      const newQuantity = existingItem.quantity + product.bulk_quantity;
+      const newQuantity = existingItem.quantity + (product.bulk_quantity || 0);
       
       updatedItems[existingItemIndex] = {
         ...existingItem,
         quantity: newQuantity,
-        total: (product.bulk_price / product.bulk_quantity) * newQuantity
+        total: ((product.bulk_price || 0) / (product.bulk_quantity || 1)) * newQuantity
       };
       
       setCartItems(updatedItems);
@@ -502,18 +502,22 @@ export default function POS() {
       });
     } else {
       // إضافة منتج جديد للسلة
+      const bulkQuantity = product.bulk_quantity || 0;
+      const bulkPrice = product.bulk_price || 0;
+      const pricePerUnit = bulkQuantity > 0 ? bulkPrice / bulkQuantity : 0;
+      
       setCartItems([...cartItems, {
         product,
-        quantity: product.bulk_quantity,
-        price: product.bulk_price / product.bulk_quantity,
+        quantity: bulkQuantity,
+        price: pricePerUnit,
         discount: 0,
-        total: product.bulk_price,
+        total: bulkPrice,
         isBulk: true
       }]);
 
       toast({
         title: "تم إضافة عبوة جملة ✅",
-        description: `${product.name} - ${product.bulk_quantity} وحدة`,
+        description: `${product.name} - ${bulkQuantity} وحدة بسعر ${bulkPrice.toFixed(2)} ${siteConfig.currency}`,
         className: "bg-green-50 border-green-200 text-green-800"
       });
     }
