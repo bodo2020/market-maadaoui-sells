@@ -53,7 +53,7 @@ export default function CashTracking() {
       
       // Filter by current branch
       const branchRecords = currentBranchId 
-        ? allRecords.filter(r => r.branch_id === currentBranchId)
+        ? allRecords.filter(r => r.branch_id === currentBranchId || r.branch_id == null)
         : allRecords;
       
       // Fetch user names for creators
