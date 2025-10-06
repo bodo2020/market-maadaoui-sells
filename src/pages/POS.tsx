@@ -21,6 +21,7 @@ import InvoiceDialog from "@/components/POS/InvoiceDialog";
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
 import { useAuth } from "@/contexts/AuthContext";
 import { getFavoriteProducts, addFavoriteProduct, removeFavoriteProduct } from "@/services/supabase/favoritesService";
+import { useBranchStore } from "@/stores/branchStore";
 export default function POS() {
   const [search, setSearch] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -58,6 +59,7 @@ export default function POS() {
   const {
     user
   } = useAuth();
+  const { currentBranchId } = useBranchStore();
 
   // Debounce hook for auto-search
   const useDebounce = (value: string, delay: number) => {
@@ -84,7 +86,12 @@ export default function POS() {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [productsData, customersData, balance, favorites] = await Promise.all([fetchProducts(), fetchCustomers(), getLatestCashBalance(RegisterType.STORE), user ? getFavoriteProducts(user.id) : Promise.resolve([])]);
+        const [productsData, customersData, balance, favorites] = await Promise.all([
+          fetchProducts(),
+          fetchCustomers(),
+          getLatestCashBalance(RegisterType.STORE, currentBranchId || undefined),
+          user ? getFavoriteProducts(user.id) : Promise.resolve([])
+        ]);
         setProducts(productsData);
         setCustomers(customersData);
         setCashBalance(balance);
@@ -101,7 +108,7 @@ export default function POS() {
       }
     };
     loadData();
-  }, [toast]);
+  }, [toast, currentBranchId]);
   useEffect(() => {
     if (!manualBarcodeMode) {
       // Detect Android
