@@ -29,32 +29,39 @@ export async function fetchProducts() {
       return [];
     }
 
-    // Fetch ALL products with LEFT JOIN to inventory for current branch
-    const { data, error } = await supabase
+    // Fetch all products
+    const { data: productsData, error: productsError } = await supabase
       .from("products")
-      .select(`
-        *,
-        inventory(quantity, min_stock_level, branch_id)
-      `)
-      .eq('inventory.branch_id', currentBranchId)
+      .select("*")
       .order("name");
 
-    if (error) {
-      console.error("Error fetching products:", error);
-      throw error;
+    if (productsError) {
+      console.error("Error fetching products:", productsError);
+      throw productsError;
     }
 
-    // Map the data to include quantity from inventory (or 0 if not found)
-    const productsWithInventory = (data || []).map(product => {
-      const inventoryData = Array.isArray(product.inventory) && product.inventory.length > 0 
-        ? product.inventory[0] 
-        : null;
-      
+    // Fetch inventory data for current branch
+    const { data: inventoryData, error: inventoryError } = await supabase
+      .from("inventory")
+      .select("product_id, quantity, min_stock_level")
+      .eq("branch_id", currentBranchId);
+
+    if (inventoryError) {
+      console.error("Error fetching inventory:", inventoryError);
+    }
+
+    // Create a map of product_id to inventory data
+    const inventoryMap = new Map(
+      (inventoryData || []).map(inv => [inv.product_id, inv])
+    );
+
+    // Merge products with inventory data
+    const productsWithInventory = (productsData || []).map(product => {
+      const inventory = inventoryMap.get(product.id);
       return {
         ...product,
-        quantity: inventoryData?.quantity || 0,
-        min_stock_level: inventoryData?.min_stock_level || 5,
-        inventory: undefined // Remove the nested inventory object
+        quantity: inventory?.quantity || 0,
+        min_stock_level: inventory?.min_stock_level || 5
       };
     });
 
@@ -110,11 +117,7 @@ export async function fetchProductByBarcode(barcode: string) {
 
   const { data, error } = await supabase
     .from("products")
-    .select(`
-      *,
-      inventory(quantity, min_stock_level, branch_id)
-    `)
-    .eq('inventory.branch_id', currentBranchId)
+    .select("*")
     .or(`barcode.eq.${barcode},bulk_barcode.eq.${barcode}`)
     .maybeSingle();
 
@@ -127,19 +130,21 @@ export async function fetchProductByBarcode(barcode: string) {
     return { product: null, isBulkBarcode: false };
   }
 
+  // Fetch inventory for this product and branch
+  const { data: inventoryData } = await supabase
+    .from("inventory")
+    .select("quantity, min_stock_level")
+    .eq("product_id", data.id)
+    .eq("branch_id", currentBranchId)
+    .maybeSingle();
+
   // Check if the scanned barcode matches the bulk_barcode
   const isBulkBarcode = data.bulk_barcode === barcode;
-
-  // Map inventory data to product (or use 0 if not found)
-  const inventoryData = Array.isArray(data.inventory) && data.inventory.length > 0
-    ? data.inventory[0] 
-    : null;
     
   const productWithInventory = {
     ...data,
     quantity: inventoryData?.quantity || 0,
-    min_stock_level: inventoryData?.min_stock_level || 5,
-    inventory: undefined
+    min_stock_level: inventoryData?.min_stock_level || 5
   };
 
   return { 
