@@ -179,7 +179,7 @@ const Invoices = () => {
     <MainLayout>
       <div className="container mx-auto py-6 space-y-6 pb-20">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">إدارة الفواتير - {currentBranchName || 'جميع الفروع'}</h1>
+          <h1 className="text-3xl font-bold">إدارة الفواتير - {currentBranchName}</h1>
         </div>
 
         <Tabs defaultValue="sales" value={invoiceType} onValueChange={(value) => handleInvoiceTypeChange(value as 'sales' | 'purchases')} className="w-full">
