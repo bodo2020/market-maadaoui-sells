@@ -130,10 +130,10 @@ export default function SalesDashboard() {
   });
   
   const { data: storeRecords = [], isLoading: isStoreRecordsLoading, refetch: refetchStoreRecords } = useQuery({
-    queryKey: ['cashRecords', RegisterType.STORE, dateRange],
+    queryKey: ['cashRecords', RegisterType.STORE, dateRange, currentBranchId],
     queryFn: async () => {
       try {
-        const data = await fetchCashRecords(RegisterType.STORE, dateRange);
+        const data = await fetchCashRecords(RegisterType.STORE, dateRange, currentBranchId || undefined);
         console.log("Store cash records:", data);
         return data;
       } catch (error) {
@@ -144,10 +144,10 @@ export default function SalesDashboard() {
   });
   
   const { data: onlineRecords = [], isLoading: isOnlineRecordsLoading, refetch: refetchOnlineRecords } = useQuery({
-    queryKey: ['cashRecords', RegisterType.ONLINE, dateRange],
+    queryKey: ['cashRecords', RegisterType.ONLINE, dateRange, currentBranchId],
     queryFn: async () => {
       try {
-        const data = await fetchCashRecords(RegisterType.ONLINE, dateRange);
+        const data = await fetchCashRecords(RegisterType.ONLINE, dateRange, currentBranchId || undefined);
         console.log("Online cash records:", data);
         return data;
       } catch (error) {
@@ -162,8 +162,8 @@ export default function SalesDashboard() {
 
   const fetchCurrentBalance = async (registerType: RegisterType) => {
     try {
-      const balance = await getLatestCashBalance(registerType);
-      console.log(`${registerType} balance:`, balance, "Type:", typeof balance);
+      const balance = await getLatestCashBalance(registerType, currentBranchId || undefined);
+      console.log(`${registerType} balance for branch ${currentBranchId}:`, balance, "Type:", typeof balance);
       
       // تحويل الرصيد إلى رقم بشكل صحيح
       const numericBalance = typeof balance === 'string' ? parseFloat(balance) : Number(balance);
@@ -188,14 +188,15 @@ export default function SalesDashboard() {
       try {
         await fetchCurrentBalance(RegisterType.STORE);
         await fetchCurrentBalance(RegisterType.ONLINE);
-        console.log("Fetched balances:", { storeBalance, onlineBalance });
+        console.log("Fetched balances for branch:", currentBranchId, { storeBalance, onlineBalance });
       } catch (error) {
         console.error("Error loading balances:", error);
       }
     };
     
     loadBalances();
-  }, [dateRange]);
+  }, [dateRange, currentBranchId]);
+  
 
   const storeSalesTotal = storeSales?.reduce((sum, sale) => sum + Number(sale.total), 0) || 0;
   const onlineOrdersTotal = onlineOrders?.reduce((sum, order) => sum + (Number(order.total) - Number(order.shipping_cost || 0)), 0) || 0;

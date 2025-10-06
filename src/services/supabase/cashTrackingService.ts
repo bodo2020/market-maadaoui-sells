@@ -34,7 +34,11 @@ export interface TransferRecord {
 }
 
 
-export async function fetchCashRecords(registerType?: RegisterType, dateRange?: { from: Date, to: Date }) {
+export async function fetchCashRecords(
+  registerType?: RegisterType, 
+  dateRange?: { from: Date, to: Date },
+  branchId?: string
+) {
   let query = supabase
     .from('cash_tracking')
     .select('*')
@@ -44,6 +48,10 @@ export async function fetchCashRecords(registerType?: RegisterType, dateRange?: 
   // Show merged records or all records if no specific type requested
   if (registerType) {
     query = query.eq('register_type', registerType);
+  }
+  
+  if (branchId) {
+    query = query.eq('branch_id', branchId);
   }
   
   if (dateRange?.from && dateRange?.to) {
