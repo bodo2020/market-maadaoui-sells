@@ -151,9 +151,12 @@ export async function getLatestCashBalance(registerType: RegisterType, branchId?
   }
 }
 
-export async function getMergedCashBalance() {
+export async function getMergedCashBalance(branchId?: string) {
   try {
-    const { data, error } = await supabase.rpc('get_merged_cash_balance');
+    const currentBranchId = branchId || localStorage.getItem('currentBranchId');
+    const { data, error } = await supabase.rpc('get_merged_cash_balance', {
+      p_branch_id: currentBranchId
+    });
     if (error) {
       console.error('Error getting merged balance:', error);
       return 0;
@@ -181,7 +184,8 @@ export async function recordCashTransaction(
         p_amount: amount,
         p_transaction_type: transactionType,
         p_notes: notes || '',
-        p_created_by: userId
+        p_created_by: userId,
+        p_branch_id: branchId || null
       });
       
       if (error) {

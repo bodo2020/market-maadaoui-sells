@@ -2976,7 +2976,7 @@ export type Database = {
         Returns: string
       }
       get_merged_cash_balance: {
-        Args: Record<PropertyKey, never>
+        Args: Record<PropertyKey, never> | { p_branch_id?: string }
         Returns: number
       }
       get_next_invoice_number: {
@@ -2996,12 +2996,20 @@ export type Database = {
         Returns: boolean
       }
       record_merged_cash_transaction: {
-        Args: {
-          p_amount: number
-          p_created_by?: string
-          p_notes: string
-          p_transaction_type: string
-        }
+        Args:
+          | {
+              p_amount: number
+              p_branch_id?: string
+              p_created_by?: string
+              p_notes: string
+              p_transaction_type: string
+            }
+          | {
+              p_amount: number
+              p_created_by?: string
+              p_notes: string
+              p_transaction_type: string
+            }
         Returns: number
       }
       sales_summary_by_branch: {
