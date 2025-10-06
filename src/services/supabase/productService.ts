@@ -29,12 +29,12 @@ export async function fetchProducts() {
       return [];
     }
 
-    // Fetch products with their inventory quantities for the current branch
+    // Fetch ALL products with LEFT JOIN to inventory for current branch
     const { data, error } = await supabase
       .from("products")
       .select(`
         *,
-        inventory!inner(quantity, min_stock_level, branch_id)
+        inventory(quantity, min_stock_level, branch_id)
       `)
       .eq('inventory.branch_id', currentBranchId)
       .order("name");
@@ -44,9 +44,12 @@ export async function fetchProducts() {
       throw error;
     }
 
-    // Map the data to include quantity from inventory
+    // Map the data to include quantity from inventory (or 0 if not found)
     const productsWithInventory = (data || []).map(product => {
-      const inventoryData = Array.isArray(product.inventory) ? product.inventory[0] : product.inventory;
+      const inventoryData = Array.isArray(product.inventory) && product.inventory.length > 0 
+        ? product.inventory[0] 
+        : null;
+      
       return {
         ...product,
         quantity: inventoryData?.quantity || 0,
@@ -109,7 +112,7 @@ export async function fetchProductByBarcode(barcode: string) {
     .from("products")
     .select(`
       *,
-      inventory!inner(quantity, min_stock_level, branch_id)
+      inventory(quantity, min_stock_level, branch_id)
     `)
     .eq('inventory.branch_id', currentBranchId)
     .or(`barcode.eq.${barcode},bulk_barcode.eq.${barcode}`)
@@ -127,8 +130,11 @@ export async function fetchProductByBarcode(barcode: string) {
   // Check if the scanned barcode matches the bulk_barcode
   const isBulkBarcode = data.bulk_barcode === barcode;
 
-  // Map inventory data to product
-  const inventoryData = Array.isArray(data.inventory) ? data.inventory[0] : data.inventory;
+  // Map inventory data to product (or use 0 if not found)
+  const inventoryData = Array.isArray(data.inventory) && data.inventory.length > 0
+    ? data.inventory[0] 
+    : null;
+    
   const productWithInventory = {
     ...data,
     quantity: inventoryData?.quantity || 0,
