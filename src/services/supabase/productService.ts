@@ -22,9 +22,21 @@ export async function fetchProducts() {
   console.log("Fetching all products");
   
   try {
+    const currentBranchId = await getCurrentBranchId();
+    
+    if (!currentBranchId) {
+      console.error('No branch ID available');
+      return [];
+    }
+
+    // Fetch products with their inventory quantities for the current branch
     const { data, error } = await supabase
       .from("products")
-      .select("*")
+      .select(`
+        *,
+        inventory!inner(quantity, min_stock_level, branch_id)
+      `)
+      .eq('inventory.branch_id', currentBranchId)
       .order("name");
 
     if (error) {
@@ -32,8 +44,19 @@ export async function fetchProducts() {
       throw error;
     }
 
-    console.log(`Successfully fetched ${data.length} products`);
-    return data as Product[];
+    // Map the data to include quantity from inventory
+    const productsWithInventory = (data || []).map(product => {
+      const inventoryData = Array.isArray(product.inventory) ? product.inventory[0] : product.inventory;
+      return {
+        ...product,
+        quantity: inventoryData?.quantity || 0,
+        min_stock_level: inventoryData?.min_stock_level || 5,
+        inventory: undefined // Remove the nested inventory object
+      };
+    });
+
+    console.log(`Successfully fetched ${productsWithInventory.length} products for branch ${currentBranchId}`);
+    return productsWithInventory as Product[];
   } catch (error) {
     console.error("Error in fetchProducts:", error);
     return [];
@@ -41,6 +64,12 @@ export async function fetchProducts() {
 }
 
 export async function fetchProductById(id: string) {
+  const currentBranchId = await getCurrentBranchId();
+  
+  if (!currentBranchId) {
+    throw new Error('No branch ID available');
+  }
+
   const { data, error } = await supabase
     .from("products")
     .select("*")
@@ -52,15 +81,17 @@ export async function fetchProductById(id: string) {
     throw error;
   }
 
-  // جلب بيانات المخزون للمنتج (الحد الأدنى فقط)
+  // Fetch inventory data for the current branch
   const { data: inventoryData } = await supabase
     .from("inventory")
-    .select("min_stock_level")
+    .select("quantity, min_stock_level")
     .eq("product_id", id)
+    .eq("branch_id", currentBranchId)
     .maybeSingle();
 
   const productWithInventory = {
     ...data,
+    quantity: inventoryData?.quantity || 0,
     min_stock_level: inventoryData?.min_stock_level || 5,
   };
 
@@ -68,9 +99,19 @@ export async function fetchProductById(id: string) {
 }
 
 export async function fetchProductByBarcode(barcode: string) {
+  const currentBranchId = await getCurrentBranchId();
+  
+  if (!currentBranchId) {
+    return { product: null, isBulkBarcode: false };
+  }
+
   const { data, error } = await supabase
     .from("products")
-    .select("*")
+    .select(`
+      *,
+      inventory!inner(quantity, min_stock_level, branch_id)
+    `)
+    .eq('inventory.branch_id', currentBranchId)
     .or(`barcode.eq.${barcode},bulk_barcode.eq.${barcode}`)
     .maybeSingle();
 
@@ -86,8 +127,17 @@ export async function fetchProductByBarcode(barcode: string) {
   // Check if the scanned barcode matches the bulk_barcode
   const isBulkBarcode = data.bulk_barcode === barcode;
 
+  // Map inventory data to product
+  const inventoryData = Array.isArray(data.inventory) ? data.inventory[0] : data.inventory;
+  const productWithInventory = {
+    ...data,
+    quantity: inventoryData?.quantity || 0,
+    min_stock_level: inventoryData?.min_stock_level || 5,
+    inventory: undefined
+  };
+
   return { 
-    product: data as Product, 
+    product: productWithInventory as Product, 
     isBulkBarcode 
   };
 }
