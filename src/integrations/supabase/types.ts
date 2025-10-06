@@ -1562,6 +1562,7 @@ export type Database = {
       product_batches: {
         Row: {
           batch_number: string
+          branch_id: string | null
           created_at: string
           expiry_date: string
           id: string
@@ -1577,6 +1578,7 @@ export type Database = {
         }
         Insert: {
           batch_number: string
+          branch_id?: string | null
           created_at?: string
           expiry_date: string
           id?: string
@@ -1592,6 +1594,7 @@ export type Database = {
         }
         Update: {
           batch_number?: string
+          branch_id?: string | null
           created_at?: string
           expiry_date?: string
           id?: string
@@ -1606,6 +1609,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "product_batches_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "product_batches_product_id_fkey"
             columns: ["product_id"]
@@ -1849,6 +1859,7 @@ export type Database = {
       purchase_items: {
         Row: {
           batch_number: string | null
+          branch_id: string | null
           created_at: string
           expiry_date: string | null
           id: string
@@ -1864,6 +1875,7 @@ export type Database = {
         }
         Insert: {
           batch_number?: string | null
+          branch_id?: string | null
           created_at?: string
           expiry_date?: string | null
           id?: string
@@ -1879,6 +1891,7 @@ export type Database = {
         }
         Update: {
           batch_number?: string | null
+          branch_id?: string | null
           created_at?: string
           expiry_date?: string | null
           id?: string
@@ -1893,6 +1906,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "purchase_items_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "purchase_items_product_id_fkey"
             columns: ["product_id"]

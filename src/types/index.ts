@@ -112,6 +112,7 @@ export interface ProductBatch {
   supplier_id?: string | null;
   notes?: string | null;
   purchase_price?: number;
+  branch_id?: string;
   created_at: string;
   updated_at: string;
   // Optional product data when joined

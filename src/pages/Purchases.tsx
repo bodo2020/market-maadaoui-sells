@@ -16,8 +16,10 @@ import { fetchSuppliers } from "@/services/supabase/supplierService";
 import { Textarea } from "@/components/ui/textarea";
 import { Purchase } from "@/types";
 import PurchaseItemForm from "@/components/purchases/PurchaseItemForm";
+import { useBranchStore } from "@/stores/branchStore";
 
 export default function Purchases() {
+  const { currentBranchId, currentBranchName } = useBranchStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -37,8 +39,8 @@ export default function Purchases() {
   const queryClient = useQueryClient();
   
   const { data: purchases = [], isLoading } = useQuery({
-    queryKey: ["purchases"],
-    queryFn: () => fetchPurchases()
+    queryKey: ["purchases", currentBranchId],
+    queryFn: () => fetchPurchases(currentBranchId || undefined)
   });
   
   const { data: suppliers = [] } = useQuery({
@@ -177,7 +179,7 @@ export default function Purchases() {
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">إدارة المشتريات</h1>
+        <h1 className="text-2xl font-bold">إدارة المشتريات - {currentBranchName || 'جميع الفروع'}</h1>
         <Button onClick={() => setIsAddDialogOpen(true)}>
           <Plus className="ml-2 h-4 w-4" />
           إضافة فاتورة شراء جديدة

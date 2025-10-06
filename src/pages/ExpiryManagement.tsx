@@ -34,9 +34,11 @@ import { fetchProducts } from "@/services/supabase/productService";
 import { ProductBatch } from "@/types";
 import { ExpiryAlertCard } from "@/components/inventory/ExpiryAlertCard";
 import { ExpiredProductActionsDialog } from "@/components/inventory/ExpiredProductActionsDialog";
+import { useBranchStore } from "@/stores/branchStore";
 import * as XLSX from 'exceljs';
 
 export default function ExpiryManagement() {
+  const { currentBranchId, currentBranchName } = useBranchStore();
   const [expiringProducts, setExpiringProducts] = useState<ProductBatch[]>([]);
   const [damagedProducts, setDamagedProducts] = useState<ProductBatch[]>([]);
   const [allBatches, setAllBatches] = useState<ProductBatch[]>([]);
@@ -74,6 +76,7 @@ export default function ExpiryManagement() {
           purchase_date: null,
           supplier_id: null,
           notes: 'من المخزون الرئيسي',
+          branch_id: currentBranchId || undefined,
           created_at: typeof product.created_at === 'string' ? product.created_at : new Date(product.created_at).toISOString(),
           updated_at: (() => {
             const updateTime = product.updated_at || product.created_at;
@@ -93,7 +96,7 @@ export default function ExpiryManagement() {
   const fetchDamagedProducts = async () => {
     try {
       const [damagedBatches, allProducts] = await Promise.all([
-        fetchProductBatches(),
+        fetchProductBatches(undefined, currentBranchId || undefined),
         fetchProducts()
       ]);
       
@@ -115,6 +118,7 @@ export default function ExpiryManagement() {
           purchase_date: null,
           supplier_id: null,
           notes: product.description || 'تالف من المخزون الرئيسي',
+          branch_id: currentBranchId || undefined,
           created_at: typeof product.created_at === 'string' ? product.created_at : new Date(product.created_at).toISOString(),
           updated_at: typeof product.updated_at === 'string' ? product.updated_at : new Date(product.updated_at || product.created_at).toISOString(),
           product_name: product.name,
@@ -141,8 +145,8 @@ export default function ExpiryManagement() {
     try {
       // جلب المنتجات منتهية الصلاحية من جدول product_batches
       const [expiringBatches, allBatches, expiringProducts, damagedProducts] = await Promise.all([
-        getExpiringProducts(7),
-        fetchProductBatches(),
+        getExpiringProducts(7, currentBranchId || undefined),
+        fetchProductBatches(undefined, currentBranchId || undefined),
         getExpiringProductsFromProducts(7), // دالة جديدة لجلب المنتجات من جدول products
         fetchDamagedProducts()
       ]);
@@ -407,7 +411,7 @@ export default function ExpiryManagement() {
           <div className="flex items-center space-x-4 space-x-reverse">
             <Calendar className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-2xl font-bold">إدارة الصلاحيات</h1>
+              <h1 className="text-2xl font-bold">إدارة الصلاحيات - {currentBranchName || 'جميع الفروع'}</h1>
               <p className="text-muted-foreground">
                 تتبع ومراقبة تواريخ انتهاء صلاحية المنتجات
               </p>

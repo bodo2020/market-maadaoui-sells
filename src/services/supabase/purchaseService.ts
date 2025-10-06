@@ -100,7 +100,8 @@ export async function createPurchase(purchaseData: any) {
         batch_number: item.batch_number || null,
         expiry_date: item.expiry_date || null,
         shelf_location: item.shelf_location || null,
-        notes: item.notes || null
+        notes: item.notes || null,
+        branch_id: currentBranchId
       }));
       
       console.log("Formatted purchase items:", purchaseItems);

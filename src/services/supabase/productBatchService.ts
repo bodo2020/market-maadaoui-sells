@@ -1,8 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { ProductBatch } from "@/types";
 
-export async function fetchProductBatches(productId?: string): Promise<ProductBatch[]> {
+export async function fetchProductBatches(productId?: string, branchId?: string): Promise<ProductBatch[]> {
   try {
+    const currentBranchId = branchId || localStorage.getItem('currentBranchId');
+    
     let query = supabase
       .from("product_batches")
       .select(`
@@ -13,6 +15,10 @@ export async function fetchProductBatches(productId?: string): Promise<ProductBa
 
     if (productId) {
       query = query.eq("product_id", productId);
+    }
+
+    if (currentBranchId) {
+      query = query.eq("branch_id", currentBranchId);
     }
 
     const { data, error } = await query;
@@ -31,9 +37,16 @@ export async function fetchProductBatches(productId?: string): Promise<ProductBa
 
 export async function createProductBatch(batch: Omit<ProductBatch, "id" | "created_at" | "updated_at">): Promise<ProductBatch> {
   try {
+    const currentBranchId = localStorage.getItem('currentBranchId');
+    
+    const batchWithBranch: any = {
+      ...batch,
+      branch_id: currentBranchId
+    };
+
     const { data, error } = await supabase
       .from("product_batches")
-      .insert(batch)
+      .insert(batchWithBranch)
       .select()
       .single();
 
@@ -89,12 +102,13 @@ export async function deleteProductBatch(id: string): Promise<boolean> {
   }
 }
 
-export async function getExpiringProducts(daysAhead: number = 7): Promise<ProductBatch[]> {
+export async function getExpiringProducts(daysAhead: number = 7, branchId?: string): Promise<ProductBatch[]> {
   try {
+    const currentBranchId = branchId || localStorage.getItem('currentBranchId');
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + daysAhead);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("product_batches")
       .select(`
         *,
@@ -103,6 +117,12 @@ export async function getExpiringProducts(daysAhead: number = 7): Promise<Produc
       .lte("expiry_date", futureDate.toISOString().split('T')[0])
       .gt("quantity", 0)
       .order("expiry_date", { ascending: true });
+
+    if (currentBranchId) {
+      query = query.eq("branch_id", currentBranchId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching expiring products:", error);
