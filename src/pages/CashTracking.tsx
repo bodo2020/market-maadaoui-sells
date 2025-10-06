@@ -121,13 +121,18 @@ export default function CashTracking() {
         branch_id: currentBranchId
       });
       
+      if (!currentBranchId) {
+        toast.error("يرجى تحديد الفرع أولاً");
+        return;
+      }
+      
       await recordCashTransaction(
         parseFloat(amount),
         'deposit',
         registerType as RegisterType,
         notes || "إيداع نقدي",
         user?.id || '',
-        currentBranchId || undefined
+        currentBranchId
       );
       
       console.log("Cash transaction recorded successfully");
@@ -171,13 +176,18 @@ export default function CashTracking() {
         branch_id: currentBranchId
       });
       
+      if (!currentBranchId) {
+        toast.error("يرجى تحديد الفرع أولاً");
+        return;
+      }
+      
       await recordCashTransaction(
         parseFloat(amount),
         'withdrawal',
         registerType as RegisterType,
         notes || "سحب نقدي",
         user?.id || '',
-        currentBranchId || undefined
+        currentBranchId
       );
       
       console.log("Cash transaction recorded successfully");
@@ -217,13 +227,18 @@ export default function CashTracking() {
     try {
       setProcessingTransaction(true);
       
+      if (!currentBranchId) {
+        toast.error("يرجى تحديد الفرع أولاً");
+        return;
+      }
+      
       await recordCashTransfer(
         parseFloat(amount),
         fromRegister as RegisterType,
         toRegister as RegisterType,
         notes || '',
         user?.id || '',
-        currentBranchId || undefined
+        currentBranchId
       );
 
       toast.success("تم التحويل بنجاح");
