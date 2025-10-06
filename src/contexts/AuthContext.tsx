@@ -9,7 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isAdmin: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, branchCode: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -50,10 +50,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setIsLoading(false);
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, branchCode: string) => {
     try {
       setIsLoading(true);
-      const user = await authenticateUser(username, password);
+      const user = await authenticateUser(username, password, branchCode);
       
       // Create a user object that matches our User interface
       const loggedInUser: User = {
@@ -72,11 +72,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         title: "تم تسجيل الدخول بنجاح",
         description: `مرحبًا ${user.name}`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
       toast({
         title: "خطأ في تسجيل الدخول",
-        description: "اسم المستخدم أو كلمة المرور غير صحيحة",
+        description: error.message || "اسم المستخدم أو كلمة المرور غير صحيحة",
         variant: "destructive",
       });
       throw error;

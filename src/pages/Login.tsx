@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
@@ -7,30 +7,44 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
-import { LogIn, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { LogIn, Eye, EyeOff, AlertTriangle, Store } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Login() {
   // Login state
+  const [branchCode, setBranchCode] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberBranchCode, setRememberBranchCode] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   
   const { login, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Load saved branch code on mount
+  useEffect(() => {
+    const savedBranchCode = localStorage.getItem('savedBranchCode');
+    const shouldRemember = localStorage.getItem('rememberBranchCode') === 'true';
+    
+    if (savedBranchCode && shouldRemember) {
+      setBranchCode(savedBranchCode);
+      setRememberBranchCode(true);
+    }
+  }, []);
   
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
     
-    if (!username || !password) {
-      setLoginError("يرجى إدخال اسم المستخدم وكلمة المرور");
+    if (!branchCode || !username || !password) {
+      setLoginError("يرجى إدخال كود الماركت واسم المستخدم وكلمة المرور");
       toast({
         title: "خطأ",
-        description: "يرجى إدخال اسم المستخدم وكلمة المرور",
+        description: "يرجى إدخال جميع البيانات المطلوبة",
         variant: "destructive"
       });
       return;
@@ -38,11 +52,21 @@ export default function Login() {
     
     try {
       setIsLoading(true);
-      await login(username, password);
+      
+      // Save or clear branch code based on checkbox
+      if (rememberBranchCode) {
+        localStorage.setItem('savedBranchCode', branchCode);
+        localStorage.setItem('rememberBranchCode', 'true');
+      } else {
+        localStorage.removeItem('savedBranchCode');
+        localStorage.removeItem('rememberBranchCode');
+      }
+      
+      await login(username, password, branchCode);
       // We don't need to navigate manually, as the authentication state will trigger the redirect
-    } catch (error) {
+    } catch (error: any) {
       // Show explicit error message
-      setLoginError("اسم المستخدم أو كلمة المرور غير صحيحة");
+      setLoginError(error.message || "حدث خطأ في تسجيل الدخول");
       console.error("Login failed:", error);
     } finally {
       setIsLoading(false);
@@ -78,6 +102,34 @@ export default function Login() {
             
             <form onSubmit={handleLogin}>
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="branchCode">كود الماركت</Label>
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Store className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        id="branchCode" 
+                        placeholder="أدخل كود الماركت" 
+                        value={branchCode} 
+                        onChange={e => setBranchCode(e.target.value)}
+                        className="pr-10"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <Checkbox 
+                        id="rememberBranchCode"
+                        checked={rememberBranchCode}
+                        onCheckedChange={(checked) => setRememberBranchCode(checked as boolean)}
+                      />
+                      <label
+                        htmlFor="rememberBranchCode"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        تذكر كود الماركت
+                      </label>
+                    </div>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="username">اسم المستخدم</Label>
                   <Input 

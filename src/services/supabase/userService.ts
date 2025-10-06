@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { User, UserRole, Shift } from "@/types";
+import { useBranchStore } from "@/stores/branchStore";
 import * as ExcelJS from 'exceljs';
 import * as FileSaver from 'file-saver';
 
@@ -67,9 +68,25 @@ export async function fetchUserById(id: string) {
   }
 }
 
-export async function authenticateUser(username: string, password: string) {
+export async function authenticateUser(username: string, password: string, branchCode: string) {
   try {
+    // Check for hardcoded admin (special case without branch)
     if (username === 'admin' && password === 'admin') {
+      // For admin, get the first active branch as default
+      const { data: firstBranch } = await supabase
+        .from("branches")
+        .select("id, name")
+        .eq("active", true)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .single();
+      
+      if (firstBranch) {
+        useBranchStore.getState().setBranch(firstBranch.id, firstBranch.name);
+        localStorage.setItem('currentBranchId', firstBranch.id);
+        localStorage.setItem('currentBranchName', firstBranch.name);
+      }
+      
       return {
         id: '1',
         name: 'مدير النظام',
@@ -83,6 +100,23 @@ export async function authenticateUser(username: string, password: string) {
       } as User;
     }
 
+    // Verify branch code first
+    const { data: branch, error: branchError } = await supabase
+      .from("branches")
+      .select("id, name, active, code")
+      .eq("code", branchCode)
+      .maybeSingle();
+
+    if (branchError || !branch) {
+      console.error("Branch not found:", branchError);
+      throw new Error("كود الماركت غير صحيح");
+    }
+
+    if (!branch.active) {
+      throw new Error("هذا الفرع غير نشط حالياً");
+    }
+
+    // Authenticate user
     const { data, error } = await supabase
       .from("users")
       .select("*")
@@ -91,19 +125,40 @@ export async function authenticateUser(username: string, password: string) {
 
     if (error) {
       console.error("Authentication error:", error);
-      throw new Error("Invalid username or password");
+      throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة");
     }
 
     if (!data) {
       console.error("User not found");
-      throw new Error("Invalid username or password");
+      throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة");
     }
 
     if (data.password !== password) {
       console.error("Password mismatch");
-      throw new Error("Invalid username or password");
+      throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة");
     }
 
+    // Check if user has access to this branch
+    const { data: userBranchRole, error: roleError } = await supabase
+      .from("user_branch_roles")
+      .select("*")
+      .eq("user_id", data.id)
+      .eq("branch_id", branch.id)
+      .maybeSingle();
+
+    // Allow super_admin and admin to access any branch
+    const isAdmin = data.role === 'super_admin' || data.role === 'admin';
+    
+    if (!isAdmin && !userBranchRole) {
+      throw new Error("ليس لديك صلاحية للدخول لهذا الفرع");
+    }
+
+    // Set the branch in the store
+    useBranchStore.getState().setBranch(branch.id, branch.name);
+    localStorage.setItem('currentBranchId', branch.id);
+    localStorage.setItem('currentBranchName', branch.name);
+
+    // Get user shifts
     const { data: shifts, error: shiftsError } = await supabase
       .from("shifts")
       .select("*")
@@ -115,9 +170,9 @@ export async function authenticateUser(username: string, password: string) {
     }
 
     return { ...data, shifts: shifts || [] } as User;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Authentication error:", error);
-    throw new Error("Invalid username or password");
+    throw error;
   }
 }
 
