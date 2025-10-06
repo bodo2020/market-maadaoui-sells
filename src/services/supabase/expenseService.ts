@@ -1,11 +1,19 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Expense } from "@/types";
 
-export async function fetchExpenses() {
-  const { data, error } = await supabase
+export async function fetchExpenses(branchId?: string) {
+  const currentBranchId = branchId || localStorage.getItem('currentBranchId');
+  
+  let query = supabase
     .from("expenses")
-    .select("*")
-    .order("date", { ascending: false });
+    .select("*");
+  
+  // Filter by branch if branchId is available
+  if (currentBranchId) {
+    query = query.eq('branch_id', currentBranchId);
+  }
+  
+  const { data, error } = await query.order("date", { ascending: false });
 
   if (error) {
     console.error("Error fetching expenses:", error);
@@ -32,6 +40,8 @@ export async function fetchExpenseById(id: string) {
 
 export async function createExpense(expense: Omit<Expense, "id" | "created_at" | "updated_at">) {
   try {
+    const currentBranchId = localStorage.getItem('currentBranchId');
+    
     // First deduct from cash register
     const { error: deductionError } = await supabase.functions.invoke(
       'add-cash-transaction',
@@ -40,7 +50,8 @@ export async function createExpense(expense: Omit<Expense, "id" | "created_at" |
           amount: expense.amount,
           transaction_type: 'withdrawal',
           register_type: 'store',
-          notes: `مصروف: ${expense.type} - ${expense.description}`
+          notes: `مصروف: ${expense.type} - ${expense.description}`,
+          branch_id: currentBranchId
         }
       }
     );
@@ -63,6 +74,7 @@ export async function createExpense(expense: Omit<Expense, "id" | "created_at" |
         description: expense.description,
         date: formattedDate,
         receipt_url: expense.receipt_url || null,
+        branch_id: currentBranchId
       }])
       .select();
 

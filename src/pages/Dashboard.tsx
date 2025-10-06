@@ -68,17 +68,28 @@ export default function Dashboard() {
   
   const { data: sales, isLoading: salesLoading } = useQuery({
     queryKey: ['sales'],
-    queryFn: () => fetchSales()
+    queryFn: async () => {
+      const currentBranchId = localStorage.getItem('currentBranchId');
+      return fetchSales();
+    }
   });
 
   const { data: onlineOrders, isLoading: onlineOrdersLoading } = useQuery({
     queryKey: ['onlineOrders'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const currentBranchId = localStorage.getItem('currentBranchId');
+      
+      let query = supabase
         .from('online_orders')
         .select('id, total, created_at, status, payment_status')
         .eq('status', 'delivered')
         .eq('payment_status', 'paid');
+      
+      if (currentBranchId) {
+        query = query.eq('branch_id', currentBranchId);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       return data || [];

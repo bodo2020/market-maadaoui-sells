@@ -42,14 +42,14 @@ const Invoices = () => {
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 
-  // Fetch all purchases
+  // Fetch all purchases (will be filtered by branch in fetchPurchases)
   const { 
     data: purchases, 
     isLoading: purchasesLoading, 
     isError: purchasesError 
   } = useQuery({
     queryKey: ['purchases'],
-    queryFn: fetchPurchases
+    queryFn: () => fetchPurchases()
   });
 
   // Filter by search query and date

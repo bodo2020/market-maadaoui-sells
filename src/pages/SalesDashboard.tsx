@@ -62,13 +62,20 @@ export default function SalesDashboard() {
   const { data: storeSales = [], isLoading: isStoreSalesLoading, refetch: refetchStoreSales } = useQuery({
     queryKey: ['sales', dateRange],
     queryFn: async () => {
-      console.log("Fetching store sales data for date range:", dateRange);
-      const { data, error } = await supabase
+      const currentBranchId = localStorage.getItem('currentBranchId');
+      console.log("Fetching store sales data for date range:", dateRange, "Branch:", currentBranchId);
+      
+      let query = supabase
         .from('sales')
         .select('*')
         .gte('date', dateRange.from.toISOString())
-        .lte('date', dateRange.to.toISOString())
-        .order('date', { ascending: false });
+        .lte('date', dateRange.to.toISOString());
+      
+      if (currentBranchId) {
+        query = query.eq('branch_id', currentBranchId);
+      }
+      
+      const { data, error } = await query.order('date', { ascending: false });
         
       if (error) {
         console.error("Error fetching sales data:", error);
@@ -94,14 +101,21 @@ export default function SalesDashboard() {
   const { data: onlineOrders = [], isLoading: isOnlineOrdersLoading, refetch: refetchOnlineOrders } = useQuery({
     queryKey: ['onlineOrders', dateRange],
     queryFn: async () => {
-      console.log("Fetching online orders data for date range:", dateRange);
-      const { data, error } = await supabase
+      const currentBranchId = localStorage.getItem('currentBranchId');
+      console.log("Fetching online orders data for date range:", dateRange, "Branch:", currentBranchId);
+      
+      let query = supabase
         .from('online_orders')
         .select('*')
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString())
-        .eq('payment_status', 'paid')
-        .order('created_at', { ascending: false });
+        .eq('payment_status', 'paid');
+      
+      if (currentBranchId) {
+        query = query.eq('branch_id', currentBranchId);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
         
       if (error) {
         console.error("Error fetching online orders data:", error);

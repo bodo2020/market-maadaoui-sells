@@ -95,10 +95,10 @@ export default function ExpenseManagement() {
   
   const queryClient = useQueryClient();
   
-  // Fetch expenses
+  // Fetch expenses (will be filtered by branch in fetchExpenses)
   const { data: expenses, isLoading, error } = useQuery({
     queryKey: ['expenses'],
-    queryFn: fetchExpenses
+    queryFn: () => fetchExpenses()
   });
   
   // Create expense mutation

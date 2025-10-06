@@ -2,12 +2,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Purchase } from "@/types";
 
-export async function fetchPurchases() {
+export async function fetchPurchases(branchId?: string) {
   try {
-    const { data, error } = await supabase
+    const currentBranchId = branchId || localStorage.getItem('currentBranchId');
+    
+    let query = supabase
       .from("purchases")
-      .select("*, suppliers(name)")
-      .order("date", { ascending: false });
+      .select("*, suppliers(name)");
+    
+    // Filter by branch if branchId is available
+    if (currentBranchId) {
+      query = query.eq('branch_id', currentBranchId);
+    }
+    
+    const { data, error } = await query.order("date", { ascending: false });
 
     if (error) {
       console.error("Error fetching purchases:", error);
@@ -25,6 +33,8 @@ export async function fetchPurchases() {
 
 export async function createPurchase(purchaseData: any) {
   try {
+    const currentBranchId = purchaseData.branch_id || localStorage.getItem('currentBranchId');
+    
     // Generate invoice number if not provided
     if (!purchaseData.invoice_number) {
       const date = new Date();
@@ -56,7 +66,7 @@ export async function createPurchase(purchaseData: any) {
       }
     }
 
-    // First, create the purchase record
+    // First, create the purchase record with branch_id
     const { data: purchase, error: purchaseError } = await supabase
       .from("purchases")
       .insert({
@@ -65,7 +75,8 @@ export async function createPurchase(purchaseData: any) {
         date: purchaseData.date,
         total: purchaseData.total,
         paid: purchaseData.paid,
-        description: purchaseData.description
+        description: purchaseData.description,
+        branch_id: currentBranchId
       })
       .select()
       .single();
@@ -108,12 +119,12 @@ export async function createPurchase(purchaseData: any) {
         console.log("Successfully inserted purchase items:", insertedItems);
       }
 
-      // Update product quantities and purchase prices
+      // Update inventory for the current branch
       for (const item of purchaseData.items) {
         // Get current product
         const { data: product, error: productError } = await supabase
           .from("products")
-          .select("quantity, purchase_price, price")
+          .select("purchase_price, price")
           .eq("id", item.product_id)
           .single();
 
@@ -122,27 +133,53 @@ export async function createPurchase(purchaseData: any) {
           continue;
         }
 
-        // Update product quantity and purchase price
-        const newQuantity = (product.quantity || 0) + item.quantity;
-        const updateData: any = { quantity: newQuantity };
+        // Update product purchase_price if different
+        const productUpdateData: any = {};
         
         // Update purchase price if it's different from current price
         if (item.price !== product.purchase_price) {
-          updateData.purchase_price = item.price;
+          productUpdateData.purchase_price = item.price;
         }
         
         // Update sale price if provided
         if (item.sale_price && item.sale_price !== product.price) {
-          updateData.price = item.sale_price;
+          productUpdateData.price = item.sale_price;
         }
         
-        const { error: updateError } = await supabase
-          .from("products")
-          .update(updateData)
-          .eq("id", item.product_id);
+        if (Object.keys(productUpdateData).length > 0) {
+          const { error: productUpdateError } = await supabase
+            .from("products")
+            .update(productUpdateData)
+            .eq("id", item.product_id);
 
-        if (updateError) {
-          console.error(`Error updating product ${item.product_id}:`, updateError);
+          if (productUpdateError) {
+            console.error(`Error updating product ${item.product_id}:`, productUpdateError);
+          }
+        }
+
+        // Update inventory quantity for the current branch
+        const { data: inventoryData, error: fetchInventoryError } = await supabase
+          .from('inventory')
+          .select('quantity')
+          .eq('product_id', item.product_id)
+          .eq('branch_id', currentBranchId)
+          .single();
+
+        if (fetchInventoryError) {
+          console.error(`Error fetching inventory for product ${item.product_id}:`, fetchInventoryError);
+          continue;
+        }
+
+        const newQuantity = (inventoryData?.quantity || 0) + item.quantity;
+        
+        const { error: inventoryError } = await supabase
+          .from('inventory')
+          .update({ quantity: newQuantity })
+          .eq('product_id', item.product_id)
+          .eq('branch_id', currentBranchId);
+
+        if (inventoryError) {
+          console.error(`Error updating inventory for product ${item.product_id}:`, inventoryError);
         }
       }
     }

@@ -35,7 +35,10 @@ export default function Finance() {
     error: summaryError
   } = useQuery({
     queryKey: ['financialSummary', period, startDate, endDate],
-    queryFn: () => fetchFinancialSummary(period, startDate, endDate),
+    queryFn: () => {
+      const currentBranchId = localStorage.getItem('currentBranchId');
+      return fetchFinancialSummary(period, startDate, endDate, currentBranchId || undefined);
+    },
     meta: {
       onError: (error: Error) => {
         console.error("Error fetching financial summary:", error);
@@ -51,7 +54,10 @@ export default function Finance() {
     error: profitsError
   } = useQuery({
     queryKey: ['profitsSummary', period, startDate, endDate],
-    queryFn: () => fetchProfitsSummary(period, startDate, endDate),
+    queryFn: () => {
+      const currentBranchId = localStorage.getItem('currentBranchId');
+      return fetchProfitsSummary(period, startDate, endDate, currentBranchId || undefined);
+    },
     meta: {
       onError: (error: Error) => {
         console.error("Error fetching profits summary:", error);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, BellDot, User, LogOut, X, Check, Store } from "lucide-react";
+import { Bell, BellDot, User, LogOut, X, Check, Store, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   getNotifications, 
   markNotificationAsRead, 
@@ -25,17 +26,44 @@ import {
 import { toast } from "@/components/ui/sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+interface Branch {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
 export default function Navbar() {
   const { user, logout } = useAuth();
-  const { currentBranchName } = useBranchStore();
+  const { currentBranchId, currentBranchName, setBranch } = useBranchStore();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<StockNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
 
   // Load notifications on mount and when notifications change
   const loadNotifications = () => {
     setNotifications(getNotifications());
   };
+
+  // Load branches for admins
+  useEffect(() => {
+    const loadBranches = async () => {
+      if (user?.role === 'admin' || user?.role === 'super_admin') {
+        const { data, error } = await supabase
+          .from('branches')
+          .select('id, name, active')
+          .eq('active', true)
+          .order('name');
+        
+        if (!error && data) {
+          setBranches(data);
+        }
+      }
+    };
+    
+    loadBranches();
+  }, [user]);
 
   // Load notifications on mount and periodically check for low stock
   useEffect(() => {
@@ -83,6 +111,16 @@ export default function Navbar() {
     loadNotifications();
   };
 
+  const handleBranchChange = (branchId: string, branchName: string) => {
+    setBranch(branchId, branchName);
+    localStorage.setItem('currentBranchId', branchId);
+    localStorage.setItem('currentBranchName', branchName);
+    setBranchDropdownOpen(false);
+    
+    // Reload the page to refresh all data with the new branch
+    window.location.reload();
+  };
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
@@ -92,12 +130,39 @@ export default function Navbar() {
       </div>
       
       <div className="flex items-center gap-4">
-        {currentBranchName && (
+        {(user?.role === 'admin' || user?.role === 'super_admin') && branches.length > 1 ? (
+          <DropdownMenu open={branchDropdownOpen} onOpenChange={setBranchDropdownOpen}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2 px-3 py-1.5">
+                <Store className="h-4 w-4" />
+                <span className="font-medium">{currentBranchName || 'اختر الفرع'}</span>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>الفروع المتاحة</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {branches.map((branch) => (
+                <DropdownMenuItem
+                  key={branch.id}
+                  onClick={() => handleBranchChange(branch.id, branch.name)}
+                  className={currentBranchId === branch.id ? 'bg-accent' : ''}
+                >
+                  <Store className="ml-2 h-4 w-4" />
+                  <span>{branch.name}</span>
+                  {currentBranchId === branch.id && (
+                    <Check className="mr-auto h-4 w-4" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : currentBranchName ? (
           <Badge variant="outline" className="gap-2 px-3 py-1.5">
             <Store className="h-4 w-4" />
             <span className="font-medium">{currentBranchName}</span>
           </Badge>
-        )}
+        ) : null}
         
         {(user?.role === 'admin' || user?.role === 'super_admin') && (
           <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>

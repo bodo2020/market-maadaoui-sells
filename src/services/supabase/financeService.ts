@@ -102,25 +102,33 @@ const getDateRange = (period: PeriodType, startDate?: Date, endDate?: Date) => {
 export const fetchFinancialSummary = async (
   period: PeriodType = "month",
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  branchId?: string
 ): Promise<FinancialSummaryData> => {
   try {
-    console.log(`Fetching financial summary for period: ${period}`);
+    const currentBranchId = branchId || localStorage.getItem('currentBranchId');
+    console.log(`Fetching financial summary for period: ${period}, Branch: ${currentBranchId}`);
     
     const dateRange = getDateRange(period, startDate, endDate);
     console.log("Date range:", dateRange);
     
-    // Get total sales revenue
-    const { data: salesData, error: salesError } = await supabase
+    // Get total sales revenue (filtered by branch)
+    let salesQuery = supabase
       .from("sales")
       .select("total")
       .gte("date", dateRange.start.toISOString())
       .lte("date", dateRange.end.toISOString());
     
+    if (currentBranchId) {
+      salesQuery = salesQuery.eq("branch_id", currentBranchId);
+    }
+    
+    const { data: salesData, error: salesError } = await salesQuery;
+    
     if (salesError) throw salesError;
     
-    // Get total online sales revenue
-    const { data: onlineOrdersData, error: onlineOrdersError } = await supabase
+    // Get total online sales revenue (filtered by branch)
+    let onlineQuery = supabase
       .from("online_orders")
       .select("total")
       .eq("status", "delivered")
@@ -128,14 +136,26 @@ export const fetchFinancialSummary = async (
       .gte("created_at", dateRange.start.toISOString())
       .lte("created_at", dateRange.end.toISOString());
     
+    if (currentBranchId) {
+      onlineQuery = onlineQuery.eq("branch_id", currentBranchId);
+    }
+    
+    const { data: onlineOrdersData, error: onlineOrdersError } = await onlineQuery;
+    
     if (onlineOrdersError) throw onlineOrdersError;
     
-    // Get total expenses
-    const { data: expensesData, error: expensesError } = await supabase
+    // Get total expenses (filtered by branch)
+    let expensesQuery = supabase
       .from("expenses")
       .select("amount")
       .gte("date", dateRange.start.toISOString())
       .lte("date", dateRange.end.toISOString());
+    
+    if (currentBranchId) {
+      expensesQuery = expensesQuery.eq("branch_id", currentBranchId);
+    }
+    
+    const { data: expensesData, error: expensesError } = await expensesQuery;
     
     if (expensesError) throw expensesError;
 
@@ -218,31 +238,45 @@ export const fetchFinancialSummary = async (
 export const fetchProfitsSummary = async (
   period: PeriodType = "month",
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  branchId?: string
 ): Promise<ProfitData> => {
   try {
-    console.log(`Fetching profits summary for period: ${period}`);
+    const currentBranchId = branchId || localStorage.getItem('currentBranchId');
+    console.log(`Fetching profits summary for period: ${period}, Branch: ${currentBranchId}`);
     
     const dateRange = getDateRange(period, startDate, endDate);
     console.log("Date range:", dateRange);
     
-    // Get store sales profits
-    const { data: storeData, error: storeError } = await supabase
+    // Get store sales profits (filtered by branch)
+    let storeSalesQuery = supabase
       .from("sales")
       .select("profit")
       .gte("date", dateRange.start.toISOString())
       .lte("date", dateRange.end.toISOString());
     
+    if (currentBranchId) {
+      storeSalesQuery = storeSalesQuery.eq("branch_id", currentBranchId);
+    }
+    
+    const { data: storeData, error: storeError } = await storeSalesQuery;
+    
     if (storeError) throw storeError;
     
-    // Get online orders
-    const { data: onlineOrdersData, error: onlineOrdersError } = await supabase
+    // Get online orders (filtered by branch)
+    let onlineOrdersQuery = supabase
       .from("online_orders")
       .select("id, total, items")
       .eq("status", "delivered")
       .eq("payment_status", "paid")
       .gte("created_at", dateRange.start.toISOString())
       .lte("created_at", dateRange.end.toISOString());
+    
+    if (currentBranchId) {
+      onlineOrdersQuery = onlineOrdersQuery.eq("branch_id", currentBranchId);
+    }
+    
+    const { data: onlineOrdersData, error: onlineOrdersError } = await onlineOrdersQuery;
     
     if (onlineOrdersError) throw onlineOrdersError;
 
