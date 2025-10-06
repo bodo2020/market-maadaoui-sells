@@ -16,8 +16,10 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useBranchStore } from '@/stores/branchStore';
 
 const Invoices = () => {
+  const { currentBranchId, currentBranchName } = useBranchStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
@@ -37,8 +39,8 @@ const Invoices = () => {
     isError: salesError, 
     refetch: refetchSales 
   } = useQuery({
-    queryKey: ['sales', page],
-    queryFn: () => fetchSales(undefined, undefined, itemsPerPage, page * itemsPerPage),
+    queryKey: ['sales', page, currentBranchId],
+    queryFn: () => fetchSales(currentBranchId || undefined, undefined, undefined, itemsPerPage, page * itemsPerPage),
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 
@@ -48,8 +50,8 @@ const Invoices = () => {
     isLoading: purchasesLoading, 
     isError: purchasesError 
   } = useQuery({
-    queryKey: ['purchases'],
-    queryFn: () => fetchPurchases()
+    queryKey: ['purchases', currentBranchId],
+    queryFn: () => fetchPurchases(currentBranchId || undefined)
   });
 
   // Filter by search query and date
@@ -177,7 +179,7 @@ const Invoices = () => {
     <MainLayout>
       <div className="container mx-auto py-6 space-y-6 pb-20">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">إدارة الفواتير</h1>
+          <h1 className="text-3xl font-bold">إدارة الفواتير - {currentBranchName || 'جميع الفروع'}</h1>
         </div>
 
         <Tabs defaultValue="sales" value={invoiceType} onValueChange={(value) => handleInvoiceTypeChange(value as 'sales' | 'purchases')} className="w-full">

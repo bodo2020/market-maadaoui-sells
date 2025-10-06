@@ -99,7 +99,7 @@ export default function Reports() {
   
   const { data: sales, isLoading: salesLoading } = useQuery({
     queryKey: ['sales', startDate, endDate],
-    queryFn: () => fetchSales(startDate, endDate)
+    queryFn: () => fetchSales(undefined, startDate, endDate)
   });
 
   const { data: products, isLoading: productsLoading } = useQuery({

@@ -118,12 +118,16 @@ export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated
   }
 }
 
-export async function fetchSales(startDate?: Date, endDate?: Date, limit: number = 100, offset: number = 0): Promise<Sale[]> {
+export async function fetchSales(branchId?: string, startDate?: Date, endDate?: Date, limit: number = 100, offset: number = 0): Promise<Sale[]> {
   let query = supabase
     .from("sales")
     .select("*", { count: 'exact' })
     .order("date", { ascending: false })
     .range(offset, offset + limit - 1);
+  
+  if (branchId) {
+    query = query.eq("branch_id", branchId);
+  }
   
   if (startDate && endDate) {
     const start = new Date(startDate);
