@@ -42,6 +42,9 @@ export default function Analytics() {
     try {
       toast.loading("جاري تحليل البيانات بالذكاء الاصطناعي...");
       
+      // Get current branch ID
+      const currentBranchId = localStorage.getItem("currentBranchId");
+      
       // Fetch relevant data based on active tab
       const dateRange = getDateRangeFromPeriod(selectedPeriod);
       let analyticsData: any = {};
@@ -51,7 +54,8 @@ export default function Analytics() {
         // Fetch comprehensive product analytics data
         const { data: sales } = await supabase
           .from('sales')
-          .select('items, total, profit, date, created_at')
+          .select('items, total, profit, date, created_at, branch_id')
+          .eq('branch_id', currentBranchId)
           .gte('date', dateRange.from?.toISOString())
           .lte('date', dateRange.to?.toISOString())
           .order('date', { ascending: false });
@@ -62,7 +66,8 @@ export default function Analytics() {
         
         const { data: inventory } = await supabase
           .from('inventory')
-          .select('product_id, quantity');
+          .select('product_id, quantity, branch_id')
+          .eq('branch_id', currentBranchId);
         
         analyticsData = { sales, products, inventory, period: selectedPeriod };
         analysisType = 'products';
@@ -74,14 +79,16 @@ export default function Analytics() {
         
         const { data: orders } = await supabase
           .from('online_orders')
-          .select('customer_id, total, items, created_at, status')
+          .select('customer_id, total, items, created_at, status, branch_id')
+          .eq('branch_id', currentBranchId)
           .gte('created_at', dateRange.from?.toISOString())
           .lte('created_at', dateRange.to?.toISOString())
           .order('created_at', { ascending: false });
         
         const { data: sales } = await supabase
           .from('sales')
-          .select('items, total, date, customer_id')
+          .select('items, total, date, customer_id, branch_id')
+          .eq('branch_id', currentBranchId)
           .gte('date', dateRange.from?.toISOString())
           .lte('date', dateRange.to?.toISOString());
         
@@ -91,21 +98,24 @@ export default function Analytics() {
         // Fetch comprehensive revenue data
         const { data: sales } = await supabase
           .from('sales')
-          .select('total, profit, date, items, payment_method')
+          .select('total, profit, date, items, payment_method, branch_id')
+          .eq('branch_id', currentBranchId)
           .gte('date', dateRange.from?.toISOString())
           .lte('date', dateRange.to?.toISOString())
           .order('date', { ascending: false });
         
         const { data: expenses } = await supabase
           .from('expenses')
-          .select('amount, type, date, description')
+          .select('amount, type, date, description, branch_id')
+          .eq('branch_id', currentBranchId)
           .gte('date', dateRange.from?.toISOString())
           .lte('date', dateRange.to?.toISOString())
           .order('date', { ascending: false });
         
         const { data: onlineOrders } = await supabase
           .from('online_orders')
-          .select('total, created_at, payment_method')
+          .select('total, created_at, payment_method, branch_id')
+          .eq('branch_id', currentBranchId)
           .gte('created_at', dateRange.from?.toISOString())
           .lte('created_at', dateRange.to?.toISOString());
         
@@ -115,14 +125,16 @@ export default function Analytics() {
         // Fetch comprehensive expense data
         const { data: expenses } = await supabase
           .from('expenses')
-          .select('amount, type, date, description')
+          .select('amount, type, date, description, branch_id')
+          .eq('branch_id', currentBranchId)
           .gte('date', dateRange.from?.toISOString())
           .lte('date', dateRange.to?.toISOString())
           .order('amount', { ascending: false });
         
         const { data: sales } = await supabase
           .from('sales')
-          .select('total, profit, date')
+          .select('total, profit, date, branch_id')
+          .eq('branch_id', currentBranchId)
           .gte('date', dateRange.from?.toISOString())
           .lte('date', dateRange.to?.toISOString());
         

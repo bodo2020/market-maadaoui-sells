@@ -3,17 +3,22 @@ import { supabase } from "@/integrations/supabase/client";
 // جلب تحليلات مبيعات المنتجات مع الربح الحقيقي
 export async function fetchProductSalesAnalytics() {
   try {
+    // Get current branch ID
+    const currentBranchId = localStorage.getItem("currentBranchId");
+    
     // جلب المبيعات من المتجر مع بيانات الربح
     const { data: salesData, error: salesError } = await supabase
       .from("sales")
-      .select("items, profit");
+      .select("items, profit, branch_id")
+      .eq("branch_id", currentBranchId);
 
     if (salesError) throw salesError;
 
     // جلب الطلبات الإلكترونية
     const { data: ordersData, error: ordersError } = await supabase
       .from("online_orders")
-      .select("items");
+      .select("items, branch_id")
+      .eq("branch_id", currentBranchId);
 
     if (ordersError) throw ordersError;
 
@@ -111,16 +116,21 @@ export async function fetchProductSalesAnalytics() {
 // جلب تحليلات مبيعات الفئات
 export async function fetchCategorySalesAnalytics() {
   try {
+    // Get current branch ID
+    const currentBranchId = localStorage.getItem("currentBranchId");
+    
     // جلب المبيعات والطلبات
     const { data: salesData, error: salesError } = await supabase
       .from("sales")
-      .select("items");
+      .select("items, branch_id")
+      .eq("branch_id", currentBranchId);
 
     if (salesError) throw salesError;
 
     const { data: ordersData, error: ordersError } = await supabase
       .from("online_orders")
-      .select("items");
+      .select("items, branch_id")
+      .eq("branch_id", currentBranchId);
 
     if (ordersError) throw ordersError;
 
@@ -215,10 +225,14 @@ export async function fetchCategorySalesAnalytics() {
 // جلب بيانات ساعات العمل للطلبات الأونلاين
 export async function fetchOnlineOrdersHeatmapData() {
   try {
+    // Get current branch ID
+    const currentBranchId = localStorage.getItem("currentBranchId");
+    
     // جلب الطلبات الإلكترونية فقط
     const { data: ordersData, error: ordersError } = await supabase
       .from("online_orders")
-      .select("created_at")
+      .select("created_at, branch_id")
+      .eq("branch_id", currentBranchId)
       .not("created_at", "is", null);
 
     if (ordersError) {
@@ -271,10 +285,14 @@ export async function fetchOnlineOrdersHeatmapData() {
 // جلب بيانات ساعات العمل لمبيعات الكاشير
 export async function fetchPOSSalesHeatmapData() {
   try {
+    // Get current branch ID
+    const currentBranchId = localStorage.getItem("currentBranchId");
+    
     // جلب المبيعات من الكاشير فقط
     const { data: salesData, error: salesError } = await supabase
       .from("sales")
-      .select("date")
+      .select("date, branch_id")
+      .eq("branch_id", currentBranchId)
       .not("date", "is", null);
 
     if (salesError) {
@@ -327,10 +345,14 @@ export async function fetchPOSSalesHeatmapData() {
 // Product sales analytics
 export const getProductSalesAnalytics = async (productId: string) => {
   try {
+    // Get current branch ID
+    const currentBranchId = localStorage.getItem("currentBranchId");
+    
     // جلب مبيعات المتجر التي تحتوي على هذا المنتج
     const { data: salesData, error: salesError } = await supabase
       .from("sales")
-      .select("items, profit, total, date")
+      .select("items, profit, total, date, branch_id")
+      .eq("branch_id", currentBranchId)
       .not('items', 'is', null);
 
     if (salesError) throw salesError;
@@ -338,7 +360,8 @@ export const getProductSalesAnalytics = async (productId: string) => {
     // جلب الطلبات الإلكترونية التي تحتوي على هذا المنتج
     const { data: ordersData, error: ordersError } = await supabase
       .from("online_orders")
-      .select("items, total, created_at, customer_id")
+      .select("items, total, created_at, customer_id, branch_id")
+      .eq("branch_id", currentBranchId)
       .not('items', 'is', null);
 
     if (ordersError) throw ordersError;
