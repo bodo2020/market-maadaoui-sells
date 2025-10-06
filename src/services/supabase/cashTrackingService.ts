@@ -278,7 +278,7 @@ export async function getLatestCashBalanceFromTracking(registerType: RegisterTyp
 }
 
 // سحب ذكي: يسحب من خزنة المحل أولاً ثم يكمل من خزنة الأونلاين عند الحاجة
-export async function recordSmartWithdrawal(amount: number, notes: string, userId: string | null) {
+export async function recordSmartWithdrawal(amount: number, notes: string, userId: string | null, branchId?: string) {
   if (amount <= 0) throw new Error('المبلغ غير صالح');
 
   const storeBalance = await getLatestCashBalanceFromTracking(RegisterType.STORE);
@@ -289,7 +289,7 @@ export async function recordSmartWithdrawal(amount: number, notes: string, userI
       p_register_type: 'store',
       p_notes: notes || '',
       p_created_by: userId,
-      p_branch_id: null
+      p_branch_id: branchId || null
     });
     if (error) throw error;
     return true;
@@ -307,7 +307,7 @@ export async function recordSmartWithdrawal(amount: number, notes: string, userI
       p_register_type: 'store',
       p_notes: notes ? `${notes} (من خزنة المحل)` : '(من خزنة المحل)',
       p_created_by: userId,
-      p_branch_id: null
+      p_branch_id: branchId || null
     });
     if (err1) throw err1;
   }
@@ -319,7 +319,7 @@ export async function recordSmartWithdrawal(amount: number, notes: string, userI
       p_register_type: 'online',
       p_notes: notes ? `${notes} (تكملة من الأونلاين)` : '(تكملة من الأونلاين)',
       p_created_by: userId,
-      p_branch_id: null
+      p_branch_id: branchId || null
     });
     if (err2) throw err2;
     return true;

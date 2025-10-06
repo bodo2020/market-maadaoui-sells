@@ -30,6 +30,8 @@ import { CreateReturnDialog } from "@/components/returns/CreateReturnDialog";
 import { AddProductToReturnDialog } from "@/components/returns/AddProductToReturnDialog";
 import { InvoiceBasedReturnDialog } from "@/components/returns/InvoiceBasedReturnDialog";
 import { updateProductQuantity } from "@/services/supabase/productService";
+import { recordCashTransaction, RegisterType } from "@/services/supabase/cashTrackingService";
+import { useBranchStore } from "@/stores/branchStore";
 
 // Types
 interface ReturnItem {
@@ -55,6 +57,7 @@ interface Return {
 }
 
 export default function Returns() {
+  const { currentBranchId } = useBranchStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedReturn, setSelectedReturn] = useState<Return | null>(null);
@@ -207,17 +210,14 @@ export default function Returns() {
       
       // إضافة معاملة نقدية لخصم مبلغ الإرجاع من الخزنة
       try {
-        const { error: cashError } = await supabase.rpc('add_cash_transaction', {
-          p_amount: returnData.total_amount,
-          p_transaction_type: 'withdrawal',
-          p_register_type: 'store',
-          p_notes: `إرجاع طلب رقم ${returnData.id}`
-        });
-
-        if (cashError) {
-          console.error('Error adding cash transaction:', cashError);
-          toast.error('تم قبول الإرجاع وتحديث المخزون لكن فشل تسجيل المعاملة النقدية');
-        }
+        await recordCashTransaction(
+          returnData.total_amount,
+          'withdrawal',
+          RegisterType.STORE,
+          `إرجاع طلب رقم ${returnData.id}`,
+          null,
+          currentBranchId || undefined
+        );
       } catch (error) {
         console.error('Error processing cash transaction:', error);
         toast.error('تم قبول الإرجاع وتحديث المخزون لكن فشل تسجيل المعاملة النقدية');

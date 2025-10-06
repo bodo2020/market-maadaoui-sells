@@ -16,10 +16,12 @@ import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
+import { useBranchStore } from "@/stores/branchStore";
 import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
 import { updateProductQuantity } from "@/services/supabase/productService";
 import OnlineOrderInvoiceDialog from "@/components/orders/OnlineOrderInvoiceDialog";
 export default function OnlineOrders() {
+  const { currentBranchId } = useBranchStore();
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -120,7 +122,8 @@ export default function OnlineOrders() {
       }
       if (orderDetails.payment_status === 'paid') {
         try {
-          await recordCashTransaction(orderDetails.total, 'deposit', RegisterType.ONLINE, `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, '');
+          const branchId = orderDetails.branch_id || currentBranchId || undefined;
+          await recordCashTransaction(orderDetails.total, 'deposit', RegisterType.ONLINE, `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, '', branchId);
           console.log(`Added ${orderDetails.total} to online cash register`);
         } catch (cashError) {
           console.error("Error recording cash transaction:", cashError);

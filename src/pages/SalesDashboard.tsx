@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBranchStore } from "@/stores/branchStore";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 
 export default function SalesDashboard() {
   const { user } = useAuth();
+  const { currentBranchId } = useBranchStore();
   const [dateRange, setDateRange] = useState({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
@@ -222,7 +224,8 @@ export default function SalesDashboard() {
       await recordSmartWithdrawal(
         Number(withdrawalAmount),
         withdrawalNote,
-        user?.id || ''
+        user?.id || '',
+        currentBranchId || undefined
       );
       
       toast.success(`تم سحب ${withdrawalAmount} بنجاح (سحب ذكي من المحل ثم الأونلاين)`);
@@ -253,7 +256,8 @@ export default function SalesDashboard() {
         'deposit',
         depositRegister,
         depositNote,
-        user?.id || ''
+        user?.id || '',
+        currentBranchId || undefined
       );
       
       toast.success(`تم إيداع ${depositAmount} بنجاح إلى خزنة ${depositRegister === RegisterType.STORE ? 'المحل' : 'الأونلاين'}`);

@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
 import { recordCashTransaction, RegisterType } from "@/services/supabase/cashTrackingService";
+import { useBranchStore } from "@/stores/branchStore";
 
 interface UpdateOrderStatusDialogProps {
   order: Order | null;
@@ -23,6 +24,7 @@ export function UpdateOrderStatusDialog({
   onOpenChange,
   onStatusUpdated
 }: UpdateOrderStatusDialogProps) {
+  const { currentBranchId } = useBranchStore();
   const [status, setStatus] = useState<Order['status']>(order?.status || 'pending');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -85,12 +87,14 @@ export function UpdateOrderStatusDialog({
 
         if (order.payment_status === 'paid') {
           try {
+            const branchId = order.branch_id || currentBranchId || undefined;
             await recordCashTransaction(
               order.total,
               'deposit',
               RegisterType.ONLINE,
               `إيداع من الطلب رقم ${order.id.slice(-8)} - ${order.customer_name || 'عميل غير معروف'}`,
-              ''
+              '',
+              branchId
             );
             console.log(`Added ${order.total} to online cash register`);
           } catch (cashError) {

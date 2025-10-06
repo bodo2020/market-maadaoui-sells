@@ -168,6 +168,7 @@ export interface OnlineOrder {
   delivery_location_id?: string;
   notes?: string;
   updated_at: string;
+  branch_id?: string;
 }
 
 export interface Expense {
@@ -284,6 +285,7 @@ export interface Order {
   tracking_number?: string | null;
   delivery_person?: string | null;
   return_status?: 'none' | 'partial' | 'full';
+  branch_id?: string;
   // Location data
   governorate?: string;
   city?: string;

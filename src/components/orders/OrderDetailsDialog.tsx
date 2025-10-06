@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { findOrCreateCustomer } from "@/services/supabase/customerService";
 import { updateProduct } from "@/services/supabase/productService";
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
+import { useBranchStore } from "@/stores/branchStore";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Check, FileText } from "lucide-react";
@@ -32,6 +33,7 @@ export function OrderDetailsDialog({
   onOpenChange, 
   onStatusUpdated 
 }: OrderDetailsDialogProps) {
+  const { currentBranchId } = useBranchStore();
   const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
   const [isUpdatingShipping, setIsUpdatingShipping] = useState(false);
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
@@ -115,12 +117,14 @@ export function OrderDetailsDialog({
         // If the order is marked as paid, add the amount to the online cash register
         if (order.payment_status === 'paid') {
           try {
+            const branchId = order.branch_id || currentBranchId || undefined;
             await recordCashTransaction(
               order.total, 
               'deposit', 
               RegisterType.ONLINE, 
               `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-              ''
+              '',
+              branchId
             );
             console.log(`Added ${order.total} to online cash register`);
           } catch (cashError) {

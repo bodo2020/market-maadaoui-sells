@@ -9,6 +9,7 @@ import { Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
+import { useBranchStore } from "@/stores/branchStore";
 
 interface PaymentConfirmationDialogProps {
   open: boolean;
@@ -23,6 +24,7 @@ export function PaymentConfirmationDialog({
   orderId,
   onConfirm 
 }: PaymentConfirmationDialogProps) {
+  const { currentBranchId } = useBranchStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [transactionId, setTransactionId] = useState<string>('');
@@ -57,6 +59,7 @@ export function PaymentConfirmationDialog({
       // If the order is already marked as done, add the amount to cash tracking
       if (orderData.status === 'delivered') {
         try {
+          const branchId = orderData.branch_id || currentBranchId || undefined;
           await recordCashTransaction(
             orderData.total, 
             'deposit', 
@@ -66,7 +69,8 @@ export function PaymentConfirmationDialog({
               paymentMethod === 'card' ? 'بطاقة' : 
               'تحويل بنكي'
             }`, 
-            ''
+            '',
+            branchId
           );
           console.log(`Added ${orderData.total} to online cash register`);
         } catch (cashError) {
