@@ -13,13 +13,15 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchProductById, updateProduct, createProduct, fetchProductByBarcode } from "@/services/supabase/productService";
 import { saveInventoryAlert, getInventoryAlert } from "@/services/supabase/inventoryService";
 import { Product } from "@/types";
-import { Loader2, Scan, Bell, BellOff, AlertTriangle, QrCode } from "lucide-react";
+import { Loader2, Scan, Bell, BellOff, AlertTriangle, QrCode, Info } from "lucide-react";
 import { fetchMainCategories } from "@/services/supabase/categoryService";
 import { fetchCompanies } from "@/services/supabase/companyService";
 import { fetchSubcategories } from "@/services/supabase/categoryService";
 import { MainCategory, Subcategory, Company } from "@/types";
 import { DragDropImage } from "@/components/ui/drag-drop-image";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
+import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function AddProduct() {
   const [product, setProduct] = useState<Partial<Product>>({
@@ -131,6 +133,14 @@ export default function AddProduct() {
     try {
       const data = await fetchProductById(id);
 
+      // Store original prices
+      if (data.original_price !== undefined) {
+        setOriginalPrice(data.original_price);
+      }
+      if (data.original_purchase_price !== undefined) {
+        setOriginalPurchasePrice(data.original_purchase_price);
+      }
+
       // تأكد من جلب الفئة الفرعية والفئة الرئيسية من قاعدة البيانات
       let mainCategoryId = data.main_category_id || "";
       let subcategoryId = data.subcategory_id || "";
@@ -180,6 +190,39 @@ export default function AddProduct() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetToDefaultPrice = async () => {
+    if (!productId || !isIndependentPricing) return;
+    
+    try {
+      const currentBranchId = localStorage.getItem("currentBranchId");
+      if (!currentBranchId) return;
+
+      // Delete custom pricing for this branch
+      const { error } = await supabase
+        .from("branch_product_pricing")
+        .delete()
+        .eq("product_id", productId)
+        .eq("branch_id", currentBranchId);
+
+      if (error) throw error;
+
+      // Reload product to get default prices
+      await loadProduct(productId);
+
+      toast({
+        title: "تم بنجاح",
+        description: "تم استعادة الأسعار الافتراضية",
+      });
+    } catch (error) {
+      console.error("Error resetting prices:", error);
+      toast({
+        title: "خطأ",
+        description: "فشل في استعادة الأسعار الافتراضية",
+        variant: "destructive",
+      });
     }
   };
 
