@@ -29,11 +29,45 @@ export async function fetchProducts() {
       return [];
     }
 
-    // Fetch all products
-    const { data: productsData, error: productsError } = await supabase
-      .from("products")
-      .select("*")
-      .order("name");
+    // Get branch settings
+    const { data: branchData, error: branchError } = await supabase
+      .from("branches")
+      .select("independent_pricing, independent_inventory, branch_type")
+      .eq("id", currentBranchId)
+      .single();
+
+    if (branchError) {
+      console.error("Error fetching branch data:", branchError);
+      throw branchError;
+    }
+
+    const isIndependentInventory = branchData?.independent_inventory || false;
+    const isIndependentPricing = branchData?.independent_pricing || false;
+
+    // Fetch products based on branch type
+    let productsQuery = supabase.from("products").select("*");
+    
+    // If branch has independent inventory, only show products in its inventory
+    if (isIndependentInventory) {
+      const { data: branchProducts, error: branchProductsError } = await supabase
+        .from("inventory")
+        .select("product_id")
+        .eq("branch_id", currentBranchId);
+      
+      if (branchProductsError) {
+        console.error("Error fetching branch products:", branchProductsError);
+      }
+      
+      const productIds = (branchProducts || []).map(bp => bp.product_id);
+      if (productIds.length > 0) {
+        productsQuery = productsQuery.in("id", productIds);
+      } else {
+        // No products for this branch
+        return [];
+      }
+    }
+
+    const { data: productsData, error: productsError } = await productsQuery.order("name");
 
     if (productsError) {
       console.error("Error fetching products:", productsError);
@@ -50,18 +84,44 @@ export async function fetchProducts() {
       console.error("Error fetching inventory:", inventoryError);
     }
 
+    // Fetch custom pricing if branch has independent pricing
+    let pricingMap = new Map();
+    if (isIndependentPricing) {
+      const { data: pricingData, error: pricingError } = await supabase
+        .from("branch_product_pricing")
+        .select("product_id, sale_price, purchase_price, offer_price, is_offer")
+        .eq("branch_id", currentBranchId);
+
+      if (pricingError) {
+        console.error("Error fetching branch pricing:", pricingError);
+      }
+
+      pricingMap = new Map(
+        (pricingData || []).map(price => [price.product_id, price])
+      );
+    }
+
     // Create a map of product_id to inventory data
     const inventoryMap = new Map(
       (inventoryData || []).map(inv => [inv.product_id, inv])
     );
 
-    // Merge products with inventory data
+    // Merge products with inventory data and custom pricing
     const productsWithInventory = (productsData || []).map(product => {
       const inventory = inventoryMap.get(product.id);
+      const customPricing = pricingMap.get(product.id);
+
       return {
         ...product,
         quantity: inventory?.quantity || 0,
-        min_stock_level: inventory?.min_stock_level || 5
+        min_stock_level: inventory?.min_stock_level || 5,
+        // Use custom pricing if available, otherwise use default
+        price: customPricing?.sale_price ?? product.price,
+        purchase_price: customPricing?.purchase_price ?? product.purchase_price,
+        offer_price: customPricing?.offer_price ?? product.offer_price,
+        is_offer: customPricing?.is_offer ?? product.is_offer,
+        // Add flag to indicate if custom pricing exists
+        has_custom_pricing: !!customPricing
       };
     });
 
@@ -79,6 +139,15 @@ export async function fetchProductById(id: string) {
   if (!currentBranchId) {
     throw new Error('No branch ID available');
   }
+
+  // Get branch settings
+  const { data: branchData } = await supabase
+    .from("branches")
+    .select("independent_pricing")
+    .eq("id", currentBranchId)
+    .single();
+
+  const isIndependentPricing = branchData?.independent_pricing || false;
 
   const { data, error } = await supabase
     .from("products")
@@ -99,10 +168,32 @@ export async function fetchProductById(id: string) {
     .eq("branch_id", currentBranchId)
     .maybeSingle();
 
+  // Fetch custom pricing if branch has independent pricing
+  let customPricing = null;
+  if (isIndependentPricing) {
+    const { data: pricingData } = await supabase
+      .from("branch_product_pricing")
+      .select("sale_price, purchase_price, offer_price, is_offer")
+      .eq("product_id", id)
+      .eq("branch_id", currentBranchId)
+      .maybeSingle();
+    
+    customPricing = pricingData;
+  }
+
   const productWithInventory = {
     ...data,
     quantity: inventoryData?.quantity || 0,
     min_stock_level: inventoryData?.min_stock_level || 5,
+    // Use custom pricing if available
+    price: customPricing?.sale_price ?? data.price,
+    purchase_price: customPricing?.purchase_price ?? data.purchase_price,
+    offer_price: customPricing?.offer_price ?? data.offer_price,
+    is_offer: customPricing?.is_offer ?? data.is_offer,
+    has_custom_pricing: !!customPricing,
+    // Store original prices for reference
+    original_price: data.price,
+    original_purchase_price: data.purchase_price,
   };
 
   return productWithInventory as Product;
@@ -272,8 +363,19 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
 
 export async function updateProduct(id: string, product: Partial<Omit<Product, "id" | "created_at" | "updated_at">>) {
   try {
-    // Extract min_stock_level from product to handle separately
-    const { min_stock_level, ...productUpdateData } = product;
+    const currentBranchId = await getCurrentBranchId();
+    
+    // Get branch settings
+    const { data: branchData } = await supabase
+      .from("branches")
+      .select("independent_pricing")
+      .eq("id", currentBranchId)
+      .single();
+
+    const isIndependentPricing = branchData?.independent_pricing || false;
+
+    // Extract min_stock_level and pricing fields from product
+    const { min_stock_level, price, purchase_price, offer_price, is_offer, ...productUpdateData } = product;
     const updateData: any = { ...productUpdateData };
     
     // If changing barcode, check if it's a scale barcode
@@ -316,12 +418,43 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
       }
     }
 
+    // Handle pricing updates
+    if (isIndependentPricing && currentBranchId) {
+      // For branches with independent pricing, update branch_product_pricing table
+      if (price !== undefined || purchase_price !== undefined || offer_price !== undefined || is_offer !== undefined) {
+        const pricingUpdate: any = {};
+        if (price !== undefined) pricingUpdate.sale_price = price;
+        if (purchase_price !== undefined) pricingUpdate.purchase_price = purchase_price;
+        if (offer_price !== undefined) pricingUpdate.offer_price = offer_price;
+        if (is_offer !== undefined) pricingUpdate.is_offer = is_offer;
+
+        const { error: pricingError } = await supabase
+          .from("branch_product_pricing")
+          .upsert({
+            product_id: id,
+            branch_id: currentBranchId,
+            ...pricingUpdate,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'product_id,branch_id' });
+
+        if (pricingError) {
+          console.error("Error updating branch pricing:", pricingError);
+          throw pricingError;
+        }
+      }
+    } else {
+      // For branches without independent pricing, update main products table
+      if (price !== undefined) updateData.price = price;
+      if (purchase_price !== undefined) updateData.purchase_price = purchase_price;
+      if (offer_price !== undefined) updateData.offer_price = offer_price;
+      if (is_offer !== undefined) updateData.is_offer = is_offer;
+    }
+
     console.log("Updating product with data:", updateData);
     console.log("Original product data sent:", product);
 
     // إذا كان هناك تحديث للكمية، تحديثها في جدول المخزون أولاً
     if (product.quantity !== undefined) {
-      const currentBranchId = await getCurrentBranchId();
       if (currentBranchId) {
         const { error: inventoryError } = await supabase
           .from("inventory")
@@ -356,15 +489,14 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
     }
 
     // تحديث الحد الأدنى للمخزون في جدول المخزون إذا تم تمريره
-    if (product.min_stock_level !== undefined) {
-      const currentBranchId = await getCurrentBranchId();
+    if (min_stock_level !== undefined) {
       if (currentBranchId) {
         const { error: inventoryError } = await supabase
           .from("inventory")
           .upsert({
             product_id: id,
             branch_id: currentBranchId,
-            min_stock_level: product.min_stock_level,
+            min_stock_level: min_stock_level,
             updated_at: new Date().toISOString()
           }, { onConflict: 'product_id,branch_id' });
         
@@ -376,7 +508,7 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
         const { error: inventoryError } = await supabase
           .from("inventory")
           .update({
-            min_stock_level: product.min_stock_level,
+            min_stock_level: min_stock_level,
             updated_at: new Date().toISOString()
           })
           .eq("product_id", id);

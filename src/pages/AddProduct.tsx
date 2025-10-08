@@ -36,6 +36,11 @@ export default function AddProduct() {
   const [alertEnabled, setAlertEnabled] = useState(false);
   const [minStockLevel, setMinStockLevel] = useState<number | null>(null);
   
+  // Branch pricing settings
+  const [isIndependentPricing, setIsIndependentPricing] = useState(false);
+  const [originalPrice, setOriginalPrice] = useState<number>(0);
+  const [originalPurchasePrice, setOriginalPurchasePrice] = useState<number>(0);
+  
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<MainCategory[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -50,10 +55,33 @@ export default function AddProduct() {
   useEffect(() => {
     loadCategories();
     loadCompanies();
+    loadBranchSettings();
     if (productId) {
       loadProduct(productId);
     }
   }, [productId]);
+
+  const loadBranchSettings = async () => {
+    try {
+      const currentBranchId = localStorage.getItem("currentBranchId");
+      if (!currentBranchId) return;
+
+      const { data: branchData, error } = await supabase
+        .from("branches")
+        .select("independent_pricing")
+        .eq("id", currentBranchId)
+        .single();
+
+      if (error) {
+        console.error("Error loading branch settings:", error);
+        return;
+      }
+
+      setIsIndependentPricing(branchData?.independent_pricing || false);
+    } catch (error) {
+      console.error("Error in loadBranchSettings:", error);
+    }
+  };
 
   const loadCategories = async () => {
     try {
