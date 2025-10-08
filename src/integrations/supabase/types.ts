@@ -204,41 +204,112 @@ export type Database = {
           },
         ]
       }
+      branch_product_pricing: {
+        Row: {
+          branch_id: string
+          created_at: string | null
+          id: string
+          is_offer: boolean | null
+          offer_price: number | null
+          product_id: string
+          purchase_price: number
+          sale_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string | null
+          id?: string
+          is_offer?: boolean | null
+          offer_price?: number | null
+          product_id: string
+          purchase_price: number
+          sale_price: number
+          updated_at?: string | null
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string | null
+          id?: string
+          is_offer?: boolean | null
+          offer_price?: number | null
+          product_id?: string
+          purchase_price?: number
+          sale_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branch_product_pricing_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branch_product_pricing_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           active: boolean | null
           address: string | null
+          branch_type: Database["public"]["Enums"]["branch_type"]
           code: string | null
           created_at: string | null
           email: string | null
           id: string
+          independent_inventory: boolean | null
+          independent_pricing: boolean | null
           name: string
+          parent_branch_id: string | null
           phone: string | null
           updated_at: string | null
         }
         Insert: {
           active?: boolean | null
           address?: string | null
+          branch_type?: Database["public"]["Enums"]["branch_type"]
           code?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
+          independent_inventory?: boolean | null
+          independent_pricing?: boolean | null
           name: string
+          parent_branch_id?: string | null
           phone?: string | null
           updated_at?: string | null
         }
         Update: {
           active?: boolean | null
           address?: string | null
+          branch_type?: Database["public"]["Enums"]["branch_type"]
           code?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
+          independent_inventory?: boolean | null
+          independent_pricing?: boolean | null
           name?: string
+          parent_branch_id?: string | null
           phone?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "branches_parent_branch_id_fkey"
+            columns: ["parent_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cart_items: {
         Row: {
@@ -1736,6 +1807,7 @@ export type Database = {
           barcode: string | null
           barcode_type: string | null
           base_unit: string | null
+          branch_id: string | null
           bulk_barcode: string | null
           bulk_enabled: boolean | null
           bulk_price: number | null
@@ -1767,6 +1839,7 @@ export type Database = {
           barcode?: string | null
           barcode_type?: string | null
           base_unit?: string | null
+          branch_id?: string | null
           bulk_barcode?: string | null
           bulk_enabled?: boolean | null
           bulk_price?: number | null
@@ -1798,6 +1871,7 @@ export type Database = {
           barcode?: string | null
           barcode_type?: string | null
           base_unit?: string | null
+          branch_id?: string | null
           bulk_barcode?: string | null
           bulk_enabled?: boolean | null
           bulk_price?: number | null
@@ -1845,6 +1919,13 @@ export type Database = {
             columns: ["subcategory_id"]
             isOneToOne: false
             referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
             referencedColumns: ["id"]
           },
           {
@@ -2967,6 +3048,12 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_branch_products: {
+        Args: { p_branch_id: string }
+        Returns: {
+          product_id: string
+        }[]
+      }
       get_current_cash_balance: {
         Args: { p_branch_id?: string; p_register_type: string }
         Returns: number
@@ -2983,12 +3070,25 @@ export type Database = {
         Args: { p_branch_id: string }
         Returns: string
       }
+      get_product_price: {
+        Args: { p_branch_id: string; p_product_id: string }
+        Returns: {
+          is_offer: boolean
+          offer_price: number
+          purchase_price: number
+          sale_price: number
+        }[]
+      }
       has_branch_access: {
         Args: { _branch: string; _user: string }
         Returns: boolean
       }
       is_admin: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_external_branch: {
+        Args: { p_branch_id: string }
         Returns: boolean
       }
       is_super_admin: {
@@ -3040,6 +3140,7 @@ export type Database = {
       }
     }
     Enums: {
+      branch_type: "internal" | "external"
       order_payment_status: "pending" | "paid" | "failed" | "refunded"
       order_status:
         | "pending"
@@ -3178,6 +3279,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      branch_type: ["internal", "external"],
       order_payment_status: ["pending", "paid", "failed", "refunded"],
       order_status: [
         "pending",
