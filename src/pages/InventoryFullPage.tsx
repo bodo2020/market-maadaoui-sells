@@ -69,13 +69,25 @@ export default function InventoryFullPage() {
     setLoading(true);
     try {
       const branchId = getBranchId();
+      
+      // للجرد الكامل، نحذف السجلات القديمة ونبدأ من جديد دائماً
       const existingRecords = await fetchInventoryRecordsByDate(currentDate, branchId || undefined);
       
       if (existingRecords.length > 0) {
-        setInventoryRecords(existingRecords);
-      } else {
-        await startFullInventory();
+        // حذف السجلات القديمة
+        const { error } = await supabase
+          .from('inventory_records')
+          .delete()
+          .eq('inventory_date', currentDate)
+          .eq('branch_id', branchId);
+        
+        if (error) {
+          console.error("Error deleting old records:", error);
+        }
       }
+      
+      // إنشاء جرد كامل جديد
+      await startFullInventory();
     } catch (error) {
       console.error("Error loading inventory data:", error);
       toast({
