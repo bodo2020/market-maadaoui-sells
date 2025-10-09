@@ -40,6 +40,7 @@ import CRM from "@/pages/CRM";
 import Analytics from "@/pages/Analytics";
 import AIInsights from "@/pages/AIInsights";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
+import InventoryFullPage from "@/pages/InventoryFullPage";
 import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
 import ExpiryManagement from "@/pages/ExpiryManagement";
 import ExpensesAndSalaries from "@/pages/ExpensesAndSalaries";
@@ -83,6 +84,7 @@ function App() {
               <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
               <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
               <Route path="/daily-inventory" element={<ProtectedRoute><DailyInventoryPage /></ProtectedRoute>} />
+              <Route path="/inventory-full" element={<ProtectedRoute><InventoryFullPage /></ProtectedRoute>} />
               <Route path="/inventory-history" element={<ProtectedRoute><InventoryHistoryPage /></ProtectedRoute>} />
               <Route path="/expiry-management" element={<ProtectedRoute><ExpiryManagement /></ProtectedRoute>} />
               <Route path="/supplier-purchases" element={<ProtectedRoute><SupplierPurchases /></ProtectedRoute>} />
