@@ -112,11 +112,8 @@ export default function DailyInventoryPage() {
         // جرد كامل - كل المنتجات
         selectedProducts = allProducts;
         setInventoryType('full');
-        // فتح صفحة جديدة لعرض جميع المنتجات
-        navigate('/inventory-full');
-        return;
       } else {
-        // جرد عادي - اختيار عشوائي
+        // جرد يومي - اختيار عشوائي
         const randomCount = Math.floor(Math.random() * 6) + 10;
         const shuffled = allProducts.sort(() => 0.5 - Math.random());
         selectedProducts = shuffled.slice(0, randomCount);
@@ -153,7 +150,7 @@ export default function DailyInventoryPage() {
       
       toast({
         title: "تم إنشاء جرد جديد",
-        description: `تم اختيار ${selectedProducts.length} منتج للجرد`,
+        description: `تم اختيار ${selectedProducts.length} منتج للجرد ${type === 'full' ? 'الكامل' : 'اليومي'}`,
       });
     } catch (error) {
       console.error("Error creating new inventory:", error);
@@ -308,7 +305,7 @@ export default function DailyInventoryPage() {
 
       // إضافة العنوان الرئيسي
       const currentDate = format(new Date(), 'yyyy-MM-dd', { locale: ar });
-      const inventoryTypeText = inventoryType === 'full' ? 'الكامل' : '';
+      const inventoryTypeText = inventoryType === 'full' ? 'الكامل' : 'اليومي';
       worksheet.mergeCells('A1:F3');
       const titleCell = worksheet.getCell('A1');
       titleCell.value = `تقرير الجرد ${inventoryTypeText}\nتاريخ: ${currentDate}`;
@@ -495,7 +492,7 @@ export default function DailyInventoryPage() {
           <div className="flex items-center space-x-4 space-x-reverse">
             <Package className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-2xl font-bold">الجرد</h1>
+              <h1 className="text-2xl font-bold">الجرد اليومي</h1>
               <p className="text-muted-foreground">
                 {format(new Date(), 'eeee، d MMMM yyyy', { locale: ar })}
               </p>
@@ -640,7 +637,7 @@ export default function DailyInventoryPage() {
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center">
                 <Calendar className="ml-2 h-5 w-5" />
-                منتجات الجرد {inventoryType === 'full' ? 'الكامل' : ''}
+                منتجات الجرد {inventoryType === 'full' ? 'الكامل' : 'اليومي'}
               </div>
               
               <div className="flex items-center gap-2">

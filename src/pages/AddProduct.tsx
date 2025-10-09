@@ -133,9 +133,13 @@ export default function AddProduct() {
     try {
       const data = await fetchProductById(id);
 
-      // Store original prices from the product data if they exist
-      setOriginalPrice(data.price);
-      setOriginalPurchasePrice(data.purchase_price);
+      // Store original prices
+      if (data.original_price !== undefined) {
+        setOriginalPrice(data.original_price);
+      }
+      if (data.original_purchase_price !== undefined) {
+        setOriginalPurchasePrice(data.original_purchase_price);
+      }
 
       // تأكد من جلب الفئة الفرعية والفئة الرئيسية من قاعدة البيانات
       let mainCategoryId = data.main_category_id || "";

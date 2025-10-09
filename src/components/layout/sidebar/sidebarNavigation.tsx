@@ -85,7 +85,7 @@ export const productsNavigation: NavigationGroup = {
       icon: Warehouse,
     },
     {
-      label: "الجرد",
+      label: "الجرد اليومي",
       href: "/daily-inventory",
       icon: ClipboardList,
     },
