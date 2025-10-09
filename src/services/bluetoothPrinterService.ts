@@ -144,7 +144,7 @@ class BluetoothPrinterService {
       if (this.printer.characteristic) {
         const encoder = new TextEncoder();
         const data = encoder.encode(text + '\n\n\n');
-        await this.printer.characteristic.writeValue(data);
+        await this.printer.characteristic.writeValue(data.buffer);
         toast.success('تم إرسال النص للطباعة عبر Bluetooth');
         return true;
       }
