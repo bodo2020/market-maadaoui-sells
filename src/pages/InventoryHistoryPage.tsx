@@ -464,8 +464,16 @@ export default function InventoryHistoryPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      sessions.map((session) => (
-                        <TableRow key={session.id}>
+                       sessions.map((session) => (
+                        <TableRow 
+                          key={session.id}
+                          className={session.status !== 'approved' ? 'cursor-pointer hover:bg-muted/50' : ''}
+                          onClick={() => {
+                            if (session.status !== 'approved') {
+                              navigate('/daily-inventory');
+                            }
+                          }}
+                        >
                           <TableCell>
                             {format(new Date(session.session_date), 'dd/MM/yyyy', { locale: ar })}
                           </TableCell>
@@ -515,7 +523,7 @@ export default function InventoryHistoryPage() {
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell>
+                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <div className="flex gap-2">
                               <Button
                                 size="sm"
