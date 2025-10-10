@@ -230,7 +230,8 @@ export default function InventoryFullPage() {
         return;
       }
 
-      await completeInventorySessionByDate(currentDate);
+      const branchId = getBranchId();
+      await completeInventorySessionByDate(currentDate, branchId || undefined);
       
       toast({
         title: "تم إكمال الجرد",
