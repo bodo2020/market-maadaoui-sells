@@ -53,6 +53,8 @@ export const createInventoryRecords = async (
 ) => {
   console.log(`Creating inventory records for ${products.length} products, branch: ${branchId}`);
   
+  const currentDate = new Date().toISOString().slice(0, 10);
+  
   const { data, error } = await supabase
     .from('inventory_records')
     .insert(
@@ -72,6 +74,22 @@ export const createInventoryRecords = async (
   if (error) {
     console.error('Error creating inventory records:', error);
     throw error;
+  }
+  
+  // Create inventory session for this branch
+  if (branchId) {
+    await supabase
+      .from('inventory_sessions')
+      .insert({
+        session_date: currentDate,
+        branch_id: branchId,
+        status: 'active',
+        total_products: products.length,
+        completed_products: 0,
+        matched_products: 0,
+        discrepancy_products: 0,
+        total_difference_value: 0
+      });
   }
   
   console.log(`Successfully created ${data?.length || 0} inventory records`);
@@ -152,34 +170,51 @@ export const fetchInventoryRecordsByDate = async (date: string, branchId?: strin
 };
 
 // جلب جلسات الجرد
-export const fetchInventorySessions = async () => {
-  const { data, error } = await supabase
+export const fetchInventorySessions = async (branchId?: string) => {
+  let query = supabase
     .from('inventory_sessions')
     .select('*')
     .order('session_date', { ascending: false });
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return data as InventorySession[];
 };
 
 // جلب جلسة جرد بالتاريخ
-export const fetchInventorySessionByDate = async (date: string) => {
-  const { data, error } = await supabase
+export const fetchInventorySessionByDate = async (date: string, branchId?: string) => {
+  let query = supabase
     .from('inventory_sessions')
     .select('*')
-    .eq('session_date', date)
-    .maybeSingle();
+    .eq('session_date', date);
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) throw error;
   return data as InventorySession | null;
 };
 
 // حذف سجلات جرد لتاريخ معين
-export const deleteInventoryRecordsByDate = async (date: string) => {
-  const { error } = await supabase
+export const deleteInventoryRecordsByDate = async (date: string, branchId?: string) => {
+  let query = supabase
     .from('inventory_records')
     .delete()
     .eq('inventory_date', date);
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+
+  const { error } = await query;
 
   if (error) throw error;
 };
@@ -197,25 +232,36 @@ export const completeInventorySession = async (sessionId: string) => {
 };
 
 // إكمال جلسة جرد بناءً على التاريخ
-export const completeInventorySessionByDate = async (date: string) => {
-  const { data, error } = await supabase
+export const completeInventorySessionByDate = async (date: string, branchId?: string) => {
+  let query = supabase
     .from('inventory_sessions')
     .update({ status: 'completed' })
     .eq('session_date', date)
-    .eq('status', 'active')
-    .select();
+    .eq('status', 'active');
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+
+  const { data, error } = await query.select();
 
   if (error) throw error;
   return data[0];
 };
 
 // جلب إحصائيات الجرد
-export const fetchInventoryStats = async () => {
-  const { data: sessions, error } = await supabase
+export const fetchInventoryStats = async (branchId?: string) => {
+  let query = supabase
     .from('inventory_sessions')
     .select('*')
     .order('session_date', { ascending: false })
     .limit(12);
+
+  if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+
+  const { data: sessions, error } = await query;
 
   if (error) throw error;
 
@@ -347,18 +393,24 @@ export const approveInventorySession = async (sessionId: string) => {
 
     if (recordsError) throw recordsError;
 
-    // تحديث الكميات في جدول inventory
+    // تحديث الكميات في جدول inventory للفرع المحدد
     for (const record of records) {
-      // تحديث الكمية في جدول inventory
-      await supabase
+      let updateQuery = supabase
         .from('inventory')
         .update({ 
           quantity: record.actual_quantity,
           updated_at: new Date().toISOString()
         })
         .eq('product_id', record.product_id);
+      
+      // Add branch filter if available
+      if (record.branch_id) {
+        updateQuery = updateQuery.eq('branch_id', record.branch_id);
+      }
+      
+      await updateQuery;
         
-      console.log(`Updated inventory for product ${record.product_id}: ${record.actual_quantity}`);
+      console.log(`Updated inventory for product ${record.product_id} in branch ${record.branch_id}: ${record.actual_quantity}`);
     }
 
     // تحديث حالة session إلى approved
@@ -383,16 +435,21 @@ export const approveInventorySession = async (sessionId: string) => {
 };
 
 // حذف جلسة جرد
-export const deleteInventorySession = async (sessionId: string, sessionDate: string) => {
-  console.log(`Deleting inventory session: ${sessionId} for date: ${sessionDate}`);
+export const deleteInventorySession = async (sessionId: string, sessionDate: string, branchId?: string) => {
+  console.log(`Deleting inventory session: ${sessionId} for date: ${sessionDate}, branch: ${branchId}`);
   
   try {
     // حذف جميع inventory records أولاً
-    const { error: recordsError } = await supabase
+    let deleteRecordsQuery = supabase
       .from('inventory_records')
       .delete()
       .eq('inventory_date', sessionDate);
+    
+    if (branchId) {
+      deleteRecordsQuery = deleteRecordsQuery.eq('branch_id', branchId);
+    }
 
+    const { error: recordsError } = await deleteRecordsQuery;
     if (recordsError) throw recordsError;
 
     // حذف الجلسة

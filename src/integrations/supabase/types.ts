@@ -1180,6 +1180,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          branch_id: string
           completed_products: number
           created_at: string
           created_by: string | null
@@ -1195,6 +1196,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          branch_id: string
           completed_products?: number
           created_at?: string
           created_by?: string | null
@@ -1210,6 +1212,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          branch_id?: string
           completed_products?: number
           created_at?: string
           created_by?: string | null
@@ -1222,7 +1225,15 @@ export type Database = {
           total_products?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventory_sessions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory_transfer_items: {
         Row: {

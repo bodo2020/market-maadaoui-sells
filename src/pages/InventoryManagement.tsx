@@ -53,6 +53,9 @@ import { checkLowStockProducts, showLowStockToasts } from "@/services/notificati
 import { fetchInventoryWithAlerts } from "@/services/supabase/inventoryService";
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import { supabase } from "@/integrations/supabase/client";
+
+const getBranchId = () => (typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null);
 
 export default function InventoryManagement() {
   const [inventory, setInventory] = useState<any[]>([]);
@@ -95,11 +98,104 @@ export default function InventoryManagement() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      // Load inventory data with alerts
-      const inventoryData = await fetchInventoryWithAlerts();
+      const branchId = getBranchId();
       
-      setInventory(inventoryData.all);
-      setLowStockProducts(inventoryData.lowStock);
+      // جلب المخزون من جدول inventory للفرع المحدد
+      let inventoryQuery = supabase
+        .from('inventory')
+        .select('product_id, quantity, branch_id')
+        .order('quantity', { ascending: true });
+
+      if (branchId) {
+        inventoryQuery = inventoryQuery.eq('branch_id', branchId);
+      }
+
+      const { data: inventoryData, error: invError } = await inventoryQuery;
+
+      if (invError) throw invError;
+
+      if (!inventoryData || inventoryData.length === 0) {
+        setInventory([]);
+        setLowStockProducts([]);
+        setLoading(false);
+        return;
+      }
+
+      // جلب بيانات المنتجات في batches (100 منتج في كل مرة)
+      const productIds = inventoryData.map(inv => inv.product_id);
+      const batchSize = 100;
+      const batches = [];
+      
+      for (let i = 0; i < productIds.length; i += batchSize) {
+        batches.push(productIds.slice(i, i + batchSize));
+      }
+
+      // جلب كل الـ batches
+      const productsDataPromises = batches.map(batch =>
+        supabase
+          .from('products')
+          .select(`
+            id,
+            name,
+            barcode,
+            price,
+            purchase_price,
+            image_urls,
+            shelf_location,
+            expiry_date,
+            unit_of_measure
+          `)
+          .in('id', batch)
+      );
+
+      const productsResults = await Promise.all(productsDataPromises);
+      
+      // دمج النتائج
+      const productsData = productsResults.flatMap(result => result.data || []);
+
+      // جلب إعدادات التنبيهات في batches أيضاً
+      const alertsPromises = batches.map(batch =>
+        supabase
+          .from('inventory_alerts')
+          .select('product_id, min_stock_level, alert_enabled')
+          .in('product_id', batch)
+      );
+
+      const alertsResults = await Promise.all(alertsPromises);
+      const alertsData = alertsResults.flatMap(result => result.data || []);
+
+      // دمج البيانات
+      const productMap = new Map(productsData?.map(p => [p.id, p]) || []);
+      const alertsMap = new Map(alertsData?.map(a => [a.product_id, a]) || []);
+
+      const formattedInventory = inventoryData.map(item => {
+        const product = productMap.get(item.product_id);
+        const alert = alertsMap.get(item.product_id);
+        
+        return {
+          id: product?.id || '',
+          name: product?.name || '',
+          barcode: product?.barcode,
+          price: product?.price || 0,
+          purchase_price: product?.purchase_price || 0,
+          quantity: item.quantity,
+          image_urls: product?.image_urls,
+          shelf_location: product?.shelf_location,
+          expiry_date: product?.expiry_date,
+          unit_of_measure: product?.unit_of_measure,
+          inventory_alerts: alert
+        };
+      }).filter(item => item.id); // فلترة أي منتجات محذوفة
+
+      // فلترة المنتجات منخفضة المخزون
+      const lowStock = formattedInventory.filter(product => {
+        const alert = product.inventory_alerts;
+        if (!alert || !alert.alert_enabled || !alert.min_stock_level) return false;
+        return (product.quantity || 0) < alert.min_stock_level;
+      });
+
+      setInventory(formattedInventory);
+      setLowStockProducts(lowStock);
     } catch (error) {
       console.error("Error loading products:", error);
       toast({
@@ -122,14 +218,20 @@ export default function InventoryManagement() {
     if (selectedProduct && stockToAdd > 0) {
       setLoading(true);
       try {
-        const updatedProduct = {
-          ...selectedProduct,
-          quantity: (selectedProduct.quantity || 0) + stockToAdd
-        };
+        const branchId = getBranchId();
         
-        await updateProduct(selectedProduct.id, updatedProduct);
+        // تحديث الكمية في جدول inventory
+        const { error } = await supabase
+          .from('inventory')
+          .update({ 
+            quantity: (selectedProduct.quantity || 0) + stockToAdd 
+          })
+          .eq('product_id', selectedProduct.id)
+          .eq('branch_id', branchId);
+
+        if (error) throw error;
         
-        // Reload data to get updated inventory alerts
+        // Reload data to get updated inventory
         await loadProducts();
         
         toast({
