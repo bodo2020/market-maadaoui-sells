@@ -121,30 +121,48 @@ export default function InventoryManagement() {
         return;
       }
 
-      // جلب بيانات المنتجات
+      // جلب بيانات المنتجات في batches (100 منتج في كل مرة)
       const productIds = inventoryData.map(inv => inv.product_id);
-      const { data: productsData, error: prodError } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          barcode,
-          price,
-          purchase_price,
-          image_urls,
-          shelf_location,
-          expiry_date,
-          unit_of_measure
-        `)
-        .in('id', productIds);
+      const batchSize = 100;
+      const batches = [];
+      
+      for (let i = 0; i < productIds.length; i += batchSize) {
+        batches.push(productIds.slice(i, i + batchSize));
+      }
 
-      if (prodError) throw prodError;
+      // جلب كل الـ batches
+      const productsDataPromises = batches.map(batch =>
+        supabase
+          .from('products')
+          .select(`
+            id,
+            name,
+            barcode,
+            price,
+            purchase_price,
+            image_urls,
+            shelf_location,
+            expiry_date,
+            unit_of_measure
+          `)
+          .in('id', batch)
+      );
 
-      // جلب إعدادات التنبيهات
-      const { data: alertsData } = await supabase
-        .from('inventory_alerts')
-        .select('product_id, min_stock_level, alert_enabled')
-        .in('product_id', productIds);
+      const productsResults = await Promise.all(productsDataPromises);
+      
+      // دمج النتائج
+      const productsData = productsResults.flatMap(result => result.data || []);
+
+      // جلب إعدادات التنبيهات في batches أيضاً
+      const alertsPromises = batches.map(batch =>
+        supabase
+          .from('inventory_alerts')
+          .select('product_id, min_stock_level, alert_enabled')
+          .in('product_id', batch)
+      );
+
+      const alertsResults = await Promise.all(alertsPromises);
+      const alertsData = alertsResults.flatMap(result => result.data || []);
 
       // دمج البيانات
       const productMap = new Map(productsData?.map(p => [p.id, p]) || []);
