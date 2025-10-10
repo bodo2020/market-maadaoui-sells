@@ -69,13 +69,25 @@ export default function InventoryFullPage() {
     setLoading(true);
     try {
       const branchId = getBranchId();
+      
+      // للجرد الكامل، نحذف السجلات القديمة ونبدأ من جديد دائماً
       const existingRecords = await fetchInventoryRecordsByDate(currentDate, branchId || undefined);
       
       if (existingRecords.length > 0) {
-        setInventoryRecords(existingRecords);
-      } else {
-        await startFullInventory();
+        // حذف السجلات القديمة
+        const { error } = await supabase
+          .from('inventory_records')
+          .delete()
+          .eq('inventory_date', currentDate)
+          .eq('branch_id', branchId);
+        
+        if (error) {
+          console.error("Error deleting old records:", error);
+        }
       }
+      
+      // إنشاء جرد كامل جديد
+      await startFullInventory();
     } catch (error) {
       console.error("Error loading inventory data:", error);
       toast({
@@ -90,14 +102,6 @@ export default function InventoryFullPage() {
 
   const startFullInventory = async () => {
     try {
-      const allProducts = await fetchProducts();
-      
-      const inventoryData = allProducts.map(product => ({
-        product_id: product.id,
-        expected_quantity: product.quantity || 0,
-        purchase_price: product.purchase_price
-      }));
-      
       let branchId = getBranchId();
       if (!branchId) {
         const { data } = await supabase
@@ -113,14 +117,48 @@ export default function InventoryFullPage() {
         }
       }
       
-      await createInventoryRecords(inventoryData, branchId || undefined);
+      // جلب المنتجات مع كمياتها من المخزن للفرع المحدد
+      const { data: inventoryData, error: invError } = await supabase
+        .from('inventory')
+        .select('product_id, quantity')
+        .eq('branch_id', branchId);
+      
+      if (invError) throw invError;
+      
+      if (!inventoryData || inventoryData.length === 0) {
+        toast({
+          title: "تنبيه",
+          description: "لا توجد منتجات في مخزن هذا الفرع",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // جلب تفاصيل المنتجات
+      const productIds = inventoryData.map(inv => inv.product_id);
+      const { data: products, error: prodError } = await supabase
+        .from('products')
+        .select('id, purchase_price')
+        .in('id', productIds);
+      
+      if (prodError) throw prodError;
+      
+      const productMap = new Map(products?.map(p => [p.id, p]) || []);
+      
+      const inventoryRecordsData = inventoryData.map(inv => ({
+        product_id: inv.product_id,
+        expected_quantity: inv.quantity || 0,
+        purchase_price: productMap.get(inv.product_id)?.purchase_price || 0
+      }));
+      
+      await createInventoryRecords(inventoryRecordsData, branchId || undefined);
       
       const newRecords = await fetchInventoryRecordsByDate(currentDate, branchId || undefined);
       setInventoryRecords(newRecords);
       
       toast({
         title: "تم إنشاء الجرد الكامل",
-        description: `تم إنشاء جرد لـ ${allProducts.length} منتج`,
+        description: `تم إنشاء جرد لـ ${inventoryData.length} منتج`,
       });
     } catch (error) {
       console.error("Error creating full inventory:", error);
@@ -230,8 +268,7 @@ export default function InventoryFullPage() {
         return;
       }
 
-      const branchId = getBranchId();
-      await completeInventorySessionByDate(currentDate, branchId || undefined);
+      await completeInventorySessionByDate(currentDate);
       
       toast({
         title: "تم إكمال الجرد",
