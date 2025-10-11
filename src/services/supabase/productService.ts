@@ -374,8 +374,18 @@ export async function updateProduct(id: string, product: Partial<Omit<Product, "
 
     const isIndependentPricing = branchData?.independent_pricing || false;
 
-    // Extract min_stock_level and pricing fields from product
-    const { min_stock_level, price, purchase_price, offer_price, is_offer, ...productUpdateData } = product;
+    // Extract fields that should not be saved to products table
+    const { 
+      min_stock_level, 
+      price, 
+      purchase_price, 
+      offer_price, 
+      is_offer, 
+      has_custom_pricing, // Remove computed field
+      original_price, // Remove computed field
+      original_purchase_price, // Remove computed field
+      ...productUpdateData 
+    } = product as any;
     const updateData: any = { ...productUpdateData };
     
     // If changing barcode, check if it's a scale barcode
