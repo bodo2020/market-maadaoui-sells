@@ -67,7 +67,7 @@ export async function fetchProducts() {
       }
     }
 
-    const { data: productsData, error: productsError } = await productsQuery.order("name");
+    const { data: productsData, error: productsError } = await productsQuery.order("name").limit(10000);
 
     if (productsError) {
       console.error("Error fetching products:", productsError);
