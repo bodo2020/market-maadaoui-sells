@@ -112,12 +112,21 @@ export default function ProductManagement() {
 
   // Filter products based on search and selected filters
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase()) ||
-                         (product.barcode && product.barcode.includes(search));
+    const normalizeDigits = (s: string) =>
+      s.replace(/[\u0660-\u0669]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x0660 + 48))
+       .replace(/[\u06F0-\u06F9]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x06F0 + 48));
+
+    const normalizedSearch = normalizeDigits(search).toLowerCase().trim();
+    if (!normalizedSearch) return (selectedCompany === "all" || product.company_id === selectedCompany) && (selectedMainCategory === "all" || product.main_category_id === selectedMainCategory);
+
+    const nameMatch = (product.name || "").toLowerCase().includes(normalizedSearch);
+    const barcodeMatch = (product.barcode || "").includes(normalizedSearch);
+    const bulkBarcodeMatch = ((product as any).bulk_barcode || "").includes(normalizedSearch);
+
     const matchesCompany = selectedCompany === "all" || product.company_id === selectedCompany;
     const matchesMainCategory = selectedMainCategory === "all" || product.main_category_id === selectedMainCategory;
-    
-    return matchesSearch && matchesCompany && matchesMainCategory;
+
+    return (nameMatch || barcodeMatch || bulkBarcodeMatch) && matchesCompany && matchesMainCategory;
   });
 
   const handleDeleteProduct = async () => {
