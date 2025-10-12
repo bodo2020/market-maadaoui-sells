@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Pencil, Trash2, Package, ArrowUpDown, MoreHorizontal, Tag, Barcode, Box, Loader2, ScanLine, Image as ImageIcon, FolderOpen, Building2, QrCode, Eye, Edit, ShoppingCart } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, Package, ArrowUpDown, MoreHorizontal, Tag, Barcode, Box, Loader2, ScanLine, Image as ImageIcon, FolderOpen, Building2, QrCode, Eye, Edit, ShoppingCart, Download } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Product } from "@/types";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,6 +27,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import ProductAssignmentDialog from "@/components/categories/ProductAssignmentDialog";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 export default function ProductManagement() {
   const navigate = useNavigate();
@@ -204,12 +206,91 @@ export default function ProductManagement() {
     setIsOfferDialogOpen(true);
   };
 
+  const handleExportToExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'نظام إدارة المتاجر';
+      workbook.created = new Date();
+
+      const worksheet = workbook.addWorksheet('المنتجات');
+
+      // إضافة العناوين
+      worksheet.columns = [
+        { header: 'اسم المنتج', key: 'name', width: 30 },
+        { header: 'الباركود', key: 'barcode', width: 20 },
+        { header: 'السعر', key: 'price', width: 15 },
+        { header: 'سعر الشراء', key: 'purchase_price', width: 15 },
+        { header: 'الكمية', key: 'quantity', width: 12 },
+        { header: 'الحد الأدنى', key: 'min_stock_level', width: 12 },
+        { header: 'الوصف', key: 'description', width: 35 },
+        { header: 'الشركة', key: 'company', width: 20 },
+        { header: 'الفئة الرئيسية', key: 'main_category', width: 20 },
+        { header: 'الفئة الفرعية', key: 'subcategory', width: 20 },
+      ];
+
+      // تنسيق العناوين
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '4472C4' } };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      // إضافة البيانات
+      const productsToExport = search || selectedCompany !== 'all' || selectedMainCategory !== 'all' 
+        ? filteredProducts 
+        : products;
+
+      for (const product of productsToExport) {
+        const company = companies.find(c => c.id === product.company_id);
+        const mainCategory = mainCategories.find(mc => mc.id === product.main_category_id);
+        const subcategory = subcategories.find(sc => sc.id === product.subcategory_id);
+
+        worksheet.addRow({
+          name: product.name || '',
+          barcode: product.barcode || '',
+          price: product.price || 0,
+          purchase_price: product.purchase_price || 0,
+          quantity: product.quantity || 0,
+          min_stock_level: product.min_stock_level || 5,
+          description: product.description || '',
+          company: company?.name || '',
+          main_category: mainCategory?.name || '',
+          subcategory: subcategory?.name || '',
+        });
+      }
+
+      // تنسيق جميع الخلايا
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) {
+          row.alignment = { vertical: 'middle', horizontal: 'right' };
+        }
+      });
+
+      // حفظ الملف
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      
+      const fileName = `المنتجات_${new Date().toISOString().split('T')[0]}.xlsx`;
+      saveAs(blob, fileName);
+
+      toast.success(`تم تصدير ${productsToExport.length} منتج بنجاح`);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      toast.error('فشل في تصدير الملف');
+    }
+  };
+
   return (
     <MainLayout>
       <div className="flex-1 space-y-4 p-4 pt-6">
         <div className="flex items-center justify-between space-y-2">
           <h2 className="text-3xl font-bold tracking-tight">إدارة المنتجات</h2>
-          <div className="flex items-center space-x-2 space-x-reverse">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleExportToExcel}>
+              <Download className="ml-2 h-4 w-4" />
+              تصدير Excel
+            </Button>
             <Button onClick={() => navigate("/add-product")}>
               <Plus className="ml-2 h-4 w-4" />
               إضافة منتج جديد
