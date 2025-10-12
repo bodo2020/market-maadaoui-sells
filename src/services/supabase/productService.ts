@@ -52,7 +52,8 @@ export async function fetchProducts() {
       const { data: branchProducts, error: branchProductsError } = await supabase
         .from("inventory")
         .select("product_id")
-        .eq("branch_id", currentBranchId);
+        .eq("branch_id", currentBranchId)
+        .limit(10000);
       
       if (branchProductsError) {
         console.error("Error fetching branch products:", branchProductsError);
@@ -78,7 +79,8 @@ export async function fetchProducts() {
     const { data: inventoryData, error: inventoryError } = await supabase
       .from("inventory")
       .select("product_id, quantity, min_stock_level")
-      .eq("branch_id", currentBranchId);
+      .eq("branch_id", currentBranchId)
+      .limit(10000);
 
     if (inventoryError) {
       console.error("Error fetching inventory:", inventoryError);
@@ -90,7 +92,8 @@ export async function fetchProducts() {
       const { data: pricingData, error: pricingError } = await supabase
         .from("branch_product_pricing")
         .select("product_id, sale_price, purchase_price, offer_price, is_offer")
-        .eq("branch_id", currentBranchId);
+        .eq("branch_id", currentBranchId)
+        .limit(10000);
 
       if (pricingError) {
         console.error("Error fetching branch pricing:", pricingError);
