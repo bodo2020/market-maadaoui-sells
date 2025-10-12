@@ -44,73 +44,89 @@ export async function fetchProducts() {
     const isIndependentInventory = branchData?.independent_inventory || false;
     const isIndependentPricing = branchData?.independent_pricing || false;
 
-    // Fetch products based on branch type
-    let productsQuery = supabase.from("products").select("*");
-    
-    // If branch has independent inventory, only show products in its inventory
-    if (isIndependentInventory) {
-      const { data: branchProducts, error: branchProductsError } = await supabase
-        .from("inventory")
-        .select("product_id")
-        .eq("branch_id", currentBranchId)
-        .limit(10000);
-      
-      if (branchProductsError) {
-        console.error("Error fetching branch products:", branchProductsError);
+    // Pagination to bypass PostgREST default 1000 row limit
+    const PAGE_SIZE = 1000;
+
+    // 1) Fetch products (join inventory when independent inventory is enabled)
+    let allProducts: any[] = [];
+    {
+      let from = 0;
+      while (true) {
+        let q = isIndependentInventory
+          ? supabase
+              .from("products")
+              .select("*, inventory!inner(branch_id)")
+              .eq("inventory.branch_id", currentBranchId)
+              .order("name")
+          : supabase.from("products").select("*").order("name");
+
+        const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
+        if (error) {
+          console.error("Error fetching products (paged):", error);
+          throw error;
+        }
+        if (!data || data.length === 0) break;
+        // Remove joined inventory object if present
+        const cleaned = data.map((p: any) => {
+          const { inventory, ...rest } = p || {};
+          return rest;
+        });
+        allProducts = allProducts.concat(cleaned);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
       }
-      
-      const productIds = (branchProducts || []).map(bp => bp.product_id);
-      if (productIds.length > 0) {
-        productsQuery = productsQuery.in("id", productIds);
-      } else {
-        // No products for this branch
-        return [];
+    }
+
+    // 2) Fetch inventory for current branch (paged)
+    let allInventory: any[] = [];
+    {
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("inventory")
+          .select("product_id, quantity, min_stock_level")
+          .eq("branch_id", currentBranchId)
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) {
+          console.error("Error fetching inventory (paged):", error);
+          break;
+        }
+        if (!data || data.length === 0) break;
+        allInventory = allInventory.concat(data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
       }
     }
 
-    const { data: productsData, error: productsError } = await productsQuery.order("name").limit(10000);
-
-    if (productsError) {
-      console.error("Error fetching products:", productsError);
-      throw productsError;
-    }
-
-    // Fetch inventory data for current branch
-    const { data: inventoryData, error: inventoryError } = await supabase
-      .from("inventory")
-      .select("product_id, quantity, min_stock_level")
-      .eq("branch_id", currentBranchId)
-      .limit(10000);
-
-    if (inventoryError) {
-      console.error("Error fetching inventory:", inventoryError);
-    }
-
-    // Fetch custom pricing if branch has independent pricing
+    // 3) Fetch branch pricing if needed (paged)
     let pricingMap = new Map();
     if (isIndependentPricing) {
-      const { data: pricingData, error: pricingError } = await supabase
-        .from("branch_product_pricing")
-        .select("product_id, sale_price, purchase_price, offer_price, is_offer")
-        .eq("branch_id", currentBranchId)
-        .limit(10000);
-
-      if (pricingError) {
-        console.error("Error fetching branch pricing:", pricingError);
+      let allPricing: any[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("branch_product_pricing")
+          .select("product_id, sale_price, purchase_price, offer_price, is_offer")
+          .eq("branch_id", currentBranchId)
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) {
+          console.error("Error fetching branch pricing (paged):", error);
+          break;
+        }
+        if (!data || data.length === 0) break;
+        allPricing = allPricing.concat(data);
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
       }
-
-      pricingMap = new Map(
-        (pricingData || []).map(price => [price.product_id, price])
-      );
+      pricingMap = new Map((allPricing || []).map((price: any) => [price.product_id, price]));
     }
 
     // Create a map of product_id to inventory data
-    const inventoryMap = new Map(
-      (inventoryData || []).map(inv => [inv.product_id, inv])
-    );
+    const inventoryMap = new Map((allInventory || []).map((inv: any) => [inv.product_id, inv]));
+
 
     // Merge products with inventory data and custom pricing
-    const productsWithInventory = (productsData || []).map(product => {
+    const productsWithInventory = (allProducts || []).map(product => {
       const inventory = inventoryMap.get(product.id);
       const customPricing = pricingMap.get(product.id);
 
