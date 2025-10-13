@@ -27,6 +27,7 @@ import {
   Activity,
   Calendar,
   Sparkles,
+  FileSpreadsheet,
 } from "lucide-react";
 import { SidebarItemData, NavigationGroup } from "./types";
 
@@ -88,6 +89,11 @@ export const productsNavigation: NavigationGroup = {
       label: "الجرد",
       href: "/daily-inventory",
       icon: ClipboardList,
+    },
+    {
+      label: "استيراد المخزون",
+      href: "/inventory-import",
+      icon: FileSpreadsheet,
     },
     {
       label: "إدارة الصلاحيات",

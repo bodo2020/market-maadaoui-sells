@@ -47,6 +47,7 @@ import ExpensesAndSalaries from "@/pages/ExpensesAndSalaries";
 import CustomerCartsPage from "@/pages/CustomerCartsPage";
 import SubcategoryDetails from "@/pages/SubcategoryDetails";
 import ProductDetails from "@/pages/ProductDetails";
+import InventoryImport from "@/pages/InventoryImport";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
@@ -86,6 +87,7 @@ function App() {
               <Route path="/daily-inventory" element={<ProtectedRoute><DailyInventoryPage /></ProtectedRoute>} />
               <Route path="/inventory-full" element={<ProtectedRoute><InventoryFullPage /></ProtectedRoute>} />
               <Route path="/inventory-history" element={<ProtectedRoute><InventoryHistoryPage /></ProtectedRoute>} />
+              <Route path="/inventory-import" element={<ProtectedRoute><InventoryImport /></ProtectedRoute>} />
               <Route path="/expiry-management" element={<ProtectedRoute><ExpiryManagement /></ProtectedRoute>} />
               <Route path="/supplier-purchases" element={<ProtectedRoute><SupplierPurchases /></ProtectedRoute>} />
               <Route path="/companies" element={<ProtectedRoute><Companies /></ProtectedRoute>} />
