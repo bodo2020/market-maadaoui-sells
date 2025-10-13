@@ -62,8 +62,8 @@ export default function InventoryImport() {
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return; // تخطي الصف الأول (العناوين)
         
-        const barcode = row.getCell(1).value; // العمود الأول
-        const quantity = row.getCell(2).value; // العمود الثاني
+        const barcode = row.getCell(2).value; // العمود الثاني = الباركود
+        const quantity = row.getCell(5).value; // العمود الخامس = الكمية
 
         if (barcode && quantity !== null && quantity !== undefined) {
           products.push({
