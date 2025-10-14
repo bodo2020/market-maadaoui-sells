@@ -26,9 +26,50 @@ import { getFavoriteProducts, addFavoriteProduct, removeFavoriteProduct } from "
 import { useBranchStore } from "@/stores/branchStore";
 
 export default function POS() {
+  // Initialize tabs state with default tab
+  const initializeTabs = (): POSTab[] => {
+    const savedTabs = localStorage.getItem('pos_tabs');
+    if (savedTabs) {
+      try {
+        const parsed = JSON.parse(savedTabs);
+        if (parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error('Error parsing saved tabs:', e);
+      }
+    }
+    // Create default tab if no saved tabs
+    return [{
+      id: `tab-${Date.now()}`,
+      tabName: "عميل 1",
+      cartItems: [],
+      selectedCustomer: "",
+      customerName: "",
+      customerPhone: "",
+      search: "",
+      searchResults: [],
+      createdAt: new Date()
+    }];
+  };
+
+  const initializeActiveTabId = (): string => {
+    const savedActiveId = localStorage.getItem('pos_active_tab');
+    if (savedActiveId) return savedActiveId;
+    
+    const savedTabs = localStorage.getItem('pos_tabs');
+    if (savedTabs) {
+      try {
+        const parsed = JSON.parse(savedTabs);
+        if (parsed.length > 0) return parsed[0].id;
+      } catch (e) {
+        // Ignore error
+      }
+    }
+    return `tab-${Date.now()}`;
+  };
+
   // Tabs Management
-  const [tabs, setTabs] = useState<POSTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string>("");
+  const [tabs, setTabs] = useState<POSTab[]>(initializeTabs);
+  const [activeTabId, setActiveTabId] = useState<string>(initializeActiveTabId);
   
   // Shared state (not tab-specific)
   const [weightInput, setWeightInput] = useState<string>("");
@@ -156,27 +197,9 @@ export default function POS() {
   };
   const debouncedSearch = useDebounce(search, 500);
 
-  // Initialize tabs from localStorage or create first tab
+  // Save tabs to localStorage whenever they change
   useEffect(() => {
-    const savedTabs = localStorage.getItem('pos_tabs');
-    const savedActiveId = localStorage.getItem('pos_active_tab');
-    
-    if (savedTabs) {
-      try {
-        const parsed = JSON.parse(savedTabs);
-        setTabs(parsed);
-        setActiveTabId(savedActiveId || parsed[0]?.id || "");
-      } catch (e) {
-        createNewTab();
-      }
-    } else {
-      createNewTab();
-    }
-  }, []);
-
-  // Save tabs to localStorage
-  useEffect(() => {
-    if (tabs.length > 0) {
+    if (tabs.length > 0 && activeTabId) {
       localStorage.setItem('pos_tabs', JSON.stringify(tabs));
       localStorage.setItem('pos_active_tab', activeTabId);
     }
