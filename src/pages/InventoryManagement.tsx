@@ -155,45 +155,82 @@ export default function InventoryManagement() {
     try {
       if (!currentBranch) return;
 
-      // الخطوة 1: جلب جميع المنتجات (بدون فلترة)
-      const { data: allProducts, error: productsError } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          barcode,
-          price,
-          purchase_price,
-          image_urls,
-          shelf_location,
-          expiry_date,
-          unit_of_measure
-        `)
-        .order('name');
+      // الخطوة 1: جلب جميع المنتجات مع pagination لتجاوز حد 1000
+      let allProducts: any[] = [];
+      const PAGE_SIZE = 1000;
+      let from = 0;
+      
+      while (true) {
+        const { data, error } = await supabase
+          .from('products')
+          .select(`
+            id,
+            name,
+            barcode,
+            price,
+            purchase_price,
+            image_urls,
+            shelf_location,
+            expiry_date,
+            unit_of_measure
+          `)
+          .order('name')
+          .range(from, from + PAGE_SIZE - 1);
 
-      if (productsError) throw productsError;
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        allProducts = allProducts.concat(data);
+        
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
 
-      // الخطوة 2: جلب المخزون للفرع الحالي
-      const { data: inventoryData, error: invError } = await supabase
-        .from('inventory')
-        .select('product_id, quantity')
-        .eq('branch_id', currentBranch);
+      // الخطوة 2: جلب المخزون للفرع الحالي مع pagination
+      let inventoryData: any[] = [];
+      from = 0;
+      
+      while (true) {
+        const { data, error } = await supabase
+          .from('inventory')
+          .select('product_id, quantity')
+          .eq('branch_id', currentBranch)
+          .range(from, from + PAGE_SIZE - 1);
 
-      if (invError) throw invError;
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        inventoryData = inventoryData.concat(data);
+        
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
 
-      // الخطوة 3: جلب إعدادات التنبيهات
-      const { data: alertsData, error: alertsError } = await supabase
-        .from('inventory_alerts')
-        .select('product_id, min_stock_level, alert_enabled');
+      // الخطوة 3: جلب إعدادات التنبيهات مع pagination
+      let alertsData: any[] = [];
+      from = 0;
+      
+      while (true) {
+        const { data, error } = await supabase
+          .from('inventory_alerts')
+          .select('product_id, min_stock_level, alert_enabled')
+          .range(from, from + PAGE_SIZE - 1);
 
-      if (alertsError) throw alertsError;
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        
+        alertsData = alertsData.concat(data);
+        
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
 
       // إنشاء Maps للوصول السريع
-      const inventoryMap = new Map(inventoryData?.map(inv => [inv.product_id, inv.quantity]) || []);
-      const alertsMap = new Map(alertsData?.map(a => [a.product_id, a]) || []);
+      const inventoryMap = new Map(inventoryData.map(inv => [inv.product_id, inv.quantity]));
+      const alertsMap = new Map(alertsData.map(a => [a.product_id, a]));
 
       // دمج البيانات: جميع المنتجات مع الكمية من المخزون (0 إذا لم توجد)
-      const formattedInventory = (allProducts || []).map(product => {
+      const formattedInventory = allProducts.map(product => {
         const quantity = inventoryMap.get(product.id) || 0;
         const alert = alertsMap.get(product.id);
         
