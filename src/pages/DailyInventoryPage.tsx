@@ -105,31 +105,7 @@ export default function DailyInventoryPage() {
 
   const startNewInventory = async (type: 'daily' | 'full' = 'daily') => {
     try {
-      const allProducts = await fetchProducts();
-      let selectedProducts: Product[];
-      
-      if (type === 'full') {
-        // جرد كامل - كل المنتجات
-        selectedProducts = allProducts;
-        setInventoryType('full');
-        // فتح صفحة جديدة لعرض جميع المنتجات
-        navigate('/inventory-full');
-        return;
-      } else {
-        // جرد عادي - اختيار عشوائي
-        const randomCount = Math.floor(Math.random() * 6) + 10;
-        const shuffled = allProducts.sort(() => 0.5 - Math.random());
-        selectedProducts = shuffled.slice(0, randomCount);
-        setInventoryType('daily');
-      }
-      
-      const inventoryData = selectedProducts.map(product => ({
-        product_id: product.id,
-        expected_quantity: product.quantity || 0,
-        purchase_price: product.purchase_price
-      }));
-      
-      // تحديد الفرع الحالي (من التخزين المحلي أو أول فرع فعّال)
+      // الحصول على الفرع الحالي أولاً
       let branchId = getBranchId();
       if (!branchId) {
         const { data } = await supabase
@@ -144,16 +120,80 @@ export default function DailyInventoryPage() {
           if (data?.[0]?.name) localStorage.setItem('currentBranchName', data[0].name);
         }
       }
+
+      if (!branchId) {
+        toast({
+          title: "خطأ",
+          description: "لم يتم العثور على فرع نشط",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // جلب جميع المنتجات من المخزون للفرع الحالي
+      const { data: inventoryItems, error: invError } = await supabase
+        .from('inventory')
+        .select('product_id, quantity')
+        .eq('branch_id', branchId);
+
+      if (invError) throw invError;
+
+      if (!inventoryItems || inventoryItems.length === 0) {
+        toast({
+          title: "تحذير",
+          description: "لا توجد منتجات في مخزون هذا الفرع",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // جلب بيانات المنتجات
+      const productIds = inventoryItems.map(item => item.product_id);
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('id, purchase_price')
+        .in('id', productIds);
+
+      if (productsError) throw productsError;
+
+      const productPriceMap = new Map(
+        (productsData || []).map(p => [p.id, p.purchase_price || 0])
+      );
+
+      let selectedProducts: any[];
       
-      await createInventoryRecords(inventoryData, branchId || undefined);
+      if (type === 'full') {
+        // جرد كامل - كل المنتجات في المخزون
+        selectedProducts = inventoryItems;
+        setInventoryType('full');
+        navigate('/inventory-full');
+        return;
+      } else {
+        // جرد يومي - اختيار عشوائي من المخزون
+        const randomCount = Math.min(
+          Math.floor(Math.random() * 6) + 10, 
+          inventoryItems.length
+        );
+        const shuffled = inventoryItems.sort(() => 0.5 - Math.random());
+        selectedProducts = shuffled.slice(0, randomCount);
+        setInventoryType('daily');
+      }
+      
+      const inventoryData = selectedProducts.map(item => ({
+        product_id: item.product_id,
+        expected_quantity: item.quantity || 0,
+        purchase_price: productPriceMap.get(item.product_id) || 0
+      }));
+      
+      await createInventoryRecords(inventoryData, branchId);
       
       // إعادة تحميل البيانات
-      const newRecords = await fetchInventoryRecordsByDate(currentDate, branchId || undefined);
+      const newRecords = await fetchInventoryRecordsByDate(currentDate, branchId);
       setInventoryRecords(newRecords);
       
       toast({
         title: "تم إنشاء جرد جديد",
-        description: `تم اختيار ${selectedProducts.length} منتج للجرد`,
+        description: `تم اختيار ${selectedProducts.length} منتج للجرد من فرع ${localStorage.getItem('currentBranchName') || 'الحالي'}`,
       });
     } catch (error) {
       console.error("Error creating new inventory:", error);

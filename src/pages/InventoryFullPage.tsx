@@ -90,14 +90,7 @@ export default function InventoryFullPage() {
 
   const startFullInventory = async () => {
     try {
-      const allProducts = await fetchProducts();
-      
-      const inventoryData = allProducts.map(product => ({
-        product_id: product.id,
-        expected_quantity: product.quantity || 0,
-        purchase_price: product.purchase_price
-      }));
-      
+      // الحصول على الفرع الحالي
       let branchId = getBranchId();
       if (!branchId) {
         const { data } = await supabase
@@ -112,15 +105,60 @@ export default function InventoryFullPage() {
           if (data?.[0]?.name) localStorage.setItem('currentBranchName', data[0].name);
         }
       }
+
+      if (!branchId) {
+        toast({
+          title: "خطأ",
+          description: "لم يتم العثور على فرع نشط",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // جلب جميع المنتجات من المخزون للفرع الحالي
+      const { data: inventoryItems, error: invError } = await supabase
+        .from('inventory')
+        .select('product_id, quantity')
+        .eq('branch_id', branchId);
+
+      if (invError) throw invError;
+
+      if (!inventoryItems || inventoryItems.length === 0) {
+        toast({
+          title: "تحذير",
+          description: "لا توجد منتجات في مخزون هذا الفرع",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // جلب بيانات المنتجات
+      const productIds = inventoryItems.map(item => item.product_id);
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('id, purchase_price')
+        .in('id', productIds);
+
+      if (productsError) throw productsError;
+
+      const productPriceMap = new Map(
+        (productsData || []).map(p => [p.id, p.purchase_price || 0])
+      );
+
+      const inventoryData = inventoryItems.map(item => ({
+        product_id: item.product_id,
+        expected_quantity: item.quantity || 0,
+        purchase_price: productPriceMap.get(item.product_id) || 0
+      }));
       
-      await createInventoryRecords(inventoryData, branchId || undefined);
+      await createInventoryRecords(inventoryData, branchId);
       
-      const newRecords = await fetchInventoryRecordsByDate(currentDate, branchId || undefined);
+      const newRecords = await fetchInventoryRecordsByDate(currentDate, branchId);
       setInventoryRecords(newRecords);
       
       toast({
         title: "تم إنشاء الجرد الكامل",
-        description: `تم إنشاء جرد لـ ${allProducts.length} منتج`,
+        description: `تم إنشاء جرد لـ ${inventoryItems.length} منتج من فرع ${localStorage.getItem('currentBranchName') || 'الحالي'}`,
       });
     } catch (error) {
       console.error("Error creating full inventory:", error);

@@ -137,6 +137,12 @@ export const updateInventoryRecord = async (
 export const fetchInventoryRecordsByDate = async (date: string, branchId?: string) => {
   console.log(`Fetching inventory records for date: ${date}, branch: ${branchId}`);
   
+  // إذا لم يتم تمرير branchId، استخدم الفرع الحالي من localStorage
+  let targetBranchId = branchId;
+  if (!targetBranchId) {
+    targetBranchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+  }
+
   let query = supabase
     .from('inventory_records')
     .select(`
@@ -154,8 +160,8 @@ export const fetchInventoryRecordsByDate = async (date: string, branchId?: strin
     .order('created_at', { ascending: false });
 
   // Only add branch filter if branchId is provided and not null
-  if (branchId && branchId !== 'null') {
-    query = query.eq('branch_id', branchId);
+  if (targetBranchId && targetBranchId !== 'null') {
+    query = query.eq('branch_id', targetBranchId);
   }
 
   const { data, error } = await query;

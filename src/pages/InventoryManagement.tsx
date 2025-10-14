@@ -6,6 +6,13 @@ import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Card, 
   CardContent, 
@@ -65,26 +72,34 @@ export default function InventoryManagement() {
   const [isAddStockDialogOpen, setIsAddStockDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [stockToAdd, setStockToAdd] = useState(0);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [currentBranch, setCurrentBranch] = useState<string>("");
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
   
   useEffect(() => {
-    loadProducts();
-    
-    // Check for low stock and display notifications
-    const checkStock = async () => {
-      await checkLowStockProducts();
-      showLowStockToasts();
-    };
-    
-    checkStock();
+    loadBranches();
   }, []);
+
+  useEffect(() => {
+    if (currentBranch) {
+      loadProducts();
+      
+      // Check for low stock and display notifications
+      const checkStock = async () => {
+        await checkLowStockProducts();
+        showLowStockToasts();
+      };
+      
+      checkStock();
+    }
+  }, [currentBranch]);
 
   // Add effect to reload data when returning from edit page
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && currentBranch) {
         loadProducts();
       }
     };
@@ -93,99 +108,110 @@ export default function InventoryManagement() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [currentBranch]);
+
+  const loadBranches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('id, name')
+        .eq('active', true)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setBranches(data || []);
+      
+      // تعيين الفرع الحالي من localStorage أو أول فرع
+      const savedBranchId = getBranchId();
+      if (savedBranchId && data?.some(b => b.id === savedBranchId)) {
+        setCurrentBranch(savedBranchId);
+      } else if (data && data.length > 0) {
+        setCurrentBranch(data[0].id);
+        localStorage.setItem('currentBranchId', data[0].id);
+        localStorage.setItem('currentBranchName', data[0].name);
+      }
+    } catch (error) {
+      console.error("Error loading branches:", error);
+      toast({
+        title: "خطأ",
+        description: "حدث خطأ أثناء تحميل الفروع",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleBranchChange = (branchId: string) => {
+    setCurrentBranch(branchId);
+    const branch = branches.find(b => b.id === branchId);
+    if (branch) {
+      localStorage.setItem('currentBranchId', branchId);
+      localStorage.setItem('currentBranchName', branch.name);
+    }
+  };
 
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const branchId = getBranchId();
-      
-      // جلب المخزون من جدول inventory للفرع المحدد
-      let inventoryQuery = supabase
+      if (!currentBranch) return;
+
+      // الخطوة 1: جلب جميع المنتجات (بدون فلترة)
+      const { data: allProducts, error: productsError } = await supabase
+        .from('products')
+        .select(`
+          id,
+          name,
+          barcode,
+          price,
+          purchase_price,
+          image_urls,
+          shelf_location,
+          expiry_date,
+          unit_of_measure
+        `)
+        .order('name');
+
+      if (productsError) throw productsError;
+
+      // الخطوة 2: جلب المخزون للفرع الحالي
+      const { data: inventoryData, error: invError } = await supabase
         .from('inventory')
-        .select('product_id, quantity, branch_id')
-        .order('quantity', { ascending: true });
-
-      if (branchId) {
-        inventoryQuery = inventoryQuery.eq('branch_id', branchId);
-      }
-
-      const { data: inventoryData, error: invError } = await inventoryQuery;
+        .select('product_id, quantity')
+        .eq('branch_id', currentBranch);
 
       if (invError) throw invError;
 
-      if (!inventoryData || inventoryData.length === 0) {
-        setInventory([]);
-        setLowStockProducts([]);
-        setLoading(false);
-        return;
-      }
+      // الخطوة 3: جلب إعدادات التنبيهات
+      const { data: alertsData, error: alertsError } = await supabase
+        .from('inventory_alerts')
+        .select('product_id, min_stock_level, alert_enabled');
 
-      // جلب بيانات المنتجات في batches (100 منتج في كل مرة)
-      const productIds = inventoryData.map(inv => inv.product_id);
-      const batchSize = 100;
-      const batches = [];
-      
-      for (let i = 0; i < productIds.length; i += batchSize) {
-        batches.push(productIds.slice(i, i + batchSize));
-      }
+      if (alertsError) throw alertsError;
 
-      // جلب كل الـ batches
-      const productsDataPromises = batches.map(batch =>
-        supabase
-          .from('products')
-          .select(`
-            id,
-            name,
-            barcode,
-            price,
-            purchase_price,
-            image_urls,
-            shelf_location,
-            expiry_date,
-            unit_of_measure
-          `)
-          .in('id', batch)
-      );
-
-      const productsResults = await Promise.all(productsDataPromises);
-      
-      // دمج النتائج
-      const productsData = productsResults.flatMap(result => result.data || []);
-
-      // جلب إعدادات التنبيهات في batches أيضاً
-      const alertsPromises = batches.map(batch =>
-        supabase
-          .from('inventory_alerts')
-          .select('product_id, min_stock_level, alert_enabled')
-          .in('product_id', batch)
-      );
-
-      const alertsResults = await Promise.all(alertsPromises);
-      const alertsData = alertsResults.flatMap(result => result.data || []);
-
-      // دمج البيانات
-      const productMap = new Map(productsData?.map(p => [p.id, p]) || []);
+      // إنشاء Maps للوصول السريع
+      const inventoryMap = new Map(inventoryData?.map(inv => [inv.product_id, inv.quantity]) || []);
       const alertsMap = new Map(alertsData?.map(a => [a.product_id, a]) || []);
 
-      const formattedInventory = inventoryData.map(item => {
-        const product = productMap.get(item.product_id);
-        const alert = alertsMap.get(item.product_id);
+      // دمج البيانات: جميع المنتجات مع الكمية من المخزون (0 إذا لم توجد)
+      const formattedInventory = (allProducts || []).map(product => {
+        const quantity = inventoryMap.get(product.id) || 0;
+        const alert = alertsMap.get(product.id);
         
         return {
-          id: product?.id || '',
-          name: product?.name || '',
-          barcode: product?.barcode,
-          price: product?.price || 0,
-          purchase_price: product?.purchase_price || 0,
-          quantity: item.quantity,
-          image_urls: product?.image_urls,
-          shelf_location: product?.shelf_location,
-          expiry_date: product?.expiry_date,
-          unit_of_measure: product?.unit_of_measure,
-          inventory_alerts: alert
+          id: product.id,
+          name: product.name,
+          barcode: product.barcode,
+          price: product.price || 0,
+          purchase_price: product.purchase_price || 0,
+          quantity: quantity,
+          image_urls: product.image_urls,
+          shelf_location: product.shelf_location,
+          expiry_date: product.expiry_date,
+          unit_of_measure: product.unit_of_measure,
+          inventory_alerts: alert,
+          branch_id: currentBranch
         };
-      }).filter(item => item.id); // فلترة أي منتجات محذوفة
+      });
 
       // فلترة المنتجات منخفضة المخزون
       const lowStock = formattedInventory.filter(product => {
@@ -218,16 +244,15 @@ export default function InventoryManagement() {
     if (selectedProduct && stockToAdd > 0) {
       setLoading(true);
       try {
-        const branchId = getBranchId();
-        
-        // تحديث الكمية في جدول inventory
+        // تحديث أو إنشاء سجل المخزون
         const { error } = await supabase
           .from('inventory')
-          .update({ 
-            quantity: (selectedProduct.quantity || 0) + stockToAdd 
-          })
-          .eq('product_id', selectedProduct.id)
-          .eq('branch_id', branchId);
+          .upsert({ 
+            product_id: selectedProduct.id,
+            branch_id: currentBranch,
+            quantity: (selectedProduct.quantity || 0) + stockToAdd,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'product_id,branch_id' });
 
         if (error) throw error;
         
@@ -373,7 +398,26 @@ export default function InventoryManagement() {
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">إدارة المخزون</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold">إدارة المخزون</h1>
+          {branches.length > 1 && (
+            <div className="flex items-center gap-2">
+              <Label>الفرع:</Label>
+              <Select value={currentBranch} onValueChange={handleBranchChange}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="اختر الفرع" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map(branch => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button variant="outline">
             <Filter className="ml-2 h-4 w-4" />
