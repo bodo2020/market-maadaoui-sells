@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,21 +8,49 @@ import { supabase } from "@/integrations/supabase/client";
 import * as ExcelJS from "exceljs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface ProductData {
   barcode: string;
   quantity: number;
 }
 
+interface Branch {
+  id: string;
+  name: string;
+}
+
 export default function InventoryImport() {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [results, setResults] = useState<{
     total: number;
     success: number;
     failed: number;
   } | null>(null);
+
+  useEffect(() => {
+    loadBranches();
+  }, []);
+
+  const loadBranches = async () => {
+    const { data, error } = await supabase
+      .from("branches")
+      .select("id, name")
+      .eq("active", true)
+      .order("name");
+
+    if (!error && data) {
+      setBranches(data);
+      if (data.length > 0) {
+        setSelectedBranchId(data[0].id);
+      }
+    }
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -42,6 +70,11 @@ export default function InventoryImport() {
   const processExcelFile = async () => {
     if (!file) {
       toast.error("يرجى اختيار ملف أولاً");
+      return;
+    }
+
+    if (!selectedBranchId) {
+      toast.error("يرجى اختيار الفرع أولاً");
       return;
     }
 
@@ -100,14 +133,15 @@ export default function InventoryImport() {
             continue;
           }
 
-          // تحديث الكمية في جميع الفروع
+          // تحديث الكمية في الفرع المحدد فقط
           const { error: updateError } = await supabase
             .from("inventory")
             .update({ 
               quantity: product.quantity,
               updated_at: new Date().toISOString()
             })
-            .eq("product_id", productData.id);
+            .eq("product_id", productData.id)
+            .eq("branch_id", selectedBranchId);
 
           if (updateError) {
             console.error(`Update error for ${product.barcode}:`, updateError);
@@ -158,6 +192,23 @@ export default function InventoryImport() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* اختيار الفرع */}
+            <div className="space-y-2">
+              <Label htmlFor="branch-select">اختر الفرع</Label>
+              <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
+                <SelectTrigger id="branch-select">
+                  <SelectValue placeholder="اختر الفرع" />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* منطقة رفع الملف */}
             <div className="border-2 border-dashed rounded-lg p-8 text-center">
               <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -211,7 +262,7 @@ export default function InventoryImport() {
             {/* زر المعالجة */}
             <Button
               onClick={processExcelFile}
-              disabled={!file || isProcessing}
+              disabled={!file || isProcessing || !selectedBranchId}
               className="w-full"
               size="lg"
             >
@@ -225,9 +276,10 @@ export default function InventoryImport() {
                 <div className="space-y-2 text-sm">
                   <p className="font-semibold">تعليمات:</p>
                   <ul className="list-disc list-inside space-y-1">
+                    <li>يجب اختيار الفرع المراد تحديث مخزونه</li>
                     <li>يجب أن يحتوي الملف على عمود باسم "الباركود" أو "barcode"</li>
                     <li>يجب أن يحتوي الملف على عمود باسم "الكمية" أو "quantity"</li>
-                    <li>سيتم تحديث الكميات في جميع الفروع</li>
+                    <li>سيتم تحديث الكميات في الفرع المحدد فقط</li>
                     <li>المنتجات التي لا يوجد لها باركود مطابق سيتم تجاهلها</li>
                   </ul>
                 </div>
