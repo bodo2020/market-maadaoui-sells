@@ -479,16 +479,6 @@ export default function POS() {
         handleAddToCart(exactMatch);
         setSearch("");
       } else if (results.length === 1 && results[0].barcode_type === "scale") {
-        // Check stock before opening weight dialog
-        if ((results[0].quantity || 0) <= 0) {
-          toast({
-            title: "❌ منتج الميزان غير متوفر",
-            description: `المنتج "${results[0].name}" غير متوفر في المخزون`,
-            variant: "destructive"
-          });
-          setSearch("");
-          return; // Don't open weight dialog
-        }
         setCurrentScaleProduct(results[0]);
         setShowWeightDialog(true);
         setSearch("");
@@ -503,42 +493,6 @@ export default function POS() {
     }
   };
   const handleAddToCart = (product: Product) => {
-    // 1. Check available stock
-    const currentQuantityInCart = cartItems
-      .filter(item => item.product.id === product.id && !item.isBulk)
-      .reduce((sum, item) => sum + item.quantity, 0);
-    
-    const availableStock = product.quantity || 0;
-    
-    // 2. Check if exceeding stock limit
-    if (currentQuantityInCart + 1 > availableStock) {
-      toast({
-        title: "⚠️ تحذير: المخزون غير كافٍ",
-        description: `الكمية المتوفرة: ${availableStock} - في السلة: ${currentQuantityInCart}`,
-        variant: "destructive"
-      });
-      return; // Prevent adding
-    }
-    
-    // 3. If stock is 0
-    if (availableStock === 0) {
-      toast({
-        title: "❌ المنتج غير متوفر",
-        description: `المنتج "${product.name}" غير متوفر في المخزون`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // 4. Warning if stock is low (less than 5)
-    if (availableStock - currentQuantityInCart <= 5 && availableStock - currentQuantityInCart > 0) {
-      toast({
-        title: "⚠️ تنبيه: المخزون قليل",
-        description: `باقي ${availableStock - currentQuantityInCart} فقط`,
-        className: "bg-yellow-50 border-yellow-200 text-yellow-800"
-      });
-    }
-
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
       setCartItems(cartItems.map(item => item.product.id === product.id ? {
@@ -574,49 +528,6 @@ export default function POS() {
     setSearchResults([]);
   };
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
-    const availableStock = product.quantity || 0;
-    
-    // 1. Check if stock is 0
-    if (availableStock <= 0) {
-      toast({
-        title: "❌ منتج الميزان غير متوفر",
-        description: `المنتج "${product.name}" غير متوفر في المخزون حالياً`,
-        variant: "destructive"
-      });
-      // Close weight dialog
-      setShowWeightDialog(false);
-      setCurrentScaleProduct(null);
-      setWeightInput("");
-      return;
-    }
-    
-    // 2. Calculate current weight in cart
-    const currentWeightInCart = cartItems
-      .filter(item => item.product.id === product.id && item.weight !== null)
-      .reduce((sum, item) => sum + (item.weight || 0), 0);
-    
-    const totalWeight = currentWeightInCart + weight;
-    
-    // 3. Check if exceeding stock (assuming product.quantity is in kg)
-    if (totalWeight > availableStock) {
-      toast({
-        title: "⚠️ الوزن المطلوب غير متوفر",
-        description: `المتوفر: ${availableStock} كجم - في السلة: ${currentWeightInCart.toFixed(2)} كجم`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // 4. Warning if remaining stock is low
-    const remaining = availableStock - totalWeight;
-    if (remaining < 1 && remaining > 0) {
-      toast({
-        title: "⚠️ المخزون على وشك النفاد",
-        description: `باقي ${remaining.toFixed(2)} كجم فقط`,
-        className: "bg-yellow-50 border-yellow-200 text-yellow-800"
-      });
-    }
-
     const itemPrice = product.price * weight;
     const discountPerKg = product.is_offer && product.offer_price ? product.price - product.offer_price : 0;
     setCartItems([...cartItems, {
@@ -647,26 +558,6 @@ export default function POS() {
     setWeightInput("");
   };
   const handleAddBulkToCart = (product: Product) => {
-    const bulkQty = product.bulk_quantity || 0;
-    
-    // 1. Calculate current bulk quantity in cart
-    const currentBulkInCart = cartItems
-      .filter(item => item.product.id === product.id && item.isBulk)
-      .reduce((sum, item) => sum + item.quantity, 0);
-    
-    const totalNeeded = currentBulkInCart + bulkQty;
-    const availableStock = product.quantity || 0;
-    
-    // 2. Check if bulk quantity is available
-    if (totalNeeded > availableStock) {
-      toast({
-        title: "❌ عبوة الجملة غير متوفرة",
-        description: `المطلوب: ${totalNeeded} - المتوفر: ${availableStock}`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
     if (!product.bulk_enabled || !product.bulk_quantity || !product.bulk_price) {
       toast({
         title: "خطأ",
@@ -1131,24 +1022,19 @@ export default function POS() {
                   <h3 className="font-semibold">نتائج البحث</h3>
                   
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {searchResults.map(product => {
-                      const availableStock = product.quantity || 0;
-                      const isOutOfStock = availableStock === 0;
-                      
-                      return (
-                        <Card 
-                          key={product.id} 
-                          className={`cursor-pointer transition-colors ${isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-                          onClick={() => {
-                            if (isOutOfStock) return;
-                            if (product.barcode_type === "scale") {
-                              setCurrentScaleProduct(product);
-                              setShowWeightDialog(true);
-                            } else {
-                              handleAddToCart(product);
-                            }
-                          }}
-                        >
+                    {searchResults.map(product => (
+                      <Card 
+                        key={product.id} 
+                        className="cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => {
+                          if (product.barcode_type === "scale") {
+                            setCurrentScaleProduct(product);
+                            setShowWeightDialog(true);
+                          } else {
+                            handleAddToCart(product);
+                          }
+                        }}
+                      >
                         <CardContent className="p-3">
                           <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
                             <img src={product.image_urls?.[0] || "/placeholder.svg"} alt={product.name} className="h-16 w-16 object-contain" />
@@ -1156,11 +1042,6 @@ export default function POS() {
                           <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
                           
                           <div className="flex gap-1 my-1 flex-wrap">
-                            {/* Stock Badge */}
-                            <Badge variant={availableStock > 10 ? "default" : availableStock > 0 ? "secondary" : "destructive"} className="text-xs">
-                              المخزون: {availableStock}
-                            </Badge>
-                            
                             {product.barcode_type === "scale" && <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
                                 <Scale className="h-3 w-3 ml-1" />
                                 بالوزن
@@ -1183,8 +1064,7 @@ export default function POS() {
                           </div>
                         </CardContent>
                       </Card>
-                      );
-                    })}
+                    ))}
                   </div>
                 </div>}
               
@@ -1202,24 +1082,19 @@ export default function POS() {
                   </div> : products.length === 0 ? <div className="text-center py-6 text-muted-foreground">
                     <p>لا توجد منتجات متاحة</p>
                   </div> : <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {getDisplayedProducts().map(product => {
-                      const availableStock = product.quantity || 0;
-                      const isOutOfStock = availableStock === 0;
-                      
-                      return (
-                        <Card 
-                          key={product.id} 
-                          className={`cursor-pointer transition-colors relative group ${isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'}`}
-                          onClick={() => {
-                            if (isOutOfStock) return;
-                            if (product.barcode_type === "scale") {
-                              setCurrentScaleProduct(product);
-                              setShowWeightDialog(true);
-                            } else {
-                              handleAddToCart(product);
-                            }
-                          }}
-                        >
+                    {getDisplayedProducts().map(product => (
+                      <Card 
+                        key={product.id} 
+                        className="cursor-pointer hover:bg-gray-50 transition-colors relative group"
+                        onClick={() => {
+                          if (product.barcode_type === "scale") {
+                            setCurrentScaleProduct(product);
+                            setShowWeightDialog(true);
+                          } else {
+                            handleAddToCart(product);
+                          }
+                        }}
+                      >
                         <CardContent className="p-3">
                           <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2 relative">
                             <img src={product.image_urls?.[0] || "/placeholder.svg"} alt={product.name} className="h-16 w-16 object-contain" />
@@ -1233,7 +1108,7 @@ export default function POS() {
                             </Button>
                             
                             {/* Bulk Purchase Button */}
-                            {product.bulk_enabled && !isOutOfStock && <Button 
+                            {product.bulk_enabled && <Button 
                               variant="secondary" 
                               size="sm" 
                               className="absolute bottom-1 left-1 h-6 px-2 text-xs bg-amber-500/90 hover:bg-amber-600 text-white opacity-80 hover:opacity-100 transition-opacity" 
@@ -1241,7 +1116,6 @@ export default function POS() {
                                 e.stopPropagation();
                                 handleAddBulkToCart(product);
                               }}
-                              disabled={isOutOfStock}
                             >
                               <Box className="h-3 w-3 ml-1" />
                               جملة
@@ -1250,11 +1124,6 @@ export default function POS() {
                           <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
                           
                           <div className="flex gap-1 my-1 flex-wrap">
-                            {/* Stock Badge */}
-                            <Badge variant={availableStock > 10 ? "default" : availableStock > 0 ? "secondary" : "destructive"} className="text-xs">
-                              المخزون: {availableStock}
-                            </Badge>
-                            
                             {product.barcode_type === "scale" && <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
                                 <Scale className="h-3 w-3 ml-1" />
                                 بالوزن
@@ -1281,8 +1150,7 @@ export default function POS() {
                           </div>
                         </CardContent>
                       </Card>
-                      );
-                    })}
+                    ))}
                   </div>}
               </div>
             </CardContent>
