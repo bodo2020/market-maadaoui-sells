@@ -720,14 +720,6 @@ export default function POS() {
       if (i === index) {
         if (item.weight !== null && change > 0) return item;
         const newQuantity = Math.max(1, item.quantity + change);
-        if (change > 0 && newQuantity > (item.product.quantity || 0)) {
-          toast({
-            title: "الكمية غير متوفرة",
-            description: `الكمية المتوفرة من المنتج "${item.product.name}" هي ${item.product.quantity}`,
-            variant: "destructive"
-          });
-          return item;
-        }
         let price = item.price;
         let total = item.weight !== null ? item.price : newQuantity * price;
         return {
