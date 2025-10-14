@@ -1106,8 +1106,16 @@ export default function POS() {
                         }}
                       >
                         <CardContent className="p-3">
-                          <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
+                          <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2 relative">
                             <img src={product.image_urls?.[0] || "/placeholder.svg"} alt={product.name} className="h-16 w-16 object-contain" />
+                            
+                            {/* Pin Button */}
+                            <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 bg-white/90 hover:bg-white opacity-70 hover:opacity-100 transition-opacity" onClick={e => {
+                        e.stopPropagation();
+                        togglePinProduct(product.id);
+                      }}>
+                              {pinnedProducts.includes(product.id) ? <Pin className="h-3 w-3 text-primary" /> : <PinOff className="h-3 w-3" />}
+                            </Button>
                           </div>
                           <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
                           
