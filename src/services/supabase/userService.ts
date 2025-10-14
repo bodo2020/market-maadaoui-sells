@@ -237,6 +237,8 @@ export async function authenticateUser(username: string, password: string, branc
 
 export async function createUser(user: Omit<User, "id" | "created_at" | "updated_at" | "shifts">) {
   try {
+    console.log("Creating user with data:", user);
+    
     const { data, error } = await supabase
       .from("users")
       .insert([{
@@ -256,10 +258,14 @@ export async function createUser(user: Omit<User, "id" | "created_at" | "updated
     }
 
     const newUser = data[0];
+    console.log("User created successfully:", newUser);
 
     // Add user to current branch (except super_admin)
     if (newUser.role !== 'super_admin') {
       const currentBranchId = localStorage.getItem("currentBranchId");
+      const currentBranchName = localStorage.getItem("currentBranchName");
+      
+      console.log("Adding user to branch:", { currentBranchId, currentBranchName });
       
       if (currentBranchId) {
         const { error: roleError } = await supabase
@@ -272,8 +278,12 @@ export async function createUser(user: Omit<User, "id" | "created_at" | "updated
 
         if (roleError) {
           console.error("Error adding user to branch:", roleError);
-          // Don't throw, user is created but not assigned to branch
+          throw roleError; // Throw error instead of silently failing
         }
+        
+        console.log("User successfully added to branch");
+      } else {
+        console.warn("No current branch ID found in localStorage");
       }
     }
 
@@ -327,6 +337,20 @@ export async function updateUser(id: string, user: Partial<User>) {
 
 export async function deleteUser(id: string) {
   try {
+    console.log("Attempting to delete user:", id);
+    
+    // Delete user_branch_roles first (foreign key constraint)
+    const { error: branchRolesError } = await supabase
+      .from("user_branch_roles")
+      .delete()
+      .eq("user_id", id);
+
+    if (branchRolesError) {
+      console.error("Error deleting user branch roles:", branchRolesError);
+      throw branchRolesError;
+    }
+
+    // Delete shifts
     const { error: shiftsError } = await supabase
       .from("shifts")
       .delete()
@@ -337,6 +361,7 @@ export async function deleteUser(id: string) {
       throw shiftsError;
     }
 
+    // Finally delete user
     const { error } = await supabase
       .from("users")
       .delete()
@@ -347,6 +372,7 @@ export async function deleteUser(id: string) {
       throw error;
     }
 
+    console.log("User deleted successfully:", id);
     return true;
   } catch (error) {
     console.error("Error in deleteUser:", error);
