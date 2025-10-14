@@ -292,15 +292,3 @@ export interface Order {
   area?: string;
   neighborhood?: string;
 }
-
-export interface POSTab {
-  id: string;
-  tabName: string;
-  cartItems: CartItem[];
-  selectedCustomer: string;
-  customerName: string;
-  customerPhone: string;
-  search: string;
-  searchResults: Product[];
-  createdAt: Date;
-}
