@@ -20,11 +20,12 @@ export async function fetchUsers() {
       }
     }
 
-    // If super_admin, fetch all users
+    // If super_admin, fetch all users (excluding super_admin role)
     if (userRole === 'super_admin') {
       const { data, error } = await supabase
         .from("users")
-        .select("*");
+        .select("*")
+        .neq("role", "super_admin"); // Exclude super_admin from results
 
       if (error) {
         console.error("Error fetching users:", error);
@@ -50,7 +51,7 @@ export async function fetchUsers() {
       return usersWithShifts as User[];
     }
 
-    // For other roles, fetch only users in the current branch
+    // For other roles, fetch only users in the current branch (excluding super_admin)
     if (!currentBranchId) {
       console.warn("No current branch ID found");
       return [];
@@ -72,7 +73,8 @@ export async function fetchUsers() {
     const usersWithShifts = await Promise.all(
       (branchUsers || []).map(async (branchUser: any) => {
         const user = branchUser.users;
-        if (!user) return null;
+        // Filter out super_admin and null users
+        if (!user || user.role === 'super_admin') return null;
 
         const { data: shifts, error: shiftsError } = await supabase
           .from("shifts")

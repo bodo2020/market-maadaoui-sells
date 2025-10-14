@@ -266,6 +266,9 @@ export function useEmployeeManagement() {
   };
 
   const filteredEmployees = employees ? employees.filter(employee => {
+    // Exclude super_admin from the list
+    if (employee.role === 'super_admin') return false;
+
     const textMatch = employee.name.toLowerCase().includes(search.toLowerCase()) ||
       (employee.phone && employee.phone.includes(search));
 
