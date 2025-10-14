@@ -130,59 +130,41 @@ export default function DailyInventoryPage() {
         return;
       }
 
-      // جلب جميع المنتجات من المخزون للفرع الحالي
-      const { data: inventoryItems, error: invError } = await supabase
-        .from('inventory')
-        .select('product_id, quantity')
-        .eq('branch_id', branchId);
-
-      if (invError) throw invError;
-
-      if (!inventoryItems || inventoryItems.length === 0) {
+      // جلب المنتجات من fetchProducts الذي يدمج البيانات من inventory و products
+      const allProducts = await fetchProducts();
+      
+      if (!allProducts || allProducts.length === 0) {
         toast({
           title: "تحذير",
-          description: "لا توجد منتجات في مخزون هذا الفرع",
+          description: "لا توجد منتجات في النظام",
           variant: "destructive"
         });
         return;
       }
 
-      // جلب بيانات المنتجات
-      const productIds = inventoryItems.map(item => item.product_id);
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select('id, purchase_price')
-        .in('id', productIds);
-
-      if (productsError) throw productsError;
-
-      const productPriceMap = new Map(
-        (productsData || []).map(p => [p.id, p.purchase_price || 0])
-      );
-
-      let selectedProducts: any[];
+      let selectedProducts: Product[];
       
       if (type === 'full') {
-        // جرد كامل - كل المنتجات في المخزون
-        selectedProducts = inventoryItems;
+        // جرد كامل - كل المنتجات
+        selectedProducts = allProducts;
         setInventoryType('full');
         navigate('/inventory-full');
         return;
       } else {
-        // جرد يومي - اختيار عشوائي من المخزون
+        // جرد يومي - اختيار عشوائي
         const randomCount = Math.min(
           Math.floor(Math.random() * 6) + 10, 
-          inventoryItems.length
+          allProducts.length
         );
-        const shuffled = inventoryItems.sort(() => 0.5 - Math.random());
+        const shuffled = [...allProducts].sort(() => 0.5 - Math.random());
         selectedProducts = shuffled.slice(0, randomCount);
         setInventoryType('daily');
       }
       
-      const inventoryData = selectedProducts.map(item => ({
-        product_id: item.product_id,
-        expected_quantity: item.quantity || 0,
-        purchase_price: productPriceMap.get(item.product_id) || 0
+      const inventoryData = selectedProducts.map(product => ({
+        product_id: product.id,
+        expected_quantity: product.quantity || 0,
+        purchase_price: product.purchase_price || 0
       }));
       
       await createInventoryRecords(inventoryData, branchId);
