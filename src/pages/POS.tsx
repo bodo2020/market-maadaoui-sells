@@ -4,8 +4,9 @@ import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Receipt, Scale, Box, CreditCard as CardIcon, Banknote, Check, X, ScanLine, Printer, User, Wallet, Pin, PinOff, MoreHorizontal } from "lucide-react";
-import { CartItem, Product, Sale, Customer } from "@/types";
+import { CartItem, Product, Sale, Customer, POSTab } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
 import { createSale, generateInvoiceNumber } from "@/services/supabase/saleService";
@@ -18,28 +19,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
+import POSTabs from "@/components/POS/POSTabs";
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
 import { useAuth } from "@/contexts/AuthContext";
 import { getFavoriteProducts, addFavoriteProduct, removeFavoriteProduct } from "@/services/supabase/favoritesService";
 import { useBranchStore } from "@/stores/branchStore";
+
 export default function POS() {
-  const [search, setSearch] = useState("");
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  // Tabs Management
+  const [tabs, setTabs] = useState<POSTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>("");
+  
+  // Shared state (not tab-specific)
   const [weightInput, setWeightInput] = useState<string>("");
   const [showWeightDialog, setShowWeightDialog] = useState(false);
   const [currentScaleProduct, setCurrentScaleProduct] = useState<Product | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<string>("");
   const [cashBalance, setCashBalance] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mixed'>('cash');
   const [cashAmount, setCashAmount] = useState<string>("");
   const [cardAmount, setCardAmount] = useState<string>("");
-  const [customerName, setCustomerName] = useState<string>("");
-  const [customerPhone, setCustomerPhone] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [currentInvoiceNumber, setCurrentInvoiceNumber] = useState<string>("");
@@ -53,13 +55,91 @@ export default function POS() {
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cartScrollRef = useRef<HTMLDivElement>(null);
-  const {
-    toast
-  } = useToast();
-  const {
-    user
-  } = useAuth();
+  const { toast } = useToast();
+  const { user } = useAuth();
   const { currentBranchId } = useBranchStore();
+
+  // Get active tab
+  const getActiveTab = (): POSTab | null => {
+    return tabs.find(tab => tab.id === activeTabId) || null;
+  };
+
+  // Tab-specific getters
+  const search = getActiveTab()?.search || "";
+  const cartItems = getActiveTab()?.cartItems || [];
+  const searchResults = getActiveTab()?.searchResults || [];
+  const selectedCustomer = getActiveTab()?.selectedCustomer || "";
+  const customerName = getActiveTab()?.customerName || "";
+  const customerPhone = getActiveTab()?.customerPhone || "";
+
+  // Tab Management Functions
+  const createNewTab = () => {
+    const newTab: POSTab = {
+      id: `tab-${Date.now()}`,
+      tabName: `عميل ${tabs.length + 1}`,
+      cartItems: [],
+      selectedCustomer: "",
+      customerName: "",
+      customerPhone: "",
+      search: "",
+      searchResults: [],
+      createdAt: new Date()
+    };
+    setTabs([...tabs, newTab]);
+    setActiveTabId(newTab.id);
+  };
+
+  const closeTab = (tabId: string) => {
+    if (tabs.length === 1) return; // Don't close last tab
+    
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab && tab.cartItems.length > 0) {
+      if (!confirm("هذا التبويب يحتوي على منتجات. هل تريد إغلاقه؟")) {
+        return;
+      }
+    }
+    
+    const newTabs = tabs.filter(t => t.id !== tabId);
+    setTabs(newTabs);
+    
+    if (activeTabId === tabId && newTabs.length > 0) {
+      setActiveTabId(newTabs[0].id);
+    }
+  };
+
+  const switchTab = (tabId: string) => {
+    setActiveTabId(tabId);
+  };
+
+  const updateActiveTab = (updates: Partial<POSTab>) => {
+    setTabs(tabs.map(tab => 
+      tab.id === activeTabId ? { ...tab, ...updates } : tab
+    ));
+  };
+
+  const setSearch = (value: string) => {
+    updateActiveTab({ search: value });
+  };
+
+  const setCartItems = (items: CartItem[]) => {
+    updateActiveTab({ cartItems: items });
+  };
+
+  const setSearchResults = (results: Product[]) => {
+    updateActiveTab({ searchResults: results });
+  };
+
+  const setSelectedCustomer = (value: string) => {
+    updateActiveTab({ selectedCustomer: value });
+  };
+
+  const setCustomerName = (value: string) => {
+    updateActiveTab({ customerName: value });
+  };
+
+  const setCustomerPhone = (value: string) => {
+    updateActiveTab({ customerPhone: value });
+  };
 
   // Debounce hook for auto-search
   const useDebounce = (value: string, delay: number) => {
@@ -75,6 +155,32 @@ export default function POS() {
     return debouncedValue;
   };
   const debouncedSearch = useDebounce(search, 500);
+
+  // Initialize tabs from localStorage or create first tab
+  useEffect(() => {
+    const savedTabs = localStorage.getItem('pos_tabs');
+    const savedActiveId = localStorage.getItem('pos_active_tab');
+    
+    if (savedTabs) {
+      try {
+        const parsed = JSON.parse(savedTabs);
+        setTabs(parsed);
+        setActiveTabId(savedActiveId || parsed[0]?.id || "");
+      } catch (e) {
+        createNewTab();
+      }
+    } else {
+      createNewTab();
+    }
+  }, []);
+
+  // Save tabs to localStorage
+  useEffect(() => {
+    if (tabs.length > 0) {
+      localStorage.setItem('pos_tabs', JSON.stringify(tabs));
+      localStorage.setItem('pos_active_tab', activeTabId);
+    }
+  }, [tabs, activeTabId]);
 
   // Auto search effect for numbers only
   useEffect(() => {
@@ -373,6 +479,16 @@ export default function POS() {
         handleAddToCart(exactMatch);
         setSearch("");
       } else if (results.length === 1 && results[0].barcode_type === "scale") {
+        // Check stock before opening weight dialog
+        if ((results[0].quantity || 0) <= 0) {
+          toast({
+            title: "❌ منتج الميزان غير متوفر",
+            description: `المنتج "${results[0].name}" غير متوفر في المخزون`,
+            variant: "destructive"
+          });
+          setSearch("");
+          return; // Don't open weight dialog
+        }
         setCurrentScaleProduct(results[0]);
         setShowWeightDialog(true);
         setSearch("");
@@ -387,6 +503,42 @@ export default function POS() {
     }
   };
   const handleAddToCart = (product: Product) => {
+    // 1. Check available stock
+    const currentQuantityInCart = cartItems
+      .filter(item => item.product.id === product.id && !item.isBulk)
+      .reduce((sum, item) => sum + item.quantity, 0);
+    
+    const availableStock = product.quantity || 0;
+    
+    // 2. Check if exceeding stock limit
+    if (currentQuantityInCart + 1 > availableStock) {
+      toast({
+        title: "⚠️ تحذير: المخزون غير كافٍ",
+        description: `الكمية المتوفرة: ${availableStock} - في السلة: ${currentQuantityInCart}`,
+        variant: "destructive"
+      });
+      return; // Prevent adding
+    }
+    
+    // 3. If stock is 0
+    if (availableStock === 0) {
+      toast({
+        title: "❌ المنتج غير متوفر",
+        description: `المنتج "${product.name}" غير متوفر في المخزون`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // 4. Warning if stock is low (less than 5)
+    if (availableStock - currentQuantityInCart <= 5 && availableStock - currentQuantityInCart > 0) {
+      toast({
+        title: "⚠️ تنبيه: المخزون قليل",
+        description: `باقي ${availableStock - currentQuantityInCart} فقط`,
+        className: "bg-yellow-50 border-yellow-200 text-yellow-800"
+      });
+    }
+
     const existingItem = cartItems.find(item => item.product.id === product.id);
     if (existingItem) {
       setCartItems(cartItems.map(item => item.product.id === product.id ? {
@@ -422,14 +574,49 @@ export default function POS() {
     setSearchResults([]);
   };
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
-    if ((product.quantity || 0) <= 0) {
+    const availableStock = product.quantity || 0;
+    
+    // 1. Check if stock is 0
+    if (availableStock <= 0) {
       toast({
-        title: "المنتج غير متوفر",
-        description: `المنتج "${product.name}" غير متوفر في المخزون`,
+        title: "❌ منتج الميزان غير متوفر",
+        description: `المنتج "${product.name}" غير متوفر في المخزون حالياً`,
+        variant: "destructive"
+      });
+      // Close weight dialog
+      setShowWeightDialog(false);
+      setCurrentScaleProduct(null);
+      setWeightInput("");
+      return;
+    }
+    
+    // 2. Calculate current weight in cart
+    const currentWeightInCart = cartItems
+      .filter(item => item.product.id === product.id && item.weight !== null)
+      .reduce((sum, item) => sum + (item.weight || 0), 0);
+    
+    const totalWeight = currentWeightInCart + weight;
+    
+    // 3. Check if exceeding stock (assuming product.quantity is in kg)
+    if (totalWeight > availableStock) {
+      toast({
+        title: "⚠️ الوزن المطلوب غير متوفر",
+        description: `المتوفر: ${availableStock} كجم - في السلة: ${currentWeightInCart.toFixed(2)} كجم`,
         variant: "destructive"
       });
       return;
     }
+    
+    // 4. Warning if remaining stock is low
+    const remaining = availableStock - totalWeight;
+    if (remaining < 1 && remaining > 0) {
+      toast({
+        title: "⚠️ المخزون على وشك النفاد",
+        description: `باقي ${remaining.toFixed(2)} كجم فقط`,
+        className: "bg-yellow-50 border-yellow-200 text-yellow-800"
+      });
+    }
+
     const itemPrice = product.price * weight;
     const discountPerKg = product.is_offer && product.offer_price ? product.price - product.offer_price : 0;
     setCartItems([...cartItems, {
@@ -460,14 +647,26 @@ export default function POS() {
     setWeightInput("");
   };
   const handleAddBulkToCart = (product: Product) => {
-    if ((product.quantity || 0) < (product.bulk_quantity || 0)) {
+    const bulkQty = product.bulk_quantity || 0;
+    
+    // 1. Calculate current bulk quantity in cart
+    const currentBulkInCart = cartItems
+      .filter(item => item.product.id === product.id && item.isBulk)
+      .reduce((sum, item) => sum + item.quantity, 0);
+    
+    const totalNeeded = currentBulkInCart + bulkQty;
+    const availableStock = product.quantity || 0;
+    
+    // 2. Check if bulk quantity is available
+    if (totalNeeded > availableStock) {
       toast({
-        title: "المنتج غير متوفر",
-        description: `عبوة الجملة للمنتج "${product.name}" غير متوفرة في المخزون (المتاح: ${product.quantity || 0})`,
+        title: "❌ عبوة الجملة غير متوفرة",
+        description: `المطلوب: ${totalNeeded} - المتوفر: ${availableStock}`,
         variant: "destructive"
       });
       return;
     }
+    
     if (!product.bulk_enabled || !product.bulk_quantity || !product.bulk_price) {
       toast({
         title: "خطأ",
@@ -476,13 +675,14 @@ export default function POS() {
       });
       return;
     }
-    // البحث عن المنتج في السلة للدمج
+    
+    // Search for existing bulk item in cart
     const existingItemIndex = cartItems.findIndex(item => 
       item.product.id === product.id && item.isBulk === true
     );
 
     if (existingItemIndex !== -1) {
-      // إذا وُجد المنتج، قم بزيادة الكمية
+      // If found, increase quantity
       const updatedItems = [...cartItems];
       const existingItem = updatedItems[existingItemIndex];
       const newQuantity = existingItem.quantity + (product.bulk_quantity || 0);
@@ -501,7 +701,7 @@ export default function POS() {
         className: "bg-blue-50 border-blue-200 text-blue-800"
       });
     } else {
-      // إضافة منتج جديد للسلة
+      // Add new bulk product to cart
       const bulkQuantity = product.bulk_quantity || 0;
       const bulkPrice = product.bulk_price || 0;
       const pricePerUnit = bulkQuantity > 0 ? bulkPrice / bulkQuantity : 0;
@@ -847,6 +1047,17 @@ export default function POS() {
         </p>
       </div>
       
+      {/* Tabs Component */}
+      <div className="mb-4">
+        <POSTabs
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onCreateTab={createNewTab}
+          onCloseTab={closeTab}
+          onSwitchTab={switchTab}
+        />
+      </div>
+      
       <div className="relative mb-4 bg-muted/30 p-3 rounded-lg border border-muted flex items-center py-0 px-[12px]">
         <ScanLine className="h-5 w-5 text-primary ml-3" />
         <div className="flex-1">
@@ -920,21 +1131,36 @@ export default function POS() {
                   <h3 className="font-semibold">نتائج البحث</h3>
                   
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {searchResults.map(product => <Card key={product.id} className="cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => {
-                  if (product.barcode_type === "scale") {
-                    setCurrentScaleProduct(product);
-                    setShowWeightDialog(true);
-                  } else {
-                    handleAddToCart(product);
-                  }
-                }}>
+                    {searchResults.map(product => {
+                      const availableStock = product.quantity || 0;
+                      const isOutOfStock = availableStock === 0;
+                      
+                      return (
+                        <Card 
+                          key={product.id} 
+                          className={`cursor-pointer transition-colors ${isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+                          onClick={() => {
+                            if (isOutOfStock) return;
+                            if (product.barcode_type === "scale") {
+                              setCurrentScaleProduct(product);
+                              setShowWeightDialog(true);
+                            } else {
+                              handleAddToCart(product);
+                            }
+                          }}
+                        >
                         <CardContent className="p-3">
                           <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2">
                             <img src={product.image_urls?.[0] || "/placeholder.svg"} alt={product.name} className="h-16 w-16 object-contain" />
                           </div>
                           <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
                           
-                          <div className="flex gap-1 my-1">
+                          <div className="flex gap-1 my-1 flex-wrap">
+                            {/* Stock Badge */}
+                            <Badge variant={availableStock > 10 ? "default" : availableStock > 0 ? "secondary" : "destructive"} className="text-xs">
+                              المخزون: {availableStock}
+                            </Badge>
+                            
                             {product.barcode_type === "scale" && <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
                                 <Scale className="h-3 w-3 ml-1" />
                                 بالوزن
@@ -956,7 +1182,9 @@ export default function POS() {
                             {product.is_offer && <Tag className="h-4 w-4 text-primary" />}
                           </div>
                         </CardContent>
-                      </Card>)}
+                      </Card>
+                      );
+                    })}
                   </div>
                 </div>}
               
@@ -969,19 +1197,29 @@ export default function POS() {
                   </Button>
                 </div>
                 
-                {isLoading ? <div className="flex justify-center items-center h-40">
+                  {isLoading ? <div className="flex justify-center items-center h-40">
                     <p className="text-muted-foreground">جاري تحميل المنتجات...</p>
                   </div> : products.length === 0 ? <div className="text-center py-6 text-muted-foreground">
                     <p>لا توجد منتجات متاحة</p>
                   </div> : <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {getDisplayedProducts().map(product => <Card key={product.id} className="cursor-pointer hover:bg-gray-50 transition-colors relative group" onClick={() => {
-                  if (product.barcode_type === "scale") {
-                    setCurrentScaleProduct(product);
-                    setShowWeightDialog(true);
-                  } else {
-                    handleAddToCart(product);
-                  }
-                }}>
+                    {getDisplayedProducts().map(product => {
+                      const availableStock = product.quantity || 0;
+                      const isOutOfStock = availableStock === 0;
+                      
+                      return (
+                        <Card 
+                          key={product.id} 
+                          className={`cursor-pointer transition-colors relative group ${isOutOfStock ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+                          onClick={() => {
+                            if (isOutOfStock) return;
+                            if (product.barcode_type === "scale") {
+                              setCurrentScaleProduct(product);
+                              setShowWeightDialog(true);
+                            } else {
+                              handleAddToCart(product);
+                            }
+                          }}
+                        >
                         <CardContent className="p-3">
                           <div className="aspect-square rounded bg-gray-100 flex items-center justify-center mb-2 relative">
                             <img src={product.image_urls?.[0] || "/placeholder.svg"} alt={product.name} className="h-16 w-16 object-contain" />
@@ -995,17 +1233,28 @@ export default function POS() {
                             </Button>
                             
                             {/* Bulk Purchase Button */}
-                            {product.bulk_enabled && <Button variant="secondary" size="sm" className="absolute bottom-1 left-1 h-6 px-2 text-xs bg-amber-500/90 hover:bg-amber-600 text-white opacity-80 hover:opacity-100 transition-opacity" onClick={e => {
-                        e.stopPropagation();
-                        handleAddBulkToCart(product);
-                      }}>
-                                <Box className="h-3 w-3 ml-1" />
-                                جملة
-                              </Button>}
+                            {product.bulk_enabled && !isOutOfStock && <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              className="absolute bottom-1 left-1 h-6 px-2 text-xs bg-amber-500/90 hover:bg-amber-600 text-white opacity-80 hover:opacity-100 transition-opacity" 
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleAddBulkToCart(product);
+                              }}
+                              disabled={isOutOfStock}
+                            >
+                              <Box className="h-3 w-3 ml-1" />
+                              جملة
+                            </Button>}
                           </div>
                           <h4 className="text-sm font-medium line-clamp-2">{product.name}</h4>
                           
-                          <div className="flex gap-1 my-1">
+                          <div className="flex gap-1 my-1 flex-wrap">
+                            {/* Stock Badge */}
+                            <Badge variant={availableStock > 10 ? "default" : availableStock > 0 ? "secondary" : "destructive"} className="text-xs">
+                              المخزون: {availableStock}
+                            </Badge>
+                            
                             {product.barcode_type === "scale" && <span className="bg-blue-100 text-blue-800 text-xs rounded px-1.5 py-0.5 flex items-center">
                                 <Scale className="h-3 w-3 ml-1" />
                                 بالوزن
@@ -1031,7 +1280,9 @@ export default function POS() {
                             {product.is_offer && <Tag className="h-4 w-4 text-primary" />}
                           </div>
                         </CardContent>
-                      </Card>)}
+                      </Card>
+                      );
+                    })}
                   </div>}
               </div>
             </CardContent>
