@@ -71,6 +71,11 @@ export default function POS() {
   // Tabs Management
   const [tabs, setTabs] = useState<POSTab[]>(initializeTabs);
   const [activeTabId, setActiveTabId] = useState<string>(initializeActiveTabId);
+  // Keep a ref synced with activeTabId to avoid stale closures when updating cart
+  const activeTabIdRef = useRef(activeTabId);
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  }, [activeTabId]);
   
   // Shared state (not tab-specific)
   const [weightInput, setWeightInput] = useState<string>("");
@@ -154,9 +159,11 @@ export default function POS() {
   };
 
   const updateActiveTab = (updates: Partial<POSTab>) => {
-    setTabs(tabs.map(tab => 
-      tab.id === activeTabId ? { ...tab, ...updates } : tab
-    ));
+    setTabs(prev =>
+      prev.map(tab =>
+        tab.id === activeTabIdRef.current ? { ...tab, ...updates } : tab
+      )
+    );
   };
 
   const setSearch = (value: string) => {
@@ -517,30 +524,46 @@ export default function POS() {
     }
   };
   const handleAddToCart = (product: Product) => {
-    const existingItem = cartItems.find(item => item.product.id === product.id);
-    if (existingItem) {
-      setCartItems(cartItems.map(item => item.product.id === product.id ? {
-        ...item,
-        quantity: item.quantity + 1,
-        total: (item.quantity + 1) * (product.is_offer && product.offer_price ? product.offer_price : product.price)
-      } : item));
-    } else {
-      const price = product.is_offer && product.offer_price ? product.offer_price : product.price;
-      setCartItems([...cartItems, {
-        product,
-        quantity: 1,
-        price,
-        discount: product.is_offer && product.offer_price ? product.price - product.offer_price : 0,
-        total: price,
-        weight: null
-      }]);
-    }
+    setTabs(prev =>
+      prev.map(tab => {
+        if (tab.id !== activeTabIdRef.current) return tab;
+        const existingItem = tab.cartItems.find(item => item.product.id === product.id);
+        if (existingItem) {
+          const newItems = tab.cartItems.map(item =>
+            item.product.id === product.id
+              ? {
+                  ...item,
+                  quantity: item.quantity + 1,
+                  total:
+                    (item.quantity + 1) *
+                    (product.is_offer && product.offer_price ? product.offer_price : product.price),
+                }
+              : item
+          );
+          return { ...tab, cartItems: newItems };
+        } else {
+          const price = product.is_offer && product.offer_price ? product.offer_price : product.price;
+          const newItems = [
+            ...tab.cartItems,
+            {
+              product,
+              quantity: 1,
+              price,
+              discount: product.is_offer && product.offer_price ? product.price - product.offer_price : 0,
+              total: price,
+              weight: null,
+            },
+          ];
+          return { ...tab, cartItems: newItems };
+        }
+      })
+    );
 
     // Show success notification
     toast({
       title: "تم إضافة المنتج ✅",
       description: `${product.name} - تم إضافته للسلة`,
-      className: "bg-green-50 border-green-200 text-green-800"
+      className: "bg-green-50 border-green-200 text-green-800",
     });
 
     // Auto-scroll to bottom of cart
@@ -554,20 +577,33 @@ export default function POS() {
   const handleAddScaleProductToCart = (product: Product, weight: number) => {
     const itemPrice = product.price * weight;
     const discountPerKg = product.is_offer && product.offer_price ? product.price - product.offer_price : 0;
-    setCartItems([...cartItems, {
-      product,
-      quantity: 1,
-      price: itemPrice,
-      discount: discountPerKg * weight,
-      total: itemPrice,
-      weight: weight
-    }]);
+
+    setTabs(prev =>
+      prev.map(tab =>
+        tab.id === activeTabIdRef.current
+          ? {
+              ...tab,
+              cartItems: [
+                ...tab.cartItems,
+                {
+                  product,
+                  quantity: 1,
+                  price: itemPrice,
+                  discount: discountPerKg * weight,
+                  total: itemPrice,
+                  weight: weight,
+                },
+              ],
+            }
+          : tab
+      )
+    );
 
     // Show success notification
     toast({
       title: "تم إضافة منتج بالوزن ✅",
       description: `${product.name} - ${weight} كجم`,
-      className: "bg-green-50 border-green-200 text-green-800"
+      className: "bg-green-50 border-green-200 text-green-800",
     });
 
     // Auto-scroll to bottom of cart
@@ -586,54 +622,72 @@ export default function POS() {
       toast({
         title: "خطأ",
         description: "تفاصيل الجملة غير كاملة لهذا المنتج",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
-    
-    // Search for existing bulk item in cart
-    const existingItemIndex = cartItems.findIndex(item => 
-      item.product.id === product.id && item.isBulk === true
+
+    let updated = false;
+    let updatedQuantity = 0;
+
+    setTabs(prev =>
+      prev.map(tab => {
+        if (tab.id !== activeTabIdRef.current) return tab;
+
+        const existingItemIndex = tab.cartItems.findIndex(
+          item => item.product.id === product.id && item.isBulk === true
+        );
+
+        if (existingItemIndex !== -1) {
+          const updatedItems = [...tab.cartItems];
+          const existingItem = updatedItems[existingItemIndex];
+          const newQuantity = existingItem.quantity + (product.bulk_quantity || 0);
+
+          updatedItems[existingItemIndex] = {
+            ...existingItem,
+            quantity: newQuantity,
+            total: ((product.bulk_price || 0) / (product.bulk_quantity || 1)) * newQuantity,
+          };
+
+          updated = true;
+          updatedQuantity = newQuantity;
+          return { ...tab, cartItems: updatedItems };
+        } else {
+          const bulkQuantity = product.bulk_quantity || 0;
+          const bulkPrice = product.bulk_price || 0;
+          const pricePerUnit = bulkQuantity > 0 ? bulkPrice / bulkQuantity : 0;
+
+          return {
+            ...tab,
+            cartItems: [
+              ...tab.cartItems,
+              {
+                product,
+                quantity: bulkQuantity,
+                price: pricePerUnit,
+                discount: 0,
+                total: bulkPrice,
+                isBulk: true,
+              },
+            ],
+          };
+        }
+      })
     );
 
-    if (existingItemIndex !== -1) {
-      // If found, increase quantity
-      const updatedItems = [...cartItems];
-      const existingItem = updatedItems[existingItemIndex];
-      const newQuantity = existingItem.quantity + (product.bulk_quantity || 0);
-      
-      updatedItems[existingItemIndex] = {
-        ...existingItem,
-        quantity: newQuantity,
-        total: ((product.bulk_price || 0) / (product.bulk_quantity || 1)) * newQuantity
-      };
-      
-      setCartItems(updatedItems);
-      
+    if (updated) {
       toast({
         title: "تم تحديث الكمية ✅",
-        description: `${product.name} - المجموع: ${newQuantity} وحدة`,
-        className: "bg-blue-50 border-blue-200 text-blue-800"
+        description: `${product.name} - المجموع: ${updatedQuantity} وحدة`,
+        className: "bg-blue-50 border-blue-200 text-blue-800",
       });
     } else {
-      // Add new bulk product to cart
       const bulkQuantity = product.bulk_quantity || 0;
       const bulkPrice = product.bulk_price || 0;
-      const pricePerUnit = bulkQuantity > 0 ? bulkPrice / bulkQuantity : 0;
-      
-      setCartItems([...cartItems, {
-        product,
-        quantity: bulkQuantity,
-        price: pricePerUnit,
-        discount: 0,
-        total: bulkPrice,
-        isBulk: true
-      }]);
-
       toast({
         title: "تم إضافة عبوة جملة ✅",
         description: `${product.name} - ${bulkQuantity} وحدة بسعر ${bulkPrice.toFixed(2)} ${siteConfig.currency}`,
-        className: "bg-green-50 border-green-200 text-green-800"
+        className: "bg-green-50 border-green-200 text-green-800",
       });
     }
 
