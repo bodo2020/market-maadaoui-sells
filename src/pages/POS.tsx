@@ -26,6 +26,7 @@ import { getFavoriteProducts, addFavoriteProduct, removeFavoriteProduct } from "
 import { useBranchStore } from "@/stores/branchStore";
 
 export default function POS() {
+  const DEFAULT_TAB_ID = "tab-default";
   // Initialize tabs state with default tab
   const initializeTabs = (): POSTab[] => {
     const savedTabs = localStorage.getItem('pos_tabs');
@@ -39,7 +40,7 @@ export default function POS() {
     }
     // Create default tab if no saved tabs
     return [{
-      id: `tab-${Date.now()}`,
+      id: DEFAULT_TAB_ID,
       tabName: "عميل 1",
       cartItems: [],
       selectedCustomer: "",
@@ -64,7 +65,7 @@ export default function POS() {
         // Ignore error
       }
     }
-    return `tab-${Date.now()}`;
+    return DEFAULT_TAB_ID;
   };
 
   // Tabs Management
