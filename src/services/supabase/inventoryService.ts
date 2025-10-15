@@ -51,10 +51,39 @@ export const createInventoryRecords = async (
   }>,
   branchId?: string
 ) => {
+  // التأكد من وجود branch_id
+  if (!branchId) {
+    throw new Error('branch_id مطلوب لإنشاء جرد جديد');
+  }
+  
   console.log(`Creating inventory records for ${products.length} products, branch: ${branchId}`);
   
   const currentDate = new Date().toISOString().slice(0, 10);
   
+  // إنشاء session أولاً
+  const { data: sessionData, error: sessionError } = await supabase
+    .from('inventory_sessions')
+    .insert({
+      session_date: currentDate,
+      branch_id: branchId,
+      status: 'active',
+      total_products: products.length,
+      completed_products: 0,
+      matched_products: 0,
+      discrepancy_products: 0,
+      total_difference_value: 0
+    })
+    .select()
+    .single();
+
+  if (sessionError) {
+    console.error('Error creating inventory session:', sessionError);
+    throw sessionError;
+  }
+
+  console.log('Inventory session created:', sessionData);
+  
+  // ثم إنشاء السجلات
   const { data, error } = await supabase
     .from('inventory_records')
     .insert(
@@ -66,7 +95,7 @@ export const createInventoryRecords = async (
         purchase_price: product.purchase_price,
         difference_value: -product.expected_quantity * product.purchase_price,
         status: 'pending' as const,
-        branch_id: branchId || null
+        branch_id: branchId
       }))
     )
     .select();
@@ -74,22 +103,6 @@ export const createInventoryRecords = async (
   if (error) {
     console.error('Error creating inventory records:', error);
     throw error;
-  }
-  
-  // Create inventory session for this branch
-  if (branchId) {
-    await supabase
-      .from('inventory_sessions')
-      .insert({
-        session_date: currentDate,
-        branch_id: branchId,
-        status: 'active',
-        total_products: products.length,
-        completed_products: 0,
-        matched_products: 0,
-        discrepancy_products: 0,
-        total_difference_value: 0
-      });
   }
   
   console.log(`Successfully created ${data?.length || 0} inventory records`);
@@ -239,17 +252,22 @@ export const completeInventorySession = async (sessionId: string) => {
 
 // إكمال جلسة جرد بناءً على التاريخ
 export const completeInventorySessionByDate = async (date: string, branchId?: string) => {
-  let query = supabase
+  // التأكد من وجود branch_id
+  if (!branchId) {
+    const currentBranchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
+    if (!currentBranchId) {
+      throw new Error('branch_id مطلوب لإكمال الجرد');
+    }
+    branchId = currentBranchId;
+  }
+
+  const { data, error } = await supabase
     .from('inventory_sessions')
     .update({ status: 'completed' })
     .eq('session_date', date)
-    .eq('status', 'active');
-
-  if (branchId) {
-    query = query.eq('branch_id', branchId);
-  }
-
-  const { data, error } = await query.select();
+    .eq('branch_id', branchId)
+    .eq('status', 'active')
+    .select();
 
   if (error) throw error;
   return data[0];

@@ -293,16 +293,26 @@ export default function DailyInventoryPage() {
         return;
       }
 
-      // إكمال الجرد بناءً على التاريخ
-      await completeInventorySessionByDate(currentDate);
+      const branchId = getBranchId();
+      if (!branchId) {
+        toast({
+          title: "خطأ",
+          description: "لم يتم العثور على معرف الفرع",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // إكمال الجرد بناءً على التاريخ والفرع
+      await completeInventorySessionByDate(currentDate, branchId);
       
       toast({
         title: "تم إكمال الجرد",
         description: "تم تحديد الجرد كمكتمل ومتاح للموافقة",
       });
 
-      // إعادة تحميل البيانات لتحديث الحالة
-      await loadInventoryData();
+      // الانتقال إلى صفحة السجل
+      navigate('/inventory-history');
     } catch (error) {
       console.error("Error completing inventory:", error);
       toast({

@@ -251,7 +251,16 @@ export default function InventoryFullPage() {
       }
 
       const branchId = getBranchId();
-      await completeInventorySessionByDate(currentDate, branchId || undefined);
+      if (!branchId) {
+        toast({
+          title: "خطأ",
+          description: "لم يتم العثور على معرف الفرع",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      await completeInventorySessionByDate(currentDate, branchId);
       
       toast({
         title: "تم إكمال الجرد",
