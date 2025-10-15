@@ -556,6 +556,7 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          branch_id: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string | null
@@ -567,6 +568,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          branch_id?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string | null
@@ -578,6 +580,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          branch_id?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string | null
@@ -587,7 +590,15 @@ export type Database = {
           name?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       coupon_usage: {
         Row: {
