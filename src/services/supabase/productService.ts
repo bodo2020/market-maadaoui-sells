@@ -55,24 +55,14 @@ export async function fetchProducts() {
         let q;
         
         if (isIndependentInventory) {
-          // For external branches with independent inventory:
-          // Fetch products that belong to this branch OR are shared (branch_id IS NULL)
-          // AND have inventory for this branch
-          if (branchData?.branch_type === 'external') {
-            q = supabase
-              .from("products")
-              .select("*, inventory!inner(branch_id)")
-              .eq("inventory.branch_id", currentBranchId)
-              .or(`branch_id.eq.${currentBranchId},branch_id.is.null`)
-              .order("name");
-          } else {
-            // Internal branches: show all products with inventory for this branch
-            q = supabase
-              .from("products")
-              .select("*, inventory!inner(branch_id)")
-              .eq("inventory.branch_id", currentBranchId)
-              .order("name");
-          }
+          // For branches with independent inventory:
+          // Only fetch products that have inventory records for this specific branch
+          // This automatically filters to show only branch-specific products
+          q = supabase
+            .from("products")
+            .select("*, inventory!inner(branch_id)")
+            .eq("inventory.branch_id", currentBranchId)
+            .order("name");
         } else {
           // No independent inventory: show all products
           q = supabase.from("products").select("*").order("name");
