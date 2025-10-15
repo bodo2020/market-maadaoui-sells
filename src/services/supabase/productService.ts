@@ -52,13 +52,31 @@ export async function fetchProducts() {
     {
       let from = 0;
       while (true) {
-        let q = isIndependentInventory
-          ? supabase
+        let q;
+        
+        if (isIndependentInventory) {
+          // For external branches with independent inventory:
+          // Fetch products that belong to this branch OR are shared (branch_id IS NULL)
+          // AND have inventory for this branch
+          if (branchData?.branch_type === 'external') {
+            q = supabase
               .from("products")
               .select("*, inventory!inner(branch_id)")
               .eq("inventory.branch_id", currentBranchId)
-              .order("name")
-          : supabase.from("products").select("*").order("name");
+              .or(`branch_id.eq.${currentBranchId},branch_id.is.null`)
+              .order("name");
+          } else {
+            // Internal branches: show all products with inventory for this branch
+            q = supabase
+              .from("products")
+              .select("*, inventory!inner(branch_id)")
+              .eq("inventory.branch_id", currentBranchId)
+              .order("name");
+          }
+        } else {
+          // No independent inventory: show all products
+          q = supabase.from("products").select("*").order("name");
+        }
 
         const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
         if (error) {
