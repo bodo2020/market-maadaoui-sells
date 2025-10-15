@@ -155,35 +155,76 @@ export default function InventoryManagement() {
     try {
       if (!currentBranch) return;
 
-      // الخطوة 1: جلب جميع المنتجات مع pagination لتجاوز حد 1000
+      // التحقق من نوع الفرع
+      const { data: branchData } = await supabase
+        .from('branches')
+        .select('branch_type, independent_inventory')
+        .eq('id', currentBranch)
+        .single();
+
+      const isIndependentInventory = branchData?.independent_inventory === true;
+
+      // الخطوة 1: جلب المنتجات حسب نوع الفرع
       let allProducts: any[] = [];
       const PAGE_SIZE = 1000;
       let from = 0;
       
-      while (true) {
-        const { data, error } = await supabase
-          .from('products')
-          .select(`
-            id,
-            name,
-            barcode,
-            price,
-            purchase_price,
-            image_urls,
-            shelf_location,
-            expiry_date,
-            unit_of_measure
-          `)
-          .order('name')
-          .range(from, from + PAGE_SIZE - 1);
+      if (isIndependentInventory) {
+        // للفروع المستقلة: جلب فقط المنتجات التي لها inventory في هذا الفرع
+        while (true) {
+          const { data, error } = await supabase
+            .from('products')
+            .select(`
+              id,
+              name,
+              barcode,
+              price,
+              purchase_price,
+              image_urls,
+              shelf_location,
+              expiry_date,
+              unit_of_measure,
+              inventory!inner(branch_id)
+            `)
+            .eq('inventory.branch_id', currentBranch)
+            .order('name')
+            .range(from, from + PAGE_SIZE - 1);
 
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        
-        allProducts = allProducts.concat(data);
-        
-        if (data.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          
+          allProducts = allProducts.concat(data);
+          
+          if (data.length < PAGE_SIZE) break;
+          from += PAGE_SIZE;
+        }
+      } else {
+        // للفروع العادية: جلب كل المنتجات
+        while (true) {
+          const { data, error } = await supabase
+            .from('products')
+            .select(`
+              id,
+              name,
+              barcode,
+              price,
+              purchase_price,
+              image_urls,
+              shelf_location,
+              expiry_date,
+              unit_of_measure
+            `)
+            .order('name')
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          
+          allProducts = allProducts.concat(data);
+          
+          if (data.length < PAGE_SIZE) break;
+          from += PAGE_SIZE;
+        }
       }
 
       // الخطوة 2: جلب المخزون للفرع الحالي مع pagination
