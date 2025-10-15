@@ -20,12 +20,52 @@ export async function fetchUsers() {
       }
     }
 
-    // If super_admin, fetch all users (excluding super_admin role)
+    // If super_admin, prefer filtering by selected branch; otherwise fall back to all (excluding super_admin)
     if (userRole === 'super_admin') {
+      const selectedBranchId = localStorage.getItem("currentBranchId");
+
+      if (selectedBranchId) {
+        // Show only users assigned to the selected branch
+        const { data: branchUsers, error: branchError } = await supabase
+          .from("user_branch_roles")
+          .select(`
+            user_id,
+            users:user_id (*)
+          `)
+          .eq("branch_id", selectedBranchId);
+
+        if (branchError) {
+          console.error("Error fetching branch users (super_admin):", branchError);
+          throw branchError;
+        }
+
+        const usersWithShifts = await Promise.all(
+          (branchUsers || []).map(async (branchUser: any) => {
+            const user = branchUser.users;
+            if (!user || user.role === 'super_admin') return null; // hide super_admin
+
+            const { data: shifts, error: shiftsError } = await supabase
+              .from("shifts")
+              .select("*")
+              .eq("employee_id", user.id);
+
+            if (shiftsError) {
+              console.error("Error fetching shifts for user:", shiftsError);
+              return { ...user, shifts: [] };
+            }
+
+            return { ...user, shifts: shifts || [] };
+          })
+        );
+
+        return usersWithShifts.filter(u => u !== null) as User[];
+      }
+
+      // No branch selected: return all (excluding super_admin)
       const { data, error } = await supabase
         .from("users")
         .select("*")
-        .neq("role", "super_admin"); // Exclude super_admin from results
+        .neq("role", "super_admin");
 
       if (error) {
         console.error("Error fetching users:", error);
@@ -359,6 +399,17 @@ export async function deleteUser(id: string) {
     if (shiftsError) {
       console.error("Error deleting user shifts:", shiftsError);
       throw shiftsError;
+    }
+
+    // Delete salaries
+    const { error: salariesError } = await supabase
+      .from("salaries")
+      .delete()
+      .eq("employee_id", id);
+
+    if (salariesError) {
+      console.error("Error deleting user salaries:", salariesError);
+      throw salariesError;
     }
 
     // Finally delete user
