@@ -269,6 +269,7 @@ export type Database = {
           name: string
           parent_branch_id: string | null
           phone: string | null
+          schema_name: string | null
           updated_at: string | null
         }
         Insert: {
@@ -284,6 +285,7 @@ export type Database = {
           name: string
           parent_branch_id?: string | null
           phone?: string | null
+          schema_name?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -299,6 +301,7 @@ export type Database = {
           name?: string
           parent_branch_id?: string | null
           phone?: string | null
+          schema_name?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3058,6 +3061,10 @@ export type Database = {
         }
         Returns: number
       }
+      create_branch_schema: {
+        Args: { p_branch_code: string; p_branch_id: string }
+        Returns: string
+      }
       create_bucket_if_not_exists: {
         Args: { bucket_name: string }
         Returns: undefined
@@ -3105,6 +3112,10 @@ export type Database = {
         Args: { _branch: string; _user: string }
         Returns: boolean
       }
+      initialize_external_branch: {
+        Args: { p_branch_code: string; p_branch_id: string }
+        Returns: string
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -3143,6 +3154,10 @@ export type Database = {
           total_profit: number
           total_sales: number
         }[]
+      }
+      setup_branch_tables: {
+        Args: { p_schema_name: string }
+        Returns: undefined
       }
       top_products_by_branch: {
         Args: {
