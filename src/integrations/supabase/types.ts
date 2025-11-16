@@ -3025,9 +3025,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      add_cash_transaction: {
-        Args:
-          | {
+      add_cash_transaction:
+        | {
+            Args: {
+              p_amount: number
+              p_notes: string
+              p_register_type: string
+              p_transaction_type: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
+              p_amount: number
+              p_created_by?: string
+              p_notes: string
+              p_register_type: string
+              p_transaction_type: string
+            }
+            Returns: number
+          }
+        | {
+            Args: {
               p_amount: number
               p_branch_id?: string
               p_created_by?: string
@@ -3035,21 +3054,8 @@ export type Database = {
               p_register_type: string
               p_transaction_type: string
             }
-          | {
-              p_amount: number
-              p_created_by?: string
-              p_notes: string
-              p_register_type: string
-              p_transaction_type: string
-            }
-          | {
-              p_amount: number
-              p_notes: string
-              p_register_type: string
-              p_transaction_type: string
-            }
-        Returns: number
-      }
+            Returns: number
+          }
       add_cash_transaction_api: {
         Args: {
           p_amount: number
@@ -3069,13 +3075,29 @@ export type Database = {
         Args: { bucket_name: string }
         Returns: undefined
       }
-      create_verification_codes_table: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
+      create_verification_codes_table: { Args: never; Returns: undefined }
+      get_admin_role: { Args: never; Returns: string }
+      get_branch_from_neighborhood: {
+        Args: { p_neighborhood_id: string }
+        Returns: {
+          branch_address: string
+          branch_id: string
+          branch_name: string
+          branch_phone: string
+        }[]
       }
-      get_admin_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string
+      get_branch_neighborhoods: {
+        Args: { p_branch_id: string }
+        Returns: {
+          active: boolean
+          area_name: string
+          city_name: string
+          estimated_time: string
+          governorate_name: string
+          neighborhood_id: string
+          neighborhood_name: string
+          price: number
+        }[]
       }
       get_branch_products: {
         Args: { p_branch_id: string }
@@ -3087,14 +3109,10 @@ export type Database = {
         Args: { p_branch_id?: string; p_register_type: string }
         Returns: number
       }
-      get_customer_id_from_user: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_merged_cash_balance: {
-        Args: Record<PropertyKey, never> | { p_branch_id?: string }
-        Returns: number
-      }
+      get_customer_id_from_user: { Args: never; Returns: string }
+      get_merged_cash_balance:
+        | { Args: { p_branch_id?: string }; Returns: number }
+        | { Args: never; Returns: number }
       get_next_invoice_number: {
         Args: { p_branch_id: string }
         Returns: string
@@ -3116,35 +3134,33 @@ export type Database = {
         Args: { p_branch_code: string; p_branch_id: string }
         Returns: string
       }
-      is_admin: {
-        Args: Record<PropertyKey, never>
+      is_admin: { Args: never; Returns: boolean }
+      is_delivery_available: {
+        Args: { p_branch_id: string; p_neighborhood_id: string }
         Returns: boolean
       }
-      is_external_branch: {
-        Args: { p_branch_id: string }
-        Returns: boolean
-      }
-      is_super_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      record_merged_cash_transaction: {
-        Args:
-          | {
+      is_external_branch: { Args: { p_branch_id: string }; Returns: boolean }
+      is_super_admin: { Args: never; Returns: boolean }
+      record_merged_cash_transaction:
+        | {
+            Args: {
               p_amount: number
               p_branch_id?: string
               p_created_by?: string
               p_notes: string
               p_transaction_type: string
             }
-          | {
+            Returns: number
+          }
+        | {
+            Args: {
               p_amount: number
               p_created_by?: string
               p_notes: string
               p_transaction_type: string
             }
-        Returns: number
-      }
+            Returns: number
+          }
       sales_summary_by_branch: {
         Args: { p_end?: string; p_start?: string }
         Returns: {
