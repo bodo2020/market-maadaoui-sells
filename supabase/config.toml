@@ -80,6 +80,9 @@ url = ""
 # Port to use for Functions server.
 port = 54321
 
+[functions.notify-new-order]
+verify_jwt = false
+
 [vector]
 # Port to use for the pgvector search endpoint
 port = 54327

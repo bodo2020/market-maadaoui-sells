@@ -66,8 +66,9 @@ export default function OnlineOrders() {
           schema: 'public',
           table: 'online_orders'
         },
-        (payload) => {
+        async (payload) => {
           console.log('New order received:', payload);
+          const newOrder = payload.new as any;
           
           // Play notification sound
           if (audioRef.current) {
@@ -76,10 +77,31 @@ export default function OnlineOrders() {
             });
           }
           
-          // Show toast notification
+          // Send email notification via edge function
+          try {
+            await supabase.functions.invoke('notify-new-order', {
+              body: {
+                orderId: newOrder.id,
+                orderNumber: newOrder.id.slice(0, 8),
+                customerName: 'عميل جديد',
+                total: newOrder.total,
+                items: newOrder.items || []
+              }
+            });
+          } catch (error) {
+            console.error('Error sending email notification:', error);
+          }
+          
+          // Show toast notification with 5 minutes duration and action to navigate
           toast.success('طلب جديد وارد! 🔔', {
-            description: `طلب رقم: ${payload.new.id.slice(0, 8)}`,
-            duration: 5000,
+            description: `طلب رقم: ${newOrder.id.slice(0, 8)} - المبلغ: ${newOrder.total} ج.م`,
+            duration: 300000, // 5 minutes = 300000 milliseconds
+            action: {
+              label: "عرض الطلب",
+              onClick: () => {
+                navigate(`/online-orders?orderId=${newOrder.id}`);
+              },
+            },
           });
           
           // Refresh orders list
@@ -91,7 +113,7 @@ export default function OnlineOrders() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [notificationEnabled, handleOrderUpdate]);
+  }, [notificationEnabled, handleOrderUpdate, navigate]);
   const handleArchive = (order: Order) => {
     toast.success("تم أرشفة الطلب");
   };
