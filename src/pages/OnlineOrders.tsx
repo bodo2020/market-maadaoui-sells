@@ -189,12 +189,13 @@ export default function OnlineOrders() {
         error
       } = await supabase.from('online_orders').update({
         status: 'cancelled',
+        payment_status: 'pending', // إلغاء حالة الدفع تلقائياً
         notes,
         updated_at: new Date().toISOString()
       }).eq('id', order.id);
       if (error) throw error;
       handleOrderUpdate();
-      toast.success("تم إلغاء الطلب");
+      toast.success("تم إلغاء الطلب وإلغاء عملية الدفع");
     } catch (error) {
       console.error('Error cancelling order:', error);
       toast.error("حدث خطأ أثناء إلغاء الطلب");
