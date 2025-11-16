@@ -29,7 +29,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // تنسيق قائمة المنتجات
     const itemsList = items
-      .map((item: any) => `<li>${item.product.name} - الكمية: ${item.quantity} - السعر: ${item.price} ج.م</li>`)
+      .map((item: any) => `<li>${item.name || item.product?.name || 'منتج'} - الكمية: ${item.quantity} - السعر: ${item.price} ج.م</li>`)
       .join("");
 
     const emailResponse = await resend.emails.send({
