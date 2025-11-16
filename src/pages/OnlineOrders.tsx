@@ -55,7 +55,12 @@ export default function OnlineOrders() {
 
   // Listen for new orders using Realtime
   useEffect(() => {
-    if (!notificationEnabled) return;
+    console.log('🔔 Setting up realtime subscription. Notification enabled:', notificationEnabled);
+    
+    if (!notificationEnabled) {
+      console.log('⚠️ Notifications disabled, skipping realtime setup');
+      return;
+    }
 
     const channel = supabase
       .channel('online-orders-changes')
@@ -67,50 +72,61 @@ export default function OnlineOrders() {
           table: 'online_orders'
         },
         async (payload) => {
-          console.log('New order received:', payload);
+          console.log('✅ New order received via realtime:', payload);
           const newOrder = payload.new as any;
           
           // Play notification sound
           if (audioRef.current) {
+            console.log('🔊 Playing notification sound');
             audioRef.current.play().catch(error => {
-              console.error('Error playing notification sound:', error);
+              console.error('❌ Error playing notification sound:', error);
             });
           }
           
           // Send email notification via edge function
+          console.log('📧 Sending email notification...');
           try {
-            await supabase.functions.invoke('notify-new-order', {
+            const response = await supabase.functions.invoke('notify-new-order', {
               body: {
                 orderId: newOrder.id,
                 orderNumber: newOrder.id.slice(0, 8),
-                customerName: 'عميل جديد',
+                customerName: newOrder.customers?.name || 'عميل جديد',
                 total: newOrder.total,
                 items: newOrder.items || []
               }
             });
+            console.log('✅ Email notification response:', response);
           } catch (error) {
-            console.error('Error sending email notification:', error);
+            console.error('❌ Error sending email notification:', error);
           }
           
           // Show toast notification with 5 minutes duration and action to navigate
+          console.log('🔔 Showing toast notification');
           toast.success('طلب جديد وارد! 🔔', {
             description: `طلب رقم: ${newOrder.id.slice(0, 8)} - المبلغ: ${newOrder.total} ج.م`,
             duration: 300000, // 5 minutes = 300000 milliseconds
             action: {
               label: "عرض الطلب",
               onClick: () => {
+                console.log('👆 User clicked on order notification');
                 navigate(`/online-orders?orderId=${newOrder.id}`);
               },
             },
           });
           
           // Refresh orders list
+          console.log('🔄 Refreshing orders list');
           handleOrderUpdate();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Realtime subscription status:', status);
+      });
+
+    console.log('✅ Realtime channel created and subscribed');
 
     return () => {
+      console.log('🔌 Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [notificationEnabled, handleOrderUpdate, navigate]);
