@@ -40,11 +40,27 @@ export async function fetchAreas(cityId: string) {
   return data;
 }
 
-export async function fetchNeighborhoods(areaId: string) {
-  const { data, error } = await supabase
+export async function fetchNeighborhoods(areaId: string, branchId?: string | null) {
+  let query = supabase
     .from('neighborhoods')
     .select('*')
-    .eq('area_id', areaId)
+    .eq('area_id', areaId);
+  
+  if (branchId) {
+    query = query.eq('branch_id', branchId);
+  }
+  
+  const { data, error } = await query.order('name');
+    
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchBranches() {
+  const { data, error } = await supabase
+    .from('branches')
+    .select('id, name, code, active')
+    .eq('active', true)
     .order('name');
     
   if (error) throw error;
@@ -104,6 +120,7 @@ export async function createNeighborhood(data: {
   area_id: string;
   price?: number;
   estimated_time?: string;
+  branch_id?: string | null;
 }) {
   const { data: result, error } = await supabase
     .from('neighborhoods')

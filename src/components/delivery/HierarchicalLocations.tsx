@@ -33,7 +33,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export default function HierarchicalLocations() {
+interface HierarchicalLocationsProps {
+  branchId?: string | null;
+}
+
+export default function HierarchicalLocations({ branchId }: HierarchicalLocationsProps) {
   const queryClient = useQueryClient();
   const [selectedGovernorate, setSelectedGovernorate] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
@@ -65,8 +69,8 @@ export default function HierarchicalLocations() {
 
   // Fetch neighborhoods for selected area
   const { data: neighborhoods = [], isLoading: neighborhoodsLoading } = useQuery({
-    queryKey: ["neighborhoods", selectedArea],
-    queryFn: () => selectedArea ? fetchNeighborhoods(selectedArea) : Promise.resolve([]),
+    queryKey: ["neighborhoods", selectedArea, branchId],
+    queryFn: () => selectedArea ? fetchNeighborhoods(selectedArea, branchId) : Promise.resolve([]),
     enabled: !!selectedArea
   });
 
@@ -88,7 +92,8 @@ export default function HierarchicalLocations() {
           name: data.name,
           area_id: selectedArea!,
           price: data.price || 0,
-          estimated_time: data.estimated_time
+          estimated_time: data.estimated_time,
+          branch_id: branchId
         });
       }
     },
@@ -101,7 +106,7 @@ export default function HierarchicalLocations() {
         queryClient.invalidateQueries({ queryKey: ["areas", selectedCity] });
       } else {
         queryClient.invalidateQueries({ 
-          queryKey: ["neighborhoods", selectedArea] 
+          queryKey: ["neighborhoods", selectedArea, branchId] 
         });
       }
       
@@ -141,7 +146,7 @@ export default function HierarchicalLocations() {
         setSelectedArea(null);
       } else if (locationToDelete?.type === 'neighborhood') {
         queryClient.invalidateQueries({ 
-          queryKey: ["neighborhoods", selectedArea] 
+          queryKey: ["neighborhoods", selectedArea, branchId] 
         });
       }
       
