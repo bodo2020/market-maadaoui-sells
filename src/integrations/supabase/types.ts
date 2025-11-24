@@ -162,56 +162,6 @@ export type Database = {
           },
         ]
       }
-      branch_delivery_zones: {
-        Row: {
-          branch_id: string
-          color: string | null
-          created_at: string | null
-          delivery_price: number
-          estimated_time: string | null
-          id: string
-          is_active: boolean | null
-          polygon_coordinates: Json
-          priority: number | null
-          updated_at: string | null
-          zone_name: string
-        }
-        Insert: {
-          branch_id: string
-          color?: string | null
-          created_at?: string | null
-          delivery_price?: number
-          estimated_time?: string | null
-          id?: string
-          is_active?: boolean | null
-          polygon_coordinates: Json
-          priority?: number | null
-          updated_at?: string | null
-          zone_name: string
-        }
-        Update: {
-          branch_id?: string
-          color?: string | null
-          created_at?: string | null
-          delivery_price?: number
-          estimated_time?: string | null
-          id?: string
-          is_active?: boolean | null
-          polygon_coordinates?: Json
-          priority?: number | null
-          updated_at?: string | null
-          zone_name?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "branch_delivery_zones_branch_id_fkey"
-            columns: ["branch_id"]
-            isOneToOne: false
-            referencedRelation: "branches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       branch_neighborhoods: {
         Row: {
           active: boolean | null
@@ -1659,7 +1609,6 @@ export type Database = {
           customer_id: string | null
           delivery_location_id: string | null
           delivery_person: string | null
-          delivery_zone_id: string | null
           id: string
           items: Json
           notes: string | null
@@ -1679,7 +1628,6 @@ export type Database = {
           customer_id?: string | null
           delivery_location_id?: string | null
           delivery_person?: string | null
-          delivery_zone_id?: string | null
           id?: string
           items: Json
           notes?: string | null
@@ -1699,7 +1647,6 @@ export type Database = {
           customer_id?: string | null
           delivery_location_id?: string | null
           delivery_person?: string | null
-          delivery_zone_id?: string | null
           id?: string
           items?: Json
           notes?: string | null
@@ -1726,13 +1673,6 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "online_orders_delivery_zone_id_fkey"
-            columns: ["delivery_zone_id"]
-            isOneToOne: false
-            referencedRelation: "branch_delivery_zones"
             referencedColumns: ["id"]
           },
         ]
@@ -3299,18 +3239,6 @@ export type Database = {
           needed_quantity: number
           product_id: string
           product_name: string
-        }[]
-      }
-      check_point_in_delivery_zone: {
-        Args: { p_lat: number; p_lng: number }
-        Returns: {
-          branch_id: string
-          branch_name: string
-          delivery_price: number
-          estimated_time: string
-          priority: number
-          zone_id: string
-          zone_name: string
         }[]
       }
       create_branch_schema: {
