@@ -3255,7 +3255,6 @@ export type Database = {
           branch_type: Database["public"]["Enums"]["branch_type"]
           category: Database["public"]["Enums"]["branch_category"]
           priority: number
-          routing_reason: string
         }[]
       }
       get_branch_from_neighborhood: {
