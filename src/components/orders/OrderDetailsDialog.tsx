@@ -16,9 +16,10 @@ import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTra
 import { useBranchStore } from "@/stores/branchStore";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Check, FileText } from "lucide-react";
+import { Check, FileText, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import OnlineOrderInvoiceDialog from "./OnlineOrderInvoiceDialog";
+import { useQuery } from "@tanstack/react-query";
 
 interface OrderDetailsDialogProps {
   order: Order | null;
@@ -39,6 +40,47 @@ export function OrderDetailsDialog({
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
   const [assignDeliveryOpen, setAssignDeliveryOpen] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+
+  // Fetch routing information
+  const { data: routingInfo } = useQuery({
+    queryKey: ["order-routing", order?.id],
+    queryFn: async () => {
+      if (!order?.id) return null;
+      const { data, error } = await supabase
+        .from('order_routing_log')
+        .select(`
+          *,
+          branches:assigned_branch_id (
+            name,
+            address,
+            phone
+          ),
+          neighborhoods:neighborhood_id (
+            name,
+            areas (
+              name,
+              cities (
+                name,
+                governorates (
+                  name
+                )
+              )
+            )
+          )
+        `)
+        .eq('order_id', order.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error) {
+        console.error("Error fetching routing info:", error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!order?.id,
+  });
 
   if (!order) return null;
 
@@ -241,7 +283,43 @@ export function OrderDetailsDialog({
             />
           </div>
 
-          <div className="w-full md:w-2/5">
+          <div className="w-full md:w-2/5 space-y-4">
+            {/* Routing Information Card */}
+            {routingInfo && (
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-100">
+                    معلومات التوزيع
+                  </h3>
+                </div>
+                
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">الفرع المخصص:</span>
+                    <p className="font-medium">{routingInfo.branches?.name}</p>
+                  </div>
+                  
+                  {routingInfo.neighborhoods && (
+                    <div>
+                      <span className="text-muted-foreground">منطقة التوصيل:</span>
+                      <p className="font-medium">
+                        {routingInfo.neighborhoods.name} - {routingInfo.neighborhoods.areas?.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {routingInfo.neighborhoods.areas?.cities?.name} - {routingInfo.neighborhoods.areas?.cities?.governorates?.name}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <span className="text-muted-foreground">سبب التوزيع:</span>
+                    <p className="text-xs">{routingInfo.routing_reason}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <CustomerInfoCards
               customerName={renderCustomerNameWithVerification()}
               customerEmail={order.customer_email}

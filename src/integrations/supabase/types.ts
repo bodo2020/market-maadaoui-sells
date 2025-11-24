@@ -168,9 +168,11 @@ export type Database = {
           branch_id: string
           created_at: string | null
           delivery_radius_km: number | null
+          estimated_time: string | null
           id: string
           is_primary: boolean | null
           neighborhood_id: string
+          price: number | null
           priority: number | null
           updated_at: string | null
         }
@@ -179,9 +181,11 @@ export type Database = {
           branch_id: string
           created_at?: string | null
           delivery_radius_km?: number | null
+          estimated_time?: string | null
           id?: string
           is_primary?: boolean | null
           neighborhood_id: string
+          price?: number | null
           priority?: number | null
           updated_at?: string | null
         }
@@ -190,9 +194,11 @@ export type Database = {
           branch_id?: string
           created_at?: string | null
           delivery_radius_km?: number | null
+          estimated_time?: string | null
           id?: string
           is_primary?: boolean | null
           neighborhood_id?: string
+          price?: number | null
           priority?: number | null
           updated_at?: string | null
         }
@@ -3255,6 +3261,7 @@ export type Database = {
           branch_type: Database["public"]["Enums"]["branch_type"]
           category: Database["public"]["Enums"]["branch_category"]
           priority: number
+          routing_reason: string
         }[]
       }
       get_branch_from_neighborhood: {
@@ -3318,6 +3325,13 @@ export type Database = {
         Returns: number
       }
       get_customer_id_from_user: { Args: never; Returns: string }
+      get_delivery_price: {
+        Args: { p_branch_id: string; p_neighborhood_id: string }
+        Returns: {
+          estimated_time: string
+          price: number
+        }[]
+      }
       get_merged_cash_balance:
         | { Args: { p_branch_id?: string }; Returns: number }
         | { Args: never; Returns: number }
