@@ -12,6 +12,9 @@ import {
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { List, Map as MapIcon } from "lucide-react";
+import { NeighborhoodMapSelector } from "./NeighborhoodMapSelector";
 
 interface Props {
   branchId: string;
@@ -21,10 +24,14 @@ interface Props {
 
 interface NeighborhoodSelection {
   id: string;
+  name: string;
   price: number;
   estimated_time: string;
   priority: number;
   is_primary: boolean;
+  governorate?: string;
+  city?: string;
+  area?: string;
 }
 
 export function SelectNeighborhoodsDialog({ branchId, open, onOpenChange }: Props) {
@@ -89,14 +96,26 @@ export function SelectNeighborhoodsDialog({ branchId, open, onOpenChange }: Prop
     return acc;
   }, {});
 
-  const handleNeighborhoodToggle = (neighborhoodId: string, checked: boolean) => {
+  const handleNeighborhoodToggle = (neighborhood: any, checked: boolean) => {
+    const neighborhoodId = typeof neighborhood === 'string' ? neighborhood : neighborhood.id;
+    const neighborhoodName = typeof neighborhood === 'string' 
+      ? availableNeighborhoods.find(n => n.id === neighborhood)?.name || ''
+      : neighborhood.name;
+    const neighborhoodData = typeof neighborhood === 'string'
+      ? availableNeighborhoods.find(n => n.id === neighborhood)
+      : neighborhood;
+
     if (checked) {
       setSelectedNeighborhoods(prev => new Map(prev).set(neighborhoodId, {
         id: neighborhoodId,
+        name: neighborhoodName,
         price: 0,
         estimated_time: "30-45 دقيقة",
         priority: 1,
         is_primary: false,
+        governorate: neighborhoodData?.areas?.cities?.governorates?.name,
+        city: neighborhoodData?.areas?.cities?.name,
+        area: neighborhoodData?.areas?.name,
       }));
     } else {
       setSelectedNeighborhoods(prev => {
@@ -126,12 +145,25 @@ export function SelectNeighborhoodsDialog({ branchId, open, onOpenChange }: Prop
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>اختر الأحياء للتوصيل</DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="flex-1">
+        <Tabs defaultValue="list" className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="list" className="gap-2">
+              <List className="w-4 h-4" />
+              عرض القائمة
+            </TabsTrigger>
+            <TabsTrigger value="map" className="gap-2">
+              <MapIcon className="w-4 h-4" />
+              عرض الخريطة
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="list" className="flex-1 overflow-hidden">
+            <ScrollArea className="h-full">
           {isLoading ? (
             <p className="text-center py-8">جاري التحميل...</p>
           ) : Object.keys(groupedNeighborhoods).length === 0 ? (
@@ -161,13 +193,13 @@ export function SelectNeighborhoodsDialog({ branchId, open, onOpenChange }: Prop
                                       return (
                                         <div key={neighborhood.id} className="space-y-3 border rounded-lg p-4">
                                           <div className="flex items-center gap-2">
-                                            <Checkbox
-                                              id={`neighborhood-${neighborhood.id}`}
-                                              checked={isSelected}
-                                              onCheckedChange={(checked) => 
-                                                handleNeighborhoodToggle(neighborhood.id, checked as boolean)
-                                              }
-                                            />
+                                             <Checkbox
+                                               id={`neighborhood-${neighborhood.id}`}
+                                               checked={isSelected}
+                                               onCheckedChange={(checked) => 
+                                                 handleNeighborhoodToggle(neighborhood, checked as boolean)
+                                               }
+                                             />
                                             <label
                                               htmlFor={`neighborhood-${neighborhood.id}`}
                                               className="text-sm font-medium cursor-pointer"
@@ -268,9 +300,20 @@ export function SelectNeighborhoodsDialog({ branchId, open, onOpenChange }: Prop
               ))}
             </Accordion>
           )}
-        </ScrollArea>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="map" className="flex-1 overflow-hidden">
+            <NeighborhoodMapSelector
+              availableNeighborhoods={availableNeighborhoods}
+              selectedNeighborhoods={selectedNeighborhoods}
+              onNeighborhoodToggle={handleNeighborhoodToggle}
+              onNeighborhoodUpdate={updateNeighborhoodData}
+            />
+          </TabsContent>
+        </Tabs>
         
-        <DialogFooter>
+        <DialogFooter className="mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             إلغاء
           </Button>
