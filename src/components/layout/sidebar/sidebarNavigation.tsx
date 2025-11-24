@@ -137,9 +137,14 @@ export const customersNavigation: NavigationGroup = {
       icon: UserCog,
     },
     {
-      label: "أماكن التوصيل",
+      label: "أماكن التوصيل العامة",
       href: "/delivery-locations",
       icon: MapPin,
+    },
+    {
+      label: "أماكن التوصيل للفروع",
+      href: "/branch-delivery-zones",
+      icon: Building2,
     },
     {
       label: "الإعلانات",

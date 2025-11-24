@@ -33,11 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface HierarchicalLocationsProps {
-  branchId?: string | null;
-}
-
-export default function HierarchicalLocations({ branchId }: HierarchicalLocationsProps) {
+export function HierarchicalLocations() {
   const queryClient = useQueryClient();
   const [selectedGovernorate, setSelectedGovernorate] = useState<string | null>(null);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
@@ -69,8 +65,8 @@ export default function HierarchicalLocations({ branchId }: HierarchicalLocation
 
   // Fetch neighborhoods for selected area
   const { data: neighborhoods = [], isLoading: neighborhoodsLoading } = useQuery({
-    queryKey: ["neighborhoods", selectedArea, branchId],
-    queryFn: () => selectedArea ? fetchNeighborhoods(selectedArea, branchId) : Promise.resolve([]),
+    queryKey: ["neighborhoods", selectedArea],
+    queryFn: () => selectedArea ? fetchNeighborhoods(selectedArea) : Promise.resolve([]),
     enabled: !!selectedArea
   });
 
@@ -92,8 +88,7 @@ export default function HierarchicalLocations({ branchId }: HierarchicalLocation
           name: data.name,
           area_id: selectedArea!,
           price: data.price || 0,
-          estimated_time: data.estimated_time,
-          branch_id: branchId
+          estimated_time: data.estimated_time
         });
       }
     },
@@ -106,7 +101,7 @@ export default function HierarchicalLocations({ branchId }: HierarchicalLocation
         queryClient.invalidateQueries({ queryKey: ["areas", selectedCity] });
       } else {
         queryClient.invalidateQueries({ 
-          queryKey: ["neighborhoods", selectedArea, branchId] 
+          queryKey: ["neighborhoods", selectedArea] 
         });
       }
       
@@ -146,7 +141,7 @@ export default function HierarchicalLocations({ branchId }: HierarchicalLocation
         setSelectedArea(null);
       } else if (locationToDelete?.type === 'neighborhood') {
         queryClient.invalidateQueries({ 
-          queryKey: ["neighborhoods", selectedArea, branchId] 
+          queryKey: ["neighborhoods", selectedArea] 
         });
       }
       

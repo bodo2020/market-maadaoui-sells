@@ -29,6 +29,7 @@ import AddBanner from "@/pages/AddBanner";
 import Barcode from "@/pages/Barcode";
 import DeliveryLocationsPage from "@/pages/DeliveryLocationsPage";
 import DeliveryLocations from "@/pages/DeliveryLocations";
+import BranchDeliveryZones from "@/pages/BranchDeliveryZones";
 import SalesDashboard from "@/pages/SalesDashboard";
 import OffersPage from "@/pages/OffersPage";
 import ProductCollections from "@/pages/ProductCollections";
@@ -115,6 +116,7 @@ function App() {
               <Route path="/banners/edit" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
               <Route path="/delivery-locations" element={<ProtectedRoute><DeliveryLocationsPage /></ProtectedRoute>} />
               <Route path="/delivery-locations/:id" element={<ProtectedRoute><DeliveryLocations /></ProtectedRoute>} />
+              <Route path="/branch-delivery-zones" element={<ProtectedRoute><BranchDeliveryZones /></ProtectedRoute>} />
               <Route path="/sales-dashboard" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
               <Route path="/offers" element={<ProtectedRoute><OffersPage /></ProtectedRoute>} />
               <Route path="/product-collections" element={<ProtectedRoute><ProductCollections /></ProtectedRoute>} />

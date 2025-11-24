@@ -322,58 +322,149 @@ export async function updateDeliveryTypePricing(data: {
   price: number;
   estimated_time?: string;
 }): Promise<DeliveryTypePrice> {
-  try {
-    // Check if pricing record already exists
-    const { data: existingPricing, error: fetchError } = await supabase
+  const { data: existing } = await supabase
+    .from('delivery_type_pricing')
+    .select()
+    .eq('delivery_location_id', data.delivery_location_id)
+    .eq('delivery_type_id', data.delivery_type_id)
+    .single();
+
+  if (existing) {
+    const { data: result, error } = await supabase
       .from('delivery_type_pricing')
-      .select('*')
-      .eq('delivery_location_id', data.delivery_location_id)
-      .eq('delivery_type_id', data.delivery_type_id);
-      
-    if (fetchError) throw fetchError;
-    
-    // If pricing record exists, update it
-    if (existingPricing && existingPricing.length > 0) {
-      const { data: result, error } = await supabase
-        .from('delivery_type_pricing')
-        .update({
-          price: data.price,
-          estimated_time: data.estimated_time,
-          updated_at: new Date().toISOString() // Convert Date to ISO string
-        })
-        .eq('delivery_location_id', data.delivery_location_id)
-        .eq('delivery_type_id', data.delivery_type_id)
-        .select()
-        .single();
-        
-      if (error) {
-        console.error("Error updating delivery type pricing:", error);
-        throw error;
-      }
-      
-      return result;
-    } else {
-      // If pricing record doesn't exist, create a new one
-      const { data: result, error } = await supabase
-        .from('delivery_type_pricing')
-        .insert([{
-          delivery_location_id: data.delivery_location_id,
-          delivery_type_id: data.delivery_type_id,
-          price: data.price,
-          estimated_time: data.estimated_time
-        }])
-        .select()
-        .single();
-        
-      if (error) {
-        console.error("Error creating delivery type pricing:", error);
-        throw error;
-      }
-      
-      return result;
-    }
-  } catch (err) {
-    console.error("Error in updateDeliveryTypePricing:", err);
-    throw err;
+      .update({ price: data.price, estimated_time: data.estimated_time })
+      .eq('id', existing.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return result;
+  } else {
+    const { data: result, error } = await supabase
+      .from('delivery_type_pricing')
+      .insert([data])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return result;
   }
+}
+
+// ==== المرحلة 4: دوال جديدة لإدارة أماكن التوصيل الخاصة بالفروع ====
+
+// الحصول على أحياء فرع معين مع الأسعار والأوقات
+export async function fetchBranchNeighborhoods(branchId: string) {
+  const { data, error } = await supabase
+    .from('branch_neighborhoods')
+    .select(`
+      *,
+      neighborhoods!inner(
+        *,
+        areas!inner(
+          *,
+          cities!inner(
+            *,
+            governorates!inner(*)
+          )
+        )
+      )
+    `)
+    .eq('branch_id', branchId)
+    .eq('active', true)
+    .order('priority', { ascending: true });
+    
+  if (error) throw error;
+  return data;
+}
+
+// ربط حي بفرع مع السعر والوقت والأولوية
+export async function assignNeighborhoodToBranch(data: {
+  branch_id: string;
+  neighborhood_id: string;
+  price: number;
+  estimated_time?: string;
+  priority?: number;
+  is_primary?: boolean;
+  delivery_radius_km?: number;
+}) {
+  const { data: result, error } = await supabase
+    .from('branch_neighborhoods')
+    .insert([data])
+    .select()
+    .single();
+    
+  if (error) throw error;
+  return result;
+}
+
+// تحديث السعر والوقت لحي في فرع
+export async function updateBranchNeighborhoodPricing(
+  branchId: string,
+  neighborhoodId: string,
+  data: {
+    price?: number;
+    estimated_time?: string;
+    priority?: number;
+    is_primary?: boolean;
+  }
+) {
+  const { data: result, error } = await supabase
+    .from('branch_neighborhoods')
+    .update(data)
+    .eq('branch_id', branchId)
+    .eq('neighborhood_id', neighborhoodId)
+    .select()
+    .single();
+    
+  if (error) throw error;
+  return result;
+}
+
+// حذف ربط حي من فرع
+export async function removeBranchNeighborhood(
+  branchId: string,
+  neighborhoodId: string
+) {
+  const { error } = await supabase
+    .from('branch_neighborhoods')
+    .delete()
+    .eq('branch_id', branchId)
+    .eq('neighborhood_id', neighborhoodId);
+    
+  if (error) throw error;
+  return true;
+}
+
+// الحصول على جميع الأحياء المتاحة (غير المرتبطة بالفرع)
+export async function fetchAvailableNeighborhoods(branchId?: string) {
+  const { data: allNeighborhoods, error } = await supabase
+    .from('neighborhoods')
+    .select(`
+      *,
+      areas!inner(
+        *,
+        cities!inner(
+          *,
+          governorates!inner(*)
+        )
+      )
+    `)
+    .eq('active', true);
+    
+  if (error) throw error;
+  
+  if (!branchId) {
+    return allNeighborhoods || [];
+  }
+  
+  // فلترة الأحياء غير المرتبطة بالفرع
+  const { data: assigned } = await supabase
+    .from('branch_neighborhoods')
+    .select('neighborhood_id')
+    .eq('branch_id', branchId);
+  
+  const assignedIds = new Set(assigned?.map(a => a.neighborhood_id) || []);
+  
+  return allNeighborhoods?.filter(n => !assignedIds.has(n.id)) || [];
 }
