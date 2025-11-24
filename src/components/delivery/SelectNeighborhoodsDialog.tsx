@@ -9,6 +9,7 @@ import {
   fetchAvailableNeighborhoods, 
   assignNeighborhoodToBranch 
 } from "@/services/supabase/deliveryService";
+import { supabase } from "@/integrations/supabase/client";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -42,6 +43,20 @@ export function SelectNeighborhoodsDialog({ branchId, open, onOpenChange }: Prop
     queryKey: ["available-neighborhoods", branchId],
     queryFn: () => fetchAvailableNeighborhoods(branchId),
     enabled: !!branchId && open,
+  });
+
+  const { data: allNeighborhoods = [] } = useQuery({
+    queryKey: ["all-neighborhoods"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('neighborhoods')
+        .select('*, areas!inner(*, cities!inner(*, governorates!inner(*)))')
+        .eq('active', true);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
   });
 
   const assignMutation = useMutation({
@@ -306,6 +321,7 @@ export function SelectNeighborhoodsDialog({ branchId, open, onOpenChange }: Prop
           <TabsContent value="map" className="flex-1 overflow-hidden">
             <NeighborhoodMapSelector
               availableNeighborhoods={availableNeighborhoods}
+              allNeighborhoods={allNeighborhoods}
               selectedNeighborhoods={selectedNeighborhoods}
               onNeighborhoodToggle={handleNeighborhoodToggle}
               onNeighborhoodUpdate={updateNeighborhoodData}

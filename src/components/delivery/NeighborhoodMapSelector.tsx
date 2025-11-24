@@ -32,13 +32,15 @@ interface Props {
   selectedNeighborhoods: Map<string, NeighborhoodSelection>;
   onNeighborhoodToggle: (neighborhood: any, checked: boolean) => void;
   onNeighborhoodUpdate: (neighborhoodId: string, field: keyof NeighborhoodSelection, value: any) => void;
+  allNeighborhoods?: any[];
 }
 
 export function NeighborhoodMapSelector({ 
   availableNeighborhoods, 
   selectedNeighborhoods,
   onNeighborhoodToggle,
-  onNeighborhoodUpdate
+  onNeighborhoodUpdate,
+  allNeighborhoods = []
 }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<any>(null);
@@ -98,10 +100,14 @@ export function NeighborhoodMapSelector({
     markers.forEach(marker => marker.setMap(null));
     const newMarkers = new Map();
 
-    // Add markers for available neighborhoods (approximated locations)
-    availableNeighborhoods.forEach((neighborhood, index) => {
+    // Show all neighborhoods (both available and already assigned)
+    const displayNeighborhoods = allNeighborhoods.length > 0 ? allNeighborhoods : availableNeighborhoods;
+
+    // Add markers for neighborhoods
+    displayNeighborhoods.forEach((neighborhood, index) => {
       const isSelected = selectedNeighborhoods.has(neighborhood.id);
       const isHighlighted = selectedOnMap === neighborhood.id;
+      const isAlreadyAssigned = !availableNeighborhoods.find(n => n.id === neighborhood.id);
       
       // Create approximate position (you can later fetch real coordinates)
       const lat = CENTER_LOCATION.lat + (Math.random() - 0.5) * 0.5;
@@ -114,8 +120,8 @@ export function NeighborhoodMapSelector({
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: isHighlighted ? 12 : isSelected ? 10 : 8,
-          fillColor: isSelected ? '#22c55e' : '#3b82f6',
-          fillOpacity: isHighlighted ? 1 : 0.8,
+          fillColor: isAlreadyAssigned ? '#9ca3af' : isSelected ? '#22c55e' : '#3b82f6',
+          fillOpacity: isHighlighted ? 1 : isAlreadyAssigned ? 0.6 : 0.8,
           strokeColor: '#ffffff',
           strokeWeight: 2,
         },
@@ -127,13 +133,15 @@ export function NeighborhoodMapSelector({
         }
       });
 
-      // Add click listener
-      marker.addListener('click', () => {
-        setSelectedOnMap(neighborhood.id);
-        if (!isSelected) {
-          onNeighborhoodToggle(neighborhood, true);
-        }
-      });
+      // Add click listener (only for available neighborhoods)
+      if (!isAlreadyAssigned) {
+        marker.addListener('click', () => {
+          setSelectedOnMap(neighborhood.id);
+          if (!isSelected) {
+            onNeighborhoodToggle(neighborhood, true);
+          }
+        });
+      }
 
       // Add info window
       const infoWindow = new window.google.maps.InfoWindow({
@@ -162,7 +170,7 @@ export function NeighborhoodMapSelector({
     });
 
     setMarkers(newMarkers);
-  }, [map, availableNeighborhoods, selectedNeighborhoods, selectedOnMap]);
+  }, [map, availableNeighborhoods, allNeighborhoods, selectedNeighborhoods, selectedOnMap]);
 
   const zoomIn = () => map?.setZoom(map.getZoom() + 1);
   const zoomOut = () => map?.setZoom(map.getZoom() - 1);
@@ -217,7 +225,11 @@ export function NeighborhoodMapSelector({
             </div>
             <div className="flex items-center gap-2 text-xs">
               <div className="w-3 h-3 rounded-full bg-green-500" />
-              <span>محدد</span>
+              <span>محدد للإضافة</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <div className="w-3 h-3 rounded-full bg-gray-400 opacity-60" />
+              <span>مرتبط بالفعل</span>
             </div>
           </CardContent>
         </Card>
