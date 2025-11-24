@@ -167,24 +167,33 @@ export type Database = {
           active: boolean | null
           branch_id: string
           created_at: string | null
+          delivery_radius_km: number | null
           id: string
+          is_primary: boolean | null
           neighborhood_id: string
+          priority: number | null
           updated_at: string | null
         }
         Insert: {
           active?: boolean | null
           branch_id: string
           created_at?: string | null
+          delivery_radius_km?: number | null
           id?: string
+          is_primary?: boolean | null
           neighborhood_id: string
+          priority?: number | null
           updated_at?: string | null
         }
         Update: {
           active?: boolean | null
           branch_id?: string
           created_at?: string | null
+          delivery_radius_km?: number | null
           id?: string
+          is_primary?: boolean | null
           neighborhood_id?: string
+          priority?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -260,12 +269,19 @@ export type Database = {
           active: boolean | null
           address: string | null
           branch_type: Database["public"]["Enums"]["branch_type"]
+          category: Database["public"]["Enums"]["branch_category"] | null
           code: string | null
+          commission_rate: number | null
+          contract_end_date: string | null
+          contract_start_date: string | null
           created_at: string | null
           email: string | null
+          franchise_code: string | null
+          hub_branch_id: string | null
           id: string
           independent_inventory: boolean | null
           independent_pricing: boolean | null
+          monthly_fee: number | null
           name: string
           parent_branch_id: string | null
           phone: string | null
@@ -276,12 +292,19 @@ export type Database = {
           active?: boolean | null
           address?: string | null
           branch_type?: Database["public"]["Enums"]["branch_type"]
+          category?: Database["public"]["Enums"]["branch_category"] | null
           code?: string | null
+          commission_rate?: number | null
+          contract_end_date?: string | null
+          contract_start_date?: string | null
           created_at?: string | null
           email?: string | null
+          franchise_code?: string | null
+          hub_branch_id?: string | null
           id?: string
           independent_inventory?: boolean | null
           independent_pricing?: boolean | null
+          monthly_fee?: number | null
           name: string
           parent_branch_id?: string | null
           phone?: string | null
@@ -292,12 +315,19 @@ export type Database = {
           active?: boolean | null
           address?: string | null
           branch_type?: Database["public"]["Enums"]["branch_type"]
+          category?: Database["public"]["Enums"]["branch_category"] | null
           code?: string | null
+          commission_rate?: number | null
+          contract_end_date?: string | null
+          contract_start_date?: string | null
           created_at?: string | null
           email?: string | null
+          franchise_code?: string | null
+          hub_branch_id?: string | null
           id?: string
           independent_inventory?: boolean | null
           independent_pricing?: boolean | null
+          monthly_fee?: number | null
           name?: string
           parent_branch_id?: string | null
           phone?: string | null
@@ -305,6 +335,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "branches_hub_branch_id_fkey"
+            columns: ["hub_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "branches_parent_branch_id_fkey"
             columns: ["parent_branch_id"]
@@ -1013,6 +1050,59 @@ export type Database = {
           },
         ]
       }
+      franchise_settings: {
+        Row: {
+          branch_id: string
+          can_add_products: boolean | null
+          can_manage_inventory: boolean | null
+          can_modify_prices: boolean | null
+          can_view_analytics: boolean | null
+          created_at: string | null
+          id: string
+          max_discount_percentage: number | null
+          payment_terms: string | null
+          profit_share_percentage: number | null
+          requires_approval_for_orders: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          branch_id: string
+          can_add_products?: boolean | null
+          can_manage_inventory?: boolean | null
+          can_modify_prices?: boolean | null
+          can_view_analytics?: boolean | null
+          created_at?: string | null
+          id?: string
+          max_discount_percentage?: number | null
+          payment_terms?: string | null
+          profit_share_percentage?: number | null
+          requires_approval_for_orders?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          branch_id?: string
+          can_add_products?: boolean | null
+          can_manage_inventory?: boolean | null
+          can_modify_prices?: boolean | null
+          can_view_analytics?: boolean | null
+          created_at?: string | null
+          id?: string
+          max_discount_percentage?: number | null
+          payment_terms?: string | null
+          profit_share_percentage?: number | null
+          requires_approval_for_orders?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "franchise_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       governorates: {
         Row: {
           active: boolean | null
@@ -1287,36 +1377,45 @@ export type Database = {
       }
       inventory_transfers: {
         Row: {
+          actual_arrival_date: string | null
           approved_by: string | null
           created_at: string | null
           created_by: string | null
+          expected_arrival_date: string | null
           from_branch_id: string
           id: string
           notes: string | null
           status: string
           to_branch_id: string
+          transfer_type: string | null
           updated_at: string | null
         }
         Insert: {
+          actual_arrival_date?: string | null
           approved_by?: string | null
           created_at?: string | null
           created_by?: string | null
+          expected_arrival_date?: string | null
           from_branch_id: string
           id?: string
           notes?: string | null
           status?: string
           to_branch_id: string
+          transfer_type?: string | null
           updated_at?: string | null
         }
         Update: {
+          actual_arrival_date?: string | null
           approved_by?: string | null
           created_at?: string | null
           created_by?: string | null
+          expected_arrival_date?: string | null
           from_branch_id?: string
           id?: string
           notes?: string | null
           status?: string
           to_branch_id?: string
+          transfer_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1568,6 +1667,55 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_routing_log: {
+        Row: {
+          assigned_branch_id: string | null
+          created_at: string | null
+          id: string
+          neighborhood_id: string | null
+          order_id: string | null
+          routing_reason: string | null
+        }
+        Insert: {
+          assigned_branch_id?: string | null
+          created_at?: string | null
+          id?: string
+          neighborhood_id?: string | null
+          order_id?: string | null
+          routing_reason?: string | null
+        }
+        Update: {
+          assigned_branch_id?: string | null
+          created_at?: string | null
+          id?: string
+          neighborhood_id?: string | null
+          order_id?: string | null
+          routing_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_routing_log_assigned_branch_id_fkey"
+            columns: ["assigned_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_routing_log_neighborhood_id_fkey"
+            columns: ["neighborhood_id"]
+            isOneToOne: false
+            referencedRelation: "neighborhoods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_routing_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "online_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -3067,6 +3215,26 @@ export type Database = {
         }
         Returns: number
       }
+      auto_transfer_from_hub: {
+        Args: {
+          p_product_id: string
+          p_quantity: number
+          p_target_branch_id: string
+        }
+        Returns: string
+      }
+      calculate_branch_needs: {
+        Args: never
+        Returns: {
+          branch_id: string
+          branch_name: string
+          current_quantity: number
+          min_stock_level: number
+          needed_quantity: number
+          product_id: string
+          product_name: string
+        }[]
+      }
       create_branch_schema: {
         Args: { p_branch_code: string; p_branch_id: string }
         Returns: string
@@ -3077,6 +3245,19 @@ export type Database = {
       }
       create_verification_codes_table: { Args: never; Returns: undefined }
       get_admin_role: { Args: never; Returns: string }
+      get_branch_for_neighborhood: {
+        Args: { p_neighborhood_id: string }
+        Returns: {
+          branch_address: string
+          branch_id: string
+          branch_name: string
+          branch_phone: string
+          branch_type: Database["public"]["Enums"]["branch_type"]
+          category: Database["public"]["Enums"]["branch_category"]
+          priority: number
+          routing_reason: string
+        }[]
+      }
       get_branch_from_neighborhood: {
         Args: { p_neighborhood_id: string }
         Returns: {
@@ -3099,10 +3280,38 @@ export type Database = {
           price: number
         }[]
       }
+      get_branch_performance: {
+        Args: {
+          p_branch_id: string
+          p_end_date?: string
+          p_start_date?: string
+        }
+        Returns: {
+          avg_order_value: number
+          completed_orders: number
+          pending_orders: number
+          total_orders: number
+          total_revenue: number
+        }[]
+      }
       get_branch_products: {
         Args: { p_branch_id: string }
         Returns: {
           product_id: string
+        }[]
+      }
+      get_branches_by_category: {
+        Args: { p_category: Database["public"]["Enums"]["branch_category"] }
+        Returns: {
+          active: boolean
+          address: string
+          branch_type: Database["public"]["Enums"]["branch_type"]
+          category: Database["public"]["Enums"]["branch_category"]
+          commission_rate: number
+          franchise_code: string
+          id: string
+          name: string
+          phone: string
         }[]
       }
       get_current_cash_balance: {
@@ -3193,6 +3402,12 @@ export type Database = {
       }
     }
     Enums: {
+      branch_category:
+        | "main_hub"
+        | "franchise"
+        | "internal"
+        | "retail"
+        | "warehouse"
       branch_type: "internal" | "external"
       order_payment_status: "pending" | "paid" | "failed" | "refunded"
       order_status:
@@ -3332,6 +3547,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      branch_category: [
+        "main_hub",
+        "franchise",
+        "internal",
+        "retail",
+        "warehouse",
+      ],
       branch_type: ["internal", "external"],
       order_payment_status: ["pending", "paid", "failed", "refunded"],
       order_status: [
