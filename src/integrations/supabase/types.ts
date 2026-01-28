@@ -3405,8 +3405,8 @@ export type Database = {
         }[]
       }
       get_merged_cash_balance:
-        | { Args: never; Returns: number }
         | { Args: { p_branch_id?: string }; Returns: number }
+        | { Args: never; Returns: number }
       get_next_invoice_number: {
         Args: { p_branch_id: string }
         Returns: string
@@ -3439,6 +3439,7 @@ export type Database = {
         | {
             Args: {
               p_amount: number
+              p_branch_id?: string
               p_created_by?: string
               p_notes: string
               p_transaction_type: string
@@ -3448,7 +3449,6 @@ export type Database = {
         | {
             Args: {
               p_amount: number
-              p_branch_id?: string
               p_created_by?: string
               p_notes: string
               p_transaction_type: string
