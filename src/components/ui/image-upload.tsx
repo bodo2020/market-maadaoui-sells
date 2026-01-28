@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Upload, X, Link, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -12,6 +13,28 @@ interface ImageUploadProps {
 
 export function ImageUpload({ value, onChange, onRemove }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [imageUrl, setImageUrl] = useState("");
+  const [showUrlInput, setShowUrlInput] = useState(false);
+
+  const handleAddImageUrl = () => {
+    if (!imageUrl.trim()) {
+      toast.error('يرجى إدخال رابط الصورة');
+      return;
+    }
+
+    // Validate URL format
+    try {
+      new URL(imageUrl);
+    } catch {
+      toast.error('رابط الصورة غير صالح');
+      return;
+    }
+
+    onChange([...value, imageUrl.trim()]);
+    setImageUrl("");
+    setShowUrlInput(false);
+    toast.success('تم إضافة رابط الصورة بنجاح');
+  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -55,6 +78,16 @@ export function ImageUpload({ value, onChange, onRemove }: ImageUploadProps) {
 
   const handleRemove = async (url: string) => {
     if (!url) return;
+    
+    // Check if it's an external URL (not from our storage)
+    const isExternalUrl = !url.includes('supabase.co/storage');
+    
+    if (isExternalUrl) {
+      // Just remove from UI, no need to delete from storage
+      onRemove(url);
+      toast.success('تم حذف الصورة بنجاح');
+      return;
+    }
     
     try {
       // Extract file path from the URL
@@ -106,29 +139,84 @@ export function ImageUpload({ value, onChange, onRemove }: ImageUploadProps) {
         ))}
       </div>
 
-      <div className="flex items-center justify-center w-full">
-        <label
-          htmlFor="image-upload"
-          className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-        >
-          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-            <Upload className="w-8 h-8 mb-2 text-gray-500" />
-            <p className="mb-2 text-sm text-gray-500">
-              <span className="font-medium">انقر لرفع صور</span> أو اسحب وأفلت
-            </p>
-            <p className="text-xs text-gray-500">PNG, JPG, WEBP حتى 10MB</p>
-          </div>
-          <input
-            id="image-upload"
-            type="file"
-            multiple
-            className="hidden"
-            accept="image/*"
-            onChange={handleUpload}
-            disabled={isUploading}
+      {/* URL Input Section */}
+      {showUrlInput && (
+        <div className="flex gap-2 items-center p-3 border rounded-lg bg-muted/30">
+          <Input
+            type="url"
+            placeholder="أدخل رابط الصورة هنا..."
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            className="flex-1"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddImageUrl();
+              }
+            }}
           />
-        </label>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleAddImageUrl}
+          >
+            <Plus className="h-4 w-4 ml-1" />
+            إضافة
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setShowUrlInput(false);
+              setImageUrl("");
+            }}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
+        {/* Upload from device */}
+        <div className="flex items-center justify-center w-full">
+          <label
+            htmlFor="image-upload"
+            className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+          >
+            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+              <Upload className="w-8 h-8 mb-2 text-gray-500" />
+              <p className="mb-2 text-sm text-gray-500">
+                <span className="font-medium">انقر لرفع صور</span> أو اسحب وأفلت
+              </p>
+              <p className="text-xs text-gray-500">PNG, JPG, WEBP حتى 10MB</p>
+            </div>
+            <input
+              id="image-upload"
+              type="file"
+              multiple
+              className="hidden"
+              accept="image/*"
+              onChange={handleUpload}
+              disabled={isUploading}
+            />
+          </label>
+        </div>
+
+        {/* Add URL button */}
+        {!showUrlInput && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowUrlInput(true)}
+            className="w-full"
+          >
+            <Link className="h-4 w-4 ml-2" />
+            إضافة صورة من رابط
+          </Button>
+        )}
       </div>
+
       {isUploading && (
         <div className="text-center text-sm text-gray-500">
           جاري رفع الصور...
