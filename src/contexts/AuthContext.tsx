@@ -1,7 +1,11 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { User, UserRole } from "@/types";
-import { authenticateUser } from "@/services/supabase/userService";
+import {
+  authenticateStaffUser,
+  restoreStaffSession,
+  signOutStaff,
+} from "@/services/supabase/staffAuthService";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextType {
@@ -10,7 +14,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAdmin: boolean;
   login: (username: string, password: string, branchCode: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,7 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   isAdmin: false,
   login: async () => {},
-  logout: () => {},
+  logout: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -33,44 +37,63 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // Check if user is admin
   const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN;
 
   useEffect(() => {
-    // Check for saved user in local storage on initialization
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
+    let active = true;
+
+    const restore = async () => {
       try {
-        setUser(JSON.parse(storedUser));
+        const restoredUser = await restoreStaffSession();
+        if (!active) return;
+
+        setUser(restoredUser);
+        if (restoredUser) {
+          // Kept only for legacy UI/services that read display/role data from localStorage.
+          // Authentication itself is never based on this value anymore.
+          localStorage.setItem("user", JSON.stringify(restoredUser));
+        } else {
+          localStorage.removeItem("user");
+        }
       } catch (error) {
-        console.error("Error parsing stored user:", error);
+        console.error("Error restoring staff session:", error);
+        if (active) {
+          setUser(null);
+          localStorage.removeItem("user");
+        }
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    restore();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session && active) {
+        setUser(null);
         localStorage.removeItem("user");
       }
-    }
-    setIsLoading(false);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (username: string, password: string, branchCode: string) => {
     try {
       setIsLoading(true);
-      const user = await authenticateUser(username, password, branchCode);
-      
-      // Create a user object that matches our User interface
-      const loggedInUser: User = {
-        id: user.id,
-        name: user.name,
-        role: user.role as UserRole,
-        phone: user.phone || "",
-        password: "", // Don't store the actual password in state
-        created_at: user.created_at,
-        username: user.username
-      };
+      const authenticatedUser = await authenticateStaffUser(username, password, branchCode);
 
-      setUser(loggedInUser);
-      localStorage.setItem("user", JSON.stringify(loggedInUser));
+      setUser(authenticatedUser);
+      localStorage.setItem("user", JSON.stringify(authenticatedUser));
+
       toast({
         title: "تم تسجيل الدخول بنجاح",
-        description: `مرحبًا ${user.name}`,
+        description: `مرحبًا ${authenticatedUser.name}`,
       });
     } catch (error: any) {
       console.error("Login error:", error);
@@ -85,12 +108,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
-    toast({
-      title: "تم تسجيل الخروج بنجاح",
-    });
+  const logout = async () => {
+    try {
+      await signOutStaff();
+    } finally {
+      setUser(null);
+      localStorage.removeItem("user");
+      toast({
+        title: "تم تسجيل الخروج بنجاح",
+      });
+    }
   };
 
   return (
