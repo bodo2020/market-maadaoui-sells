@@ -5,16 +5,15 @@ import { Purchase } from "@/types";
 export async function fetchPurchases(branchId?: string) {
   try {
     const currentBranchId = branchId || localStorage.getItem('currentBranchId');
-    
+
     let query = supabase
       .from("purchases")
       .select("*, suppliers(name)");
-    
-    // Filter by branch if branchId is available
+
     if (currentBranchId) {
       query = query.eq('branch_id', currentBranchId);
     }
-    
+
     const { data, error } = await query.order("date", { ascending: false });
 
     if (error) {
@@ -34,8 +33,11 @@ export async function fetchPurchases(branchId?: string) {
 export async function createPurchase(purchaseData: any) {
   try {
     const currentBranchId = purchaseData.branch_id || localStorage.getItem('currentBranchId');
-    
-    // Generate invoice number if not provided
+    if (!currentBranchId || currentBranchId === 'null') {
+      toast.error("يجب اختيار فرع أولاً");
+      return null;
+    }
+
     if (!purchaseData.invoice_number) {
       const date = new Date();
       const year = date.getFullYear();
@@ -45,16 +47,16 @@ export async function createPurchase(purchaseData: any) {
       purchaseData.invoice_number = `P-${year}${month}${day}-${randomPart}`;
     }
 
-    // First, check if there's enough cash in the online register
     if (purchaseData.paid > 0) {
-      const { data: deductionResult, error: deductionError } = await supabase.functions.invoke(
+      const { error: deductionError } = await supabase.functions.invoke(
         'add-cash-transaction',
         {
           body: {
             amount: purchaseData.paid,
             transaction_type: 'withdrawal',
             register_type: 'online',
-            notes: `دفع مستحقات المورد ${purchaseData.supplier_name || ''} - فاتورة رقم: ${purchaseData.invoice_number}`
+            notes: `دفع مستحقات المورد ${purchaseData.supplier_name || ''} - فاتورة رقم: ${purchaseData.invoice_number}`,
+            branch_id: currentBranchId,
           }
         }
       );
@@ -66,7 +68,6 @@ export async function createPurchase(purchaseData: any) {
       }
     }
 
-    // First, create the purchase record with branch_id
     const { data: purchase, error: purchaseError } = await supabase
       .from("purchases")
       .insert({
@@ -87,10 +88,9 @@ export async function createPurchase(purchaseData: any) {
       return null;
     }
 
-    // Then add items to the purchase_items table if they were provided
     if (purchaseData.items && purchaseData.items.length > 0) {
       console.log("Purchase items to insert:", purchaseData.items);
-      
+
       const purchaseItems = purchaseData.items.map((item: any) => ({
         purchase_id: purchase.id,
         product_id: item.product_id,
@@ -103,7 +103,7 @@ export async function createPurchase(purchaseData: any) {
         notes: item.notes || null,
         branch_id: currentBranchId
       }));
-      
+
       console.log("Formatted purchase items:", purchaseItems);
 
       const { data: insertedItems, error: itemsError } = await supabase
@@ -114,15 +114,11 @@ export async function createPurchase(purchaseData: any) {
       if (itemsError) {
         console.error("Error adding purchase items:", itemsError);
         toast.error("فشل في إضافة عناصر الفاتورة");
-        // We don't return early here - we'll still update the product quantities even if
-        // storing the line items fails
       } else {
         console.log("Successfully inserted purchase items:", insertedItems);
       }
 
-      // Update inventory for the current branch
       for (const item of purchaseData.items) {
-        // Get current product
         const { data: product, error: productError } = await supabase
           .from("products")
           .select("purchase_price, price")
@@ -134,19 +130,16 @@ export async function createPurchase(purchaseData: any) {
           continue;
         }
 
-        // Update product purchase_price if different
         const productUpdateData: any = {};
-        
-        // Update purchase price if it's different from current price
+
         if (item.price !== product.purchase_price) {
           productUpdateData.purchase_price = item.price;
         }
-        
-        // Update sale price if provided
+
         if (item.sale_price && item.sale_price !== product.price) {
           productUpdateData.price = item.sale_price;
         }
-        
+
         if (Object.keys(productUpdateData).length > 0) {
           const { error: productUpdateError } = await supabase
             .from("products")
@@ -158,7 +151,6 @@ export async function createPurchase(purchaseData: any) {
           }
         }
 
-        // Update inventory quantity for the current branch
         const { data: inventoryData, error: fetchInventoryError } = await supabase
           .from('inventory')
           .select('quantity')
@@ -172,7 +164,7 @@ export async function createPurchase(purchaseData: any) {
         }
 
         const newQuantity = (inventoryData?.quantity || 0) + item.quantity;
-        
+
         const { error: inventoryError } = await supabase
           .from('inventory')
           .update({ quantity: newQuantity })
@@ -185,11 +177,9 @@ export async function createPurchase(purchaseData: any) {
       }
     }
 
-    // Update supplier balance
     if (purchase) {
       const remainingAmount = purchaseData.total - purchaseData.paid;
       if (remainingAmount !== 0) {
-        // Get current supplier balance
         const { data: supplier, error: supplierError } = await supabase
           .from("suppliers")
           .select("balance")
@@ -197,12 +187,9 @@ export async function createPurchase(purchaseData: any) {
           .single();
 
         if (!supplierError && supplier) {
-          // Update supplier balance
-          // Negative balance means the supplier owes the business money
-          // Positive balance means the business owes money to the supplier
           const currentBalance = supplier.balance || 0;
           const newBalance = currentBalance + remainingAmount;
-          
+
           const { error: updateError } = await supabase
             .from("suppliers")
             .update({ balance: newBalance })
@@ -226,7 +213,6 @@ export async function createPurchase(purchaseData: any) {
 
 export async function deletePurchase(id: string) {
   try {
-    // Get purchase details to update supplier balance
     const { data: purchase, error: purchaseError } = await supabase
       .from("purchases")
       .select("*")
@@ -239,10 +225,8 @@ export async function deletePurchase(id: string) {
       return false;
     }
 
-    // Update supplier balance
     const remainingAmount = purchase.total - purchase.paid;
     if (remainingAmount !== 0) {
-      // Get current supplier balance
       const { data: supplier, error: supplierError } = await supabase
         .from("suppliers")
         .select("balance")
@@ -250,11 +234,9 @@ export async function deletePurchase(id: string) {
         .single();
 
       if (!supplierError && supplier) {
-        // Update supplier balance
-        // We're reversing the effect of the purchase
         const currentBalance = supplier.balance || 0;
         const newBalance = currentBalance - remainingAmount;
-        
+
         const { error: updateError } = await supabase
           .from("suppliers")
           .update({ balance: newBalance })
@@ -266,7 +248,6 @@ export async function deletePurchase(id: string) {
       }
     }
 
-    // Note: We don't need to manually delete purchase items because of the ON DELETE CASCADE constraint
     const { error } = await supabase.from("purchases").delete().eq("id", id);
 
     if (error) {
@@ -308,7 +289,6 @@ export async function getPurchaseById(id: string) {
 
 export async function getPurchaseWithItems(id: string) {
   try {
-    // First get the purchase
     const { data: purchase, error: purchaseError } = await supabase
       .from("purchases")
       .select("*, suppliers(name)")
@@ -321,7 +301,6 @@ export async function getPurchaseWithItems(id: string) {
       return null;
     }
 
-    // Then get the purchase items with batch information
     const { data: items, error: itemsError } = await supabase
       .from("purchase_items")
       .select("*, products(name, track_expiry)")
@@ -332,7 +311,7 @@ export async function getPurchaseWithItems(id: string) {
       toast.error("فشل في جلب عناصر فاتورة الشراء");
       return null;
     }
-    
+
     console.log(`Found ${items?.length || 0} items for purchase ${id}:`, items);
 
     return {
