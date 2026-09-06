@@ -225,6 +225,7 @@ export const useOrderManagement = (activeTab: string) => {
           payment_status: validatePaymentStatus(item.payment_status),
           payment_method: item.payment_method,
           shipping_address: item.shipping_address,
+          shipping_cost: item.shipping_cost,
           items: Array.isArray(item.items) ? item.items as any[] : [],
           customer_id: item.customer_id,
           customer_name: readCheckoutSnapshot(item).customer_snapshot?.name || item.customers?.name || '',

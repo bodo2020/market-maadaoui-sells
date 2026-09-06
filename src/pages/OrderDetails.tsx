@@ -256,7 +256,7 @@ export default function OrderDetails() {
       </div>
       <aside className="pos-detail-sidebar">
         <Card><CardHeader><CardTitle>ملخص الطلب</CardTitle></CardHeader><CardContent className="space-y-4"><div className="flex justify-between"><span>المنتجات</span><strong>{(order.total-(order.shipping_cost || 0)).toFixed(2)} ج.م</strong></div><div className="flex justify-between"><span>التوصيل</span><strong>{(order.shipping_cost || 0).toFixed(2)} ج.م</strong></div><div className="flex justify-between border-t pt-4 text-xl font-bold"><span>الإجمالي</span><span className="text-primary">{order.total.toFixed(2)} ج.م</span></div><div className="flex flex-wrap gap-2"><PaymentStatusBadge status={order.payment_status} editable={false} /><PaymentMethodBadge paymentMethod={order.payment_method} /></div>{order.payment_status !== 'paid' && order.status !== 'cancelled' && <Button variant="outline" className="w-full min-h-12" onClick={() => setPaymentConfirmOpen(true)}>تأكيد استلام الدفع</Button>}</CardContent></Card>
-        <OrderTimeline status={order.status} createdAt={order.created_at} updatedAt={order.created_at} />
+        <OrderTimeline status={order.status} createdAt={order.created_at} />
         <div className="pos-detail-actions">{!['delivered','cancelled'].includes(order.status) ? <><Button disabled={isProcessing} className="min-h-12 flex-1" onClick={() => setConfirmAction('next')}><Check size={18} />{getNextStatusLabel()}</Button>{order.status !== 'shipped' && <Button variant="outline" disabled={isProcessing} className="min-h-12 text-red-700" onClick={() => setConfirmAction('cancel')}>إلغاء الطلب</Button>}</> : <p className="font-semibold">{order.status === 'delivered' ? 'تم تسليم الطلب' : 'الطلب ملغي'}</p>}</div>
       </aside>
     </div>

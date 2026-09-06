@@ -15,20 +15,21 @@ interface TimelineItem {
 interface OrderTimelineProps {
   status: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
-const statusOrder = ['pending', 'confirmed', 'preparing', 'shipped', 'delivered'];
+const statusOrder = ['pending', 'confirmed', 'preparing', 'ready', 'shipped', 'delivered'];
 
 const statusConfig: Record<string, { label: string; icon: any }> = {
   pending: { label: 'تم إنشاء الطلب', icon: Clock },
   confirmed: { label: 'تم التأكيد', icon: CheckCircle2 },
   preparing: { label: 'جاري التجهيز', icon: Package },
+  ready: { label: 'جاهز للشحن', icon: Package },
   shipped: { label: 'تم الشحن', icon: Truck },
   delivered: { label: 'تم التسليم', icon: Home },
 };
 
-export function OrderTimeline({ status, createdAt, updatedAt }: OrderTimelineProps) {
+export function OrderTimeline({ status, createdAt }: OrderTimelineProps) {
   const currentStatusIndex = statusOrder.indexOf(status);
 
   const timelineItems: TimelineItem[] = statusOrder.map((orderStatus, index) => {
@@ -37,7 +38,7 @@ export function OrderTimeline({ status, createdAt, updatedAt }: OrderTimelinePro
       status: orderStatus,
       label: config.label,
       icon: config.icon,
-      date: index === 0 ? createdAt : (index <= currentStatusIndex ? updatedAt : undefined),
+      date: index === 0 ? createdAt : undefined,
       isActive: index === currentStatusIndex,
       isCompleted: index < currentStatusIndex,
     };
@@ -49,6 +50,7 @@ export function OrderTimeline({ status, createdAt, updatedAt }: OrderTimelinePro
         <CardTitle className="text-lg">مراحل الطلب</CardTitle>
       </CardHeader>
       <CardContent>
+        {status === "cancelled" && <p className="mb-4 rounded-lg bg-red-50 p-3 text-red-800">تم إلغاء الطلب</p>}
         <div className="relative">
           {/* Timeline Line */}
           <div className="absolute right-4 top-0 bottom-0 w-0.5 bg-border" />
@@ -88,3 +90,4 @@ export function OrderTimeline({ status, createdAt, updatedAt }: OrderTimelinePro
     </Card>
   );
 }
+
