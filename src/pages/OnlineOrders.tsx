@@ -1,17 +1,18 @@
 import { readCheckoutSnapshot } from "@/services/supabase/checkoutOrderService";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Plus, Search, Bell } from "lucide-react";
+import { Search, Bell, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { Order, OrderItem } from "@/types";
 import { useOrderManagement } from "@/hooks/orders/useOrderManagement";
-import { OrderStats } from "@/components/orders/OrderStats";
+import { OrderStats, matchesOrderFilter } from "@/components/orders/OrderStats";
 import { OrdersTable } from "@/components/orders/OrdersTable";
 import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog";
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
@@ -23,6 +24,8 @@ import { updateProductQuantity } from "@/services/supabase/productService";
 import OnlineOrderInvoiceDialog from "@/components/orders/OnlineOrderInvoiceDialog";
 export default function OnlineOrders() {
   const { currentBranchId } = useBranchStore();
+  const [page, setPage] = useState(1);
+  const [cancelTargets, setCancelTargets] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -41,8 +44,9 @@ export default function OnlineOrders() {
   const {
     orders,
     loading,
-    handleOrderUpdate
-  } = useOrderManagement(activeTab);
+    handleOrderUpdate,
+    error: ordersError,
+    } = useOrderManagement("all");
   const {
     markOrdersAsRead
   } = useNotificationStore();
@@ -84,23 +88,6 @@ export default function OnlineOrders() {
             });
           }
           
-          // Send email notification via edge function
-          console.log('📧 Sending email notification...');
-          try {
-            const response = await supabase.functions.invoke('notify-new-order', {
-              body: {
-                orderId: newOrder.id,
-                orderNumber: newOrder.id.slice(0, 8),
-                customerName: newOrder.customers?.name || 'عميل جديد',
-                total: newOrder.total,
-                items: newOrder.items || []
-              }
-            });
-            console.log('✅ Email notification response:', response);
-          } catch (error) {
-            console.error('❌ Error sending email notification:', error);
-          }
-          
           // Show toast notification with 5 minutes duration and action to navigate
           console.log('🔔 Showing toast notification');
           toast.success('طلب جديد وارد! 🔔', {
@@ -110,7 +97,7 @@ export default function OnlineOrders() {
               label: "عرض الطلب",
               onClick: () => {
                 console.log('👆 User clicked on order notification');
-                navigate(`/online-orders?orderId=${newOrder.id}`);
+                navigate(`/online-orders/${newOrder.id}`);
               },
             },
           });
@@ -191,7 +178,6 @@ export default function OnlineOrders() {
         error
       } = await supabase.from('online_orders').update({
         status: 'cancelled',
-        payment_status: 'pending', // إلغاء حالة الدفع تلقائياً
         notes,
         updated_at: new Date().toISOString()
       }).eq('id', order.id);
@@ -235,93 +221,36 @@ export default function OnlineOrders() {
     setInvoiceDialogOpen(true);
   };
 
-  // Selection handlers
-  const handleSelectAll = () => {
-    if (selectedOrders.length === filteredOrders.length) {
-      setSelectedOrders([]);
-    } else {
-      setSelectedOrders(filteredOrders.map(order => order.id));
-    }
-  };
-  const handleSelectOrder = (orderId: string) => {
-    setSelectedOrders(prev => prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]);
-  };
-
-  // Bulk cancel selected orders
+  const normalise = (value: string) => value.toLowerCase().replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit))).trim();
+  const filteredOrders = useMemo(() => orders.filter(order => matchesOrderFilter(order,activeTab) && normalise([order.id,order.tracking_number,order.customer_name,order.customer_phone].filter(Boolean).join(' ')).includes(normalise(searchQuery))),[orders,activeTab,searchQuery]);
+  const pageCount = Math.max(1, Math.ceil(filteredOrders.length / 25));
+  const visibleOrders = filteredOrders.slice((Math.min(page,pageCount)-1)*25,Math.min(page,pageCount)*25);
+  const eligible = visibleOrders.filter(order => !['shipped','delivered','cancelled'].includes(order.status));
+  useEffect(() => { setPage(1); setSelectedOrders([]); }, [activeTab,searchQuery,currentBranchId]);
+  const handleSelectAll = () => setSelectedOrders(eligible.every(order => selectedOrders.includes(order.id)) ? [] : eligible.map(order => order.id));
+  const handleSelectOrder = (id: string) => setSelectedOrders(previous => previous.includes(id) ? previous.filter(value => value !== id) : [...previous,id]);
   const handleBulkCancel = async () => {
-    if (selectedOrders.length === 0) return;
+    const ids = [...cancelTargets];
+    if (!ids.length) return;
     setBulkActionLoading(true);
     try {
-      const {
-        error
-      } = await supabase.from('online_orders').update({
-        status: 'cancelled',
-        notes: 'تم إلغاء هذا الطلب - إلغاء جماعي',
-        updated_at: new Date().toISOString()
-      }).in('id', selectedOrders);
+      const { data, error } = await supabase.from('online_orders').update({status:'cancelled',updated_at:new Date().toISOString()}).in('id',ids).in('status',['pending','confirmed','preparing','ready']).select('id');
       if (error) throw error;
-      setSelectedOrders([]);
-      handleOrderUpdate();
-      toast.success(`تم إلغاء ${selectedOrders.length} طلب بنجاح`);
-    } catch (error) {
-      console.error('Error bulk cancelling orders:', error);
-      toast.error("حدث خطأ أثناء إلغاء الطلبات");
-    } finally {
-      setBulkActionLoading(false);
-    }
+      if ((data?.length || 0) !== ids.length) toast.info('بعض الطلبات اتغيّرت حالتها. راجع القائمة المحدّثة.');
+      else toast.success('تم إلغاء الطلبات المحددة');
+      setSelectedOrders([]); setCancelTargets([]); handleOrderUpdate();
+    } catch { toast.error('تعذّر إلغاء الطلبات. حاول مرة أخرى.'); }
+    finally { setBulkActionLoading(false); }
   };
-  const filteredOrders = orders.filter(order => {
-    if (!searchQuery) return true;
-    const searchLower = searchQuery.toLowerCase();
-    return order.id.toLowerCase().includes(searchLower) || order.customer_name?.toLowerCase().includes(searchLower) || order.customer_phone?.toLowerCase().includes(searchLower);
-  });
   return <MainLayout>
-      <div className="container p-6 dir-rtl mx-0 px-0 py-px">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">الطلبات</h1>
-          <Button
-            variant={notificationEnabled ? "default" : "outline"}
-            size="sm"
-            onClick={() => setNotificationEnabled(!notificationEnabled)}
-            className="flex items-center gap-2"
-          >
-            <Bell className={`h-4 w-4 ${notificationEnabled ? 'animate-pulse' : ''}`} />
-            {notificationEnabled ? 'التنبيهات مفعلة' : 'التنبيهات معطلة'}
-          </Button>
-        </div>
-
+      <div className="pos-orders">
+        <header className="pos-orders-heading"><div><h1>الطلبات الإلكترونية</h1><p>تابع الطلب من أول التأكيد لحد التسليم.</p></div><div className="flex gap-2"><Button variant="outline" onClick={handleOrderUpdate} disabled={loading} aria-label="تحديث الطلبات"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></Button><Button variant="outline" aria-pressed={notificationEnabled} onClick={() => setNotificationEnabled(!notificationEnabled)}><Bell size={18} />{notificationEnabled ? 'الصوت مفعّل' : 'الصوت متوقف'}</Button></div></header>
         <OrderStats orders={orders} activeTab={activeTab} onTabChange={setActiveTab} />
-
-        <div className="mb-4 flex justify-between items-center">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="البحث والتصنيفات" className="pl-10 pr-10" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-          </div>
-          
-          {selectedOrders.length > 0 && <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-lg border">
-              <span className="text-sm text-muted-foreground">
-                تم تحديد {selectedOrders.length} طلب
-              </span>
-              <Button size="sm" variant="destructive" onClick={handleBulkCancel} disabled={bulkActionLoading} className="h-8">
-                {bulkActionLoading ? "جاري الإلغاء..." : "إلغاء المحدد"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setSelectedOrders([])} className="h-8">
-                إلغاء التحديد
-              </Button>
-            </div>}
-        </div>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>قائمة الطلبات</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? <p className="text-center py-4">جاري التحميل...</p> : <div className="overflow-x-auto">
-                <OrdersTable orders={filteredOrders} onShowCustomer={showCustomerProfile} onArchive={handleArchive} onCancel={handleCancel} onProcess={handleProcess} onComplete={handleComplete} onPaymentConfirm={handlePaymentConfirm} onAssignDelivery={handleAssignDelivery} onOrderUpdate={handleOrderUpdate} onReturn={handleReturn} onPrintInvoice={handlePrintInvoice} selectedOrders={selectedOrders} onSelectOrder={handleSelectOrder} onSelectAll={handleSelectAll} />
-              </div>}
-          </CardContent>
-        </Card>
-
+        <div className="pos-orders-toolbar"><div className="pos-orders-search"><Search size={18} /><Input aria-label="البحث في الطلبات" placeholder="اسم العميل، رقم الموبايل أو الطلب" value={searchQuery} onChange={event => setSearchQuery(event.target.value)} /></div><p className="text-sm text-muted-foreground">{filteredOrders.length} طلب</p></div>
+        {selectedOrders.length > 0 && <div className="pos-orders-selection"><span>تم تحديد {selectedOrders.length} طلب</span><Button variant="destructive" disabled={bulkActionLoading} onClick={() => setCancelTargets(selectedOrders)}>إلغاء المحدد</Button><Button variant="ghost" onClick={() => setSelectedOrders([])}>إلغاء التحديد</Button></div>}
+        {ordersError ? <div role="alert" className="pos-orders-empty"><h2>تعذّر تحميل الطلبات</h2><p>البيانات الظاهرة قد تكون قديمة. جرّب التحديث.</p><Button onClick={handleOrderUpdate}>حاول تاني</Button></div> : loading && !orders.length ? <div role="status" className="pos-orders-empty">جاري تحميل الطلبات…</div> : <OrdersTable orders={visibleOrders} onShowCustomer={showCustomerProfile} onArchive={handleArchive} onCancel={order => setCancelTargets([order.id])} onProcess={handleProcess} onComplete={handleComplete} onPaymentConfirm={handlePaymentConfirm} onAssignDelivery={handleAssignDelivery} onOrderUpdate={handleOrderUpdate} onReturn={handleReturn} onPrintInvoice={handlePrintInvoice} selectedOrders={selectedOrders} onSelectOrder={handleSelectOrder} onSelectAll={handleSelectAll} />}
+        {pageCount > 1 && <nav className="pos-orders-pagination" aria-label="صفحات الطلبات"><Button variant="outline" disabled={page <= 1} onClick={() => {setPage(value => value-1);setSelectedOrders([]);}}>السابق</Button><span>{Math.min(page,pageCount)} من {pageCount}</span><Button variant="outline" disabled={page >= pageCount} onClick={() => {setPage(value => value+1);setSelectedOrders([]);}}>التالي</Button></nav>}
+        <AlertDialog open={cancelTargets.length > 0} onOpenChange={open => {if (!open && !bulkActionLoading) setCancelTargets([]);}}><AlertDialogContent dir="rtl"><AlertDialogHeader><AlertDialogTitle>إلغاء {cancelTargets.length} طلب؟</AlertDialogTitle><AlertDialogDescription>الإلغاء متاح قبل الشحن. لو الطلب مدفوع، رد المبلغ يحتاج مراجعة منفصلة.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={bulkActionLoading}>رجوع</AlertDialogCancel><AlertDialogAction disabled={bulkActionLoading} onClick={event => {event.preventDefault();void handleBulkCancel();}}>{bulkActionLoading ? 'جاري الإلغاء…' : 'تأكيد الإلغاء'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
         <CustomerProfileDialog customer={selectedCustomer} open={!!selectedCustomer} onOpenChange={open => !open && setSelectedCustomer(null)} />
 
         {currentOrderId && <>

@@ -1,6 +1,7 @@
+import { useBranchStore } from "@/stores/branchStore";
 import { readCheckoutSnapshot } from "@/services/supabase/checkoutOrderService";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Order } from "@/types";
@@ -28,6 +29,9 @@ export type OrderFromDB = {
 };
 
 export const useOrderManagement = (activeTab: string) => {
+  const { currentBranchId } = useBranchStore();
+  const requestVersion = useRef(0);
+  const [error, setError] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [ordersRefreshKey, setOrdersRefreshKey] = useState(0);
@@ -44,11 +48,12 @@ export const useOrderManagement = (activeTab: string) => {
     fetchPendingReturnsCount();
     const channel = subscribeToOrders();
     return () => {
+      requestVersion.current++;
       if (channel) {
         supabase.removeChannel(channel);
       }
     };
-  }, [activeTab, ordersRefreshKey]);
+  }, [activeTab, ordersRefreshKey, currentBranchId]);
 
   const fetchPendingOrdersCount = async () => {
     try {
@@ -140,7 +145,9 @@ export const useOrderManagement = (activeTab: string) => {
   };
 
   const fetchOrders = async () => {
+    const version = ++requestVersion.current;
     try {
+      setError(false);
       setLoading(true);
       let query = supabase.from('online_orders')
         .select(`
@@ -161,34 +168,16 @@ export const useOrderManagement = (activeTab: string) => {
           ascending: false
         });
       
-      if (activeTab === "waiting") {
-        query = query.eq('status', 'pending');
-      } else if (activeTab === "ready") {
-        query = query.eq('status', 'ready');
-      } else if (activeTab === "shipped") {
-        query = query.eq('status', 'shipped');
-      } else if (activeTab === "done") {
-        query = query.eq('status', 'delivered');
-      } else if (activeTab === "cancelled") {
-        query = query.eq('status', 'cancelled');
-      } else if (activeTab === "unpaid") {
-        query = query.eq('payment_status', 'pending');
-      } else if (activeTab === "returns") {
-        // عندما تكون علامة التبويب النشطة هي "returns"، نقوم بسحب طلبات الإرجاع
-        // ملاحظة: سنحتاج إلى تنفيذ هذا في واجهة المستخدم أيضًا
-        const { data: returnsData, error: returnsError } = await supabase
-          .from('returns')
-          .select('*')
-          .eq('status', 'pending');
-          
-        if (returnsError) throw returnsError;
-        
-        console.log("Fetched returns:", returnsData);
-        // هنا يمكنك معالجة بيانات الإرجاع وإرجاعها كجزء من حالة التطبيق
+      if (currentBranchId) query = query.eq('branch_id',currentBranchId);
+      const data: any[] = [];
+      for (let start = 0; ; start += 1000) {
+        const response = await query.range(start,start+999);
+        if (response.error) throw response.error;
+        if (version !== requestVersion.current) return;
+        data.push(...(response.data || []));
+        if ((response.data?.length || 0) < 1000) break;
       }
-      
-      const { data, error } = await query;
-      if (error) throw error;
+
       
       
       console.log(`Fetched ${data?.length || 0} orders for tab ${activeTab}`, data);
@@ -253,23 +242,27 @@ export const useOrderManagement = (activeTab: string) => {
         });
       }
       
-      setOrders(transformedOrders);
+      if (version === requestVersion.current) setOrders(transformedOrders);
     } catch (error) {
+      if (version !== requestVersion.current) return;
+      setError(true);
       console.error('Error fetching orders:', error);
       toast.error("حدث خطأ أثناء تحميل الطلبات");
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   };
 
-  const handleOrderUpdate = () => {
+  const handleOrderUpdate = useCallback(() => {
     setOrdersRefreshKey(prev => prev + 1);
-  };
+  }, []);
 
   return {
     orders,
     loading,
+    error,
     handleOrderUpdate,
     fetchOrders
   };
 };
+
