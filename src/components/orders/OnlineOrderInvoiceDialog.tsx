@@ -444,6 +444,8 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
   };
 
   // Format order date for preview
+  if (!order) return null;
+
   const orderDate = new Date(order.created_at);
   const formattedDate = orderDate.toLocaleDateString('ar-EG', {
     year: 'numeric',
@@ -467,7 +469,6 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
     'cancelled': 'ملغي'
   }[order.status] || order.status;
 
-  if (!order) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
