@@ -1,3 +1,4 @@
+import { readCheckoutSnapshot } from "@/services/supabase/checkoutOrderService";
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -237,9 +238,9 @@ export const useOrderManagement = (activeTab: string) => {
           shipping_address: item.shipping_address,
           items: Array.isArray(item.items) ? item.items as any[] : [],
           customer_id: item.customer_id,
-          customer_name: item.customers?.name || '',
+          customer_name: readCheckoutSnapshot(item).customer_snapshot?.name || item.customers?.name || '',
           customer_email: item.customers?.email || '',
-          customer_phone: item.customers?.phone || '',
+          customer_phone: readCheckoutSnapshot(item).customer_snapshot?.phone || item.customers?.phone || '',
           customer_phone_verified: Boolean(item.customers?.phone_verified),
           notes: item.notes || '',
           tracking_number: item.tracking_number || null,

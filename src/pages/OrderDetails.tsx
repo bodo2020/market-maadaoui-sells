@@ -1,3 +1,5 @@
+import { OrderDeliverySnapshot } from "@/components/orders/OrderDeliverySnapshot";
+import { getCheckoutSnapshot } from "@/services/supabase/checkoutOrderService";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,7 +60,8 @@ export default function OrderDetails() {
       setIsProcessing(true);
       
       if (nextStatus === 'delivered' && order.status !== 'delivered') {
-        if (order.customer_name || order.customer_phone) {
+        const checkout = await getCheckoutSnapshot(order.id);
+        if (checkout.checkout_version !== 1 && (order.customer_name || order.customer_phone)) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
             phone: order.customer_phone || undefined
@@ -73,7 +76,7 @@ export default function OrderDetails() {
           }
         }
         
-        const orderItems = order.items || [];
+        const orderItems = checkout.checkout_version === 1 ? [] : (order.items || []);
         
         for (const item of orderItems) {
           const { data: product, error: productError } = await supabase
@@ -241,6 +244,7 @@ export default function OrderDetails() {
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6">
+      <OrderDeliverySnapshot orderId={id} />
       {/* Header Section - Enhanced */}
       <Card className="bg-gradient-to-br from-primary/10 via-background to-background border-primary/20 animate-fade-in">
         <CardHeader className="pb-4">

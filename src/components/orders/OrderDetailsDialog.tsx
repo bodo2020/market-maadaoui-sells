@@ -1,3 +1,4 @@
+import { getCheckoutSnapshot } from "@/services/supabase/checkoutOrderService";
 
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -91,8 +92,9 @@ export function OrderDetailsDialog({
       setIsUpdatingShipping(true);
       
       if (status === 'delivered' && order.status !== 'delivered') {
+        const checkout = await getCheckoutSnapshot(order.id);
         // If marking as done, process inventory and financial updates
-        if (order.customer_name || order.customer_phone) {
+        if (checkout.checkout_version !== 1 && (order.customer_name || order.customer_phone)) {
           const customerInfo = {
             name: order.customer_name || 'عميل غير معروف',
             phone: order.customer_phone || undefined
@@ -111,7 +113,7 @@ export function OrderDetailsDialog({
         }
         
         // Process inventory reduction for each item in the order
-        const orderItems = order.items || [];
+        const orderItems = checkout.checkout_version === 1 ? [] : (order.items || []);
         console.log("Processing inventory for items:", orderItems);
         
         for (const item of orderItems) {

@@ -1,3 +1,4 @@
+import { readCheckoutSnapshot } from "@/services/supabase/checkoutOrderService";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -143,7 +144,8 @@ export default function OnlineOrders() {
         error: orderError
       } = await supabase.from('online_orders').select('*').eq('id', order.id).single();
       if (orderError) throw orderError;
-      const orderItems = Array.isArray(orderDetails.items) ? orderDetails.items : [];
+      if (orderDetails.status === 'delivered' || orderDetails.status === 'cancelled') return;
+      const orderItems = readCheckoutSnapshot(orderDetails).checkout_version === 1 ? [] : (Array.isArray(orderDetails.items) ? orderDetails.items : []);
       for (const item of orderItems) {
         const orderItem = item as unknown as OrderItem;
         if (!orderItem.product_id) {
