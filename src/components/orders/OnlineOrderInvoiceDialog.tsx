@@ -33,8 +33,6 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
   onClose, 
   order
 }) => {
-  // Move early return BEFORE any hooks to follow Rules of Hooks
-  if (!order) return null;
 
   const [enrichedItems, setEnrichedItems] = useState<EnrichedOrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -66,7 +64,7 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
         // Enrich order items with database product names
         const enriched = order.items.map(item => ({
           ...item,
-          product_name: productNameMap.get(item.product_id) || (item as any).name || item.product_name || 'منتج غير محدد'
+          product_name: (item as any).name || item.product_name || productNameMap.get(item.product_id) || 'منتج غير محدد'
         }));
 
         setEnrichedItems(enriched);
@@ -102,6 +100,7 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
   }, [isOpen, order]);
 
   const handlePrint = async () => {
+    if (!order || isLoading) return;
     // Try Bluetooth printer first if connected
     if (bluetoothPrinterService.isConnected()) {
       try {
@@ -127,11 +126,10 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
     // Generate the HTML for the invoice using enriched items
     const invoiceHTML = generateInvoiceHTML(order, enrichedItems);
     
+    printWindow.onload = () => { printWindow.focus(); printWindow.print(); };
     printWindow.document.write(invoiceHTML);
     printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    printWindow.close();
+    // Keep the window open for mobile print dialogs and PDF saving.
   };
 
   const generateBluetoothInvoiceText = (order: Order, items: EnrichedOrderItem[]) => {
@@ -446,6 +444,8 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
   };
 
   // Format order date for preview
+  if (!order) return null;
+
   const orderDate = new Date(order.created_at);
   const formattedDate = orderDate.toLocaleDateString('ar-EG', {
     year: 'numeric',
@@ -468,6 +468,7 @@ const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({
     'done': 'مكتمل',
     'cancelled': 'ملغي'
   }[order.status] || order.status;
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

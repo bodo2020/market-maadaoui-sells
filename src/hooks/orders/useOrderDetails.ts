@@ -1,3 +1,4 @@
+import { readCheckoutSnapshot } from "@/services/supabase/checkoutOrderService";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Order, OrderItem } from "@/types";
@@ -101,9 +102,9 @@ export function useOrderDetails(orderId: string) {
         const customerData = (data.customers || {}) as CustomerData;
         
         // Extract customer properties with safe fallbacks
-        const customerName = customerData.name || '';
+        const customerName = readCheckoutSnapshot(data).customer_snapshot?.name || customerData.name || '';
         const customerEmail = customerData.email || '';
-        const customerPhone = customerData.phone || '';
+        const customerPhone = readCheckoutSnapshot(data).customer_snapshot?.phone || customerData.phone || '';
         const customerPhoneVerified = Boolean(customerData.phone_verified);
         
         const transformedItems = await transformItems(data.items);

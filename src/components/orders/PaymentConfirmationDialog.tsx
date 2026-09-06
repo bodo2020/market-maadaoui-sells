@@ -1,165 +1,49 @@
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { supabase } from '@/integrations/supabase/client';
+import { confirmOnlineOrderPayment } from '@/services/supabase/orderOperationsService';
+import { readCheckoutSnapshot } from '@/services/supabase/checkoutOrderService';
+import { toast } from 'sonner';
 
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Check } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
-import { useBranchStore } from "@/stores/branchStore";
-
-interface PaymentConfirmationDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  orderId: string;
-  onConfirm?: () => void;
-}
-
-export function PaymentConfirmationDialog({ 
-  open, 
-  onOpenChange, 
-  orderId,
-  onConfirm 
-}: PaymentConfirmationDialogProps) {
-  const { currentBranchId } = useBranchStore();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<string>('cash');
-  const [transactionId, setTransactionId] = useState<string>('');
-  
-  const confirmPayment = async () => {
-    if (!orderId || isSubmitting) return;
-    
+interface Props { open:boolean; onOpenChange:(open:boolean)=>void; orderId:string; onConfirm?:()=>void; }
+const methods: Record<string,string> = {cash:'نقدي',card:'بطاقة',bank_transfer:'تحويل بنكي',wallet:'محفظة إلكترونية'};
+export function PaymentConfirmationDialog({open,onOpenChange,orderId,onConfirm}:Props) {
+  const [method,setMethod] = useState('cash');
+  const [reference,setReference] = useState('');
+  const [saving,setSaving] = useState(false);
+  const query = useQuery({queryKey:['order-payment',orderId],enabled:open && !!orderId,staleTime:0,queryFn:async()=>{
+    const {data,error}=await supabase.from('online_orders').select('*').eq('id',orderId).single();
+    if(error)throw error; return data;
+  }});
+  useEffect(()=>{if(open){setMethod(query.data?.payment_method || 'cash');setReference('');}},[open,orderId,query.data?.payment_method]);
+  const order=query.data;
+  const immutable=order && readCheckoutSnapshot(order).checkout_version===1;
+  const blocked=!order || query.isFetching || !!query.error || order.status==='cancelled' || order.payment_status==='paid' || order.payment_status==='refunded';
+  const confirm=async()=>{
+    if(saving || blocked)return;
+    setSaving(true);
     try {
-      setIsSubmitting(true);
-      
-      // Fetch the order details to get the total
-      const { data: orderData, error: orderError } = await supabase
-        .from('online_orders')
-        .select('*')
-        .eq('id', orderId)
-        .single();
-        
-      if (orderError) throw orderError;
-      
-      // Update the payment status
-      const { error } = await supabase
-        .from('online_orders')
-        .update({ 
-          payment_status: 'paid',
-          payment_method: paymentMethod,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderId);
-      
-      if (error) throw error;
-      
-      // If the order is already marked as done, add the amount to cash tracking
-      if (orderData.status === 'delivered') {
-        try {
-          const branchId = orderData.branch_id || currentBranchId || undefined;
-          await recordCashTransaction(
-            orderData.total, 
-            'deposit', 
-            RegisterType.ONLINE, 
-            `أمر الدفع من الطلب الإلكتروني #${orderId.slice(0, 8)} - ${
-              paymentMethod === 'cash' ? 'نقداً' : 
-              paymentMethod === 'card' ? 'بطاقة' : 
-              'تحويل بنكي'
-            }`, 
-            '',
-            branchId
-          );
-          console.log(`Added ${orderData.total} to online cash register`);
-        } catch (cashError) {
-          console.error("Error recording cash transaction:", cashError);
-          toast.error("تم تأكيد الدفع لكن حدث خطأ في تسجيل المعاملة المالية");
-        }
-      }
-      
-      toast.success('تم تأكيد الدفع بنجاح');
-      onOpenChange(false);
-      if (onConfirm) onConfirm();
-    } catch (error) {
-      console.error('Error confirming payment:', error);
-      toast.error('حدث خطأ أثناء تأكيد الدفع');
-    } finally {
-      setIsSubmitting(false);
-      // Reset form
-      setPaymentMethod('cash');
-      setTransactionId('');
-    }
+      await confirmOnlineOrderPayment(orderId,immutable ? order.payment_method : method,reference);
+      toast.success('تم تأكيد استلام الدفع');onOpenChange(false);onConfirm?.();
+    } catch(error){toast.error(error instanceof Error ? error.message : 'تعذّر تأكيد الدفع');}
+    finally{setSaving(false);}
   };
-  
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] dir-rtl">
-        <DialogHeader>
-          <DialogTitle>تأكيد الدفع</DialogTitle>
-          <DialogDescription>
-            تأكيد استلام الدفع للطلب #{orderId.slice(0, 8)}
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>طريقة الدفع</Label>
-            <RadioGroup 
-              value={paymentMethod} 
-              onValueChange={setPaymentMethod}
-              className="grid gap-3"
-            >
-              <div className="flex items-center space-x-2 space-x-reverse rounded-lg border p-3 transition-colors hover:bg-muted/50">
-                <RadioGroupItem value="cash" id="cash" />
-                <Label htmlFor="cash" className="flex flex-1 cursor-pointer">
-                  نقدي
-                </Label>
-                {paymentMethod === 'cash' && <Check className="h-4 w-4 text-primary" />}
-              </div>
-              
-              <div className="flex items-center space-x-2 space-x-reverse rounded-lg border p-3 transition-colors hover:bg-muted/50">
-                <RadioGroupItem value="card" id="card" />
-                <Label htmlFor="card" className="flex flex-1 cursor-pointer">
-                  بطاقة ائتمان
-                </Label>
-                {paymentMethod === 'card' && <Check className="h-4 w-4 text-primary" />}
-              </div>
-              
-              <div className="flex items-center space-x-2 space-x-reverse rounded-lg border p-3 transition-colors hover:bg-muted/50">
-                <RadioGroupItem value="bank_transfer" id="bank_transfer" />
-                <Label htmlFor="bank_transfer" className="flex flex-1 cursor-pointer">
-                  تحويل بنكي
-                </Label>
-                {paymentMethod === 'bank_transfer' && <Check className="h-4 w-4 text-primary" />}
-              </div>
-            </RadioGroup>
-          </div>
-          
-          {(paymentMethod === 'card' || paymentMethod === 'bank_transfer') && (
-            <div className="space-y-2">
-              <Label htmlFor="transaction-id">رقم العملية</Label>
-              <Input 
-                id="transaction-id" 
-                value={transactionId}
-                onChange={(e) => setTransactionId(e.target.value)}
-                placeholder="أدخل رقم العملية (اختياري)"
-              />
-            </div>
-          )}
-        </div>
-        
-        <DialogFooter>
-          <Button 
-            type="submit" 
-            onClick={confirmPayment} 
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'جاري المعالجة...' : 'تأكيد الدفع'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  return <Dialog open={open} onOpenChange={value=>{if(!saving)onOpenChange(value);}}>
+    <DialogContent dir="rtl" className="w-[calc(100%-2rem)] max-w-md max-h-[90dvh] overflow-y-auto">
+      <DialogHeader><DialogTitle>تأكيد استلام الدفع</DialogTitle><DialogDescription>راجع استلام المبلغ فعليًا قبل التأكيد.</DialogDescription></DialogHeader>
+      {query.isPending ? <p role="status">جاري تحميل بيانات الدفع…</p> : query.error ? <div role="alert"><p>تعذّر تحميل الطلب.</p><Button onClick={()=>query.refetch()} variant="outline">حاول تاني</Button></div> : order && <div className="space-y-5">
+        <div className="rounded-xl bg-muted p-4"><p className="text-sm">المبلغ المطلوب</p><p className="mt-1 text-2xl font-bold">{Number(order.total).toFixed(2)} ج.م</p><p className="mt-2 text-xs text-muted-foreground" dir="ltr">#{order.tracking_number || order.id.slice(0,8)}</p></div>
+        {immutable ? <p>طريقة الدفع: <strong>{methods[order.payment_method] || order.payment_method}</strong></p> : <fieldset><legend className="mb-2 font-medium">طريقة استلام الدفع</legend><RadioGroup value={method} onValueChange={setMethod} disabled={saving || blocked} className="grid grid-cols-2 gap-2">{Object.entries(methods).map(([value,label])=><Label key={value} htmlFor={`payment-${value}`} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border p-3"><RadioGroupItem id={`payment-${value}`} value={value}/>{label}</Label>)}</RadioGroup></fieldset>}
+        {(immutable ? order.payment_method : method)!=='cash' && <div className="space-y-2"><Label htmlFor="payment-reference">رقم العملية (اختياري)</Label><Input id="payment-reference" dir="ltr" maxLength={120} value={reference} onChange={event=>setReference(event.target.value)} disabled={saving || blocked}/></div>}
+        {order.payment_status==='paid' && <p role="status">الدفع مؤكد بالفعل.</p>}
+        {(order.status==='cancelled' || order.payment_status==='refunded') && <p role="alert">الطلب غير متاح لتأكيد الدفع.</p>}
+      </div>}
+      <DialogFooter><Button variant="outline" disabled={saving} onClick={()=>onOpenChange(false)}>رجوع</Button><Button className="min-h-12" disabled={saving || blocked} onClick={confirm}>{saving?'جاري التأكيد…':'تأكيد استلام المبلغ'}</Button></DialogFooter>
+    </DialogContent>
+  </Dialog>;
 }
