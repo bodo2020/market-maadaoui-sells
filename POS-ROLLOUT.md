@@ -19,9 +19,18 @@ The responsive UI commit passed the existing GitHub Build workflow. Re-run that 
 
 Keep `private.customer_checkout_rollout.enabled` false. The customer source version 8 is also not deployed. Before enabling that separate checkout engine:
 
-1. Migrate remaining legacy online delivery/payment side effects to a single idempotent server operation. PaymentConfirmationDialog currently tries to change payment_method, which is immutable on version 1 orders, and legacy online cash recording is separate from status updates.
+1. Deploy all online status/payment callers together. `online_order_operations.sql` now handles legacy delivery stock, modern order transitions, confirmation references and cash receipt once. The four delivery/status paths and payment dialog use this API. Historical delivered/paid orders are not backfilled. The published old POS still contains its previous writes until rollout.
 2. Replace remaining absolute inventory writers in inventory management/import/legacy delivery and remove permissive catalog/inventory write policies in a coordinated staff rollout.
 3. Replace legacy direct customer order INSERT policy with the new placement flow; verify customer isolation with independent sessions.
 4. Verify the responsive UI and full order lifecycle on the preview, then coordinate customer/POS deployment. Build success alone is not device or production acceptance.
 
 The new POS sale RPC validates staff totals/payment split but retains existing staff-authorized item pricing. Cash balance calculation in the legacy cash function is not claimed to serialize every other cash writer. Do not describe the full rollout as completed based on this draft.
+
+
+## Online order operations follow-up
+
+`atomic_online_order_operations` was applied additively. Its rollback-only test covers legacy units/bulk/fractional kg, modern checkout without a second stock deduction, preserving wallet method, payment before/after delivery, repeated calls, stock shortage rollback, stale/out-of-sequence transitions, cancellation restocking once and customer-role rejection.
+
+The RPC is restricted to active admin/super_admin accounts, matching the existing checkout manager guard. Branchless orders require branch assignment before processing. Card/wallet/bank payments are confirmed and referenced but do not enter the physical cash balance. Refunds remain a separate process; cancelling does not claim a refund.
+
+Existing inventory management/import writers and permissive database policies still require coordinated replacement. This additive API does not secure old clients that continue writing tables directly, and the customer checkout activation flag remains false.

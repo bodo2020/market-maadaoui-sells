@@ -1,3 +1,4 @@
+import { changeOnlineOrderStatus } from '@/services/supabase/orderOperationsService';
 import "@/components/orders/orders-workspace.css";
 import { useQuery } from "@tanstack/react-query";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -20,10 +21,6 @@ import { Order } from "@/types";
 import { useState } from "react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
-import { findOrCreateCustomer } from "@/services/supabase/customerService";
-import { updateProduct } from "@/services/supabase/productService";
-import { RegisterType } from "@/services/supabase/cashTrackingService";
-import { recordCashTransaction } from "@/services/supabase/cashTrackingService";
 
 export default function OrderDetails() {
   const { id } = useParams();
@@ -64,86 +61,14 @@ export default function OrderDetails() {
     try {
       setIsProcessing(true);
       
-      if (nextStatus === 'delivered' && order.status !== 'delivered') {
-        const checkout = await getCheckoutSnapshot(order.id);
-        if (checkout.checkout_version !== 1 && (order.customer_name || order.customer_phone)) {
-          const customerInfo = {
-            name: order.customer_name || 'عميل غير معروف',
-            phone: order.customer_phone || undefined
-          };
-          
-          const customer = await findOrCreateCustomer(customerInfo);
-          if (customer && !order.customer_id) {
-            await supabase
-              .from('online_orders')
-              .update({ customer_id: customer.id })
-              .eq('id', order.id);
-          }
-        }
-        
-        const orderItems = checkout.checkout_version === 1 ? [] : (order.items || []);
-        
-        for (const item of orderItems) {
-          const { data: product, error: productError } = await supabase
-            .from('products')
-            .select('*')
-            .eq('id', item.product_id)
-            .single();
-            
-          if (productError) continue;
-          
-          let quantityToDeduct = item.quantity;
-          
-          if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
-            quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
-          }
-          
-          let newQuantity: number;
-          
-          if (item.is_weight_based || product.barcode_type === 'scale') {
-            const currentQuantity = Math.floor(product.quantity || 0);
-            newQuantity = Math.max(0, currentQuantity - Math.floor(quantityToDeduct));
-          } else {
-            newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
-          }
-          
-          await updateProduct(product.id, {
-            quantity: newQuantity
-          });
-        }
-        
-        if (order.payment_status === 'paid') {
-          try {
-            await recordCashTransaction(
-              order.total, 
-              'deposit', 
-              RegisterType.ONLINE, 
-              `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-              ''
-            );
-          } catch (cashError) {
-            console.error("Error recording cash transaction:", cashError);
-            toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
-          }
-        }
-      }
-      
-      const { error } = await supabase
-        .from('online_orders')
-        .update({ 
-          status: nextStatus as Order['status'],
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', order.id);
-      
-      if (error) throw error;
-      
+      await changeOnlineOrderStatus(order.id, order.status, nextStatus as Order['status']);
+
       toast.success(`تم تحديث حالة الطلب إلى ${getNextStatusLabel()}`);
       fetchOrder();
       
     } catch (error) {
       console.error('Error processing order:', error);
-      toast.error("حدث خطأ أثناء معالجة الطلب");
+      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء معالجة الطلب");
     } finally {
       setIsProcessing(false);
     }
@@ -155,65 +80,14 @@ export default function OrderDetails() {
     try {
       setIsProcessing(true);
       
-      const { error } = await supabase
-        .from('online_orders')
-        .update({ 
-          status: 'cancelled',
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', order.id);
-      
-      if (error) throw error;
-      
+      await changeOnlineOrderStatus(order.id, order.status, 'cancelled');
+
       toast.success('تم إلغاء الطلب بنجاح');
       fetchOrder();
       
     } catch (error) {
       console.error('Error cancelling order:', error);
       toast.error("حدث خطأ أثناء إلغاء الطلب");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handlePaymentStatusChange = async (newStatus: Order['payment_status']) => {
-    if (!order || isProcessing) return;
-    
-    try {
-      setIsProcessing(true);
-      
-      const { error } = await supabase
-        .from('online_orders')
-        .update({
-          payment_status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', order.id);
-      
-      if (error) throw error;
-      
-      toast.success(`تم تحديث حالة الدفع`);
-      
-      if (newStatus === 'paid' && order.status === 'delivered') {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          await recordCashTransaction(
-            order.total, 
-            'deposit', 
-            RegisterType.ONLINE, 
-            `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-            user?.id || ''
-          );
-        } catch (cashError) {
-          console.error("Error recording cash transaction:", cashError);
-        }
-      }
-      
-      fetchOrder();
-      setPaymentConfirmOpen(false);
-    } catch (error) {
-      console.error('Error updating payment status:', error);
-      toast.error('حدث خطأ أثناء تحديث حالة الدفع');
     } finally {
       setIsProcessing(false);
     }

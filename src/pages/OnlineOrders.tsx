@@ -1,3 +1,4 @@
+import { changeOnlineOrderStatus } from '@/services/supabase/orderOperationsService';
 import { readCheckoutSnapshot } from "@/services/supabase/checkoutOrderService";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,10 +18,8 @@ import { OrdersTable } from "@/components/orders/OrdersTable";
 import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog";
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
-import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 import { useBranchStore } from "@/stores/branchStore";
 import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
-import { updateProductQuantity } from "@/services/supabase/productService";
 import OnlineOrderInvoiceDialog from "@/components/orders/OnlineOrderInvoiceDialog";
 export default function OnlineOrders() {
   const { currentBranchId } = useBranchStore();
@@ -126,67 +125,12 @@ export default function OnlineOrders() {
   };
   const handleComplete = async (order: Order) => {
     try {
-      const {
-        data: orderDetails,
-        error: orderError
-      } = await supabase.from('online_orders').select('*').eq('id', order.id).single();
-      if (orderError) throw orderError;
-      if (orderDetails.status === 'delivered' || orderDetails.status === 'cancelled') return;
-      const orderItems = readCheckoutSnapshot(orderDetails).checkout_version === 1 ? [] : (Array.isArray(orderDetails.items) ? orderDetails.items : []);
-      for (const item of orderItems) {
-        const orderItem = item as unknown as OrderItem;
-        if (!orderItem.product_id) {
-          console.error("Invalid order item missing product_id:", item);
-          continue;
-        }
-        try {
-          await updateProductQuantity(orderItem.product_id, orderItem.quantity || 0, 'decrease');
-          console.log(`Updated inventory for product ${orderItem.product_id}: decreased by ${orderItem.quantity}`);
-        } catch (inventoryError) {
-          console.error("Error updating inventory:", inventoryError);
-          continue;
-        }
-      }
-      if (orderDetails.payment_status === 'paid') {
-        try {
-          const branchId = orderDetails.branch_id || currentBranchId || undefined;
-          await recordCashTransaction(orderDetails.total, 'deposit', RegisterType.ONLINE, `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, '', branchId);
-          console.log(`Added ${orderDetails.total} to online cash register`);
-        } catch (cashError) {
-          console.error("Error recording cash transaction:", cashError);
-          toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
-        }
-      }
-      const {
-        error
-      } = await supabase.from('online_orders').update({
-        status: 'delivered',
-        updated_at: new Date().toISOString()
-      }).eq('id', order.id);
-      if (error) throw error;
+      await changeOnlineOrderStatus(order.id, order.status, 'delivered');
       handleOrderUpdate();
-      toast.success("تم اكتمال الطلب وتحديث المخزون");
+      toast.success("تم تسليم الطلب بنجاح");
     } catch (error) {
       console.error('Error completing order:', error);
-      toast.error("حدث خطأ أثناء اكتمال الطلب");
-    }
-  };
-  const handleCancel = async (order: Order) => {
-    try {
-      const notes = `${order.notes ? order.notes + ' - ' : ''}تم إلغاء هذا الطلب`;
-      const {
-        error
-      } = await supabase.from('online_orders').update({
-        status: 'cancelled',
-        notes,
-        updated_at: new Date().toISOString()
-      }).eq('id', order.id);
-      if (error) throw error;
-      handleOrderUpdate();
-      toast.success("تم إلغاء الطلب وإلغاء عملية الدفع");
-    } catch (error) {
-      console.error('Error cancelling order:', error);
-      toast.error("حدث خطأ أثناء إلغاء الطلب");
+      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء اكتمال الطلب");
     }
   };
   const handlePaymentConfirm = (order: Order) => {
@@ -231,12 +175,17 @@ export default function OnlineOrders() {
   const handleSelectOrder = (id: string) => setSelectedOrders(previous => previous.includes(id) ? previous.filter(value => value !== id) : [...previous,id]);
   const handleBulkCancel = async () => {
     const ids = [...cancelTargets];
-    if (!ids.length) return;
+    if (!ids.length || bulkActionLoading) return;
     setBulkActionLoading(true);
     try {
-      const { data, error } = await supabase.from('online_orders').update({status:'cancelled',updated_at:new Date().toISOString()}).in('id',ids).in('status',['pending','confirmed','preparing','ready']).select('id');
-      if (error) throw error;
-      if ((data?.length || 0) !== ids.length) toast.info('بعض الطلبات اتغيّرت حالتها. راجع القائمة المحدّثة.');
+      let failed = 0;
+      for (const id of ids) {
+        const order = orders.find(item => item.id === id);
+        if (!order) { failed++; continue; }
+        try { await changeOnlineOrderStatus(id, order.status, 'cancelled'); }
+        catch { failed++; }
+      }
+      if (failed) toast.info(`تعذّر إلغاء ${failed} طلب. راجع القائمة المحدّثة.`);
       else toast.success('تم إلغاء الطلبات المحددة');
       setSelectedOrders([]); setCancelTargets([]); handleOrderUpdate();
     } catch { toast.error('تعذّر إلغاء الطلبات. حاول مرة أخرى.'); }
