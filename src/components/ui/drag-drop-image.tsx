@@ -1,126 +1,127 @@
-
-import { useState, useEffect } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Upload, X, Image as ImageIcon } from "lucide-react";
+import { Upload, X, Image as ImageIcon, ImageDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { compressCatalogImage, formatFileSize } from "@/lib/imageCompression";
 
 interface DragDropImageProps {
   value: string | null;
   onChange: (url: string | null) => void;
   bucketName?: string;
+  folder?: string;
+  maxDimension?: number;
+  targetBytes?: number;
 }
 
-export function DragDropImage({ value, onChange, bucketName = "images" }: DragDropImageProps) {
+type CompressionSummary = {
+  before: number;
+  after: number;
+  width: number;
+  height: number;
+};
+
+function storagePathFromPublicUrl(urlValue: string, bucketName: string) {
+  try {
+    const url = new URL(urlValue);
+    const marker = `/storage/v1/object/public/${bucketName}/`;
+    const markerIndex = url.pathname.indexOf(marker);
+    if (markerIndex < 0) return null;
+    return decodeURIComponent(url.pathname.slice(markerIndex + marker.length));
+  } catch {
+    return null;
+  }
+}
+
+export function DragDropImage({
+  value,
+  onChange,
+  bucketName = "images",
+  folder,
+  maxDimension = 800,
+  targetBytes = 140 * 1024,
+}: DragDropImageProps) {
+  const reactId = useId();
+  const inputId = `image-upload-${reactId.replace(/:/g, "")}`;
   const [dragging, setDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [compression, setCompression] = useState<CompressionSummary | null>(null);
 
-  // Ensure bucket exists when component mounts
-  useEffect(() => {
-    const ensureBucketExists = async () => {
-      try {
-        const { data: buckets } = await supabase.storage.listBuckets();
-        const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
-        
-        if (!bucketExists) {
-          console.log(`Creating bucket: ${bucketName}`);
-          const { error } = await supabase.storage.createBucket(bucketName, {
-            public: true,
-            fileSizeLimit: 10485760, // 10MB
-          });
-          
-          if (error) {
-            // If there's an error creating the bucket, but it might already exist
-            // We'll proceed with the upload anyway
-            console.error(`Error creating ${bucketName} bucket:`, error);
-          } else {
-            console.log(`${bucketName} bucket created successfully`);
-          }
-        }
-      } catch (error) {
-        console.error("Error checking/creating bucket:", error);
-        // Continue with upload - it might still work if bucket exists but we can't check
-      }
-    };
-
-    ensureBucketExists();
-  }, [bucketName]);
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
     setDragging(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
     setDragging(false);
   };
 
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
     setDragging(false);
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      await handleUpload(files[0]);
-    }
+    const file = event.dataTransfer.files?.[0];
+    if (file) await handleUpload(file);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      await handleUpload(file);
-    }
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) await handleUpload(file);
   };
 
   const handleUpload = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast.error('يرجى اختيار ملف صورة فقط');
+    if (!file.type.startsWith("image/")) {
+      toast.error("يرجى اختيار ملف صورة فقط");
       return;
     }
 
     try {
       setIsUploading(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-      const filePath = `categories/${fileName}`;
+      setCompression(null);
 
-      console.log(`Attempting to upload to bucket: ${bucketName}, file path: ${filePath}`);
+      const optimized = await compressCatalogImage(file, { maxDimension, targetBytes });
+      const safeFolder = (folder || bucketName).replace(/^\/+|\/+$/g, "") || "uploads";
+      const filePath = `${safeFolder}/${crypto.randomUUID()}.webp`;
 
-      // First, ensure the bucket exists again right before upload
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
-      
-      if (!bucketExists) {
-        console.log(`Creating bucket before upload: ${bucketName}`);
-        await supabase.storage.createBucket(bucketName, {
-          public: true,
-          fileSizeLimit: 10485760, // 10MB
-        });
-      }
-
-      // Attempt to upload the file
       const { data, error } = await supabase.storage
         .from(bucketName)
-        .upload(filePath, file);
+        .upload(filePath, optimized.file, {
+          cacheControl: "31536000",
+          contentType: optimized.mimeType || "image/webp",
+          upsert: false,
+        });
 
-      if (error) {
-        console.error(`Error uploading to ${bucketName}:`, error);
-        toast.error(`حدث خطأ أثناء رفع الصورة: ${error.message}`);
-        return;
-      }
+      if (error) throw error;
 
-      // Get the public URL for the uploaded file
-      const { data: { publicUrl } } = supabase.storage
+      const { data: publicData } = supabase.storage
         .from(bucketName)
         .getPublicUrl(data.path);
 
-      console.log(`File uploaded successfully. Public URL: ${publicUrl}`);
-      onChange(publicUrl);
-      toast.success('تم رفع الصورة بنجاح');
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('حدث خطأ أثناء رفع الصورة');
+      setCompression({
+        before: optimized.originalBytes,
+        after: optimized.compressedBytes,
+        width: optimized.width,
+        height: optimized.height,
+      });
+      onChange(publicData.publicUrl);
+
+      const savedPercent = optimized.originalBytes > 0
+        ? Math.max(0, Math.round((1 - optimized.compressedBytes / optimized.originalBytes) * 100))
+        : 0;
+      toast.success(
+        savedPercent > 0
+          ? `تم ضغط ورفع الصورة — وفرنا تقريبًا ${savedPercent}% من المساحة`
+          : "تم تحسين ورفع الصورة بنجاح",
+      );
+    } catch (error: any) {
+      console.error("Image upload failed:", error);
+      const message = error?.message === "IMAGE_DECODE_FAILED"
+        ? "تعذر قراءة الصورة. جرّب صورة JPG أو PNG أو WebP سليمة."
+        : error?.message === "IMAGE_CANVAS_UNAVAILABLE"
+          ? "المتصفح لا يدعم ضغط الصورة على هذا الجهاز."
+          : error?.message || "حدث خطأ أثناء رفع الصورة";
+      toast.error(message);
     } finally {
       setIsUploading(false);
     }
@@ -128,94 +129,98 @@ export function DragDropImage({ value, onChange, bucketName = "images" }: DragDr
 
   const handleRemove = async () => {
     if (!value) return;
-    
+
+    const filePath = storagePathFromPublicUrl(value, bucketName);
+    if (!filePath) {
+      // Older/external URLs may not belong to this bucket. Remove the reference without
+      // attempting to delete an unrelated Storage object.
+      onChange(null);
+      setCompression(null);
+      return;
+    }
+
     try {
-      // Extract file path from the URL
-      const url = new URL(value);
-      const pathParts = url.pathname.split('/');
-      const filePath = pathParts.slice(pathParts.indexOf('object') + 2).join('/');
-      
-      console.log(`Attempting to delete file: ${filePath} from bucket: ${bucketName}`);
-      
-      // Delete the file from Supabase storage
       const { error } = await supabase.storage
         .from(bucketName)
         .remove([filePath]);
-      
-      if (error) {
-        console.error('Error deleting file from storage:', error);
-        toast.error('حدث خطأ أثناء حذف الصورة من التخزين');
-        return;
-      }
-      
-      // Update the UI state
+      if (error) throw error;
       onChange(null);
-      toast.success('تم حذف الصورة بنجاح');
-      
-    } catch (error) {
-      console.error('Error removing image:', error);
-      toast.error('حدث خطأ أثناء حذف الصورة');
+      setCompression(null);
+      toast.success("تم حذف الصورة");
+    } catch (error: any) {
+      console.error("Image removal failed:", error);
+      toast.error(error?.message || "حدث خطأ أثناء حذف الصورة");
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative aspect-video rounded-lg border-2 border-dashed p-4 transition-colors
-          ${dragging ? 'border-primary bg-primary/10' : 'border-gray-300 hover:border-primary/50'}
-          ${isUploading ? 'opacity-50' : ''}`}
+        className={`relative aspect-[4/3] max-h-[300px] rounded-xl border-2 border-dashed p-3 transition-colors
+          ${dragging ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}
+          ${isUploading ? "pointer-events-none opacity-60" : ""}`}
       >
         {value ? (
           <div className="relative h-full w-full">
-            <img 
-              src={value} 
-              alt="Uploaded" 
-              className="h-full w-full object-contain"
+            <img
+              src={value}
+              alt="الصورة المرفوعة"
+              className="h-full w-full rounded-lg object-contain"
             />
             <button
               type="button"
               onClick={handleRemove}
-              className="absolute top-2 right-2 rounded-full bg-white p-1 shadow-md hover:bg-gray-100"
+              aria-label="حذف الصورة"
+              className="absolute end-2 top-2 rounded-full bg-background/95 p-1.5 shadow hover:bg-muted"
             >
-              <X className="h-4 w-4 text-red-500" />
+              <X className="h-4 w-4 text-destructive" />
             </button>
           </div>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center">
-            <div className="mb-4">
-              {isUploading ? (
-                <div className="animate-pulse">جاري الرفع...</div>
-              ) : (
-                <>
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <p className="mt-2 text-sm text-gray-500">
-                    اسحب وأفلت الصورة هنا أو
-                  </p>
-                </>
-              )}
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isUploading}
-              onClick={() => document.getElementById('image-upload')?.click()}
-            >
-              <ImageIcon className="ml-2 h-4 w-4" />
-              اختر صورة
-            </Button>
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            {isUploading ? (
+              <>
+                <ImageDown className="mb-3 h-10 w-10 animate-pulse text-primary" />
+                <p className="font-medium">جاري ضغط الصورة ورفعها...</p>
+                <p className="mt-1 text-xs text-muted-foreground">يتم تحويلها لصيغة WebP قبل الرفع</p>
+              </>
+            ) : (
+              <>
+                <Upload className="mb-3 h-10 w-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">اسحب الصورة هنا أو اختر صورة من الجهاز</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => document.getElementById(inputId)?.click()}
+                >
+                  <ImageIcon className="ms-2 h-4 w-4" />
+                  اختر صورة
+                </Button>
+              </>
+            )}
           </div>
         )}
         <input
-          id="image-upload"
+          id={inputId}
           type="file"
           className="hidden"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/avif"
           onChange={handleFileChange}
           disabled={isUploading}
         />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>يتم التصغير تلقائيًا حتى {maxDimension}px والتحويل إلى WebP.</span>
+        {compression && (
+          <span className="rounded-full bg-muted px-2.5 py-1 font-medium text-foreground">
+            {formatFileSize(compression.before)} → {formatFileSize(compression.after)} · {compression.width}×{compression.height}
+          </span>
+        )}
       </div>
     </div>
   );
