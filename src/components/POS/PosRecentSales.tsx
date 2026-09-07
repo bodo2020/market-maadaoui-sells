@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
+import PosPrinterRuntime from "@/components/POS/PosPrinterRuntime";
 import type { CartItem, Sale } from "@/types";
 
 function money(value: number) {
@@ -60,6 +61,8 @@ export default function PosRecentSales() {
 
   return (
     <>
+      <PosPrinterRuntime />
+
       <Button
         type="button"
         variant="outline"
