@@ -46,6 +46,18 @@ export type ProductManagementStats = {
   pricing_branch_id: string;
 };
 
+export type LegacyBulkReviewRow = {
+  id: string;
+  name: string;
+  barcode: string | null;
+  bulk_barcode: string | null;
+  bulk_quantity: number;
+  bulk_price: number;
+  quantity: number;
+  image_url: string | null;
+  issue: "missing_barcode" | "barcode_conflict" | "needs_review";
+};
+
 export type ProductManagementFilters = {
   search?: string;
   companyId?: string | null;
@@ -75,6 +87,16 @@ export async function fetchProductManagementStats(): Promise<ProductManagementSt
   if (error) throw productManagementError(error.message);
   if (!data || typeof data !== "object") throw new Error("تعذر قراءة إحصائيات المنتجات.");
   return data as ProductManagementStats;
+}
+
+export async function fetchLegacyBulkReviewQueue(): Promise<LegacyBulkReviewRow[]> {
+  const branchId = requireCurrentBranchId();
+  const { data, error } = await rpc("get_legacy_bulk_review_queue", {
+    p_branch_id: branchId,
+  });
+
+  if (error) throw productManagementError(error.message);
+  return (Array.isArray(data) ? data : []) as LegacyBulkReviewRow[];
 }
 
 export async function fetchProductManagementPage(filters: ProductManagementFilters = {}) {
