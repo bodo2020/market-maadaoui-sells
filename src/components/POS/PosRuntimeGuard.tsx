@@ -1,5 +1,5 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Backspace, LockKeyhole, RefreshCw, ShieldAlert, WifiOff } from "lucide-react";
+import { AlertTriangle, LockKeyhole, RefreshCw, ShieldAlert, WifiOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { createPosQuickSession, getLocalPosDevice } from "@/services/supabase/posDeviceService";
@@ -22,7 +22,7 @@ function PinKeypad({ onDigit, onClear, onBackspace, disabled }: {
       ))}
       <Button type="button" variant="ghost" className="h-14" disabled={disabled} onClick={onClear}>مسح</Button>
       <Button type="button" variant="outline" className="h-14 text-lg" disabled={disabled} onClick={() => onDigit("0")}>0</Button>
-      <Button type="button" variant="ghost" className="h-14" disabled={disabled} onClick={onBackspace}><Backspace className="h-5 w-5" /></Button>
+      <Button type="button" variant="ghost" className="h-14 text-xl" disabled={disabled} onClick={onBackspace}>⌫</Button>
     </div>
   );
 }
