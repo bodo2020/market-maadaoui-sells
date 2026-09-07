@@ -5,7 +5,7 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import NotFound from "@/pages/NotFound";
 import POSPro from "@/pages/POSPro";
-import PosShiftGate from "@/components/POS/PosShiftGate";
+import PosShiftGatePro from "@/components/POS/PosShiftGatePro";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -64,7 +64,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const CashierPOS = () => <PosShiftGate><POSPro /></PosShiftGate>;
+const CashierPOS = () => <PosShiftGatePro><POSPro /></PosShiftGatePro>;
 
 function App() {
   return (
