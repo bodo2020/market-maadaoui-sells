@@ -3,7 +3,9 @@ import { User, UserRole } from "@/types";
 import {
   authenticateStaffUser,
   restoreStaffSession,
+  selectStaffBranch,
   signOutStaff,
+  StaffBranchContext,
 } from "@/services/supabase/staffAuthService";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -13,7 +15,11 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isAdmin: boolean;
-  login: (username: string, password: string, branchCode: string) => Promise<void>;
+  branchOptions: StaffBranchContext[];
+  branchSelectionRequired: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  selectBranch: (branchId: string) => Promise<void>;
+  switchBranch: (branchId: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -22,7 +28,11 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   isLoading: true,
   isAdmin: false,
+  branchOptions: [],
+  branchSelectionRequired: false,
   login: async () => {},
+  selectBranch: async () => {},
+  switchBranch: async () => {},
   logout: async () => {},
 });
 
@@ -34,33 +44,44 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
+  const [branchOptions, setBranchOptions] = useState<StaffBranchContext[]>([]);
+  const [branchSelectionRequired, setBranchSelectionRequired] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   const isAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.SUPER_ADMIN;
+
+  const applyLoginState = (state: Awaited<ReturnType<typeof authenticateStaffUser>> | null) => {
+    if (!state) {
+      setUser(null);
+      setBranchOptions([]);
+      setBranchSelectionRequired(false);
+      localStorage.removeItem("user");
+      return;
+    }
+
+    setBranchOptions(state.branches);
+    setBranchSelectionRequired(state.requiresBranchSelection);
+    setUser(state.user);
+
+    if (state.user) {
+      localStorage.setItem("user", JSON.stringify(state.user));
+    } else {
+      localStorage.removeItem("user");
+    }
+  };
 
   useEffect(() => {
     let active = true;
 
     const restore = async () => {
       try {
-        const restoredUser = await restoreStaffSession();
+        const restoredState = await restoreStaffSession();
         if (!active) return;
-
-        setUser(restoredUser);
-        if (restoredUser) {
-          // Kept only for legacy UI/services that read display/role data from localStorage.
-          // Authentication itself is never based on this value anymore.
-          localStorage.setItem("user", JSON.stringify(restoredUser));
-        } else {
-          localStorage.removeItem("user");
-        }
+        applyLoginState(restoredState);
       } catch (error) {
         console.error("Error restoring staff session:", error);
-        if (active) {
-          setUser(null);
-          localStorage.removeItem("user");
-        }
+        if (active) applyLoginState(null);
       } finally {
         if (active) setIsLoading(false);
       }
@@ -72,8 +93,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session && active) {
-        setUser(null);
-        localStorage.removeItem("user");
+        applyLoginState(null);
       }
     });
 
@@ -83,20 +103,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
   }, []);
 
-  const login = async (username: string, password: string, branchCode: string) => {
+  const login = async (username: string, password: string) => {
     try {
       setIsLoading(true);
-      const authenticatedUser = await authenticateStaffUser(username, password, branchCode);
+      const state = await authenticateStaffUser(username, password);
+      applyLoginState(state);
 
-      setUser(authenticatedUser);
-      localStorage.setItem("user", JSON.stringify(authenticatedUser));
-
-      toast({
-        title: "تم تسجيل الدخول بنجاح",
-        description: `مرحبًا ${authenticatedUser.name}`,
-      });
+      if (state.user) {
+        toast({
+          title: "تم تسجيل الدخول بنجاح",
+          description: `مرحبًا ${state.user.name}`,
+        });
+      }
     } catch (error: any) {
       console.error("Login error:", error);
+      applyLoginState(null);
       toast({
         title: "خطأ في تسجيل الدخول",
         description: error.message || "اسم المستخدم أو كلمة المرور غير صحيحة",
@@ -108,15 +129,39 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const activateBranch = async (branchId: string, announce = true) => {
+    try {
+      setIsLoading(true);
+      const state = await selectStaffBranch(branchId);
+      applyLoginState(state);
+      if (state.user && announce) {
+        const branch = state.branches.find(item => item.branch_id === branchId);
+        toast({
+          title: branchSelectionRequired ? "تم اختيار الفرع" : "تم تغيير الفرع",
+          description: branch?.branch_name || "تم تحديث فرع العمل",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "تعذر اختيار الفرع",
+        description: error.message || "راجع صلاحيات الفرع وحاول مرة تانية",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const selectBranch = async (branchId: string) => activateBranch(branchId, true);
+  const switchBranch = async (branchId: string) => activateBranch(branchId, true);
+
   const logout = async () => {
     try {
       await signOutStaff();
     } finally {
-      setUser(null);
-      localStorage.removeItem("user");
-      toast({
-        title: "تم تسجيل الخروج بنجاح",
-      });
+      applyLoginState(null);
+      toast({ title: "تم تسجيل الخروج بنجاح" });
     }
   };
 
@@ -127,7 +172,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         isAuthenticated: !!user,
         isLoading,
         isAdmin,
+        branchOptions,
+        branchSelectionRequired,
         login,
+        selectBranch,
+        switchBranch,
         logout,
       }}
     >
