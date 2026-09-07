@@ -56,7 +56,10 @@ Deno.serve(async (req: Request) => {
         p_device_id: body.deviceId,
         p_device_token: body.deviceToken,
       });
-      if (error) return json({ error: "DEVICE_UNAVAILABLE" }, 401);
+      if (error) {
+        console.error("POS staff list failed", error.message);
+        return json({ error: "DEVICE_UNAVAILABLE" }, 401);
+      }
       return json({ staff: Array.isArray(data) ? data : [] });
     }
 
@@ -72,6 +75,7 @@ Deno.serve(async (req: Request) => {
     });
 
     if (verifyError || !verified || typeof verified !== "object") {
+      console.error("POS PIN verification RPC failed", verifyError?.message);
       return json({ error: "AUTH_FAILED" }, 401);
     }
 
@@ -89,7 +93,10 @@ Deno.serve(async (req: Request) => {
     const name = typeof result.name === "string" ? result.name : "موظف";
     if (!username) return json({ error: "STAFF_ACCOUNT_INVALID" }, 409);
 
-    let { data: authUserData } = await admin.auth.admin.getUserById(body.userId);
+    const { data: authUserData, error: lookupError } = await admin.auth.admin.getUserById(body.userId);
+    if (lookupError && lookupError.status !== 404) {
+      console.error("POS auth lookup failed", lookupError.message);
+    }
     let authUser = authUserData?.user || null;
 
     if (!authUser) {
@@ -102,21 +109,33 @@ Deno.serve(async (req: Request) => {
         app_metadata: { staff: true, pos_provisioned: true },
         user_metadata: { name },
       });
+
       if (createError || !created.user) {
-        console.error("Failed to provision POS staff auth", createError?.message);
-        return json({ error: "SESSION_CREATE_FAILED" }, 500);
+        console.error("Failed to provision POS staff auth", {
+          message: createError?.message,
+          code: createError?.code,
+          status: createError?.status,
+          userId: body.userId,
+        });
+        return json({ error: "AUTH_PROVISION_FAILED" }, 500);
       }
       authUser = created.user;
     }
 
-    if (!authUser.email) return json({ error: "SESSION_CREATE_FAILED" }, 500);
+    if (!authUser.email) {
+      console.error("POS auth account is missing email", body.userId);
+      return json({ error: "AUTH_ACCOUNT_INVALID" }, 500);
+    }
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: "magiclink",
       email: authUser.email,
     });
     const tokenHash = linkData?.properties?.hashed_token;
-    if (linkError || !tokenHash) return json({ error: "SESSION_CREATE_FAILED" }, 500);
+    if (linkError || !tokenHash) {
+      console.error("Failed to create POS session link", linkError?.message);
+      return json({ error: "SESSION_LINK_FAILED" }, 500);
+    }
 
     const { data: sessionData, error: sessionError } = await anon.auth.verifyOtp({
       type: "magiclink",
@@ -124,7 +143,8 @@ Deno.serve(async (req: Request) => {
     });
     const session = sessionData?.session;
     if (sessionError || !session?.access_token || !session.refresh_token) {
-      return json({ error: "SESSION_CREATE_FAILED" }, 500);
+      console.error("Failed to exchange POS session link", sessionError?.message);
+      return json({ error: "SESSION_EXCHANGE_FAILED" }, 500);
     }
 
     return json({
