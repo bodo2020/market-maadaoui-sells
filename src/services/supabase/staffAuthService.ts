@@ -26,6 +26,13 @@ type StaffIdentity = {
   system_role: string | null;
 };
 
+export type StaffLoginState = {
+  user: User | null;
+  branches: StaffBranchContext[];
+  requiresBranchSelection: boolean;
+  isSuperAdmin: boolean;
+};
+
 const rpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
   args?: Record<string, unknown>,
@@ -125,77 +132,101 @@ async function fetchStaffProfile(identity: StaffIdentity, effectiveRole: UserRol
   };
 }
 
-function saveStaffAccessContext(context: StaffBranchContext) {
+function lastBranchKey(userId: string) {
+  return `lastStaffBranchId:${userId}`;
+}
+
+function saveStaffAccessContext(context: StaffBranchContext, userId: string) {
   useBranchStore.getState().setBranch(context.branch_id, context.branch_name);
-  localStorage.setItem("currentBranchId", context.branch_id);
-  localStorage.setItem("currentBranchName", context.branch_name || "");
   localStorage.setItem("currentStaffRoleCode", context.role_code);
   localStorage.setItem("currentStaffPermissions", JSON.stringify(context.permissions || []));
   localStorage.setItem("currentStaffPosEnabled", String(!!context.pos_enabled));
+  localStorage.setItem(lastBranchKey(userId), context.branch_id);
 }
 
 function clearStaffAccessContext() {
   useBranchStore.getState().setBranch(null);
-  localStorage.removeItem("currentBranchId");
-  localStorage.removeItem("currentBranchName");
   localStorage.removeItem("currentStaffRoleCode");
   localStorage.removeItem("currentStaffPermissions");
   localStorage.removeItem("currentStaffPosEnabled");
 }
 
-function chooseBranchContext(contexts: StaffBranchContext[], branchCode?: string): StaffBranchContext {
-  const normalizedCode = branchCode?.trim();
-  if (normalizedCode) {
-    const requested = contexts.find(item => item.branch_code.toLowerCase() === normalizedCode.toLowerCase());
-    if (!requested) throw new Error("ليس لديك صلاحية للدخول لهذا الفرع");
-    return requested;
-  }
-
-  const savedBranchId = localStorage.getItem("currentBranchId");
-  const saved = savedBranchId ? contexts.find(item => item.branch_id === savedBranchId) : undefined;
-  if (saved) return saved;
-
-  const primary = contexts.find(item => item.is_primary);
-  if (primary) return primary;
-  if (contexts.length === 1) return contexts[0];
-  if (contexts[0]) return contexts[0];
-  throw new Error(NO_BRANCH_ERROR);
+function findBranch(contexts: StaffBranchContext[], branchId: string | null | undefined) {
+  if (!branchId) return undefined;
+  return contexts.find(item => item.branch_id === branchId);
 }
 
-async function resolveAndSaveBranch(branchCode?: string): Promise<StaffBranchContext> {
-  const contexts = await fetchMyStaffBranches();
+async function activateBranchForIdentity(
+  identity: StaffIdentity,
+  contexts: StaffBranchContext[],
+  branchId: string,
+): Promise<User> {
+  const selected = findBranch(contexts, branchId);
+  if (!selected) throw new Error("ليس لديك صلاحية للدخول لهذا الفرع");
+  saveStaffAccessContext(selected, identity.user_id);
+  return fetchStaffProfile(
+    identity,
+    mapEffectiveRole(identity.is_super_admin ? "super_admin" : selected.role_code),
+  );
+}
+
+async function buildLoginState(
+  identity: StaffIdentity,
+  contexts: StaffBranchContext[],
+  mode: "fresh-login" | "restore",
+): Promise<StaffLoginState> {
   if (!contexts.length) throw new Error(NO_BRANCH_ERROR);
-  const selected = chooseBranchContext(contexts, branchCode);
-  saveStaffAccessContext(selected);
-  return selected;
+
+  // A single allowed branch never needs another screen.
+  if (contexts.length === 1) {
+    const user = await activateBranchForIdentity(identity, contexts, contexts[0].branch_id);
+    return { user, branches: contexts, requiresBranchSelection: false, isSuperAdmin: identity.is_super_admin };
+  }
+
+  // Restoring an already active session must keep its validated current branch.
+  if (mode === "restore") {
+    const current = findBranch(contexts, localStorage.getItem("currentBranchId"));
+    if (current) {
+      const user = await activateBranchForIdentity(identity, contexts, current.branch_id);
+      return { user, branches: contexts, requiresBranchSelection: false, isSuperAdmin: identity.is_super_admin };
+    }
+  }
+
+  // Super admins can resume their last branch across logins. Other multi-branch staff
+  // explicitly choose where they are working each time they sign in.
+  if (identity.is_super_admin) {
+    const remembered = findBranch(contexts, localStorage.getItem(lastBranchKey(identity.user_id)));
+    if (remembered) {
+      const user = await activateBranchForIdentity(identity, contexts, remembered.branch_id);
+      return { user, branches: contexts, requiresBranchSelection: false, isSuperAdmin: true };
+    }
+  }
+
+  clearStaffAccessContext();
+  return {
+    user: null,
+    branches: contexts,
+    requiresBranchSelection: true,
+    isSuperAdmin: identity.is_super_admin,
+  };
 }
 
 export async function authenticateStaffUser(
   username: string,
   password: string,
-  branchCode?: string,
-): Promise<User> {
+): Promise<StaffLoginState> {
   const normalizedUsername = username.trim();
-  const normalizedBranchCode = branchCode?.trim() || "";
 
   if (!normalizedUsername || !password) {
     throw new Error(GENERIC_LOGIN_ERROR);
   }
 
   const authEmail = staffAuthEmail(normalizedUsername);
-
-  // Migrated staff authenticate directly through Supabase Auth.
   let signInResult = await supabase.auth.signInWithPassword({ email: authEmail, password });
 
-  // Legacy accounts are migrated once. branchCode remains optional at the client layer
-  // so phase 2 can remove it from the login UI without changing this API again.
   if (signInResult.error) {
     const { error: migrationError } = await supabase.functions.invoke("migrate-staff-login", {
-      body: {
-        username: normalizedUsername,
-        password,
-        ...(normalizedBranchCode ? { branchCode: normalizedBranchCode } : {}),
-      },
+      body: { username: normalizedUsername, password },
     });
 
     if (migrationError) {
@@ -215,8 +246,8 @@ export async function authenticateStaffUser(
   try {
     const identity = await fetchMyIdentity();
     if (identity.user_id !== signInResult.data.user.id) throw new Error(GENERIC_LOGIN_ERROR);
-    const branch = await resolveAndSaveBranch(normalizedBranchCode || undefined);
-    return await fetchStaffProfile(identity, mapEffectiveRole(identity.is_super_admin ? "super_admin" : branch.role_code));
+    const contexts = await fetchMyStaffBranches();
+    return await buildLoginState(identity, contexts, "fresh-login");
   } catch (error) {
     await supabase.auth.signOut();
     clearStaffAccessContext();
@@ -224,15 +255,31 @@ export async function authenticateStaffUser(
   }
 }
 
-export async function restoreStaffSession(): Promise<User | null> {
+export async function selectStaffBranch(branchId: string): Promise<StaffLoginState> {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session?.user) throw new Error("انتهت جلسة تسجيل الدخول. سجل دخولك مرة تانية.");
+
+  const identity = await fetchMyIdentity();
+  if (identity.user_id !== sessionData.session.user.id) throw new Error("INVALID_STAFF_SESSION");
+  const contexts = await fetchMyStaffBranches();
+  const user = await activateBranchForIdentity(identity, contexts, branchId);
+  return {
+    user,
+    branches: contexts,
+    requiresBranchSelection: false,
+    isSuperAdmin: identity.is_super_admin,
+  };
+}
+
+export async function restoreStaffSession(): Promise<StaffLoginState | null> {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !sessionData.session?.user) return null;
 
   try {
     const identity = await fetchMyIdentity();
     if (identity.user_id !== sessionData.session.user.id) throw new Error("INVALID_STAFF_SESSION");
-    const branch = await resolveAndSaveBranch();
-    return await fetchStaffProfile(identity, mapEffectiveRole(identity.is_super_admin ? "super_admin" : branch.role_code));
+    const contexts = await fetchMyStaffBranches();
+    return await buildLoginState(identity, contexts, "restore");
   } catch {
     await supabase.auth.signOut();
     clearStaffAccessContext();
