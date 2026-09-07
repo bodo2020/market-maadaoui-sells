@@ -2,7 +2,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { User, UserRole } from "@/types";
 import { useBranchStore } from "@/stores/branchStore";
 
-const GENERIC_LOGIN_ERROR = "اسم المستخدم أو كلمة المرور أو كود الماركت غير صحيح";
+const GENERIC_LOGIN_ERROR = "اسم المستخدم أو كلمة المرور غير صحيح";
+const NO_BRANCH_ERROR = "لا يوجد فرع نشط متاح لهذا الحساب";
+
+export type StaffBranchContext = {
+  branch_id: string;
+  branch_name: string;
+  branch_code: string;
+  role_code: string;
+  role_name_ar: string;
+  is_primary: boolean;
+  pos_enabled: boolean;
+  permissions: string[];
+};
+
+type StaffIdentity = {
+  user_id: string;
+  name: string;
+  username: string;
+  phone: string | null;
+  active: boolean;
+  is_super_admin: boolean;
+  system_role: string | null;
+};
+
+const rpc = supabase.rpc.bind(supabase) as unknown as (
+  name: string,
+  args?: Record<string, unknown>,
+) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -18,6 +45,23 @@ function staffAuthEmail(username: string): string {
   return `u-${bytesToBase64Url(bytes)}@staff.elmadawymarket.local`;
 }
 
+function mapEffectiveRole(roleCode: string | null | undefined): UserRole {
+  switch (roleCode) {
+    case "super_admin":
+      return UserRole.SUPER_ADMIN;
+    case "branch_admin":
+    case "branch_manager":
+      return UserRole.ADMIN;
+    case "cashier":
+      return UserRole.CASHIER;
+    case "delivery":
+    case "delivery_driver":
+      return UserRole.DELIVERY;
+    default:
+      return UserRole.EMPLOYEE;
+  }
+}
+
 async function getFunctionErrorDetails(error: any): Promise<{ message?: string; code?: string }> {
   try {
     if (error?.context && typeof error.context.json === "function") {
@@ -30,15 +74,33 @@ async function getFunctionErrorDetails(error: any): Promise<{ message?: string; 
   } catch {
     // Ignore malformed/non-JSON function responses and use a generic error.
   }
-
   return {};
 }
 
-async function fetchStaffProfile(userId: string): Promise<User> {
+async function fetchMyIdentity(): Promise<StaffIdentity> {
+  const { data, error } = await rpc("get_my_staff_identity");
+  if (error || !data || typeof data !== "object") {
+    throw new Error("هذا الحساب غير متاح حالياً");
+  }
+
+  const identity = data as StaffIdentity;
+  if (!identity.user_id || identity.active === false) {
+    throw new Error("هذا الحساب غير متاح حالياً");
+  }
+  return identity;
+}
+
+export async function fetchMyStaffBranches(): Promise<StaffBranchContext[]> {
+  const { data, error } = await rpc("get_my_staff_branches");
+  if (error) throw new Error(error.message || NO_BRANCH_ERROR);
+  return (Array.isArray(data) ? data : []) as StaffBranchContext[];
+}
+
+async function fetchStaffProfile(identity: StaffIdentity, effectiveRole: UserRole): Promise<User> {
   const { data, error } = await supabase
     .from("users")
-    .select("id,name,username,role,phone,email,active,created_at")
-    .eq("id", userId)
+    .select("id,name,username,phone,email,active,created_at")
+    .eq("id", identity.user_id)
     .single();
 
   if (error || !data || data.active === false) {
@@ -48,13 +110,13 @@ async function fetchStaffProfile(userId: string): Promise<User> {
   const { data: shifts } = await supabase
     .from("shifts")
     .select("*")
-    .eq("employee_id", userId);
+    .eq("employee_id", identity.user_id);
 
   return {
     id: data.id,
     name: data.name,
     username: data.username,
-    role: data.role as UserRole,
+    role: effectiveRole,
     phone: data.phone || "",
     email: data.email || undefined,
     created_at: data.created_at,
@@ -63,128 +125,76 @@ async function fetchStaffProfile(userId: string): Promise<User> {
   };
 }
 
-async function userCanAccessBranch(user: User, branchId: string): Promise<boolean> {
-  if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN) {
-    // Admin access is still validated by RLS; super admins can select any active branch.
-    if (user.role === UserRole.SUPER_ADMIN) return true;
-  }
-
-  const { data, error } = await supabase
-    .from("user_branch_roles")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("branch_id", branchId)
-    .maybeSingle();
-
-  if (error) return false;
-  return !!data;
+function saveStaffAccessContext(context: StaffBranchContext) {
+  useBranchStore.getState().setBranch(context.branch_id, context.branch_name);
+  localStorage.setItem("currentBranchId", context.branch_id);
+  localStorage.setItem("currentBranchName", context.branch_name || "");
+  localStorage.setItem("currentStaffRoleCode", context.role_code);
+  localStorage.setItem("currentStaffPermissions", JSON.stringify(context.permissions || []));
+  localStorage.setItem("currentStaffPosEnabled", String(!!context.pos_enabled));
 }
 
-async function setValidatedBranch(user: User, branchCode: string) {
-  const { data: branch, error } = await supabase
-    .from("branches")
-    .select("id,name,active,code")
-    .eq("code", branchCode.trim())
-    .maybeSingle();
-
-  if (error || !branch || branch.active === false) {
-    throw new Error(GENERIC_LOGIN_ERROR);
-  }
-
-  if (!(await userCanAccessBranch(user, branch.id))) {
-    throw new Error("ليس لديك صلاحية للدخول لهذا الفرع");
-  }
-
-  useBranchStore.getState().setBranch(branch.id, branch.name);
-  localStorage.setItem("currentBranchId", branch.id);
-  localStorage.setItem("currentBranchName", branch.name || "");
-
-  return branch;
+function clearStaffAccessContext() {
+  useBranchStore.getState().setBranch(null);
+  localStorage.removeItem("currentBranchId");
+  localStorage.removeItem("currentBranchName");
+  localStorage.removeItem("currentStaffRoleCode");
+  localStorage.removeItem("currentStaffPermissions");
+  localStorage.removeItem("currentStaffPosEnabled");
 }
 
-async function restoreValidatedBranch(user: User): Promise<boolean> {
+function chooseBranchContext(contexts: StaffBranchContext[], branchCode?: string): StaffBranchContext {
+  const normalizedCode = branchCode?.trim();
+  if (normalizedCode) {
+    const requested = contexts.find(item => item.branch_code.toLowerCase() === normalizedCode.toLowerCase());
+    if (!requested) throw new Error("ليس لديك صلاحية للدخول لهذا الفرع");
+    return requested;
+  }
+
   const savedBranchId = localStorage.getItem("currentBranchId");
+  const saved = savedBranchId ? contexts.find(item => item.branch_id === savedBranchId) : undefined;
+  if (saved) return saved;
 
-  if (savedBranchId) {
-    const { data: savedBranch } = await supabase
-      .from("branches")
-      .select("id,name,active")
-      .eq("id", savedBranchId)
-      .maybeSingle();
+  const primary = contexts.find(item => item.is_primary);
+  if (primary) return primary;
+  if (contexts.length === 1) return contexts[0];
+  if (contexts[0]) return contexts[0];
+  throw new Error(NO_BRANCH_ERROR);
+}
 
-    if (savedBranch?.active && (await userCanAccessBranch(user, savedBranch.id))) {
-      useBranchStore.getState().setBranch(savedBranch.id, savedBranch.name);
-      return true;
-    }
-  }
-
-  if (user.role === UserRole.SUPER_ADMIN) {
-    const { data: firstBranch } = await supabase
-      .from("branches")
-      .select("id,name,active")
-      .eq("active", true)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (firstBranch) {
-      useBranchStore.getState().setBranch(firstBranch.id, firstBranch.name);
-      return true;
-    }
-
-    return false;
-  }
-
-  const { data: branchRole } = await supabase
-    .from("user_branch_roles")
-    .select("branch_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!branchRole?.branch_id) return false;
-
-  const { data: branch } = await supabase
-    .from("branches")
-    .select("id,name,active")
-    .eq("id", branchRole.branch_id)
-    .eq("active", true)
-    .maybeSingle();
-
-  if (!branch) return false;
-
-  useBranchStore.getState().setBranch(branch.id, branch.name);
-  return true;
+async function resolveAndSaveBranch(branchCode?: string): Promise<StaffBranchContext> {
+  const contexts = await fetchMyStaffBranches();
+  if (!contexts.length) throw new Error(NO_BRANCH_ERROR);
+  const selected = chooseBranchContext(contexts, branchCode);
+  saveStaffAccessContext(selected);
+  return selected;
 }
 
 export async function authenticateStaffUser(
   username: string,
   password: string,
-  branchCode: string
+  branchCode?: string,
 ): Promise<User> {
   const normalizedUsername = username.trim();
-  const normalizedBranchCode = branchCode.trim();
+  const normalizedBranchCode = branchCode?.trim() || "";
 
-  if (!normalizedUsername || !password || !normalizedBranchCode) {
+  if (!normalizedUsername || !password) {
     throw new Error(GENERIC_LOGIN_ERROR);
   }
 
   const authEmail = staffAuthEmail(normalizedUsername);
 
-  // Existing migrated users authenticate directly with Supabase Auth.
-  let signInResult = await supabase.auth.signInWithPassword({
-    email: authEmail,
-    password,
-  });
+  // Migrated staff authenticate directly through Supabase Auth.
+  let signInResult = await supabase.auth.signInWithPassword({ email: authEmail, password });
 
-  // Existing legacy users are migrated once, server-side, after their old
-  // username/password/branch combination is validated.
+  // Legacy accounts are migrated once. branchCode remains optional at the client layer
+  // so phase 2 can remove it from the login UI without changing this API again.
   if (signInResult.error) {
     const { error: migrationError } = await supabase.functions.invoke("migrate-staff-login", {
       body: {
         username: normalizedUsername,
         password,
-        branchCode: normalizedBranchCode,
+        ...(normalizedBranchCode ? { branchCode: normalizedBranchCode } : {}),
       },
     });
 
@@ -195,11 +205,7 @@ export async function authenticateStaffUser(
       }
     }
 
-    // Retry after migration (or a race where another session migrated first).
-    signInResult = await supabase.auth.signInWithPassword({
-      email: authEmail,
-      password,
-    });
+    signInResult = await supabase.auth.signInWithPassword({ email: authEmail, password });
   }
 
   if (signInResult.error || !signInResult.data.user) {
@@ -207,12 +213,13 @@ export async function authenticateStaffUser(
   }
 
   try {
-    const user = await fetchStaffProfile(signInResult.data.user.id);
-    await setValidatedBranch(user, normalizedBranchCode);
-    return user;
+    const identity = await fetchMyIdentity();
+    if (identity.user_id !== signInResult.data.user.id) throw new Error(GENERIC_LOGIN_ERROR);
+    const branch = await resolveAndSaveBranch(normalizedBranchCode || undefined);
+    return await fetchStaffProfile(identity, mapEffectiveRole(identity.is_super_admin ? "super_admin" : branch.role_code));
   } catch (error) {
     await supabase.auth.signOut();
-    useBranchStore.getState().setBranch(null);
+    clearStaffAccessContext();
     throw error;
   }
 }
@@ -222,25 +229,31 @@ export async function restoreStaffSession(): Promise<User | null> {
   if (sessionError || !sessionData.session?.user) return null;
 
   try {
-    const user = await fetchStaffProfile(sessionData.session.user.id);
-    const hasBranch = await restoreValidatedBranch(user);
-
-    if (!hasBranch) {
-      await supabase.auth.signOut();
-      useBranchStore.getState().setBranch(null);
-      return null;
-    }
-
-    return user;
+    const identity = await fetchMyIdentity();
+    if (identity.user_id !== sessionData.session.user.id) throw new Error("INVALID_STAFF_SESSION");
+    const branch = await resolveAndSaveBranch();
+    return await fetchStaffProfile(identity, mapEffectiveRole(identity.is_super_admin ? "super_admin" : branch.role_code));
   } catch {
     await supabase.auth.signOut();
-    useBranchStore.getState().setBranch(null);
+    clearStaffAccessContext();
     return null;
   }
 }
 
+export function getCurrentStaffPermissions(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem("currentStaffPermissions") || "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+export function currentStaffHasPermission(permission: string): boolean {
+  return getCurrentStaffPermissions().includes(permission);
+}
+
 export async function signOutStaff(): Promise<void> {
   await supabase.auth.signOut();
-  useBranchStore.getState().setBranch(null);
+  clearStaffAccessContext();
   localStorage.removeItem("user");
 }
