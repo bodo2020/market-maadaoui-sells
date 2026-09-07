@@ -163,6 +163,8 @@ export async function submitPosSale(
     throw new Error("لم يصل تأكيد البيع. السلة محفوظة؛ أعد المحاولة نفسها ولن تُسجّل الفاتورة مرتين.");
   }
 
+  const confirmedSale = result.data as Sale;
+
   try {
     localStorage.setItem(key, JSON.stringify({ ...pending, confirmed: true }));
   } catch {
@@ -170,5 +172,10 @@ export async function submitPosSale(
   }
 
   invalidatePOSCatalogCache(branchId);
-  return result.data as Sale;
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent<Sale>("pos:sale-completed", { detail: confirmedSale }));
+  }
+
+  return confirmedSale;
 }
