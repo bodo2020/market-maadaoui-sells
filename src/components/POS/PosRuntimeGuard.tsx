@@ -1,12 +1,12 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, LockKeyhole, RefreshCw, ShieldAlert, WifiOff } from "lucide-react";
+import { AlertTriangle, Banknote, LockKeyhole, RefreshCw, ShieldAlert, WifiOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { createPosQuickSession, getLocalPosDevice } from "@/services/supabase/posDeviceService";
 import { getPosRuntimeStatus } from "@/services/supabase/posRuntimeService";
 import { Button } from "@/components/ui/button";
 
-const AUTO_LOCK_MS = 10 * 60 * 1000;
+const DEFAULT_AUTO_LOCK_MINUTES = 10;
 const HEALTH_CHECK_MS = 20 * 1000;
 
 function PinKeypad({ onDigit, onClear, onBackspace, disabled }: {
@@ -37,6 +37,9 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [runtimeIssue, setRuntimeIssue] = useState<string | null>(null);
   const [checkingRuntime, setCheckingRuntime] = useState(false);
+  const [autoLockMinutes, setAutoLockMinutes] = useState(DEFAULT_AUTO_LOCK_MINUTES);
+  const [cashWarningThreshold, setCashWarningThreshold] = useState<number | null>(null);
+  const [drawerBalance, setDrawerBalance] = useState<number | null>(null);
   const timerRef = useRef<number | null>(null);
 
   const device = useMemo(
@@ -46,18 +49,26 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
 
   const armTimer = useCallback(() => {
     if (timerRef.current) window.clearTimeout(timerRef.current);
+    const safeMinutes = Math.min(120, Math.max(1, Number(autoLockMinutes || DEFAULT_AUTO_LOCK_MINUTES)));
     timerRef.current = window.setTimeout(() => {
       setPin("");
       setError(null);
       setLocked(true);
-    }, AUTO_LOCK_MS);
-  }, []);
+    }, safeMinutes * 60 * 1000);
+  }, [autoLockMinutes]);
+
+  const applyRuntimeSettings = (status: Awaited<ReturnType<typeof getPosRuntimeStatus>>) => {
+    if (status.auto_lock_minutes != null) setAutoLockMinutes(Number(status.auto_lock_minutes));
+    setCashWarningThreshold(status.cash_warning_threshold == null ? null : Number(status.cash_warning_threshold));
+    setDrawerBalance(status.drawer_balance == null ? null : Number(status.drawer_balance));
+  };
 
   const checkRuntime = useCallback(async () => {
     if (!device || !user?.id || !online || locked) return;
     setCheckingRuntime(true);
     try {
       const status = await getPosRuntimeStatus(device);
+      applyRuntimeSettings(status);
       if (!status.ready) {
         setRuntimeIssue(status.code === "SHIFT_NOT_OPEN"
           ? "الوردية الحالية اتقفلت أو لم تعد متاحة. حدّث الصفحة لبدء وردية جديدة قبل أي بيع."
@@ -106,6 +117,10 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
     return () => window.clearInterval(timer);
   }, [device?.device_id, user?.id, online, locked, checkRuntime]);
 
+  useEffect(() => {
+    if (!locked) armTimer();
+  }, [autoLockMinutes, locked, armTimer]);
+
   const addDigit = (digit: string) => {
     setError(null);
     setPin(value => value.length >= 6 ? value : value + digit);
@@ -124,6 +139,7 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
     try {
       await createPosQuickSession(device, user.id, pin);
       const status = await getPosRuntimeStatus(device);
+      applyRuntimeSettings(status);
       if (!status.ready) {
         setRuntimeIssue("الوردية لم تعد مفتوحة. حدّث الصفحة قبل استكمال البيع.");
         return;
@@ -140,12 +156,27 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
     }
   };
 
+  const cashWarningActive = online
+    && !locked
+    && !runtimeIssue
+    && cashWarningThreshold != null
+    && cashWarningThreshold > 0
+    && drawerBalance != null
+    && drawerBalance >= cashWarningThreshold;
+
   return (
     <>
       {!online && (
         <div dir="rtl" className="fixed inset-x-2 top-2 z-[90] mx-auto max-w-xl rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-xl">
           <div className="flex items-center gap-2 font-semibold"><WifiOff className="h-4 w-4" /> الاتصال بالإنترنت مقطوع</div>
           <div className="mt-1 text-xs leading-5">السلات الموجودة محفوظة على الجهاز. لا تعيد تسجيل البيع يدويًا؛ بعد رجوع الاتصال استخدم نفس السلة والمحاولة عشان حماية منع تكرار الفاتورة تفضل شغالة.</div>
+        </div>
+      )}
+
+      {cashWarningActive && (
+        <div dir="rtl" className="fixed inset-x-2 top-2 z-[85] mx-auto max-w-xl rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-lg">
+          <div className="flex items-center gap-2 font-semibold"><Banknote className="h-4 w-4" /> رصيد درج الكاشير مرتفع</div>
+          <div className="mt-1 text-xs">الرصيد الحالي {Number(drawerBalance).toFixed(2)} ج.م. يفضل توريد جزء للخزنة طبقًا لسياسة الفرع.</div>
         </div>
       )}
 
@@ -158,7 +189,7 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
           size="sm"
           className="fixed left-3 top-20 z-[70] bg-white/95 shadow-md backdrop-blur"
           onClick={lockNow}
-          title="قفل شاشة الكاشير بدون إنهاء الوردية"
+          title={`قفل شاشة الكاشير بدون إنهاء الوردية · تلقائي بعد ${autoLockMinutes} دقيقة`}
         >
           <LockKeyhole className="h-4 w-4" /> قفل
         </Button>
