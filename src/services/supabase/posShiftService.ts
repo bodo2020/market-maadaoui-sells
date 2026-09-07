@@ -6,10 +6,13 @@ export type PosShift = {
   user_id: string;
   branch_id: string;
   device_id: string;
+  drawer_account_id?: string | null;
   status: "open" | "closed";
   opened_at: string;
   closed_at: string | null;
   opening_cash: number;
+  opening_system_balance?: number | null;
+  opening_variance?: number | null;
   closing_cash: number | null;
   expected_cash: number | null;
   cash_difference: number | null;
@@ -20,6 +23,8 @@ export type PosShift = {
   sales_count?: number;
   sales_total?: number;
   cash_movement?: number;
+  drawer_balance?: number;
+  drawer_balance_after?: number;
   already_open?: boolean;
 };
 
@@ -29,6 +34,10 @@ const rpc = supabase.rpc.bind(supabase) as unknown as (
 ) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
 
 function shiftError(message?: string) {
+  if (message?.startsWith("OPENING_CASH_MISMATCH|")) {
+    const expected = Number(message.split("|")[1] || 0);
+    return `رصيد الدرج المسجل في النظام ${expected.toFixed(2)} ج.م. لو العد الفعلي مختلف، لازم مدير الفرع يعمل تسوية واضحة للفرق.`;
+  }
   switch (message) {
     case "DEVICE_UNAVAILABLE": return "جهاز الكاشير غير متاح أو تم إلغاء تسجيله.";
     case "POS_NOT_ALLOWED": return "حسابك غير مسموح له باستخدام نقطة البيع على هذا الفرع.";
