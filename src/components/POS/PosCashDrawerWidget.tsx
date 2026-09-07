@@ -38,8 +38,24 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(true), 2000);
-    return () => window.clearInterval(timer);
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") void refresh(true);
+    };
+    const onSaleCompleted = () => void refresh(true);
+    const onCashChanged = () => void refresh(true);
+
+    const timer = window.setInterval(refreshIfVisible, 8000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    window.addEventListener("pos:sale-completed", onSaleCompleted);
+    window.addEventListener("pos:cash-changed", onCashChanged);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+      window.removeEventListener("pos:sale-completed", onSaleCompleted);
+      window.removeEventListener("pos:cash-changed", onCashChanged);
+    };
   }, [refresh]);
 
   const submitDrop = async () => {
@@ -53,6 +69,7 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
     try {
       await cashDropToSafe(device, value, note);
       await refresh(true);
+      window.dispatchEvent(new CustomEvent("pos:cash-changed", { detail: { type: "cash_drop", amount: value } }));
       setAmount("");
       setNote("");
       setDropOpen(false);
@@ -80,7 +97,7 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
         <DialogContent dir="rtl" className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><WalletCards className="h-5 w-5 text-[#005931]" /> درج الكاشير</DialogTitle>
-            <DialogDescription>{device.device_name} · الرصيد بيتحدث تلقائيًا أثناء الوردية</DialogDescription>
+            <DialogDescription>{device.device_name} · الرصيد يتحدث فورًا بعد البيع والتوريد، مع مزامنة خفيفة أثناء الوردية</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
@@ -108,7 +125,7 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
         <DialogContent dir="rtl" className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>توريد نقدية للخزنة الرئيسية</DialogTitle>
-            <DialogDescription>الرصيد الحالي في الدرج {money(summary?.drawer_balance)}. التحويل بيتسجل على الدرج والخزنة في نفس العملية.</DialogDescription>
+            <DialogDescription>الرصيد الحالي في الدرج {money(summary?.drawer_balance)}. التحويل يتسجل على الدرج والخزنة في نفس العملية.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
