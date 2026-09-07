@@ -30,6 +30,7 @@ import {
   AlertTriangle,
   Barcode,
   Box,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -142,6 +143,7 @@ export default function ProductManagement() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [categories, setCategories] = useState<MainCategory[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [legacyReviewOpen, setLegacyReviewOpen] = useState(false);
   const [legacyReviewLoading, setLegacyReviewLoading] = useState(false);
   const [legacyReviewRows, setLegacyReviewRows] = useState<LegacyBulkReviewRow[]>([]);
@@ -234,6 +236,7 @@ export default function ProductManagement() {
   const companyNames = useMemo(() => new Map(companies.map(company => [company.id, company.name])), [companies]);
   const categoryNames = useMemo(() => new Map(categories.map(category => [category.id, category.name])), [categories]);
   const activeFilterCount = Number(Boolean(search)) + Number(companyId !== "all") + Number(categoryId !== "all");
+  const activeSelectFilterCount = Number(companyId !== "all") + Number(categoryId !== "all");
 
   const handleBarcodeScan = (barcodeValue: string) => {
     setScannerOpen(false);
@@ -322,7 +325,7 @@ export default function ProductManagement() {
 
   return (
     <MainLayout>
-      <div className="mx-auto max-w-[1700px] space-y-5 pb-10" dir="rtl">
+      <div className="mx-auto max-w-[1700px] space-y-3 pb-10 md:space-y-5" dir="rtl">
         <section className="overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#005931_0%,#087147_55%,#0a8051_100%)] p-5 text-white shadow-sm md:p-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
@@ -373,8 +376,84 @@ export default function ProductManagement() {
         )}
 
         <Card className="sticky top-2 z-10 border-0 bg-white/95 shadow-md ring-1 ring-slate-200 backdrop-blur">
-          <CardContent className="p-3 md:p-4">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <CardContent className="p-2 lg:p-4">
+            <div className="lg:hidden">
+              <div className="flex items-center gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    ref={searchInputRef}
+                    value={search}
+                    onChange={event => setSearch(event.target.value)}
+                    placeholder="اسم المنتج أو الباركود..."
+                    className="h-10 rounded-xl border-slate-200 bg-slate-50 pr-9 pl-8 text-sm focus-visible:bg-white"
+                  />
+                  {search && (
+                    <button type="button" className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-slate-200" onClick={() => setSearch("")} aria-label="مسح البحث">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl" onClick={() => setScannerOpen(true)} aria-label="مسح باركود">
+                  <ScanLine className="h-4.5 w-4.5" />
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={`relative h-10 shrink-0 gap-1.5 rounded-xl px-3 ${mobileFiltersOpen || activeSelectFilterCount > 0 ? "border-[#005931]/35 bg-emerald-50 text-[#005931]" : ""}`}
+                  onClick={() => setMobileFiltersOpen(value => !value)}
+                  aria-expanded={mobileFiltersOpen}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="hidden min-[390px]:inline">فلاتر</span>
+                  {activeSelectFilterCount > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#005931] px-1 text-[10px] font-bold text-white">{activeSelectFilterCount}</span>
+                  )}
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${mobileFiltersOpen ? "rotate-180" : ""}`} />
+                </Button>
+              </div>
+
+              <div className="mt-1.5 flex items-center justify-between px-1 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1"><LayoutGrid className="h-3 w-3" /> {statNumber(total)} نتيجة</span>
+                {activeFilterCount > 0 && !mobileFiltersOpen && (
+                  <button type="button" className="font-medium text-[#005931]" onClick={clearFilters}>مسح البحث والفلاتر</button>
+                )}
+              </div>
+
+              {mobileFiltersOpen && (
+                <div className="mt-2 border-t border-slate-100 pt-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select value={companyId} onValueChange={value => { setCompanyId(value); setPage(1); }}>
+                      <SelectTrigger className="h-10 min-w-0 rounded-xl text-xs"><SelectValue placeholder="الشركة" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">كل الشركات</SelectItem>
+                        {companies.map(company => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Select value={categoryId} onValueChange={value => { setCategoryId(value); setPage(1); }}>
+                      <SelectTrigger className="h-10 min-w-0 rounded-xl text-xs"><SelectValue placeholder="القسم" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">كل الأقسام</SelectItem>
+                        {categories.map(category => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs" onClick={refreshAll}>
+                      <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> تحديث
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {activeFilterCount > 0 && <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={clearFilters}>مسح الكل</Button>}
+                      <Button type="button" size="sm" className="h-8 bg-[#005931] px-3 text-xs hover:bg-[#004a29]" onClick={() => setMobileFiltersOpen(false)}>تم</Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="hidden items-center gap-3 lg:flex">
               <div className="relative min-w-0 flex-1">
                 <Search className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -395,7 +474,7 @@ export default function ProductManagement() {
                 <ScanLine className="ms-2 h-5 w-5" /> مسح باركود
               </Button>
 
-              <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:w-[430px]">
+              <div className="grid w-[430px] min-w-0 grid-cols-2 gap-2">
                 <Select value={companyId} onValueChange={value => { setCompanyId(value); setPage(1); }}>
                   <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="الشركة" /></SelectTrigger>
                   <SelectContent>
@@ -417,7 +496,7 @@ export default function ProductManagement() {
               </Button>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-muted-foreground">
+            <div className="mt-3 hidden items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-muted-foreground lg:flex">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="flex items-center gap-1"><LayoutGrid className="h-3.5 w-3.5" /> {statNumber(total)} نتيجة</span>
                 {activeFilterCount > 0 && <Badge variant="secondary" className="gap-1"><SlidersHorizontal className="h-3 w-3" /> {activeFilterCount} فلتر نشط</Badge>}
