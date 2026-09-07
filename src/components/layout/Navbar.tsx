@@ -32,6 +32,8 @@ export default function Navbar() {
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const [switchingBranchId, setSwitchingBranchId] = useState<string | null>(null);
 
+  const currentBranchContext = branchOptions.find(branch => branch.branch_id === currentBranchId);
+
   const loadNotifications = () => {
     setNotifications(getNotifications());
   };
@@ -82,7 +84,8 @@ export default function Navbar() {
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
-  const canSeeNotifications = user?.role === 'admin' || user?.role === 'super_admin';
+  const canSeeNotifications = user?.role === 'super_admin' || Boolean(currentBranchContext?.permissions?.includes('inventory.view'));
+  const roleLabel = currentBranchContext?.role_name_ar || (user?.role === 'super_admin' ? 'مدير النظام' : 'موظف');
 
   return (
     <header className="border-b bg-white py-3 px-6 flex items-center justify-between sticky top-0 z-30 min-h-[60px]">
@@ -200,7 +203,7 @@ export default function Navbar() {
               </Avatar>
               <div className="text-right">
                 <p className="text-sm font-medium">{user?.name || 'المستخدم'}</p>
-                <p className="text-xs text-muted-foreground">{user?.role || 'مستخدم'}</p>
+                <p className="text-xs text-muted-foreground">{roleLabel}</p>
               </div>
             </Button>
           </DropdownMenuTrigger>
