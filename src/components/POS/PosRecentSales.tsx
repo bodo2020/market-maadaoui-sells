@@ -9,6 +9,7 @@ import { useBranchStore } from "@/stores/branchStore";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
 import PosPrinterRuntime from "@/components/POS/PosPrinterRuntime";
 import PosQuickReturnDialog from "@/components/POS/PosQuickReturnDialog";
+import PosPendingCardRefunds from "@/components/POS/PosPendingCardRefunds";
 import { currentStaffHasPermission } from "@/services/supabase/staffAuthService";
 import type { CartItem, Sale } from "@/types";
 
@@ -80,6 +81,7 @@ export default function PosRecentSales() {
   return (
     <>
       <PosPrinterRuntime />
+      {canRefund && <PosPendingCardRefunds />}
 
       <Button
         type="button"
