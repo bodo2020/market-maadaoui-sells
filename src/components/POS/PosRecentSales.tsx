@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Clock3, CreditCard, FileText, RefreshCw, ReceiptText } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Clock3, CreditCard, Eye, FileText, RefreshCw, ReceiptText, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -8,6 +8,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
 import PosPrinterRuntime from "@/components/POS/PosPrinterRuntime";
+import PosQuickReturnDialog from "@/components/POS/PosQuickReturnDialog";
+import { currentStaffHasPermission } from "@/services/supabase/staffAuthService";
 import type { CartItem, Sale } from "@/types";
 
 function money(value: number) {
@@ -27,6 +29,12 @@ export default function PosRecentSales() {
   const [loading, setLoading] = useState(false);
   const [sales, setSales] = useState<Sale[]>([]);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [returnSale, setReturnSale] = useState<Sale | null>(null);
+
+  const canRefund = useMemo(
+    () => user?.role === "super_admin" || currentStaffHasPermission("sales.refund"),
+    [user?.role, currentBranchId],
+  );
 
   const load = useCallback(async () => {
     if (!user?.id || !currentBranchId) return;
@@ -89,7 +97,7 @@ export default function PosRecentSales() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <SheetTitle>آخر فواتيري</SheetTitle>
-                <SheetDescription>آخر 10 عمليات بيع على الفرع الحالي.</SheetDescription>
+                <SheetDescription>آخر 10 عمليات بيع على الفرع الحالي{canRefund ? " · المرتجع متاح حسب الصلاحية" : ""}.</SheetDescription>
               </div>
               <Button variant="outline" size="icon" disabled={loading} onClick={() => void load()}>
                 <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -107,12 +115,7 @@ export default function PosRecentSales() {
                 مفيش فواتير حديثة للكاشير الحالي.
               </div>
             ) : sales.map(sale => (
-              <button
-                key={sale.id}
-                type="button"
-                className="w-full rounded-2xl border bg-white p-4 text-right shadow-sm transition hover:border-[#005931]/30 hover:bg-emerald-50/30"
-                onClick={() => setSelectedSale(sale)}
-              >
+              <div key={sale.id} className="rounded-2xl border bg-white p-4 shadow-sm transition hover:border-[#005931]/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -127,13 +130,28 @@ export default function PosRecentSales() {
                   </div>
                   <div className="shrink-0 text-lg font-black text-[#005931]">{money(sale.total)}</div>
                 </div>
-              </button>
+
+                <div className={`mt-3 grid gap-2 ${canRefund ? "grid-cols-2" : "grid-cols-1"}`}>
+                  <Button variant="outline" size="sm" onClick={() => setSelectedSale(sale)}><Eye className="h-4 w-4" /> عرض الفاتورة</Button>
+                  {canRefund && (
+                    <Button variant="outline" size="sm" className="border-amber-200 text-amber-800 hover:bg-amber-50 hover:text-amber-900" onClick={() => setReturnSale(sale)}>
+                      <RotateCcw className="h-4 w-4" /> مرتجع
+                    </Button>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         </SheetContent>
       </Sheet>
 
       <InvoiceDialog isOpen={Boolean(selectedSale)} onClose={() => setSelectedSale(null)} sale={selectedSale} />
+      <PosQuickReturnDialog
+        open={Boolean(returnSale)}
+        onOpenChange={next => { if (!next) setReturnSale(null); }}
+        sale={returnSale}
+        onSuccess={() => void load()}
+      />
     </>
   );
 }
