@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Sale } from "@/types";
+import { preflightPosCart } from "@/services/supabase/posPreflightService";
+import { invalidatePOSCatalogCache } from "@/services/supabase/posCatalogService";
 
 type PendingSale = {
   requestId: string;
@@ -79,6 +81,15 @@ export async function submitPosSale(
   const branchId = sale.branch_id || localStorage.getItem("currentBranchId");
   if (!branchId) throw new Error("اختار الفرع قبل إتمام البيع.");
 
+  // Lightweight server preflight checks only the current cart. It validates the
+  // open shift, branch stock, bulk pack integrity and current branch pricing
+  // without creating a sale or changing inventory.
+  const preflight = await preflightPosCart(branchId, sale.items);
+  if (preflight.repriced || Math.abs(Number(preflight.total) - Number(sale.total)) > 0.009) {
+    invalidatePOSCatalogCache(branchId);
+    throw new Error("اتغير سعر أو عرض أحد المنتجات. حدّث السلة وراجع الإجمالي قبل تأكيد البيع.");
+  }
+
   const payload = {
     items: sale.items,
     subtotal: sale.subtotal,
@@ -143,6 +154,9 @@ export async function submitPosSale(
     if (isDeterministicError(result.error.code, result.error.message)) {
       try { localStorage.removeItem(key); } catch { /* noop */ }
     }
+    if (result.error.message?.includes("INSUFFICIENT_STOCK") || result.error.message?.includes("PRICE_CHANGED") || result.error.message?.includes("PRODUCT_UNAVAILABLE")) {
+      invalidatePOSCatalogCache(branchId);
+    }
     if (friendly) throw new Error(friendly);
     throw new Error("تعذّر تأكيد حفظ البيع بسبب اتصال غير مؤكد. السلة محفوظة؛ أعد المحاولة نفسها ولن تُسجّل الفاتورة مرتين.");
   }
@@ -157,5 +171,6 @@ export async function submitPosSale(
     // Sale is already committed; do not report failure because local cache could not update.
   }
 
+  invalidatePOSCatalogCache(branchId);
   return result.data as Sale;
 }
