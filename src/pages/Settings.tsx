@@ -1,6 +1,6 @@
 import MainLayout from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Users, PackageOpen, CreditCard, Truck, Receipt, FileText, Settings as SettingsIcon, MonitorSmartphone, KeyRound } from "lucide-react";
+import { Store, Users, PackageOpen, CreditCard, Truck, Receipt, FileText, Settings as SettingsIcon, MonitorSmartphone, KeyRound, Banknote } from "lucide-react";
 import StoreSettings from "@/components/settings/StoreSettings";
 import UsersManagement from "@/components/settings/UsersManagement";
 import ExpenseSettings from "@/components/settings/ExpenseSettings";
@@ -8,6 +8,7 @@ import PaymentSettings from "@/components/settings/PaymentSettings";
 import InvoiceSettings from "@/components/settings/InvoiceSettings";
 import PosDeviceSettings from "@/components/settings/PosDeviceSettings";
 import PosStaffAccessSettings from "@/components/settings/PosStaffAccessSettings";
+import OnlineMoneySettings from "@/components/settings/OnlineMoneySettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/types";
 import { currentStaffHasPermission } from "@/services/supabase/staffAuthService";
@@ -20,6 +21,7 @@ export default function Settings() {
   const canManageStaff = user?.role === UserRole.SUPER_ADMIN || currentStaffHasPermission("branch.manage_staff");
   const canUsePosSettings = user?.role === UserRole.SUPER_ADMIN || currentStaffHasPermission("pos.use") || currentStaffHasPermission("pos.manage_devices");
   const canManagePosStaff = user?.role === UserRole.SUPER_ADMIN || currentStaffHasPermission("branch.manage_staff") || currentStaffHasPermission("pos.manage_pins");
+  const canViewOnlineMoney = user?.role === UserRole.SUPER_ADMIN || currentStaffHasPermission("online_orders.view") || currentStaffHasPermission("finance.view");
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("store");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -29,6 +31,7 @@ export default function Settings() {
     ...(canManageStaff ? [{ id: "users", label: "المستخدمين", icon: <Users className="ml-2 h-4 w-4" />, component: <UsersManagement /> }] : []),
     ...(canManagePosStaff ? [{ id: "pos-staff", label: "موظفي POS", icon: <KeyRound className="ml-2 h-4 w-4" />, component: <PosStaffAccessSettings /> }] : []),
     ...(canUsePosSettings ? [{ id: "pos-devices", label: "أجهزة POS", icon: <MonitorSmartphone className="ml-2 h-4 w-4" />, component: <PosDeviceSettings /> }] : []),
+    ...(canViewOnlineMoney ? [{ id: "online-money", label: "تسويات الأونلاين", icon: <Banknote className="ml-2 h-4 w-4" />, component: <OnlineMoneySettings /> }] : []),
     { id: "products", label: "المنتجات", icon: <PackageOpen className="ml-2 h-4 w-4" />, component: <div className="text-center py-12 text-muted-foreground">إعدادات المنتجات ستكون متاحة قريباً</div> },
     { id: "payment", label: "الدفع", icon: <CreditCard className="ml-2 h-4 w-4" />, component: <PaymentSettings /> },
     { id: "shipping", label: "الشحن", icon: <Truck className="ml-2 h-4 w-4" />, component: <div className="text-center py-12 text-muted-foreground">إعدادات الشحن ستكون متاحة قريباً</div> },
