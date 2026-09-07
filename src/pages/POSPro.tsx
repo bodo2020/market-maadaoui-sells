@@ -250,8 +250,15 @@ export default function POSPro() {
 
   useEffect(() => {
     if (!device) return;
-    const timer = window.setInterval(() => void refreshCash(), 2500);
-    return () => window.clearInterval(timer);
+    const refreshVisibleCash = () => {
+      if (document.visibilityState === "visible") void refreshCash();
+    };
+    const timer = window.setInterval(refreshVisibleCash, 8000);
+    document.addEventListener("visibilitychange", refreshVisibleCash);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshVisibleCash);
+    };
   }, [device?.device_id, refreshCash]);
 
   const cartUsageForProduct = useCallback((productId: string) => {
