@@ -21,6 +21,23 @@ function currentBranchId(): string {
   return branchId;
 }
 
+function normalizeCatalogProduct(product: Product): Product {
+  // Once a product has linked sale units (carton/pack/etc), those rows are the
+  // canonical POS entry points. Keep the legacy bulk_* values in the database
+  // for backwards compatibility, but do not expose the old bulk button as a
+  // second selling path in POS.
+  if (product.has_variants && !product.is_linked_sale_unit) {
+    return {
+      ...product,
+      bulk_enabled: false,
+      bulk_quantity: null,
+      bulk_price: null,
+      bulk_barcode: null,
+    };
+  }
+  return product;
+}
+
 async function queryCatalog(params: { search?: string | null; barcode?: string | null; limit?: number }) {
   const { data, error } = await posRpc('get_pos_branch_catalog', {
     p_branch_id: currentBranchId(),
@@ -29,7 +46,7 @@ async function queryCatalog(params: { search?: string | null; barcode?: string |
     p_limit: params.limit ?? 500,
   });
   if (error) throw error;
-  return (Array.isArray(data) ? data : []) as Product[];
+  return (Array.isArray(data) ? data : []).map(row => normalizeCatalogProduct(row as Product));
 }
 
 type ScaleBarcode = {
