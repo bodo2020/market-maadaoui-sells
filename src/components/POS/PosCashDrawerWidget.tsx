@@ -38,7 +38,7 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
 
   useEffect(() => {
     void refresh();
-    const timer = window.setInterval(() => void refresh(true), 1500);
+    const timer = window.setInterval(() => void refresh(true), 2000);
     return () => window.clearInterval(timer);
   }, [refresh]);
 
@@ -65,10 +65,10 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
 
   return (
     <>
-      <div dir="rtl" className="fixed bottom-4 right-4 z-50">
+      <div dir="rtl" className="fixed bottom-20 right-3 z-50 lg:bottom-4 lg:right-4">
         <Button
           variant="outline"
-          className="h-auto min-w-[170px] justify-between gap-3 rounded-2xl bg-white px-4 py-2 shadow-lg"
+          className="h-auto min-w-[145px] justify-between gap-2 rounded-2xl bg-white px-3 py-2 text-xs shadow-lg sm:min-w-[170px] sm:px-4 sm:text-sm"
           onClick={() => { setDialogOpen(true); void refresh(true); }}
         >
           <span className="flex items-center gap-2 text-slate-600"><Banknote className="h-4 w-4 text-[#005931]" /> درج الكاشير</span>
