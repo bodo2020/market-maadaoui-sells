@@ -18,7 +18,10 @@ import {
   registerThisPosDevice,
   revokePosDevice,
   setMyPosPin,
+  updatePosDeviceRuntimeSettings,
 } from "@/services/supabase/posDeviceService";
+
+type DeviceDraft = { autoLock: string; cashThreshold: string };
 
 export default function PosDeviceSettings() {
   const { user } = useAuth();
@@ -30,6 +33,8 @@ export default function PosDeviceSettings() {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [savingDeviceId, setSavingDeviceId] = useState<string | null>(null);
+  const [deviceDrafts, setDeviceDrafts] = useState<Record<string, DeviceDraft>>({});
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [savingPin, setSavingPin] = useState(false);
@@ -56,6 +61,13 @@ export default function PosDeviceSettings() {
       ]);
       setPinReady(pinStatus);
       setDevices(deviceRows);
+      setDeviceDrafts(Object.fromEntries(deviceRows.map(device => [
+        device.device_id,
+        {
+          autoLock: String(device.auto_lock_minutes || 10),
+          cashThreshold: device.cash_warning_threshold == null ? "" : String(device.cash_warning_threshold),
+        },
+      ])));
     } catch (error: any) {
       toast({
         title: "تعذر تحميل إعدادات الجهاز",
@@ -121,6 +133,31 @@ export default function PosDeviceSettings() {
     }
   };
 
+  const saveRuntimeSettings = async (device: PosDevice) => {
+    const draft = deviceDrafts[device.device_id];
+    if (!draft) return;
+    const autoLock = Number(draft.autoLock);
+    const threshold = draft.cashThreshold.trim() === "" ? null : Number(draft.cashThreshold);
+    if (!Number.isInteger(autoLock) || autoLock < 1 || autoLock > 120) {
+      toast({ title: "مدة القفل غير صحيحة", description: "اختار من 1 إلى 120 دقيقة.", variant: "destructive" });
+      return;
+    }
+    if (threshold != null && (!Number.isFinite(threshold) || threshold < 0)) {
+      toast({ title: "حد النقدية غير صحيح", description: "اكتب مبلغ موجب أو اتركه فارغًا لإلغاء التنبيه.", variant: "destructive" });
+      return;
+    }
+    try {
+      setSavingDeviceId(device.device_id);
+      await updatePosDeviceRuntimeSettings(device.device_id, autoLock, threshold);
+      toast({ title: "تم حفظ إعدادات الجهاز", description: `${device.device_name} · قفل بعد ${autoLock} دقيقة` });
+      await refresh();
+    } catch (error: any) {
+      toast({ title: "تعذر حفظ إعدادات الجهاز", description: error.message || "حاول مرة تانية", variant: "destructive" });
+    } finally {
+      setSavingDeviceId(null);
+    }
+  };
+
   const revokeDevice = async (device: PosDevice) => {
     if (!currentBranchId || !canManageDevices || !device.active) return;
     try {
@@ -147,7 +184,7 @@ export default function PosDeviceSettings() {
     <div dir="rtl" className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">أجهزة نقطة البيع</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · تسجيل الأجهزة وPIN الدخول السريع.</p>
+        <p className="mt-1 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · تسجيل الأجهزة وPIN الدخول السريع وسياسات التشغيل.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -230,8 +267,8 @@ export default function PosDeviceSettings() {
       {canManageDevices && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">أجهزة الفرع</CardTitle>
-            <CardDescription>كل الأجهزة المسجلة على الفرع. إلغاء الجهاز يبطل الدخول السريع منه فورًا.</CardDescription>
+            <CardTitle className="text-lg">أجهزة الفرع وسياسة التشغيل</CardTitle>
+            <CardDescription>حدد مدة القفل التلقائي لكل جهاز، ويمكنك وضع حد اختياري لتنبيه الكاشير عندما تزيد النقدية في الدرج.</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -239,24 +276,67 @@ export default function PosDeviceSettings() {
             ) : devices.length === 0 ? (
               <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">مفيش أجهزة مسجلة على الفرع لسه.</div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {devices.map(device => {
                   const isThisDevice = localDevice?.device_id === device.device_id;
+                  const draft = deviceDrafts[device.device_id] || { autoLock: String(device.auto_lock_minutes || 10), cashThreshold: device.cash_warning_threshold == null ? "" : String(device.cash_warning_threshold) };
                   return (
-                    <div key={device.device_id} className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold">{device.device_name}</span>
-                          <Badge variant={device.active ? "default" : "secondary"}>{device.active ? "نشط" : "ملغي"}</Badge>
-                          {isThisDevice && <Badge variant="outline">هذا الجهاز</Badge>}
+                    <div key={device.device_id} className="rounded-2xl border p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold">{device.device_name}</span>
+                            <Badge variant={device.active ? "default" : "secondary"}>{device.active ? "نشط" : "ملغي"}</Badge>
+                            {isThisDevice && <Badge variant="outline">هذا الجهاز</Badge>}
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">{device.device_code}{device.last_seen_at ? ` · آخر استخدام ${new Date(device.last_seen_at).toLocaleString("ar-EG")}` : " · لم يستخدم بعد"}</p>
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">{device.device_code}{device.last_seen_at ? ` · آخر استخدام ${new Date(device.last_seen_at).toLocaleString("ar-EG")}` : " · لم يستخدم بعد"}</p>
+                        {device.active && (
+                          <Button variant="outline" size="sm" onClick={() => void revokeDevice(device)} disabled={revokingId === device.device_id}>
+                            {revokingId === device.device_id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
+                            إلغاء الجهاز
+                          </Button>
+                        )}
                       </div>
+
                       {device.active && (
-                        <Button variant="outline" size="sm" onClick={() => void revokeDevice(device)} disabled={revokingId === device.device_id}>
-                          {revokingId === device.device_id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
-                          إلغاء الجهاز
-                        </Button>
+                        <div className="mt-4 grid gap-3 border-t pt-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                          <div className="space-y-2">
+                            <Label htmlFor={`lock-${device.device_id}`}>القفل التلقائي بعد</Label>
+                            <div className="relative">
+                              <Input
+                                id={`lock-${device.device_id}`}
+                                type="number"
+                                min={1}
+                                max={120}
+                                value={draft.autoLock}
+                                onChange={event => setDeviceDrafts(prev => ({ ...prev, [device.device_id]: { ...draft, autoLock: event.target.value } }))}
+                                className="pl-14"
+                              />
+                              <span className="absolute inset-y-0 left-3 flex items-center text-xs text-muted-foreground">دقيقة</span>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor={`cash-${device.device_id}`}>تنبيه النقدية — اختياري</Label>
+                            <div className="relative">
+                              <Input
+                                id={`cash-${device.device_id}`}
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={draft.cashThreshold}
+                                onChange={event => setDeviceDrafts(prev => ({ ...prev, [device.device_id]: { ...draft, cashThreshold: event.target.value } }))}
+                                placeholder="مثال: 5000"
+                                className="pl-14"
+                              />
+                              <span className="absolute inset-y-0 left-3 flex items-center text-xs text-muted-foreground">ج.م</span>
+                            </div>
+                          </div>
+                          <Button className="bg-[#005931] hover:bg-[#004a29]" onClick={() => void saveRuntimeSettings(device)} disabled={savingDeviceId === device.device_id}>
+                            {savingDeviceId === device.device_id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                            حفظ
+                          </Button>
+                        </div>
                       )}
                     </div>
                   );
