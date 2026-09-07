@@ -23,10 +23,38 @@ type PosPreflightFailure = {
   pack_size?: number;
 };
 
+type CachedPreflight = {
+  key: string;
+  branchId: string;
+  createdAt: number;
+  result: PosPreflightResult;
+};
+
+const PREFLIGHT_TTL_MS = 30_000;
+let cachedPreflight: CachedPreflight | null = null;
+
 const rpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
   args?: Record<string, unknown>,
 ) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
+
+function cartFingerprint(branchId: string, items: CartItem[]) {
+  return JSON.stringify({
+    branchId,
+    items: items.map(item => ({
+      productId: item.product.id,
+      quantity: Number(item.quantity || 0),
+      weight: item.weight == null ? null : Number(item.weight),
+      isBulk: Boolean(item.isBulk),
+      total: Number(item.total || 0),
+    })),
+  });
+}
+
+export function invalidatePosPreflightCache(branchId?: string) {
+  if (!cachedPreflight) return;
+  if (!branchId || cachedPreflight.branchId === branchId) cachedPreflight = null;
+}
 
 function failureMessage(result: PosPreflightFailure) {
   switch (result.code) {
@@ -48,12 +76,18 @@ function failureMessage(result: PosPreflightFailure) {
 }
 
 export async function preflightPosCart(branchId: string, items: CartItem[]): Promise<PosPreflightResult> {
+  const key = cartFingerprint(branchId, items);
+  if (cachedPreflight && cachedPreflight.key === key && Date.now() - cachedPreflight.createdAt <= PREFLIGHT_TTL_MS) {
+    return cachedPreflight.result;
+  }
+
   const { data, error } = await rpc("preflight_pos_sale", {
     p_branch_id: branchId,
     p_items: items,
   });
 
   if (error) {
+    invalidatePosPreflightCache(branchId);
     if (error.message?.includes("BRANCH_ACCESS_DENIED")) throw new Error("ليس لديك صلاحية البيع على الفرع الحالي.");
     if (error.message?.includes("INVALID_SALE")) throw new Error("السلة غير صالحة للدفع. راجع المنتجات والكميات.");
     throw new Error(error.message || "تعذر مراجعة السلة قبل الدفع.");
@@ -61,7 +95,12 @@ export async function preflightPosCart(branchId: string, items: CartItem[]): Pro
 
   if (!data || typeof data !== "object") throw new Error("تعذر قراءة نتيجة مراجعة السلة.");
   const result = data as PosPreflightResult | PosPreflightFailure;
-  if (!result.ok) throw new Error(failureMessage(result));
+  if (!result.ok) {
+    invalidatePosPreflightCache(branchId);
+    throw new Error(failureMessage(result));
+  }
   if (!Array.isArray(result.items)) throw new Error("نتيجة مراجعة السلة غير مكتملة.");
+
+  cachedPreflight = { key, branchId, createdAt: Date.now(), result };
   return result;
 }
