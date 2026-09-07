@@ -16,6 +16,10 @@ export type PosCashSummary = {
   transfers_in: number;
   transfers_out: number;
   adjustments: number;
+  sales_count: number;
+  sales_total: number;
+  card_sales: number;
+  cash_paid_total: number;
 };
 
 const rpc = supabase.rpc.bind(supabase) as unknown as (
@@ -57,6 +61,10 @@ export async function getPosCashSummary(device: LocalPosDevice): Promise<PosCash
     transfers_in: Number(row.transfers_in || 0),
     transfers_out: Number(row.transfers_out || 0),
     adjustments: Number(row.adjustments || 0),
+    sales_count: Number(row.sales_count || 0),
+    sales_total: Number(row.sales_total || 0),
+    card_sales: Number(row.card_sales || 0),
+    cash_paid_total: Number(row.cash_paid_total || 0),
   };
 }
 
