@@ -43,8 +43,8 @@ import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
 import { getPosCashSummary, type PosCashSummary } from "@/services/supabase/posCashService";
 import { fetchCustomers, findOrCreateCustomer } from "@/services/supabase/customerService";
 import { addFavoriteProduct, getFavoriteProducts, removeFavoriteProduct } from "@/services/supabase/favoritesService";
-import { generateInvoiceNumber } from "@/services/supabase/saleService";
 import { clearConfirmedPosSale, submitPosSale } from "@/services/supabase/posCheckoutService";
+import { preflightPosCart } from "@/services/supabase/posPreflightService";
 
 const DEFAULT_TAB_ID = "tab-default";
 
@@ -56,6 +56,14 @@ function money(value: number) {
 
 function stockOf(product: Product) {
   return Number(product.quantity || 0);
+}
+
+function effectivePriceOf(product: Product) {
+  return Number(product.is_offer && product.offer_price != null ? product.offer_price : product.price || 0);
+}
+
+function discountPerUnitOf(product: Product, effectivePrice = effectivePriceOf(product)) {
+  return Math.max(0, Number(product.price || 0) - effectivePrice);
 }
 
 function emptyTab(index = 1): POSTab {
@@ -134,6 +142,7 @@ export default function POSPro() {
   const [weightProduct, setWeightProduct] = useState<Product | null>(null);
   const [weightValue, setWeightValue] = useState("");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [preflighting, setPreflighting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
   const [cashTendered, setCashTendered] = useState("");
   const [mixedCash, setMixedCash] = useState("");
@@ -268,8 +277,8 @@ export default function POSPro() {
       return;
     }
     const index = cartItems.findIndex(item => item.product.id === product.id && !item.isBulk && item.weight == null);
-    const price = Number(product.is_offer && product.offer_price ? product.offer_price : product.price);
-    const discount = product.is_offer && product.offer_price ? Number(product.price) - Number(product.offer_price) : 0;
+    const price = effectivePriceOf(product);
+    const discount = discountPerUnitOf(product, price);
     if (index >= 0) {
       setCartItems(cartItems.map((item, rowIndex) => rowIndex === index ? {
         ...item,
@@ -298,19 +307,21 @@ export default function POSPro() {
       insufficientToast(product, used + pack);
       return;
     }
+    const unitPrice = packPrice / pack;
+    const bulkDiscount = Math.max(0, Number(product.price || 0) - unitPrice);
     const index = cartItems.findIndex(item => item.product.id === product.id && item.isBulk);
     if (index >= 0) {
       setCartItems(cartItems.map((item, rowIndex) => {
         if (rowIndex !== index) return item;
         const quantity = item.quantity + pack;
-        return { ...item, product, quantity, price: packPrice / pack, total: (quantity / pack) * packPrice };
+        return { ...item, product, quantity, price: unitPrice, discount: bulkDiscount, total: (quantity / pack) * packPrice };
       }));
     } else {
       setCartItems([...cartItems, {
         product,
         quantity: pack,
-        price: packPrice / pack,
-        discount: 0,
+        price: unitPrice,
+        discount: bulkDiscount,
         total: packPrice,
         isBulk: true,
         weight: null,
@@ -322,8 +333,8 @@ export default function POSPro() {
   const addWeight = () => {
     if (!weightProduct) return;
     const weight = Number(weightValue);
-    if (!Number.isFinite(weight) || weight <= 0) {
-      toast({ title: "اكتب وزن صحيح", variant: "destructive" });
+    if (!Number.isFinite(weight) || weight <= 0 || Number(weight.toFixed(3)) !== weight) {
+      toast({ title: "اكتب وزن صحيح حتى 3 أرقام عشرية", variant: "destructive" });
       return;
     }
     const used = cartUsageForProduct(weightProduct.id);
@@ -331,14 +342,13 @@ export default function POSPro() {
       insufficientToast(weightProduct, used + weight);
       return;
     }
-    const unitPrice = Number(weightProduct.is_offer && weightProduct.offer_price ? weightProduct.offer_price : weightProduct.price);
-    const normalPrice = Number(weightProduct.price);
+    const unitPrice = effectivePriceOf(weightProduct);
     setCartItems([...cartItems, {
       product: weightProduct,
       quantity: 1,
       weight,
-      price: unitPrice * weight,
-      discount: Math.max(0, normalPrice - unitPrice),
+      price: unitPrice,
+      discount: discountPerUnitOf(weightProduct, unitPrice),
       total: unitPrice * weight,
     }]);
     setWeightProduct(null);
@@ -379,14 +389,13 @@ export default function POSPro() {
         if (used + weight > stockOf(product)) {
           insufficientToast(product, used + weight);
         } else {
-          const unitPrice = Number(product.is_offer && product.offer_price ? product.offer_price : product.price);
-          const normalPrice = Number(product.price);
+          const unitPrice = effectivePriceOf(product);
           setCartItems([...cartItems, {
             product,
             quantity: 1,
             weight,
-            price: unitPrice * weight,
-            discount: Math.max(0, normalPrice - unitPrice),
+            price: unitPrice,
+            discount: discountPerUnitOf(product, unitPrice),
             total: unitPrice * weight,
           }]);
         }
@@ -462,23 +471,41 @@ export default function POSPro() {
     return Math.abs(Number(mixedCash || 0) + Number(mixedCard || 0) - total) < 0.01;
   }, [paymentMethod, cashTendered, mixedCash, mixedCard, total]);
 
-  const openCheckout = useCallback(() => {
-    if (!cartItems.length || processing) return;
+  const syncProductsFromPreflight = (items: CartItem[]) => {
+    const freshById = new Map(items.map(item => [item.product.id, item.product]));
+    setProducts(prev => prev.map(product => freshById.has(product.id) ? { ...product, ...freshById.get(product.id)! } : product));
+  };
+
+  const openCheckout = useCallback(async () => {
+    if (!cartItems.length || processing || preflighting || !currentBranchId) return;
+    setPreflighting(true);
     setCheckoutError(null);
-    setSaleDone(false);
-    setPaymentMethod("cash");
-    setCashTendered(total.toFixed(2));
-    setMixedCash("");
-    setMixedCard("");
-    if (selectedCustomer) {
-      const customer = customers.find(row => row.id === selectedCustomer);
-      if (customer) {
-        setCustomerName(customer.name);
-        setCustomerPhone(customer.phone || "");
+    try {
+      const checked = await preflightPosCart(currentBranchId, cartItems);
+      setCartItems(checked.items);
+      syncProductsFromPreflight(checked.items);
+      setSaleDone(false);
+      setPaymentMethod("cash");
+      setCashTendered(checked.total.toFixed(2));
+      setMixedCash("");
+      setMixedCard("");
+      if (selectedCustomer) {
+        const customer = customers.find(row => row.id === selectedCustomer);
+        if (customer) {
+          setCustomerName(customer.name);
+          setCustomerPhone(customer.phone || "");
+        }
       }
+      if (checked.repriced) {
+        toast({ title: "تم تحديث السلة", description: "تم تحديث الأسعار والعروض والمخزون قبل فتح الدفع." });
+      }
+      setCheckoutOpen(true);
+    } catch (error: any) {
+      toast({ title: "السلة تحتاج مراجعة", description: error?.message || "راجع المنتجات والكميات قبل الدفع.", variant: "destructive" });
+    } finally {
+      setPreflighting(false);
     }
-    setCheckoutOpen(true);
-  }, [cartItems.length, processing, total, selectedCustomer, customers]);
+  }, [cartItems, processing, preflighting, currentBranchId, selectedCustomer, customers, toast]);
 
   const setMixedCashSmart = (value: string) => {
     setMixedCash(value);
@@ -492,19 +519,17 @@ export default function POSPro() {
     if (Number.isFinite(amount) && amount >= 0 && amount <= total) setMixedCash(Math.max(0, total - amount).toFixed(2));
   };
 
-  const validateCartAgainstFreshCatalog = async () => {
-    const fresh = await fetchPOSProducts();
-    const byId = new Map(fresh.map(product => [product.id, product]));
-    const checked = new Set<string>();
-    for (const item of cartItems) {
-      if (checked.has(item.product.id)) continue;
-      checked.add(item.product.id);
-      const product = byId.get(item.product.id);
-      if (!product) throw new Error(`${item.product.name}: المنتج غير متاح في الفرع.`);
-      const requested = cartUsageForProduct(item.product.id);
-      if (requested > stockOf(product)) throw new Error(`${product.name}: المتاح الآن ${stockOf(product)} فقط. حدّث السلة.`);
+  const applyUpdatedPaymentTotal = (nextTotal: number) => {
+    if (paymentMethod === "cash") {
+      setCashTendered(nextTotal.toFixed(2));
+      return;
     }
-    setProducts(fresh);
+    if (paymentMethod === "mixed") {
+      const currentCash = Number(mixedCash || 0);
+      const safeCash = Number.isFinite(currentCash) && currentCash >= 0 && currentCash <= nextTotal ? currentCash : 0;
+      setMixedCash(safeCash.toFixed(2));
+      setMixedCard(Math.max(0, nextTotal - safeCash).toFixed(2));
+    }
   };
 
   const completeSale = useCallback(async () => {
@@ -512,46 +537,54 @@ export default function POSPro() {
     setProcessing(true);
     setCheckoutError(null);
     try {
-      await validateCartAgainstFreshCatalog();
+      const checked = await preflightPosCart(currentBranchId, cartItems);
+      syncProductsFromPreflight(checked.items);
+      if (checked.repriced || Math.abs(Number(checked.total) - Number(total)) > 0.009) {
+        setCartItems(checked.items);
+        applyUpdatedPaymentTotal(checked.total);
+        setCheckoutError("تم تحديث سعر أو عرض في السلة. راجع الإجمالي ثم أكد الدفع مرة أخرى.");
+        return;
+      }
+
       let customer = null;
       if (customerName || customerPhone) customer = await findOrCreateCustomer({ name: customerName || "عميل", phone: customerPhone || undefined });
-      const invoiceNumber = await generateInvoiceNumber();
-      const cashApplied = paymentMethod === "cash" ? total : paymentMethod === "mixed" ? Number(mixedCash || 0) : 0;
-      const cardApplied = paymentMethod === "card" ? total : paymentMethod === "mixed" ? Number(mixedCard || 0) : 0;
-      const profit = cartItems.reduce((sum, item) => {
+      const cashApplied = paymentMethod === "cash" ? checked.total : paymentMethod === "mixed" ? Number(mixedCash || 0) : 0;
+      const cardApplied = paymentMethod === "card" ? checked.total : paymentMethod === "mixed" ? Number(mixedCard || 0) : 0;
+      const profit = checked.items.reduce((sum, item) => {
         const qty = item.weight ?? item.quantity;
         return sum + Number(item.total || 0) - Number(item.product.purchase_price || 0) * Number(qty || 0);
       }, 0);
       const payload: Omit<Sale, "id" | "created_at" | "updated_at"> = {
         date: new Date().toISOString(),
-        items: cartItems,
-        subtotal: originalSubtotal,
-        discount,
-        total,
+        items: checked.items,
+        subtotal: checked.subtotal,
+        discount: checked.discount,
+        total: checked.total,
         profit,
         payment_method: paymentMethod,
         cash_amount: cashApplied,
         card_amount: cardApplied,
         customer_name: customer?.name || customerName || undefined,
         customer_phone: customer?.phone || customerPhone || undefined,
-        invoice_number: invoiceNumber,
+        invoice_number: "PENDING",
         cashier_name: user.name,
         branch_id: currentBranchId,
       };
       const sale = await submitPosSale(payload, activeTabIdRef.current);
-      setCompletedChange(paymentMethod === "cash" ? Math.max(0, Number(cashTendered || 0) - total) : 0);
+      setCompletedChange(paymentMethod === "cash" ? Math.max(0, Number(cashTendered || 0) - checked.total) : 0);
       setCompletedPaymentMethod(paymentMethod);
       setCurrentSale(sale);
       setSaleDone(true);
       toast({ title: "تم البيع بنجاح", description: `فاتورة ${sale.invoice_number}` });
-      await Promise.all([loadWorkspace(true), refreshCash()]);
+      void loadWorkspace(true);
+      void refreshCash();
     } catch (error: any) {
       setCheckoutError(error?.message || "تعذر إتمام البيع");
       toast({ title: "تعذر إتمام البيع", description: error?.message || "راجع السلة وحاول مرة أخرى.", variant: "destructive" });
     } finally {
       setProcessing(false);
     }
-  }, [processing, paymentValid, user?.id, user?.name, currentBranchId, cartItems, customerName, customerPhone, paymentMethod, mixedCash, mixedCard, total, originalSubtotal, discount, cashTendered, loadWorkspace, refreshCash]);
+  }, [processing, paymentValid, user?.id, user?.name, currentBranchId, cartItems, customerName, customerPhone, paymentMethod, mixedCash, mixedCard, total, cashTendered, loadWorkspace, refreshCash, toast]);
 
   const newSale = () => {
     if (user?.id && currentBranchId) clearConfirmedPosSale(user.id, currentBranchId, activeTabIdRef.current);
@@ -568,6 +601,22 @@ export default function POSPro() {
     requestAnimationFrame(() => searchRef.current?.focus());
   };
 
+  const setNormalQuantity = (index: number, next: number) => {
+    const item = cartItems[index];
+    if (!item || item.isBulk || item.weight != null) return false;
+    if (!Number.isInteger(next) || next < 1) {
+      toast({ title: "الكمية لازم تكون رقم صحيح أكبر من صفر", variant: "destructive" });
+      return false;
+    }
+    const otherUsage = cartUsageForProduct(item.product.id) - Number(item.quantity || 0);
+    if (otherUsage + next > stockOf(item.product)) {
+      insufficientToast(item.product, otherUsage + next);
+      return false;
+    }
+    setCartItems(cartItems.map((row, rowIndex) => rowIndex === index ? { ...row, quantity: next, total: next * row.price } : row));
+    return true;
+  };
+
   const changeQuantity = (index: number, delta: number) => {
     const item = cartItems[index];
     if (!item || item.isBulk || item.weight != null) return;
@@ -576,12 +625,70 @@ export default function POSPro() {
       setCartItems(cartItems.filter((_, rowIndex) => rowIndex !== index));
       return;
     }
-    const otherUsage = cartUsageForProduct(item.product.id) - item.quantity;
-    if (otherUsage + next > stockOf(item.product)) {
-      insufficientToast(item.product, otherUsage + next);
+    setNormalQuantity(index, next);
+  };
+
+  const setBulkPackCount = (index: number, packCount: number) => {
+    const item = cartItems[index];
+    if (!item?.isBulk) return false;
+    const pack = Number(item.product.bulk_quantity || 0);
+    const packPrice = Number(item.product.bulk_price || 0);
+    if (!Number.isInteger(packCount) || packCount < 1 || pack <= 0 || packPrice <= 0) {
+      toast({ title: "عدد عبوات الجملة غير صحيح", variant: "destructive" });
+      return false;
+    }
+    const nextQuantity = packCount * pack;
+    const otherUsage = cartUsageForProduct(item.product.id) - Number(item.quantity || 0);
+    if (otherUsage + nextQuantity > stockOf(item.product)) {
+      insufficientToast(item.product, otherUsage + nextQuantity);
+      return false;
+    }
+    const unitPrice = packPrice / pack;
+    const perUnitDiscount = Math.max(0, Number(item.product.price || 0) - unitPrice);
+    setCartItems(cartItems.map((row, rowIndex) => rowIndex === index ? {
+      ...row,
+      quantity: nextQuantity,
+      price: unitPrice,
+      discount: perUnitDiscount,
+      total: packCount * packPrice,
+    } : row));
+    return true;
+  };
+
+  const changeBulkPacks = (index: number, delta: number) => {
+    const item = cartItems[index];
+    if (!item?.isBulk) return;
+    const pack = Number(item.product.bulk_quantity || 0);
+    const currentPacks = pack > 0 ? Math.max(1, Math.round(Number(item.quantity || 0) / pack)) : 1;
+    const next = currentPacks + delta;
+    if (next <= 0) {
+      setCartItems(cartItems.filter((_, rowIndex) => rowIndex !== index));
       return;
     }
-    setCartItems(cartItems.map((row, rowIndex) => rowIndex === index ? { ...row, quantity: next, total: next * row.price } : row));
+    setBulkPackCount(index, next);
+  };
+
+  const setCartWeight = (index: number, nextWeight: number) => {
+    const item = cartItems[index];
+    if (!item || item.weight == null) return false;
+    if (!Number.isFinite(nextWeight) || nextWeight <= 0 || Number(nextWeight.toFixed(3)) !== nextWeight) {
+      toast({ title: "الوزن لازم يكون أكبر من صفر وحتى 3 أرقام عشرية", variant: "destructive" });
+      return false;
+    }
+    const otherUsage = cartUsageForProduct(item.product.id) - Number(item.weight || 0);
+    if (otherUsage + nextWeight > stockOf(item.product)) {
+      insufficientToast(item.product, otherUsage + nextWeight);
+      return false;
+    }
+    const unitPrice = effectivePriceOf(item.product);
+    setCartItems(cartItems.map((row, rowIndex) => rowIndex === index ? {
+      ...row,
+      weight: nextWeight,
+      price: unitPrice,
+      discount: discountPerUnitOf(item.product, unitPrice),
+      total: unitPrice * nextWeight,
+    } : row));
+    return true;
   };
 
   const createTab = useCallback(() => {
@@ -642,7 +749,7 @@ export default function POSPro() {
       }
       if (event.key === "F4") {
         event.preventDefault();
-        if (!checkoutOpen && cartItems.length) openCheckout();
+        if (!checkoutOpen && cartItems.length) void openCheckout();
         return;
       }
       if (checkoutOpen && !saleDone) {
@@ -683,34 +790,102 @@ export default function POSPro() {
         </div>
       ) : (
         <div className="max-h-[46vh] space-y-2 overflow-y-auto pr-1">
-          {cartItems.map((item, index) => (
-            <div key={`${item.product.id}-${item.isBulk ? "bulk" : item.weight != null ? `w-${index}` : "unit"}-${index}`} className="rounded-2xl border bg-white p-3 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{item.product.name}</div>
-                  <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
-                    {item.isBulk && <Badge variant="secondary">جملة · {item.quantity} وحدة</Badge>}
-                    {item.weight != null && <Badge variant="secondary">{Number(item.weight).toFixed(3)} كجم</Badge>}
-                    {!item.isBulk && item.weight == null && <span>{money(item.price)} / وحدة</span>}
+          {cartItems.map((item, index) => {
+            const bulkPackSize = Number(item.product.bulk_quantity || 0);
+            const bulkPacks = item.isBulk && bulkPackSize > 0 ? Math.max(1, Math.round(Number(item.quantity || 0) / bulkPackSize)) : 0;
+            return (
+              <div key={`${item.product.id}-${item.isBulk ? "bulk" : item.weight != null ? `w-${index}` : "unit"}-${index}`} className="rounded-2xl border bg-white p-3 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold">{item.product.name}</div>
+                    <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
+                      {item.isBulk && <Badge variant="secondary">جملة · {bulkPacks} عبوة · {item.quantity} وحدة</Badge>}
+                      {item.weight != null && <Badge variant="secondary">موزون</Badge>}
+                      {!item.isBulk && item.weight == null && <span>{money(item.price)} / وحدة</span>}
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold">{money(item.total)}</div>
+                    <button type="button" aria-label="حذف الصنف" className="mt-2 rounded-lg p-1 text-red-500 hover:bg-red-50" onClick={() => setCartItems(cartItems.filter((_, i) => i !== index))}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="text-left">
-                  <div className="font-bold">{money(item.total)}</div>
-                  <button type="button" aria-label="حذف الصنف" className="mt-2 rounded-lg p-1 text-red-500 hover:bg-red-50" onClick={() => setCartItems(cartItems.filter((_, i) => i !== index))}>
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+
+                {!item.isBulk && item.weight == null && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => changeQuantity(index, -1)}><Minus className="h-4 w-4" /></Button>
+                    <Input
+                      key={`qty-${index}-${item.quantity}`}
+                      type="number"
+                      min={1}
+                      step={1}
+                      inputMode="numeric"
+                      defaultValue={item.quantity}
+                      className="h-9 w-20 text-center font-bold"
+                      onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }}
+                      onBlur={event => {
+                        const next = Number(event.currentTarget.value);
+                        if (!setNormalQuantity(index, next)) event.currentTarget.value = String(item.quantity);
+                      }}
+                    />
+                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => changeQuantity(index, 1)}><Plus className="h-4 w-4" /></Button>
+                    <span className="mr-auto text-xs text-muted-foreground">متاح {stockOf(item.product)}</span>
+                  </div>
+                )}
+
+                {item.isBulk && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => changeBulkPacks(index, -1)}><Minus className="h-4 w-4" /></Button>
+                      <Input
+                        key={`bulk-${index}-${bulkPacks}`}
+                        type="number"
+                        min={1}
+                        step={1}
+                        inputMode="numeric"
+                        defaultValue={bulkPacks}
+                        className="h-9 w-20 text-center font-bold"
+                        onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }}
+                        onBlur={event => {
+                          const next = Number(event.currentTarget.value);
+                          if (!setBulkPackCount(index, next)) event.currentTarget.value = String(bulkPacks);
+                        }}
+                      />
+                      <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => changeBulkPacks(index, 1)}><Plus className="h-4 w-4" /></Button>
+                      <span className="text-xs font-medium">عبوة × {bulkPackSize}</span>
+                      <span className="mr-auto text-xs text-muted-foreground">متاح {stockOf(item.product)}</span>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">سعر العبوة {money(Number(item.product.bulk_price || 0))} · سعر الوحدة بالجملة {money(item.price)}</div>
+                  </div>
+                )}
+
+                {item.weight != null && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <Input
+                        key={`weight-${index}-${Number(item.weight).toFixed(3)}`}
+                        type="number"
+                        min="0.001"
+                        step="0.001"
+                        inputMode="decimal"
+                        defaultValue={Number(item.weight).toFixed(3)}
+                        className="h-9 w-24 text-center font-bold"
+                        onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }}
+                        onBlur={event => {
+                          const next = Number(event.currentTarget.value);
+                          if (!setCartWeight(index, next)) event.currentTarget.value = Number(item.weight).toFixed(3);
+                        }}
+                      />
+                      <span className="text-xs">كجم</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{money(item.price)} / كجم</span>
+                    <span className="mr-auto text-xs text-muted-foreground">متاح {stockOf(item.product)} كجم</span>
+                  </div>
+                )}
               </div>
-              {!item.isBulk && item.weight == null && (
-                <div className="mt-3 flex items-center gap-2">
-                  <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => changeQuantity(index, -1)}><Minus className="h-4 w-4" /></Button>
-                  <div className="min-w-10 text-center font-bold">{item.quantity}</div>
-                  <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => changeQuantity(index, 1)}><Plus className="h-4 w-4" /></Button>
-                  <span className="mr-auto text-xs text-muted-foreground">متاح {stockOf(item.product)}</span>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -736,8 +911,9 @@ export default function POSPro() {
         <Button variant="outline" className="h-11 text-red-600 hover:text-red-700" disabled={!cartItems.length} onClick={clearCurrentCart}><Trash2 className="ml-2 h-4 w-4" /> إلغاء السلة</Button>
       </div>
 
-      <Button className="h-14 w-full bg-[#005931] text-base hover:bg-[#004a29]" disabled={!cartItems.length} onClick={openCheckout}>
-        <CreditCard className="ml-2 h-5 w-5" /> إتمام الشراء · {money(total)}
+      <Button className="h-14 w-full bg-[#005931] text-base hover:bg-[#004a29]" disabled={!cartItems.length || preflighting} onClick={() => void openCheckout()}>
+        {preflighting ? <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> : <CreditCard className="ml-2 h-5 w-5" />}
+        {preflighting ? "مراجعة السلة..." : `إتمام الشراء · ${money(total)}`}
       </Button>
     </div>
   );
@@ -824,7 +1000,7 @@ export default function POSPro() {
                       <div className="p-3">
                         <div className="line-clamp-2 min-h-10 text-sm font-semibold leading-5">{product.name}</div>
                         <div className="mt-2 flex items-end justify-between gap-2">
-                          <div className="font-black text-[#005931]">{money(Number(product.is_offer && product.offer_price ? product.offer_price : product.price))}</div>
+                          <div className="font-black text-[#005931]">{money(effectivePriceOf(product))}</div>
                           <div className="flex gap-1">{(product.barcode_type === "scale" || product.is_weight_based) && <Scale className="h-4 w-4 text-blue-600" />}{product.bulk_enabled && <Box className="h-4 w-4 text-amber-600" />}</div>
                         </div>
                         {product.bulk_enabled && !out && (
