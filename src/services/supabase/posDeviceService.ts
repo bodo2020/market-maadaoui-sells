@@ -9,6 +9,10 @@ export type PosDevice = {
   last_seen_at: string | null;
   auto_lock_minutes: number;
   cash_warning_threshold: number | null;
+  current_shift_id: string | null;
+  current_user_id: string | null;
+  current_employee_name: string | null;
+  shift_opened_at: string | null;
 };
 
 export type LocalPosDevice = {
