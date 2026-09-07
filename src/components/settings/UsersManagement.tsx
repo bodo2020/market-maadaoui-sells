@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,8 @@ import { UserRole, User } from "@/types";
 import { fetchUsers, createUser, updateUser, deleteUser } from "@/services/supabase/userService";
 import { Loader2, UserPlus, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { currentStaffHasPermission } from "@/services/supabase/staffAuthService";
+import { useBranchStore } from "@/stores/branchStore";
 
 export default function UsersManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -44,29 +46,31 @@ export default function UsersManagement() {
     username: "",
     password: "",
     role: UserRole.EMPLOYEE,
-    active: true
+    active: true,
   });
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
+  const { currentBranchId } = useBranchStore();
+
+  const canManageStaff = useMemo(
+    () => currentUser?.role === UserRole.SUPER_ADMIN || currentStaffHasPermission("branch.manage_staff"),
+    [currentUser?.role, currentBranchId],
+  );
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    void loadUsers();
+  }, [currentUser?.id, currentBranchId, canManageStaff]);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
-      
-      if (!currentUser || (currentUser.role !== UserRole.ADMIN && currentUser.role !== UserRole.SUPER_ADMIN)) {
-        toast({
-          title: "خطأ في الصلاحيات",
-          description: "ليس لديك صلاحية للوصول إلى هذه الصفحة",
-          variant: "destructive",
-        });
+
+      if (!currentUser || !canManageStaff) {
+        setUsers([]);
         setLoading(false);
         return;
       }
-      
+
       const data = await fetchUsers();
       setUsers(data);
     } catch (error) {
@@ -97,7 +101,7 @@ export default function UsersManagement() {
       username: "",
       password: "",
       role: UserRole.EMPLOYEE,
-      active: true
+      active: true,
     });
   };
 
@@ -107,9 +111,9 @@ export default function UsersManagement() {
       name: user.name,
       phone: user.phone || "",
       username: user.username,
-      password: "", // Don't set password when editing
+      password: "",
       role: user.role,
-      active: user.active !== false // Default to true if undefined
+      active: user.active !== false,
     });
     setIsEditDialogOpen(true);
   };
@@ -131,17 +135,13 @@ export default function UsersManagement() {
         username: formData.username,
         password: formData.password,
         role: formData.role,
-        active: formData.active
+        active: formData.active,
       });
 
-      toast({
-        title: "تم",
-        description: "تم إضافة المستخدم بنجاح",
-      });
-
+      toast({ title: "تم", description: "تم إضافة المستخدم بنجاح" });
       setIsAddDialogOpen(false);
       resetForm();
-      loadUsers();
+      void loadUsers();
     } catch (error) {
       console.error("Error adding user:", error);
       toast({
@@ -160,23 +160,16 @@ export default function UsersManagement() {
         name: formData.name,
         phone: formData.phone,
         role: formData.role,
-        active: formData.active
+        active: formData.active,
       };
 
-      if (formData.password) {
-        updateData.password = formData.password;
-      }
+      if (formData.password) updateData.password = formData.password;
 
       await updateUser(selectedUser.id, updateData);
-
-      toast({
-        title: "تم",
-        description: "تم تحديث بيانات المستخدم بنجاح",
-      });
-
+      toast({ title: "تم", description: "تم تحديث بيانات المستخدم بنجاح" });
       setIsEditDialogOpen(false);
       resetForm();
-      loadUsers();
+      void loadUsers();
     } catch (error) {
       console.error("Error updating user:", error);
       toast({
@@ -192,11 +185,8 @@ export default function UsersManagement() {
 
     try {
       await deleteUser(userId);
-      toast({
-        title: "تم",
-        description: "تم حذف المستخدم بنجاح",
-      });
-      loadUsers();
+      toast({ title: "تم", description: "تم حذف المستخدم بنجاح" });
+      void loadUsers();
     } catch (error) {
       console.error("Error deleting user:", error);
       toast({
@@ -209,6 +199,8 @@ export default function UsersManagement() {
 
   const getRoleDisplay = (role: UserRole) => {
     switch (role) {
+      case UserRole.SUPER_ADMIN:
+        return "مدير النظام";
       case UserRole.ADMIN:
         return "مدير";
       case UserRole.CASHIER:
@@ -222,11 +214,11 @@ export default function UsersManagement() {
     }
   };
 
-  if (!currentUser || currentUser.role !== UserRole.ADMIN) {
+  if (!currentUser || !canManageStaff) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <h2 className="text-2xl font-bold text-destructive mb-4">خطأ في الصلاحيات</h2>
-        <p className="text-muted-foreground">ليس لديك صلاحية للوصول إلى هذه الصفحة</p>
+        <h2 className="mb-4 text-2xl font-bold text-destructive">خطأ في الصلاحيات</h2>
+        <p className="text-muted-foreground">ليس لديك صلاحية إدارة موظفي الفرع الحالي</p>
       </div>
     );
   }
@@ -234,7 +226,10 @@ export default function UsersManagement() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between">
-        <h2 className="text-2xl font-bold">إدارة المستخدمين</h2>
+        <div>
+          <h2 className="text-2xl font-bold">إدارة المستخدمين</h2>
+          <p className="mt-1 text-sm text-muted-foreground">الموظفون المرتبطون بالفرع الحالي فقط.</p>
+        </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -251,57 +246,27 @@ export default function UsersManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">الاسم الكامل</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="الاسم الكامل للمستخدم"
-                  />
+                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} placeholder="الاسم الكامل للمستخدم" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">رقم الهاتف</Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="رقم الهاتف"
-                  />
+                  <Input id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="رقم الهاتف" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="username">اسم المستخدم</Label>
-                  <Input
-                    id="username"
-                    name="username"
-                    value={formData.username}
-                    onChange={handleInputChange}
-                    placeholder="اسم المستخدم للدخول"
-                  />
+                  <Input id="username" name="username" value={formData.username} onChange={handleInputChange} placeholder="اسم المستخدم للدخول" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">كلمة المرور</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    placeholder="كلمة المرور"
-                  />
+                  <Input id="password" name="password" type="password" value={formData.password} onChange={handleInputChange} placeholder="كلمة المرور" />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="role">الدور الوظيفي</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={handleRoleChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="اختر الدور الوظيفي" />
-                  </SelectTrigger>
+                <Select value={formData.role} onValueChange={handleRoleChange}>
+                  <SelectTrigger><SelectValue placeholder="اختر الدور الوظيفي" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
                     <SelectItem value={UserRole.CASHIER}>كاشير</SelectItem>
@@ -311,19 +276,15 @@ export default function UsersManagement() {
                 </Select>
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={handleAddUser}>إضافة المستخدم</Button>
-            </DialogFooter>
+            <DialogFooter><Button onClick={handleAddUser}>إضافة المستخدم</Button></DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+        <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="border rounded-md">
+        <div className="rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -337,42 +298,19 @@ export default function UsersManagement() {
             </TableHeader>
             <TableBody>
               {users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    لم يتم العثور على مستخدمين
-                  </TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">لم يتم العثور على مستخدمين</TableCell></TableRow>
               ) : (
-                users.map((user) => (
+                users.map(user => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.name}</TableCell>
                     <TableCell>{getRoleDisplay(user.role)}</TableCell>
                     <TableCell>{user.username}</TableCell>
                     <TableCell>{user.phone || "—"}</TableCell>
+                    <TableCell>{user.active !== false ? <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800">نشط</span> : <span className="rounded-full bg-red-100 px-2 py-1 text-xs text-red-800">غير نشط</span>}</TableCell>
                     <TableCell>
-                      {user.active !== false ? (
-                        <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">نشط</span>
-                      ) : (
-                        <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">غير نشط</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(user)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive"
-                          onClick={() => handleDeleteUser(user.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                      <div className="flex gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => openEditDialog(user)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => void handleDeleteUser(user.id)}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -393,54 +331,27 @@ export default function UsersManagement() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-name">الاسم الكامل</Label>
-                <Input
-                  id="edit-name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                />
+                <Input id="edit-name" name="name" value={formData.name} onChange={handleInputChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-phone">رقم الهاتف</Label>
-                <Input
-                  id="edit-phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                />
+                <Input id="edit-phone" name="phone" value={formData.phone} onChange={handleInputChange} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-username">اسم المستخدم</Label>
-                <Input
-                  id="edit-username"
-                  name="username"
-                  value={formData.username}
-                  disabled
-                />
+                <Input id="edit-username" name="username" value={formData.username} disabled />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-password">كلمة المرور (اتركها فارغة إذا لم ترغب بتغييرها)</Label>
-                <Input
-                  id="edit-password"
-                  name="password"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  placeholder="كلمة المرور الجديدة"
-                />
+                <Label htmlFor="edit-password">كلمة المرور الجديدة</Label>
+                <Input id="edit-password" name="password" type="password" value={formData.password} onChange={handleInputChange} placeholder="اتركها فارغة بدون تغيير" />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">الدور الوظيفي</Label>
-              <Select
-                value={formData.role}
-                onValueChange={handleRoleChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="اختر الدور الوظيفي" />
-                </SelectTrigger>
+              <Select value={formData.role} onValueChange={handleRoleChange}>
+                <SelectTrigger><SelectValue placeholder="اختر الدور الوظيفي" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={UserRole.ADMIN}>مدير</SelectItem>
                   <SelectItem value={UserRole.CASHIER}>كاشير</SelectItem>
@@ -450,9 +361,7 @@ export default function UsersManagement() {
               </Select>
             </div>
           </div>
-          <DialogFooter>
-            <Button onClick={handleUpdateUser}>حفظ التغييرات</Button>
-          </DialogFooter>
+          <DialogFooter><Button onClick={handleUpdateUser}>حفظ التغييرات</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
