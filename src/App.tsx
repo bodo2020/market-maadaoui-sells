@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import NotFound from "@/pages/NotFound";
-import POS from "@/pages/POS";
+import POSModern from "@/pages/POSModern";
 import PosShiftGate from "@/components/POS/PosShiftGate";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
@@ -64,7 +64,7 @@ const queryClient = new QueryClient({
   },
 });
 
-const CashierPOS = () => <PosShiftGate><POS /></PosShiftGate>;
+const CashierPOS = () => <PosShiftGate><POSModern /></PosShiftGate>;
 
 function App() {
   return (
