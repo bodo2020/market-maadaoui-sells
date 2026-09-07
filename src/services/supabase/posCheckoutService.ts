@@ -1,6 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Sale } from "@/types";
-import { preflightPosCart } from "@/services/supabase/posPreflightService";
 import { invalidatePOSCatalogCache } from "@/services/supabase/posCatalogService";
 
 type PendingSale = {
@@ -80,15 +79,6 @@ export async function submitPosSale(
 
   const branchId = sale.branch_id || localStorage.getItem("currentBranchId");
   if (!branchId) throw new Error("اختار الفرع قبل إتمام البيع.");
-
-  // Lightweight server preflight checks only the current cart. It validates the
-  // open shift, branch stock, bulk pack integrity and current branch pricing
-  // without creating a sale or changing inventory.
-  const preflight = await preflightPosCart(branchId, sale.items);
-  if (preflight.repriced || Math.abs(Number(preflight.total) - Number(sale.total)) > 0.009) {
-    invalidatePOSCatalogCache(branchId);
-    throw new Error("اتغير سعر أو عرض أحد المنتجات. حدّث السلة وراجع الإجمالي قبل تأكيد البيع.");
-  }
 
   const payload = {
     items: sale.items,
