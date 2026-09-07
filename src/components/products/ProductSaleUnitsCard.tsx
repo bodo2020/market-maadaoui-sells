@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DragDropImage } from "@/components/ui/drag-drop-image";
 import { toast } from "sonner";
-import { Box, Edit3, Loader2, PackagePlus, Power, PowerOff } from "lucide-react";
+import { AlertTriangle, Box, Edit3, Loader2, PackagePlus, Power, PowerOff, WandSparkles } from "lucide-react";
 import {
   fetchProductVariants,
   saveProductVariant,
@@ -30,25 +30,45 @@ const EMPTY_FORM: ProductVariantInput = {
   position: 0,
 };
 
+type LegacyBulkDraft = {
+  enabled?: boolean;
+  quantity?: number | null;
+  price?: number | null;
+  barcode?: string | null;
+  purchasePrice?: number | null;
+  imageUrl?: string | null;
+};
+
 interface ProductSaleUnitsCardProps {
   productId?: string | null;
   productName?: string;
   baseQuantity?: number;
+  legacyBulk?: LegacyBulkDraft | null;
+  onUnitsChanged?: (rows: ProductVariant[]) => void;
 }
 
-export default function ProductSaleUnitsCard({ productId, productName, baseQuantity = 0 }: ProductSaleUnitsCardProps) {
+export default function ProductSaleUnitsCard({
+  productId,
+  productName,
+  baseQuantity = 0,
+  legacyBulk,
+  onUnitsChanged,
+}: ProductSaleUnitsCardProps) {
   const [rows, setRows] = useState<ProductVariant[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProductVariant | null>(null);
   const [form, setForm] = useState<ProductVariantInput>(EMPTY_FORM);
+  const [legacyDraftOpen, setLegacyDraftOpen] = useState(false);
 
   const loadRows = async () => {
     if (!productId) return;
     setLoading(true);
     try {
-      setRows(await fetchProductVariants(productId, true));
+      const nextRows = await fetchProductVariants(productId, true);
+      setRows(nextRows);
+      onUnitsChanged?.(nextRows);
     } catch (error: any) {
       toast.error(error?.message || "تعذر تحميل وحدات البيع");
     } finally {
@@ -61,9 +81,17 @@ export default function ProductSaleUnitsCard({ productId, productName, baseQuant
   }, [productId]);
 
   const activeCount = useMemo(() => rows.filter(row => row.active).length, [rows]);
+  const canUseLegacyDraft = Boolean(
+    productId &&
+      legacyBulk?.enabled &&
+      rows.length === 0 &&
+      Number(legacyBulk.quantity || 0) > 1 &&
+      Number(legacyBulk.price || 0) > 0,
+  );
 
   const openCreate = () => {
     setEditing(null);
+    setLegacyDraftOpen(false);
     setForm({
       ...EMPTY_FORM,
       name: productName ? `كرتونة ${productName}` : "",
@@ -72,8 +100,30 @@ export default function ProductSaleUnitsCard({ productId, productName, baseQuant
     setDialogOpen(true);
   };
 
+  const openLegacyCreate = () => {
+    const factor = Math.max(2, Number(legacyBulk?.quantity || 2));
+    const basePurchase = Math.max(0, Number(legacyBulk?.purchasePrice || 0));
+    setEditing(null);
+    setLegacyDraftOpen(true);
+    setForm({
+      ...EMPTY_FORM,
+      name: productName ? `${productName} - جملة` : "وحدة جملة",
+      variant_type: "جملة",
+      price: Math.max(0, Number(legacyBulk?.price || 0)),
+      purchase_price: Number((basePurchase * factor).toFixed(2)),
+      conversion_factor: factor,
+      barcode: legacyBulk?.barcode || "",
+      bulk_barcode: "",
+      image_url: legacyBulk?.imageUrl || null,
+      active: true,
+      position: rows.length,
+    });
+    setDialogOpen(true);
+  };
+
   const openEdit = (row: ProductVariant) => {
     setEditing(row);
+    setLegacyDraftOpen(false);
     setForm({
       name: row.name,
       variant_type: row.variant_type || "كرتونة",
@@ -111,9 +161,10 @@ export default function ProductSaleUnitsCard({ productId, productName, baseQuant
     setSaving(true);
     try {
       await saveProductVariant(productId, form, editing?.id);
-      toast.success(editing ? "تم تحديث وحدة البيع" : "تمت إضافة وحدة البيع");
+      toast.success(editing ? "تم تحديث وحدة البيع" : legacyDraftOpen ? "تم تحويل بيانات الجملة لوحدة بيع مرتبطة" : "تمت إضافة وحدة البيع");
       setDialogOpen(false);
       setEditing(null);
+      setLegacyDraftOpen(false);
       await loadRows();
     } catch (error: any) {
       toast.error(error?.message || "تعذر حفظ وحدة البيع");
@@ -174,6 +225,28 @@ export default function ProductSaleUnitsCard({ productId, productName, baseQuant
             <Badge variant="outline">{activeCount} مفعلة</Badge>
             <Badge variant="outline">مخزون الأساس: {Number(baseQuantity || 0).toLocaleString("ar-EG")}</Badge>
           </div>
+
+          {!loading && canUseLegacyDraft && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <AlertTriangle className="h-4 w-4" />
+                    بيانات جملة قديمة جاهزة للتحويل
+                  </div>
+                  <p className="mt-1 text-xs leading-6 text-amber-900/80">
+                    عبوة × {Number(legacyBulk?.quantity || 0).toLocaleString("ar-EG")} · سعر {Number(legacyBulk?.price || 0).toFixed(2)} ج.م
+                    {legacyBulk?.barcode ? ` · باركود ${legacyBulk.barcode}` : " · باركود الجملة ناقص وسيطلب منك إدخاله"}.
+                    لن يتغير مخزون المنتج الأساسي أثناء التحويل.
+                  </p>
+                </div>
+                <Button type="button" variant="outline" className="border-amber-400 bg-white" onClick={openLegacyCreate}>
+                  <WandSparkles className="ms-2 h-4 w-4" />
+                  تحويل بيانات الجملة القديمة
+                </Button>
+              </div>
+            </div>
+          )}
 
           {loading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
@@ -237,10 +310,16 @@ export default function ProductSaleUnitsCard({ productId, productName, baseQuant
       <Dialog open={dialogOpen} onOpenChange={open => !saving && setDialogOpen(open)}>
         <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl" dir="rtl">
           <DialogHeader>
-            <DialogTitle>{editing ? "تعديل وحدة البيع" : "إضافة وحدة بيع مرتبطة"}</DialogTitle>
+            <DialogTitle>{editing ? "تعديل وحدة البيع" : legacyDraftOpen ? "تحويل بيانات الجملة القديمة" : "إضافة وحدة بيع مرتبطة"}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-5 py-2">
+            {legacyDraftOpen && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-6 text-amber-950">
+                تم ملء البيانات القديمة كمسودة فقط. راجع الباركود قبل الحفظ؛ لو الباركود مكرر سيرفض السيرفر الحفظ حتى تغيّره. المخزون سيظل مخزون المنتج الأساسي بدون إنشاء مخزون جديد.
+              </div>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>اسم المنتج المعروض</Label>
@@ -282,6 +361,7 @@ export default function ProductSaleUnitsCard({ productId, productName, baseQuant
                   onChange={event => setForm(prev => ({ ...prev, barcode: event.target.value }))}
                   placeholder="باركود الكرتونة"
                   dir="ltr"
+                  autoFocus={legacyDraftOpen && !form.barcode}
                 />
               </div>
               <div className="space-y-2">
@@ -327,7 +407,7 @@ export default function ProductSaleUnitsCard({ productId, productName, baseQuant
             <Button type="button" variant="outline" disabled={saving} onClick={() => setDialogOpen(false)}>إلغاء</Button>
             <Button type="button" disabled={saving} onClick={() => void handleSave()}>
               {saving && <Loader2 className="ms-2 h-4 w-4 animate-spin" />}
-              {editing ? "حفظ التعديل" : "إضافة الوحدة"}
+              {editing ? "حفظ التعديل" : legacyDraftOpen ? "تحويل وحفظ الوحدة" : "إضافة الوحدة"}
             </Button>
           </DialogFooter>
         </DialogContent>
