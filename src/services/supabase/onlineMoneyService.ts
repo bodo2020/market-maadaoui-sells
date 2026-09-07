@@ -17,6 +17,17 @@ export type OnlineMoneyOverview = {
   payment_accounts: OnlinePaymentAccount[];
 };
 
+export type PendingOnlineRefund = {
+  refund_id: string;
+  return_id: string;
+  order_id: string;
+  payment_method: string;
+  amount: number;
+  status: "pending";
+  provider_reference: string | null;
+  created_at: string;
+};
+
 const rpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
   args?: Record<string, unknown>,
@@ -34,6 +45,8 @@ function moneyError(message?: string) {
     case "INVALID_PAYMENT_METHOD": return "طريقة الدفع غير صحيحة.";
     case "INVALID_AMOUNT": return "قيمة العملية غير صحيحة.";
     case "INVALID_FEE": return "العمولة لا يمكن أن تكون أكبر من إجمالي التسوية.";
+    case "REFUND_NOT_FOUND": return "عملية رد المبلغ غير موجودة.";
+    case "REFUND_NOT_PENDING": return "عملية رد المبلغ لم تعد في انتظار التأكيد.";
     default: return message;
   }
 }
@@ -52,6 +65,14 @@ export async function getOnlineMoneyOverview(branchId: string): Promise<OnlineMo
       ? row.payment_accounts.map((account: any) => ({ ...account, balance: Number(account.balance || 0) }))
       : [],
   };
+}
+
+export async function getPendingOnlineRefunds(branchId: string): Promise<PendingOnlineRefund[]> {
+  const { data, error } = await rpc("get_pending_online_refunds", { p_branch_id: branchId });
+  if (error) throw new Error(moneyError(error.message));
+  return Array.isArray(data)
+    ? data.map((row: any) => ({ ...row, amount: Number(row.amount || 0) })) as PendingOnlineRefund[]
+    : [];
 }
 
 export async function depositOnlineCashToSafe(branchId: string, amount: number, note?: string) {
