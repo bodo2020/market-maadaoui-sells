@@ -30,7 +30,7 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [, setClockTick] = useState(0);
+  const [clockTick, setClockTick] = useState(0);
 
   const refresh = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -72,7 +72,7 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
     return () => window.clearInterval(timer);
   }, []);
 
-  const duration = useMemo(() => shiftAge(summary?.shift_opened_at), [summary?.shift_opened_at, summary?.sales_count]);
+  const duration = useMemo(() => shiftAge(summary?.shift_opened_at), [summary?.shift_opened_at, clockTick]);
 
   const submitDrop = async () => {
     const value = Number(amount);
