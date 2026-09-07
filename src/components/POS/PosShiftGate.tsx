@@ -215,8 +215,8 @@ export default function PosShiftGate({ children }: { children: ReactNode }) {
     <>
       {children}
       <PosCashDrawerWidget device={device} />
-      <div dir="rtl" className="fixed bottom-4 left-4 z-50">
-        <Button variant="outline" className="shadow-lg bg-white" onClick={() => { setClosingCash(""); setClosingNotes(""); setError(null); setClosingOpen(true); }}>
+      <div dir="rtl" className="fixed bottom-20 left-3 z-50 lg:bottom-4 lg:left-4">
+        <Button variant="outline" className="bg-white text-xs shadow-lg sm:text-sm" onClick={() => { setClosingCash(""); setClosingNotes(""); setError(null); setClosingOpen(true); }}>
           <Clock3 className="h-4 w-4" /> الوردية مفتوحة
         </Button>
       </div>
