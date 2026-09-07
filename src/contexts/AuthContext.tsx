@@ -7,6 +7,7 @@ import {
   signOutStaff,
   StaffBranchContext,
 } from "@/services/supabase/staffAuthService";
+import { createPosQuickSession, LocalPosDevice } from "@/services/supabase/posDeviceService";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,6 +19,7 @@ interface AuthContextType {
   branchOptions: StaffBranchContext[];
   branchSelectionRequired: boolean;
   login: (username: string, password: string) => Promise<void>;
+  quickLogin: (device: LocalPosDevice, userId: string, pin: string) => Promise<void>;
   selectBranch: (branchId: string) => Promise<void>;
   switchBranch: (branchId: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -31,6 +33,7 @@ const AuthContext = createContext<AuthContextType>({
   branchOptions: [],
   branchSelectionRequired: false,
   login: async () => {},
+  quickLogin: async () => {},
   selectBranch: async () => {},
   switchBranch: async () => {},
   logout: async () => {},
@@ -129,6 +132,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const quickLogin = async (device: LocalPosDevice, userId: string, pin: string) => {
+    try {
+      setIsLoading(true);
+      await createPosQuickSession(device, userId, pin);
+      const state = await selectStaffBranch(device.branch_id);
+      applyLoginState(state);
+      if (!state.user) throw new Error("تعذر تفعيل جلسة الموظف");
+      toast({ title: `أهلًا ${state.user.name}`, description: device.device_name });
+    } catch (error: any) {
+      await supabase.auth.signOut();
+      applyLoginState(null);
+      toast({
+        title: "تعذر الدخول السريع",
+        description: error.message || "راجع PIN وحاول مرة تانية",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const activateBranch = async (branchId: string, announce = true) => {
     try {
       setIsLoading(true);
@@ -175,6 +200,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         branchOptions,
         branchSelectionRequired,
         login,
+        quickLogin,
         selectBranch,
         switchBranch,
         logout,
