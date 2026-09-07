@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Clock3, CreditCard, FileText, RefreshCw, ReceiptText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +51,16 @@ export default function PosRecentSales() {
       setLoading(false);
     }
   }, [user?.id, currentBranchId]);
+
+  useEffect(() => {
+    const onSaleCompleted = (event: Event) => {
+      const sale = (event as CustomEvent<Sale>).detail;
+      if (!sale?.id || sale.branch_id !== currentBranchId) return;
+      setSales(prev => [sale, ...prev.filter(row => row.id !== sale.id)].slice(0, 10));
+    };
+    window.addEventListener("pos:sale-completed", onSaleCompleted);
+    return () => window.removeEventListener("pos:sale-completed", onSaleCompleted);
+  }, [currentBranchId]);
 
   const openPanel = () => {
     setOpen(true);
