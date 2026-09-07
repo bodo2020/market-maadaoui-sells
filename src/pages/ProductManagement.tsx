@@ -9,14 +9,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import { fetchCompanies } from "@/services/supabase/companyService";
 import { fetchMainCategories } from "@/services/supabase/categoryService";
 import {
   fetchAllProductManagementRows,
+  fetchLegacyBulkReviewQueue,
   fetchProductManagementPage,
   fetchProductManagementStats,
+  type LegacyBulkReviewRow,
   type ProductManagementRow,
   type ProductManagementStats,
 } from "@/services/supabase/productManagementService";
@@ -60,6 +63,12 @@ function stockBadge(row: ProductManagementRow) {
   return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">متوفر</Badge>;
 }
 
+function reviewBadge(issue: LegacyBulkReviewRow["issue"]) {
+  if (issue === "missing_barcode") return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">باركود الجملة ناقص</Badge>;
+  if (issue === "barcode_conflict") return <Badge variant="destructive">تعارض باركود</Badge>;
+  return <Badge variant="secondary">تحتاج مراجعة</Badge>;
+}
+
 export default function ProductManagement() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -79,6 +88,9 @@ export default function ProductManagement() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [categories, setCategories] = useState<MainCategory[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [legacyReviewOpen, setLegacyReviewOpen] = useState(false);
+  const [legacyReviewLoading, setLegacyReviewLoading] = useState(false);
+  const [legacyReviewRows, setLegacyReviewRows] = useState<LegacyBulkReviewRow[]>([]);
 
   useEffect(() => {
     void Promise.all([fetchCompanies(), fetchMainCategories()])
@@ -134,6 +146,19 @@ export default function ProductManagement() {
     }
   };
 
+  const openLegacyReview = async () => {
+    setLegacyReviewOpen(true);
+    setLegacyReviewLoading(true);
+    try {
+      setLegacyReviewRows(await fetchLegacyBulkReviewQueue());
+    } catch (error: any) {
+      setLegacyReviewRows([]);
+      toast({ title: "تعذر تحميل قائمة المراجعة", description: error?.message, variant: "destructive" });
+    } finally {
+      setLegacyReviewLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadRows();
   }, [debouncedSearch, companyId, categoryId, page]);
@@ -146,10 +171,11 @@ export default function ProductManagement() {
     const onCatalogChanged = () => {
       void loadRows();
       void loadStats();
+      if (legacyReviewOpen) void openLegacyReview();
     };
     window.addEventListener("catalog:changed", onCatalogChanged);
     return () => window.removeEventListener("catalog:changed", onCatalogChanged);
-  }, [debouncedSearch, companyId, categoryId, page]);
+  }, [debouncedSearch, companyId, categoryId, page, legacyReviewOpen]);
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const companyNames = useMemo(() => new Map(companies.map(company => [company.id, company.name])), [companies]);
@@ -278,8 +304,8 @@ export default function ProductManagement() {
               <span>
                 يوجد <strong>{statNumber(stats?.legacy_bulk_unresolved)}</strong> منتج جملة قديم لم يتم تحويله تلقائيًا لوحدة بيع مرتبطة بسبب باركود ناقص أو متعارض. تم الإبقاء عليه بالنظام القديم حتى تتم مراجعته يدويًا بدون مخاطرة بالمخزون.
               </span>
-              <Button type="button" size="sm" variant="outline" className="border-amber-400 bg-white" onClick={() => navigate("/inventory-import")}>
-                مراجعة/تحديث المنتجات
+              <Button type="button" size="sm" variant="outline" className="border-amber-400 bg-white" onClick={() => void openLegacyReview()}>
+                عرض المنتجات المحتاجة مراجعة
               </Button>
             </AlertDescription>
           </Alert>
@@ -412,6 +438,52 @@ export default function ProductManagement() {
             </div>
           </CardContent>
         </Card>
+
+        <Dialog open={legacyReviewOpen} onOpenChange={setLegacyReviewOpen}>
+          <DialogContent dir="rtl" className="max-h-[88vh] max-w-5xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>مراجعة منتجات الجملة القديمة</DialogTitle>
+              <DialogDescription>
+                هذه المنتجات لم يتم تحويلها تلقائيًا لأن إنشاء وحدة بيع جديدة لها يحتاج باركود جملة فريد. تعديل المنتج وحفظ وحدة البيع الصحيحة سيخرجه من القائمة تلقائيًا.
+              </DialogDescription>
+            </DialogHeader>
+
+            {legacyReviewLoading ? (
+              <div className="flex min-h-48 items-center justify-center text-muted-foreground"><Loader2 className="ms-2 h-5 w-5 animate-spin" /> تحميل قائمة المراجعة...</div>
+            ) : legacyReviewRows.length === 0 ? (
+              <div className="rounded-2xl border border-dashed bg-emerald-50 p-10 text-center text-emerald-900">
+                <PackageCheck className="mx-auto mb-2 h-8 w-8" />
+                لا توجد منتجات جملة قديمة تحتاج مراجعة.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {legacyReviewRows.map(row => (
+                  <div key={row.id} className="flex flex-wrap items-center gap-3 rounded-2xl border bg-white p-3">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-50 p-1">
+                      {row.image_url ? <img src={row.image_url} alt={row.name} className="h-full w-full object-contain" /> : <Package className="h-5 w-5 text-muted-foreground/40" />}
+                    </div>
+                    <div className="min-w-[210px] flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold">{row.name}</p>
+                        {reviewBadge(row.issue)}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>باركود الأصل: <bdi dir="ltr">{row.barcode || "—"}</bdi></span>
+                        <span>باركود الجملة: <bdi dir="ltr">{row.bulk_barcode || "—"}</bdi></span>
+                        <span>العبوة × {statNumber(row.bulk_quantity)}</span>
+                        <span>سعر الجملة {money(row.bulk_price)}</span>
+                        <span>مخزون الأصل {statNumber(row.quantity)}</span>
+                      </div>
+                    </div>
+                    <Button type="button" onClick={() => navigate(`/add-product?id=${row.id}`)}>
+                      <Edit3 className="ms-2 h-4 w-4" /> تعديل وحل المشكلة
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <BarcodeScanner isOpen={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleBarcodeScan} />
       </div>
