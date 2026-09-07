@@ -1,3 +1,5 @@
+import { changeOnlineOrderStatus } from '@/services/supabase/orderOperationsService';
+import { getCheckoutSnapshot } from "@/services/supabase/checkoutOrderService";
 
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,9 +12,6 @@ import { OrderSummaryActions } from "./OrderSummaryActions";
 import { CustomerInfoCards } from "./CustomerInfoCards";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { findOrCreateCustomer } from "@/services/supabase/customerService";
-import { updateProduct } from "@/services/supabase/productService";
-import { RegisterType, recordCashTransaction } from "@/services/supabase/cashTrackingService";
 import { useBranchStore } from "@/stores/branchStore";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -82,141 +81,23 @@ export function OrderDetailsDialog({
     enabled: !!order?.id,
   });
 
+  const snapshot = useQuery({queryKey:['order-delivery-snapshot',order?.id],enabled:open && !!order?.id,queryFn:()=>getCheckoutSnapshot(order!.id)});
+
   if (!order) return null;
 
   const updateShippingStatus = async (status: 'shipped' | 'delivered') => {
-    if (!order) return;
+    if (!order || isUpdatingShipping) return;
     
     try {
       setIsUpdatingShipping(true);
       
-      if (status === 'delivered' && order.status !== 'delivered') {
-        // If marking as done, process inventory and financial updates
-        if (order.customer_name || order.customer_phone) {
-          const customerInfo = {
-            name: order.customer_name || 'عميل غير معروف',
-            phone: order.customer_phone || undefined
-          };
-          
-          const customer = await findOrCreateCustomer(customerInfo);
-          if (customer) {
-            console.log("Customer linked to order:", customer);
-            if (!order.customer_id) {
-              await supabase
-                .from('online_orders')
-                .update({ customer_id: customer.id })
-                .eq('id', order.id);
-            }
-          }
-        }
-        
-        // Process inventory reduction for each item in the order
-        const orderItems = order.items || [];
-        console.log("Processing inventory for items:", orderItems);
-        
-        for (const item of orderItems) {
-          // Get the current product
-          const { data: product, error: productError } = await supabase
-            .from('products')
-            .select('*')
-            .eq('id', item.product_id)
-            .single();
-            
-          if (productError) {
-            console.error("Error fetching product:", productError);
-            continue;
-          }
-          
-          // Calculate new quantity based on whether it's a bulk product
-          let quantityToDeduct = item.quantity;
-          
-          // If the item's barcode matches the product's bulk_barcode, handle it as bulk
-          if (product.bulk_enabled && item.barcode === product.bulk_barcode) {
-            quantityToDeduct = item.quantity * (product.bulk_quantity || 1);
-          }
-          
-          // Convert weight-based product quantities from decimal to integer if needed
-          let newQuantity: number;
-          
-          // Check if the product is weight-based and its quantity in the database is stored as integer
-          if (item.is_weight_based || product.barcode_type === 'scale') {
-            // For weight-based products, ensure quantity is stored as an integer
-            const currentQuantity = Math.floor(product.quantity || 0);
-            newQuantity = Math.max(0, currentQuantity - Math.floor(quantityToDeduct));
-          } else {
-            // For regular products, just subtract directly
-            newQuantity = Math.max(0, (product.quantity || 0) - quantityToDeduct);
-          }
-          
-          // Update the product quantity
-          await updateProduct(product.id, {
-            quantity: newQuantity
-          });
-          
-          console.log(`Updated inventory for product ${product.name}: ${product.quantity} -> ${newQuantity}`);
-        }
-        
-        // If the order is marked as paid, add the amount to the online cash register
-        if (order.payment_status === 'paid') {
-          try {
-            const branchId = order.branch_id || currentBranchId || undefined;
-            await recordCashTransaction(
-              order.total, 
-              'deposit', 
-              RegisterType.ONLINE, 
-              `أمر الدفع من الطلب الإلكتروني #${order.id.slice(0, 8)}`, 
-              '',
-              branchId
-            );
-            console.log(`Added ${order.total} to online cash register`);
-          } catch (cashError) {
-            console.error("Error recording cash transaction:", cashError);
-            toast.error("تم تحديث المخزون لكن حدث خطأ في تسجيل المعاملة المالية");
-          }
-        }
-      }
+      await changeOnlineOrderStatus(order.id, order.status, status);
 
-      const { error } = await supabase
-        .from('online_orders')
-        .update({ 
-          status,
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', order.id);
-      
-      if (error) throw error;
-      
-      // When order is shipped, notify the delivery person
-      if (status === 'shipped' && order.delivery_person) {
-        try {
-          // Send notification to delivery person via Supabase channel
-          const notificationChannel = supabase.channel('delivery-notifications');
-          await notificationChannel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-              await notificationChannel.send({
-                type: 'broadcast',
-                event: 'new-delivery',
-                payload: {
-                  order_id: order.id,
-                  delivery_person: order.delivery_person,
-                  customer_address: order.shipping_address,
-                  status: 'shipped'
-                }
-              });
-            }
-          });
-          
-          console.log('Delivery notification sent');
-        } catch (notifyError) {
-          console.error('Error sending delivery notification:', notifyError);
-        }
-      }
-      
       if (onStatusUpdated) onStatusUpdated();
       toast.success(`تم تحديث حالة الشحن إلى ${status === 'shipped' ? 'خرج للتوصيل' : 'تم التوصيل'}`);
     } catch (error) {
       console.error('Error updating shipping status:', error);
-      toast.error('حدث خطأ أثناء تحديث حالة الشحن');
+      toast.error(error instanceof Error ? error.message : 'حدث خطأ أثناء تحديث حالة الشحن');
     } finally {
       setIsUpdatingShipping(false);
     }
@@ -266,6 +147,7 @@ export function OrderDetailsDialog({
             <div>
               <h3 className="font-medium text-lg mb-3">المنتجات</h3>
               <OrderItemsList 
+                readOnly={snapshot.isPending || !!snapshot.error || snapshot.data?.checkout_version === 1 || ['shipped','delivered','cancelled'].includes(order.status)}
                 items={order.items} 
                 orderId={order.id}
                 onItemDeleted={onStatusUpdated}
@@ -360,3 +242,4 @@ export function OrderDetailsDialog({
     </Dialog>
   );
 }
+

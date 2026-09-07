@@ -1,3 +1,4 @@
+import OrderNotifications from '@/components/orders/OrderNotifications';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import Login from "@/pages/Login";
@@ -69,6 +70,7 @@ function App() {
       <Router>
         <AuthProvider>
           <TooltipProvider>
+            <OrderNotifications />
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<ProtectedRoute><POS /></ProtectedRoute>} />

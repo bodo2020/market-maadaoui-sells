@@ -9,7 +9,7 @@ import { Search, Barcode, ShoppingCart, Plus, Minus, Trash2, CreditCard, Tag, Re
 import { CartItem, Product, Sale, Customer, POSTab } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { fetchProducts, fetchProductByBarcode } from "@/services/supabase/productService";
-import { createSale, generateInvoiceNumber } from "@/services/supabase/saleService";
+import { createSale, generateInvoiceNumber, clearConfirmedSale } from "@/services/supabase/saleService";
 import { fetchCustomers, findOrCreateCustomer } from "@/services/supabase/customerService";
 import { RegisterType, getLatestCashBalance } from "@/services/supabase/cashTrackingService";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -839,30 +839,8 @@ export default function POS() {
     });
     return showAllProducts ? sortedProducts : sortedProducts.slice(0, 8);
   };
-  const recordSaleToCashRegister = async (amount: number, paymentMethod: string) => {
-    if (paymentMethod !== 'cash' && paymentMethod !== 'mixed') return;
-    const amountToRecord = paymentMethod === 'cash' ? amount : parseFloat(cashAmount || "0");
-    if (amountToRecord <= 0) return;
-    try {
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('add-cash-transaction', {
-        body: {
-          amount: amountToRecord,
-          transaction_type: 'deposit',
-          register_type: 'store',
-          notes: 'مبيعات نقطة البيع',
-          branch_id: currentBranchId || undefined
-        }
-      });
-      if (error) throw error;
-      console.log('Sale recorded to cash register:', data);
-    } catch (error) {
-      console.error('Error recording sale to cash register:', error);
-    }
-  };
   const completeSale = async () => {
+    if (isProcessing || showSuccess) return;
     if (!validatePayment()) {
       toast({
         title: "خطأ في إتمام البيع",
@@ -892,23 +870,21 @@ export default function POS() {
       const saleData: Omit<Sale, "id" | "created_at" | "updated_at"> = {
         date: new Date().toISOString(),
         items: cartItems,
-        subtotal: subtotal,
+        subtotal: total + discount,
         discount: discount,
         total: total,
         profit: profit,
         payment_method: paymentMethod,
-        cash_amount: paymentMethod === 'card' ? undefined : parseFloat(cashAmount || "0"),
+        cash_amount: paymentMethod === 'cash' ? total : paymentMethod === 'card' ? 0 : parseFloat(cashAmount || "0"),
         card_amount: paymentMethod === 'cash' ? undefined : parseFloat(cardAmount || "0"),
         customer_name: customerName || undefined,
         customer_phone: customerPhone || undefined,
         invoice_number: invoiceNumber,
-        cashier_name: user?.name
+        cashier_name: user?.name,
+        branch_id: currentBranchId || undefined
       };
-      const sale = await createSale(saleData, user?.name);
+      const sale = await createSale(saleData, user?.name, activeTabId);
       setCurrentSale(sale);
-      if (paymentMethod === 'cash' || paymentMethod === 'mixed') {
-        await recordSaleToCashRegister(paymentMethod === 'cash' ? total : parseFloat(cashAmount || "0"), paymentMethod);
-      }
       toast({
         title: "تم إتمام البيع بنجاح",
         description: `رقم الفاتورة: ${sale.invoice_number}`
@@ -937,13 +913,14 @@ export default function POS() {
       console.error("Error completing sale:", error);
       toast({
         title: "خطأ في إتمام البيع",
-        description: "حدث خطأ أثناء حفظ بيانات البيع، يرجى المحاولة مرة أخرى.",
+        description: error instanceof Error ? error.message : "تعذّر حفظ البيع. أعد المحاولة بنفس السلة.",
         variant: "destructive"
       });
       setIsProcessing(false);
     }
   };
   const resetSale = () => {
+    if (user?.id && currentBranchId) clearConfirmedSale(user.id, currentBranchId, activeTabId);
     console.log("resetSale called - clearing all states");
     setCartItems([]);
     setSearchResults([]);

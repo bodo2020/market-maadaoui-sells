@@ -2,123 +2,65 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Sale, CartItem } from "@/types";
 
-export async function createSale(sale: Omit<Sale, "id" | "created_at" | "updated_at">, cashierName?: string) {
-  try {
-    // Get current user (cashier)
-    const { data: userData } = await supabase.auth.getUser();
-    const cashierId = userData.user?.id;
+type PendingSale = {
+  requestId: string;
+  fingerprint: string;
+  payload: Record<string, unknown>;
+  confirmed?: boolean;
+};
 
-    // Resolve current branch from localStorage (client-side)
-    let branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
-    
-    // If no branch ID, try to get default active branch
-    if (!branchId) {
-      console.warn('No branch ID found, attempting to get default branch');
-      const { data: branches } = await supabase
-        .from('branches')
-        .select('id')
-        .eq('active', true)
-        .order('created_at', { ascending: true })
-        .limit(1);
-      
-      if (branches && branches.length > 0) {
-        branchId = branches[0].id;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('currentBranchId', branchId);
-        }
-      }
-    }
+function pendingSaleKey(userId: string, branchId: string, checkoutId: string) {
+  return `pos-sale-request:${userId}:${branchId}:${checkoutId}`;
+}
 
-    // Ensure date is a string
-    const saleData = {
-      ...sale,
-      date: typeof sale.date === 'object' ? (sale.date as Date).toISOString() : sale.date,
-      // Convert CartItem[] to Json for Supabase
-      items: JSON.parse(JSON.stringify(sale.items)),
-      // Add cashier and branch info
-      cashier_id: cashierId,
-      cashier_name: cashierName || sale.cashier_name,
-      branch_id: branchId || sale.branch_id || null
-    };
-    
-    // Create the sale record
-    const { data, error } = await supabase
-      .from("sales")
-      .insert([saleData])
-      .select();
+// Only a confirmed sale may be cleared. An uncertain network result must be retried.
+export function clearConfirmedSale(userId: string, branchId: string, checkoutId: string) {
+  const key = pendingSaleKey(userId, branchId, checkoutId);
+  const raw = localStorage.getItem(key);
+  if (raw && (JSON.parse(raw) as PendingSale).confirmed) localStorage.removeItem(key);
+}
 
-    if (error) {
-      console.error("Error creating sale:", error);
-      throw error;
-    }
-
-    // Update cash tracking if payment includes cash
-    if (saleData.cash_amount && saleData.cash_amount > 0) {
-      try {
-        // Import cash tracking service
-        const { recordCashTransaction, RegisterType } = await import('./cashTrackingService');
-        // ✅ تنظيف branchId قبل إرساله
-        const cleanBranchId = branchId && branchId.trim() !== '' ? branchId : null;
-        
-        await recordCashTransaction(
-          saleData.cash_amount,
-          'deposit', // Sale is a deposit to cash register
-          RegisterType.STORE, // Sales are typically in store register
-          `مبيعات - فاتورة ${saleData.invoice_number}`,
-          cashierId || '',
-          cleanBranchId || undefined // Pass the resolved branch ID
-        );
-        console.log('Cash tracking updated for sale:', saleData.invoice_number);
-      } catch (cashError) {
-        console.error('Error updating cash tracking for sale:', cashError);
-        // Don't fail the sale if cash tracking fails
-      }
-    }
-
-    // Update product quantities for each sold item
-    if (sale.items && sale.items.length > 0) {
-      for (const item of sale.items) {
-        if (!item.product || !item.product.id) continue;
-        
-        // Get current quantity
-        const { data: product, error: fetchError } = await supabase
-          .from("products")
-          .select("quantity")
-          .eq("id", item.product.id)
-          .single();
-
-        if (fetchError) {
-          console.error(`Error fetching product ${item.product.id}:`, fetchError);
-          continue;
-        }
-
-        // Calculate new quantity (ensure it doesn't go below 0)
-        const currentQuantity = product.quantity || 0;
-        const newQuantity = Math.max(0, currentQuantity - item.quantity);
-
-        // Update the product quantity
-        const { error: updateError } = await supabase
-          .from("products")
-          .update({ quantity: newQuantity })
-          .eq("id", item.product.id);
-
-        if (updateError) {
-          console.error(`Error updating product ${item.product.id} quantity:`, updateError);
-        }
-      }
-    }
-
-    // Convert JSON data to proper Sale type
-    const saleResult = {
-      ...data[0],
-      items: data[0].items as unknown as CartItem[]
-    } as Sale;
-
-    return saleResult;
-  } catch (error) {
-    console.error("Error in createSale:", error);
-    throw error;
+export async function createSale(
+  sale: Omit<Sale, "id" | "created_at" | "updated_at">,
+  _cashierName?: string,
+  checkoutId: string = sale.invoice_number
+) {
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error("سجّل الدخول مرة أخرى لإتمام البيع.");
+  const branchId = sale.branch_id || localStorage.getItem('currentBranchId');
+  if (!branchId) throw new Error("اختار الفرع قبل إتمام البيع.");
+  const payload = {
+    items: sale.items, subtotal: sale.subtotal, discount: sale.discount,
+    total: sale.total, profit: sale.profit ?? 0, payment_method: sale.payment_method,
+    cash_amount: sale.cash_amount ?? 0, card_amount: sale.card_amount ?? 0,
+    customer_name: sale.customer_name ?? null, customer_phone: sale.customer_phone ?? null
+  };
+  // Exclude generated date/invoice number: retrying the same checkout keeps its original invoice.
+  const fingerprint = JSON.stringify(payload);
+  const key = pendingSaleKey(user.id, branchId, checkoutId);
+  const raw = localStorage.getItem(key);
+  const pending: PendingSale = raw ? JSON.parse(raw) : {
+    requestId: crypto.randomUUID(), fingerprint,
+    payload: { ...payload, invoice_number: sale.invoice_number }
+  };
+  if (pending.fingerprint !== fingerprint) {
+    throw new Error("فيه محاولة حفظ سابقة لنفس السلة. راجع الفاتورة السابقة قبل تغيير البيانات أو بدء بيع جديد.");
   }
+  // Persist before dispatch. A lost response cannot turn a retry into a second sale.
+  localStorage.setItem(key, JSON.stringify(pending));
+  const { data, error } = await supabase.rpc('create_pos_sale' as never, {
+    p_request_id: pending.requestId, p_branch_id: branchId, p_sale: pending.payload
+  } as never);
+  if (error) {
+    // Postgres validation/permission errors mean the whole transaction rolled back.
+    if (error.code?.startsWith('22') || error.code === '42501') localStorage.removeItem(key);
+    if (error.message?.includes('INSUFFICIENT_STOCK')) throw new Error("مخزون الفرع غير كافٍ. حدّث المنتجات وراجع الكميات.");
+    throw new Error("تعذّر تأكيد حفظ البيع. أعد المحاولة بنفس السلة؛ لن تُسجّل الفاتورة مرتين.");
+  }
+  if (!data) throw new Error("لم يصل تأكيد البيع. أعد المحاولة بنفس السلة.");
+  // A storage failure after commit should not report that the sale failed.
+  try { localStorage.setItem(key, JSON.stringify({ ...pending, confirmed: true })); } catch { /* Keep the original request for recovery. */ }
+  return data as unknown as Sale;
 }
 
 export async function fetchSales(branchId?: string, startDate?: Date, endDate?: Date, limit: number = 100, offset: number = 0): Promise<Sale[]> {
@@ -542,3 +484,4 @@ export function printInvoice(sale: Sale, storeInfo: {
   
   return invoiceHTML;
 }
+

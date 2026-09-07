@@ -1,3 +1,4 @@
+import { OrderDeliverySnapshot } from "@/components/orders/OrderDeliverySnapshot";
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -229,7 +230,7 @@ export function CustomerProfileDialog({ customer, open, onOpenChange }: Customer
                     {customer.address && (
                       <div className="flex items-start gap-2 mt-3 pt-3 border-t">
                         <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-                        <p>{customer.address}</p>
+                        <div><p>{customer.address}</p><OrderDeliverySnapshot orderId={customer.order?.id} /></div>
                       </div>
                     )}
                   </div>

@@ -1,3 +1,4 @@
+import BrandLoader from '@/components/ui/BrandLoader';
 import { ReactNode, useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
@@ -110,7 +111,7 @@ export default function MainLayout({
 
   // If loading, show loading indicator
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">جاري التحميل...</div>;
+    return <div className="min-h-screen flex items-center justify-center"><BrandLoader size="lg" /></div>;
   }
 
   // If not authenticated, redirect to login
