@@ -23,24 +23,44 @@ async function queryCatalog(params: { search?: string | null; barcode?: string |
   return (Array.isArray(data) ? data : []) as Product[];
 }
 
+type ScaleBarcode = {
+  productCandidates: string[];
+  weight: number;
+};
+
 /**
- * DALI-style scale labels used in the store are based on a 6-digit product code
- * (normally starting with 2), followed by five weight digits and optionally one
- * final check digit. Example: 020001 01000 5 => product 020001, 1.000 kg.
+ * Store scale products are saved with a six-digit PLU-like barcode such as
+ * 000034. DALI labels can be printed as:
+ *   PP + PLU(4) + WEIGHT(5) + optional check digit
+ * Example: 02 0034 01000 5 => stored product 000034, weight 1.000 kg.
+ *
+ * We also keep the first six digits as a fallback candidate because some scale
+ * configurations save that whole prefix+PLU value as the product barcode.
  */
-function parseScaleBarcode(barcode: string): { productBarcode: string; weight: number } | null {
+function parseScaleBarcode(barcode: string): ScaleBarcode | null {
   if (!/^\d+$/.test(barcode)) return null;
   if (barcode.length !== 11 && barcode.length !== 12) return null;
 
-  const productBarcode = barcode.slice(0, 6);
-  if (!productBarcode.startsWith('2') && !productBarcode.startsWith('02')) return null;
+  const prefix = barcode.slice(0, 2);
+  const looksLikeScalePrefix = prefix === '02' || /^2\d$/.test(prefix);
+  if (!looksLikeScalePrefix) return null;
 
+  const plu = barcode.slice(2, 6);
   const weightDigits = barcode.slice(6, 11);
-  if (!/^\d{5}$/.test(weightDigits)) return null;
+  if (!/^\d{4}$/.test(plu) || !/^\d{5}$/.test(weightDigits)) return null;
+
   const weight = Number(weightDigits) / 1000;
   if (!Number.isFinite(weight) || weight <= 0 || weight > 100) return null;
 
-  return { productBarcode, weight: Number(weight.toFixed(3)) };
+  const candidates = [
+    plu.padStart(6, '0'),
+    barcode.slice(0, 6),
+  ];
+
+  return {
+    productCandidates: [...new Set(candidates)],
+    weight: Number(weight.toFixed(3)),
+  };
 }
 
 export async function fetchPOSProducts(search?: string): Promise<Product[]> {
@@ -61,16 +81,20 @@ export async function fetchPOSProductByBarcode(barcode: string): Promise<{ produ
     };
   }
 
-  // If the label is an encoded scale barcode, resolve the 6-digit product code
-  // against the branch catalog, then attach the decoded weight for the POS cart.
   const scale = parseScaleBarcode(cleanBarcode);
   if (!scale) return { product: null, isBulkBarcode: false };
 
-  const scaleRows = await queryCatalog({ search: null, barcode: scale.productBarcode, limit: 2 });
-  const scaleProduct = scaleRows[0] || null;
-  if (!scaleProduct || scaleProduct.barcode_type !== 'scale') {
-    return { product: null, isBulkBarcode: false };
+  let scaleProduct: Product | null = null;
+  for (const candidate of scale.productCandidates) {
+    const rows = await queryCatalog({ search: null, barcode: candidate, limit: 2 });
+    const product = rows[0] || null;
+    if (product?.barcode_type === 'scale') {
+      scaleProduct = product;
+      break;
+    }
   }
+
+  if (!scaleProduct) return { product: null, isBulkBarcode: false };
 
   const effectivePrice = Number(scaleProduct.is_offer && scaleProduct.offer_price != null
     ? scaleProduct.offer_price
