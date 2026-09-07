@@ -8,6 +8,11 @@ type PendingSale = {
   confirmed?: boolean;
 };
 
+type RpcResult = {
+  data: unknown;
+  error: { message?: string; code?: string } | null;
+};
+
 function pendingSaleKey(userId: string, branchId: string, checkoutId: string) {
   return `pos-sale-request:${userId}:${branchId}:${checkoutId}`;
 }
@@ -36,6 +41,18 @@ function isDeterministicError(code?: string, message?: string) {
   return Boolean(friendlySaleError(message));
 }
 
+function sleep(ms: number) {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
+async function createSaleAttempt(requestId: string, branchId: string, payload: Record<string, unknown>): Promise<RpcResult> {
+  return await (supabase.rpc as any)("create_pos_sale", {
+    p_request_id: requestId,
+    p_branch_id: branchId,
+    p_sale: payload,
+  }) as RpcResult;
+}
+
 export function clearConfirmedPosSale(userId: string, branchId: string, checkoutId: string) {
   const key = pendingSaleKey(userId, branchId, checkoutId);
   try {
@@ -52,6 +69,10 @@ export async function submitPosSale(
   sale: Omit<Sale, "id" | "created_at" | "updated_at">,
   checkoutId: string,
 ): Promise<Sale> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    throw new Error("الإنترنت مقطوع حاليًا. السلة محفوظة؛ رجّع الاتصال وحاول بنفس السلة.");
+  }
+
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) throw new Error("سجّل الدخول مرة أخرى لإتمام البيع.");
 
@@ -102,23 +123,32 @@ export async function submitPosSale(
     // Server-side request id still protects the transaction for this attempt.
   }
 
-  const { data, error } = await (supabase.rpc as any)("create_pos_sale", {
-    p_request_id: pending.requestId,
-    p_branch_id: branchId,
-    p_sale: pending.payload,
-  });
+  let result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
 
-  if (error) {
-    const friendly = friendlySaleError(error.message);
-    if (isDeterministicError(error.code, error.message)) {
+  if (result.error && !isDeterministicError(result.error.code, result.error.message)) {
+    // A timeout / transient connection error can leave the client unsure whether the
+    // transaction committed. Retry exactly once with the SAME request id. The database
+    // idempotency contract returns the original sale instead of creating a duplicate.
+    if (typeof navigator === "undefined" || navigator.onLine) {
+      await sleep(350);
+      result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
+    }
+  } else if (!result.error && !result.data && (typeof navigator === "undefined" || navigator.onLine)) {
+    await sleep(350);
+    result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
+  }
+
+  if (result.error) {
+    const friendly = friendlySaleError(result.error.message);
+    if (isDeterministicError(result.error.code, result.error.message)) {
       try { localStorage.removeItem(key); } catch { /* noop */ }
     }
     if (friendly) throw new Error(friendly);
-    throw new Error("تعذّر تأكيد حفظ البيع بسبب اتصال غير مؤكد. أعد المحاولة بنفس السلة؛ لن تُسجّل الفاتورة مرتين.");
+    throw new Error("تعذّر تأكيد حفظ البيع بسبب اتصال غير مؤكد. السلة محفوظة؛ أعد المحاولة نفسها ولن تُسجّل الفاتورة مرتين.");
   }
 
-  if (!data) {
-    throw new Error("لم يصل تأكيد البيع. أعد المحاولة بنفس السلة؛ لن تُسجّل الفاتورة مرتين.");
+  if (!result.data) {
+    throw new Error("لم يصل تأكيد البيع. السلة محفوظة؛ أعد المحاولة نفسها ولن تُسجّل الفاتورة مرتين.");
   }
 
   try {
@@ -127,5 +157,5 @@ export async function submitPosSale(
     // Sale is already committed; do not report failure because local cache could not update.
   }
 
-  return data as Sale;
+  return result.data as Sale;
 }
