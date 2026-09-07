@@ -39,6 +39,54 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
 });
 
+const POS_TABS_KEY = "pos_tabs";
+const POS_ACTIVE_TAB_KEY = "pos_active_tab";
+const POS_WORKSPACE_PREFIX = "pos-workspace:v1";
+
+function currentBranchIdFromStorage() {
+  const branchId = localStorage.getItem("currentBranchId");
+  return branchId && branchId !== "null" ? branchId : null;
+}
+
+function posWorkspaceKey(userId: string, branchId: string) {
+  return `${POS_WORKSPACE_PREFIX}:${userId}:${branchId}`;
+}
+
+function clearLivePosWorkspace() {
+  localStorage.removeItem(POS_TABS_KEY);
+  localStorage.removeItem(POS_ACTIVE_TAB_KEY);
+}
+
+function stashPosWorkspace(userId: string | null | undefined, branchId: string | null | undefined) {
+  if (!userId || !branchId) {
+    clearLivePosWorkspace();
+    return;
+  }
+  try {
+    const tabs = localStorage.getItem(POS_TABS_KEY);
+    const activeTab = localStorage.getItem(POS_ACTIVE_TAB_KEY);
+    if (tabs) {
+      localStorage.setItem(posWorkspaceKey(userId, branchId), JSON.stringify({ tabs, activeTab }));
+    }
+  } finally {
+    clearLivePosWorkspace();
+  }
+}
+
+function restorePosWorkspace(userId: string | null | undefined, branchId: string | null | undefined) {
+  clearLivePosWorkspace();
+  if (!userId || !branchId) return;
+  try {
+    const raw = localStorage.getItem(posWorkspaceKey(userId, branchId));
+    if (!raw) return;
+    const saved = JSON.parse(raw) as { tabs?: string; activeTab?: string | null };
+    if (saved.tabs) localStorage.setItem(POS_TABS_KEY, saved.tabs);
+    if (saved.activeTab) localStorage.setItem(POS_ACTIVE_TAB_KEY, saved.activeTab);
+  } catch {
+    // Corrupt suspended-cart cache must never block authentication.
+  }
+}
+
 export const useAuth = () => useContext(AuthContext);
 
 interface AuthProviderProps {
@@ -60,6 +108,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setBranchOptions([]);
       setBranchSelectionRequired(false);
       localStorage.removeItem("user");
+      clearLivePosWorkspace();
       return;
     }
 
@@ -69,8 +118,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     if (state.user) {
       localStorage.setItem("user", JSON.stringify(state.user));
+      restorePosWorkspace(state.user.id, currentBranchIdFromStorage());
     } else {
       localStorage.removeItem("user");
+      clearLivePosWorkspace();
     }
   };
 
@@ -96,6 +147,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session && active) {
+        clearLivePosWorkspace();
         applyLoginState(null);
       }
     });
@@ -109,6 +161,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const login = async (username: string, password: string) => {
     try {
       setIsLoading(true);
+      clearLivePosWorkspace();
       const state = await authenticateStaffUser(username, password);
       applyLoginState(state);
 
@@ -135,6 +188,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const quickLogin = async (device: LocalPosDevice, userId: string, pin: string) => {
     try {
       setIsLoading(true);
+      clearLivePosWorkspace();
       await createPosQuickSession(device, userId, pin);
       const state = await selectStaffBranch(device.branch_id);
       applyLoginState(state);
@@ -155,8 +209,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const activateBranch = async (branchId: string, announce = true) => {
+    const previousBranchId = currentBranchIdFromStorage();
     try {
       setIsLoading(true);
+      if (user?.id && previousBranchId && previousBranchId !== branchId) {
+        stashPosWorkspace(user.id, previousBranchId);
+      }
       const state = await selectStaffBranch(branchId);
       applyLoginState(state);
       if (state.user && announce) {
@@ -167,6 +225,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         });
       }
     } catch (error: any) {
+      if (user?.id && previousBranchId) restorePosWorkspace(user.id, previousBranchId);
       toast({
         title: "تعذر اختيار الفرع",
         description: error.message || "راجع صلاحيات الفرع وحاول مرة تانية",
@@ -182,6 +241,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const switchBranch = async (branchId: string) => activateBranch(branchId, true);
 
   const logout = async () => {
+    const branchId = currentBranchIdFromStorage();
+    if (user?.id && branchId) stashPosWorkspace(user.id, branchId);
     try {
       await signOutStaff();
     } finally {
