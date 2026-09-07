@@ -28,7 +28,7 @@ major_version = 15
 port = 54323
 
 # Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
-# are monitored, and you can view the emails that would have been sent from the web interface.
+# are monitored, and you can view them from the web interface.
 [inbucket]
 # Port to use for the email testing server web interface.
 port = 54324
@@ -62,8 +62,7 @@ client_id = ""
 secret = ""
 # Overrides the default auth redirectUrl.
 redirect_uri = ""
-# Overrides the default auth provider URL. Used to support self-hosted gitlab, single-tenant Azure,
-# or any other third-party OIDC providers.
+# Overrides the default provider URL.
 url = ""
 
 [auth.external.github]
@@ -72,8 +71,7 @@ client_id = ""
 secret = ""
 # Overrides the default auth redirectUrl.
 redirect_uri = ""
-# Overrides the default auth provider URL. Used to support self-hosted gitlab, single-tenant Azure,
-# or any other third-party OIDC providers.
+# Overrides the default provider URL.
 url = ""
 
 [functions]
@@ -81,6 +79,13 @@ url = ""
 port = 54321
 
 [functions.notify-new-order]
+verify_jwt = false
+
+# This endpoint exists only to migrate a legacy staff username/password into Supabase Auth.
+# It cannot require a JWT because it runs before the first successful Auth session.
+# The function itself enforces rate limits, validates the legacy credential and branch access,
+# creates the Auth account once, then destroys the reusable legacy password.
+[functions.migrate-staff-login]
 verify_jwt = false
 
 [vector]
