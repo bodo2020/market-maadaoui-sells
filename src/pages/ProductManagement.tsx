@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +16,9 @@ import { fetchMainCategories } from "@/services/supabase/categoryService";
 import {
   fetchAllProductManagementRows,
   fetchProductManagementPage,
+  fetchProductManagementStats,
   type ProductManagementRow,
+  type ProductManagementStats,
 } from "@/services/supabase/productManagementService";
 import type { Company, MainCategory } from "@/types";
 import ExcelJS from "exceljs";
@@ -38,12 +41,17 @@ import {
   Plus,
   ScanLine,
   Search,
+  ShoppingBag,
 } from "lucide-react";
 
 const PAGE_SIZE = 50;
 
 function money(value: number) {
   return `${Number(value || 0).toFixed(2)} ${siteConfig.currency}`;
+}
+
+function statNumber(value?: number | null) {
+  return Number(value || 0).toLocaleString("ar-EG");
 }
 
 function stockBadge(row: ProductManagementRow) {
@@ -58,9 +66,11 @@ export default function ProductManagement() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [rows, setRows] = useState<ProductManagementRow[]>([]);
+  const [stats, setStats] = useState<ProductManagementStats | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -112,21 +122,36 @@ export default function ProductManagement() {
     }
   };
 
+  const loadStats = async () => {
+    setStatsLoading(true);
+    try {
+      setStats(await fetchProductManagementStats());
+    } catch (error) {
+      console.error("Product management stats error:", error);
+      setStats(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
     void loadRows();
   }, [debouncedSearch, companyId, categoryId, page]);
 
   useEffect(() => {
-    const onCatalogChanged = () => void loadRows();
+    void loadStats();
+  }, []);
+
+  useEffect(() => {
+    const onCatalogChanged = () => {
+      void loadRows();
+      void loadStats();
+    };
     window.addEventListener("catalog:changed", onCatalogChanged);
     return () => window.removeEventListener("catalog:changed", onCatalogChanged);
   }, [debouncedSearch, companyId, categoryId, page]);
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const linkedCount = rows.filter(row => row.is_linked_sale_unit).length;
-  const lowCount = rows.filter(row => row.stock_status === "low").length;
-  const outCount = rows.filter(row => row.stock_status === "out").length;
-
   const companyNames = useMemo(() => new Map(companies.map(company => [company.id, company.name])), [companies]);
   const categoryNames = useMemo(() => new Map(categories.map(category => [category.id, category.name])), [categories]);
 
@@ -237,12 +262,28 @@ export default function ProductManagement() {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">إجمالي السجلات</p><p className="mt-1 text-2xl font-bold">{total.toLocaleString("ar-EG")}</p></div><Package className="h-7 w-7 text-primary/60" /></CardContent></Card>
-          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">وحدات بيع في الصفحة</p><p className="mt-1 text-2xl font-bold">{linkedCount.toLocaleString("ar-EG")}</p></div><Box className="h-7 w-7 text-primary/60" /></CardContent></Card>
-          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">مخزون منخفض في الصفحة</p><p className="mt-1 text-2xl font-bold text-amber-700">{lowCount.toLocaleString("ar-EG")}</p></div><AlertTriangle className="h-7 w-7 text-amber-500" /></CardContent></Card>
-          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">نفد في الصفحة</p><p className="mt-1 text-2xl font-bold text-destructive">{outCount.toLocaleString("ar-EG")}</p></div><PackageCheck className="h-7 w-7 text-destructive/60" /></CardContent></Card>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">المنتجات الأساسية</p><p className="mt-1 text-2xl font-bold">{statsLoading ? "—" : statNumber(stats?.total_products)}</p></div><Package className="h-7 w-7 text-primary/60" /></CardContent></Card>
+          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">وحدات البيع النشطة</p><p className="mt-1 text-2xl font-bold">{statsLoading ? "—" : statNumber(stats?.active_sale_units)}</p></div><Box className="h-7 w-7 text-primary/60" /></CardContent></Card>
+          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">متوفر</p><p className="mt-1 text-2xl font-bold text-emerald-700">{statsLoading ? "—" : statNumber(stats?.in_stock_products)}</p></div><PackageCheck className="h-7 w-7 text-emerald-600/70" /></CardContent></Card>
+          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">مخزون منخفض</p><p className="mt-1 text-2xl font-bold text-amber-700">{statsLoading ? "—" : statNumber(stats?.low_stock_products)}</p></div><AlertTriangle className="h-7 w-7 text-amber-500" /></CardContent></Card>
+          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">نفد المخزون</p><p className="mt-1 text-2xl font-bold text-destructive">{statsLoading ? "—" : statNumber(stats?.out_of_stock_products)}</p></div><ShoppingBag className="h-7 w-7 text-destructive/60" /></CardContent></Card>
+          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">عروض فعالة</p><p className="mt-1 text-2xl font-bold text-[#005931]">{statsLoading ? "—" : statNumber(stats?.offer_products)}</p></div><PackagePlus className="h-7 w-7 text-[#005931]/70" /></CardContent></Card>
         </div>
+
+        {Boolean(stats?.legacy_bulk_unresolved) && (
+          <Alert className="border-amber-300 bg-amber-50 text-amber-950">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                يوجد <strong>{statNumber(stats?.legacy_bulk_unresolved)}</strong> منتج جملة قديم لم يتم تحويله تلقائيًا لوحدة بيع مرتبطة بسبب باركود ناقص أو متعارض. تم الإبقاء عليه بالنظام القديم حتى تتم مراجعته يدويًا بدون مخاطرة بالمخزون.
+              </span>
+              <Button type="button" size="sm" variant="outline" className="border-amber-400 bg-white" onClick={() => navigate("/inventory-import")}>
+                مراجعة/تحديث المنتجات
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Card>
           <CardContent className="space-y-4 p-4">
@@ -279,6 +320,11 @@ export default function ProductManagement() {
                   <Button type="button" variant="ghost" onClick={clearFilters}>مسح الفلاتر</Button>
                 )}
               </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>النتائج الحالية: {statNumber(total)} سجل حسب البحث والفلاتر</span>
+              {stats && <span>الأرقام بالأعلى محسوبة على الفرع كاملًا، وليست الصفحة الحالية.</span>}
             </div>
 
             <div className="overflow-hidden rounded-xl border">
