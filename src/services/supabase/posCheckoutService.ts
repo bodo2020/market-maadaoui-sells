@@ -3,7 +3,6 @@ import type { Sale } from "@/types";
 import { invalidatePOSCatalogCache } from "@/services/supabase/posCatalogService";
 import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
 import { logPosOperationalEvent } from "@/services/supabase/posDiagnosticsService";
-import { preflightPosCart } from "@/services/supabase/posPreflightService";
 
 type PendingSale = {
   requestId: string;
@@ -105,39 +104,27 @@ export async function submitPosSale(
 
   const fingerprint = JSON.stringify(payload);
   const key = pendingSaleKey(authData.user.id, branchId, checkoutId);
-  let pending: PendingSale | null = null;
+  let pending: PendingSale;
 
   try {
     const raw = localStorage.getItem(key);
-    if (raw) pending = JSON.parse(raw) as PendingSale;
+    pending = raw
+      ? (JSON.parse(raw) as PendingSale)
+      : {
+          requestId: crypto.randomUUID(),
+          fingerprint,
+          payload: { ...payload, invoice_number: sale.invoice_number },
+        };
   } catch {
-    pending = null;
-  }
-
-  if (pending && pending.fingerprint !== fingerprint) {
-    throw new Error("فيه محاولة حفظ سابقة لنفس السلة. راجع الفاتورة السابقة قبل تغيير بيانات الدفع.");
-  }
-
-  // Only a brand-new checkout gets a fresh preflight. If a previous request is
-  // already pending because the connection became uncertain, we must retry the
-  // SAME request id directly. Re-running preflight after a committed-but-unconfirmed
-  // sale could see the already-deducted stock and incorrectly block recovery.
-  if (!pending) {
-    const preflight = await preflightPosCart(branchId, sale.items);
-    const totalChanged = Math.abs(Number(preflight.total || 0) - Number(sale.total || 0)) > 0.009;
-    if (preflight.repriced || totalChanged) {
-      invalidatePOSCatalogCache(branchId);
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("pos:cart-repriced", { detail: preflight }));
-      }
-      throw new Error("اتغير سعر أو عرض في السلة. تم تحديث المراجعة قبل البيع؛ راجع الإجمالي ثم أكد مرة أخرى.");
-    }
-
     pending = {
       requestId: crypto.randomUUID(),
       fingerprint,
       payload: { ...payload, invoice_number: sale.invoice_number },
     };
+  }
+
+  if (pending.fingerprint !== fingerprint) {
+    throw new Error("فيه محاولة حفظ سابقة لنفس السلة. راجع الفاتورة السابقة قبل تغيير بيانات الدفع.");
   }
 
   try {
