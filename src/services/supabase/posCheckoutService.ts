@@ -3,6 +3,7 @@ import type { Sale } from "@/types";
 import { invalidatePOSCatalogCache } from "@/services/supabase/posCatalogService";
 import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
 import { logPosOperationalEvent } from "@/services/supabase/posDiagnosticsService";
+import { invalidatePosPreflightCache } from "@/services/supabase/posPreflightService";
 
 type PendingSale = {
   requestId: string;
@@ -183,6 +184,7 @@ export async function submitPosSale(
     }
     if (result.error.message?.includes("INSUFFICIENT_STOCK") || result.error.message?.includes("PRICE_CHANGED") || result.error.message?.includes("PRODUCT_UNAVAILABLE")) {
       invalidatePOSCatalogCache(branchId);
+      invalidatePosPreflightCache(branchId);
     }
     if (friendly) throw new Error(friendly);
     throw new Error("تعذّر تأكيد حفظ البيع بسبب اتصال غير مؤكد. السلة محفوظة؛ أعد المحاولة نفسها ولن تُسجّل الفاتورة مرتين.");
@@ -207,6 +209,7 @@ export async function submitPosSale(
   }
 
   invalidatePOSCatalogCache(branchId);
+  invalidatePosPreflightCache(branchId);
 
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent<Sale>("pos:sale-completed", { detail: confirmedSale }));
