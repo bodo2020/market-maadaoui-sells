@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Banknote, RefreshCw, Safe, WalletCards } from "lucide-react";
+import { Banknote, Landmark, RefreshCw, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -98,7 +98,7 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => void refresh()} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث</Button>
-              <Button className="flex-1 bg-[#005931] hover:bg-[#004a29]" onClick={() => { setError(null); setDropOpen(true); }}><Safe className="h-4 w-4" /> توريد للخزنة</Button>
+              <Button className="flex-1 bg-[#005931] hover:bg-[#004a29]" onClick={() => { setError(null); setDropOpen(true); }}><Landmark className="h-4 w-4" /> توريد للخزنة</Button>
             </div>
           </div>
         </DialogContent>
@@ -121,7 +121,7 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
               <Textarea id="cash-drop-note" value={note} onChange={e => setNote(e.target.value)} placeholder="مثلاً: توريد منتصف الوردية" />
             </div>
             <Button className="h-12 w-full bg-[#005931] hover:bg-[#004a29]" onClick={() => void submitDrop()} disabled={submitting || !amount.trim()}>
-              {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Safe className="h-4 w-4" />} تأكيد التوريد
+              {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Landmark className="h-4 w-4" />} تأكيد التوريد
             </Button>
           </div>
         </DialogContent>
