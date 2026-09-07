@@ -131,6 +131,7 @@ export default function POSPro() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [remoteSearchResults, setRemoteSearchResults] = useState<Product[] | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [cashSummary, setCashSummary] = useState<PosCashSummary | null>(null);
@@ -437,11 +438,32 @@ export default function POSPro() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [checkoutOpen, weightProduct, scannerOpen, processBarcode, search]);
 
+  useEffect(() => {
+    const query = search.trim();
+    if (!query) {
+      setRemoteSearchResults(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void fetchPOSProducts(query)
+        .then(rows => { if (!cancelled) setRemoteSearchResults(rows); })
+        .catch(() => { if (!cancelled) setRemoteSearchResults([]); });
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [search, currentBranchId]);
+
   const visibleProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const list = query
+    const localMatches = query
       ? products.filter(product => product.name.toLowerCase().includes(query) || product.barcode?.includes(query) || product.bulk_barcode?.includes(query))
       : products;
+    const list = query ? (remoteSearchResults ?? localMatches) : products;
     return [...list].sort((a, b) => {
       const aFav = favorites.includes(a.id) ? 1 : 0;
       const bFav = favorites.includes(b.id) ? 1 : 0;
@@ -451,7 +473,7 @@ export default function POSPro() {
       if (aStock !== bStock) return bStock - aStock;
       return a.name.localeCompare(b.name, "ar");
     }).slice(0, query ? 100 : 50);
-  }, [products, search, favorites]);
+  }, [products, search, favorites, remoteSearchResults]);
 
   const subtotalAfterDiscount = useMemo(() => cartItems.reduce((sum, item) => sum + Number(item.total || 0), 0), [cartItems]);
   const discount = useMemo(() => cartItems.reduce((sum, item) => {
