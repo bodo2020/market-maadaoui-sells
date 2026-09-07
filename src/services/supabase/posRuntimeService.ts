@@ -10,6 +10,8 @@ export type PosRuntimeStatus = {
   shift_id?: string;
   opened_at?: string;
   drawer_balance?: number;
+  auto_lock_minutes?: number;
+  cash_warning_threshold?: number | null;
   checked_at?: string;
 };
 
