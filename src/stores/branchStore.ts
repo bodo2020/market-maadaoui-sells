@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { supabase } from '@/integrations/supabase/client';
 
 interface BranchState {
   currentBranchId: string | null;
@@ -9,17 +8,15 @@ interface BranchState {
   init: () => Promise<void>;
 }
 
-export const useBranchStore = create<BranchState>((set, get) => {
-  // Hydrate from localStorage immediately to avoid null branch on first render
+export const useBranchStore = create<BranchState>((set) => {
   const savedId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
   const savedName = typeof window !== 'undefined' ? localStorage.getItem('currentBranchName') : null;
 
   return {
     currentBranchId: savedId,
     currentBranchName: savedName,
-    initialized: !!savedId,
+    initialized: true,
     setBranch: (id, name = null) => {
-      // Save to localStorage whenever branch is set
       if (id) {
         localStorage.setItem('currentBranchId', id);
         localStorage.setItem('currentBranchName', name || '');
@@ -27,39 +24,14 @@ export const useBranchStore = create<BranchState>((set, get) => {
         localStorage.removeItem('currentBranchId');
         localStorage.removeItem('currentBranchName');
       }
-      set({ currentBranchId: id, currentBranchName: name });
+      set({ currentBranchId: id, currentBranchName: name, initialized: true });
     },
+    // Branch selection is authentication context, not an application default.
+    // AuthContext validates/restores the branch through get_my_staff_branches().
     init: async () => {
-      if (get().initialized) return;
-
-      try {
-        // Try to load from localStorage first
-        const savedId = localStorage.getItem('currentBranchId');
-        const savedName = localStorage.getItem('currentBranchName');
-        if (savedId) {
-          set({ currentBranchId: savedId, currentBranchName: savedName, initialized: true });
-          return;
-        }
-
-        // Otherwise, fetch the first active branch and set it as default
-        const { data, error } = await supabase
-          .from('branches')
-          .select('id, name')
-          .eq('active', true)
-          .order('created_at', { ascending: true })
-          .limit(1);
-
-        if (!error && data && data.length > 0) {
-          const branch = data[0];
-          localStorage.setItem('currentBranchId', branch.id);
-          localStorage.setItem('currentBranchName', branch.name || '');
-          set({ currentBranchId: branch.id, currentBranchName: branch.name || null, initialized: true });
-        } else {
-          set({ initialized: true });
-        }
-      } catch (_e) {
-        set({ initialized: true });
-      }
-    }
+      const currentId = localStorage.getItem('currentBranchId');
+      const currentName = localStorage.getItem('currentBranchName');
+      set({ currentBranchId: currentId, currentBranchName: currentName, initialized: true });
+    },
   };
 });
