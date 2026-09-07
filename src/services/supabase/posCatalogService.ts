@@ -6,6 +6,15 @@ const posRpc = supabase.rpc.bind(supabase) as unknown as (
   args: Record<string, unknown>,
 ) => Promise<{ data: unknown; error: { message: string } | null }>;
 
+type CatalogCache = {
+  branchId: string;
+  products: Product[];
+  loadedAt: number;
+};
+
+let catalogCache: CatalogCache | null = null;
+let catalogRequest: Promise<Product[]> | null = null;
+
 function currentBranchId(): string {
   const branchId = typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null;
   if (!branchId || branchId === 'null') throw new Error('BRANCH_REQUIRED');
@@ -63,8 +72,30 @@ function parseScaleBarcode(barcode: string): ScaleBarcode | null {
   };
 }
 
+export function invalidatePOSCatalogCache(branchId?: string) {
+  if (!catalogCache) return;
+  if (!branchId || catalogCache.branchId === branchId) catalogCache = null;
+}
+
 export async function fetchPOSProducts(search?: string): Promise<Product[]> {
-  return queryCatalog({ search, barcode: null, limit: 5000 });
+  const branchId = currentBranchId();
+  const query = search?.trim();
+
+  if (query) return queryCatalog({ search: query, barcode: null, limit: 5000 });
+
+  if (catalogCache?.branchId === branchId) return catalogCache.products;
+  if (catalogRequest) return catalogRequest;
+
+  catalogRequest = queryCatalog({ search: null, barcode: null, limit: 5000 })
+    .then(products => {
+      catalogCache = { branchId, products, loadedAt: Date.now() };
+      return products;
+    })
+    .finally(() => {
+      catalogRequest = null;
+    });
+
+  return catalogRequest;
 }
 
 export async function fetchPOSProductByBarcode(barcode: string): Promise<{ product: Product | null; isBulkBarcode: boolean }> {
