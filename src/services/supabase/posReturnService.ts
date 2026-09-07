@@ -37,6 +37,16 @@ export type PosReturnPreview = {
   lines: PosReturnPreviewLine[];
 };
 
+export type PendingPosCardRefund = {
+  id: string;
+  return_id: string;
+  sale_id: string;
+  amount: number;
+  status: "pending";
+  created_at: string;
+  provider_reference: string | null;
+};
+
 export type PosQuickReturnResult = {
   id: string;
   sale_id: string;
@@ -109,6 +119,12 @@ export async function getPosSaleReturnPreview(saleId: string): Promise<PosReturn
   if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تحميل بيانات المرتجع");
   if (!data || typeof data !== "object") throw new Error("لم تصل بيانات الفاتورة للمرتجع.");
   return data as PosReturnPreview;
+}
+
+export async function listPendingPosCardRefunds(saleId: string): Promise<PendingPosCardRefund[]> {
+  const { data, error } = await rpc("list_pos_sale_pending_card_refunds", { p_sale_id: saleId });
+  if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تحميل ردود البطاقة المعلقة");
+  return (Array.isArray(data) ? data : []) as PendingPosCardRefund[];
 }
 
 export async function submitPosQuickReturn(
@@ -198,5 +214,6 @@ export async function confirmPosCardRefund(refundId: string, providerReference: 
   });
   if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تأكيد رد البطاقة");
   if (!data || typeof data !== "object") throw new Error("لم يصل تأكيد رد البطاقة.");
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pos:return-card-confirmed", { detail: { refundId } }));
   return data as Record<string, unknown>;
 }
