@@ -212,7 +212,12 @@ export async function createPosQuickSession(device: LocalPosDevice, userId: stri
     }
     if (details.code === "PIN_NOT_CONFIGURED") throw new Error("PIN غير مفعّل لهذا الموظف");
     if (details.code === "POS_NOT_ALLOWED") throw new Error("الموظف غير مسموح له باستخدام نقطة البيع");
-    throw new Error("تعذر تسجيل الدخول السريع. استخدم دخول المدير وحاول مرة تانية.");
+    if (details.code === "AUTH_PROVISION_FAILED") throw new Error("تم قبول PIN لكن تعذر تجهيز حساب الموظف. حاول مرة أخرى.");
+    if (details.code === "AUTH_ACCOUNT_INVALID") throw new Error("حساب الموظف يحتاج إعادة تهيئة من الإدارة.");
+    if (details.code === "SESSION_LINK_FAILED" || details.code === "SESSION_EXCHANGE_FAILED") {
+      throw new Error("تم قبول PIN لكن تعذر بدء جلسة الكاشير. حاول مرة أخرى.");
+    }
+    throw new Error("تعذر تسجيل الدخول السريع. حاول مرة أخرى أو استخدم دخول المدير.");
   }
 
   const { error: sessionError } = await supabase.auth.setSession({
