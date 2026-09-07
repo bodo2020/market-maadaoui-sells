@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Upload, X, Image as ImageIcon, ImageDown } from "lucide-react";
+import { Upload, X, Image as ImageIcon, ImageDown, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { compressCatalogImage, formatFileSize } from "@/lib/imageCompression";
 
@@ -21,13 +21,39 @@ type CompressionSummary = {
   height: number;
 };
 
-function storagePathFromPublicUrl(urlValue: string, bucketName: string) {
+type StorageObjectRef = {
+  bucket: string;
+  path: string;
+};
+
+function storageObjectFromUrl(urlValue: string, fallbackBucket: string): StorageObjectRef | null {
   try {
     const url = new URL(urlValue);
-    const marker = `/storage/v1/object/public/${bucketName}/`;
-    const markerIndex = url.pathname.indexOf(marker);
-    if (markerIndex < 0) return null;
-    return decodeURIComponent(url.pathname.slice(markerIndex + marker.length));
+    const pathname = decodeURIComponent(url.pathname);
+    const markers = [
+      "/storage/v1/object/public/",
+      "/storage/v1/object/sign/",
+      "/storage/v1/object/authenticated/",
+      "/storage/v1/render/image/public/",
+      "/storage/v1/render/image/authenticated/",
+    ];
+
+    for (const marker of markers) {
+      const markerIndex = pathname.indexOf(marker);
+      if (markerIndex < 0) continue;
+
+      const remainder = pathname.slice(markerIndex + marker.length).replace(/^\/+/, "");
+      const slashIndex = remainder.indexOf("/");
+      if (slashIndex <= 0) return null;
+
+      const bucket = remainder.slice(0, slashIndex) || fallbackBucket;
+      const path = remainder.slice(slashIndex + 1).replace(/^\/+/, "");
+      if (!bucket || !path) return null;
+
+      return { bucket, path };
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -45,6 +71,7 @@ export function DragDropImage({
   const inputId = `image-upload-${reactId.replace(/:/g, "")}`;
   const [dragging, setDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [compression, setCompression] = useState<CompressionSummary | null>(null);
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
@@ -128,28 +155,38 @@ export function DragDropImage({
   };
 
   const handleRemove = async () => {
-    if (!value) return;
+    if (!value || isDeleting) return;
 
-    const filePath = storagePathFromPublicUrl(value, bucketName);
-    if (!filePath) {
-      // Older/external URLs may not belong to this bucket. Remove the reference without
-      // attempting to delete an unrelated Storage object.
+    const storageObject = storageObjectFromUrl(value, bucketName);
+    if (!storageObject) {
+      // External/legacy images that are not Supabase Storage objects have no bucket object to remove.
       onChange(null);
       setCompression(null);
+      toast.info("تم إزالة الصورة من السجل؛ الرابط لا يشير إلى ملف داخل Supabase Storage");
       return;
     }
 
     try {
-      const { error } = await supabase.storage
-        .from(bucketName)
-        .remove([filePath]);
+      setIsDeleting(true);
+      const { data, error } = await supabase.storage
+        .from(storageObject.bucket)
+        .remove([storageObject.path]);
+
       if (error) throw error;
+
+      // Supabase can return an empty array when no object matched the requested path.
+      if (!data || data.length === 0) {
+        throw new Error("لم يتم العثور على ملف الصورة داخل الـStorage لحذفه");
+      }
+
       onChange(null);
       setCompression(null);
-      toast.success("تم حذف الصورة");
+      toast.success(`تم حذف الصورة نهائيًا من bucket ${storageObject.bucket}`);
     } catch (error: any) {
       console.error("Image removal failed:", error);
-      toast.error(error?.message || "حدث خطأ أثناء حذف الصورة");
+      toast.error(error?.message || "تعذر حذف الصورة من Supabase Storage");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -161,7 +198,7 @@ export function DragDropImage({
         onDrop={handleDrop}
         className={`relative aspect-[4/3] max-h-[300px] rounded-xl border-2 border-dashed p-3 transition-colors
           ${dragging ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}
-          ${isUploading ? "pointer-events-none opacity-60" : ""}`}
+          ${isUploading || isDeleting ? "pointer-events-none opacity-60" : ""}`}
       >
         {value ? (
           <div className="relative h-full w-full">
@@ -173,10 +210,11 @@ export function DragDropImage({
             <button
               type="button"
               onClick={handleRemove}
-              aria-label="حذف الصورة"
-              className="absolute end-2 top-2 rounded-full bg-background/95 p-1.5 shadow hover:bg-muted"
+              disabled={isDeleting}
+              aria-label="حذف الصورة من التخزين"
+              className="absolute end-2 top-2 rounded-full bg-background/95 p-1.5 shadow hover:bg-muted disabled:cursor-not-allowed"
             >
-              <X className="h-4 w-4 text-destructive" />
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin text-destructive" /> : <X className="h-4 w-4 text-destructive" />}
             </button>
           </div>
         ) : (
@@ -210,7 +248,7 @@ export function DragDropImage({
           className="hidden"
           accept="image/jpeg,image/png,image/webp,image/avif"
           onChange={handleFileChange}
-          disabled={isUploading}
+          disabled={isUploading || isDeleting}
         />
       </div>
 
