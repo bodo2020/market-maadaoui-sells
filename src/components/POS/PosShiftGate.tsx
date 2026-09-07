@@ -4,6 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
 import { closePosShift, getMyOpenPosShift, openPosShift, PosShift } from "@/services/supabase/posShiftService";
+import { getPosCashSummary } from "@/services/supabase/posCashService";
+import PosCashDrawerWidget from "@/components/POS/PosCashDrawerWidget";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Banknote, Clock3, LogOut, MonitorSmartphone, Play, RefreshCw, Store, WalletCards } from "lucide-react";
+import { Clock3, LogOut, MonitorSmartphone, Play, RefreshCw, Store, WalletCards } from "lucide-react";
 
 function money(value: number | null | undefined) {
   return `${Number(value || 0).toFixed(2)} ج.م`;
@@ -26,6 +28,7 @@ export default function PosShiftGate({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openingCash, setOpeningCash] = useState("0");
+  const [expectedOpeningCash, setExpectedOpeningCash] = useState<number | null>(null);
   const [closingCash, setClosingCash] = useState("");
   const [closingNotes, setClosingNotes] = useState("");
   const [closingOpen, setClosingOpen] = useState(false);
@@ -40,13 +43,22 @@ export default function PosShiftGate({ children }: { children: ReactNode }) {
   const loadShift = async () => {
     if (!device) {
       setShift(null);
+      setExpectedOpeningCash(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      setShift(await getMyOpenPosShift(device));
+      const current = await getMyOpenPosShift(device);
+      setShift(current);
+      if (!current) {
+        const cash = await getPosCashSummary(device);
+        setExpectedOpeningCash(cash.drawer_balance);
+        setOpeningCash(cash.drawer_balance.toFixed(2));
+      } else {
+        setExpectedOpeningCash(null);
+      }
     } catch (e: any) {
       setError(e.message || "تعذر قراءة الوردية الحالية");
       setShift(null);
@@ -72,6 +84,7 @@ export default function PosShiftGate({ children }: { children: ReactNode }) {
       const opened = await openPosShift(device, amount);
       setShift(opened);
       setOpeningCash(String(opened.opening_cash ?? 0));
+      setExpectedOpeningCash(null);
     } catch (e: any) {
       setError(e.message || "تعذر بدء الوردية");
     } finally {
@@ -155,14 +168,15 @@ export default function PosShiftGate({ children }: { children: ReactNode }) {
             <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600 space-y-2">
               <div className="flex items-center justify-between"><span className="flex items-center gap-2"><Store className="h-4 w-4" /> الفرع</span><strong>{currentBranchName}</strong></div>
               <div className="flex items-center justify-between"><span className="flex items-center gap-2"><MonitorSmartphone className="h-4 w-4" /> الجهاز</span><strong>{device.device_name}</strong></div>
+              <div className="flex items-center justify-between border-t pt-2"><span>رصيد الدرج المسجل</span><strong className="text-[#005931]">{money(expectedOpeningCash)}</strong></div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="opening-cash">الرصيد الافتتاحي في درج الكاشير</Label>
+              <Label htmlFor="opening-cash">النقد المعدود فعليًا في الدرج</Label>
               <div className="relative">
                 <Input id="opening-cash" inputMode="decimal" value={openingCash} onChange={e => setOpeningCash(e.target.value)} className="h-12 pl-16 text-lg" />
                 <span className="absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">ج.م</span>
               </div>
-              <p className="text-xs leading-5 text-slate-500">اكتب النقد الموجود فعلًا في الدرج قبل أول فاتورة. لو الدرج فاضي اكتب 0.</p>
+              <p className="text-xs leading-5 text-slate-500">عدّ الفلوس وأكّد الرقم. لو الرقم مختلف عن رصيد النظام، الفرق لازم يتسجل كتسوية واضحة بدل تعديل الرصيد بصمت.</p>
             </div>
             <Button className="h-12 w-full bg-[#005931] hover:bg-[#004a29]" disabled={submitting} onClick={() => void startShift()}>
               {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} بدء الوردية وفتح الكاشير
@@ -187,8 +201,9 @@ export default function PosShiftGate({ children }: { children: ReactNode }) {
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">النقد الفعلي</div><strong>{money(closingSummary.closing_cash)}</strong></div>
             </div>
             <div className={`rounded-2xl p-4 text-center ${diff === 0 ? "bg-green-50 text-green-800" : diff > 0 ? "bg-blue-50 text-blue-800" : "bg-red-50 text-red-800"}`}>
-              <div className="text-xs">فرق الصندوق</div><div className="mt-1 text-2xl font-bold">{money(diff)}</div>
+              <div className="text-xs">فرق الصندوق المسجل كتسوية</div><div className="mt-1 text-2xl font-bold">{money(diff)}</div>
             </div>
+            <p className="text-center text-xs text-slate-500">رصيد الدرج بعد الإغلاق أصبح {money(closingSummary.drawer_balance_after ?? closingSummary.closing_cash)} ويستمر للوردية التالية.</p>
             <Button className="h-12 w-full" onClick={() => void switchEmployee()}><LogOut className="h-4 w-4" /> إنهاء وتبديل الموظف</Button>
           </CardContent>
         </Card>
@@ -199,6 +214,7 @@ export default function PosShiftGate({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
+      <PosCashDrawerWidget device={device} />
       <div dir="rtl" className="fixed bottom-4 left-4 z-50">
         <Button variant="outline" className="shadow-lg bg-white" onClick={() => { setClosingCash(""); setClosingNotes(""); setError(null); setClosingOpen(true); }}>
           <Clock3 className="h-4 w-4" /> الوردية مفتوحة
@@ -221,9 +237,9 @@ export default function PosShiftGate({ children }: { children: ReactNode }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="closing-notes">ملاحظات الإغلاق — اختياري</Label>
-              <Textarea id="closing-notes" value={closingNotes} onChange={e => setClosingNotes(e.target.value)} placeholder="مثلاً: تم تسليم النقد للمدير" />
+              <Textarea id="closing-notes" value={closingNotes} onChange={e => setClosingNotes(e.target.value)} placeholder="مثلاً: تم تسليم جزء من النقد للخزنة" />
             </div>
-            <div className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">النظام هيقارن النقد الفعلي بالنقد المتوقع من الرصيد الافتتاحي وكل حركات صندوق المتجر اللي عملها الموظف أثناء الوردية.</div>
+            <div className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">النظام هيقارن العد الفعلي برصيد Cash Ledger الحالي للدرج. أي فرق بيتسجل كتسوية مستقلة ومراجعتها تفضل محفوظة.</div>
             <Button className="h-12 w-full" variant="destructive" disabled={submitting || closingCash.trim()===""} onClick={() => void finishShift()}>
               {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />} تأكيد وإنهاء الوردية
             </Button>
