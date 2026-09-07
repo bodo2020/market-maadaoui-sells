@@ -15,10 +15,12 @@ function pendingSaleKey(userId: string, branchId: string, checkoutId: string) {
 function friendlySaleError(message?: string) {
   const value = message || "";
   if (value.includes("INSUFFICIENT_STOCK")) return "مخزون الفرع غير كافٍ. راجع الكميات قبل تأكيد البيع.";
+  if (value.includes("PRICE_CHANGED")) return "اتغير سعر أو عرض أحد المنتجات. تم إيقاف البيع لحماية الفاتورة؛ حدّث السلة وراجع الإجمالي ثم أكد مرة أخرى.";
   if (value.includes("POS_SHIFT_REQUIRED") || value.includes("SHIFT_NOT_OPEN") || value.includes("POS_SHIFT_CASH_ACCOUNT_MISSING")) {
     return "لا توجد وردية POS مفتوحة لهذا الموظف على الجهاز الحالي.";
   }
   if (value.includes("INVALID_BULK_QUANTITY")) return "كمية الجملة غير صحيحة. أضف عبوة جملة كاملة فقط.";
+  if (value.includes("INVALID_QUANTITY")) return "إحدى كميات السلة غير صحيحة. راجع الكمية أو الوزن.";
   if (value.includes("INVALID_PAYMENT_SPLIT")) return "تقسيم الدفع غير صحيح. مجموع النقدي والبطاقة يجب أن يساوي إجمالي الفاتورة.";
   if (value.includes("INVALID_SALE_TOTAL")) return "إجمالي الفاتورة غير متطابق. أعد مراجعة السلة.";
   if (value.includes("BRANCH_ACCESS_DENIED")) return "ليس لديك صلاحية تنفيذ بيع على الفرع الحالي.";
