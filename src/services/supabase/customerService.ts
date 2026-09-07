@@ -1,46 +1,61 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Customer } from "@/types";
 
-export async function fetchCustomers() {
-  try {
-    console.log("Fetching customers...");
-    const { data, error } = await supabase
-      .from("customers")
-      .select("*")
-      .order("name");
+const CUSTOMER_CACHE_MS = 30_000;
+let customerCache: { rows: Customer[]; loadedAt: number } | null = null;
+let customerRequest: Promise<Customer[]> | null = null;
 
-    if (error) {
-      console.error("Error fetching customers:", error);
-      toast.error("فشل في جلب العملاء");
-      return [];
-    }
+export function invalidateCustomerCache() {
+  customerCache = null;
+}
 
-    console.log("Successfully fetched customers:", data?.length || 0);
-    return data as Customer[];
-  } catch (error) {
-    console.error("Unexpected error fetching customers:", error);
-    toast.error("حدث خطأ غير متوقع");
-    return [];
+export async function fetchCustomers(force = false) {
+  if (!force && customerCache && Date.now() - customerCache.loadedAt < CUSTOMER_CACHE_MS) {
+    return customerCache.rows;
   }
+  if (!force && customerRequest) return customerRequest;
+
+  customerRequest = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("*")
+        .order("name");
+
+      if (error) {
+        console.error("Error fetching customers:", error);
+        toast.error("فشل في جلب العملاء");
+        return customerCache?.rows || [];
+      }
+
+      const rows = (data || []) as Customer[];
+      customerCache = { rows, loadedAt: Date.now() };
+      return rows;
+    } catch (error) {
+      console.error("Unexpected error fetching customers:", error);
+      toast.error("حدث خطأ غير متوقع");
+      return customerCache?.rows || [];
+    } finally {
+      customerRequest = null;
+    }
+  })();
+
+  return customerRequest;
 }
 
 export async function addCustomer(customer: Omit<Customer, "id" | "created_at" | "updated_at">) {
   try {
-    // Check if customer with same name or phone already exists
     if (customer.phone) {
       const { data: existingCustomer } = await supabase
         .from("customers")
         .select("*")
         .eq("phone", customer.phone)
         .single();
-      
-      if (existingCustomer) {
-        return existingCustomer as Customer;
-      }
+
+      if (existingCustomer) return existingCustomer as Customer;
     }
-    
+
     const { data, error } = await supabase.from("customers").insert(customer).select().single();
 
     if (error) {
@@ -49,6 +64,7 @@ export async function addCustomer(customer: Omit<Customer, "id" | "created_at" |
       return null;
     }
 
+    invalidateCustomerCache();
     toast.success("تمت إضافة العميل بنجاح");
     return data as Customer;
   } catch (error) {
@@ -73,6 +89,7 @@ export async function updateCustomer(id: string, updates: Partial<Omit<Customer,
       return null;
     }
 
+    invalidateCustomerCache();
     toast.success("تم تحديث العميل بنجاح");
     return data as Customer;
   } catch (error) {
@@ -92,6 +109,7 @@ export async function deleteCustomer(id: string) {
       return false;
     }
 
+    invalidateCustomerCache();
     toast.success("تم حذف العميل بنجاح");
     return true;
   } catch (error) {
@@ -131,7 +149,7 @@ export async function findCustomerByPhone(phone: string) {
       .eq("phone", phone)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // Not found error
+    if (error && error.code !== 'PGRST116') {
       console.error("Error finding customer by phone:", error);
       return null;
     }
@@ -144,24 +162,19 @@ export async function findCustomerByPhone(phone: string) {
 }
 
 export async function findOrCreateCustomer(customerInfo: { name: string; phone?: string }) {
-  if (!customerInfo.name && !customerInfo.phone) {
-    return null;
-  }
-  
+  if (!customerInfo.name && !customerInfo.phone) return null;
+
   try {
-    // First check if customer exists by phone
     if (customerInfo.phone) {
       const existingCustomer = await findCustomerByPhone(customerInfo.phone);
       if (existingCustomer) {
-        // If customer exists but name is different, update it
         if (existingCustomer.name !== customerInfo.name && customerInfo.name) {
           return updateCustomer(existingCustomer.id, { name: customerInfo.name });
         }
         return existingCustomer;
       }
     }
-    
-    // If no match by phone, create a new customer
+
     return addCustomer({
       name: customerInfo.name,
       phone: customerInfo.phone || null,
@@ -169,7 +182,6 @@ export async function findOrCreateCustomer(customerInfo: { name: string; phone?:
       address: null,
       notes: null
     });
-    
   } catch (error) {
     console.error("Error in findOrCreateCustomer:", error);
     return null;
