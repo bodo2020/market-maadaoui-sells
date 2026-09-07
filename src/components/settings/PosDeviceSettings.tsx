@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { MonitorSmartphone, ShieldCheck, KeyRound, RefreshCw, Power, CheckCircle2 } from "lucide-react";
+import { Clock3, MonitorSmartphone, ShieldCheck, KeyRound, RefreshCw, Power, CheckCircle2, UserRound } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,36 +51,53 @@ export default function PosDeviceSettings() {
 
   const localDevice = currentBranchId ? getLocalPosDevice(currentBranchId) : null;
 
-  const refresh = async () => {
+  const applyDeviceRows = (deviceRows: PosDevice[]) => {
+    setDevices(deviceRows);
+    setDeviceDrafts(prev => {
+      const next = { ...prev };
+      deviceRows.forEach(device => {
+        if (!next[device.device_id]) {
+          next[device.device_id] = {
+            autoLock: String(device.auto_lock_minutes || 10),
+            cashThreshold: device.cash_warning_threshold == null ? "" : String(device.cash_warning_threshold),
+          };
+        }
+      });
+      return next;
+    });
+  };
+
+  const refresh = async (quiet = false) => {
     if (!currentBranchId) return;
-    setLoading(true);
+    if (!quiet) setLoading(true);
     try {
       const [pinStatus, deviceRows] = await Promise.all([
         canUsePos ? hasMyPosPin(currentBranchId) : Promise.resolve(false),
         canManageDevices ? listPosDevices(currentBranchId) : Promise.resolve([]),
       ]);
       setPinReady(pinStatus);
-      setDevices(deviceRows);
-      setDeviceDrafts(Object.fromEntries(deviceRows.map(device => [
-        device.device_id,
-        {
-          autoLock: String(device.auto_lock_minutes || 10),
-          cashThreshold: device.cash_warning_threshold == null ? "" : String(device.cash_warning_threshold),
-        },
-      ])));
+      applyDeviceRows(deviceRows);
     } catch (error: any) {
-      toast({
-        title: "تعذر تحميل إعدادات الجهاز",
-        description: error.message || "حاول مرة تانية",
-        variant: "destructive",
-      });
+      if (!quiet) {
+        toast({
+          title: "تعذر تحميل إعدادات الجهاز",
+          description: error.message || "حاول مرة تانية",
+          variant: "destructive",
+        });
+      }
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
   useEffect(() => {
     void refresh();
+  }, [currentBranchId, canManageDevices, canUsePos]);
+
+  useEffect(() => {
+    if (!currentBranchId || !canManageDevices) return;
+    const timer = window.setInterval(() => void refresh(true), 15000);
+    return () => window.clearInterval(timer);
   }, [currentBranchId, canManageDevices, canUsePos]);
 
   const registerCurrentDevice = async () => {
@@ -268,7 +285,7 @@ export default function PosDeviceSettings() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">أجهزة الفرع وسياسة التشغيل</CardTitle>
-            <CardDescription>حدد مدة القفل التلقائي لكل جهاز، ويمكنك وضع حد اختياري لتنبيه الكاشير عندما تزيد النقدية في الدرج.</CardDescription>
+            <CardDescription>الحالة الحية لكل كاشير، مدة القفل التلقائي، وحد تنبيه النقدية في الدرج.</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -280,19 +297,27 @@ export default function PosDeviceSettings() {
                 {devices.map(device => {
                   const isThisDevice = localDevice?.device_id === device.device_id;
                   const draft = deviceDrafts[device.device_id] || { autoLock: String(device.auto_lock_minutes || 10), cashThreshold: device.cash_warning_threshold == null ? "" : String(device.cash_warning_threshold) };
+                  const hasOpenShift = Boolean(device.current_shift_id);
                   return (
                     <div key={device.device_id} className="rounded-2xl border p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-semibold">{device.device_name}</span>
                             <Badge variant={device.active ? "default" : "secondary"}>{device.active ? "نشط" : "ملغي"}</Badge>
                             {isThisDevice && <Badge variant="outline">هذا الجهاز</Badge>}
+                            {device.active && <Badge className={hasOpenShift ? "bg-emerald-600" : "bg-slate-500"}>{hasOpenShift ? "وردية مفتوحة" : "متاح"}</Badge>}
                           </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{device.device_code}{device.last_seen_at ? ` · آخر استخدام ${new Date(device.last_seen_at).toLocaleString("ar-EG")}` : " · لم يستخدم بعد"}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{device.device_code}{device.last_seen_at ? ` · آخر اتصال ${new Date(device.last_seen_at).toLocaleString("ar-EG")}` : " · لم يستخدم بعد"}</p>
+                          {hasOpenShift && (
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-emerald-800"><UserRound className="h-3.5 w-3.5" /> {device.current_employee_name || "موظف POS"}</span>
+                              {device.shift_opened_at && <span className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-slate-700"><Clock3 className="h-3.5 w-3.5" /> بدأت {new Date(device.shift_opened_at).toLocaleString("ar-EG")}</span>}
+                            </div>
+                          )}
                         </div>
                         {device.active && (
-                          <Button variant="outline" size="sm" onClick={() => void revokeDevice(device)} disabled={revokingId === device.device_id}>
+                          <Button variant="outline" size="sm" onClick={() => void revokeDevice(device)} disabled={revokingId === device.device_id || hasOpenShift} title={hasOpenShift ? "اقفل الوردية الحالية قبل إلغاء الجهاز" : "إلغاء الجهاز"}>
                             {revokingId === device.device_id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
                             إلغاء الجهاز
                           </Button>
