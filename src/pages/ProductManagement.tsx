@@ -1,83 +1,110 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { siteConfig } from "@/config/site";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Search, Plus, Pencil, Trash2, Package, ArrowUpDown, MoreHorizontal, Tag, Barcode, Box, Loader2, ScanLine, Image as ImageIcon, FolderOpen, Building2, QrCode, Eye, Edit, ShoppingCart, Download } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Product } from "@/types";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { fetchProducts, createProduct, updateProduct, deleteProduct, fetchProductById } from "@/services/supabase/productService";
-import { fetchCompanies } from "@/services/supabase/companyService";
-import { fetchMainCategories, fetchSubcategories } from "@/services/supabase/categoryService";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button as ShadcnButton } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Loader } from "lucide-react";
-// import { createOfferForProduct } from "@/services/supabase/offerService";
-import { Company, MainCategory, Subcategory } from "@/types";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import ProductAssignmentDialog from "@/components/categories/ProductAssignmentDialog";
+import { useToast } from "@/hooks/use-toast";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import { fetchCompanies } from "@/services/supabase/companyService";
+import { fetchMainCategories } from "@/services/supabase/categoryService";
+import {
+  fetchAllProductManagementRows,
+  fetchProductManagementPage,
+  type ProductManagementRow,
+} from "@/services/supabase/productManagementService";
+import type { Company, MainCategory } from "@/types";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import {
+  AlertTriangle,
+  Barcode,
+  Box,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Edit3,
+  Eye,
+  FileSpreadsheet,
+  Image as ImageIcon,
+  Loader2,
+  Package,
+  PackageCheck,
+  PackagePlus,
+  Plus,
+  ScanLine,
+  Search,
+} from "lucide-react";
+
+const PAGE_SIZE = 50;
+
+function money(value: number) {
+  return `${Number(value || 0).toFixed(2)} ${siteConfig.currency}`;
+}
+
+function stockBadge(row: ProductManagementRow) {
+  if (row.stock_status === "out") return <Badge variant="destructive">نفد</Badge>;
+  if (row.stock_status === "low") return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">منخفض</Badge>;
+  return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">متوفر</Badge>;
+}
 
 export default function ProductManagement() {
   const navigate = useNavigate();
-  const { toast: showToast } = useToast();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [mainCategories, setMainCategories] = useState<MainCategory[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState("all");
-  const [selectedMainCategory, setSelectedMainCategory] = useState("all");
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false);
-  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
-  const [barcodeInput, setBarcodeInput] = useState("");
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state for offers
-  const [offerData, setOfferData] = useState({
-    title: "",
-    discount_type: "percentage",
-    discount_value: 0,
-    valid_from: "",
-    valid_to: "",
-    description: ""
-  });
+  const [rows, setRows] = useState<ProductManagementRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [companyId, setCompanyId] = useState("all");
+  const [categoryId, setCategoryId] = useState("all");
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [categories, setCategories] = useState<MainCategory[]>([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
-    loadProducts();
-    loadCompanies();
-    loadMainCategories();
-    loadSubcategories();
+    void Promise.all([fetchCompanies(), fetchMainCategories()])
+      .then(([companyRows, categoryRows]) => {
+        setCompanies(companyRows || []);
+        setCategories(categoryRows || []);
+      })
+      .catch(error => console.error("Product filter data error:", error));
   }, []);
 
-  const loadProducts = async () => {
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  const loadRows = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await fetchProducts();
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Error loading products:', error);
-      showToast({
-        title: "خطأ",
-        description: "فشل في تحميل المنتجات",
+      const result = await fetchProductManagementPage({
+        search: debouncedSearch,
+        companyId: companyId === "all" ? null : companyId,
+        categoryId: categoryId === "all" ? null : categoryId,
+        page,
+        pageSize: PAGE_SIZE,
+      });
+      setRows(result.rows);
+      setTotal(result.total);
+    } catch (error: any) {
+      setRows([]);
+      setTotal(0);
+      toast({
+        title: "تعذر تحميل المنتجات",
+        description: error?.message || "راجع الفرع الحالي وحاول مرة أخرى.",
         variant: "destructive",
       });
     } finally {
@@ -85,524 +112,262 @@ export default function ProductManagement() {
     }
   };
 
-  const loadCompanies = async () => {
-    try {
-      const data = await fetchCompanies();
-      setCompanies(data || []);
-    } catch (error) {
-      console.error('Error loading companies:', error);
-    }
+  useEffect(() => {
+    void loadRows();
+  }, [debouncedSearch, companyId, categoryId, page]);
+
+  useEffect(() => {
+    const onCatalogChanged = () => void loadRows();
+    window.addEventListener("catalog:changed", onCatalogChanged);
+    return () => window.removeEventListener("catalog:changed", onCatalogChanged);
+  }, [debouncedSearch, companyId, categoryId, page]);
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const linkedCount = rows.filter(row => row.is_linked_sale_unit).length;
+  const lowCount = rows.filter(row => row.stock_status === "low").length;
+  const outCount = rows.filter(row => row.stock_status === "out").length;
+
+  const companyNames = useMemo(() => new Map(companies.map(company => [company.id, company.name])), [companies]);
+  const categoryNames = useMemo(() => new Map(categories.map(category => [category.id, category.name])), [categories]);
+
+  const handleBarcodeScan = (barcodeValue: string) => {
+    setScannerOpen(false);
+    setSearch(barcodeValue);
+    requestAnimationFrame(() => searchInputRef.current?.focus());
   };
 
-  const loadMainCategories = async () => {
-    try {
-      const data = await fetchMainCategories();
-      setMainCategories(data || []);
-    } catch (error) {
-      console.error('Error loading main categories:', error);
-    }
+  const clearFilters = () => {
+    setSearch("");
+    setDebouncedSearch("");
+    setCompanyId("all");
+    setCategoryId("all");
+    setPage(1);
   };
 
-  const loadSubcategories = async () => {
+  const exportExcel = async () => {
+    setExporting(true);
     try {
-      const data = await fetchSubcategories();
-      setSubcategories(data || []);
-    } catch (error) {
-      console.error('Error loading subcategories:', error);
-    }
-  };
-
-  // Filter products based on search and selected filters
-  const filteredProducts = products.filter(product => {
-    const normalizeDigits = (s: string) =>
-      s.replace(/[\u0660-\u0669]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x0660 + 48))
-       .replace(/[\u06F0-\u06F9]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x06F0 + 48));
-
-    const normalizedSearch = normalizeDigits(search).toLowerCase().trim();
-    if (!normalizedSearch) return (selectedCompany === "all" || product.company_id === selectedCompany) && (selectedMainCategory === "all" || product.main_category_id === selectedMainCategory);
-
-    const nameMatch = (product.name || "").toLowerCase().includes(normalizedSearch);
-    const barcodeMatch = (product.barcode || "").includes(normalizedSearch);
-    const bulkBarcodeMatch = ((product as any).bulk_barcode || "").includes(normalizedSearch);
-
-    const matchesCompany = selectedCompany === "all" || product.company_id === selectedCompany;
-    const matchesMainCategory = selectedMainCategory === "all" || product.main_category_id === selectedMainCategory;
-
-    return (nameMatch || barcodeMatch || bulkBarcodeMatch) && matchesCompany && matchesMainCategory;
-  });
-
-  const handleDeleteProduct = async () => {
-    if (!selectedProduct) return;
-    
-    try {
-      await deleteProduct(selectedProduct.id);
-      setProducts(products.filter(p => p.id !== selectedProduct.id));
-      setIsDeleteConfirmOpen(false);
-      setSelectedProduct(null);
-      showToast({
-        title: "تم الحذف بنجاح",
-        description: "تم حذف المنتج بنجاح",
+      const exportRows = await fetchAllProductManagementRows({
+        search: debouncedSearch,
+        companyId: companyId === "all" ? null : companyId,
+        categoryId: categoryId === "all" ? null : categoryId,
       });
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      showToast({
-        title: "خطأ",
-        description: "فشل في حذف المنتج",
-        variant: "destructive",
-      });
-    }
-  };
 
-  const handleAddOffer = async () => {
-    if (!selectedProduct) return;
-
-    try {
-      // TODO: Implement createOfferForProduct function
-      console.log("Creating offer for product:", selectedProduct.id, offerData);
-      setIsOfferDialogOpen(false);
-      setOfferData({
-        title: "",
-        discount_type: "percentage",
-        discount_value: 0,
-        valid_from: "",
-        valid_to: "",
-        description: ""
-      });
-      showToast({
-        title: "تم إنشاء العرض بنجاح",
-        description: "تم إضافة العرض للمنتج بنجاح",
-      });
-    } catch (error) {
-      console.error('Error creating offer:', error);
-      showToast({
-        title: "خطأ",
-        description: "فشل في إنشاء العرض",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleBarcodeScanning = () => {
-    setIsScannerOpen(true);
-  };
-
-  const handleBarcodeScan = (barcode: string) => {
-    const foundProduct = products.find(p => p.barcode === barcode);
-    if (foundProduct) {
-      navigate(`/product-details/${foundProduct.id}`);
-      toast.success(`تم العثور على المنتج: ${foundProduct.name}`);
-    } else {
-      toast.error("لم يتم العثور على منتج بهذا الباركود");
-    }
-    setIsScannerOpen(false);
-  };
-
-  const handleEditClick = (product: Product) => {
-    navigate(`/add-product?id=${product.id}`);
-  };
-
-  const handleAddOfferClick = (product: Product) => {
-    setSelectedProduct(product);
-    setIsOfferDialogOpen(true);
-  };
-
-  const handleExportToExcel = async () => {
-    try {
       const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'نظام إدارة المتاجر';
+      workbook.creator = "المعداوي ماركت";
       workbook.created = new Date();
-
-      const worksheet = workbook.addWorksheet('المنتجات');
-
-      // إضافة العناوين
-      worksheet.columns = [
-        { header: 'اسم المنتج', key: 'name', width: 30 },
-        { header: 'الباركود', key: 'barcode', width: 20 },
-        { header: 'السعر', key: 'price', width: 15 },
-        { header: 'سعر الشراء', key: 'purchase_price', width: 15 },
-        { header: 'الكمية', key: 'quantity', width: 12 },
-        { header: 'الحد الأدنى', key: 'min_stock_level', width: 12 },
-        { header: 'الوصف', key: 'description', width: 35 },
-        { header: 'الشركة', key: 'company', width: 20 },
-        { header: 'الفئة الرئيسية', key: 'main_category', width: 20 },
-        { header: 'الفئة الفرعية', key: 'subcategory', width: 20 },
+      const sheet = workbook.addWorksheet("المنتجات", { views: [{ rightToLeft: true }] });
+      sheet.columns = [
+        { header: "نوع السجل", key: "type", width: 18 },
+        { header: "اسم المنتج", key: "name", width: 34 },
+        { header: "المنتج الأساسي", key: "parent", width: 30 },
+        { header: "الباركود", key: "barcode", width: 22 },
+        { header: "الوحدة", key: "unit", width: 15 },
+        { header: "معامل التحويل", key: "factor", width: 15 },
+        { header: "سعر البيع", key: "price", width: 14 },
+        { header: "سعر الشراء", key: "purchase", width: 14 },
+        { header: "الربح", key: "profit", width: 14 },
+        { header: "المخزون", key: "quantity", width: 14 },
+        { header: "الشركة", key: "company", width: 22 },
+        { header: "القسم", key: "category", width: 22 },
+        { header: "الحالة", key: "status", width: 14 },
       ];
 
-      // تنسيق العناوين
-      const headerRow = worksheet.getRow(1);
-      headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
-      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '4472C4' } };
-      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-
-      // إضافة البيانات
-      const productsToExport = search || selectedCompany !== 'all' || selectedMainCategory !== 'all' 
-        ? filteredProducts 
-        : products;
-
-      for (const product of productsToExport) {
-        const company = companies.find(c => c.id === product.company_id);
-        const mainCategory = mainCategories.find(mc => mc.id === product.main_category_id);
-        const subcategory = subcategories.find(sc => sc.id === product.subcategory_id);
-
-        worksheet.addRow({
-          name: product.name || '',
-          barcode: product.barcode || '',
-          price: product.price || 0,
-          purchase_price: product.purchase_price || 0,
-          quantity: product.quantity || 0,
-          min_stock_level: product.min_stock_level || 5,
-          description: product.description || '',
-          company: company?.name || '',
-          main_category: mainCategory?.name || '',
-          subcategory: subcategory?.name || '',
+      exportRows.forEach(row => {
+        sheet.addRow({
+          type: row.is_linked_sale_unit ? "وحدة بيع مرتبطة" : "منتج أساسي",
+          name: row.name,
+          parent: row.parent_name || "",
+          barcode: row.barcode || "",
+          unit: row.unit_of_measure || "",
+          factor: row.conversion_factor || 1,
+          price: Number(row.price || 0),
+          purchase: Number(row.purchase_price || 0),
+          profit: Number(row.price || 0) - Number(row.purchase_price || 0),
+          quantity: Number(row.quantity || 0),
+          company: row.company_id ? companyNames.get(row.company_id) || "" : "",
+          category: row.main_category_id ? categoryNames.get(row.main_category_id) || "" : "",
+          status: row.active ? (row.stock_status === "out" ? "نفد" : row.stock_status === "low" ? "منخفض" : "متوفر") : "متوقف",
         });
-      }
-
-      // تنسيق جميع الخلايا
-      worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber > 1) {
-          row.alignment = { vertical: 'middle', horizontal: 'right' };
-        }
       });
 
-      // حفظ الملف
+      const header = sheet.getRow(1);
+      header.font = { bold: true };
+      header.alignment = { horizontal: "center", vertical: "middle" };
+      sheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) row.alignment = { horizontal: "right", vertical: "middle" };
+      });
+
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-      });
-      
-      const fileName = `المنتجات_${new Date().toISOString().split('T')[0]}.xlsx`;
-      saveAs(blob, fileName);
-
-      toast.success(`تم تصدير ${productsToExport.length} منتج بنجاح`);
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      toast.error('فشل في تصدير الملف');
+      saveAs(
+        new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+        `المنتجات_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+      toast({ title: `تم تصدير ${exportRows.length} سجل` });
+    } catch (error: any) {
+      toast({ title: "تعذر تصدير المنتجات", description: error?.message, variant: "destructive" });
+    } finally {
+      setExporting(false);
     }
   };
 
   return (
     <MainLayout>
-      <div className="flex-1 space-y-4 p-4 pt-6">
-        <div className="flex items-center justify-between space-y-2">
-          <h2 className="text-3xl font-bold tracking-tight">إدارة المنتجات</h2>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleExportToExcel}>
-              <Download className="ml-2 h-4 w-4" />
-              تصدير Excel
+      <div className="space-y-5 p-4 pb-10 md:p-6" dir="rtl">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold md:text-3xl">المنتجات</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              المنتج الأساسي ووحدات الجملة يظهروا كسجلات مستقلة، مع مخزون موحد في الخلفية.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => navigate("/inventory-import")}>
+              <FileSpreadsheet className="ms-2 h-4 w-4" />
+              رفع منتجات Excel
+            </Button>
+            <Button variant="outline" onClick={() => void exportExcel()} disabled={exporting}>
+              {exporting ? <Loader2 className="ms-2 h-4 w-4 animate-spin" /> : <Download className="ms-2 h-4 w-4" />}
+              تصدير
             </Button>
             <Button onClick={() => navigate("/add-product")}>
-              <Plus className="ml-2 h-4 w-4" />
-              إضافة منتج جديد
+              <Plus className="ms-2 h-4 w-4" />
+              إضافة منتج
             </Button>
           </div>
         </div>
 
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">إجمالي السجلات</p><p className="mt-1 text-2xl font-bold">{total.toLocaleString("ar-EG")}</p></div><Package className="h-7 w-7 text-primary/60" /></CardContent></Card>
+          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">وحدات بيع في الصفحة</p><p className="mt-1 text-2xl font-bold">{linkedCount.toLocaleString("ar-EG")}</p></div><Box className="h-7 w-7 text-primary/60" /></CardContent></Card>
+          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">مخزون منخفض في الصفحة</p><p className="mt-1 text-2xl font-bold text-amber-700">{lowCount.toLocaleString("ar-EG")}</p></div><AlertTriangle className="h-7 w-7 text-amber-500" /></CardContent></Card>
+          <Card><CardContent className="flex items-center justify-between p-4"><div><p className="text-xs text-muted-foreground">نفد في الصفحة</p><p className="mt-1 text-2xl font-bold text-destructive">{outCount.toLocaleString("ar-EG")}</p></div><PackageCheck className="h-7 w-7 text-destructive/60" /></CardContent></Card>
+        </div>
+
         <Card>
-          <CardHeader>
-            <CardTitle>قائمة المنتجات</CardTitle>
-            <CardDescription>
-              إدارة وعرض جميع المنتجات في النظام
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center space-x-2 space-x-reverse mb-4">
-              <Input
-                placeholder="البحث عن منتج..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="max-w-sm"
-              />
-              <Button variant="outline">
-                <Search className="ml-2 h-4 w-4" />
-                بحث
-              </Button>
-              <Button variant="outline" onClick={handleBarcodeScanning}>
-                <QrCode className="ml-2 h-4 w-4" />
-                ماسح الباركود
-              </Button>
-            </div>
-            
-            <div className="flex gap-2 flex-wrap">
-              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="فلترة بالشركة" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">جميع الشركات</SelectItem>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedMainCategory} onValueChange={setSelectedMainCategory}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="فلترة بالفئة الرئيسية" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">جميع الفئات</SelectItem>
-                  {mainCategories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {selectedProducts.length > 0 && (
-                <Button
-                  variant="outline"
-                  onClick={() => setIsAssignmentDialogOpen(true)}
-                >
-                  <Tag className="ml-2 h-4 w-4" />
-                  تصنيف المنتجات المحددة ({selectedProducts.length})
-                </Button>
-              )}
-            </div>
-
-            {loading ? (
-              <div className="flex justify-center items-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin" />
-                <span className="mr-2">جاري تحميل المنتجات...</span>
+          <CardContent className="space-y-4 p-4">
+            <div className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_220px_220px_auto]">
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  ref={searchInputRef}
+                  value={search}
+                  onChange={event => setSearch(event.target.value)}
+                  placeholder="ابحث بالاسم أو الباركود أو اسم وحدة الجملة..."
+                  className="pr-9"
+                />
               </div>
-            ) : (
-              <div className="rounded-md border mt-4">
+              <Select value={companyId} onValueChange={value => { setCompanyId(value); setPage(1); }}>
+                <SelectTrigger><SelectValue placeholder="الشركة" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">كل الشركات</SelectItem>
+                  {companies.map(company => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={categoryId} onValueChange={value => { setCategoryId(value); setPage(1); }}>
+                <SelectTrigger><SelectValue placeholder="القسم" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">كل الأقسام</SelectItem>
+                  {categories.map(category => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="icon" onClick={() => setScannerOpen(true)} title="مسح باركود">
+                  <ScanLine className="h-4 w-4" />
+                </Button>
+                {(search || companyId !== "all" || categoryId !== "all") && (
+                  <Button type="button" variant="ghost" onClick={clearFilters}>مسح الفلاتر</Button>
+                )}
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedProducts(filteredProducts.map(p => p.id));
-                            } else {
-                              setSelectedProducts([]);
-                            }
-                          }}
-                        />
-                      </TableHead>
                       <TableHead>الصورة</TableHead>
-                      <TableHead>اسم المنتج</TableHead>
+                      <TableHead>المنتج</TableHead>
                       <TableHead>الباركود</TableHead>
-                      <TableHead>السعر</TableHead>
+                      <TableHead>النوع</TableHead>
+                      <TableHead>سعر البيع</TableHead>
+                      <TableHead>سعر الشراء</TableHead>
+                      <TableHead>الربح</TableHead>
                       <TableHead>المخزون</TableHead>
-                      <TableHead>الإجراءات</TableHead>
+                      <TableHead>الحالة</TableHead>
+                      <TableHead className="text-left">الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProducts.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8">
-                          <div className="flex flex-col items-center justify-center space-y-2">
-                            <Package className="h-8 w-8 text-muted-foreground" />
-                            <p className="text-muted-foreground">
-                              {products.length === 0 ? "لا توجد منتجات" : "لم يتم العثور على منتجات"}
-                            </p>
-                            {products.length === 0 && (
-                              <Button variant="outline" onClick={() => navigate("/add-product")}>
-                                <Plus className="ml-2 h-4 w-4" />
-                                إضافة منتج جديد
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredProducts.map((product) => (
-                        <TableRow 
-                          key={product.id}
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => navigate(`/product-details/${product.id}`)}
-                        >
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={selectedProducts.includes(product.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedProducts([...selectedProducts, product.id]);
-                                } else {
-                                  setSelectedProducts(selectedProducts.filter(id => id !== product.id));
-                                }
-                              }}
-                            />
-                          </TableCell>
+                    {loading ? (
+                      <TableRow><TableCell colSpan={10}><div className="flex items-center justify-center py-12 text-muted-foreground"><Loader2 className="ms-2 h-5 w-5 animate-spin" /> جاري تحميل المنتجات...</div></TableCell></TableRow>
+                    ) : rows.length === 0 ? (
+                      <TableRow><TableCell colSpan={10}><div className="py-12 text-center text-muted-foreground"><Package className="mx-auto mb-3 h-9 w-9 opacity-30" /><p>لا توجد منتجات مطابقة</p></div></TableCell></TableRow>
+                    ) : rows.map(row => {
+                      const profitValue = Number(row.price || 0) - Number(row.purchase_price || 0);
+                      return (
+                        <TableRow key={row.row_key} className={!row.active ? "opacity-55" : ""}>
                           <TableCell>
-                            {product.image_urls && product.image_urls.length > 0 ? (
-                              <img 
-                                src={product.image_urls[0]} 
-                                alt={product.name}
-                                className="w-10 h-10 object-cover rounded"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">
-                                <span className="text-xs text-gray-500">لا توجد صورة</span>
-                              </div>
-                            )}
+                            <div className="h-12 w-12 overflow-hidden rounded-lg border bg-muted">
+                              {row.image_urls?.[0] ? <img src={row.image_urls[0]} alt={row.name} className="h-full w-full object-contain" /> : <ImageIcon className="m-auto h-full w-5 text-muted-foreground/40" />}
+                            </div>
                           </TableCell>
-                          <TableCell className="font-medium">{product.name}</TableCell>
-                          <TableCell>{product.barcode || 'غير محدد'}</TableCell>
-                          <TableCell>{product.price} ج.م</TableCell>
-                          <TableCell>{product.quantity}</TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <span className="sr-only">فتح القائمة</span>
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => navigate(`/product-details/${product.id}`)}>
-                                  <Eye className="ml-2 h-4 w-4" />
-                                  عرض التفاصيل
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleEditClick(product)}>
-                                  <Edit className="ml-2 h-4 w-4" />
-                                  تعديل
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleAddOfferClick(product)}>
-                                  <ShoppingCart className="ml-2 h-4 w-4" />
-                                  إضافة عرض
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  onClick={() => {
-                                    setSelectedProduct(product);
-                                    setIsDeleteConfirmOpen(true);
-                                  }}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="ml-2 h-4 w-4" />
-                                  حذف
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                          <TableCell className="min-w-[220px]">
+                            <button
+                              type="button"
+                              className="text-right"
+                              onClick={() => navigate(row.is_linked_sale_unit ? `/add-product?id=${row.base_product_id}` : `/product-details/${row.base_product_id}`)}
+                            >
+                              <p className="font-semibold hover:text-primary">{row.name}</p>
+                              {row.is_linked_sale_unit ? (
+                                <p className="mt-0.5 text-xs text-muted-foreground">مرتبط بـ {row.parent_name} · ×{Number(row.conversion_factor).toLocaleString("ar-EG")}</p>
+                              ) : (
+                                <p className="mt-0.5 text-xs text-muted-foreground">{row.company_id ? companyNames.get(row.company_id) || "" : ""}{row.main_category_id ? ` · ${categoryNames.get(row.main_category_id) || ""}` : ""}</p>
+                              )}
+                            </button>
+                          </TableCell>
+                          <TableCell><span className="font-mono text-xs" dir="ltr">{row.barcode || "—"}</span></TableCell>
+                          <TableCell>
+                            {row.is_linked_sale_unit ? <Badge variant="secondary"><PackagePlus className="ms-1 h-3 w-3" />{row.variant_type || "جملة"} ×{Number(row.conversion_factor)}</Badge> : row.barcode_type === "scale" ? <Badge variant="outline"><Barcode className="ms-1 h-3 w-3" />ميزان</Badge> : <Badge variant="outline">أساسي</Badge>}
+                          </TableCell>
+                          <TableCell className="font-semibold">{money(row.price)}</TableCell>
+                          <TableCell>{money(row.purchase_price)}</TableCell>
+                          <TableCell className={profitValue < 0 ? "font-semibold text-destructive" : "font-semibold text-emerald-700"}>{money(profitValue)}</TableCell>
+                          <TableCell>
+                            <div className="font-semibold">{Number(row.quantity || 0).toLocaleString("ar-EG")}</div>
+                            <div className="text-[11px] text-muted-foreground">{row.unit_of_measure || "وحدة"}</div>
+                          </TableCell>
+                          <TableCell><div className="flex flex-col items-start gap-1">{stockBadge(row)}{!row.active && <Badge variant="secondary">متوقف</Badge>}</div></TableCell>
+                          <TableCell>
+                            <div className="flex justify-end gap-1">
+                              {!row.is_linked_sale_unit && (
+                                <Button type="button" variant="ghost" size="icon" title="التفاصيل" onClick={() => navigate(`/product-details/${row.base_product_id}`)}><Eye className="h-4 w-4" /></Button>
+                              )}
+                              <Button type="button" variant="ghost" size="icon" title="تعديل" onClick={() => navigate(`/add-product?id=${row.base_product_id}`)}><Edit3 className="h-4 w-4" /></Button>
+                            </div>
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
-            )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+              <p className="text-muted-foreground">
+                {total > 0 ? `عرض ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} من ${total}` : "لا توجد نتائج"}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => setPage(value => Math.max(1, value - 1))}><ChevronRight className="h-4 w-4" /> السابق</Button>
+                <span className="min-w-20 text-center">{page} / {pageCount}</span>
+                <Button variant="outline" size="sm" disabled={page >= pageCount || loading} onClick={() => setPage(value => Math.min(pageCount, value + 1))}>التالي <ChevronLeft className="h-4 w-4" /></Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>تأكيد الحذف</DialogTitle>
-              <DialogDescription>
-                هل أنت متأكد من حذف المنتج "{selectedProduct?.name}"؟ هذا الإجراء لا يمكن التراجع عنه.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>
-                إلغاء
-              </Button>
-              <Button variant="destructive" onClick={handleDeleteProduct}>
-                حذف
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Offer Dialog */}
-        <Dialog open={isOfferDialogOpen} onOpenChange={setIsOfferDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>إضافة عرض للمنتج</DialogTitle>
-              <DialogDescription>
-                إضافة عرض خاص للمنتج "{selectedProduct?.name}"
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="offer-title">عنوان العرض</Label>
-                <Input
-                  id="offer-title"
-                  value={offerData.title}
-                  onChange={(e) => setOfferData({...offerData, title: e.target.value})}
-                  placeholder="مثال: خصم 20% على المنتج"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>نوع الخصم</Label>
-                  <Select value={offerData.discount_type} onValueChange={(value) => setOfferData({...offerData, discount_type: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="percentage">نسبة مئوية</SelectItem>
-                      <SelectItem value="fixed">مبلغ ثابت</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>قيمة الخصم</Label>
-                  <Input
-                    type="number"
-                    value={offerData.discount_value}
-                    onChange={(e) => setOfferData({...offerData, discount_value: Number(e.target.value)})}
-                    placeholder="20"
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>تاريخ البداية</Label>
-                  <Input
-                    type="date"
-                    value={offerData.valid_from}
-                    onChange={(e) => setOfferData({...offerData, valid_from: e.target.value})}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>تاريخ النهاية</Label>
-                  <Input
-                    type="date"
-                    value={offerData.valid_to}
-                    onChange={(e) => setOfferData({...offerData, valid_to: e.target.value})}
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsOfferDialogOpen(false)}>
-                إلغاء
-              </Button>
-              <Button onClick={handleAddOffer}>إضافة العرض</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Product Assignment Dialog */}
-        <ProductAssignmentDialog
-          open={isAssignmentDialogOpen}
-          onOpenChange={setIsAssignmentDialogOpen}
-          product={selectedProduct}
-          onSaved={() => {
-            setSelectedProducts([]);
-            loadProducts();
-          }}
-          type="category"
-        />
-
-        {/* Barcode Scanner */}
-        <BarcodeScanner
-          isOpen={isScannerOpen}
-          onClose={() => setIsScannerOpen(false)}
-          onScan={handleBarcodeScan}
-        />
+        <BarcodeScanner isOpen={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleBarcodeScan} />
       </div>
     </MainLayout>
   );
