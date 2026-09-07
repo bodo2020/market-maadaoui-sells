@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DragDropImage } from "@/components/ui/drag-drop-image";
+import { fetchProductById } from "@/services/supabase/productService";
 import { toast } from "sonner";
 import { AlertTriangle, Box, Edit3, Loader2, PackagePlus, Power, PowerOff, WandSparkles } from "lucide-react";
 import {
@@ -61,6 +62,9 @@ export default function ProductSaleUnitsCard({
   const [editing, setEditing] = useState<ProductVariant | null>(null);
   const [form, setForm] = useState<ProductVariantInput>(EMPTY_FORM);
   const [legacyDraftOpen, setLegacyDraftOpen] = useState(false);
+  const [detectedLegacyBulk, setDetectedLegacyBulk] = useState<LegacyBulkDraft | null>(legacyBulk ?? null);
+
+  const resolvedLegacyBulk = legacyBulk === undefined ? detectedLegacyBulk : legacyBulk;
 
   const loadRows = async () => {
     if (!productId) return;
@@ -80,13 +84,46 @@ export default function ProductSaleUnitsCard({
     void loadRows();
   }, [productId]);
 
+  useEffect(() => {
+    if (legacyBulk !== undefined) {
+      setDetectedLegacyBulk(legacyBulk || null);
+      return;
+    }
+    if (!productId) {
+      setDetectedLegacyBulk(null);
+      return;
+    }
+
+    let cancelled = false;
+    void fetchProductById(productId)
+      .then(product => {
+        if (cancelled) return;
+        setDetectedLegacyBulk({
+          enabled: Boolean(product.bulk_enabled),
+          quantity: Number(product.bulk_quantity || 0),
+          price: Number(product.bulk_price || 0),
+          barcode: product.bulk_barcode || "",
+          purchasePrice: Number(product.purchase_price || 0),
+          imageUrl: product.image_urls?.[0] || null,
+        });
+      })
+      .catch(error => {
+        console.error("Legacy bulk draft load error:", error);
+        if (!cancelled) setDetectedLegacyBulk(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [productId, legacyBulk]);
+
   const activeCount = useMemo(() => rows.filter(row => row.active).length, [rows]);
   const canUseLegacyDraft = Boolean(
     productId &&
-      legacyBulk?.enabled &&
+      resolvedLegacyBulk?.enabled &&
       rows.length === 0 &&
-      Number(legacyBulk.quantity || 0) > 1 &&
-      Number(legacyBulk.price || 0) > 0,
+      Number(resolvedLegacyBulk.quantity || 0) > 1 &&
+      Number(resolvedLegacyBulk.price || 0) > 0,
   );
 
   const openCreate = () => {
@@ -101,20 +138,20 @@ export default function ProductSaleUnitsCard({
   };
 
   const openLegacyCreate = () => {
-    const factor = Math.max(2, Number(legacyBulk?.quantity || 2));
-    const basePurchase = Math.max(0, Number(legacyBulk?.purchasePrice || 0));
+    const factor = Math.max(2, Number(resolvedLegacyBulk?.quantity || 2));
+    const basePurchase = Math.max(0, Number(resolvedLegacyBulk?.purchasePrice || 0));
     setEditing(null);
     setLegacyDraftOpen(true);
     setForm({
       ...EMPTY_FORM,
       name: productName ? `${productName} - جملة` : "وحدة جملة",
       variant_type: "جملة",
-      price: Math.max(0, Number(legacyBulk?.price || 0)),
+      price: Math.max(0, Number(resolvedLegacyBulk?.price || 0)),
       purchase_price: Number((basePurchase * factor).toFixed(2)),
       conversion_factor: factor,
-      barcode: legacyBulk?.barcode || "",
+      barcode: resolvedLegacyBulk?.barcode || "",
       bulk_barcode: "",
-      image_url: legacyBulk?.imageUrl || null,
+      image_url: resolvedLegacyBulk?.imageUrl || null,
       active: true,
       position: rows.length,
     });
@@ -235,8 +272,8 @@ export default function ProductSaleUnitsCard({
                     بيانات جملة قديمة جاهزة للتحويل
                   </div>
                   <p className="mt-1 text-xs leading-6 text-amber-900/80">
-                    عبوة × {Number(legacyBulk?.quantity || 0).toLocaleString("ar-EG")} · سعر {Number(legacyBulk?.price || 0).toFixed(2)} ج.م
-                    {legacyBulk?.barcode ? ` · باركود ${legacyBulk.barcode}` : " · باركود الجملة ناقص وسيطلب منك إدخاله"}.
+                    عبوة × {Number(resolvedLegacyBulk?.quantity || 0).toLocaleString("ar-EG")} · سعر {Number(resolvedLegacyBulk?.price || 0).toFixed(2)} ج.م
+                    {resolvedLegacyBulk?.barcode ? ` · باركود ${resolvedLegacyBulk.barcode}` : " · باركود الجملة ناقص وسيطلب منك إدخاله"}.
                     لن يتغير مخزون المنتج الأساسي أثناء التحويل.
                   </p>
                 </div>
