@@ -32,6 +32,20 @@ export type ProductManagementRow = {
   total_count: number;
 };
 
+export type ProductManagementStats = {
+  total_products: number;
+  in_stock_products: number;
+  low_stock_products: number;
+  out_of_stock_products: number;
+  offer_products: number;
+  active_sale_units: number;
+  inactive_sale_units: number;
+  legacy_bulk_unresolved: number;
+  operational_branch_id: string;
+  inventory_branch_id: string;
+  pricing_branch_id: string;
+};
+
 export type ProductManagementFilters = {
   search?: string;
   companyId?: string | null;
@@ -44,6 +58,24 @@ const rpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
   args: Record<string, unknown>,
 ) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
+
+function productManagementError(message?: string) {
+  if (message?.includes("BRANCH_ACCESS_DENIED")) {
+    return new Error("ليس لديك صلاحية إدارة منتجات الفرع الحالي.");
+  }
+  return new Error(message || "تعذر تحميل بيانات المنتجات.");
+}
+
+export async function fetchProductManagementStats(): Promise<ProductManagementStats> {
+  const branchId = requireCurrentBranchId();
+  const { data, error } = await rpc("get_product_management_stats", {
+    p_branch_id: branchId,
+  });
+
+  if (error) throw productManagementError(error.message);
+  if (!data || typeof data !== "object") throw new Error("تعذر قراءة إحصائيات المنتجات.");
+  return data as ProductManagementStats;
+}
 
 export async function fetchProductManagementPage(filters: ProductManagementFilters = {}) {
   const branchId = requireCurrentBranchId();
@@ -59,12 +91,7 @@ export async function fetchProductManagementPage(filters: ProductManagementFilte
     p_offset: (page - 1) * pageSize,
   });
 
-  if (error) {
-    if (error.message?.includes("BRANCH_ACCESS_DENIED")) {
-      throw new Error("ليس لديك صلاحية إدارة منتجات الفرع الحالي.");
-    }
-    throw new Error(error.message || "تعذر تحميل المنتجات.");
-  }
+  if (error) throw productManagementError(error.message);
 
   const rows = (Array.isArray(data) ? data : []) as ProductManagementRow[];
   return {
