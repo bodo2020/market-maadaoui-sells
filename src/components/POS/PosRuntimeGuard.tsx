@@ -1,11 +1,13 @@
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Backspace, LockKeyhole, RefreshCw, WifiOff } from "lucide-react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Backspace, LockKeyhole, RefreshCw, ShieldAlert, WifiOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { createPosQuickSession, getLocalPosDevice } from "@/services/supabase/posDeviceService";
+import { getPosRuntimeStatus } from "@/services/supabase/posRuntimeService";
 import { Button } from "@/components/ui/button";
 
 const AUTO_LOCK_MS = 10 * 60 * 1000;
+const HEALTH_CHECK_MS = 20 * 1000;
 
 function PinKeypad({ onDigit, onClear, onBackspace, disabled }: {
   onDigit: (digit: string) => void;
@@ -33,6 +35,8 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
   const [pin, setPin] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [runtimeIssue, setRuntimeIssue] = useState<string | null>(null);
+  const [checkingRuntime, setCheckingRuntime] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   const device = useMemo(
@@ -40,17 +44,39 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
     [currentBranchId],
   );
 
-  const armTimer = () => {
+  const armTimer = useCallback(() => {
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => {
       setPin("");
       setError(null);
       setLocked(true);
     }, AUTO_LOCK_MS);
-  };
+  }, []);
+
+  const checkRuntime = useCallback(async () => {
+    if (!device || !user?.id || !online || locked) return;
+    setCheckingRuntime(true);
+    try {
+      const status = await getPosRuntimeStatus(device);
+      if (!status.ready) {
+        setRuntimeIssue(status.code === "SHIFT_NOT_OPEN"
+          ? "الوردية الحالية اتقفلت أو لم تعد متاحة. حدّث الصفحة لبدء وردية جديدة قبل أي بيع."
+          : "نقطة البيع غير جاهزة حاليًا.");
+        return;
+      }
+      setRuntimeIssue(null);
+    } catch (e: any) {
+      setRuntimeIssue(e?.message || "تعذر التحقق من حالة الجهاز والوردية.");
+    } finally {
+      setCheckingRuntime(false);
+    }
+  }, [device?.device_id, device?.device_token, user?.id, online, locked]);
 
   useEffect(() => {
-    const goOnline = () => setOnline(true);
+    const goOnline = () => {
+      setOnline(true);
+      setRuntimeIssue(null);
+    };
     const goOffline = () => setOnline(false);
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
@@ -71,11 +97,24 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
       if (timerRef.current) window.clearTimeout(timerRef.current);
       events.forEach(event => window.removeEventListener(event, activity));
     };
-  }, [locked, user?.id, currentBranchId]);
+  }, [locked, user?.id, currentBranchId, armTimer]);
+
+  useEffect(() => {
+    if (!device || !user?.id || !online || locked) return;
+    void checkRuntime();
+    const timer = window.setInterval(() => void checkRuntime(), HEALTH_CHECK_MS);
+    return () => window.clearInterval(timer);
+  }, [device?.device_id, user?.id, online, locked, checkRuntime]);
 
   const addDigit = (digit: string) => {
     setError(null);
     setPin(value => value.length >= 6 ? value : value + digit);
+  };
+
+  const lockNow = () => {
+    setPin("");
+    setError(null);
+    setLocked(true);
   };
 
   const unlock = async () => {
@@ -84,6 +123,12 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
     setError(null);
     try {
       await createPosQuickSession(device, user.id, pin);
+      const status = await getPosRuntimeStatus(device);
+      if (!status.ready) {
+        setRuntimeIssue("الوردية لم تعد مفتوحة. حدّث الصفحة قبل استكمال البيع.");
+        return;
+      }
+      setRuntimeIssue(null);
       setPin("");
       setLocked(false);
       armTimer();
@@ -94,12 +139,6 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
       setUnlocking(false);
     }
   };
-
-  useEffect(() => {
-    if (locked && pin.length >= 4 && pin.length <= 6) {
-      // Do not auto-submit because employees can use 4, 5 or 6 digit PINs.
-    }
-  }, [locked, pin]);
 
   return (
     <>
@@ -112,7 +151,35 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
 
       {children}
 
-      {locked && (
+      {!locked && !runtimeIssue && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="fixed left-3 top-20 z-[70] bg-white/95 shadow-md backdrop-blur"
+          onClick={lockNow}
+          title="قفل شاشة الكاشير بدون إنهاء الوردية"
+        >
+          <LockKeyhole className="h-4 w-4" /> قفل
+        </Button>
+      )}
+
+      {checkingRuntime && !locked && !runtimeIssue && (
+        <div className="pointer-events-none fixed left-3 top-32 z-[60] rounded-full bg-white/90 p-2 text-slate-400 shadow-sm"><RefreshCw className="h-3.5 w-3.5 animate-spin" /></div>
+      )}
+
+      {runtimeIssue && (
+        <div dir="rtl" className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600"><ShieldAlert className="h-7 w-7" /></div>
+            <h2 className="mt-4 text-xl font-black">تم إيقاف البيع مؤقتًا</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{runtimeIssue}</p>
+            <Button className="mt-5 h-12 w-full bg-[#005931] hover:bg-[#004a29]" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" /> تحديث حالة الكاشير</Button>
+          </div>
+        </div>
+      )}
+
+      {locked && !runtimeIssue && (
         <div dir="rtl" className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md">
           <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl">
             <div className="text-center">
