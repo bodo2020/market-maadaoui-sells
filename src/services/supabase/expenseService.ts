@@ -1,200 +1,114 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Expense } from "@/types";
 
+const rpc = supabase.rpc.bind(supabase) as unknown as (
+  name: string,
+  args?: Record<string, unknown>,
+) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
+
 function getCurrentBranchId(): string {
-  const branchId = localStorage.getItem('currentBranchId');
-  if (!branchId || branchId === 'null') {
-    throw new Error('يجب اختيار فرع أولاً');
-  }
+  const branchId = localStorage.getItem("currentBranchId");
+  if (!branchId || branchId === "null") throw new Error("يجب اختيار فرع أولاً");
   return branchId;
 }
 
-export async function fetchExpenses(branchId?: string) {
-  const currentBranchId = branchId || localStorage.getItem('currentBranchId');
-
-  let query = supabase.from("expenses").select("*");
-  if (currentBranchId) query = query.eq('branch_id', currentBranchId);
-
-  const { data, error } = await query.order("date", { ascending: false });
-  if (error) {
-    console.error("Error fetching expenses:", error);
-    throw error;
+function expenseError(message?: string) {
+  if (!message) return "تعذر حفظ المصروف";
+  if (message.startsWith("INSUFFICIENT_SAFE_CASH|")) {
+    const balance = message.split("|")[1] || "0.00";
+    return `رصيد خزنة الفرع غير كافٍ. الرصيد الحالي ${balance} ج.م`;
   }
+  switch (message) {
+    case "AUTH_REQUIRED": return "سجّل الدخول مرة أخرى.";
+    case "EXPENSE_MANAGE_DENIED": return "ليس لديك صلاحية إدارة مصروفات هذا الفرع.";
+    case "INVALID_AMOUNT": return "قيمة المصروف غير صحيحة.";
+    case "EXPENSE_DETAILS_REQUIRED": return "اكتب نوع المصروف ووصفه.";
+    case "EXPENSE_NOT_FOUND": return "المصروف غير موجود.";
+    case "EXPENSE_FINANCIAL_FIELDS_LOCKED": return "بعد تسجيل المصروف نقديًا لا يمكن تغيير قيمته. ألغِ المصروف وأنشئ مصروفًا جديدًا بالقيمة الصحيحة.";
+    case "USE_EXPENSE_VOID": return "المصروف النقدي لا يُحذف. استخدم الإلغاء حتى يظل أثر النقدية محفوظًا.";
+    default: return message;
+  }
+}
+
+function expenseDate(expense: Partial<Expense>) {
+  if (!expense.date) return new Date().toISOString();
+  return typeof expense.date === "string" ? expense.date : (expense.date as Date).toISOString();
+}
+
+export async function fetchExpenses(branchId?: string) {
+  const currentBranchId = branchId || localStorage.getItem("currentBranchId");
+  let query = supabase.from("expenses").select("*").eq("status" as never, "active" as never);
+  if (currentBranchId) query = query.eq("branch_id", currentBranchId);
+  const { data, error } = await query.order("date", { ascending: false });
+  if (error) throw error;
   return data as Expense[];
 }
 
 export async function fetchExpenseById(id: string) {
-  const { data, error } = await supabase
-    .from("expenses")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const { data, error } = await supabase.from("expenses").select("*").eq("id", id).single();
+  if (error) throw error;
+  return data as Expense;
+}
 
-  if (error) {
-    console.error("Error fetching expense:", error);
-    throw error;
-  }
+async function createExpenseWithSource(
+  expense: Omit<Expense, "id" | "created_at" | "updated_at">,
+  source: "safe" | "noncash",
+) {
+  const { data, error } = await rpc("create_branch_expense_atomic", {
+    p_branch_id: getCurrentBranchId(),
+    p_type: expense.type,
+    p_amount: Number(expense.amount),
+    p_description: expense.description,
+    p_date: expenseDate(expense),
+    p_receipt_url: expense.receipt_url || null,
+    p_source: source,
+  });
+  if (error || !data || typeof data !== "object") throw new Error(expenseError(error?.message));
   return data as Expense;
 }
 
 export async function createExpense(expense: Omit<Expense, "id" | "created_at" | "updated_at">) {
-  try {
-    const currentBranchId = getCurrentBranchId();
-
-    const { error: deductionError } = await supabase.functions.invoke('add-cash-transaction', {
-      body: {
-        amount: expense.amount,
-        transaction_type: 'withdrawal',
-        register_type: 'store',
-        notes: `مصروف: ${expense.type} - ${expense.description}`,
-        branch_id: currentBranchId,
-      },
-    });
-
-    if (deductionError) {
-      console.error("Error deducting expense from cash register:", deductionError);
-      throw new Error("فشل في خصم المبلغ من الخزنة");
-    }
-
-    const formattedDate = typeof expense.date === 'string'
-      ? expense.date
-      : (expense.date as Date).toISOString();
-
-    const { data, error } = await supabase
-      .from("expenses")
-      .insert([{
-        type: expense.type,
-        amount: expense.amount,
-        description: expense.description,
-        date: formattedDate,
-        receipt_url: expense.receipt_url || null,
-        branch_id: currentBranchId,
-      }])
-      .select();
-
-    if (error) {
-      console.error("Error creating expense:", error);
-      throw error;
-    }
-
-    return data[0] as Expense;
-  } catch (error) {
-    console.error("Error in createExpense:", error);
-    throw error;
-  }
+  return createExpenseWithSource(expense, "safe");
 }
 
 export async function updateExpense(id: string, expense: Partial<Expense>) {
-  const updateData: any = {};
-
+  const updateData: Record<string, unknown> = {};
   Object.keys(expense).forEach(key => {
-    if (expense[key as keyof Expense] !== undefined) {
-      if (key === 'date' && expense.date) {
-        updateData[key] = typeof expense.date === 'string'
-          ? expense.date
-          : (expense.date as Date).toISOString();
-      } else {
-        updateData[key] = expense[key as keyof Expense];
-      }
-    }
+    const value = expense[key as keyof Expense];
+    if (value === undefined) return;
+    updateData[key] = key === "date" && expense.date ? expenseDate(expense) : value;
   });
 
-  // Never let a browser edit move an expense to another branch.
-  delete updateData.branch_id;
-
-  const { data, error } = await supabase
-    .from("expenses")
-    .update(updateData)
-    .eq("id", id)
-    .select();
-
-  if (error) {
-    console.error("Error updating expense:", error);
-    throw error;
+  // Financial fields are immutable once an expense is posted. Correct amounts by void + recreate.
+  for (const key of ["branch_id", "amount", "paid_from_account_id", "payment_method", "shift_id", "status", "voided_at", "voided_by", "void_reason", "created_by"]) {
+    delete updateData[key];
   }
-  return data[0] as Expense;
+
+  const { data, error } = await supabase.from("expenses").update(updateData as never).eq("id", id).select().single();
+  if (error) throw new Error(expenseError(error.message));
+  return data as Expense;
 }
 
 export async function deleteExpense(id: string) {
-  const { data: expense, error: fetchError } = await supabase
-    .from("expenses")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (fetchError) {
-    console.error("Error fetching expense for deletion:", fetchError);
-    throw fetchError;
-  }
-
-  if (!expense.branch_id) {
-    throw new Error("المصروف غير مرتبط بفرع ولا يمكن تعديل الخزنة بأمان");
-  }
-
-  const { error: refundError } = await supabase.functions.invoke('add-cash-transaction', {
-    body: {
-      amount: expense.amount,
-      transaction_type: 'deposit',
-      register_type: 'store',
-      notes: `إلغاء مصروف: ${expense.type} - ${expense.description}`,
-      branch_id: expense.branch_id,
-    },
+  const { data, error } = await rpc("void_branch_expense_atomic", {
+    p_expense_id: id,
+    p_reason: "إلغاء من شاشة المصروفات",
   });
-
-  if (refundError) {
-    console.error("Error refunding to cash register:", refundError);
-    throw new Error("فشل في إعادة المبلغ للخزنة");
-  }
-
-  const { error } = await supabase.from("expenses").delete().eq("id", id);
-  if (error) {
-    console.error("Error deleting expense:", error);
-    throw error;
-  }
+  if (error || !data) throw new Error(expenseError(error?.message));
   return true;
 }
 
-// تسجيل مصروف التوالف دون خصم من الخزنة.
+// التوالف مصروف محاسبي، وليس حركة نقدية من الخزنة.
 export async function createDamageExpense(expense: Omit<Expense, "id" | "created_at" | "updated_at">) {
-  try {
-    const currentBranchId = getCurrentBranchId();
-    const formattedDate = typeof expense.date === 'string'
-      ? expense.date
-      : (expense.date as Date).toISOString();
-
-    const { data, error } = await supabase
-      .from("expenses")
-      .insert([{
-        type: expense.type,
-        amount: expense.amount,
-        description: expense.description,
-        date: formattedDate,
-        receipt_url: expense.receipt_url || null,
-        branch_id: currentBranchId,
-      }])
-      .select();
-
-    if (error) {
-      console.error("Error creating damage expense:", error);
-      throw error;
-    }
-    return data[0] as Expense;
-  } catch (error) {
-    console.error("Error in createDamageExpense:", error);
-    throw error;
-  }
+  return createExpenseWithSource(expense, "noncash");
 }
 
 export async function getExpensesByDateRange(startDate?: string, endDate?: string) {
-  let query = supabase.from("expenses").select("*").order("date", { ascending: false });
+  let query = supabase.from("expenses").select("*").eq("status" as never, "active" as never).order("date", { ascending: false });
   if (startDate) query = query.gte("date", startDate);
   if (endDate) query = query.lte("date", endDate);
-
   const { data, error } = await query;
-  if (error) {
-    console.error("Error fetching expenses by date range:", error);
-    throw error;
-  }
+  if (error) throw error;
   return data as Expense[];
 }
 
@@ -202,20 +116,16 @@ export async function getExpensesByType() {
   const { data, error } = await supabase
     .from("expenses")
     .select("type, amount")
+    .eq("status" as never, "active" as never)
     .order("amount", { ascending: false });
+  if (error) throw error;
 
-  if (error) {
-    console.error("Error fetching expenses by type:", error);
-    throw error;
-  }
-
-  const grouped = data.reduce((acc: any, expense) => {
+  const grouped = (data || []).reduce((acc: Record<string, { type: string; amount: number; count: number }>, expense: any) => {
     if (!acc[expense.type]) acc[expense.type] = { type: expense.type, amount: 0, count: 0 };
-    acc[expense.type].amount += expense.amount;
+    acc[expense.type].amount += Number(expense.amount || 0);
     acc[expense.type].count += 1;
     return acc;
   }, {});
-
   return Object.values(grouped);
 }
 
@@ -223,11 +133,8 @@ export async function getMonthlyExpensesTrend(months: number = 6) {
   const { data, error } = await supabase
     .from("expenses")
     .select("amount, date, type")
+    .eq("status" as never, "active" as never)
     .gte("date", new Date(Date.now() - months * 30 * 24 * 60 * 60 * 1000).toISOString());
-
-  if (error) {
-    console.error("Error fetching monthly expenses trend:", error);
-    throw error;
-  }
+  if (error) throw error;
   return data as Expense[];
 }
