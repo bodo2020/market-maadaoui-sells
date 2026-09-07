@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Banknote, CreditCard, Landmark, RefreshCw, WalletCards } from "lucide-react";
+import { Banknote, CreditCard, Landmark, RefreshCw, RotateCcw, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { useBranchStore } from "@/stores/branchStore";
 import {
+  confirmOnlineRefund,
   depositOnlineCashToSafe,
   getOnlineMoneyOverview,
+  getPendingOnlineRefunds,
   recordOnlineGatewaySettlement,
 } from "@/services/supabase/onlineMoneyService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,12 +31,21 @@ export default function OnlineMoneySettings() {
   const [fee, setFee] = useState("0");
   const [reference, setReference] = useState("");
   const [settlementNote, setSettlementNote] = useState("");
+  const [refundReferences, setRefundReferences] = useState<Record<string, string>>({});
   const [savingCash, setSavingCash] = useState(false);
   const [savingSettlement, setSavingSettlement] = useState(false);
+  const [confirmingRefund, setConfirmingRefund] = useState<string | null>(null);
 
   const query = useQuery({
     queryKey: ["online-money-overview", currentBranchId],
     queryFn: () => getOnlineMoneyOverview(currentBranchId!),
+    enabled: Boolean(currentBranchId),
+    refetchInterval: 5000,
+  });
+
+  const refundsQuery = useQuery({
+    queryKey: ["pending-online-refunds", currentBranchId],
+    queryFn: () => getPendingOnlineRefunds(currentBranchId!),
     enabled: Boolean(currentBranchId),
     refetchInterval: 5000,
   });
@@ -103,6 +114,24 @@ export default function OnlineMoneySettings() {
     }
   };
 
+  const confirmRefund = async (refundId: string) => {
+    setConfirmingRefund(refundId);
+    try {
+      await confirmOnlineRefund(refundId, refundReferences[refundId]);
+      toast.success("تم تأكيد رد المبلغ من مزود الدفع");
+      setRefundReferences(prev => {
+        const next = { ...prev };
+        delete next[refundId];
+        return next;
+      });
+      await Promise.all([refundsQuery.refetch(), query.refetch()]);
+    } catch (error: any) {
+      toast.error(error?.message || "تعذر تأكيد رد المبلغ");
+    } finally {
+      setConfirmingRefund(null);
+    }
+  };
+
   if (!currentBranchId) {
     return <Alert><AlertDescription>اختار الفرع أولًا لعرض وتسوية أموال الطلبات الإلكترونية.</AlertDescription></Alert>;
   }
@@ -114,7 +143,7 @@ export default function OnlineMoneySettings() {
           <h2 className="text-xl font-bold">تسويات الأونلاين</h2>
           <p className="mt-1 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · افصل النقد المحصل عن الأموال المعلقة عند مزودي الدفع.</p>
         </div>
-        <Button variant="outline" size="sm" disabled={query.isFetching} onClick={() => query.refetch()}>
+        <Button variant="outline" size="sm" disabled={query.isFetching} onClick={() => Promise.all([query.refetch(), refundsQuery.refetch()])}>
           <RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} /> تحديث
         </Button>
       </div>
@@ -175,6 +204,40 @@ export default function OnlineMoneySettings() {
         <CardContent className="space-y-2">
           {clearingAccounts.length === 0 ? <p className="text-sm text-muted-foreground">لا توجد أرصدة إلكترونية مسجلة حتى الآن.</p> : clearingAccounts.map(account => (
             <div key={account.account_id} className="flex items-center justify-between rounded-xl border p-3 text-sm"><span>{account.name}</span><strong>{money(account.balance)}</strong></div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><RotateCcw className="h-5 w-5" /> Refunds إلكترونية في انتظار المزود</CardTitle>
+          <CardDescription>اعتماد المرتجع يرجع المخزون فورًا، لكن رد Wallet/Card لا يُعتبر مكتملًا إلا بعد تأكيد مزود الدفع هنا.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {refundsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">جاري تحميل عمليات رد المبالغ...</p>
+          ) : (refundsQuery.data || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">لا توجد Refunds إلكترونية معلقة.</p>
+          ) : (refundsQuery.data || []).map(refund => (
+            <div key={refund.refund_id} className="rounded-xl border p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="font-medium">{refund.payment_method.toUpperCase()} · {money(refund.amount)}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">طلب {refund.order_id.slice(0, 8)} · مرتجع {refund.return_id.slice(0, 8)}</div>
+                </div>
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-xs text-amber-800">في انتظار تأكيد المزود</span>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  value={refundReferences[refund.refund_id] || ""}
+                  onChange={e => setRefundReferences(prev => ({ ...prev, [refund.refund_id]: e.target.value }))}
+                  placeholder="مرجع Refund من مزود الدفع — اختياري"
+                />
+                <Button disabled={confirmingRefund === refund.refund_id} onClick={() => confirmRefund(refund.refund_id)}>
+                  {confirmingRefund === refund.refund_id && <RefreshCw className="ml-2 h-4 w-4 animate-spin" />} تأكيد رد المبلغ
+                </Button>
+              </div>
+            </div>
           ))}
         </CardContent>
       </Card>
