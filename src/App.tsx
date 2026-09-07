@@ -7,6 +7,7 @@ import NotFound from "@/pages/NotFound";
 import POSPro from "@/pages/POSPro";
 import PosShiftGatePro from "@/components/POS/PosShiftGatePro";
 import PosRuntimeGuard from "@/components/POS/PosRuntimeGuard";
+import PosRecentSales from "@/components/POS/PosRecentSales";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -68,7 +69,10 @@ const queryClient = new QueryClient({
 const CashierPOS = () => (
   <PosShiftGatePro>
     <PosRuntimeGuard>
-      <POSPro />
+      <>
+        <POSPro />
+        <PosRecentSales />
+      </>
     </PosRuntimeGuard>
   </PosShiftGatePro>
 );
