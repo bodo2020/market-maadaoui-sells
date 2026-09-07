@@ -27,7 +27,23 @@ function relativeTime(value: string) {
 function friendlyEventType(value: string) {
   if (value === "checkout_retry") return "إعادة محاولة حفظ البيع";
   if (value === "checkout_error") return "خطأ في إتمام البيع";
+  if (value === "checkout_slow") return "حفظ البيع بطيء";
+  if (value === "preflight_slow") return "مراجعة السلة بطيئة";
   return value.replaceAll("_", " ");
+}
+
+function eventHint(event: PosOperationalEvent) {
+  if (event.event_type === "preflight_slow") return "التحقق من السعر والمخزون أخذ وقتًا أطول من الطبيعي. راقب الاتصال أو زمن استجابة قاعدة البيانات.";
+  if (event.event_type === "checkout_slow") return "حفظ الفاتورة الذري أخذ وقتًا أطول من الطبيعي. الفاتورة تظل محمية من التكرار.";
+  if (event.event_type === "checkout_retry") return "حصل عدم يقين لحظي في الاتصال وتمت إعادة نفس Request ID بأمان بدون إنشاء فاتورة مكررة.";
+  return null;
+}
+
+function eventDuration(event: PosOperationalEvent) {
+  const raw = event.details?.duration_ms;
+  const ms = typeof raw === "number" ? raw : Number(raw || 0);
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  return ms >= 1000 ? `${(ms / 1000).toFixed(ms >= 10000 ? 1 : 2)} ث` : `${Math.round(ms)} ms`;
 }
 
 function deviceOnline(device: PosDevice) {
@@ -80,6 +96,8 @@ export default function PosHealthSettings() {
   );
   const errors24h = last24h.filter(event => event.severity === "error" || event.severity === "critical").length;
   const warnings24h = last24h.filter(event => event.severity === "warning").length;
+  const slow24h = last24h.filter(event => event.event_type === "preflight_slow" || event.event_type === "checkout_slow").length;
+  const retries24h = last24h.filter(event => event.event_type === "checkout_retry").length;
   const affectedDevices = new Set(last24h.map(event => event.device_id).filter(Boolean)).size;
   const onlineDevices = devices.filter(deviceOnline).length;
   const activeDevices = devices.filter(device => device.active).length;
@@ -101,7 +119,7 @@ export default function PosHealthSettings() {
 
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
         <Card className={healthy ? "border-emerald-200 bg-emerald-50/40" : ""}>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">{healthy ? <ShieldCheck className="h-4 w-4 text-emerald-600" /> : <Activity className="h-4 w-4" />} الحالة آخر 24 ساعة</div>
@@ -111,6 +129,8 @@ export default function PosHealthSettings() {
         <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><MonitorSmartphone className="h-4 w-4 text-emerald-600" /> أجهزة Online</div><div className="mt-2 text-2xl font-black">{onlineDevices}<span className="mr-1 text-sm font-normal text-muted-foreground">/ {activeDevices}</span></div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><CircleAlert className="h-4 w-4 text-red-600" /> أخطاء</div><div className="mt-2 text-2xl font-black">{errors24h}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><AlertTriangle className="h-4 w-4 text-amber-600" /> تحذيرات</div><div className="mt-2 text-2xl font-black">{warnings24h}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="h-4 w-4 text-amber-600" /> عمليات بطيئة</div><div className="mt-2 text-2xl font-black">{slow24h}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><RefreshCw className="h-4 w-4 text-blue-600" /> Retry شبكة</div><div className="mt-2 text-2xl font-black">{retries24h}</div></CardContent></Card>
         <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Activity className="h-4 w-4" /> أجهزة بها أحداث</div><div className="mt-2 text-2xl font-black">{affectedDevices}</div></CardContent></Card>
       </div>
 
@@ -156,7 +176,7 @@ export default function PosHealthSettings() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">الأحداث الأخيرة</CardTitle>
-          <CardDescription>السجل لا يحتوي PIN أو Device Token أو كلمات مرور. الهدف منه تشخيص الأعطال فقط.</CardDescription>
+          <CardDescription>السجل لا يحتوي PIN أو Device Token أو كلمات مرور. الهدف منه تشخيص الأعطال والبطء فقط.</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -169,6 +189,9 @@ export default function PosHealthSettings() {
             <div className="space-y-2">
               {filteredEvents.map(event => {
                 const meta = severityMeta[event.severity];
+                const duration = eventDuration(event);
+                const hint = eventHint(event);
+                const retried = event.details?.retried === true;
                 return (
                   <div key={event.id} className="rounded-2xl border bg-white p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -176,6 +199,8 @@ export default function PosHealthSettings() {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-bold">{friendlyEventType(event.event_type)}</span>
                           <Badge className={meta.className}>{meta.label}</Badge>
+                          {duration && <Badge variant="outline">المدة {duration}</Badge>}
+                          {retried && <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">Retry آمن</Badge>}
                           {event.message_code && <code className="max-w-full truncate rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">{event.message_code}</code>}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -183,6 +208,7 @@ export default function PosHealthSettings() {
                           <span className="inline-flex items-center gap-1"><UserRound className="h-3.5 w-3.5" /> {event.employee_name || "موظف غير معروف"}</span>
                           <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" /> {relativeTime(event.created_at)}</span>
                         </div>
+                        {hint && <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">{hint}</div>}
                       </div>
                     </div>
                   </div>
