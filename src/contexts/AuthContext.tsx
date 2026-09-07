@@ -74,15 +74,31 @@ function stashPosWorkspace(userId: string | null | undefined, branchId: string |
 }
 
 function restorePosWorkspace(userId: string | null | undefined, branchId: string | null | undefined) {
-  clearLivePosWorkspace();
-  if (!userId || !branchId) return;
+  if (!userId || !branchId) {
+    clearLivePosWorkspace();
+    return;
+  }
   try {
+    // On a browser refresh the live workspace is the newest copy. Preserve it
+    // before reading any older suspended snapshot for the same staff/branch.
+    const liveTabs = localStorage.getItem(POS_TABS_KEY);
+    const liveActiveTab = localStorage.getItem(POS_ACTIVE_TAB_KEY);
+    if (liveTabs) {
+      localStorage.setItem(
+        posWorkspaceKey(userId, branchId),
+        JSON.stringify({ tabs: liveTabs, activeTab: liveActiveTab }),
+      );
+      return;
+    }
+
     const raw = localStorage.getItem(posWorkspaceKey(userId, branchId));
+    clearLivePosWorkspace();
     if (!raw) return;
     const saved = JSON.parse(raw) as { tabs?: string; activeTab?: string | null };
     if (saved.tabs) localStorage.setItem(POS_TABS_KEY, saved.tabs);
     if (saved.activeTab) localStorage.setItem(POS_ACTIVE_TAB_KEY, saved.activeTab);
   } catch {
+    clearLivePosWorkspace();
     // Corrupt suspended-cart cache must never block authentication.
   }
 }
