@@ -74,6 +74,16 @@ export default function PosPrinterRuntime() {
     return () => window.removeEventListener("pos:sale-completed", onSaleCompleted);
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "F10" || !lastSale || busy) return;
+      event.preventDefault();
+      void printSale(lastSale);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [lastSale, busy]);
+
   const connect = async () => {
     try {
       setBusy(true);
@@ -198,7 +208,7 @@ export default function PosPrinterRuntime() {
 
           {lastSale && (
             <Button variant="outline" className="h-12 w-full" onClick={() => void printSale(lastSale)} disabled={busy}>
-              <ReceiptText className="h-4 w-4" /> طباعة آخر فاتورة · {lastSale.invoice_number}
+              <ReceiptText className="h-4 w-4" /> طباعة آخر فاتورة · {lastSale.invoice_number} · F10
             </Button>
           )}
 
