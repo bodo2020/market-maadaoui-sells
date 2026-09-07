@@ -25,6 +25,17 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function toBase64Url(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function staffAuthEmail(username: string): string {
+  return `u-${toBase64Url(username.trim())}@staff.elmadawymarket.local`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
@@ -74,9 +85,31 @@ Deno.serve(async (req: Request) => {
       }, code === "PIN_LOCKED" ? 423 : 401);
     }
 
-    const { data: authUserData, error: authUserError } = await admin.auth.admin.getUserById(body.userId);
-    const authUser = authUserData?.user;
-    if (authUserError || !authUser?.email) return json({ error: "FULL_LOGIN_REQUIRED" }, 409);
+    const username = typeof result.username === "string" ? result.username.trim() : "";
+    const name = typeof result.name === "string" ? result.name : "موظف";
+    if (!username) return json({ error: "STAFF_ACCOUNT_INVALID" }, 409);
+
+    let { data: authUserData } = await admin.auth.admin.getUserById(body.userId);
+    let authUser = authUserData?.user || null;
+
+    if (!authUser) {
+      const randomPassword = `${crypto.randomUUID()}-${crypto.randomUUID()}-Aa9!`;
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        id: body.userId,
+        email: staffAuthEmail(username),
+        password: randomPassword,
+        email_confirm: true,
+        app_metadata: { staff: true, pos_provisioned: true },
+        user_metadata: { name },
+      });
+      if (createError || !created.user) {
+        console.error("Failed to provision POS staff auth", createError?.message);
+        return json({ error: "SESSION_CREATE_FAILED" }, 500);
+      }
+      authUser = created.user;
+    }
+
+    if (!authUser.email) return json({ error: "SESSION_CREATE_FAILED" }, 500);
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: "magiclink",
