@@ -7,6 +7,8 @@ export type PosDevice = {
   active: boolean;
   registered_at: string;
   last_seen_at: string | null;
+  auto_lock_minutes: number;
+  cash_warning_threshold: number | null;
 };
 
 export type LocalPosDevice = {
@@ -85,6 +87,23 @@ export async function listPosDevices(branchId: string): Promise<PosDevice[]> {
   const { data, error } = await rpc("list_pos_devices", { p_branch_id: branchId });
   if (error) throw new Error(error.message || "تعذر تحميل أجهزة نقطة البيع");
   return (Array.isArray(data) ? data : []) as PosDevice[];
+}
+
+export async function updatePosDeviceRuntimeSettings(
+  deviceId: string,
+  autoLockMinutes: number,
+  cashWarningThreshold: number | null,
+): Promise<void> {
+  const { error } = await rpc("update_pos_device_runtime_settings", {
+    p_device_id: deviceId,
+    p_auto_lock_minutes: autoLockMinutes,
+    p_cash_warning_threshold: cashWarningThreshold,
+  });
+  if (error) {
+    if (error.message === "INVALID_AUTO_LOCK_MINUTES") throw new Error("مدة القفل التلقائي لازم تكون من 1 إلى 120 دقيقة.");
+    if (error.message === "INVALID_CASH_WARNING_THRESHOLD") throw new Error("حد تنبيه النقدية غير صحيح.");
+    throw new Error(error.message || "تعذر حفظ إعدادات جهاز الكاشير");
+  }
 }
 
 export async function registerThisPosDevice(branchId: string, name: string): Promise<LocalPosDevice> {
