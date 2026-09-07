@@ -68,34 +68,61 @@ export interface Company {
 export interface Product {
   id: string;
   name: string;
-  barcode?: string;
-  description?: string;
+  barcode?: string | null;
+  description?: string | null;
   image_urls: string[];
+  /** Effective inventory quantity for the resolved inventory source branch. */
   quantity: number;
   price: number;
-  purchase_price: number; 
-  offer_price?: number;
+  purchase_price: number;
+  offer_price?: number | null;
   is_offer: boolean;
-  category_id?: string;
-  main_category_id?: string;
-  subcategory_id?: string;
-  company_id?: string;
-  barcode_type?: string;
+  category_id?: string | null;
+  main_category_id?: string | null;
+  subcategory_id?: string | null;
+  company_id?: string | null;
+  branch_id?: string | null;
+  barcode_type?: string | null;
+
+  /** Legacy bulk fields kept temporarily for backward compatibility. */
   bulk_enabled: boolean;
-  bulk_quantity?: number;
-  bulk_price?: number;
-  bulk_barcode?: string;
+  bulk_quantity?: number | null;
+  bulk_price?: number | null;
+  bulk_barcode?: string | null;
+
   created_at: Date | string;
-  updated_at?: Date | string;
-  manufacturer_name?: string;
+  updated_at?: Date | string | null;
+  manufacturer_name?: string | null;
   is_bulk: boolean;
-  unit_of_measure?: string;
+  unit_of_measure?: string | null;
+  base_unit?: string | null;
+  has_variants?: boolean;
+  is_variant?: boolean;
+
+  /** Linked sale unit / product_variants fields returned by branch catalog RPCs. */
+  is_linked_sale_unit?: boolean;
+  variant_id?: string | null;
+  parent_product_id?: string | null;
+  conversion_factor?: number | null;
+  variant_type?: string | null;
+  variant_price?: number | null;
+  variant_purchase_price?: number | null;
+  variant_image_url?: string | null;
+  base_quantity?: number | null;
+
+  /** Branch source context returned by authoritative catalog RPCs. */
+  operational_branch_id?: string | null;
+  inventory_branch_id?: string | null;
+  pricing_branch_id?: string | null;
+  has_custom_pricing?: boolean;
+
   is_weight_based?: boolean;
   calculated_weight?: number;
   calculated_price?: number;
   is_bulk_scan?: boolean;
   track_inventory?: boolean;
   min_stock_level?: number;
+  max_stock_level?: number | null;
   expiry_date?: string | null;
   shelf_location?: string | null;
   track_expiry?: boolean;
@@ -216,91 +243,4 @@ export interface Customer {
   updated_at: string;
   user_id?: string | null;
   phone_verified?: boolean;
-}
-
-export interface Purchase {
-  id: string;
-  supplier_id: string;
-  invoice_number: string;
-  date: string;
-  total: number;
-  paid: number;
-  description?: string;
-  invoice_file_url?: string;
-  created_at: string;
-  updated_at?: string;
-  suppliers?: { name: string };
-  items?: PurchaseItem[];
-}
-
-export interface PurchaseItem {
-  id: string;
-  purchase_id: string;
-  product_id: string;
-  quantity: number;
-  price: number;
-  total: number;
-  batch_number?: string;
-  expiry_date?: string;
-  shelf_location?: string;
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
-  products?: { 
-    name: string;
-    track_expiry?: boolean;
-  };
-}
-
-export interface OrderItem {
-  product_id: string;
-  product_name: string;
-  quantity: number;
-  price: number;
-  total: number;
-  image_url?: string;
-  barcode?: string;
-  is_bulk?: boolean;
-  is_weight_based?: boolean;
-  bulk_quantity?: number;
-  shelf_location?: string;
-}
-
-export interface Order {
-  id: string;
-  created_at: string;
-  total: number;
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'shipped' | 'delivered' | 'cancelled';
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
-  payment_method: string;
-  shipping_address?: string;
-  shipping_cost?: number;
-  items: OrderItem[];
-  customer_id?: string;
-  customer_name?: string;
-  customer_email?: string;
-  customer_phone?: string;
-  customer_phone_verified?: boolean;
-  notes?: string;
-  tracking_number?: string | null;
-  delivery_person?: string | null;
-  return_status?: 'none' | 'partial' | 'full';
-  branch_id?: string;
-  // Location data
-  governorate?: string;
-  city?: string;
-  area?: string;
-  neighborhood?: string;
-}
-
-export interface POSTab {
-  id: string;
-  tabName: string;
-  cartItems: CartItem[];
-  selectedCustomer: string;
-  customerName: string;
-  customerPhone: string;
-  search: string;
-  searchResults: Product[];
-  createdAt: Date;
 }
