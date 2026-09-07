@@ -5,6 +5,7 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import NotFound from "@/pages/NotFound";
 import POS from "@/pages/POS";
+import PosShiftGate from "@/components/POS/PosShiftGate";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -50,7 +51,6 @@ import CustomerCartsPage from "@/pages/CustomerCartsPage";
 import SubcategoryDetails from "@/pages/SubcategoryDetails";
 import ProductDetails from "@/pages/ProductDetails";
 import InventoryImport from "@/pages/InventoryImport";
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -64,6 +64,8 @@ const queryClient = new QueryClient({
   },
 });
 
+const CashierPOS = () => <PosShiftGate><POS /></PosShiftGate>;
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -73,9 +75,9 @@ function App() {
             <OrderNotifications />
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/" element={<ProtectedRoute><POS /></ProtectedRoute>} />
+              <Route path="/" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
+              <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
               <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
               <Route path="/categories/:id" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
               <Route path="/categories/:id/:subId" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
