@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, BellDot, User, LogOut, X, Check, Store, ChevronDown } from "lucide-react";
+import { Bell, BellDot, User, LogOut, Check, Store, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,127 +10,88 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { 
-  getNotifications, 
-  markNotificationAsRead, 
-  markAllNotificationsAsRead, 
+import {
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
   checkLowStockProducts,
   showLowStockToasts,
-  StockNotification
+  StockNotification,
 } from "@/services/notificationService";
-import { toast } from "@/components/ui/sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-interface Branch {
-  id: string;
-  name: string;
-  active: boolean;
-}
-
 export default function Navbar() {
-  const { user, logout } = useAuth();
-  const { currentBranchId, currentBranchName, setBranch } = useBranchStore();
+  const { user, logout, branchOptions, switchBranch } = useAuth();
+  const { currentBranchId, currentBranchName } = useBranchStore();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<StockNotification[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
+  const [switchingBranchId, setSwitchingBranchId] = useState<string | null>(null);
 
-  // Load notifications on mount and when notifications change
   const loadNotifications = () => {
     setNotifications(getNotifications());
   };
 
-  // Load branches for admins
   useEffect(() => {
-    const loadBranches = async () => {
-      if (user?.role === 'admin' || user?.role === 'super_admin') {
-        const { data, error } = await supabase
-          .from('branches')
-          .select('id, name, active')
-          .eq('active', true)
-          .order('name');
-        
-        if (!error && data) {
-          setBranches(data);
-        }
-      }
-    };
-    
-    loadBranches();
-  }, [user]);
-
-  // Load notifications on mount and periodically check for low stock
-  useEffect(() => {
-    // Load existing notifications
     loadNotifications();
-    
-    // Check for low stock products initially
+
     const checkStock = async () => {
       await checkLowStockProducts();
-      // Show toasts for new notifications only
       showLowStockToasts();
-      // Refresh notifications list after checking
       loadNotifications();
     };
-    
+
     checkStock();
-    
-    // Periodically check for low stock (every 5 minutes)
     const interval = setInterval(checkStock, 5 * 60 * 1000);
-    
     return () => clearInterval(interval);
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
   const handleNotificationClick = (notification: StockNotification) => {
-    // Mark the notification as read
     markNotificationAsRead(notification.id);
-    // Update notifications state immediately after marking as read
     loadNotifications();
-    
-    // Navigate to inventory management page
     navigate('/inventory');
-    
-    // Close the dropdown
     setNotificationsOpen(false);
   };
 
   const handleMarkAllAsRead = () => {
     markAllNotificationsAsRead();
-    // Update notifications state immediately after marking all as read
     loadNotifications();
   };
 
-  const handleBranchChange = (branchId: string, branchName: string) => {
-    setBranch(branchId, branchName);
-    localStorage.setItem('currentBranchId', branchId);
-    localStorage.setItem('currentBranchName', branchName);
-    setBranchDropdownOpen(false);
-    
-    // Reload the page to refresh all data with the new branch
-    window.location.reload();
+  const handleBranchChange = async (branchId: string) => {
+    if (branchId === currentBranchId || switchingBranchId) return;
+    try {
+      setSwitchingBranchId(branchId);
+      await switchBranch(branchId);
+      setBranchDropdownOpen(false);
+      // Existing pages have several branch-keyed stores and queries. A controlled reload
+      // guarantees that every module rehydrates from the newly validated branch context.
+      window.location.reload();
+    } finally {
+      setSwitchingBranchId(null);
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  const canSeeNotifications = user?.role === 'admin' || user?.role === 'super_admin';
 
   return (
     <header className="border-b bg-white py-3 px-6 flex items-center justify-between sticky top-0 z-30 min-h-[60px]">
       <div className="flex items-center">
         <h2 className="text-lg font-medium">لوحة التحكم</h2>
       </div>
-      
+
       <div className="flex items-center gap-4">
-        {user?.role === 'super_admin' && branches.length > 1 ? (
+        {branchOptions.length > 1 ? (
           <DropdownMenu open={branchDropdownOpen} onOpenChange={setBranchDropdownOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2 px-3 py-1.5">
@@ -139,20 +100,26 @@ export default function Navbar() {
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>الفروع المتاحة</DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>فروعك المتاحة</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {branches.map((branch) => (
+              {branchOptions.map(branch => (
                 <DropdownMenuItem
-                  key={branch.id}
-                  onClick={() => handleBranchChange(branch.id, branch.name)}
-                  className={currentBranchId === branch.id ? 'bg-accent' : ''}
+                  key={branch.branch_id}
+                  disabled={Boolean(switchingBranchId)}
+                  onClick={() => void handleBranchChange(branch.branch_id)}
+                  className={currentBranchId === branch.branch_id ? 'bg-accent' : ''}
                 >
                   <Store className="ml-2 h-4 w-4" />
-                  <span>{branch.name}</span>
-                  {currentBranchId === branch.id && (
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium">{branch.branch_name}</div>
+                    <div className="text-[11px] text-muted-foreground">{branch.branch_code} · {branch.role_name_ar}</div>
+                  </div>
+                  {switchingBranchId === branch.branch_id ? (
+                    <span className="mr-auto inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : currentBranchId === branch.branch_id ? (
                     <Check className="mr-auto h-4 w-4" />
-                  )}
+                  ) : null}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -163,8 +130,8 @@ export default function Navbar() {
             <span className="font-medium">{currentBranchName}</span>
           </div>
         ) : null}
-        
-        {(user?.role === 'admin' || user?.role === 'super_admin') && (
+
+        {canSeeNotifications && (
           <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
@@ -184,26 +151,19 @@ export default function Navbar() {
               <DropdownMenuLabel className="flex items-center justify-between">
                 <span>الإشعارات</span>
                 {unreadCount > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-7 text-xs"
-                    onClick={handleMarkAllAsRead}
-                  >
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllAsRead}>
                     <Check className="ml-1 h-3 w-3" /> تعيين الكل كمقروء
                   </Button>
                 )}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              
+
               <ScrollArea className="h-[300px]">
                 {notifications.length === 0 ? (
-                  <div className="py-4 px-2 text-center text-muted-foreground">
-                    لا توجد إشعارات
-                  </div>
+                  <div className="py-4 px-2 text-center text-muted-foreground">لا توجد إشعارات</div>
                 ) : (
                   notifications.map(notification => (
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       key={notification.id}
                       className={`p-3 cursor-pointer ${!notification.read ? 'bg-yellow-50' : ''}`}
                       onClick={() => handleNotificationClick(notification)}
@@ -229,7 +189,7 @@ export default function Navbar() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2">
@@ -253,7 +213,7 @@ export default function Navbar() {
             </DropdownMenuItem>
             <DropdownMenuItem>الإعدادات</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
+            <DropdownMenuItem onClick={() => void handleLogout()}>
               <LogOut className="ml-2 h-4 w-4" />
               <span>تسجيل الخروج</span>
             </DropdownMenuItem>
