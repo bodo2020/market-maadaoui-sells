@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Sale } from "@/types";
 import { invalidatePOSCatalogCache } from "@/services/supabase/posCatalogService";
+import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
 
 type PendingSale = {
   requestId: string;
@@ -25,6 +26,8 @@ function friendlySaleError(message?: string) {
   if (value.includes("POS_SHIFT_REQUIRED") || value.includes("SHIFT_NOT_OPEN") || value.includes("POS_SHIFT_CASH_ACCOUNT_MISSING")) {
     return "لا توجد وردية POS مفتوحة لهذا الموظف على الجهاز الحالي.";
   }
+  if (value.includes("POS_DEVICE_SHIFT_MISMATCH")) return "الوردية المفتوحة مرتبطة بجهاز POS مختلف. ارجع لشاشة الدخول وافتح الوردية على هذا الجهاز.";
+  if (value.includes("DEVICE_REQUIRED")) return "هذا المتصفح غير مسجل كجهاز POS للفرع الحالي.";
   if (value.includes("INVALID_BULK_QUANTITY")) return "كمية الجملة غير صحيحة. أضف عبوة جملة كاملة فقط.";
   if (value.includes("INVALID_QUANTITY")) return "إحدى كميات السلة غير صحيحة. راجع الكمية أو الوزن.";
   if (value.includes("INVALID_PAYMENT_SPLIT")) return "تقسيم الدفع غير صحيح. مجموع النقدي والبطاقة يجب أن يساوي إجمالي الفاتورة.";
@@ -33,7 +36,7 @@ function friendlySaleError(message?: string) {
   if (value.includes("PRODUCT_UNAVAILABLE")) return "أحد المنتجات لم يعد متاحًا للبيع. حدّث السلة وحاول مرة أخرى.";
   if (value.includes("BULK_UNAVAILABLE")) return "إعداد الجملة لهذا المنتج لم يعد متاحًا.";
   if (value.includes("REQUEST_CONFLICT")) return "تم العثور على محاولة بيع سابقة مختلفة لنفس السلة. راجع الفاتورة السابقة قبل إعادة المحاولة.";
-  if (value.includes("DEVICE_UNAVAILABLE")) return "جهاز الكاشير غير متاح أو تم إلغاء تسجيله.";
+  if (value.includes("DEVICE_UNAVAILABLE")) return "جهاز الكاشير غير متاح أو تم إلغاء تسجيله. ارجع لتسجيل الجهاز أو تواصل مع المدير.";
   return null;
 }
 
@@ -80,6 +83,9 @@ export async function submitPosSale(
   const branchId = sale.branch_id || localStorage.getItem("currentBranchId");
   if (!branchId) throw new Error("اختار الفرع قبل إتمام البيع.");
 
+  const device = getLocalPosDevice(branchId);
+  if (!device) throw new Error("هذا المتصفح غير مسجل كجهاز POS للفرع الحالي.");
+
   const payload = {
     items: sale.items,
     subtotal: sale.subtotal,
@@ -91,6 +97,8 @@ export async function submitPosSale(
     card_amount: sale.card_amount ?? 0,
     customer_name: sale.customer_name ?? null,
     customer_phone: sale.customer_phone ?? null,
+    device_id: device.device_id,
+    device_token: device.device_token,
   };
 
   const fingerprint = JSON.stringify(payload);
