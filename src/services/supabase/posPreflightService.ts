@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { CartItem } from "@/types";
+import { logPosOperationalEvent } from "@/services/supabase/posDiagnosticsService";
 
 export type PosPreflightResult = {
   ok: true;
@@ -31,6 +32,7 @@ type CachedPreflight = {
 };
 
 const PREFLIGHT_TTL_MS = 30_000;
+const SLOW_PREFLIGHT_MS = 800;
 let cachedPreflight: CachedPreflight | null = null;
 
 const rpc = supabase.rpc.bind(supabase) as unknown as (
@@ -81,10 +83,19 @@ export async function preflightPosCart(branchId: string, items: CartItem[]): Pro
     return cachedPreflight.result;
   }
 
+  const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
   const { data, error } = await rpc("preflight_pos_sale", {
     p_branch_id: branchId,
     p_items: items,
   });
+  const elapsedMs = Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt);
+
+  if (elapsedMs >= SLOW_PREFLIGHT_MS) {
+    void logPosOperationalEvent(branchId, "preflight_slow", "warning", "SLOW_PREFLIGHT", {
+      duration_ms: elapsedMs,
+      item_count: items.length,
+    });
+  }
 
   if (error) {
     invalidatePosPreflightCache(branchId);
