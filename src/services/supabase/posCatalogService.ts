@@ -26,7 +26,7 @@ async function queryCatalog(params: { search?: string | null; barcode?: string |
     p_branch_id: currentBranchId(),
     p_search: params.search?.trim() || null,
     p_barcode: params.barcode?.trim() || null,
-    p_limit: params.limit ?? 5000,
+    p_limit: params.limit ?? 500,
   });
   if (error) throw error;
   return (Array.isArray(data) ? data : []) as Product[];
@@ -81,12 +81,15 @@ export async function fetchPOSProducts(search?: string): Promise<Product[]> {
   const branchId = currentBranchId();
   const query = search?.trim();
 
-  if (query) return queryCatalog({ search: query, barcode: null, limit: 5000 });
+  // Search stays server-side so a large catalog never has to be downloaded to the cashier.
+  if (query) return queryCatalog({ search: query, barcode: null, limit: 100 });
 
   if (catalogCache?.branchId === branchId) return catalogCache.products;
   if (catalogRequest) return catalogRequest;
 
-  catalogRequest = queryCatalog({ search: null, barcode: null, limit: 5000 })
+  // The server orders favorites and in-stock products first. 500 is enough for the
+  // fast browse screen while barcode/search can still reach every product in the branch.
+  catalogRequest = queryCatalog({ search: null, barcode: null, limit: 500 })
     .then(products => {
       catalogCache = { branchId, products, loadedAt: Date.now() };
       return products;
