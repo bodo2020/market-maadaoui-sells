@@ -100,7 +100,9 @@ Deno.serve(async (req: Request) => {
     let authUser = authUserData?.user || null;
 
     if (!authUser) {
-      const randomPassword = `${crypto.randomUUID()}-${crypto.randomUUID()}-Aa9!`;
+      // Keep the generated credential safely below GoTrue/bcrypt password-length limits.
+      // The credential is never shown or used interactively; POS sessions are issued via a magic link after PIN verification.
+      const randomPassword = `${crypto.randomUUID()}-Aa9!`;
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         id: body.userId,
         email: staffAuthEmail(username),
