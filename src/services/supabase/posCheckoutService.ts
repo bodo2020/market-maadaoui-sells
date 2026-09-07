@@ -134,9 +134,12 @@ export async function submitPosSale(
     // Server-side request id still protects the transaction for this attempt.
   }
 
+  const startedAt = typeof performance !== "undefined" ? performance.now() : Date.now();
+  let retried = false;
   let result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
 
   if (result.error && !isDeterministicError(result.error.code, result.error.message)) {
+    retried = true;
     void logPosOperationalEvent(branchId, "checkout_retry", "warning", result.error.message || result.error.code || "NETWORK_UNCERTAIN", {
       request_id: pending.requestId,
       checkout_id: checkoutId,
@@ -153,6 +156,7 @@ export async function submitPosSale(
       result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
     }
   } else if (!result.error && !result.data && (typeof navigator === "undefined" || navigator.onLine)) {
+    retried = true;
     void logPosOperationalEvent(branchId, "checkout_retry", "warning", "NO_CONFIRMATION", {
       request_id: pending.requestId,
       checkout_id: checkoutId,
@@ -163,6 +167,8 @@ export async function submitPosSale(
     await sleep(350);
     result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
   }
+
+  const elapsedMs = Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - startedAt);
 
   if (result.error) {
     const friendly = friendlySaleError(result.error.message);
@@ -177,6 +183,8 @@ export async function submitPosSale(
       total: Number(sale.total || 0),
       payment_method: sale.payment_method,
       rpc_code: result.error.code || null,
+      duration_ms: elapsedMs,
+      retried,
     });
 
     if (isDeterministicError(result.error.code, result.error.message)) {
@@ -196,11 +204,25 @@ export async function submitPosSale(
       checkout_id: checkoutId,
       item_count: sale.items.length,
       total: Number(sale.total || 0),
+      duration_ms: elapsedMs,
+      retried,
     });
     throw new Error("لم يصل تأكيد البيع. السلة محفوظة؛ أعد المحاولة نفسها ولن تُسجّل الفاتورة مرتين.");
   }
 
   const confirmedSale = result.data as Sale;
+
+  if (elapsedMs >= 1500) {
+    void logPosOperationalEvent(branchId, "checkout_slow", "warning", "SLOW_CHECKOUT", {
+      request_id: pending.requestId,
+      checkout_id: checkoutId,
+      duration_ms: elapsedMs,
+      retried,
+      item_count: sale.items.length,
+      total: Number(sale.total || 0),
+      payment_method: sale.payment_method,
+    });
+  }
 
   try {
     localStorage.setItem(key, JSON.stringify({ ...pending, confirmed: true }));
