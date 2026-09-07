@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Sale } from "@/types";
 import { invalidatePOSCatalogCache } from "@/services/supabase/posCatalogService";
 import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
+import { logPosOperationalEvent } from "@/services/supabase/posDiagnosticsService";
 
 type PendingSale = {
   requestId: string;
@@ -135,6 +136,14 @@ export async function submitPosSale(
   let result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
 
   if (result.error && !isDeterministicError(result.error.code, result.error.message)) {
+    void logPosOperationalEvent(branchId, "checkout_retry", "warning", result.error.message || result.error.code || "NETWORK_UNCERTAIN", {
+      request_id: pending.requestId,
+      checkout_id: checkoutId,
+      item_count: sale.items.length,
+      total: Number(sale.total || 0),
+      payment_method: sale.payment_method,
+    });
+
     // A timeout / transient connection error can leave the client unsure whether the
     // transaction committed. Retry exactly once with the SAME request id. The database
     // idempotency contract returns the original sale instead of creating a duplicate.
@@ -143,12 +152,32 @@ export async function submitPosSale(
       result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
     }
   } else if (!result.error && !result.data && (typeof navigator === "undefined" || navigator.onLine)) {
+    void logPosOperationalEvent(branchId, "checkout_retry", "warning", "NO_CONFIRMATION", {
+      request_id: pending.requestId,
+      checkout_id: checkoutId,
+      item_count: sale.items.length,
+      total: Number(sale.total || 0),
+      payment_method: sale.payment_method,
+    });
     await sleep(350);
     result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
   }
 
   if (result.error) {
     const friendly = friendlySaleError(result.error.message);
+    const severity = result.error.message?.includes("PRICE_CHANGED") || result.error.message?.includes("INSUFFICIENT_STOCK")
+      ? "warning"
+      : "error";
+
+    void logPosOperationalEvent(branchId, "checkout_error", severity, result.error.message || result.error.code || "CHECKOUT_ERROR", {
+      request_id: pending.requestId,
+      checkout_id: checkoutId,
+      item_count: sale.items.length,
+      total: Number(sale.total || 0),
+      payment_method: sale.payment_method,
+      rpc_code: result.error.code || null,
+    });
+
     if (isDeterministicError(result.error.code, result.error.message)) {
       try { localStorage.removeItem(key); } catch { /* noop */ }
     }
@@ -160,6 +189,12 @@ export async function submitPosSale(
   }
 
   if (!result.data) {
+    void logPosOperationalEvent(branchId, "checkout_error", "error", "NO_FINAL_CONFIRMATION", {
+      request_id: pending.requestId,
+      checkout_id: checkoutId,
+      item_count: sale.items.length,
+      total: Number(sale.total || 0),
+    });
     throw new Error("لم يصل تأكيد البيع. السلة محفوظة؛ أعد المحاولة نفسها ولن تُسجّل الفاتورة مرتين.");
   }
 
