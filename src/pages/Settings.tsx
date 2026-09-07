@@ -1,28 +1,31 @@
-
 import MainLayout from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Users, PackageOpen, CreditCard, Truck, Receipt, FileText, Settings as SettingsIcon } from "lucide-react";
+import { Store, Users, PackageOpen, CreditCard, Truck, Receipt, FileText, Settings as SettingsIcon, MonitorSmartphone } from "lucide-react";
 import StoreSettings from "@/components/settings/StoreSettings";
 import UsersManagement from "@/components/settings/UsersManagement";
 import ExpenseSettings from "@/components/settings/ExpenseSettings";
 import PaymentSettings from "@/components/settings/PaymentSettings";
 import InvoiceSettings from "@/components/settings/InvoiceSettings";
+import PosDeviceSettings from "@/components/settings/PosDeviceSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/types";
+import { currentStaffHasPermission } from "@/services/supabase/staffAuthService";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export default function Settings() {
   const { user } = useAuth();
-  const isAdmin = user?.role === UserRole.ADMIN;
+  const canManageStaff = user?.role === UserRole.SUPER_ADMIN || currentStaffHasPermission("branch.manage_staff");
+  const canUsePosSettings = user?.role === UserRole.SUPER_ADMIN || currentStaffHasPermission("pos.use") || currentStaffHasPermission("pos.manage_devices");
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("store");
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const tabs = [
     { id: "store", label: "المتجر", icon: <Store className="ml-2 h-4 w-4" />, component: <StoreSettings /> },
-    ...(isAdmin ? [{ id: "users", label: "المستخدمين", icon: <Users className="ml-2 h-4 w-4" />, component: <UsersManagement /> }] : []),
+    ...(canManageStaff ? [{ id: "users", label: "المستخدمين", icon: <Users className="ml-2 h-4 w-4" />, component: <UsersManagement /> }] : []),
+    ...(canUsePosSettings ? [{ id: "pos-devices", label: "أجهزة POS", icon: <MonitorSmartphone className="ml-2 h-4 w-4" />, component: <PosDeviceSettings /> }] : []),
     { id: "products", label: "المنتجات", icon: <PackageOpen className="ml-2 h-4 w-4" />, component: <div className="text-center py-12 text-muted-foreground">إعدادات المنتجات ستكون متاحة قريباً</div> },
     { id: "payment", label: "الدفع", icon: <CreditCard className="ml-2 h-4 w-4" />, component: <PaymentSettings /> },
     { id: "shipping", label: "الشحن", icon: <Truck className="ml-2 h-4 w-4" />, component: <div className="text-center py-12 text-muted-foreground">إعدادات الشحن ستكون متاحة قريباً</div> },
@@ -30,7 +33,6 @@ export default function Settings() {
     { id: "invoices", label: "الفواتير", icon: <FileText className="ml-2 h-4 w-4" />, component: <InvoiceSettings /> },
   ];
 
-  // Mobile tabs sheet
   const MobileTabsSheet = () => (
     <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
       <SheetTrigger asChild>
@@ -42,18 +44,14 @@ export default function Settings() {
       </SheetTrigger>
       <SheetContent side="bottom" className="h-[70vh]">
         <div className="flex flex-col space-y-2 pt-6 h-full overflow-y-auto">
-          {tabs.map((tab) => (
+          {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => {
                 setActiveTab(tab.id);
                 setSheetOpen(false);
               }}
-              className={`flex items-center p-3 rounded-md text-right ${
-                activeTab === tab.id 
-                  ? "bg-primary/10 text-primary font-medium" 
-                  : "hover:bg-muted"
-              }`}
+              className={`flex items-center p-3 rounded-md text-right ${activeTab === tab.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"}`}
             >
               {tab.icon}
               {tab.label}
@@ -69,17 +67,14 @@ export default function Settings() {
       <div className="container py-4 md:py-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
           <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-0">الإعدادات</h1>
-          
           {isMobile && <MobileTabsSheet />}
         </div>
 
         {isMobile ? (
-          <div className="mt-4">
-            {tabs.find(tab => tab.id === activeTab)?.component}
-          </div>
+          <div className="mt-4">{tabs.find(tab => tab.id === activeTab)?.component}</div>
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-7 mb-8">
+            <TabsList className="mb-8 flex h-auto w-full flex-wrap justify-start gap-1 p-1">
               {tabs.map(tab => (
                 <TabsTrigger key={tab.id} value={tab.id} className="flex items-center">
                   {tab.icon}
@@ -87,7 +82,7 @@ export default function Settings() {
                 </TabsTrigger>
               ))}
             </TabsList>
-            
+
             {tabs.map(tab => (
               <TabsContent key={tab.id} value={tab.id}>
                 {tab.component}
