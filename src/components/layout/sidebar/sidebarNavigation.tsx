@@ -24,7 +24,6 @@ import {
   QrCode,
   Calendar,
   FileSpreadsheet,
-  BarChart3,
 } from "lucide-react";
 import { NavigationGroup } from "./types";
 
@@ -70,9 +69,8 @@ export const customersNavigation: NavigationGroup = {
 };
 
 export const financeNavigation: NavigationGroup = {
-  title: "المالية والتقارير",
+  title: "المالية",
   items: [
-    { label: "مركز التقارير", href: "/reports", icon: BarChart3 },
     { label: "المالية", href: "/finance", icon: DollarSign },
     { label: "وسائل الدفع", href: "/payment-methods", icon: WalletCards },
     { label: "المصروفات والرواتب", href: "/expenses-salaries", icon: FileText },
