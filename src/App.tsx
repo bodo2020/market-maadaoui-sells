@@ -9,6 +9,7 @@ import PosShiftGatePro from "@/components/POS/PosShiftGatePro";
 import PosRuntimeGuard from "@/components/POS/PosRuntimeGuard";
 import PosWorkspaceRecoveryGate from "@/components/POS/PosWorkspaceRecoveryGate";
 import PosRecentSales from "@/components/POS/PosRecentSales";
+import POSCustomerLoyaltyBridge from "@/components/POS/POSCustomerLoyaltyBridge";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -73,6 +74,7 @@ const CashierPOS = () => (
       <PosWorkspaceRecoveryGate>
         <>
           <POSPro />
+          <POSCustomerLoyaltyBridge />
           <PosRecentSales />
         </>
       </PosWorkspaceRecoveryGate>
