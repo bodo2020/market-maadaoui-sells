@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Banknote, CheckCircle2, CreditCard, Gift, RefreshCw, RotateCcw, Scale } from "lucide-react";
+import { AlertTriangle, Banknote, CheckCircle2, Gift, RefreshCw, RotateCcw, Scale, WalletCards } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -130,6 +130,9 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
     [preview, returnTotal],
   );
 
+  const originalPaymentName = preview?.payment_method_name || (preview?.payment_method === "cash" ? "نقدي" : "وسيلة الدفع الإلكترونية");
+  const electronicRefundName = result?.refund_payment_method_name || originalPaymentName || "وسيلة الدفع الإلكترونية";
+
   const allAvailableSelected = Boolean(preview?.lines.filter(line => line.available_quantity > 0).length)
     && preview!.lines.filter(line => line.available_quantity > 0).every(line => selected[line.line_index]);
 
@@ -177,7 +180,7 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
     }
   };
 
-  const confirmCard = async () => {
+  const confirmElectronicRefund = async () => {
     if (!result?.card_refund_id) return;
     try {
       setConfirmingCard(true);
@@ -187,7 +190,7 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
       setResult(prev => prev ? { ...prev, refund_status: "completed", card_refund_pending: false } : prev);
       onSuccess?.();
     } catch (e: any) {
-      setError(e.message || "تعذر تأكيد رد البطاقة");
+      setError(e.message || `تعذر تأكيد رد ${electronicRefundName}`);
     } finally {
       setConfirmingCard(false);
     }
@@ -218,21 +221,21 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Gift className="h-4 w-4" /> رجع لكوبون الخصم</div><div className="mt-1 text-xl font-black text-amber-700">{money(result.refund_loyalty_amount)}</div></div>
               <div className="rounded-2xl border p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4" /> رد نقدي من الدرج</div><div className="mt-1 text-xl font-black">{money(result.refund_cash_amount)}</div></div>
-              <div className="rounded-2xl border p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><CreditCard className="h-4 w-4" /> رد بطاقة</div><div className="mt-1 text-xl font-black">{money(result.refund_card_amount)}</div></div>
+              <div className="rounded-2xl border p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><WalletCards className="h-4 w-4" /> رد {electronicRefundName}</div><div className="mt-1 text-xl font-black">{money(result.refund_card_amount)}</div></div>
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4 text-sm">
               <div className="flex items-center justify-between"><span className="text-muted-foreground">إجمالي يرجع للعميل كفلوس</span><strong>{money(result.refund_customer_money)}</strong></div>
-              {result.refund_loyalty_amount > 0 && <p className="mt-2 text-xs leading-5 text-slate-500">جزء كوبون الخصم رجع لنفس الكوبون، لذلك لا يخرج من درج الكاشير ولا من البطاقة.</p>}
+              {result.refund_loyalty_amount > 0 && <p className="mt-2 text-xs leading-5 text-slate-500">جزء كوبون الخصم رجع لنفس الكوبون، لذلك لا يخرج من درج الكاشير ولا من وسيلة الدفع.</p>}
             </div>
 
             {result.refund_card_amount > 0 && !cardConfirmed && result.card_refund_pending && (
               <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-4">
-                <div className="font-bold text-amber-900">متبقي تأكيد رد البطاقة</div>
-                <p className="text-sm leading-6 text-amber-800">نفّذ رد {money(result.refund_card_amount)} على جهاز/مزود البطاقة، وبعدها اكتب رقم مرجع العملية هنا. المخزون والجزء النقدي وكوبون الخصم تم تسجيلهم بالفعل.</p>
-                <div className="space-y-2"><Label>مرجع رد البطاقة</Label><Input value={providerReference} onChange={event => setProviderReference(event.target.value)} placeholder="مثال: REF-123456" /></div>
-                <Button className="w-full bg-[#005931] hover:bg-[#004a29]" disabled={confirmingCard || providerReference.trim().length < 3} onClick={() => void confirmCard()}>
-                  {confirmingCard ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} تأكيد رد البطاقة
+                <div className="font-bold text-amber-900">متبقي تأكيد رد {electronicRefundName}</div>
+                <p className="text-sm leading-6 text-amber-800">نفّذ رد {money(result.refund_card_amount)} على {electronicRefundName}، وبعدها اكتب رقم مرجع عملية الرد هنا. المخزون والجزء النقدي وكوبون الخصم تم تسجيلهم بالفعل.</p>
+                <div className="space-y-2"><Label>مرجع رد {electronicRefundName}</Label><Input value={providerReference} onChange={event => setProviderReference(event.target.value)} placeholder="مثال: REF-123456" /></div>
+                <Button className="w-full bg-[#005931] hover:bg-[#004a29]" disabled={confirmingCard || providerReference.trim().length < 3} onClick={() => void confirmElectronicRefund()}>
+                  {confirmingCard ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} تأكيد رد {electronicRefundName}
                 </Button>
               </div>
             )}
@@ -244,12 +247,23 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
           <div className="space-y-5">
             {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
 
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white p-3 text-sm">
+              <WalletCards className="h-4 w-4 text-[#005931]" />
+              <span className="text-muted-foreground">وسيلة الدفع الأصلية:</span>
+              <strong>{originalPaymentName}</strong>
+              {preview.payment_reference && <Badge variant="outline">مرجع البيع: {preview.payment_reference}</Badge>}
+            </div>
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">قيمة الفاتورة</div><strong>{money(preview.sale_total)}</strong></div>
               <div className="rounded-xl bg-amber-50 p-3"><div className="text-[11px] text-amber-700">كوبون الخصم</div><strong className="text-amber-800">{money(preview.loyalty_voucher_amount)}</strong></div>
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">المدفوع فعليًا</div><strong>{money(preview.amount_paid)}</strong></div>
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">متبقي للإرجاع</div><strong className="text-[#005931]">{money(preview.remaining_total)}</strong></div>
+              <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">المحصّل من العميل</div><strong>{money(preview.amount_charged ?? preview.amount_paid)}</strong></div>
+              <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">متبقي من قيمة المنتجات</div><strong className="text-[#005931]">{money(preview.remaining_total)}</strong></div>
             </div>
+
+            {Number(preview.customer_payment_fee_amount || 0) > 0 && preview.payment_fee_refundable === false && (
+              <Alert className="border-amber-200 bg-amber-50"><AlertTriangle className="h-4 w-4 text-amber-700" /><AlertDescription>المبلغ المحصّل يتضمن رسوم وسيلة دفع بقيمة {money(Number(preview.customer_payment_fee_amount || 0))}. رسوم وسيلة الدفع منفصلة عن قيمة المنتجات ولا تدخل تلقائيًا في حساب مرتجع الأصناف.</AlertDescription></Alert>
+            )}
 
             {preview.returned_total > 0 && (
               <div className="rounded-xl border bg-white p-3 text-xs text-muted-foreground">
@@ -303,9 +317,9 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
               <div className="mt-3 grid grid-cols-1 gap-2 border-t pt-3 sm:grid-cols-3">
                 <div className="rounded-xl bg-amber-50 p-3"><div className="flex items-center gap-1 text-xs text-amber-700"><Gift className="h-3.5 w-3.5" /> يرجع لكوبون الخصم</div><strong className="text-amber-800">{money(split.loyalty)}</strong></div>
                 <div className="rounded-xl bg-white p-3"><div className="flex items-center gap-1 text-xs text-muted-foreground"><Banknote className="h-3.5 w-3.5" /> من درج الكاشير</div><strong>{money(split.cash)}</strong></div>
-                <div className="rounded-xl bg-white p-3"><div className="flex items-center gap-1 text-xs text-muted-foreground"><CreditCard className="h-3.5 w-3.5" /> رد بطاقة</div><strong>{money(split.card)}</strong></div>
+                <div className="rounded-xl bg-white p-3"><div className="flex items-center gap-1 text-xs text-muted-foreground"><WalletCards className="h-3.5 w-3.5" /> رد {originalPaymentName}</div><strong>{money(split.card)}</strong></div>
               </div>
-              {split.loyalty > 0 && <p className="mt-3 text-xs leading-5 text-slate-500">الكوبون لا يُرد كاش. الجزء الخاص به يرجع لرصيد نفس كوبون الخصم، والمبلغ المدفوع فقط هو الذي يُرد نقدي/بطاقة.</p>}
+              {split.loyalty > 0 && <p className="mt-3 text-xs leading-5 text-slate-500">الكوبون لا يُرد كاش. الجزء الخاص به يرجع لرصيد نفس كوبون الخصم، والمبلغ المدفوع فقط يرجع إلى مصدر الدفع الأصلي.</p>}
             </div>
 
             <Button className="h-12 w-full bg-[#005931] hover:bg-[#004a29]" disabled={submitting || returnTotal <= 0 || reason.trim().length < 3} onClick={() => void submit()}>
