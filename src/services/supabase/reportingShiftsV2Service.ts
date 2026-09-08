@@ -1,4 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchReportingShiftReconciliationsV2,
+  type ReportingShiftReconciliationRowV2,
+} from "@/services/supabase/reportingShiftReconciliationV2Service";
 
 const n = (value: unknown) => {
   const parsed = Number(value ?? 0);
@@ -29,7 +33,12 @@ export interface ReportingShiftPaymentMethodV2 {
   customer_fee_amount: number;
   merchant_fee_amount: number;
   recorded_net_settlement: number | null;
+  actual_expected_amount: number | null;
   actual_counted_amount: number | null;
+  actual_variance_amount: number | null;
+  actual_variance_reason: string | null;
+  actual_confirmed_at: string | null;
+  actual_confirmed_by_name: string | null;
   actual_available: boolean;
 }
 
@@ -145,6 +154,8 @@ export interface ReportingShiftsV2 {
     cash_actual_source?: string;
     electronic_actual_available?: boolean;
     electronic_actual_reason?: string;
+    reconciliation_source?: string;
+    reconciliation_rows?: number;
     first_shift_at?: string | null;
     unassigned_invoice_count?: number;
     unassigned_invoice_amount?: number;
@@ -180,9 +191,71 @@ const paymentRow = (row: Record<string, unknown>): ReportingShiftPaymentMethodV2
   customer_fee_amount: n(row.customer_fee_amount),
   merchant_fee_amount: n(row.merchant_fee_amount),
   recorded_net_settlement: nullableNumber(row.recorded_net_settlement),
+  actual_expected_amount: nullableNumber(row.actual_expected_amount),
   actual_counted_amount: nullableNumber(row.actual_counted_amount),
+  actual_variance_amount: nullableNumber(row.actual_variance_amount),
+  actual_variance_reason: nullableString(row.actual_variance_reason),
+  actual_confirmed_at: nullableString(row.actual_confirmed_at),
+  actual_confirmed_by_name: nullableString(row.actual_confirmed_by_name),
   actual_available: Boolean(row.actual_available),
 });
+
+const reconciliationKey = (shiftId: string, code: string) => `${shiftId}::${code}`;
+
+function mergeActual(
+  row: ReportingShiftPaymentMethodV2,
+  actual?: ReportingShiftReconciliationRowV2,
+): ReportingShiftPaymentMethodV2 {
+  if (!actual) return row;
+  return {
+    ...row,
+    payment_method_id: actual.payment_method_id || row.payment_method_id,
+    name: actual.name || row.name,
+    method_type: actual.method_type || row.method_type,
+    actual_expected_amount: actual.expected_amount,
+    actual_counted_amount: actual.counted_amount,
+    actual_variance_amount: actual.variance_amount,
+    actual_variance_reason: actual.variance_reason,
+    actual_confirmed_at: actual.confirmed_at || null,
+    actual_confirmed_by_name: actual.confirmed_by_name,
+    actual_available: actual.counted_amount !== null,
+  };
+}
+
+function aggregateActual(rows: ReportingShiftReconciliationRowV2[]) {
+  const grouped = new Map<string, {
+    expected: number;
+    counted: number;
+    variance: number;
+    hasValues: boolean;
+    latestAt: string | null;
+    latestBy: string | null;
+  }>();
+
+  rows.forEach((row) => {
+    const current = grouped.get(row.code) || {
+      expected: 0,
+      counted: 0,
+      variance: 0,
+      hasValues: false,
+      latestAt: null,
+      latestBy: null,
+    };
+    if (row.expected_amount !== null && row.counted_amount !== null && row.variance_amount !== null) {
+      current.expected += row.expected_amount;
+      current.counted += row.counted_amount;
+      current.variance += row.variance_amount;
+      current.hasValues = true;
+    }
+    if (row.confirmed_at && (!current.latestAt || row.confirmed_at > current.latestAt)) {
+      current.latestAt = row.confirmed_at;
+      current.latestBy = row.confirmed_by_name;
+    }
+    grouped.set(row.code, current);
+  });
+
+  return grouped;
+}
 
 export async function fetchReportingShiftsV2(
   branchId: string,
@@ -190,19 +263,94 @@ export async function fetchReportingShiftsV2(
   to: Date,
   limit = 100,
 ): Promise<ReportingShiftsV2> {
-  const { data, error } = await supabase.rpc("get_reporting_shifts_v2" as never, {
-    p_branch_id: branchId,
-    p_from: from.toISOString(),
-    p_to: to.toISOString(),
-    p_limit: limit,
-  } as never);
+  const [core, reconciliations] = await Promise.all([
+    supabase.rpc("get_reporting_shifts_v2" as never, {
+      p_branch_id: branchId,
+      p_from: from.toISOString(),
+      p_to: to.toISOString(),
+      p_limit: limit,
+    } as never),
+    fetchReportingShiftReconciliationsV2(branchId, from, to, 2000),
+  ]);
 
-  if (error) throw error;
-  if (!data) throw new Error("REPORTING_SHIFTS_EMPTY");
+  if (core.error) throw core.error;
+  if (!core.data) throw new Error("REPORTING_SHIFTS_EMPTY");
 
-  const raw = data as unknown as RawReportingShiftsV2;
+  const raw = core.data as unknown as RawReportingShiftsV2;
   const summary = raw.summary || {};
   const dataQuality = raw.data_quality || {};
+  const actualByShift = new Map<string, ReportingShiftReconciliationRowV2>();
+  reconciliations.rows.forEach((row) => actualByShift.set(reconciliationKey(row.shift_id, row.code), row));
+  const actualByMethod = aggregateActual(reconciliations.rows);
+  const canSeeActual = reconciliations.permissions.can_view_reconciliation;
+  const hasActualRows = reconciliations.rows.length > 0;
+
+  const shifts: ReportingShiftRowV2[] = (raw.shifts || []).map((row) => {
+    const shiftId = String(row.shift_id || "");
+    const paymentBreakdown = Array.isArray(row.payment_breakdown)
+      ? (row.payment_breakdown as Array<Record<string, unknown>>).map((rawPayment) => {
+          const payment = paymentRow(rawPayment);
+          return mergeActual(payment, actualByShift.get(reconciliationKey(shiftId, payment.code)));
+        })
+      : [];
+
+    return {
+      shift_id: shiftId,
+      cashier_id: String(row.cashier_id || ""),
+      cashier_name: String(row.cashier_name || "موظف غير متاح"),
+      device_id: String(row.device_id || ""),
+      device_name: String(row.device_name || "جهاز غير متاح"),
+      device_code: nullableString(row.device_code),
+      status: String(row.status || "closed"),
+      opened_at: String(row.opened_at || ""),
+      closed_at: nullableString(row.closed_at),
+      opened_in_range: Boolean(row.opened_in_range),
+      closed_in_range: Boolean(row.closed_in_range),
+      duration_minutes_in_range: n(row.duration_minutes_in_range),
+      invoice_count: n(row.invoice_count),
+      recognized_sales: n(row.recognized_sales),
+      approved_returns: n(row.approved_returns),
+      return_count: n(row.return_count),
+      net_sales: n(row.net_sales),
+      average_ticket: n(row.average_ticket),
+      recorded_payment_base: n(row.recorded_payment_base),
+      payment_legacy_gap: n(row.payment_legacy_gap),
+      payment_coverage_percent: n(row.payment_coverage_percent),
+      customer_payment_fees: n(row.customer_payment_fees),
+      merchant_payment_fees: n(row.merchant_payment_fees),
+      cash_refunds: n(row.cash_refunds),
+      electronic_refunds: n(row.electronic_refunds),
+      loyalty_refunds: n(row.loyalty_refunds),
+      pending_electronic_refunds: n(row.pending_electronic_refunds),
+      confirmed_electronic_refunds: n(row.confirmed_electronic_refunds),
+      opening_cash: nullableNumber(row.opening_cash),
+      opening_system_balance: nullableNumber(row.opening_system_balance),
+      opening_variance: nullableNumber(row.opening_variance),
+      expected_cash: nullableNumber(row.expected_cash),
+      closing_cash: nullableNumber(row.closing_cash),
+      cash_difference: nullableNumber(row.cash_difference),
+      closing_notes: nullableString(row.closing_notes),
+      closed_by: nullableString(row.closed_by),
+      closed_by_name: nullableString(row.closed_by_name),
+      payment_breakdown: paymentBreakdown,
+    };
+  });
+
+  const paymentMethods = (raw.payment_methods || []).map((rawPayment) => {
+    const payment = paymentRow(rawPayment);
+    const actual = actualByMethod.get(payment.code);
+    if (!actual?.hasValues) return payment;
+    return {
+      ...payment,
+      actual_expected_amount: Math.round(actual.expected * 100) / 100,
+      actual_counted_amount: Math.round(actual.counted * 100) / 100,
+      actual_variance_amount: Math.round(actual.variance * 100) / 100,
+      actual_variance_reason: null,
+      actual_confirmed_at: actual.latestAt,
+      actual_confirmed_by_name: actual.latestBy,
+      actual_available: true,
+    };
+  });
 
   return {
     version: n(raw.version) || 2,
@@ -240,48 +388,7 @@ export async function fetchReportingShiftsV2(
       cash_variance_absolute: nullableNumber(summary.cash_variance_absolute),
       opening_variance_absolute: nullableNumber(summary.opening_variance_absolute),
     },
-    shifts: (raw.shifts || []).map((row) => ({
-      shift_id: String(row.shift_id || ""),
-      cashier_id: String(row.cashier_id || ""),
-      cashier_name: String(row.cashier_name || "موظف غير متاح"),
-      device_id: String(row.device_id || ""),
-      device_name: String(row.device_name || "جهاز غير متاح"),
-      device_code: nullableString(row.device_code),
-      status: String(row.status || "closed"),
-      opened_at: String(row.opened_at || ""),
-      closed_at: nullableString(row.closed_at),
-      opened_in_range: Boolean(row.opened_in_range),
-      closed_in_range: Boolean(row.closed_in_range),
-      duration_minutes_in_range: n(row.duration_minutes_in_range),
-      invoice_count: n(row.invoice_count),
-      recognized_sales: n(row.recognized_sales),
-      approved_returns: n(row.approved_returns),
-      return_count: n(row.return_count),
-      net_sales: n(row.net_sales),
-      average_ticket: n(row.average_ticket),
-      recorded_payment_base: n(row.recorded_payment_base),
-      payment_legacy_gap: n(row.payment_legacy_gap),
-      payment_coverage_percent: n(row.payment_coverage_percent),
-      customer_payment_fees: n(row.customer_payment_fees),
-      merchant_payment_fees: n(row.merchant_payment_fees),
-      cash_refunds: n(row.cash_refunds),
-      electronic_refunds: n(row.electronic_refunds),
-      loyalty_refunds: n(row.loyalty_refunds),
-      pending_electronic_refunds: n(row.pending_electronic_refunds),
-      confirmed_electronic_refunds: n(row.confirmed_electronic_refunds),
-      opening_cash: nullableNumber(row.opening_cash),
-      opening_system_balance: nullableNumber(row.opening_system_balance),
-      opening_variance: nullableNumber(row.opening_variance),
-      expected_cash: nullableNumber(row.expected_cash),
-      closing_cash: nullableNumber(row.closing_cash),
-      cash_difference: nullableNumber(row.cash_difference),
-      closing_notes: nullableString(row.closing_notes),
-      closed_by: nullableString(row.closed_by),
-      closed_by_name: nullableString(row.closed_by_name),
-      payment_breakdown: Array.isArray(row.payment_breakdown)
-        ? (row.payment_breakdown as Array<Record<string, unknown>>).map(paymentRow)
-        : [],
-    })),
+    shifts,
     cashiers: (raw.cashiers || []).map((row) => ({
       cashier_id: String(row.cashier_id || ""),
       cashier_name: String(row.cashier_name || "موظف غير متاح"),
@@ -303,15 +410,21 @@ export async function fetchReportingShiftsV2(
       cash_variance_signed: nullableNumber(row.cash_variance_signed),
       cash_variance_absolute: nullableNumber(row.cash_variance_absolute),
     })),
-    payment_methods: (raw.payment_methods || []).map(paymentRow),
+    payment_methods: paymentMethods,
     data_quality: {
       shift_source: nullableString(dataQuality.shift_source) || undefined,
       sales_source: nullableString(dataQuality.sales_source) || undefined,
       payment_record_source: nullableString(dataQuality.payment_record_source) || undefined,
       returns_source: nullableString(dataQuality.returns_source) || undefined,
-      cash_actual_source: nullableString(dataQuality.cash_actual_source) || undefined,
-      electronic_actual_available: dataQuality.electronic_actual_available == null ? undefined : Boolean(dataQuality.electronic_actual_available),
-      electronic_actual_reason: nullableString(dataQuality.electronic_actual_reason) || undefined,
+      cash_actual_source: canSeeActual && hasActualRows ? "pos_shift_payment_reconciliations_v2" : nullableString(dataQuality.cash_actual_source) || undefined,
+      electronic_actual_available: canSeeActual ? hasActualRows : false,
+      electronic_actual_reason: !canSeeActual
+        ? "reconciliation_amounts_hidden_by_permission"
+        : hasActualRows
+          ? "per_method_reconciliation_v2_available_for_newly_closed_shifts"
+          : "no_shift_closed_with_reconciliation_v2_in_selected_range",
+      reconciliation_source: "pos_shift_payment_reconciliations",
+      reconciliation_rows: reconciliations.rows.length,
       first_shift_at: nullableString(dataQuality.first_shift_at),
       unassigned_invoice_count: dataQuality.unassigned_invoice_count == null ? undefined : n(dataQuality.unassigned_invoice_count),
       unassigned_invoice_amount: dataQuality.unassigned_invoice_amount == null ? undefined : n(dataQuality.unassigned_invoice_amount),
