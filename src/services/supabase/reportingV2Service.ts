@@ -160,13 +160,14 @@ interface RawReportingOverviewV2 {
     net_period_movement?: RawNumber;
     live_account_balance?: RawNumber;
   }>;
-  top_products?: Array<{
-    product_id?: string | null;
-    product_name?: string;
-    quantity?: RawNumber;
-    revenue?: RawNumber;
-    profit?: RawNumber;
-  }>;
+}
+
+interface RawTopProductV2 {
+  product_id?: string | null;
+  product_name?: string;
+  quantity?: RawNumber;
+  revenue?: RawNumber;
+  profit?: RawNumber;
 }
 
 const toNumber = (value: unknown) => {
@@ -288,16 +289,26 @@ export async function fetchReportingOverviewV2(
   from: Date,
   to: Date,
 ): Promise<ReportingOverviewV2> {
-  const { data, error } = await supabase.rpc("get_reporting_overview_v2", {
-    p_branch_id: branchId,
-    p_from: from.toISOString(),
-    p_to: to.toISOString(),
-  });
+  const [overviewResult, productsResult] = await Promise.all([
+    supabase.rpc("get_reporting_overview_v2", {
+      p_branch_id: branchId,
+      p_from: from.toISOString(),
+      p_to: to.toISOString(),
+    }),
+    supabase.rpc("get_reporting_top_products_v2" as never, {
+      p_branch_id: branchId,
+      p_from: from.toISOString(),
+      p_to: to.toISOString(),
+      p_limit: 8,
+    } as never),
+  ]);
 
-  if (error) throw error;
-  if (!data) throw new Error("REPORTING_OVERVIEW_EMPTY");
+  if (overviewResult.error) throw overviewResult.error;
+  if (productsResult.error) throw productsResult.error;
+  if (!overviewResult.data) throw new Error("REPORTING_OVERVIEW_EMPTY");
 
-  const raw = data as unknown as RawReportingOverviewV2;
+  const raw = overviewResult.data as unknown as RawReportingOverviewV2;
+  const rawTopProducts = (productsResult.data || []) as unknown as RawTopProductV2[];
   const canViewProfit = Boolean(raw.permissions?.can_view_profit);
 
   const payments = (raw.payment_methods || []).map<ReportingPaymentV2>((row) => {
@@ -326,7 +337,7 @@ export async function fetchReportingOverviewV2(
     net_sales: toNumber(point.net_sales),
   }));
 
-  const topProducts = (raw.top_products || []).map<ReportingTopProductV2>((row) => ({
+  const topProducts = rawTopProducts.map<ReportingTopProductV2>((row) => ({
     product_id: row.product_id || null,
     product_name: row.product_name || "منتج",
     quantity: toNumber(row.quantity),
