@@ -12,6 +12,7 @@ import {
   Users,
   UserCheck,
   Wallet,
+  WalletCards,
   Image,
   MapPin,
   FolderOpen,
@@ -73,6 +74,7 @@ export const financeNavigation: NavigationGroup = {
   title: "المالية والتحليلات",
   items: [
     { label: "المالية", href: "/finance", icon: DollarSign },
+    { label: "وسائل الدفع", href: "/payment-methods", icon: WalletCards },
     { label: "المصروفات والرواتب", href: "/expenses-salaries", icon: FileText },
     { label: "التحليلات", href: "/analytics", icon: Activity },
     { label: "تحليلات الذكاء الاصطناعي", href: "/ai-insights", icon: Sparkles },
