@@ -12,6 +12,7 @@ import PosRecentSales from "@/components/POS/PosRecentSales";
 import POSCustomerLoyaltyBridge from "@/components/POS/POSCustomerLoyaltyBridge";
 import CustomerManagementDock from "@/components/customers/CustomerManagementDock";
 import CustomerInsightsDock from "@/components/customers/CustomerInsightsDock";
+import CustomerOpportunityDock from "@/components/customers/CustomerOpportunityDock";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -84,6 +85,13 @@ const CashierPOS = () => (
   </PosShiftGatePro>
 );
 
+const CustomersWorkspace = () => (
+  <>
+    <CustomersAdvanced />
+    <CustomerOpportunityDock />
+  </>
+);
+
 const Customer360Workspace = () => (
   <>
     <Customer360Profile />
@@ -133,7 +141,7 @@ function App() {
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
               <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
-              <Route path="/customers" element={<ProtectedRoute><CustomersAdvanced /></ProtectedRoute>} />
+              <Route path="/customers" element={<ProtectedRoute><CustomersWorkspace /></ProtectedRoute>} />
               <Route path="/customers/:customerId" element={<ProtectedRoute><Customer360Workspace /></ProtectedRoute>} />
               <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
               <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
