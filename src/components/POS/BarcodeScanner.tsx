@@ -1,8 +1,7 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Camera, X, Smartphone, Barcode as BarcodeIcon } from "lucide-react";
+import { Camera, X, Smartphone } from "lucide-react";
 
 interface BarcodeScannerProps {
   isOpen: boolean;
@@ -20,11 +19,9 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
   const barcodeDetectorRef = useRef<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Check if BarcodeDetector is supported
   const isBarcodeDetectorSupported = 'BarcodeDetector' in window;
 
   useEffect(() => {
-    // Initialize BarcodeDetector if supported
     if (isBarcodeDetectorSupported) {
       try {
         // @ts-ignore - TypeScript doesn't know about BarcodeDetector yet
@@ -35,26 +32,19 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
         console.error("Error initializing BarcodeDetector:", err);
         setError("لا يمكن تهيئة قارئ الباركود.");
       }
-    } else {
-      console.warn("BarcodeDetector API is not supported in this browser.");
     }
 
     return () => {
-      // Clean up scan interval if it exists
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
-      }
+      if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
     };
   }, []);
 
   useEffect(() => {
     if (isOpen) {
       setIsProcessing(false);
-      startCamera();
+      void startCamera();
     } else {
       stopCamera();
-      
-      // Stop scanning when dialog is closed
       if (scanIntervalRef.current) {
         clearInterval(scanIntervalRef.current);
         scanIntervalRef.current = null;
@@ -62,36 +52,38 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
       }
       setIsProcessing(false);
     }
-    
+
     return () => {
       stopCamera();
-      
-      // Clean up scan interval on unmount
-      if (scanIntervalRef.current) {
-        clearInterval(scanIntervalRef.current);
-      }
+      if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
       setIsProcessing(false);
     };
   }, [isOpen]);
 
+  const emitScan = (barcode: string) => {
+    const loyaltyEvent = new CustomEvent<{ barcode: string }>('pos:camera-barcode', {
+      detail: { barcode },
+      cancelable: true,
+    });
+    window.dispatchEvent(loyaltyEvent);
+    if (!loyaltyEvent.defaultPrevented) onScan(barcode);
+    onClose();
+  };
+
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'environment', // Use back camera if available
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
           width: { ideal: 1280 },
-          height: { ideal: 720 }
-        } 
+          height: { ideal: 720 },
+        },
       });
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setHasPermission(true);
-        
-        // Start scanning automatically after camera is ready
-        videoRef.current.onloadedmetadata = () => {
-          startBarcodeScanning();
-        };
+        videoRef.current.onloadedmetadata = () => startBarcodeScanning();
       }
     } catch (err) {
       console.error("Error accessing camera:", err);
@@ -101,8 +93,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
   };
 
   const stopCamera = () => {
-    // Stop the camera when dialog is closed
-    if (videoRef.current && videoRef.current.srcObject) {
+    if (videoRef.current?.srcObject) {
       const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
       tracks.forEach(track => track.stop());
       videoRef.current.srcObject = null;
@@ -111,75 +102,47 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
 
   const startBarcodeScanning = () => {
     if (!videoRef.current || !canvasRef.current || !isBarcodeDetectorSupported) return;
-
     setScanning(true);
-
-    // Start scanning at regular intervals (adjust timing for performance)
-    scanIntervalRef.current = window.setInterval(() => {
-      scanBarcode();
-    }, 200) as unknown as number; // Scan more frequently (every 200ms)
+    scanIntervalRef.current = window.setInterval(() => void scanBarcode(), 200) as unknown as number;
   };
 
   const scanBarcode = async () => {
     if (!videoRef.current || !canvasRef.current || !barcodeDetectorRef.current || isProcessing) return;
 
     try {
-      // Draw current video frame to canvas for processing
       const canvas = canvasRef.current;
       const video = videoRef.current;
       const ctx = canvas.getContext('2d');
-      
       if (!ctx) return;
 
-      // Set canvas dimensions to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
-      // Draw the current video frame to the canvas
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Detect barcodes in the image
-      const barcodes = await barcodeDetectorRef.current.detect(canvas);
 
+      const barcodes = await barcodeDetectorRef.current.detect(canvas);
       if (barcodes.length > 0 && !isProcessing) {
         setIsProcessing(true);
-        
-        // Stop scanning immediately once a barcode is detected
         if (scanIntervalRef.current) {
           clearInterval(scanIntervalRef.current);
           scanIntervalRef.current = null;
           setScanning(false);
         }
 
-        // Get the first detected barcode
         const barcode = barcodes[0].rawValue;
-        
-        // Highlight the detected barcode
         const boundingBox = barcodes[0].boundingBox;
         ctx.strokeStyle = 'lime';
         ctx.lineWidth = 5;
-        ctx.strokeRect(
-          boundingBox.x, 
-          boundingBox.y, 
-          boundingBox.width, 
-          boundingBox.height
-        );
-        
-        // Send barcode immediately and close
-        onScan(barcode);
-        onClose();
+        ctx.strokeRect(boundingBox.x, boundingBox.y, boundingBox.width, boundingBox.height);
+        emitScan(barcode);
       }
     } catch (err) {
       console.error("Error scanning barcode:", err);
     }
   };
 
-  // Fallback for browsers that don't support BarcodeDetector
   const handleTestScan = () => {
-    // Simulating a random barcode
     const randomBarcode = Math.floor(Math.random() * 10000000000000).toString().padStart(13, '0');
-    onScan(randomBarcode);
-    onClose();
+    emitScan(randomBarcode);
   };
 
   return (
@@ -191,7 +154,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
             يمكنك استخدام ماسح الباركود الخارجي مباشرة أو استخدام كاميرا الهاتف
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="py-4">
           {hasPermission === false ? (
             <div className="text-center p-6 text-destructive">
@@ -199,16 +162,8 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
             </div>
           ) : (
             <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                className="w-full h-full object-cover"
-              />
-              <canvas 
-                ref={canvasRef} 
-                className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
-              />
+              <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+              <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-0 pointer-events-none" />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="border-2 border-primary w-2/3 h-1/3 rounded-md"></div>
               </div>
@@ -219,17 +174,15 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
               )}
             </div>
           )}
-          
+
           <div className="space-y-2 mt-4">
             <p className="text-sm text-muted-foreground text-center">
               قم بتوجيه الكاميرا نحو الباركود ليتم مسحه تلقائياً
             </p>
-            
             <div className="bg-muted/30 p-3 rounded-md flex items-center gap-2 text-sm border border-muted">
               <Smartphone className="h-4 w-4 text-primary" />
               <p>الماسح الضوئي الخارجي: قم بتوصيل الماسح وسيتم التقاط الباركود تلقائياً</p>
             </div>
-            
             {!isBarcodeDetectorSupported && (
               <p className="text-xs text-amber-600 text-center">
                 متصفحك لا يدعم قراءة الباركود تلقائياً. استخدم زر "اختبار المسح" أدناه.
@@ -237,22 +190,13 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onScan
             )}
           </div>
         </div>
-        
+
         <DialogFooter className="sm:justify-start flex space-x-2 space-x-reverse">
-          <Button 
-            type="button" 
-            onClick={handleTestScan}
-            className="flex-1"
-          >
+          <Button type="button" onClick={handleTestScan} className="flex-1">
             <Camera className="ml-2 h-4 w-4" />
             اختبار المسح
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-            className="flex-1"
-          >
+          <Button type="button" variant="outline" onClick={onClose} className="flex-1">
             <X className="ml-2 h-4 w-4" />
             إغلاق
           </Button>
