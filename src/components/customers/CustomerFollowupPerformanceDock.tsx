@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import CustomerFollowupPerformanceCard from "@/components/customers/CustomerFollowupPerformanceCard";
 import CustomerStructuredFollowupControl from "@/components/customers/CustomerStructuredFollowupControl";
 import CustomerOpportunityQueueControl from "@/components/customers/CustomerOpportunityQueueControl";
+import CustomerFollowupAssignmentControl from "@/components/customers/CustomerFollowupAssignmentControl";
 
 export default function CustomerFollowupPerformanceDock() {
   const { customerId } = useParams();
@@ -26,10 +27,11 @@ export default function CustomerFollowupPerformanceDock() {
         <SheetContent side="left" dir="rtl" className="w-full overflow-y-auto sm:max-w-2xl">
           <SheetHeader className="text-right">
             <SheetTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-[#005931]" />متابعة ونتائج العميل</SheetTitle>
-            <SheetDescription>سجل نتيجة المتابعة، تحكم في ظهور العميل بقائمة الفرص، واعرف هل رجع واشترى بعدها وقيمة المبيعات الناتجة.</SheetDescription>
+            <SheetDescription>وزّع المتابعات على المسؤول المناسب، سجل النتيجة، تحكم في ظهور العميل بقائمة الفرص، واعرف أثر المتابعة على المبيعات.</SheetDescription>
           </SheetHeader>
           <div className="mt-5 space-y-4">
             <CustomerOpportunityQueueControl customerId={customerId} />
+            <CustomerFollowupAssignmentControl customerId={customerId} />
             <CustomerStructuredFollowupControl customerId={customerId} />
             <CustomerFollowupPerformanceCard customerId={customerId} />
           </div>
