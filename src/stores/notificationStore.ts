@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -7,11 +6,13 @@ interface NotificationState {
   unreadReturns: number;
   unreadDeliveries: number;
   unreadInventoryAlerts: number;
+  customerTaskAlerts: number;
   
   setUnreadOrders: (count: number) => void;
   setUnreadReturns: (count: number) => void;
   setUnreadDeliveries: (count: number) => void;
   setUnreadInventoryAlerts: (count: number) => void;
+  setCustomerTaskAlerts: (count: number) => void;
   
   markOrdersAsRead: () => void;
   markReturnsAsRead: () => void;
@@ -31,11 +32,13 @@ export const useNotificationStore = create<NotificationState>()(
       unreadReturns: 0,
       unreadDeliveries: 0,
       unreadInventoryAlerts: 0,
+      customerTaskAlerts: 0,
       
       setUnreadOrders: (count) => set({ unreadOrders: count }),
       setUnreadReturns: (count) => set({ unreadReturns: count }),
       setUnreadDeliveries: (count) => set({ unreadDeliveries: count }),
       setUnreadInventoryAlerts: (count) => set({ unreadInventoryAlerts: count }),
+      setCustomerTaskAlerts: (count) => set({ customerTaskAlerts: Math.max(0, Number(count || 0)) }),
       
       markOrdersAsRead: () => set({ unreadOrders: 0 }),
       markReturnsAsRead: () => set({ unreadReturns: 0 }),
