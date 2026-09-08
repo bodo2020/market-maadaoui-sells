@@ -4,15 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   BadgeCheck,
-  BarChart3,
   CalendarClock,
   CheckCircle2,
   CircleDollarSign,
   Gauge,
+  Gift,
+  ReceiptText,
   RefreshCw,
-  Sparkles,
   Target,
-  TrendingUp,
   UsersRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -23,10 +22,15 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBranchStore } from "@/stores/branchStore";
-import { fetchCustomerOperationsCenter, type CustomerPrioritySignal } from "@/services/supabase/customerOperationsService";
+import {
+  fetchCustomerCouponConversionDashboard,
+  fetchCustomerOperationsCenter,
+  type CustomerPrioritySignal,
+} from "@/services/supabase/customerOperationsService";
 
 const money = (value: number | null | undefined) => `${Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2 })} ج.م`;
 const num = (value: number | null | undefined) => Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 1 });
+const date = (value?: string | null) => value ? new Intl.DateTimeFormat("ar-EG", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value)) : "—";
 
 const typeLabel: Record<string, string> = {
   call: "مكالمة",
@@ -68,7 +72,14 @@ export default function CustomerOperationsCenterDock() {
     queryFn: () => fetchCustomerOperationsCenter(currentBranchId || null, days, 60),
   });
 
+  const couponQuery = useQuery({
+    queryKey: ["customer-coupon-conversion-dashboard", currentBranchId, days],
+    enabled: open,
+    queryFn: () => fetchCustomerCouponConversionDashboard(currentBranchId || null, days, 40),
+  });
+
   const data = query.data;
+  const coupon = couponQuery.data;
   const summary = data?.summary;
   const queue = data?.priority_queue || [];
   const urgentCount = useMemo(() => queue.filter(item => item.priority_level === "critical" || item.priority_level === "high").length, [queue]);
@@ -76,6 +87,11 @@ export default function CustomerOperationsCenterDock() {
   const openCustomer = (id: string) => {
     setOpen(false);
     navigate(`/customers/${id}`);
+  };
+
+  const refresh = () => {
+    void query.refetch();
+    void couponQuery.refetch();
   };
 
   return (
@@ -94,7 +110,7 @@ export default function CustomerOperationsCenterDock() {
         <SheetContent side="left" dir="rtl" className="w-full overflow-y-auto sm:max-w-3xl">
           <SheetHeader className="text-right">
             <SheetTitle className="flex items-center gap-2 text-xl"><Gauge className="h-5 w-5 text-[#005931]" />مركز تشغيل العملاء</SheetTitle>
-            <SheetDescription>ترتيب يومي للفرص ومتابعة أثر التواصل على المبيعات الفعلية.</SheetDescription>
+            <SheetDescription>ترتيب يومي للفرص وقياس أثر المتابعة وكوبونات الخصم على المبيعات الفعلية.</SheetDescription>
           </SheetHeader>
 
           <div className="mt-5 flex items-center justify-between gap-3">
@@ -106,8 +122,8 @@ export default function CustomerOperationsCenterDock() {
                 <SelectItem value="90">آخر 90 يوم</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={() => void query.refetch()} disabled={query.isFetching}>
-              <RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث
+            <Button variant="outline" size="sm" onClick={refresh} disabled={query.isFetching || couponQuery.isFetching}>
+              <RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching || couponQuery.isFetching ? "animate-spin" : ""}`} />تحديث
             </Button>
           </div>
 
@@ -125,13 +141,14 @@ export default function CustomerOperationsCenterDock() {
               </section>
 
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3 text-xs leading-5 text-emerald-900">
-                التحويل يُحسب لو حصل شراء خلال {data.attribution_window_days} أيام بعد متابعة مكتملة، وكل عملية شراء تُنسب لأقرب متابعة سابقة فقط حتى لا تتكرر المبيعات.
+                المتابعة تُعتبر محوّلة لو حصل شراء خلال {data.attribution_window_days} أيام بعدها، وكل فاتورة تُنسب لأقرب متابعة سابقة فقط. استخدام الكوبون يُقاس مباشرة من الفاتورة أو الطلب المرتبط بالكوبون.
               </div>
 
               <Tabs defaultValue="queue" className="space-y-3">
-                <TabsList className="grid h-auto w-full grid-cols-3 rounded-2xl bg-slate-100 p-1">
+                <TabsList className="grid h-auto w-full grid-cols-4 rounded-2xl bg-slate-100 p-1">
                   <TabsTrigger value="queue">الأولوية</TabsTrigger>
-                  <TabsTrigger value="channels">النتائج</TabsTrigger>
+                  <TabsTrigger value="channels">المتابعات</TabsTrigger>
+                  <TabsTrigger value="coupons">الكوبونات</TabsTrigger>
                   <TabsTrigger value="team">الفريق</TabsTrigger>
                 </TabsList>
 
@@ -166,6 +183,37 @@ export default function CustomerOperationsCenterDock() {
                       <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 p-3 text-sm"><span>المبيعات المنسوبة</span><strong>{money(item.attributed_revenue)}</strong></div>
                     </div>
                   ))}
+                </TabsContent>
+
+                <TabsContent value="coupons" className="space-y-3">
+                  {couponQuery.isLoading ? <Skeleton className="h-72 rounded-2xl" /> : couponQuery.isError || !coupon ? (
+                    <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">تعذر تحميل أداء كوبونات الخصم.</div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                        <Card><CardContent className="p-3"><Gift className="h-4 w-4 text-[#005931]" /><div className="mt-2 text-xl font-black">{num(coupon.summary.cohort_redemption_rate)}%</div><div className="text-[10px] text-muted-foreground">استخدام كوبونات الفترة</div></CardContent></Card>
+                        <Card><CardContent className="p-3"><ReceiptText className="h-4 w-4 text-emerald-600" /><div className="mt-2 text-xl font-black">{num(coupon.summary.coupon_orders)}</div><div className="text-[10px] text-muted-foreground">طلبات استخدمت كوبون</div></CardContent></Card>
+                        <Card><CardContent className="p-3"><CircleDollarSign className="h-4 w-4 text-red-600" /><div className="mt-2 truncate text-base font-black">{money(coupon.summary.discount_used)}</div><div className="text-[10px] text-muted-foreground">خصم تم صرفه</div></CardContent></Card>
+                        <Card><CardContent className="p-3"><CircleDollarSign className="h-4 w-4 text-[#005931]" /><div className="mt-2 truncate text-base font-black">{money(coupon.summary.net_sales_after_coupon)}</div><div className="text-[10px] text-muted-foreground">صافي مبيعات الكوبونات</div></CardContent></Card>
+                      </div>
+
+                      <div className="rounded-2xl border bg-white p-4">
+                        <div className="flex items-center justify-between gap-3"><div><div className="font-black">الكوبونات القائمة حاليًا</div><div className="mt-1 text-xs text-muted-foreground">رصيد خصم لم يُصرف بعد</div></div><div className="text-left"><div className="text-xl font-black text-[#005931]">{money(coupon.summary.active_value)}</div><div className="text-[10px] text-muted-foreground">{num(coupon.summary.active_vouchers)} كوبون</div></div></div>
+                      </div>
+
+                      <div>
+                        <div className="mb-2 text-sm font-black">آخر عمليات شراء بالكوبون</div>
+                        {coupon.recent_conversions.length === 0 ? <div className="rounded-2xl border border-dashed p-6 text-center text-xs text-muted-foreground">لسه مفيش كوبونات اتصرفت في الفترة المختارة.</div> : <div className="space-y-2">{coupon.recent_conversions.slice(0, 12).map(item => (
+                          <button key={`${item.source}-${item.purchase_id}`} type="button" onClick={() => item.customer_id && openCustomer(item.customer_id)} className="w-full rounded-2xl border bg-white p-3 text-right transition hover:border-emerald-200">
+                            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="truncate font-bold">{item.name || "عميل"}</div><div className="mt-1 text-[11px] text-muted-foreground">{item.membership_number || "—"} · {item.source === "store" ? "شراء من الفرع" : "طلب أونلاين"} · {date(item.purchased_at)}</div></div><div className="text-left"><div className="font-black text-[#005931]">{money(item.net_amount)}</div><div className="text-[10px] text-red-600">خصم {money(item.discount_amount)}</div></div></div>
+                            {item.voucher_code && <div className="mt-2 text-[10px] text-muted-foreground">كوبون: {item.voucher_code}</div>}
+                          </button>
+                        ))}</div>}
+                      </div>
+
+                      {coupon.top_customers.length > 0 && <div><div className="mb-2 text-sm font-black">أعلى عملاء استخدموا كوبونات</div><div className="space-y-2">{coupon.top_customers.slice(0, 8).map(item => <button key={item.customer_id} onClick={() => openCustomer(item.customer_id)} className="w-full rounded-xl border bg-white p-3 text-right"><div className="flex items-center justify-between gap-3"><div><div className="font-bold">{item.name || "عميل"}</div><div className="text-[11px] text-muted-foreground">{item.membership_number || "—"} · {num(item.coupon_orders)} طلب</div></div><div className="text-left"><div className="font-black">{money(item.net_sales)}</div><div className="text-[10px] text-red-600">خصم {money(item.discount_used)}</div></div></div></button>)}</div></div>}
+                    </>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="team" className="space-y-2">
