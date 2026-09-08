@@ -99,6 +99,7 @@ function shiftError(message?: string) {
     case "POS_NOT_ALLOWED": return "حسابك غير مسموح له باستخدام نقطة البيع على هذا الفرع.";
     case "DEVICE_SHIFT_BUSY": return "فيه موظف آخر عنده وردية مفتوحة على جهاز الكاشير ده.";
     case "USER_SHIFT_ALREADY_OPEN": return "عندك وردية مفتوحة بالفعل على جهاز كاشير آخر.";
+    case "CASH_HANDOFF_PENDING": return "لا يمكن فتح وردية جديدة على هذا الكاشير لأن نقدية الوردية السابقة لم تستلمها المالية بعد. اطلب من مسؤول المالية فتح «استلام نقدية الورديات» وتأكيد استلام وتسليم المبلغ للخزنة أولًا.";
     case "INVALID_OPENING_CASH": return "الرصيد الافتتاحي غير صحيح.";
     case "INVALID_CLOSING_CASH": return "الرصيد الفعلي عند الإغلاق غير صحيح.";
     case "INVALID_RECONCILIATION": return "بيانات تسوية وسائل الدفع غير صحيحة.";
