@@ -56,6 +56,7 @@ const EMPTY_PRODUCT: Partial<Product> = {
   offer_price: undefined,
   barcode_type: "normal",
   unit_of_measure: "قطعة",
+  default_weight_grams: 250,
   track_expiry: false,
 };
 
