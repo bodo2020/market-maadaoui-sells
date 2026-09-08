@@ -9,6 +9,7 @@ import {
   CircleDollarSign,
   Gauge,
   Gift,
+  MessageCircleMore,
   ReceiptText,
   RefreshCw,
   Target,
@@ -24,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBranchStore } from "@/stores/branchStore";
 import {
   fetchCustomerCouponConversionDashboard,
+  fetchCustomerFollowupOutcomeDashboard,
   fetchCustomerOperationsCenter,
   type CustomerPrioritySignal,
 } from "@/services/supabase/customerOperationsService";
@@ -37,6 +39,17 @@ const typeLabel: Record<string, string> = {
   whatsapp: "WhatsApp",
   email: "بريد",
   meeting: "مقابلة",
+};
+
+const outcomeLabel: Record<string, string> = {
+  reached: "تم التواصل",
+  no_answer: "لم يرد",
+  interested: "مهتم",
+  not_interested: "غير مهتم",
+  issue_resolved: "تم حل المشكلة",
+  callback_requested: "طلب إعادة التواصل",
+  wrong_number: "رقم غير صحيح",
+  legacy: "نتيجة قديمة غير مصنفة",
 };
 
 const signalLabel: Record<string, string> = {
@@ -78,8 +91,15 @@ export default function CustomerOperationsCenterDock() {
     queryFn: () => fetchCustomerCouponConversionDashboard(currentBranchId || null, days, 40),
   });
 
+  const outcomeQuery = useQuery({
+    queryKey: ["customer-followup-outcome-dashboard", currentBranchId, days],
+    enabled: open,
+    queryFn: () => fetchCustomerFollowupOutcomeDashboard(currentBranchId || null, days),
+  });
+
   const data = query.data;
   const coupon = couponQuery.data;
+  const outcome = outcomeQuery.data;
   const summary = data?.summary;
   const queue = data?.priority_queue || [];
   const urgentCount = useMemo(() => queue.filter(item => item.priority_level === "critical" || item.priority_level === "high").length, [queue]);
@@ -92,6 +112,7 @@ export default function CustomerOperationsCenterDock() {
   const refresh = () => {
     void query.refetch();
     void couponQuery.refetch();
+    void outcomeQuery.refetch();
   };
 
   return (
@@ -122,8 +143,8 @@ export default function CustomerOperationsCenterDock() {
                 <SelectItem value="90">آخر 90 يوم</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={refresh} disabled={query.isFetching || couponQuery.isFetching}>
-              <RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching || couponQuery.isFetching ? "animate-spin" : ""}`} />تحديث
+            <Button variant="outline" size="sm" onClick={refresh} disabled={query.isFetching || couponQuery.isFetching || outcomeQuery.isFetching}>
+              <RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching || couponQuery.isFetching || outcomeQuery.isFetching ? "animate-spin" : ""}`} />تحديث
             </Button>
           </div>
 
@@ -145,9 +166,10 @@ export default function CustomerOperationsCenterDock() {
               </div>
 
               <Tabs defaultValue="queue" className="space-y-3">
-                <TabsList className="grid h-auto w-full grid-cols-4 rounded-2xl bg-slate-100 p-1">
+                <TabsList className="grid h-auto w-full grid-cols-5 rounded-2xl bg-slate-100 p-1">
                   <TabsTrigger value="queue">الأولوية</TabsTrigger>
                   <TabsTrigger value="channels">المتابعات</TabsTrigger>
+                  <TabsTrigger value="outcomes">النتائج</TabsTrigger>
                   <TabsTrigger value="coupons">الكوبونات</TabsTrigger>
                   <TabsTrigger value="team">الفريق</TabsTrigger>
                 </TabsList>
@@ -179,10 +201,35 @@ export default function CustomerOperationsCenterDock() {
                   </div>
                   {data.type_performance.length === 0 ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">لسه مفيش متابعات مكتملة في الفترة المختارة.</div> : data.type_performance.map(item => (
                     <div key={item.type} className="rounded-2xl border bg-white p-4">
-                      <div className="flex items-center justify-between gap-3"><div><div className="font-black">{typeLabel[item.type] || item.type}</div><div className="mt-1 text-xs text-muted-foreground">{num(item.completed)} مكتملة · {num(item.converted)} تحولت لشراء</div></div><div className="text-left"><div className="text-xl font-black text-[#005931]">{num(item.conversion_rate)}%</div><div className="text-[10px] text-muted-foreground">Conversion</div></div></div>
+                      <div className="flex items-center justify-between gap-3"><div><div className="font-black">{typeLabel[item.type] || item.type}</div><div className="mt-1 text-xs text-muted-foreground">{num(item.completed)} مكتملة · {num(item.converted)} تحولت لشراء</div></div><div className="text-left"><div className="text-xl font-black text-[#005931]">{num(item.conversion_rate)}%</div><div className="text-[10px] text-muted-foreground">تحويل</div></div></div>
                       <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 p-3 text-sm"><span>المبيعات المنسوبة</span><strong>{money(item.attributed_revenue)}</strong></div>
                     </div>
                   ))}
+                </TabsContent>
+
+                <TabsContent value="outcomes" className="space-y-3">
+                  {outcomeQuery.isLoading ? <Skeleton className="h-72 rounded-2xl" /> : outcomeQuery.isError || !outcome ? (
+                    <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">تعذر تحميل Funnel نتائج المتابعة.</div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                        <Card><CardContent className="p-3"><MessageCircleMore className="h-4 w-4 text-[#005931]" /><div className="mt-2 text-xl font-black">{num(outcome.summary.structured_outcomes)}</div><div className="text-[10px] text-muted-foreground">نتائج منظمة</div></CardContent></Card>
+                        <Card><CardContent className="p-3"><Target className="h-4 w-4 text-emerald-600" /><div className="mt-2 text-xl font-black">{num(outcome.summary.interested)}</div><div className="text-[10px] text-muted-foreground">عملاء مهتمون</div></CardContent></Card>
+                        <Card><CardContent className="p-3"><CalendarClock className="h-4 w-4 text-blue-600" /><div className="mt-2 text-xl font-black">{num(outcome.summary.callback_requested)}</div><div className="text-[10px] text-muted-foreground">طلبوا إعادة التواصل</div></CardContent></Card>
+                        <Card><CardContent className="p-3"><MessageCircleMore className="h-4 w-4 text-amber-600" /><div className="mt-2 text-xl font-black">{num(outcome.summary.no_answer)}</div><div className="text-[10px] text-muted-foreground">لم يردوا</div></CardContent></Card>
+                      </div>
+
+                      {outcome.outcomes.length === 0 ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">أول ما تبدأ تسجل النتائج المنظمة هتظهر المقارنة هنا.</div> : outcome.outcomes.map(item => (
+                        <div key={item.outcome_code} className="rounded-2xl border bg-white p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div><div className="font-black">{outcomeLabel[item.outcome_code] || item.outcome_code}</div><div className="mt-1 text-xs text-muted-foreground">{num(item.completed)} متابعة · {num(item.converted)} نتج عنها شراء</div></div>
+                            <div className="text-left"><div className="text-xl font-black text-[#005931]">{num(item.conversion_rate)}%</div><div className="text-[10px] text-muted-foreground">نسبة التحويل</div></div>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-sm"><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">المبيعات المنسوبة</div><strong>{money(item.attributed_revenue)}</strong></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">الإجراء المقترح</div><strong className="text-xs leading-5">{item.recommended_action}</strong></div></div>
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="coupons" className="space-y-3">
@@ -219,7 +266,7 @@ export default function CustomerOperationsCenterDock() {
                 <TabsContent value="team" className="space-y-2">
                   {data.agent_performance.length === 0 ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">لسه مفيش أداء فريق قابل للقياس في الفترة المختارة.</div> : data.agent_performance.map((item, index) => (
                     <div key={item.staff_id || `staff-${index}`} className="rounded-2xl border bg-white p-4">
-                      <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2"><UsersRound className="h-4 w-4 text-[#005931]" /><div><div className="font-black">{item.staff_name || "غير محدد"}</div><div className="mt-1 text-xs text-muted-foreground">{num(item.completed)} متابعة · {num(item.converted)} Conversion</div></div></div><BadgeCheck className="h-5 w-5 text-emerald-600" /></div>
+                      <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2"><UsersRound className="h-4 w-4 text-[#005931]" /><div><div className="font-black">{item.staff_name || "غير محدد"}</div><div className="mt-1 text-xs text-muted-foreground">{num(item.completed)} متابعة · {num(item.converted)} تحويل</div></div></div><BadgeCheck className="h-5 w-5 text-emerald-600" /></div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-center text-sm"><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">نسبة التحويل</div><strong>{num(item.conversion_rate)}%</strong></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">المبيعات</div><strong>{money(item.attributed_revenue)}</strong></div></div>
                     </div>
                   ))}
