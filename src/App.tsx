@@ -12,6 +12,7 @@ import ReportsInventoryV2 from "@/pages/ReportsInventoryV2";
 import ReportsShiftsV2 from "@/pages/ReportsShiftsV2";
 import ReportsOnlineV2 from "@/pages/ReportsOnlineV2";
 import ReportsCustomersV2 from "@/pages/ReportsCustomersV2";
+import ReportsCostsV2 from "@/pages/ReportsCostsV2";
 import NotFound from "@/pages/NotFound";
 import POSPro from "@/pages/POSPro";
 import PosShiftGatePro from "@/components/POS/PosShiftGatePro";
@@ -78,135 +79,95 @@ import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
+  defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
 });
 
 const CashierPOS = () => (
-  <PosShiftGatePro>
-    <PosRuntimeGuard>
-      <PosWorkspaceRecoveryGate>
-        <>
-          <POSPro />
-          <POSCustomerLoyaltyBridge />
-          <PosRecentSales />
-        </>
-      </PosWorkspaceRecoveryGate>
-    </PosRuntimeGuard>
-  </PosShiftGatePro>
+  <PosShiftGatePro><PosRuntimeGuard><PosWorkspaceRecoveryGate><><POSPro /><POSCustomerLoyaltyBridge /><PosRecentSales /></></PosWorkspaceRecoveryGate></PosRuntimeGuard></PosShiftGatePro>
 );
 
-const CustomersWorkspace = () => (
-  <>
-    <CustomersAdvanced />
-    <CustomerMyTasksDock />
-    <CustomerTeamWorkloadDock />
-    <CustomerOperationsCenterDock />
-    <CustomerOpportunityDock />
-  </>
-);
-
-const Customer360Workspace = () => (
-  <>
-    <Customer360Profile />
-    <CustomerMyTasksDock />
-    <CustomerFollowupPerformanceDock />
-    <CustomerInsightsDock />
-    <CustomerManagementDock />
-  </>
-);
-
+const CustomersWorkspace = () => (<><CustomersAdvanced /><CustomerMyTasksDock /><CustomerTeamWorkloadDock /><CustomerOperationsCenterDock /><CustomerOpportunityDock /></>);
+const Customer360Workspace = () => (<><Customer360Profile /><CustomerMyTasksDock /><CustomerFollowupPerformanceDock /><CustomerInsightsDock /><CustomerManagementDock /></>);
 const ReportsRedirect = () => <Navigate to="/reports" replace />;
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <AuthProvider>
-          <TooltipProvider>
-            <OrderNotifications />
-            <CustomerTaskNotifications />
-            <OperationsTaskNotifications />
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
-              <Route path="/dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
-              <Route path="/reports" element={<ProtectedRoute><ReportsV2 /></ProtectedRoute>} />
-              <Route path="/reports/sales" element={<ProtectedRoute><ReportsSalesV2 /></ProtectedRoute>} />
-              <Route path="/reports/profitability" element={<ProtectedRoute><ReportsProfitabilityV2 /></ProtectedRoute>} />
-              <Route path="/reports/payments" element={<ProtectedRoute><ReportsPaymentsV2 /></ProtectedRoute>} />
-              <Route path="/reports/returns" element={<ProtectedRoute><ReportsReturnsV2 /></ProtectedRoute>} />
-              <Route path="/reports/products" element={<ProtectedRoute><ReportsProductsV2 /></ProtectedRoute>} />
-              <Route path="/reports/inventory" element={<ProtectedRoute><ReportsInventoryV2 /></ProtectedRoute>} />
-              <Route path="/reports/shifts" element={<ProtectedRoute><ReportsShiftsV2 /></ProtectedRoute>} />
-              <Route path="/reports/online" element={<ProtectedRoute><ReportsOnlineV2 /></ProtectedRoute>} />
-              <Route path="/reports/customers" element={<ProtectedRoute><ReportsCustomersV2 /></ProtectedRoute>} />
-              <Route path="/analytics" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
-              <Route path="/ai-insights" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
-              <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
-              <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
-              <Route path="/tasks" element={<ProtectedRoute><OperationsTasksPage /></ProtectedRoute>} />
-              <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
-              <Route path="/categories/:id" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
-              <Route path="/categories/:id/:subId" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
-              <Route path="/subcategory/:id" element={<ProtectedRoute><SubcategoryDetails /></ProtectedRoute>} />
-              <Route path="/subsubcategories/:id" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
-              <Route path="/products" element={<ProtectedRoute><ProductManagement /></ProtectedRoute>} />
-              <Route path="/product-details/:id" element={<ProtectedRoute><ProductDetails /></ProtectedRoute>} />
-              <Route path="/products/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-              <Route path="/products/edit/:id" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-              <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-              <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
-              <Route path="/daily-inventory" element={<ProtectedRoute><DailyInventoryPage /></ProtectedRoute>} />
-              <Route path="/inventory-full" element={<ProtectedRoute><InventoryFullPage /></ProtectedRoute>} />
-              <Route path="/inventory-history" element={<ProtectedRoute><InventoryHistoryPage /></ProtectedRoute>} />
-              <Route path="/inventory-import" element={<ProtectedRoute><InventoryImport /></ProtectedRoute>} />
-              <Route path="/expiry-management" element={<ProtectedRoute><ExpiryManagement /></ProtectedRoute>} />
-              <Route path="/supplier-purchases" element={<ProtectedRoute><SupplierPurchases /></ProtectedRoute>} />
-              <Route path="/companies" element={<ProtectedRoute><Companies /></ProtectedRoute>} />
-              <Route path="/companies/:id" element={<ProtectedRoute><CompanyDetails /></ProtectedRoute>} />
-              <Route path="/company/:id" element={<ProtectedRoute><CompanyDetails /></ProtectedRoute>} />
-              <Route path="/purchases/:id" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
-              <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
-              <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
-              <Route path="/payment-methods" element={<ProtectedRoute><PaymentMethods /></ProtectedRoute>} />
-              <Route path="/expenses" element={<ProtectedRoute><ExpenseManagement /></ProtectedRoute>} />
-              <Route path="/expenses-salaries" element={<ProtectedRoute><ExpensesAndSalaries /></ProtectedRoute>} />
-              <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-              <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
-              <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
-              <Route path="/customers" element={<ProtectedRoute><CustomersWorkspace /></ProtectedRoute>} />
-              <Route path="/customer-tasks" element={<ProtectedRoute><CustomerMyTasksPage /></ProtectedRoute>} />
-              <Route path="/customers/:customerId" element={<ProtectedRoute><Customer360Workspace /></ProtectedRoute>} />
-              <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
-              <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
-              <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
-              <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />
-              <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
-              <Route path="/banners/add" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
-              <Route path="/banners/edit" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
-              <Route path="/delivery-locations" element={<ProtectedRoute><DeliveryLocationsPage /></ProtectedRoute>} />
-              <Route path="/delivery-locations/:id" element={<ProtectedRoute><DeliveryLocations /></ProtectedRoute>} />
-              <Route path="/branch-delivery-zones" element={<ProtectedRoute><BranchDeliveryZones /></ProtectedRoute>} />
-              <Route path="/offers" element={<ProtectedRoute><OffersPage /></ProtectedRoute>} />
-              <Route path="/product-collections" element={<ProtectedRoute><ProductCollections /></ProtectedRoute>} />
-              <Route path="/product-collections/create" element={<ProtectedRoute><CreateProductCollection /></ProtectedRoute>} />
-              <Route path="/product-collections/edit/:id" element={<ProtectedRoute><EditProductCollection /></ProtectedRoute>} />
-              <Route path="/barcode" element={<ProtectedRoute><Barcode /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <SonnerToaster position="top-center" richColors />
-            <Toaster />
-          </TooltipProvider>
-        </AuthProvider>
-      </Router>
+      <Router><AuthProvider><TooltipProvider>
+        <OrderNotifications /><CustomerTaskNotifications /><OperationsTaskNotifications />
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><ReportsV2 /></ProtectedRoute>} />
+          <Route path="/reports/sales" element={<ProtectedRoute><ReportsSalesV2 /></ProtectedRoute>} />
+          <Route path="/reports/profitability" element={<ProtectedRoute><ReportsProfitabilityV2 /></ProtectedRoute>} />
+          <Route path="/reports/payments" element={<ProtectedRoute><ReportsPaymentsV2 /></ProtectedRoute>} />
+          <Route path="/reports/returns" element={<ProtectedRoute><ReportsReturnsV2 /></ProtectedRoute>} />
+          <Route path="/reports/products" element={<ProtectedRoute><ReportsProductsV2 /></ProtectedRoute>} />
+          <Route path="/reports/inventory" element={<ProtectedRoute><ReportsInventoryV2 /></ProtectedRoute>} />
+          <Route path="/reports/shifts" element={<ProtectedRoute><ReportsShiftsV2 /></ProtectedRoute>} />
+          <Route path="/reports/online" element={<ProtectedRoute><ReportsOnlineV2 /></ProtectedRoute>} />
+          <Route path="/reports/customers" element={<ProtectedRoute><ReportsCustomersV2 /></ProtectedRoute>} />
+          <Route path="/reports/costs" element={<ProtectedRoute><ReportsCostsV2 /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
+          <Route path="/ai-insights" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
+          <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
+          <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
+          <Route path="/tasks" element={<ProtectedRoute><OperationsTasksPage /></ProtectedRoute>} />
+          <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
+          <Route path="/categories/:id" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
+          <Route path="/categories/:id/:subId" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
+          <Route path="/subcategory/:id" element={<ProtectedRoute><SubcategoryDetails /></ProtectedRoute>} />
+          <Route path="/subsubcategories/:id" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
+          <Route path="/products" element={<ProtectedRoute><ProductManagement /></ProtectedRoute>} />
+          <Route path="/product-details/:id" element={<ProtectedRoute><ProductDetails /></ProtectedRoute>} />
+          <Route path="/products/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+          <Route path="/products/edit/:id" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+          <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+          <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
+          <Route path="/daily-inventory" element={<ProtectedRoute><DailyInventoryPage /></ProtectedRoute>} />
+          <Route path="/inventory-full" element={<ProtectedRoute><InventoryFullPage /></ProtectedRoute>} />
+          <Route path="/inventory-history" element={<ProtectedRoute><InventoryHistoryPage /></ProtectedRoute>} />
+          <Route path="/inventory-import" element={<ProtectedRoute><InventoryImport /></ProtectedRoute>} />
+          <Route path="/expiry-management" element={<ProtectedRoute><ExpiryManagement /></ProtectedRoute>} />
+          <Route path="/supplier-purchases" element={<ProtectedRoute><SupplierPurchases /></ProtectedRoute>} />
+          <Route path="/companies" element={<ProtectedRoute><Companies /></ProtectedRoute>} />
+          <Route path="/companies/:id" element={<ProtectedRoute><CompanyDetails /></ProtectedRoute>} />
+          <Route path="/company/:id" element={<ProtectedRoute><CompanyDetails /></ProtectedRoute>} />
+          <Route path="/purchases/:id" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
+          <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
+          <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
+          <Route path="/payment-methods" element={<ProtectedRoute><PaymentMethods /></ProtectedRoute>} />
+          <Route path="/expenses" element={<ProtectedRoute><ExpenseManagement /></ProtectedRoute>} />
+          <Route path="/expenses-salaries" element={<ProtectedRoute><ExpensesAndSalaries /></ProtectedRoute>} />
+          <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
+          <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
+          <Route path="/customers" element={<ProtectedRoute><CustomersWorkspace /></ProtectedRoute>} />
+          <Route path="/customer-tasks" element={<ProtectedRoute><CustomerMyTasksPage /></ProtectedRoute>} />
+          <Route path="/customers/:customerId" element={<ProtectedRoute><Customer360Workspace /></ProtectedRoute>} />
+          <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
+          <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
+          <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
+          <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />
+          <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
+          <Route path="/banners/add" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
+          <Route path="/banners/edit" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
+          <Route path="/delivery-locations" element={<ProtectedRoute><DeliveryLocationsPage /></ProtectedRoute>} />
+          <Route path="/delivery-locations/:id" element={<ProtectedRoute><DeliveryLocations /></ProtectedRoute>} />
+          <Route path="/branch-delivery-zones" element={<ProtectedRoute><BranchDeliveryZones /></ProtectedRoute>} />
+          <Route path="/offers" element={<ProtectedRoute><OffersPage /></ProtectedRoute>} />
+          <Route path="/product-collections" element={<ProtectedRoute><ProductCollections /></ProtectedRoute>} />
+          <Route path="/product-collections/create" element={<ProtectedRoute><CreateProductCollection /></ProtectedRoute>} />
+          <Route path="/product-collections/edit/:id" element={<ProtectedRoute><EditProductCollection /></ProtectedRoute>} />
+          <Route path="/barcode" element={<ProtectedRoute><Barcode /></ProtectedRoute>} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        <SonnerToaster position="top-center" richColors /><Toaster />
+      </TooltipProvider></AuthProvider></Router>
     </QueryClientProvider>
   );
 }
-
 export default App;
