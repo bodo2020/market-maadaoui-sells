@@ -124,7 +124,14 @@ export async function submitModernPosSale(
   }
 
   if (pending.fingerprint !== fingerprint) {
-    throw new Error("فيه محاولة حفظ سابقة لنفس السلة. أكمل نفس بيانات العميل والكوبون والدفع أو ابدأ عملية بيع جديدة.");
+    // Keep the same request id while the previous result is uncertain. The server
+    // now resolves an already-committed request first, so this cannot duplicate a sale.
+    // If the browser already knows the old request was confirmed, start a fresh id.
+    pending = {
+      requestId: pending.confirmed ? crypto.randomUUID() : (pending.requestId || crypto.randomUUID()),
+      fingerprint,
+      payload,
+    };
   }
   try { localStorage.setItem(storageKey, JSON.stringify(pending)); } catch { /* noop */ }
 
