@@ -26,9 +26,20 @@ export type PosReturnPreview = {
   date: string;
   branch_id: string;
   payment_method: "cash" | "card" | "mixed";
+  payment_method_id?: string | null;
+  payment_method_code?: string | null;
+  payment_method_name?: string | null;
+  payment_method_type?: "cash" | "card" | "digital_wallet" | "bank_transfer" | "other" | string | null;
+  payment_reference?: string | null;
   sale_total: number;
   loyalty_voucher_amount: number;
   amount_paid: number;
+  amount_charged?: number;
+  payment_fee_amount?: number;
+  customer_payment_fee_amount?: number;
+  merchant_payment_fee_amount?: number;
+  payment_fee_bearer?: "customer" | "business" | string | null;
+  payment_fee_refundable?: boolean;
   cash_amount: number;
   card_amount: number;
   returned_total: number;
@@ -50,6 +61,11 @@ export type PendingPosCardRefund = {
   status: "pending";
   created_at: string;
   provider_reference: string | null;
+  payment_method_id?: string | null;
+  payment_method_code?: string | null;
+  payment_method_name?: string | null;
+  payment_method_type?: string | null;
+  payment_reference?: string | null;
 };
 
 export type PosQuickReturnResult = {
@@ -71,6 +87,10 @@ export type PosQuickReturnResult = {
   card_refund_pending: boolean;
   drawer_balance_after: number;
   idempotent: boolean;
+  refund_payment_method_id?: string | null;
+  refund_payment_method_code?: string | null;
+  refund_payment_method_name?: string | null;
+  refund_payment_method_type?: string | null;
 };
 
 type PendingReturn = {
@@ -113,9 +133,9 @@ function friendlyReturnError(message?: string) {
   if (value.includes("REFUND_ALLOCATION_INVALID")) return "تعذر توزيع المرتجع بين كوبون الخصم والمبلغ المدفوع. أعد تحميل الفاتورة.";
   if (value.includes("LOYALTY_RETURN_ALLOCATION_CHANGED")) return "رصيد كوبون الخصم اتغير أثناء المرتجع. أعد المحاولة بعد تحديث الفاتورة.";
   if (value.includes("RETURN_REQUEST_CONFLICT")) return "يوجد طلب مرتجع سابق مختلف لنفس المحاولة. راجع المرتجعات قبل إعادة التنفيذ.";
-  if (value.includes("PROVIDER_REFERENCE_REQUIRED")) return "اكتب مرجع عملية رد البطاقة من جهاز/مزود الدفع.";
-  if (value.includes("REFUND_NOT_PENDING")) return "رد البطاقة لم يعد في حالة انتظار.";
-  if (value.includes("REFUND_NOT_FOUND")) return "عملية رد البطاقة غير موجودة.";
+  if (value.includes("PROVIDER_REFERENCE_REQUIRED")) return "اكتب مرجع عملية الرد من مزود وسيلة الدفع.";
+  if (value.includes("REFUND_NOT_PENDING")) return "عملية الرد الإلكتروني لم تعد في حالة انتظار.";
+  if (value.includes("REFUND_NOT_FOUND")) return "عملية الرد الإلكتروني غير موجودة.";
   return null;
 }
 
@@ -133,7 +153,7 @@ export async function getPosSaleReturnPreview(saleId: string): Promise<PosReturn
 
 export async function listPendingPosCardRefunds(saleId: string): Promise<PendingPosCardRefund[]> {
   const { data, error } = await rpc("list_pos_sale_pending_card_refunds", { p_sale_id: saleId });
-  if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تحميل ردود البطاقة المعلقة");
+  if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تحميل ردود الدفع الإلكتروني المعلقة");
   return (Array.isArray(data) ? data : []) as PendingPosCardRefund[];
 }
 
@@ -207,7 +227,13 @@ export async function submitPosQuickReturn(
   try { localStorage.removeItem(key); } catch { /* noop */ }
   invalidatePOSCatalogCache(preview.branch_id);
   invalidatePosPreflightCache(preview.branch_id);
-  const confirmed = result.data as PosQuickReturnResult;
+  const confirmed = {
+    ...(result.data as PosQuickReturnResult),
+    refund_payment_method_id: preview.payment_method_id || null,
+    refund_payment_method_code: preview.payment_method_code || null,
+    refund_payment_method_name: preview.payment_method_name || (preview.payment_method === "cash" ? "نقدي" : "وسيلة الدفع الإلكترونية"),
+    refund_payment_method_type: preview.payment_method_type || preview.payment_method,
+  } as PosQuickReturnResult;
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("pos:return-completed", { detail: confirmed }));
     window.dispatchEvent(new CustomEvent("pos:cash-changed", { detail: confirmed }));
@@ -217,13 +243,13 @@ export async function submitPosQuickReturn(
 
 export async function confirmPosCardRefund(refundId: string, providerReference: string) {
   const reference = providerReference.trim();
-  if (reference.length < 3) throw new Error("اكتب مرجع رد البطاقة من جهاز/مزود الدفع.");
+  if (reference.length < 3) throw new Error("اكتب مرجع عملية الرد من مزود وسيلة الدفع.");
   const { data, error } = await rpc("confirm_pos_card_refund", {
     p_refund_id: refundId,
     p_provider_reference: reference,
   });
-  if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تأكيد رد البطاقة");
-  if (!data || typeof data !== "object") throw new Error("لم يصل تأكيد رد البطاقة.");
-  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pos:return-card-confirmed", { detail: { refundId } }));
+  if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تأكيد الرد الإلكتروني");
+  if (!data || typeof data !== "object") throw new Error("لم يصل تأكيد الرد الإلكتروني.");
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pos:return-card-confirmed", { detail: { refundId, ...(data as Record<string, unknown>) } }));
   return data as Record<string, unknown>;
 }
