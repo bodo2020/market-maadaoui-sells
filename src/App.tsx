@@ -11,6 +11,7 @@ import PosWorkspaceRecoveryGate from "@/components/POS/PosWorkspaceRecoveryGate"
 import PosRecentSales from "@/components/POS/PosRecentSales";
 import POSCustomerLoyaltyBridge from "@/components/POS/POSCustomerLoyaltyBridge";
 import CustomerManagementDock from "@/components/customers/CustomerManagementDock";
+import CustomerInsightsDock from "@/components/customers/CustomerInsightsDock";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -28,7 +29,7 @@ import ExpenseManagement from "@/pages/ExpenseManagement";
 import Settings from "@/pages/Settings";
 import OnlineOrders from "@/pages/OnlineOrders";
 import OrderDetails from "@/pages/OrderDetails";
-import Customers from "@/pages/Customers";
+import CustomersAdvanced from "@/pages/CustomersAdvanced";
 import Suppliers from "@/pages/Suppliers";
 import EmployeeManagement from "@/pages/EmployeeManagement";
 import CashTracking from "@/pages/CashTracking";
@@ -86,6 +87,7 @@ const CashierPOS = () => (
 const Customer360Workspace = () => (
   <>
     <Customer360Profile />
+    <CustomerInsightsDock />
     <CustomerManagementDock />
   </>
 );
@@ -131,7 +133,7 @@ function App() {
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
               <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
-              <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+              <Route path="/customers" element={<ProtectedRoute><CustomersAdvanced /></ProtectedRoute>} />
               <Route path="/customers/:customerId" element={<ProtectedRoute><Customer360Workspace /></ProtectedRoute>} />
               <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
               <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
