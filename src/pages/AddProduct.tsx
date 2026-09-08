@@ -483,12 +483,63 @@ export default function AddProduct() {
 
                       <div className="space-y-2">
                         <Label>نوع الباركود</Label>
-                        <Select value={product.barcode_type || "normal"} onValueChange={value => setProduct(prev => ({ ...prev, barcode_type: value, unit_of_measure: value === "scale" ? "كجم" : (prev.unit_of_measure === "كجم" ? "قطعة" : prev.unit_of_measure) }))}>
+                        <Select value={product.barcode_type || "normal"} onValueChange={value => setProduct(prev => ({ ...prev, barcode_type: value, unit_of_measure: value === "scale" ? "كجم" : (prev.unit_of_measure === "كجم" ? "قطعة" : prev.unit_of_measure), default_weight_grams: value === "scale" ? (Number(prev.default_weight_grams) > 0 ? Number(prev.default_weight_grams) : 250) : prev.default_weight_grams }))}>
                           <SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger>
                           <SelectContent><SelectItem value="normal">باركود عادي</SelectItem><SelectItem value="scale">ميزان / PLU</SelectItem></SelectContent>
                         </Select>
                         {product.barcode_type === "scale" && <p className="flex items-center gap-1 text-xs text-muted-foreground"><Scale className="h-3.5 w-3.5" /> الـPOS سيحسب الوزن والسعر من باركود الميزان.</p>}
                       </div>
+
+                      {product.barcode_type === "scale" && (
+                        <div className="md:col-span-2 rounded-2xl border border-[#005931]/30 bg-[#005931]/5 p-4">
+                          <div className="mb-3 flex items-start gap-3">
+                            <div className="rounded-xl bg-[#005931]/10 p-2 text-[#005931]"><Scale className="h-5 w-5" /></div>
+                            <div>
+                              <h3 className="font-black text-[#005931]">الوزن الافتراضي وخطوة الزيادة</h3>
+                              <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                                هذه هي القيمة التي يبدأ بها العميل عند إضافة المنتج، وكل ضغطة على + أو − تزيد أو تنقص بنفس القيمة.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {[100, 250, 500, 1000].map(preset => {
+                              const active = Number(product.default_weight_grams) === preset;
+                              return (
+                                <Button
+                                  key={preset}
+                                  type="button"
+                                  variant={active ? "default" : "outline"}
+                                  className={`h-11 rounded-xl px-4 font-bold ${active ? "bg-[#005931] text-white hover:bg-[#005931]/90" : "border-[#005931]/40 text-[#005931] hover:bg-[#005931]/10"}`}
+                                  onClick={() => setProduct(prev => ({ ...prev, default_weight_grams: preset }))}
+                                >
+                                  {preset} جم
+                                </Button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="mt-3 space-y-2">
+                            <Label>الوزن بالجرام</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={100000}
+                              step={1}
+                              dir="ltr"
+                              className="h-12 rounded-xl text-lg font-bold"
+                              value={product.default_weight_grams ?? ""}
+                              onChange={event => {
+                                const raw = event.target.value;
+                                setProduct(prev => ({ ...prev, default_weight_grams: raw === "" ? null : Math.min(100000, Math.max(1, Math.round(Number(raw)))) }));
+                              }}
+                              onBlur={() => setProduct(prev => ({ ...prev, default_weight_grams: Number(prev.default_weight_grams) > 0 ? Number(prev.default_weight_grams) : 250 }))}
+                            />
+                            <p className="text-xs text-muted-foreground">القيمة المسموحة من 1 جم إلى 100000 جم.</p>
+                          </div>
+                        </div>
+                      )}
+
 
                       <div className="space-y-2">
                         <Label>الشركة</Label>
