@@ -1,7 +1,17 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { startOfDay, startOfMonth, subDays } from "date-fns";
-import { Banknote, Filter, ReceiptText, RefreshCcw, RotateCcw, ShoppingCart, TrendingUp, Users } from "lucide-react";
+import {
+  Banknote,
+  Filter,
+  ReceiptText,
+  RefreshCcw,
+  RotateCcw,
+  Search,
+  ShoppingCart,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import MainLayout from "@/components/layout/MainLayout";
 import ReportsSectionNav from "@/components/reports/ReportsSectionNav";
@@ -10,6 +20,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { siteConfig } from "@/config/site";
 import { useBranchStore } from "@/stores/branchStore";
@@ -19,7 +30,9 @@ type PeriodPreset = "today" | "7d" | "30d" | "month";
 
 const money = (value: number | null | undefined) =>
   `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siteConfig.currency}`;
-const number = (value: number | null | undefined) => Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2 });
+
+const number = (value: number | null | undefined) =>
+  Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2 });
 
 const getRange = (preset: PeriodPreset) => {
   const now = new Date();
@@ -39,7 +52,7 @@ function Metric({ title, value, hint, icon }: { title: string; value: string; hi
             <p className="mt-2 text-2xl font-black tracking-tight">{value}</p>
             <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
           </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">{icon}</div>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">{icon}</div>
         </div>
       </CardContent>
     </Card>
@@ -52,6 +65,7 @@ export default function ReportsSalesV2() {
   const [channel, setChannel] = useState<ReportingSalesChannel>("all");
   const [cashier, setCashier] = useState("all");
   const [payment, setPayment] = useState("all");
+  const [search, setSearch] = useState("");
   const range = useMemo(() => getRange(period), [period]);
 
   const optionsQuery = useQuery({
@@ -62,7 +76,7 @@ export default function ReportsSalesV2() {
   });
 
   const query = useQuery({
-    queryKey: ["reporting-sales-v2", currentBranchId, period, channel, cashier, payment],
+    queryKey: ["reporting-sales-v2", currentBranchId, period, channel, cashier, payment, search.trim()],
     enabled: Boolean(currentBranchId),
     queryFn: () => fetchReportingSalesV2({
       branchId: currentBranchId!,
@@ -71,6 +85,7 @@ export default function ReportsSalesV2() {
       channel,
       cashierId: cashier === "all" ? null : cashier,
       paymentCode: payment === "all" ? null : payment,
+      search: search.trim() || null,
     }),
     staleTime: 30_000,
   });
@@ -82,7 +97,13 @@ export default function ReportsSalesV2() {
   );
 
   if (!currentBranchId) {
-    return <MainLayout><div className="mx-auto mt-16 max-w-xl"><Alert><AlertDescription>اختر فرعًا أولًا لعرض تقرير المبيعات.</AlertDescription></Alert></div></MainLayout>;
+    return (
+      <MainLayout>
+        <div className="mx-auto mt-16 max-w-xl">
+          <Alert><AlertDescription>اختر فرعًا أولًا لعرض تقرير المبيعات.</AlertDescription></Alert>
+        </div>
+      </MainLayout>
+    );
   }
 
   return (
@@ -93,22 +114,86 @@ export default function ReportsSalesV2() {
         <section className="rounded-3xl border bg-white p-5 shadow-sm md:p-7">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <div className="mb-2 flex flex-wrap gap-2"><Badge variant="secondary">Sales V2</Badge><Badge variant="outline">{currentBranchName || "الفرع الحالي"}</Badge></div>
+              <div className="mb-2 flex flex-wrap gap-2">
+                <Badge variant="secondary">Sales V2</Badge>
+                <Badge variant="outline">{currentBranchName || "الفرع الحالي"}</Badge>
+              </div>
               <h1 className="text-2xl font-black md:text-3xl">تقرير المبيعات</h1>
-              <p className="mt-2 text-sm text-muted-foreground">تحليل POS والأونلاين حسب الوقت والكاشير ووسيلة الدفع، مع خصم المرتجعات المؤكدة.</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                تحليل POS والأونلاين حسب الوقت والكاشير ووسيلة الدفع، مع خصم المرتجعات المؤكدة.
+              </p>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-              <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="today">اليوم</SelectItem><SelectItem value="7d">آخر 7 أيام</SelectItem><SelectItem value="30d">آخر 30 يوم</SelectItem><SelectItem value="month">هذا الشهر</SelectItem></SelectContent></Select>
-              <Select value={channel} onValueChange={(v) => { setChannel(v as ReportingSalesChannel); if (v === "online") { setCashier("all"); setPayment("all"); } }}><SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">كل القنوات</SelectItem><SelectItem value="pos">POS فقط</SelectItem><SelectItem value="online">أونلاين فقط</SelectItem></SelectContent></Select>
-              <Select value={cashier} onValueChange={setCashier} disabled={channel === "online"}><SelectTrigger className="rounded-xl"><SelectValue placeholder="الكاشير" /></SelectTrigger><SelectContent><SelectItem value="all">كل الكاشيرين</SelectItem>{(optionsQuery.data?.cashiers || []).filter((x) => x.cashier_id).map((x) => <SelectItem key={x.cashier_id!} value={x.cashier_id!}>{x.cashier_name}</SelectItem>)}</SelectContent></Select>
-              <Select value={payment} onValueChange={setPayment} disabled={channel === "online"}><SelectTrigger className="rounded-xl"><SelectValue placeholder="وسيلة الدفع" /></SelectTrigger><SelectContent><SelectItem value="all">كل وسائل الدفع</SelectItem>{(optionsQuery.data?.payments || []).map((x) => <SelectItem key={x.code} value={x.code}>{x.name}</SelectItem>)}</SelectContent></Select>
-              <Button variant="outline" className="rounded-xl" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCcw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+              <Select value={period} onValueChange={(v) => setPeriod(v as PeriodPreset)}>
+                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">اليوم</SelectItem>
+                  <SelectItem value="7d">آخر 7 أيام</SelectItem>
+                  <SelectItem value="30d">آخر 30 يوم</SelectItem>
+                  <SelectItem value="month">هذا الشهر</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={channel}
+                onValueChange={(v) => {
+                  setChannel(v as ReportingSalesChannel);
+                  if (v === "online") setCashier("all");
+                }}
+              >
+                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">كل القنوات</SelectItem>
+                  <SelectItem value="pos">POS فقط</SelectItem>
+                  <SelectItem value="online">أونلاين فقط</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={cashier} onValueChange={setCashier} disabled={channel === "online"}>
+                <SelectTrigger className="rounded-xl"><SelectValue placeholder="الكاشير" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">كل الكاشيرين</SelectItem>
+                  {(optionsQuery.data?.cashiers || []).filter((x) => x.cashier_id).map((x) => (
+                    <SelectItem key={x.cashier_id!} value={x.cashier_id!}>{x.cashier_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={payment} onValueChange={setPayment}>
+                <SelectTrigger className="rounded-xl"><SelectValue placeholder="وسيلة الدفع" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">كل وسائل الدفع</SelectItem>
+                  {(optionsQuery.data?.payments || []).map((x) => (
+                    <SelectItem key={x.code} value={x.code}>{x.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="relative">
+                <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="rounded-xl pr-9"
+                  placeholder="فاتورة / عميل / كاشير"
+                />
+              </div>
+
+              <Button variant="outline" className="rounded-xl" onClick={() => query.refetch()} disabled={query.isFetching}>
+                <RefreshCcw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
+                تحديث
+              </Button>
             </div>
           </div>
         </section>
 
-        {query.isLoading ? <div className="flex min-h-[420px] items-center justify-center"><BrandLoader size="lg" /></div> : query.isError || !summary ? (
-          <Alert variant="destructive"><AlertDescription>تعذر تحميل تقرير المبيعات. تأكد من صلاحية التقارير وحاول مرة أخرى.</AlertDescription></Alert>
+        {query.isLoading ? (
+          <div className="flex min-h-[420px] items-center justify-center"><BrandLoader size="lg" /></div>
+        ) : query.isError || !summary ? (
+          <Alert variant="destructive">
+            <AlertDescription>تعذر تحميل تقرير المبيعات. تأكد من صلاحية التقارير وحاول مرة أخرى.</AlertDescription>
+          </Alert>
         ) : (
           <>
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -116,23 +201,51 @@ export default function ReportsSalesV2() {
               <Metric title="إجمالي المبيعات" value={money(summary.gross_sales)} hint={`POS ${money(summary.pos_sales)} • أونلاين ${money(summary.online_sales)}`} icon={<ShoppingCart className="h-5 w-5" />} />
               <Metric title="متوسط الفاتورة" value={money(summary.average_ticket)} hint="بعد المرتجعات المؤكدة" icon={<ReceiptText className="h-5 w-5" />} />
               <Metric title="المرتجعات" value={money(summary.refunds)} hint={`${number(summary.return_count)} مرتجع`} icon={<RotateCcw className="h-5 w-5" />} />
-              <Metric title="خصومات وولاء" value={money(summary.product_discounts + summary.loyalty_discounts)} hint={`رسوم منشأة ${money(summary.merchant_payment_fees)}`} icon={<Filter className="h-5 w-5" />} />
+              <Metric title="الخصومات والولاء" value={money(summary.product_discounts + summary.loyalty_discounts)} hint={`${number(summary.pos_item_lines)} سطر أصناف POS`} icon={<Filter className="h-5 w-5" />} />
             </section>
 
             <section className="grid gap-5 xl:grid-cols-[1.65fr_1fr]">
               <Card className="border-0 shadow-sm ring-1 ring-black/5">
-                <CardHeader><CardTitle className="text-lg">المبيعات حسب الساعة</CardTitle><p className="text-xs text-muted-foreground">يساعدك على معرفة ساعات الذروة الفعلية خلال الفترة المختارة.</p></CardHeader>
+                <CardHeader>
+                  <CardTitle className="text-lg">المبيعات حسب الساعة</CardTitle>
+                  <p className="text-xs text-muted-foreground">ساعات الذروة الفعلية خلال الفترة والفلاتر المختارة.</p>
+                </CardHeader>
                 <CardContent className="h-[330px] px-2 md:px-6">
-                  <ResponsiveContainer width="100%" height="100%"><BarChart data={hourly}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" fontSize={11} interval={2} /><YAxis fontSize={11} /><Tooltip formatter={(v) => money(Number(v))} /><Bar dataKey="net_sales" name="صافي المبيعات" fill="hsl(var(--primary))" radius={[6,6,0,0]} /></BarChart></ResponsiveContainer>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={hourly}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="label" fontSize={11} interval={2} />
+                      <YAxis fontSize={11} />
+                      <Tooltip formatter={(v) => money(Number(v))} />
+                      <Bar dataKey="net_sales" name="صافي المبيعات" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
 
               <Card className="border-0 shadow-sm ring-1 ring-black/5">
                 <CardHeader><CardTitle className="text-lg">قنوات البيع</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="rounded-2xl bg-muted/60 p-4"><div className="flex items-center justify-between"><span className="flex items-center gap-2 font-semibold"><ReceiptText className="h-4 w-4" />POS</span><strong>{money(summary.pos_sales)}</strong></div><p className="mt-1 text-xs text-muted-foreground">{number(summary.pos_transactions)} فاتورة</p></div>
-                  <div className="rounded-2xl bg-muted/60 p-4"><div className="flex items-center justify-between"><span className="flex items-center gap-2 font-semibold"><ShoppingCart className="h-4 w-4" />أونلاين</span><strong>{money(summary.online_sales)}</strong></div><p className="mt-1 text-xs text-muted-foreground">{number(summary.online_transactions)} طلب مكتمل ومدفوع</p></div>
-                  <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-4"><div className="flex items-center justify-between"><span className="flex items-center gap-2 font-semibold text-rose-800"><RotateCcw className="h-4 w-4" />مرتجعات</span><strong className="text-rose-800">-{money(summary.refunds)}</strong></div></div>
+                  <div className="rounded-2xl bg-muted/60 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-semibold"><ReceiptText className="h-4 w-4" />POS</span>
+                      <strong>{money(summary.pos_sales)}</strong>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{number(summary.pos_transactions)} فاتورة</p>
+                  </div>
+                  <div className="rounded-2xl bg-muted/60 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-semibold"><ShoppingCart className="h-4 w-4" />أونلاين</span>
+                      <strong>{money(summary.online_sales)}</strong>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{number(summary.online_transactions)} طلب مكتمل ومدفوع</p>
+                  </div>
+                  <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 font-semibold text-rose-800"><RotateCcw className="h-4 w-4" />مرتجعات</span>
+                      <strong className="text-rose-800">-{money(summary.refunds)}</strong>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </section>
@@ -141,10 +254,18 @@ export default function ReportsSalesV2() {
               <Card className="border-0 shadow-sm ring-1 ring-black/5">
                 <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Users className="h-5 w-5" />أداء الكاشير</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
-                  {(query.data?.cashiers || []).length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">لا توجد مبيعات POS ضمن الفلاتر الحالية.</p> : query.data!.cashiers.map((row, index) => (
+                  {(query.data?.cashiers || []).length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">لا توجد مبيعات POS ضمن الفلاتر الحالية.</p>
+                  ) : query.data!.cashiers.map((row, index) => (
                     <div key={row.cashier_id || `${row.cashier_name}-${index}`} className="flex items-center justify-between gap-4 rounded-2xl border p-4">
-                      <div><p className="font-bold">{index + 1}. {row.cashier_name}</p><p className="mt-1 text-xs text-muted-foreground">{number(row.invoices)} فاتورة • متوسط {money(row.average_ticket)} • {number(row.returns)} مرتجع</p></div>
-                      <div className="text-left"><p className="font-black">{money(row.net_sales)}</p>{row.refunds > 0 && <p className="text-xs text-rose-600">مرتجع -{money(row.refunds)}</p>}</div>
+                      <div>
+                        <p className="font-bold">{index + 1}. {row.cashier_name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{number(row.invoices)} فاتورة • متوسط {money(row.average_ticket)}</p>
+                      </div>
+                      <div className="text-left">
+                        <p className="font-black">{money(row.net_sales)}</p>
+                        {row.refunds > 0 && <p className="text-xs text-rose-600">مرتجع -{money(row.refunds)}</p>}
+                      </div>
                     </div>
                   ))}
                 </CardContent>
@@ -153,22 +274,65 @@ export default function ReportsSalesV2() {
               <Card className="border-0 shadow-sm ring-1 ring-black/5">
                 <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Banknote className="h-5 w-5" />وسائل الدفع</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
-                  {(query.data?.payments || []).map((row) => (
-                    <div key={row.code} className="rounded-2xl border p-4">
-                      <div className="flex items-center justify-between gap-3"><div><p className="font-bold">{row.name}</p><p className="text-xs text-muted-foreground">{number(row.transactions)} عملية • {row.method_type}</p></div><strong>{money(row.net_collected)}</strong></div>
-                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-muted-foreground"><span>محصل {money(row.gross_collected)}</span><span>مرتجع {money(row.refunds)}</span><span>رسوم {money(row.merchant_fees)}</span></div>
+                  {(query.data?.payments || []).length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">لا توجد وسائل دفع ضمن الفلاتر الحالية.</p>
+                  ) : query.data!.payments.map((row) => (
+                    <div key={row.code} className="flex items-center justify-between gap-4 rounded-2xl border p-4">
+                      <div>
+                        <p className="font-bold">{row.name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{number(row.transactions)} عملية • {row.method_type}</p>
+                      </div>
+                      <strong>{money(row.gross_collected)}</strong>
                     </div>
                   ))}
+                  <p className="pt-2 text-xs leading-5 text-muted-foreground">
+                    تفاصيل الرسوم والمرتجعات والتسويات لكل وسيلة تظهر في تقرير وسائل الدفع المتخصص.
+                  </p>
                 </CardContent>
               </Card>
             </section>
 
             <Card className="border-0 shadow-sm ring-1 ring-black/5">
-              <CardHeader><CardTitle className="text-lg">أحدث العمليات</CardTitle></CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-lg">أحدث العمليات</CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">{number(query.data?.pagination.total)} عملية مطابقة للفلاتر.</p>
+                </div>
+                {query.isFetching && <Badge variant="secondary">جاري التحديث</Badge>}
+              </CardHeader>
               <CardContent className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-sm">
-                  <thead><tr className="border-b text-muted-foreground"><th className="px-3 py-3 text-right">المرجع</th><th className="px-3 py-3 text-right">القناة</th><th className="px-3 py-3 text-right">الكاشير/المصدر</th><th className="px-3 py-3 text-right">الدفع</th><th className="px-3 py-3 text-right">التاريخ</th><th className="px-3 py-3 text-left">المبلغ</th></tr></thead>
-                  <tbody>{(query.data?.recent || []).map((row) => <tr key={`${row.channel}-${row.entity_id}`} className="border-b last:border-0"><td className="px-3 py-3 font-mono text-xs">{row.reference}</td><td className="px-3 py-3"><Badge variant="outline">{row.channel === "pos" ? "POS" : "أونلاين"}</Badge></td><td className="px-3 py-3">{row.actor_name}</td><td className="px-3 py-3">{row.payment_name}</td><td className="px-3 py-3 text-muted-foreground">{new Date(row.occurred_at).toLocaleString("ar-EG")}</td><td className="px-3 py-3 text-left font-bold">{money(row.amount)}</td></tr>)}</tbody>
+                <table className="w-full min-w-[920px] text-sm">
+                  <thead>
+                    <tr className="border-b text-muted-foreground">
+                      <th className="px-3 py-3 text-right">المرجع</th>
+                      <th className="px-3 py-3 text-right">القناة</th>
+                      <th className="px-3 py-3 text-right">الكاشير/المصدر</th>
+                      <th className="px-3 py-3 text-right">الدفع</th>
+                      <th className="px-3 py-3 text-right">الأصناف</th>
+                      <th className="px-3 py-3 text-right">المرتجع</th>
+                      <th className="px-3 py-3 text-right">التاريخ</th>
+                      <th className="px-3 py-3 text-left">الصافي</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(query.data?.recent || []).map((row) => (
+                      <tr key={`${row.channel}-${row.entity_id}`} className="border-b last:border-0">
+                        <td className="px-3 py-3 font-mono text-xs">{row.reference}</td>
+                        <td className="px-3 py-3"><Badge variant="outline">{row.channel === "pos" ? "POS" : "أونلاين"}</Badge></td>
+                        <td className="px-3 py-3">{row.actor_name}</td>
+                        <td className="px-3 py-3">{row.payment_name}</td>
+                        <td className="px-3 py-3">{number(row.item_count)}</td>
+                        <td className={`px-3 py-3 ${row.refunds > 0 ? "font-semibold text-rose-700" : "text-muted-foreground"}`}>
+                          {row.refunds > 0 ? `-${money(row.refunds)}` : "—"}
+                        </td>
+                        <td className="px-3 py-3 text-muted-foreground">{row.occurred_at ? new Date(row.occurred_at).toLocaleString("ar-EG") : "—"}</td>
+                        <td className="px-3 py-3 text-left font-bold">{money(row.amount)}</td>
+                      </tr>
+                    ))}
+                    {(query.data?.recent || []).length === 0 && (
+                      <tr><td colSpan={8} className="px-3 py-10 text-center text-muted-foreground">لا توجد عمليات مطابقة.</td></tr>
+                    )}
+                  </tbody>
                 </table>
               </CardContent>
             </Card>
