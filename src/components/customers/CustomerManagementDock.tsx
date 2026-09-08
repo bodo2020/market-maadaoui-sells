@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
   Gift,
   History,
   Loader2,
@@ -16,6 +18,7 @@ import {
   Tag,
   Trash2,
   UserRoundCog,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,9 +33,13 @@ import { fetchCustomer360 } from "@/services/supabase/customer360Service";
 import {
   addCustomerManagementNote,
   adjustCustomerLoyaltyPoints,
+  cancelCustomerFollowup,
+  completeCustomerFollowup,
+  createCustomerFollowup,
   fetchCustomerManagementWorkspace,
   setCustomerManagementStatus,
   setCustomerManagementTag,
+  type CustomerFollowupType,
 } from "@/services/supabase/customerManagementActionsService";
 
 const statusLabel: Record<string, string> = {
@@ -47,12 +54,22 @@ const auditLabel: Record<string, string> = {
   note_added: "إضافة ملاحظة",
   status_changed: "تغيير حالة العميل",
   points_adjusted: "تعديل نقاط الولاء",
+  followup_created: "إنشاء متابعة",
+  followup_completed: "إتمام متابعة",
+  followup_cancelled: "إلغاء متابعة",
 };
 
 const priorityLabel: Record<string, string> = {
   low: "عادية",
   medium: "متوسطة",
   high: "مهمة",
+};
+
+const followupTypeLabel: Record<string, string> = {
+  call: "مكالمة",
+  whatsapp: "WhatsApp",
+  email: "بريد إلكتروني",
+  meeting: "مقابلة",
 };
 
 const formatDate = (value?: string | null) => {
@@ -85,6 +102,13 @@ export default function CustomerManagementDock() {
   const [nextStatus, setNextStatus] = useState<"active" | "watch" | "blocked">("active");
   const [pointsDelta, setPointsDelta] = useState("");
   const [pointsReason, setPointsReason] = useState("");
+  const [followupType, setFollowupType] = useState<CustomerFollowupType>("whatsapp");
+  const [followupSubject, setFollowupSubject] = useState("");
+  const [followupDescription, setFollowupDescription] = useState("");
+  const [followupPriority, setFollowupPriority] = useState<"low" | "medium" | "high">("medium");
+  const [followupAt, setFollowupAt] = useState("");
+  const [closingFollowupId, setClosingFollowupId] = useState<string | null>(null);
+  const [followupOutcome, setFollowupOutcome] = useState("");
 
   const workspaceQuery = useQuery({
     queryKey: ["customer-management-workspace", customerId, currentBranchId],
@@ -114,6 +138,7 @@ export default function CustomerManagementDock() {
       workspaceQuery.refetch(),
       queryClient.invalidateQueries({ queryKey: ["customer-360", customerId] }),
       queryClient.invalidateQueries({ queryKey: ["customer-management"] }),
+      queryClient.invalidateQueries({ queryKey: ["customer-opportunity-board"] }),
     ]);
   };
 
@@ -126,6 +151,7 @@ export default function CustomerManagementDock() {
       await refreshAll();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر تنفيذ العملية.");
+      throw error;
     } finally {
       setBusy(false);
     }
@@ -137,7 +163,7 @@ export default function CustomerManagementDock() {
     void run(
       () => setCustomerManagementTag(customerId!, value, true, currentBranchId || null),
       "تمت إضافة التصنيف للعميل.",
-    ).then(() => setTagName(""));
+    ).then(() => setTagName("")).catch(() => undefined);
   };
 
   const addNote = () => {
@@ -149,7 +175,7 @@ export default function CustomerManagementDock() {
       setNoteSubject("");
       setNoteDescription("");
       setNotePriority("medium");
-    });
+    }).catch(() => undefined);
   };
 
   const changeStatus = () => {
@@ -157,7 +183,7 @@ export default function CustomerManagementDock() {
     void run(
       () => setCustomerManagementStatus(customerId!, nextStatus, statusReason.trim(), currentBranchId || null),
       "تم تحديث حالة العميل.",
-    ).then(() => setStatusReason(""));
+    ).then(() => setStatusReason("")).catch(() => undefined);
   };
 
   const adjustPoints = () => {
@@ -170,10 +196,50 @@ export default function CustomerManagementDock() {
     ).then(() => {
       setPointsDelta("");
       setPointsReason("");
-    });
+    }).catch(() => undefined);
+  };
+
+  const addFollowup = () => {
+    if (followupSubject.trim().length < 2) return toast.error("اكتب عنوان المتابعة.");
+    if (!followupAt) return toast.error("حدد موعد المتابعة.");
+    const parsed = new Date(followupAt);
+    if (Number.isNaN(parsed.getTime())) return toast.error("موعد المتابعة غير صحيح.");
+    void run(
+      () => createCustomerFollowup({
+        customerId: customerId!,
+        type: followupType,
+        subject: followupSubject.trim(),
+        description: followupDescription.trim(),
+        scheduledAt: parsed.toISOString(),
+        priority: followupPriority,
+        branchId: currentBranchId || null,
+      }),
+      "تم جدولة متابعة العميل.",
+    ).then(() => {
+      setFollowupSubject("");
+      setFollowupDescription("");
+      setFollowupAt("");
+      setFollowupPriority("medium");
+    }).catch(() => undefined);
+  };
+
+  const closeFollowup = (mode: "complete" | "cancel") => {
+    if (!closingFollowupId) return;
+    if (followupOutcome.trim().length < 2) return toast.error(mode === "complete" ? "اكتب نتيجة المتابعة." : "اكتب سبب الإلغاء.");
+    void run(
+      () => mode === "complete"
+        ? completeCustomerFollowup(closingFollowupId, followupOutcome.trim(), currentBranchId || null)
+        : cancelCustomerFollowup(closingFollowupId, followupOutcome.trim(), currentBranchId || null),
+      mode === "complete" ? "تم إغلاق المتابعة بنجاح." : "تم إلغاء المتابعة.",
+    ).then(() => {
+      setClosingFollowupId(null);
+      setFollowupOutcome("");
+    }).catch(() => undefined);
   };
 
   if (!customerId) return null;
+
+  const notes = workspace?.interactions.filter(item => item.type === "note") || [];
 
   return (
     <>
@@ -222,8 +288,9 @@ export default function CustomerManagementDock() {
             </div>
           ) : (
             <Tabs defaultValue="manage" className="mt-5 space-y-4">
-              <TabsList className="grid h-auto w-full grid-cols-4 rounded-2xl bg-slate-100 p-1">
+              <TabsList className="grid h-auto w-full grid-cols-5 rounded-2xl bg-slate-100 p-1">
                 <TabsTrigger value="manage">إدارة</TabsTrigger>
+                <TabsTrigger value="followups">متابعة</TabsTrigger>
                 <TabsTrigger value="notes">ملاحظات</TabsTrigger>
                 <TabsTrigger value="points">النقاط</TabsTrigger>
                 <TabsTrigger value="audit">السجل</TabsTrigger>
@@ -271,7 +338,7 @@ export default function CustomerManagementDock() {
                             type="button"
                             className="mr-1 rounded-full p-0.5 hover:bg-black/10"
                             disabled={busy}
-                            onClick={() => void run(() => setCustomerManagementTag(customerId, tag.name, false, currentBranchId || null), "تمت إزالة التصنيف.")}
+                            onClick={() => void run(() => setCustomerManagementTag(customerId, tag.name, false, currentBranchId || null), "تمت إزالة التصنيف.").catch(() => undefined)}
                             aria-label={`إزالة ${tag.name}`}
                           >
                             <Trash2 className="h-3 w-3" />
@@ -286,6 +353,79 @@ export default function CustomerManagementDock() {
                       <Button size="icon" disabled={busy} onClick={addTag}><Plus className="h-4 w-4" /></Button>
                     </div>
                   )}
+                </section>
+              </TabsContent>
+
+              <TabsContent value="followups" className="space-y-4">
+                {workspace.permissions.can_manage && (
+                  <section className="rounded-2xl border p-4">
+                    <div className="flex items-center gap-2 font-black"><CalendarClock className="h-4 w-4 text-[#005931]" />جدولة متابعة جديدة</div>
+                    <div className="mt-4 space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Select value={followupType} onValueChange={(value) => setFollowupType(value as CustomerFollowupType)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                            <SelectItem value="call">مكالمة</SelectItem>
+                            <SelectItem value="meeting">مقابلة</SelectItem>
+                            <SelectItem value="email">بريد إلكتروني</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select value={followupPriority} onValueChange={(value) => setFollowupPriority(value as "low" | "medium" | "high") }>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">عادية</SelectItem>
+                            <SelectItem value="medium">متوسطة</SelectItem>
+                            <SelectItem value="high">مهمة</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Input value={followupSubject} onChange={(e) => setFollowupSubject(e.target.value)} placeholder="مثال: متابعة السلة المتروكة" />
+                      <Textarea value={followupDescription} onChange={(e) => setFollowupDescription(e.target.value)} placeholder="تفاصيل أو هدف المتابعة..." />
+                      <div>
+                        <Label>موعد المتابعة</Label>
+                        <Input className="mt-1" type="datetime-local" value={followupAt} onChange={(e) => setFollowupAt(e.target.value)} />
+                      </div>
+                      <Button className="w-full" disabled={busy} onClick={addFollowup}><CalendarClock className="ml-2 h-4 w-4" />جدولة المتابعة</Button>
+                    </div>
+                  </section>
+                )}
+
+                <section className="space-y-2">
+                  {workspace.pending_followups.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">لا توجد متابعات معلقة.</div>
+                  ) : workspace.pending_followups.map((item) => (
+                    <div key={item.id} className={`rounded-2xl border p-4 ${item.overdue ? "border-red-200 bg-red-50/50" : "bg-white"}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-bold">{item.subject}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">{followupTypeLabel[item.type] || item.type} · {formatDate(item.scheduled_at)}</div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant="outline">{priorityLabel[item.priority] || item.priority}</Badge>
+                          {item.overdue && <Badge className="bg-red-100 text-red-700 hover:bg-red-100">متأخرة {formatNumber(Math.ceil(Number(item.overdue_hours || 0) / 24))} يوم</Badge>}
+                        </div>
+                      </div>
+                      {item.description && <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.description}</p>}
+                      {item.assigned_to_name && <div className="mt-2 text-[11px] text-muted-foreground">المسؤول: {item.assigned_to_name}</div>}
+                      {workspace.permissions.can_manage && (
+                        <div className="mt-3">
+                          {closingFollowupId === item.id ? (
+                            <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+                              <Textarea value={followupOutcome} onChange={(e) => setFollowupOutcome(e.target.value)} placeholder="اكتب نتيجة المتابعة أو سبب الإلغاء..." />
+                              <div className="grid grid-cols-2 gap-2">
+                                <Button disabled={busy} onClick={() => closeFollowup("complete")}><CheckCircle2 className="ml-2 h-4 w-4" />تمت المتابعة</Button>
+                                <Button variant="outline" disabled={busy} onClick={() => closeFollowup("cancel")}><XCircle className="ml-2 h-4 w-4" />إلغاء المهمة</Button>
+                              </div>
+                              <Button variant="ghost" size="sm" className="w-full" onClick={() => { setClosingFollowupId(null); setFollowupOutcome(""); }}>رجوع</Button>
+                            </div>
+                          ) : (
+                            <Button variant="outline" size="sm" className="w-full" onClick={() => setClosingFollowupId(item.id)}>إغلاق / تسجيل النتيجة</Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </section>
               </TabsContent>
 
@@ -312,9 +452,9 @@ export default function CustomerManagementDock() {
                 )}
 
                 <section className="space-y-2">
-                  {workspace.interactions.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">لا توجد ملاحظات أو متابعات.</div>
-                  ) : workspace.interactions.map((item) => (
+                  {notes.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">لا توجد ملاحظات داخلية.</div>
+                  ) : notes.map((item) => (
                     <div key={item.id} className="rounded-2xl border p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div><div className="font-bold">{item.subject}</div><div className="mt-1 text-xs text-muted-foreground">{formatDate(item.created_at)}</div></div>
@@ -364,12 +504,14 @@ export default function CustomerManagementDock() {
                 ) : workspace.audit.map((item) => (
                   <div key={item.id} className="rounded-2xl border p-4">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="font-bold">{auditLabel[item.action_type] || item.action_type}</div>
+                      <div><div className="font-bold">{auditLabel[item.action_type] || item.action_type}</div>{item.created_by_name && <div className="mt-1 text-[11px] text-muted-foreground">بواسطة {item.created_by_name}</div>}</div>
                       <div className="text-[11px] text-muted-foreground">{formatDate(item.created_at)}</div>
                     </div>
                     {item.metadata && Object.keys(item.metadata).length > 0 && (
                       <div className="mt-2 rounded-xl bg-slate-50 p-2 text-xs text-muted-foreground">
                         {typeof item.metadata.reason === "string" && <div>السبب: {item.metadata.reason}</div>}
+                        {typeof item.metadata.outcome === "string" && <div>النتيجة: {item.metadata.outcome}</div>}
+                        {typeof item.metadata.subject === "string" && <div>المتابعة: {item.metadata.subject}</div>}
                         {typeof item.metadata.tag === "string" && <div>التصنيف: {item.metadata.tag}</div>}
                         {typeof item.metadata.points_delta === "number" && <div>النقاط: {item.metadata.points_delta > 0 ? "+" : ""}{formatNumber(item.metadata.points_delta)}</div>}
                         {typeof item.metadata.to === "string" && <div>الحالة الجديدة: {statusLabel[item.metadata.to] || item.metadata.to}</div>}
