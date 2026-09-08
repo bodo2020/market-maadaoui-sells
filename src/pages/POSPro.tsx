@@ -6,19 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  AlertTriangle,
-  Banknote,
   Barcode,
   Box,
-  Check,
   CreditCard,
   Minus,
-  PackageCheck,
   Pin,
   PinOff,
   Plus,
@@ -27,30 +20,24 @@ import {
   ScanLine,
   Search,
   ShoppingCart,
-  Ticket,
   Trash2,
   WalletCards,
 } from "lucide-react";
-import type { CartItem, Customer, POSTab, Product, Sale } from "@/types";
+import type { CartItem, POSTab, Product, Sale } from "@/types";
 import { siteConfig } from "@/config/site";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { useToast } from "@/hooks/use-toast";
 import POSTabs from "@/components/POS/POSTabs";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
-import InvoiceDialog from "@/components/POS/InvoiceDialog";
-import { readPOSLoyaltyVoucher } from "@/components/POS/POSCustomerLoyaltyBridge";
+import POSCheckoutModernDialog from "@/components/POS/POSCheckoutModernDialog";
 import { fetchPOSProductByBarcode, fetchPOSProducts } from "@/services/supabase/posCatalogService";
 import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
 import { getPosCashSummary, type PosCashSummary } from "@/services/supabase/posCashService";
-import { fetchCustomers, findOrCreateCustomer } from "@/services/supabase/customerService";
 import { addFavoriteProduct, getFavoriteProducts, removeFavoriteProduct } from "@/services/supabase/favoritesService";
-import { clearConfirmedPosSale, submitPosSale } from "@/services/supabase/posCheckoutService";
 import { preflightPosCart } from "@/services/supabase/posPreflightService";
 
 const DEFAULT_TAB_ID = "tab-default";
-
-type PaymentMethod = "cash" | "card" | "mixed";
 
 function money(value: number) {
   return `${Number(value || 0).toFixed(2)} ${siteConfig.currency}`;
@@ -71,7 +58,7 @@ function discountPerUnitOf(product: Product, effectivePrice = effectivePriceOf(p
 function emptyTab(index = 1): POSTab {
   return {
     id: index === 1 ? DEFAULT_TAB_ID : `tab-${Date.now()}-${index}`,
-    tabName: `عميل ${index}`,
+    tabName: `سلة ${index}`,
     cartItems: [],
     selectedCustomer: "",
     customerName: "",
@@ -88,7 +75,11 @@ function initialTabs(): POSTab[] {
     if (saved) {
       const parsed = JSON.parse(saved) as POSTab[];
       if (Array.isArray(parsed) && parsed.length) {
-        return parsed.map((tab, index) => ({ ...tab, createdAt: tab.createdAt ? new Date(tab.createdAt) : new Date(), tabName: tab.tabName || `عميل ${index + 1}` }));
+        return parsed.map((tab, index) => ({
+          ...tab,
+          createdAt: tab.createdAt ? new Date(tab.createdAt) : new Date(),
+          tabName: tab.tabName || `سلة ${index + 1}`,
+        }));
       }
     }
   } catch {
@@ -100,26 +91,6 @@ function initialTabs(): POSTab[] {
 function initialActiveTab(tabs: POSTab[]) {
   const stored = localStorage.getItem("pos_active_tab");
   return tabs.some(tab => tab.id === stored) ? stored! : tabs[0]?.id || DEFAULT_TAB_ID;
-}
-
-function quickCashValues(total: number) {
-  if (total <= 0) return [];
-  const candidates = [
-    total,
-    Math.ceil(total / 5) * 5,
-    Math.ceil(total / 10) * 10,
-    Math.ceil(total / 20) * 20,
-    Math.ceil(total / 50) * 50,
-    Math.ceil(total / 100) * 100,
-    100,
-    200,
-    500,
-    1000,
-  ];
-  return [...new Set(candidates.map(value => Number(value.toFixed(2))))]
-    .filter(value => value >= total)
-    .sort((a, b) => a - b)
-    .slice(0, 6);
 }
 
 export default function POSPro() {
@@ -134,30 +105,16 @@ export default function POSPro() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [remoteSearchResults, setRemoteSearchResults] = useState<Product[] | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [cashSummary, setCashSummary] = useState<PosCashSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
-  const [voucherVersion, setVoucherVersion] = useState(0);
-
   const [weightProduct, setWeightProduct] = useState<Product | null>(null);
   const [weightValue, setWeightValue] = useState("");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [preflighting, setPreflighting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [cashTendered, setCashTendered] = useState("");
-  const [mixedCash, setMixedCash] = useState("");
-  const [mixedCard, setMixedCard] = useState("");
-  const [processing, setProcessing] = useState(false);
-  const [saleDone, setSaleDone] = useState(false);
-  const [currentSale, setCurrentSale] = useState<Sale | null>(null);
-  const [invoiceOpen, setInvoiceOpen] = useState(false);
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  const [completedChange, setCompletedChange] = useState(0);
-  const [completedPaymentMethod, setCompletedPaymentMethod] = useState<PaymentMethod>("cash");
 
   const device = useMemo(
     () => currentBranchId ? getLocalPosDevice(currentBranchId) : null,
@@ -177,25 +134,12 @@ export default function POSPro() {
     }
   }, [tabs, activeTabId]);
 
-  useEffect(() => {
-    const refreshVoucher = () => setVoucherVersion(value => value + 1);
-    window.addEventListener("pos:loyalty-voucher-changed", refreshVoucher);
-    return () => window.removeEventListener("pos:loyalty-voucher-changed", refreshVoucher);
-  }, []);
-
   const activeTab = useMemo(
     () => tabs.find(tab => tab.id === activeTabId) || tabs[0],
     [tabs, activeTabId],
   );
   const cartItems = activeTab?.cartItems || [];
   const search = activeTab?.search || "";
-  const selectedCustomer = activeTab?.selectedCustomer || "";
-  const customerName = activeTab?.customerName || "";
-  const customerPhone = activeTab?.customerPhone || "";
-  const loyaltyVoucher = useMemo(
-    () => currentBranchId ? readPOSLoyaltyVoucher(currentBranchId, activeTabId) : null,
-    [currentBranchId, activeTabId, voucherVersion],
-  );
 
   const updateActiveTab = useCallback((updates: Partial<POSTab>) => {
     setTabs(prev => prev.map(tab => tab.id === activeTabIdRef.current ? { ...tab, ...updates } : tab));
@@ -203,22 +147,6 @@ export default function POSPro() {
 
   const setCartItems = (items: CartItem[]) => updateActiveTab({ cartItems: items });
   const setSearch = (value: string) => updateActiveTab({ search: value });
-  const setCustomerName = (value: string) => updateActiveTab({ customerName: value });
-  const setCustomerPhone = (value: string) => updateActiveTab({ customerPhone: value });
-
-  const selectCustomer = (value: string) => {
-    if (value === "none") {
-      updateActiveTab({ selectedCustomer: "", customerName: "", customerPhone: "" });
-      return;
-    }
-    const customer = customers.find(row => row.id === value);
-    updateActiveTab({
-      selectedCustomer: value,
-      customerName: customer?.name || "",
-      customerPhone: customer?.phone || "",
-      tabName: customer?.name ? customer.name.slice(0, 18) : activeTab?.tabName,
-    });
-  };
 
   const refreshCash = useCallback(async () => {
     if (!device) {
@@ -236,13 +164,11 @@ export default function POSPro() {
     if (!currentBranchId) return;
     quiet ? setRefreshing(true) : setLoading(true);
     try {
-      const [catalog, customerRows, favoriteRows] = await Promise.all([
+      const [catalog, favoriteRows] = await Promise.all([
         fetchPOSProducts(),
-        fetchCustomers(),
         user?.id ? getFavoriteProducts(user.id) : Promise.resolve([]),
       ]);
       setProducts(catalog);
-      setCustomers(customerRows);
       setFavorites(favoriteRows);
       await refreshCash();
     } catch (error: any) {
@@ -495,158 +421,46 @@ export default function POSPro() {
     }).slice(0, query ? 100 : 50);
   }, [products, search, favorites, remoteSearchResults]);
 
-  const subtotalAfterDiscount = useMemo(() => cartItems.reduce((sum, item) => sum + Number(item.total || 0), 0), [cartItems]);
+  const total = useMemo(() => cartItems.reduce((sum, item) => sum + Number(item.total || 0), 0), [cartItems]);
   const discount = useMemo(() => cartItems.reduce((sum, item) => {
     const multiplier = item.weight != null ? Number(item.weight) : Number(item.quantity || 1);
     return sum + Number(item.discount || 0) * multiplier;
   }, 0), [cartItems]);
-  const total = subtotalAfterDiscount;
-  const voucherAmount = loyaltyVoucher ? Math.max(0, Math.min(Number(loyaltyVoucher.remaining_value_egp || 0), total)) : 0;
-  const payableTotal = Math.max(0, Number((total - voucherAmount).toFixed(2)));
   const originalSubtotal = total + discount;
   const unitsCount = useMemo(() => cartItems.reduce((sum, item) => sum + (item.weight != null ? 1 : item.quantity), 0), [cartItems]);
-  const change = paymentMethod === "cash" ? Math.max(0, Number(cashTendered || 0) - payableTotal) : 0;
-  const quickCash = useMemo(() => quickCashValues(payableTotal), [payableTotal]);
-
-  const paymentValid = useMemo(() => {
-    if (total <= 0) return false;
-    if (payableTotal <= 0) return true;
-    if (paymentMethod === "cash") return Number(cashTendered || 0) >= payableTotal;
-    if (paymentMethod === "card") return true;
-    return Math.abs(Number(mixedCash || 0) + Number(mixedCard || 0) - payableTotal) < 0.01;
-  }, [paymentMethod, cashTendered, mixedCash, mixedCard, total, payableTotal]);
 
   const syncProductsFromPreflight = (items: CartItem[]) => {
     const freshById = new Map(items.map(item => [item.product.id, item.product]));
     setProducts(prev => prev.map(product => freshById.has(product.id) ? { ...product, ...freshById.get(product.id)! } : product));
   };
 
-  const payableForGross = useCallback((gross: number) => {
-    const appliedVoucher = loyaltyVoucher ? Math.max(0, Math.min(Number(loyaltyVoucher.remaining_value_egp || 0), gross)) : 0;
-    return Math.max(0, Number((gross - appliedVoucher).toFixed(2)));
-  }, [loyaltyVoucher]);
-
   const openCheckout = useCallback(async () => {
-    if (!cartItems.length || processing || preflighting || !currentBranchId) return;
+    if (!cartItems.length || preflighting || !currentBranchId) return;
     setPreflighting(true);
-    setCheckoutError(null);
     try {
       const checked = await preflightPosCart(currentBranchId, cartItems);
-      const checkedPayable = payableForGross(checked.total);
       setCartItems(checked.items);
       syncProductsFromPreflight(checked.items);
-      setSaleDone(false);
-      setPaymentMethod("cash");
-      setCashTendered(checkedPayable.toFixed(2));
-      setMixedCash("");
-      setMixedCard("");
-      if (selectedCustomer) {
-        const customer = customers.find(row => row.id === selectedCustomer);
-        if (customer) {
-          setCustomerName(customer.name);
-          setCustomerPhone(customer.phone || "");
-        }
-      }
-      if (checked.repriced) toast({ title: "تم تحديث السلة", description: "تم تحديث الأسعار والعروض والمخزون قبل فتح الدفع." });
+      if (checked.repriced) toast({ title: "تم تحديث السلة", description: "تم تحديث الأسعار والعروض والمخزون قبل فتح إتمام البيع." });
+      setMobileCartOpen(false);
       setCheckoutOpen(true);
     } catch (error: any) {
       toast({ title: "السلة تحتاج مراجعة", description: error?.message || "راجع المنتجات والكميات قبل الدفع.", variant: "destructive" });
     } finally {
       setPreflighting(false);
     }
-  }, [cartItems, processing, preflighting, currentBranchId, selectedCustomer, customers, toast, payableForGross]);
-
-  const setMixedCashSmart = (value: string) => {
-    setMixedCash(value);
-    const amount = Number(value || 0);
-    if (Number.isFinite(amount) && amount >= 0 && amount <= payableTotal) setMixedCard(Math.max(0, payableTotal - amount).toFixed(2));
-  };
-
-  const setMixedCardSmart = (value: string) => {
-    setMixedCard(value);
-    const amount = Number(value || 0);
-    if (Number.isFinite(amount) && amount >= 0 && amount <= payableTotal) setMixedCash(Math.max(0, payableTotal - amount).toFixed(2));
-  };
-
-  const applyUpdatedPaymentTotal = (nextPayable: number) => {
-    if (paymentMethod === "cash") {
-      setCashTendered(nextPayable.toFixed(2));
-      return;
-    }
-    if (paymentMethod === "mixed") {
-      const currentCash = Number(mixedCash || 0);
-      const safeCash = Number.isFinite(currentCash) && currentCash >= 0 && currentCash <= nextPayable ? currentCash : 0;
-      setMixedCash(safeCash.toFixed(2));
-      setMixedCard(Math.max(0, nextPayable - safeCash).toFixed(2));
-    }
-  };
-
-  const completeSale = useCallback(async () => {
-    if (processing || !paymentValid || !user?.id || !currentBranchId || !cartItems.length) return;
-    setProcessing(true);
-    setCheckoutError(null);
-    try {
-      const checked = await preflightPosCart(currentBranchId, cartItems);
-      const checkedPayable = payableForGross(checked.total);
-      syncProductsFromPreflight(checked.items);
-      if (checked.repriced || Math.abs(Number(checked.total) - Number(total)) > 0.009) {
-        setCartItems(checked.items);
-        applyUpdatedPaymentTotal(checkedPayable);
-        setCheckoutError("تم تحديث سعر أو عرض في السلة. راجع الإجمالي والفاوچر ثم أكد الدفع مرة أخرى.");
-        return;
-      }
-
-      let customer = null;
-      if (customerName || customerPhone) customer = await findOrCreateCustomer({ name: customerName || "عميل", phone: customerPhone || undefined });
-      const cashApplied = checkedPayable <= 0 ? 0 : paymentMethod === "cash" ? checkedPayable : paymentMethod === "mixed" ? Number(mixedCash || 0) : 0;
-      const cardApplied = checkedPayable <= 0 ? 0 : paymentMethod === "card" ? checkedPayable : paymentMethod === "mixed" ? Number(mixedCard || 0) : 0;
-      const profit = checked.items.reduce((sum, item) => {
-        const qty = item.weight ?? item.quantity;
-        return sum + Number(item.total || 0) - Number(item.product.purchase_price || 0) * Number(qty || 0);
-      }, 0);
-      const payload: Omit<Sale, "id" | "created_at" | "updated_at"> = {
-        date: new Date().toISOString(),
-        items: checked.items,
-        subtotal: checked.subtotal,
-        discount: checked.discount,
-        total: checked.total,
-        profit,
-        payment_method: paymentMethod,
-        cash_amount: cashApplied,
-        card_amount: cardApplied,
-        customer_name: customer?.name || customerName || undefined,
-        customer_phone: customer?.phone || customerPhone || undefined,
-        invoice_number: "PENDING",
-        cashier_name: user.name,
-        branch_id: currentBranchId,
-      };
-      const sale = await submitPosSale(payload, activeTabIdRef.current);
-      setCompletedChange(paymentMethod === "cash" ? Math.max(0, Number(cashTendered || 0) - checkedPayable) : 0);
-      setCompletedPaymentMethod(paymentMethod);
-      setCurrentSale(sale);
-      setSaleDone(true);
-      toast({ title: "تم البيع بنجاح", description: `فاتورة ${sale.invoice_number}${Number(sale.loyalty_voucher_amount || 0) > 0 ? ` · فاوچر ${money(Number(sale.loyalty_voucher_amount || 0))}` : ""}` });
-      void loadWorkspace(true);
-      void refreshCash();
-    } catch (error: any) {
-      setCheckoutError(error?.message || "تعذر إتمام البيع");
-      toast({ title: "تعذر إتمام البيع", description: error?.message || "راجع السلة وحاول مرة أخرى.", variant: "destructive" });
-    } finally {
-      setProcessing(false);
-    }
-  }, [processing, paymentValid, user?.id, user?.name, currentBranchId, cartItems, customerName, customerPhone, paymentMethod, mixedCash, mixedCard, total, cashTendered, loadWorkspace, refreshCash, toast, payableForGross]);
+  }, [cartItems, preflighting, currentBranchId, toast]);
 
   const newSale = () => {
-    if (user?.id && currentBranchId) clearConfirmedPosSale(user.id, currentBranchId, activeTabIdRef.current);
-    updateActiveTab({ cartItems: [], search: "", selectedCustomer: "", customerName: "", customerPhone: "", tabName: activeTab?.tabName?.startsWith("عميل") ? activeTab.tabName : "عميل" });
-    setCurrentSale(null);
-    setSaleDone(false);
+    updateActiveTab({
+      cartItems: [],
+      search: "",
+      selectedCustomer: "",
+      customerName: "",
+      customerPhone: "",
+      tabName: activeTab?.tabName?.startsWith("سلة") ? activeTab.tabName : "سلة",
+    });
     setCheckoutOpen(false);
-    setPaymentMethod("cash");
-    setCashTendered("");
-    setMixedCash("");
-    setMixedCard("");
-    setCompletedChange(0);
     setMobileCartOpen(false);
     requestAnimationFrame(() => searchRef.current?.focus());
   };
@@ -802,22 +616,16 @@ export default function POSPro() {
         if (!checkoutOpen && cartItems.length) void openCheckout();
         return;
       }
-      if (checkoutOpen && !saleDone) {
-        if (event.key === "F6") { event.preventDefault(); setPaymentMethod("cash"); setCashTendered(payableTotal.toFixed(2)); }
-        if (event.key === "F7") { event.preventDefault(); setPaymentMethod("card"); }
-        if (event.key === "F8") { event.preventDefault(); setPaymentMethod("mixed"); setMixedCash("0.00"); setMixedCard(payableTotal.toFixed(2)); }
-        if (event.key === "F9") { event.preventDefault(); if (paymentValid && !processing) void completeSale(); }
-      }
-      if (event.key === "Escape" && !processing) {
+      if (event.key === "Escape") {
         if (scannerOpen) setScannerOpen(false);
         else if (weightProduct) setWeightProduct(null);
-        else if (checkoutOpen && !saleDone) setCheckoutOpen(false);
+        else if (checkoutOpen) setCheckoutOpen(false);
         else setMobileCartOpen(false);
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [createTab, checkoutOpen, saleDone, cartItems.length, openCheckout, payableTotal, paymentValid, processing, completeSale, scannerOpen, weightProduct]);
+  }, [createTab, checkoutOpen, cartItems.length, openCheckout, scannerOpen, weightProduct]);
 
   const cartPanel = (
     <div className="space-y-4" dir="rtl">
@@ -902,21 +710,12 @@ export default function POSPro() {
 
       <div className="rounded-2xl bg-slate-50 p-4">
         {discount > 0 && <div className="flex items-center justify-between text-sm text-muted-foreground"><span>قبل الخصم</span><span>{money(originalSubtotal)}</span></div>}
-        {discount > 0 && <div className="mt-1 flex items-center justify-between text-sm text-emerald-700"><span>الخصم</span><span>- {money(discount)}</span></div>}
-        <div className={`${discount > 0 ? "mt-3 border-t pt-3" : ""} flex items-center justify-between text-base font-bold`}><span>إجمالي الفاتورة</span><span>{money(total)}</span></div>
-        {voucherAmount > 0 && <div className="mt-2 flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800"><span className="flex items-center gap-1"><Ticket className="h-4 w-4" /> فاوچر</span><strong>- {money(voucherAmount)}</strong></div>}
-        <div className="mt-3 flex items-center justify-between border-t pt-3 text-xl font-black"><span>المطلوب تحصيله</span><span className="text-[#005931]">{money(payableTotal)}</span></div>
+        {discount > 0 && <div className="mt-1 flex items-center justify-between text-sm text-emerald-700"><span>خصومات المنتجات</span><span>- {money(discount)}</span></div>}
+        <div className={`${discount > 0 ? "mt-3 border-t pt-3" : ""} flex items-center justify-between text-xl font-black`}><span>إجمالي المنتجات</span><span className="text-[#005931]">{money(total)}</span></div>
       </div>
 
-      <div className="space-y-2">
-        <Label>العميل — اختياري</Label>
-        <Select value={selectedCustomer || "none"} onValueChange={selectCustomer}>
-          <SelectTrigger className="h-11"><SelectValue placeholder="بدون عميل" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">بدون عميل</SelectItem>
-            {customers.map(customer => <SelectItem key={customer.id} value={customer.id}>{customer.name}{customer.phone ? ` · ${customer.phone}` : ""}</SelectItem>)}
-          </SelectContent>
-        </Select>
+      <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 p-3 text-xs leading-5 text-emerald-950">
+        العميل والنقاط وكوبون الخصم يتم ربطهم داخل <strong>إتمام البيع</strong>. البيع بدون عميل مسموح ولن ينتج عنه نقاط ولاء.
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -926,7 +725,7 @@ export default function POSPro() {
 
       <Button className="h-14 w-full bg-[#005931] text-base hover:bg-[#004a29]" disabled={!cartItems.length || preflighting} onClick={() => void openCheckout()}>
         {preflighting ? <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> : <CreditCard className="ml-2 h-5 w-5" />}
-        {preflighting ? "مراجعة السلة..." : `إتمام الشراء · ${money(payableTotal)}`}
+        {preflighting ? "مراجعة السلة..." : `إتمام البيع · ${money(total)}`}
       </Button>
     </div>
   );
@@ -951,7 +750,7 @@ export default function POSPro() {
           <div className="min-w-0 space-y-4">
             <Card className="border-0 shadow-sm ring-1 ring-slate-200"><CardContent className="p-3 md:p-4">
               <div className="flex gap-2"><div className="relative flex-1"><Search className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" /><Input ref={searchRef} autoFocus value={search} onChange={event => setSearch(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && search.trim()) void processBarcode(search); }} placeholder="امسح الباركود أو ابحث باسم المنتج" className="h-12 pr-10 text-base" /></div><Button variant="outline" className="h-12 px-4" onClick={() => setScannerOpen(true)}><ScanLine className="ml-2 h-5 w-5" /><span className="hidden sm:inline">كاميرا</span></Button></div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><Barcode className="h-3.5 w-3.5" /> قارئ الباركود جاهز</span><span className="hidden md:inline">F2 بحث</span><span className="hidden md:inline">F4 دفع</span><span className="hidden md:inline">F6 نقدي</span><span className="hidden md:inline">F7 بطاقة</span><span className="hidden md:inline">F8 مختلط</span><span className="hidden md:inline">F9 تأكيد</span><span className="hidden md:inline">Ctrl+N سلة جديدة</span></div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><Barcode className="h-3.5 w-3.5" /> قارئ المنتجات جاهز</span><span className="hidden md:inline">F2 بحث</span><span className="hidden md:inline">F4 إتمام البيع</span><span className="hidden md:inline">Ctrl+N سلة جديدة</span></div>
             </CardContent></Card>
 
             {loading ? (
@@ -976,51 +775,23 @@ export default function POSPro() {
         </div>
       </div>
 
-      <div className="fixed inset-x-3 bottom-3 z-40 lg:hidden" dir="rtl"><Button className="h-14 w-full justify-between rounded-2xl bg-[#005931] px-5 text-base shadow-2xl hover:bg-[#004a29]" onClick={() => setMobileCartOpen(true)}><span className="flex items-center gap-2"><ShoppingCart className="h-5 w-5" /> السلة · {cartItems.length}</span><strong>{money(payableTotal)}</strong></Button></div>
+      <div className="fixed inset-x-3 bottom-3 z-40 lg:hidden" dir="rtl"><Button className="h-14 w-full justify-between rounded-2xl bg-[#005931] px-5 text-base shadow-2xl hover:bg-[#004a29]" onClick={() => setMobileCartOpen(true)}><span className="flex items-center gap-2"><ShoppingCart className="h-5 w-5" /> السلة · {cartItems.length}</span><strong>{money(total)}</strong></Button></div>
 
       <Sheet open={mobileCartOpen} onOpenChange={setMobileCartOpen}><SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-3xl" dir="rtl"><SheetHeader><SheetTitle>سلة البيع الحالية</SheetTitle></SheetHeader><div className="mt-4">{cartPanel}</div></SheetContent></Sheet>
 
       <Dialog open={Boolean(weightProduct)} onOpenChange={open => !open && setWeightProduct(null)}><DialogContent dir="rtl" className="sm:max-w-sm"><DialogHeader><DialogTitle>إدخال الوزن</DialogTitle></DialogHeader><div className="space-y-4"><div className="rounded-2xl bg-slate-50 p-3"><div className="font-semibold">{weightProduct?.name}</div><div className="mt-1 text-sm text-muted-foreground">المتاح {weightProduct ? stockOf(weightProduct) : 0} كجم</div></div><div className="space-y-2"><Label>الوزن بالكيلو</Label><Input autoFocus inputMode="decimal" value={weightValue} onChange={event => setWeightValue(event.target.value)} onKeyDown={event => event.key === "Enter" && addWeight()} placeholder="0.000" className="h-12 text-lg" /></div><Button className="h-12 w-full bg-[#005931]" onClick={addWeight}><Scale className="ml-2 h-4 w-4" /> إضافة للسلة</Button></div></DialogContent></Dialog>
 
-      <Dialog open={checkoutOpen} onOpenChange={open => { if (!processing && !saleDone) setCheckoutOpen(open); }}>
-        <DialogContent dir="rtl" className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader><DialogTitle>{saleDone ? "تمت عملية البيع" : "إتمام البيع"}</DialogTitle></DialogHeader>
-          {saleDone && currentSale ? (
-            <div className="space-y-5 py-2">
-              <div className="rounded-3xl bg-emerald-50 p-6 text-center text-emerald-900"><div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white"><Check className="h-7 w-7 text-[#005931]" /></div><div className="text-xl font-black">تم تسجيل الفاتورة</div><div className="mt-1 text-sm">{currentSale.invoice_number}</div><div className="mt-3 text-2xl font-black">{money(currentSale.total)}</div>{Number(currentSale.loyalty_voucher_amount || 0) > 0 && <div className="mt-2 text-sm">فاوچر - {money(Number(currentSale.loyalty_voucher_amount || 0))} · تم تحصيل {money(Number(currentSale.amount_due ?? (currentSale.total - Number(currentSale.loyalty_voucher_amount || 0))))}</div>}</div>
-              {completedPaymentMethod === "cash" && completedChange > 0 && <div className="rounded-2xl border-2 border-[#005931]/20 bg-white p-4 text-center"><div className="text-sm text-muted-foreground">الباقي للعميل</div><div className="mt-1 text-3xl font-black text-[#005931]">{money(completedChange)}</div></div>}
-              <Button className="h-12 w-full" variant="outline" onClick={() => setInvoiceOpen(true)}><PackageCheck className="ml-2 h-4 w-4" /> عرض وطباعة الفاتورة</Button><Button className="h-12 w-full bg-[#005931]" onClick={newSale}>عملية بيع جديدة</Button>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {checkoutError && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertDescription>{checkoutError}</AlertDescription></Alert>}
-              <div className="space-y-2 rounded-2xl bg-slate-50 p-4"><div className="flex items-center justify-between"><span className="text-muted-foreground">إجمالي الفاتورة</span><strong>{money(total)}</strong></div>{voucherAmount > 0 && <div className="flex items-center justify-between text-sm text-emerald-700"><span>فاوچر</span><strong>- {money(voucherAmount)}</strong></div>}<div className="flex items-center justify-between border-t pt-3"><span className="font-bold">المطلوب تحصيله</span><strong className="text-2xl text-[#005931]">{money(payableTotal)}</strong></div></div>
+      <POSCheckoutModernDialog
+        open={checkoutOpen}
+        onOpenChange={setCheckoutOpen}
+        checkoutId={activeTabId}
+        items={cartItems}
+        total={total}
+        onRepriced={items => { setCartItems(items); syncProductsFromPreflight(items); }}
+        onSaleCommitted={(_sale: Sale) => { void loadWorkspace(true); void refreshCash(); }}
+        onStartNewSale={newSale}
+      />
 
-              {payableTotal <= 0 ? (
-                <div className="rounded-2xl bg-emerald-50 p-4 text-center text-emerald-900"><Ticket className="mx-auto mb-2 h-6 w-6" /><strong>الفاوچر يغطي كامل الفاتورة</strong><div className="mt-1 text-xs">مفيش نقدي أو بطاقة مطلوبين من العميل.</div></div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between"><Label>طريقة الدفع</Label><span className="text-[11px] text-muted-foreground">F6 / F7 / F8</span></div>
-                  <RadioGroup value={paymentMethod} onValueChange={value => { const method = value as PaymentMethod; setPaymentMethod(method); setCheckoutError(null); if (method === "cash") setCashTendered(payableTotal.toFixed(2)); if (method === "mixed") { setMixedCash("0.00"); setMixedCard(payableTotal.toFixed(2)); } }} className="grid grid-cols-3 gap-2">
-                    {[{ id: "cash", label: "نقدي", icon: Banknote }, { id: "card", label: "بطاقة", icon: CreditCard }, { id: "mixed", label: "مختلط", icon: WalletCards }].map(option => <Label key={option.id} htmlFor={`pay-${option.id}`} className={`flex cursor-pointer flex-col items-center gap-2 rounded-2xl border p-3 ${paymentMethod === option.id ? "border-[#005931] bg-emerald-50 text-[#005931]" : ""}`}><RadioGroupItem className="sr-only" value={option.id} id={`pay-${option.id}`} /><option.icon className="h-5 w-5" /><span className="text-sm font-semibold">{option.label}</span></Label>)}
-                  </RadioGroup>
-                </div>
-              )}
-
-              {payableTotal > 0 && paymentMethod === "cash" && <div className="space-y-3"><div className="space-y-2"><Label>المبلغ المستلم من العميل</Label><Input autoFocus inputMode="decimal" value={cashTendered} onChange={event => setCashTendered(event.target.value)} className="h-12 text-xl font-bold" /></div><div className="flex flex-wrap gap-2">{quickCash.map(value => <Button key={value} type="button" variant={Math.abs(Number(cashTendered || 0) - value) < 0.001 ? "default" : "outline"} className={Math.abs(Number(cashTendered || 0) - value) < 0.001 ? "bg-[#005931]" : ""} onClick={() => setCashTendered(value.toFixed(2))}>{Math.abs(value - payableTotal) < 0.001 ? "بالضبط" : money(value)}</Button>)}</div><div className={`rounded-2xl p-4 text-center ${paymentValid ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}><div className="text-xs">الباقي للعميل</div><div className="mt-1 text-3xl font-black">{money(change)}</div></div></div>}
-
-              {payableTotal > 0 && paymentMethod === "mixed" && <div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label>نقدي</Label><Input autoFocus inputMode="decimal" value={mixedCash} onChange={event => setMixedCashSmart(event.target.value)} className="h-12 text-lg" /></div><div className="space-y-2"><Label>بطاقة</Label><Input inputMode="decimal" value={mixedCard} onChange={event => setMixedCardSmart(event.target.value)} className="h-12 text-lg" /></div></div><div className={`rounded-xl p-3 text-sm ${paymentValid ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>المجموع: <strong>{money(Number(mixedCash || 0) + Number(mixedCard || 0))}</strong> من {money(payableTotal)}</div></div>}
-
-              <div className="space-y-3 border-t pt-4"><div className="text-sm font-semibold">بيانات العميل — اختياري</div><div className="grid grid-cols-2 gap-3"><Input value={customerPhone} onChange={event => setCustomerPhone(event.target.value)} placeholder="رقم الهاتف" /><Input value={customerName} onChange={event => setCustomerName(event.target.value)} placeholder="اسم العميل" /></div></div>
-
-              <Button className="h-14 w-full bg-[#005931] text-base hover:bg-[#004a29]" disabled={!paymentValid || processing} onClick={() => void completeSale()}>{processing ? <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> : <Check className="ml-2 h-5 w-5" />} {processing ? "جاري تسجيل البيع..." : `تأكيد البيع · ${money(payableTotal)}`}</Button>
-              <div className="text-center text-[11px] text-muted-foreground">F9 للتأكيد · لا تغلق الصفحة أثناء ظهور «جاري تسجيل البيع»</div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <InvoiceDialog isOpen={invoiceOpen} onClose={() => setInvoiceOpen(false)} sale={currentSale} />
       <BarcodeScanner isOpen={scannerOpen} onClose={() => setScannerOpen(false)} onScan={barcode => { setScannerOpen(false); void processBarcode(barcode); }} />
     </MainLayout>
   );
