@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Banknote, Clock3, CreditCard, RefreshCw, ShoppingCart, UserRound, WalletCards } from "lucide-react";
+import { AlertTriangle, Banknote, Clock3, CreditCard, RefreshCw, ShoppingCart, WalletCards } from "lucide-react";
+import PosShiftReconciliationForm, { reconciliationVariance } from "@/components/POS/PosShiftReconciliationForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useBranchStore } from "@/stores/branchStore";
-import { listBranchPosShifts, managerClosePosShift, type ManagedPosShift } from "@/services/supabase/posShiftManagementService";
+import {
+  getManagerPosShiftReconciliationPreview,
+  listBranchPosShifts,
+  managerClosePosShiftV2,
+  type ManagedPosShift,
+} from "@/services/supabase/posShiftManagementService";
+import type { PosShiftReconciliationPreview } from "@/services/supabase/posShiftService";
 
 function money(value: number | null | undefined) {
   return `${Number(value || 0).toFixed(2)} ج.م`;
@@ -32,7 +38,10 @@ export default function PosShiftManagement() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "open" | "closed">("all");
   const [selected, setSelected] = useState<ManagedPosShift | null>(null);
-  const [closingCash, setClosingCash] = useState("");
+  const [reconciliationPreview, setReconciliationPreview] = useState<PosShiftReconciliationPreview | null>(null);
+  const [reconciliationValues, setReconciliationValues] = useState<Record<string, string>>({});
+  const [reconciliationReasons, setReconciliationReasons] = useState<Record<string, string>>({});
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -59,34 +68,70 @@ export default function PosShiftManagement() {
   const openShifts = useMemo(() => shifts.filter(shift => shift.status === "open"), [shifts]);
   const openSalesTotal = useMemo(() => openShifts.reduce((sum, shift) => sum + Number(shift.sales_total || 0), 0), [openShifts]);
 
-  const openManagerClose = (shift: ManagedPosShift) => {
-    setSelected(shift);
-    setClosingCash(Number(shift.drawer_balance || shift.expected_cash || 0).toFixed(2));
+  const resetManagerClose = () => {
+    setSelected(null);
+    setReconciliationPreview(null);
+    setReconciliationValues({});
+    setReconciliationReasons({});
     setReason("");
   };
 
-  const confirmClose = async () => {
-    if (!selected) return;
-    const amount = Number(closingCash);
-    if (!Number.isFinite(amount) || amount < 0) {
-      toast({ title: "النقد المعدود غير صحيح", variant: "destructive" });
-      return;
+  const openManagerClose = async (shift: ManagedPosShift) => {
+    setSelected(shift);
+    setReconciliationPreview(null);
+    setReconciliationValues({});
+    setReconciliationReasons({});
+    setReason("");
+    setPreviewLoading(true);
+    try {
+      const preview = await getManagerPosShiftReconciliationPreview(shift.id);
+      setReconciliationPreview(preview);
+    } catch (error: any) {
+      toast({ title: "تعذر تجهيز تسوية الوردية", description: error.message || "أعد المحاولة", variant: "destructive" });
+      setSelected(null);
+    } finally {
+      setPreviewLoading(false);
     }
+  };
+
+  const confirmClose = async () => {
+    if (!selected || !reconciliationPreview) return;
     if (reason.trim().length < 3) {
       toast({ title: "اكتب سبب الإغلاق الإداري", variant: "destructive" });
       return;
     }
+
+    const reconciliation = [] as Array<{ code: string; counted_amount: number; variance_reason: string | null }>;
+    for (const method of reconciliationPreview.methods) {
+      const raw = reconciliationValues[method.code] ?? "";
+      const counted = Number(raw);
+      if (!raw.trim() || !Number.isFinite(counted) || (method.method_type === "cash" && counted < 0)) {
+        toast({ title: `راجع المبلغ الفعلي لـ ${method.name}`, description: "لازم كل وسيلة دفع تتأكد قبل الإغلاق الإداري.", variant: "destructive" });
+        return;
+      }
+      const variance = reconciliationVariance(method.expected_amount, raw);
+      const varianceReason = (reconciliationReasons[method.code] || "").trim();
+      if (variance !== null && Math.abs(variance) >= 0.01 && varianceReason.length < 3) {
+        toast({ title: `اكتب سبب الفرق في ${method.name}`, variant: "destructive" });
+        return;
+      }
+      reconciliation.push({
+        code: method.code,
+        counted_amount: counted,
+        variance_reason: varianceReason || null,
+      });
+    }
+
     try {
       setSubmitting(true);
-      const result = await managerClosePosShift(selected.id, amount, reason);
-      const diff = Number(result.cash_difference || 0);
+      const result = await managerClosePosShiftV2(selected.id, reconciliation, reason);
+      const rows = result.payment_reconciliations || [];
+      const absoluteVariance = rows.reduce((sum, row) => sum + Math.abs(Number(row.variance_amount || 0)), 0);
       toast({
         title: "تم إغلاق الوردية إداريًا",
-        description: `${selected.employee_name} · فرق الصندوق ${money(diff)}`,
+        description: `${selected.employee_name} · تمت مطابقة ${rows.length} وسيلة دفع · إجمالي الفروق ${money(absoluteVariance)}`,
       });
-      setSelected(null);
-      setClosingCash("");
-      setReason("");
+      resetManagerClose();
       await load();
     } catch (error: any) {
       toast({ title: "تعذر إغلاق الوردية", description: error.message || "حاول مرة تانية", variant: "destructive" });
@@ -120,7 +165,7 @@ export default function PosShiftManagement() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-lg">سجل الورديات</CardTitle><CardDescription>الأرقام المعروضة محسوبة من الفواتير وCash Ledger، وليست رصيدًا يدويًا.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-lg">سجل الورديات</CardTitle><CardDescription>الأرقام المعروضة محسوبة من الفواتير وCash Ledger، والإغلاق الإداري الحديث يثبت عهدة كل وسيلة دفع بصورة مستقلة.</CardDescription></CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" /> جاري تحميل الورديات</div>
@@ -145,13 +190,13 @@ export default function PosShiftManagement() {
                           {shift.closed_at && <span>انتهت {new Date(shift.closed_at).toLocaleString("ar-EG")}</span>}
                         </div>
                       </div>
-                      {shift.status === "open" && <Button variant="destructive" size="sm" onClick={() => openManagerClose(shift)}>إغلاق إداري</Button>}
+                      {shift.status === "open" && <Button variant="destructive" size="sm" onClick={() => void openManagerClose(shift)}>إغلاق إداري</Button>}
                     </div>
 
                     <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                       <div className="rounded-xl bg-white p-3"><div className="flex items-center gap-1 text-xs text-muted-foreground"><ShoppingCart className="h-3.5 w-3.5" /> المبيعات</div><strong>{money(shift.sales_total)}</strong><div className="text-[10px] text-muted-foreground">{shift.sales_count} فاتورة</div></div>
                       <div className="rounded-xl bg-white p-3"><div className="flex items-center gap-1 text-xs text-muted-foreground"><Banknote className="h-3.5 w-3.5" /> نقدي</div><strong>{money(shift.cash_sales_total)}</strong></div>
-                      <div className="rounded-xl bg-white p-3"><div className="flex items-center gap-1 text-xs text-muted-foreground"><CreditCard className="h-3.5 w-3.5" /> بطاقة</div><strong>{money(shift.card_sales_total)}</strong></div>
+                      <div className="rounded-xl bg-white p-3"><div className="flex items-center gap-1 text-xs text-muted-foreground"><CreditCard className="h-3.5 w-3.5" /> بطاقة قديم</div><strong>{money(shift.card_sales_total)}</strong></div>
                       <div className="rounded-xl bg-white p-3"><div className="flex items-center gap-1 text-xs text-muted-foreground"><WalletCards className="h-3.5 w-3.5" /> الدرج {shift.status === "open" ? "الآن" : "عند الإغلاق"}</div><strong>{money(shift.status === "open" ? shift.drawer_balance : shift.closing_cash)}</strong></div>
                       <div className="rounded-xl bg-white p-3"><div className="text-xs text-muted-foreground">فرق الصندوق</div><strong className={diff === 0 ? "text-slate-900" : diff > 0 ? "text-blue-700" : "text-red-700"}>{shift.status === "open" ? "—" : money(diff)}</strong></div>
                     </div>
@@ -165,16 +210,42 @@ export default function PosShiftManagement() {
         </CardContent>
       </Card>
 
-      <Dialog open={Boolean(selected)} onOpenChange={open => { if (!open && !submitting) setSelected(null); }}>
-        <DialogContent dir="rtl" className="sm:max-w-md">
-          <DialogHeader><DialogTitle>إغلاق وردية إداريًا</DialogTitle><DialogDescription>{selected?.employee_name} · {selected?.device_name}. استخدمها فقط لو الكاشير مش قادر يقفل ورديته بنفسه.</DialogDescription></DialogHeader>
+      <Dialog open={Boolean(selected)} onOpenChange={open => { if (!open && !submitting) resetManagerClose(); }}>
+        <DialogContent dir="rtl" className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>إغلاق وردية إداريًا</DialogTitle>
+            <DialogDescription>{selected?.employee_name} · {selected?.device_name}. الإغلاق الإداري الآن يتطلب مطابقة كل وسيلة دفع، وليس النقد فقط.</DialogDescription>
+          </DialogHeader>
+
           {selected && (
             <div className="space-y-4">
-              <Alert className="border-amber-300 bg-amber-50"><AlertTriangle className="h-4 w-4" /><AlertDescription>الرصيد المتوقع حاليًا {money(selected.drawer_balance)}. عدّ النقد الموجود فعليًا قبل الإغلاق؛ أي فرق هيتسجل في الـLedger.</AlertDescription></Alert>
-              <div className="space-y-2"><Label htmlFor="manager-close-cash">النقد المعدود فعليًا</Label><Input id="manager-close-cash" inputMode="decimal" value={closingCash} onChange={event => setClosingCash(event.target.value)} /></div>
-              <div className="space-y-2"><Label htmlFor="manager-close-reason">سبب الإغلاق — إجباري</Label><Textarea id="manager-close-reason" value={reason} onChange={event => setReason(event.target.value)} placeholder="مثال: جهاز الكاشير توقف وتم عد الصندوق بحضور المدير" /></div>
-              <div className="rounded-xl bg-slate-50 p-3 text-sm">الفرق المتوقع بعد الإدخال: <strong>{money(Number(closingCash || 0) - Number(selected.drawer_balance || 0))}</strong></div>
-              <Button variant="destructive" className="h-12 w-full" disabled={submitting || reason.trim().length < 3 || closingCash.trim() === ""} onClick={() => void confirmClose()}>{submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />} تأكيد الإغلاق الإداري</Button>
+              <Alert className="border-amber-300 bg-amber-50">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>استخدم الإغلاق الإداري فقط لو الكاشير غير قادر يقفل ورديته بنفسه. راجع النقد والمحافظ والبطاقات فعليًا؛ أي فرق في أي وسيلة لازم يتسجل له سبب مستقل.</AlertDescription>
+              </Alert>
+
+              {previewLoading ? (
+                <div className="flex min-h-44 items-center justify-center gap-2 text-sm text-muted-foreground"><RefreshCw className="h-4 w-4 animate-spin" /> جاري تجهيز عهدة الوردية</div>
+              ) : reconciliationPreview ? (
+                <PosShiftReconciliationForm
+                  preview={reconciliationPreview}
+                  values={reconciliationValues}
+                  reasons={reconciliationReasons}
+                  onValueChange={(code, value) => setReconciliationValues(current => ({ ...current, [code]: value }))}
+                  onReasonChange={(code, value) => setReconciliationReasons(current => ({ ...current, [code]: value }))}
+                />
+              ) : (
+                <Alert variant="destructive"><AlertDescription>تعذر تحميل تفاصيل وسائل الدفع. اقفل النافذة وأعد المحاولة.</AlertDescription></Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="manager-close-reason">سبب الإغلاق الإداري — إجباري</Label>
+                <Textarea id="manager-close-reason" value={reason} onChange={event => setReason(event.target.value)} placeholder="مثال: جهاز الكاشير توقف وتمت مراجعة العهدة بحضور المدير" />
+              </div>
+
+              <Button variant="destructive" className="h-12 w-full" disabled={submitting || previewLoading || !reconciliationPreview || reason.trim().length < 3} onClick={() => void confirmClose()}>
+                {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />} تأكيد المطابقة والإغلاق الإداري
+              </Button>
             </div>
           )}
         </DialogContent>
