@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftRight, Banknote, Building2, Landmark, RefreshCw, ShieldCheck, WalletCards } from "lucide-react";
 import PaymentMethodBrand from "@/components/payments/PaymentMethodBrand";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -32,6 +32,7 @@ function newRequestId() {
 export default function FinanceSettlementCenterV2() {
   const { currentBranchId, currentBranchName } = useBranchStore();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedSource, setSelectedSource] = useState<FinanceSettlementSourceV2 | null>(null);
   const [targetKind, setTargetKind] = useState<FinanceSettlementTargetKind>("safe");
   const [targetAccountId, setTargetAccountId] = useState("");
@@ -64,8 +65,8 @@ export default function FinanceSettlementCenterV2() {
     (targetKind === "bank" || Boolean(targetAccountId || targets[0]?.account_id)),
   );
 
-  const closeDialog = () => {
-    if (submitting) return;
+  const closeDialog = (force = false) => {
+    if (submitting && !force) return;
     setSelectedSource(null);
     setTargetAccountId("");
     setGross("");
@@ -114,8 +115,12 @@ export default function FinanceSettlementCenterV2() {
         title: "تم تسجيل التوريد المالي",
         description: `${result.payment_method_name}: ${money(result.gross_amount)} → ${result.target_account_name}، صافي ${money(result.net_amount)}`,
       });
-      closeDialog();
-      await query.refetch();
+      closeDialog(true);
+      await Promise.all([
+        query.refetch(),
+        queryClient.invalidateQueries({ queryKey: ["finance-payment-report-v2", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["reporting-payments-v2", currentBranchId] }),
+      ]);
     } catch (error: any) {
       toast({ title: "تعذر تنفيذ التوريد", description: error.message || "راجع البيانات وحاول مرة أخرى.", variant: "destructive" });
     } finally {
