@@ -192,6 +192,7 @@ export default function AddProduct() {
         ...data,
         image_urls: data.image_urls || [],
         unit_of_measure: data.unit_of_measure || (data.barcode_type === "scale" ? "كجم" : "قطعة"),
+        default_weight_grams: Number(data.default_weight_grams) > 0 ? Number(data.default_weight_grams) : 250,
       });
       setMinStockLevel(Number(data.min_stock_level ?? 5));
       setLegacyBulkDetected(Boolean(data.bulk_enabled));
