@@ -35,6 +35,7 @@ import Settings from "@/pages/Settings";
 import OnlineOrders from "@/pages/OnlineOrders";
 import OrderDetails from "@/pages/OrderDetails";
 import CustomersAdvanced from "@/pages/CustomersAdvanced";
+import CustomerMyTasksPage from "@/pages/CustomerMyTasksPage";
 import Suppliers from "@/pages/Suppliers";
 import EmployeeManagement from "@/pages/EmployeeManagement";
 import CashTracking from "@/pages/CashTracking";
@@ -151,6 +152,7 @@ function App() {
               <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
               <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><CustomersWorkspace /></ProtectedRoute>} />
+              <Route path="/customer-tasks" element={<ProtectedRoute><CustomerMyTasksPage /></ProtectedRoute>} />
               <Route path="/customers/:customerId" element={<ProtectedRoute><Customer360Workspace /></ProtectedRoute>} />
               <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
               <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
