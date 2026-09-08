@@ -90,12 +90,7 @@ class BluetoothPrinterService {
         console.warn('Printer connected but direct BLE write characteristic was not found:', error);
       }
 
-      this.printer = {
-        device,
-        server,
-        characteristic,
-        isConnected: true,
-      };
+      this.printer = { device, server, characteristic, isConnected: true };
 
       localStorage.setItem('bluetoothPrinter', JSON.stringify({
         name: device.name || 'طابعة بلوتوث',
@@ -207,9 +202,6 @@ class BluetoothPrinterService {
         toast.success('تم إرسال الفاتورة للطابعة');
         return true;
       }
-
-      // A selected printer can still require the OS/browser print dialog. This is
-      // deliberately treated as a fallback, not as a fake successful BLE write.
       return this.printThroughBrowser(text);
     } catch (error) {
       console.error('خطأ في الطباعة:', error);
@@ -262,6 +254,9 @@ class BluetoothPrinterService {
   generateInvoiceText(sale: any, storeInfo: any): string {
     const date = new Date(sale.date).toLocaleDateString('ar-EG');
     const time = new Date(sale.date).toLocaleTimeString('ar-EG');
+    const currency = storeInfo.currency || 'ج.م';
+    const loyaltyCoupon = Number(sale.loyalty_voucher_amount || 0);
+    const amountPaid = Math.max(0, Number(sale.amount_due ?? (Number(sale.total || 0) - loyaltyCoupon)));
     let invoiceText = '';
 
     invoiceText += '================================\n';
@@ -282,14 +277,17 @@ class BluetoothPrinterService {
     });
 
     invoiceText += '--------------------------------\n';
-    invoiceText += `المجموع الفرعي: ${Number(sale.subtotal || 0).toFixed(2)} ${storeInfo.currency || 'ج.م'}\n`;
-    if (Number(sale.discount || 0) > 0) invoiceText += `الخصم: -${Number(sale.discount).toFixed(2)} ${storeInfo.currency || 'ج.م'}\n`;
-    invoiceText += `الإجمالي: ${Number(sale.total || 0).toFixed(2)} ${storeInfo.currency || 'ج.م'}\n\n`;
+    invoiceText += `المجموع الفرعي: ${Number(sale.subtotal || 0).toFixed(2)} ${currency}\n`;
+    if (Number(sale.discount || 0) > 0) invoiceText += `خصومات المنتجات: -${Number(sale.discount).toFixed(2)} ${currency}\n`;
+    invoiceText += `الإجمالي بعد خصومات المنتجات: ${Number(sale.total || 0).toFixed(2)} ${currency}\n`;
+    if (loyaltyCoupon > 0) invoiceText += `خصم كوبون الولاء: -${loyaltyCoupon.toFixed(2)} ${currency}\n`;
+    invoiceText += `المدفوع فعليًا: ${amountPaid.toFixed(2)} ${currency}\n\n`;
 
     const paymentMethod = sale.payment_method === 'cash' ? 'نقدي' : sale.payment_method === 'card' ? 'بطاقة' : 'مختلط';
     invoiceText += `طريقة الدفع: ${paymentMethod}\n`;
-    if (Number(sale.cash_amount || 0) > 0) invoiceText += `المبلغ النقدي: ${Number(sale.cash_amount).toFixed(2)}\n`;
-    if (Number(sale.card_amount || 0) > 0) invoiceText += `مبلغ البطاقة: ${Number(sale.card_amount).toFixed(2)}\n`;
+    if (Number(sale.cash_amount || 0) > 0) invoiceText += `المبلغ النقدي: ${Number(sale.cash_amount).toFixed(2)} ${currency}\n`;
+    if (Number(sale.card_amount || 0) > 0) invoiceText += `مبلغ البطاقة: ${Number(sale.card_amount).toFixed(2)} ${currency}\n`;
+    if (loyaltyCoupon > 0) invoiceText += `كوبون الخصم: ${loyaltyCoupon.toFixed(2)} ${currency}\n`;
     invoiceText += '\n================================\n';
     invoiceText += `       ${storeInfo.footer || 'شكراً لزيارتكم!'}\n`;
     invoiceText += '================================\n';
