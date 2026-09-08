@@ -43,7 +43,7 @@ import ProductCollections from "@/pages/ProductCollections";
 import CreateProductCollection from "@/pages/CreateProductCollection";
 import EditProductCollection from "@/pages/EditProductCollection";
 import Returns from "@/pages/Returns";
-import CustomerProfile from "@/pages/CustomerProfile";
+import Customer360Profile from "@/pages/Customer360Profile";
 import Analytics from "@/pages/Analytics";
 import AIInsights from "@/pages/AIInsights";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
@@ -124,7 +124,7 @@ function App() {
               <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
               <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
-              <Route path="/customers/:customerId" element={<ProtectedRoute><CustomerProfile /></ProtectedRoute>} />
+              <Route path="/customers/:customerId" element={<ProtectedRoute><Customer360Profile /></ProtectedRoute>} />
               <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
               <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
