@@ -112,6 +112,31 @@ export type CustomerCouponConversionDashboard = {
   }>;
 };
 
+export type CustomerFollowupOutcomeDashboard = {
+  attribution_window_days: number;
+  summary: {
+    window_days: number;
+    total_completed: number;
+    structured_outcomes: number;
+    no_answer: number;
+    interested: number;
+    not_interested: number;
+    callback_requested: number;
+    issue_resolved: number;
+    reached: number;
+    wrong_number: number;
+  };
+  outcomes: Array<{
+    outcome_code: string;
+    completed: number;
+    converted: number;
+    conversion_rate: number;
+    attributed_orders: number;
+    attributed_revenue: number;
+    recommended_action: string;
+  }>;
+};
+
 const rpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
   args?: Record<string, unknown>,
@@ -151,4 +176,13 @@ export async function fetchCustomerCouponConversionDashboard(branchId?: string |
   });
   if (error) throw mapError(error.message);
   return data as CustomerCouponConversionDashboard;
+}
+
+export async function fetchCustomerFollowupOutcomeDashboard(branchId?: string | null, days = 30): Promise<CustomerFollowupOutcomeDashboard> {
+  const { data, error } = await rpc("get_customer_followup_outcome_dashboard", {
+    p_branch_id: branchId || null,
+    p_days: days,
+  });
+  if (error) throw mapError(error.message);
+  return data as CustomerFollowupOutcomeDashboard;
 }
