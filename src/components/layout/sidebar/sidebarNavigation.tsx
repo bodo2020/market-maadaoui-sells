@@ -35,6 +35,7 @@ export const mainNavigation: NavigationGroup = {
   items: [
     { label: "لوحة التحكم", href: "/", icon: LayoutDashboard },
     { label: "نقطة البيع", href: "/pos", icon: ShoppingCart },
+    { label: "المهام", href: "/tasks", icon: ClipboardList },
     { label: "الطلبات الإلكترونية", href: "/online-orders", icon: ShoppingBag },
     { label: "الفواتير", href: "/invoices", icon: Receipt },
   ],
