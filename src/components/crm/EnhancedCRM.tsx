@@ -23,7 +23,7 @@ export function EnhancedCRM() {
     isLoading
   } = useQuery({
     queryKey: ["customers"],
-    queryFn: fetchCustomers
+    queryFn: () => fetchCustomers()
   });
   const {
     data: analytics
