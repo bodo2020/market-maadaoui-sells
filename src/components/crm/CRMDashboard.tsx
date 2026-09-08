@@ -10,7 +10,7 @@ import { Users, ShoppingCart, TrendingUp, DollarSign } from "lucide-react";
 export function CRMDashboard() {
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
-    queryFn: fetchCustomers,
+    queryFn: () => fetchCustomers(),
   });
 
   const { data: analytics, isLoading } = useQuery({

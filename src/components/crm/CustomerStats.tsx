@@ -8,7 +8,7 @@ import { Users, Phone, MapPin, Calendar } from "lucide-react";
 export function CustomerStats() {
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ["customers"],
-    queryFn: fetchCustomers,
+    queryFn: () => fetchCustomers(),
   });
 
   // إحصائيات العملاء
