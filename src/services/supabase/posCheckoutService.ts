@@ -17,8 +17,46 @@ type RpcResult = {
   error: { message?: string; code?: string } | null;
 };
 
+type StoredLoyaltyCustomer = {
+  customer_id?: string;
+  name?: string | null;
+  phone?: string | null;
+  barcode_token?: string | null;
+};
+
+type StoredPOSTab = {
+  id?: string;
+  selectedCustomer?: string;
+  customerName?: string;
+  customerPhone?: string;
+};
+
 function pendingSaleKey(userId: string, branchId: string, checkoutId: string) {
   return `pos-sale-request:${userId}:${branchId}:${checkoutId}`;
+}
+
+function loyaltyContextKey(branchId: string, checkoutId: string) {
+  return `pos-loyalty-customer:${branchId}:${checkoutId}`;
+}
+
+function readStoredLoyaltyCustomer(branchId: string, checkoutId: string): StoredLoyaltyCustomer | null {
+  try {
+    const raw = localStorage.getItem(loyaltyContextKey(branchId, checkoutId));
+    return raw ? JSON.parse(raw) as StoredLoyaltyCustomer : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredTab(checkoutId: string): StoredPOSTab | null {
+  try {
+    const raw = localStorage.getItem("pos_tabs");
+    if (!raw) return null;
+    const tabs = JSON.parse(raw) as StoredPOSTab[];
+    return Array.isArray(tabs) ? tabs.find(tab => tab.id === checkoutId) || null : null;
+  } catch {
+    return null;
+  }
 }
 
 function friendlySaleError(message?: string) {
@@ -35,6 +73,8 @@ function friendlySaleError(message?: string) {
   if (value.includes("INVALID_PAYMENT_SPLIT")) return "تقسيم الدفع غير صحيح. مجموع النقدي والبطاقة يجب أن يساوي إجمالي الفاتورة.";
   if (value.includes("INVALID_SALE_TOTAL")) return "إجمالي الفاتورة غير متطابق. أعد مراجعة السلة.";
   if (value.includes("BRANCH_ACCESS_DENIED")) return "ليس لديك صلاحية تنفيذ بيع على الفرع الحالي.";
+  if (value.includes("CUSTOMER_NOT_FOUND") || value.includes("CUSTOMER_CODE_MISMATCH")) return "تعذر ربط العميل بالفاتورة. امسح باركود العميل مرة أخرى.";
+  if (value.includes("LOYALTY_ACCOUNT_SUSPENDED")) return "حساب ولاء العميل موقوف حاليًا.";
   if (value.includes("PRODUCT_UNAVAILABLE")) return "أحد المنتجات لم يعد متاحًا للبيع. حدّث السلة وحاول مرة أخرى.";
   if (value.includes("BULK_UNAVAILABLE")) return "إعداد الجملة لهذا المنتج لم يعد متاحًا.";
   if (value.includes("REQUEST_CONFLICT")) return "تم العثور على محاولة بيع سابقة مختلفة لنفس السلة. راجع الفاتورة السابقة قبل إعادة المحاولة.";
@@ -88,6 +128,12 @@ export async function submitPosSale(
   const device = getLocalPosDevice(branchId);
   if (!device) throw new Error("هذا المتصفح غير مسجل كجهاز POS للفرع الحالي.");
 
+  const loyaltyCustomer = readStoredLoyaltyCustomer(branchId, checkoutId);
+  const storedTab = readStoredTab(checkoutId);
+  const customerId = loyaltyCustomer?.customer_id || sale.customer_id || storedTab?.selectedCustomer || null;
+  const customerName = loyaltyCustomer?.name || sale.customer_name || storedTab?.customerName || null;
+  const customerPhone = loyaltyCustomer?.phone || sale.customer_phone || storedTab?.customerPhone || null;
+
   const payload = {
     items: sale.items,
     subtotal: sale.subtotal,
@@ -97,8 +143,10 @@ export async function submitPosSale(
     payment_method: sale.payment_method,
     cash_amount: sale.cash_amount ?? 0,
     card_amount: sale.card_amount ?? 0,
-    customer_name: sale.customer_name ?? null,
-    customer_phone: sale.customer_phone ?? null,
+    customer_id: customerId,
+    customer_barcode: loyaltyCustomer?.barcode_token ?? null,
+    customer_name: customerName,
+    customer_phone: customerPhone,
     device_id: device.device_id,
     device_token: device.device_token,
   };
@@ -146,11 +194,9 @@ export async function submitPosSale(
       item_count: sale.items.length,
       total: Number(sale.total || 0),
       payment_method: sale.payment_method,
+      customer_id: customerId,
     });
 
-    // A timeout / transient connection error can leave the client unsure whether the
-    // transaction committed. Retry exactly once with the SAME request id. The database
-    // idempotency contract returns the original sale instead of creating a duplicate.
     if (typeof navigator === "undefined" || navigator.onLine) {
       await sleep(350);
       result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
@@ -163,6 +209,7 @@ export async function submitPosSale(
       item_count: sale.items.length,
       total: Number(sale.total || 0),
       payment_method: sale.payment_method,
+      customer_id: customerId,
     });
     await sleep(350);
     result = await createSaleAttempt(pending.requestId, branchId, pending.payload);
@@ -182,6 +229,7 @@ export async function submitPosSale(
       item_count: sale.items.length,
       total: Number(sale.total || 0),
       payment_method: sale.payment_method,
+      customer_id: customerId,
       rpc_code: result.error.code || null,
       duration_ms: elapsedMs,
       retried,
@@ -204,6 +252,7 @@ export async function submitPosSale(
       checkout_id: checkoutId,
       item_count: sale.items.length,
       total: Number(sale.total || 0),
+      customer_id: customerId,
       duration_ms: elapsedMs,
       retried,
     });
@@ -221,11 +270,13 @@ export async function submitPosSale(
       item_count: sale.items.length,
       total: Number(sale.total || 0),
       payment_method: sale.payment_method,
+      customer_id: customerId,
     });
   }
 
   try {
     localStorage.setItem(key, JSON.stringify({ ...pending, confirmed: true }));
+    localStorage.removeItem(loyaltyContextKey(branchId, checkoutId));
   } catch {
     // Sale is already committed; do not report failure because local cache could not update.
   }
