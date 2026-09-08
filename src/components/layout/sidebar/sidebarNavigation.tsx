@@ -31,7 +31,7 @@ import { NavigationGroup } from "./types";
 export const mainNavigation: NavigationGroup = {
   title: "الرئيسية",
   items: [
-    { label: "لوحة التحكم", href: "/dashboard", icon: LayoutDashboard },
+    { label: "التقارير والتحليلات", href: "/reports", icon: LayoutDashboard },
     { label: "نقطة البيع", href: "/pos", icon: ShoppingCart },
     { label: "المهام", href: "/tasks", icon: ClipboardList },
     { label: "الطلبات الإلكترونية", href: "/online-orders", icon: ShoppingBag },
@@ -72,7 +72,7 @@ export const customersNavigation: NavigationGroup = {
 export const financeNavigation: NavigationGroup = {
   title: "المالية والتقارير",
   items: [
-    { label: "التقارير والتحليلات", href: "/reports", icon: BarChart3 },
+    { label: "مركز التقارير", href: "/reports", icon: BarChart3 },
     { label: "المالية", href: "/finance", icon: DollarSign },
     { label: "وسائل الدفع", href: "/payment-methods", icon: WalletCards },
     { label: "المصروفات والرواتب", href: "/expenses-salaries", icon: FileText },
