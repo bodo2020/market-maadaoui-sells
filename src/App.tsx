@@ -13,6 +13,7 @@ import ReportsShiftsV2 from "@/pages/ReportsShiftsV2";
 import ReportsOnlineV2 from "@/pages/ReportsOnlineV2";
 import ReportsCustomersV2 from "@/pages/ReportsCustomersV2";
 import ReportsCostsV2 from "@/pages/ReportsCostsV2";
+import ReportsInsightsV2 from "@/pages/ReportsInsightsV2";
 import NotFound from "@/pages/NotFound";
 import POSPro from "@/pages/POSPro";
 import PosShiftGatePro from "@/components/POS/PosShiftGatePro";
@@ -110,8 +111,9 @@ function App() {
           <Route path="/reports/online" element={<ProtectedRoute><ReportsOnlineV2 /></ProtectedRoute>} />
           <Route path="/reports/customers" element={<ProtectedRoute><ReportsCustomersV2 /></ProtectedRoute>} />
           <Route path="/reports/costs" element={<ProtectedRoute><ReportsCostsV2 /></ProtectedRoute>} />
+          <Route path="/reports/insights" element={<ProtectedRoute><ReportsInsightsV2 /></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
-          <Route path="/ai-insights" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
+          <Route path="/ai-insights" element={<ProtectedRoute><ReportsInsightsV2 /></ProtectedRoute>} />
           <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
           <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute><OperationsTasksPage /></ProtectedRoute>} />
