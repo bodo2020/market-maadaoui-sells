@@ -143,7 +143,6 @@ export interface ProductBatch {
   branch_id?: string;
   created_at: string;
   updated_at: string;
-  // Optional product data when joined
   products?: {
     name: string;
     purchase_price?: number;
@@ -172,6 +171,10 @@ export interface Sale {
   customer_phone?: string;
   source_channel?: 'store' | 'online' | string;
   loyalty_points_earned?: number;
+  loyalty_voucher_id?: string | null;
+  loyalty_voucher_amount?: number;
+  voucher_remaining_egp?: number | null;
+  amount_due?: number;
   payment_method: 'cash' | 'card' | 'mixed';
   total: number;
   subtotal: number;
@@ -202,6 +205,8 @@ export interface OnlineOrder {
   branch_id?: string;
   source_channel?: 'online' | string;
   loyalty_points_earned?: number;
+  loyalty_voucher_id?: string | null;
+  loyalty_voucher_amount?: number;
 }
 
 export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'shipped' | 'delivered' | 'cancelled';
