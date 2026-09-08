@@ -66,7 +66,7 @@ export async function updateProductBatch(id: string, updates: Partial<ProductBat
   try {
     const { data, error } = await supabase
       .from("product_batches")
-      .update(updates)
+      .update(updates as any)
       .eq("id", id)
       .select()
       .single();

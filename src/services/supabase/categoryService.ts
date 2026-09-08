@@ -66,7 +66,7 @@ export async function createMainCategory(category: Omit<MainCategory, "id" | "cr
 export async function updateMainCategory(id: string, category: Partial<Omit<MainCategory, "id" | "created_at" | "updated_at">>) {
   const { data, error } = await supabase
     .from("main_categories")
-    .update(category)
+    .update(category as any)
     .eq("id", id)
     .select();
 
