@@ -15,18 +15,10 @@ interface OnlineOrderInvoiceDialogProps {
   order: Order | null;
 }
 
-interface EnrichedOrderItem {
-  product_id: string;
+interface EnrichedOrderItem extends OrderItem {
   product_name: string;
-  quantity: number;
-  price: number;
-  total: number;
-  image_url?: string;
-  barcode?: string;
-  is_bulk?: boolean;
-  is_weight_based?: boolean;
-  bulk_quantity?: number;
 }
+
 
 const OnlineOrderInvoiceDialog: React.FC<OnlineOrderInvoiceDialogProps> = ({ 
   isOpen, 
