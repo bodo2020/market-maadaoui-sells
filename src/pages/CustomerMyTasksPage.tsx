@@ -8,11 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useBranchStore } from "@/stores/branchStore";
-import { completeCustomerFollowupV2, type CustomerFollowupOutcomeCode } from "@/services/supabase/customerManagementActionsService";
+import { completeCustomerFollowupV3, type CustomerFollowupOutcomeCode } from "@/services/supabase/customerManagementActionsService";
 import { fetchMyCustomerFollowupInbox, type MyCustomerFollowupTask } from "@/services/supabase/customerMyTasksService";
 
 const outcomeLabels: Record<CustomerFollowupOutcomeCode, string> = {
@@ -33,6 +35,12 @@ const dateTime = (value: string) => {
   } catch {
     return "—";
   }
+};
+
+const localDateTimeAfter = (hours: number) => {
+  const target = new Date(Date.now() + hours * 60 * 60 * 1000);
+  const local = new Date(target.getTime() - target.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
 };
 
 const whatsappPhone = (phone?: string | null) => {
@@ -56,6 +64,7 @@ export default function CustomerMyTasksPage() {
   const [selectedTask, setSelectedTask] = useState<MyCustomerFollowupTask | null>(null);
   const [outcome, setOutcome] = useState<CustomerFollowupOutcomeCode>("reached");
   const [note, setNote] = useState("");
+  const [callbackAt, setCallbackAt] = useState(localDateTimeAfter(24));
   const [saving, setSaving] = useState(false);
 
   const query = useQuery({
@@ -78,18 +87,40 @@ export default function CustomerMyTasksPage() {
 
   const saveResult = async () => {
     if (!selectedTask || saving) return;
+    let callbackIso: string | null = null;
+    if (outcome === "callback_requested") {
+      if (!callbackAt) return toast.error("حدد موعد إعادة التواصل.");
+      const parsed = new Date(callbackAt);
+      if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) return toast.error("اختار موعد إعادة تواصل في المستقبل.");
+      callbackIso = parsed.toISOString();
+    }
+
     setSaving(true);
     try {
-      await completeCustomerFollowupV2(selectedTask.interaction_id, outcome, note.trim() || undefined, currentBranchId || null);
-      toast.success("تم تسجيل النتيجة وإغلاق المهمة.");
+      const result = await completeCustomerFollowupV3(
+        selectedTask.interaction_id,
+        outcome,
+        note.trim() || undefined,
+        callbackIso,
+        currentBranchId || null,
+      );
+      toast.success(result.callback_created ? "تم إغلاق المهمة وإنشاء موعد إعادة التواصل تلقائيًا." : "تم تسجيل النتيجة وإغلاق المهمة.");
       setSelectedTask(null);
       setNote("");
+      setCallbackAt(localDateTimeAfter(24));
       await refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر تسجيل نتيجة المتابعة.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const openResult = (task: MyCustomerFollowupTask) => {
+    setSelectedTask(task);
+    setOutcome("reached");
+    setNote("");
+    setCallbackAt(localDateTimeAfter(24));
   };
 
   const TaskCard = ({ task }: { task: MyCustomerFollowupTask }) => {
@@ -115,7 +146,7 @@ export default function CustomerMyTasksPage() {
             <Button variant="outline" disabled={!task.customer_phone} asChild={Boolean(task.customer_phone)}>{task.customer_phone ? <a href={`tel:${task.customer_phone}`}><Phone className="ml-2 h-4 w-4" />اتصال</a> : <span><Phone className="ml-2 h-4 w-4" />اتصال</span>}</Button>
             <Button variant="outline" disabled={!wa} onClick={() => wa && window.open(`https://wa.me/${wa}`, "_blank", "noopener,noreferrer")}><MessageCircle className="ml-2 h-4 w-4" />WhatsApp</Button>
             <Button variant="outline" onClick={() => navigate(`/customers/${task.customer_id}`)}><ExternalLink className="ml-2 h-4 w-4" />ملف العميل</Button>
-            <Button className="bg-[#005931] hover:bg-[#004a29]" onClick={() => { setSelectedTask(task); setOutcome("reached"); setNote(""); }}><CheckCircle2 className="ml-2 h-4 w-4" />سجل النتيجة</Button>
+            <Button className="bg-[#005931] hover:bg-[#004a29]" onClick={() => openResult(task)}><CheckCircle2 className="ml-2 h-4 w-4" />سجل النتيجة</Button>
           </div>
         </CardContent>
       </Card>
@@ -168,7 +199,20 @@ export default function CustomerMyTasksPage() {
       <Dialog open={Boolean(selectedTask)} onOpenChange={open => !open && setSelectedTask(null)}>
         <DialogContent dir="rtl" className="sm:max-w-md">
           <DialogHeader className="text-right"><DialogTitle>نتيجة متابعة العميل</DialogTitle></DialogHeader>
-          {selectedTask && <div className="space-y-4"><div className="rounded-2xl bg-slate-50 p-3"><div className="font-black">{selectedTask.customer_name || "عميل"}</div><div className="mt-1 text-xs text-muted-foreground">{selectedTask.subject}</div></div><Select value={outcome} onValueChange={value => setOutcome(value as CustomerFollowupOutcomeCode)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(outcomeLabels).map(([value,label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select><Textarea value={note} onChange={event => setNote(event.target.value)} placeholder="ملاحظة اختيارية..." className="min-h-24" /></div>}
+          {selectedTask && (
+            <div className="space-y-4">
+              <div className="rounded-2xl bg-slate-50 p-3"><div className="font-black">{selectedTask.customer_name || "عميل"}</div><div className="mt-1 text-xs text-muted-foreground">{selectedTask.subject}</div></div>
+              <Select value={outcome} onValueChange={value => setOutcome(value as CustomerFollowupOutcomeCode)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(outcomeLabels).map(([value,label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select>
+              {outcome === "callback_requested" && (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
+                  <Label>موعد إعادة التواصل</Label>
+                  <Input className="mt-1 bg-white" type="datetime-local" value={callbackAt} onChange={event => setCallbackAt(event.target.value)} />
+                  <p className="mt-1 text-[11px] text-blue-700">عند الحفظ هتتعمل مهمة جديدة تلقائيًا لنفس المسؤول.</p>
+                </div>
+              )}
+              <Textarea value={note} onChange={event => setNote(event.target.value)} placeholder="ملاحظة اختيارية..." className="min-h-24" />
+            </div>
+          )}
           <DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={() => setSelectedTask(null)} disabled={saving}>إلغاء</Button><Button className="bg-[#005931] hover:bg-[#004a29]" onClick={() => void saveResult()} disabled={saving}>{saving && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}حفظ وإغلاق المهمة</Button></DialogFooter>
         </DialogContent>
       </Dialog>
