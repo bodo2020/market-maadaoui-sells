@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import CustomerOpportunityToTaskButton from "@/components/customers/CustomerOpportunityToTaskButton";
 import { useBranchStore } from "@/stores/branchStore";
 import {
   fetchCustomerCouponConversionDashboard,
@@ -180,16 +181,27 @@ export default function CustomerOperationsCenterDock() {
                   ) : queue.map((item, index) => {
                     const meta = priorityMeta[item.priority_level] || priorityMeta.low;
                     return (
-                      <button key={item.id} type="button" onClick={() => openCustomer(item.id)} className="w-full rounded-2xl border bg-white p-4 text-right transition hover:border-emerald-200 hover:bg-emerald-50/20">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2"><span className="text-xs font-black text-muted-foreground">#{index + 1}</span><div className="truncate font-black">{item.name || "عميل"}</div></div>
-                            <div className="mt-1 text-xs text-muted-foreground">{item.membership_number || "—"}{item.phone ? ` · ${item.phone}` : ""}</div>
+                      <div key={item.id} className="w-full rounded-2xl border bg-white p-4 text-right transition hover:border-emerald-200 hover:bg-emerald-50/20">
+                        <button type="button" onClick={() => openCustomer(item.id)} className="w-full text-right">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2"><span className="text-xs font-black text-muted-foreground">#{index + 1}</span><div className="truncate font-black">{item.name || "عميل"}</div></div>
+                              <div className="mt-1 text-xs text-muted-foreground">{item.membership_number || "—"}{item.phone ? ` · ${item.phone}` : ""}</div>
+                            </div>
+                            <div className="flex items-center gap-2"><Badge variant="outline" className={meta.className}>{meta.label}</Badge><div className="min-w-11 rounded-xl bg-slate-950 px-2 py-1 text-center text-sm font-black text-white">{num(item.priority_score)}</div><ArrowLeft className="h-4 w-4 text-muted-foreground" /></div>
                           </div>
-                          <div className="flex items-center gap-2"><Badge variant="outline" className={meta.className}>{meta.label}</Badge><div className="min-w-11 rounded-xl bg-slate-950 px-2 py-1 text-center text-sm font-black text-white">{num(item.priority_score)}</div><ArrowLeft className="h-4 w-4 text-muted-foreground" /></div>
-                        </div>
+                        </button>
                         <div className="mt-3 flex flex-wrap gap-1.5">{item.signals.map((signal, signalIndex) => <SignalBadge key={`${signal.type}-${signalIndex}`} signal={signal} />)}</div>
-                      </button>
+                        <div className="mt-3 flex justify-end">
+                          <CustomerOpportunityToTaskButton
+                            customerId={item.id}
+                            customerName={item.name}
+                            signals={item.signals}
+                            priorityLevel={item.priority_level}
+                            onCreated={() => void query.refetch()}
+                          />
+                        </div>
+                      </div>
                     );
                   })}
                 </TabsContent>
