@@ -1,5 +1,22 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export type CustomerFollowupType = "call" | "email" | "meeting" | "whatsapp";
+
+export type CustomerPendingFollowup = {
+  id: string;
+  type: CustomerFollowupType;
+  subject: string;
+  description: string | null;
+  priority: "low" | "medium" | "high" | string;
+  scheduled_at: string;
+  created_at: string;
+  branch_id: string | null;
+  assigned_to: string | null;
+  assigned_to_name: string | null;
+  overdue: boolean;
+  overdue_hours: number;
+};
+
 export type CustomerManagementWorkspace = {
   management_status: "active" | "watch" | "blocked";
   permissions: {
@@ -15,7 +32,7 @@ export type CustomerManagementWorkspace = {
   }>;
   interactions: Array<{
     id: string;
-    type: "call" | "email" | "meeting" | "note" | string;
+    type: "call" | "email" | "meeting" | "note" | "whatsapp" | string;
     subject: string;
     description: string | null;
     status: string;
@@ -23,12 +40,19 @@ export type CustomerManagementWorkspace = {
     scheduled_at: string | null;
     created_by: string | null;
     created_at: string;
+    branch_id?: string | null;
+    assigned_to?: string | null;
+    assigned_to_name?: string | null;
+    completed_at?: string | null;
+    completed_by?: string | null;
   }>;
+  pending_followups: CustomerPendingFollowup[];
   audit: Array<{
     id: string;
     action_type: string;
     branch_id: string | null;
     created_by: string | null;
+    created_by_name?: string | null;
     metadata: Record<string, unknown>;
     created_at: string;
   }>;
@@ -46,6 +70,11 @@ function rpcError(message?: string) {
   if (message?.includes("INSUFFICIENT_POINTS")) return new Error("لا يمكن خصم نقاط أكثر من رصيد العميل الحالي.");
   if (message?.includes("ADJUSTMENT_REASON_REQUIRED") || message?.includes("STATUS_REASON_REQUIRED")) return new Error("اكتب سببًا واضحًا لتنفيذ العملية.");
   if (message?.includes("INVALID_TAG_NAME")) return new Error("اسم التصنيف يجب أن يكون من 2 إلى 40 حرفًا.");
+  if (message?.includes("FOLLOWUP_SCHEDULE_REQUIRED")) return new Error("حدد موعد المتابعة.");
+  if (message?.includes("INVALID_FOLLOWUP_SUBJECT")) return new Error("اكتب عنوانًا واضحًا للمتابعة.");
+  if (message?.includes("FOLLOWUP_OUTCOME_REQUIRED")) return new Error("اكتب نتيجة المتابعة قبل إغلاقها.");
+  if (message?.includes("FOLLOWUP_CANCEL_REASON_REQUIRED")) return new Error("اكتب سبب إلغاء المتابعة.");
+  if (message?.includes("FOLLOWUP_ALREADY_CLOSED")) return new Error("المتابعة مقفولة بالفعل.");
   return new Error(message || "تعذر تنفيذ العملية.");
 }
 
@@ -117,4 +146,48 @@ export async function adjustCustomerLoyaltyPoints(
   });
   if (error) throw rpcError(error.message);
   return data as { before: number; after: number; delta: number; workspace: CustomerManagementWorkspace };
+}
+
+export async function createCustomerFollowup(params: {
+  customerId: string;
+  type: CustomerFollowupType;
+  subject: string;
+  description?: string;
+  scheduledAt: string;
+  priority?: "low" | "medium" | "high";
+  assignedTo?: string | null;
+  branchId?: string | null;
+}): Promise<{ id: string; workspace: CustomerManagementWorkspace }> {
+  const { data, error } = await rpc("create_customer_followup", {
+    p_customer_id: params.customerId,
+    p_type: params.type,
+    p_subject: params.subject,
+    p_description: params.description?.trim() || null,
+    p_scheduled_at: params.scheduledAt,
+    p_priority: params.priority || "medium",
+    p_assigned_to: params.assignedTo || null,
+    p_branch_id: params.branchId || null,
+  });
+  if (error) throw rpcError(error.message);
+  return data as { id: string; workspace: CustomerManagementWorkspace };
+}
+
+export async function completeCustomerFollowup(interactionId: string, outcome: string, branchId?: string | null): Promise<CustomerManagementWorkspace> {
+  const { data, error } = await rpc("complete_customer_followup", {
+    p_interaction_id: interactionId,
+    p_outcome: outcome,
+    p_branch_id: branchId || null,
+  });
+  if (error) throw rpcError(error.message);
+  return data as CustomerManagementWorkspace;
+}
+
+export async function cancelCustomerFollowup(interactionId: string, reason: string, branchId?: string | null): Promise<CustomerManagementWorkspace> {
+  const { data, error } = await rpc("cancel_customer_followup", {
+    p_interaction_id: interactionId,
+    p_reason: reason,
+    p_branch_id: branchId || null,
+  });
+  if (error) throw rpcError(error.message);
+  return data as CustomerManagementWorkspace;
 }
