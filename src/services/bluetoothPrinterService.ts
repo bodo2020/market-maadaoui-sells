@@ -256,7 +256,17 @@ class BluetoothPrinterService {
     const time = new Date(sale.date).toLocaleTimeString('ar-EG');
     const currency = storeInfo.currency || 'ج.م';
     const loyaltyCoupon = Number(sale.loyalty_voucher_amount || 0);
-    const amountPaid = Math.max(0, Number(sale.amount_due ?? (Number(sale.total || 0) - loyaltyCoupon)));
+    const paymentFee = Number(sale.payment_fee_amount || 0);
+    const customerPaymentFee = Number(sale.customer_payment_fee_amount || 0);
+    const merchantPaymentFee = Number(sale.merchant_payment_fee_amount || 0);
+    const paymentName = String(
+      sale.payment_method_name ||
+      (sale.payment_method === 'cash' ? 'نقدي' : sale.payment_method === 'card' ? 'بطاقة بنكية' : 'مختلط')
+    );
+    const amountPaid = Math.max(
+      0,
+      Number(sale.amount_charged ?? sale.amount_due ?? (Number(sale.total || 0) - loyaltyCoupon + customerPaymentFee)),
+    );
     let invoiceText = '';
 
     invoiceText += '================================\n';
@@ -280,14 +290,18 @@ class BluetoothPrinterService {
     invoiceText += `المجموع الفرعي: ${Number(sale.subtotal || 0).toFixed(2)} ${currency}\n`;
     if (Number(sale.discount || 0) > 0) invoiceText += `خصومات المنتجات: -${Number(sale.discount).toFixed(2)} ${currency}\n`;
     invoiceText += `الإجمالي بعد خصومات المنتجات: ${Number(sale.total || 0).toFixed(2)} ${currency}\n`;
-    if (loyaltyCoupon > 0) invoiceText += `خصم كوبون الولاء: -${loyaltyCoupon.toFixed(2)} ${currency}\n`;
+    if (loyaltyCoupon > 0) invoiceText += `كوبون الخصم: -${loyaltyCoupon.toFixed(2)} ${currency}\n`;
+    if (customerPaymentFee > 0) invoiceText += `رسوم وسيلة الدفع: +${customerPaymentFee.toFixed(2)} ${currency}\n`;
     invoiceText += `المدفوع فعليًا: ${amountPaid.toFixed(2)} ${currency}\n\n`;
 
-    const paymentMethod = sale.payment_method === 'cash' ? 'نقدي' : sale.payment_method === 'card' ? 'بطاقة' : 'مختلط';
-    invoiceText += `طريقة الدفع: ${paymentMethod}\n`;
+    invoiceText += `طريقة الدفع: ${paymentName}\n`;
+    if (sale.payment_reference) invoiceText += `مرجع العملية: ${sale.payment_reference}\n`;
     if (Number(sale.cash_amount || 0) > 0) invoiceText += `المبلغ النقدي: ${Number(sale.cash_amount).toFixed(2)} ${currency}\n`;
-    if (Number(sale.card_amount || 0) > 0) invoiceText += `مبلغ البطاقة: ${Number(sale.card_amount).toFixed(2)} ${currency}\n`;
     if (loyaltyCoupon > 0) invoiceText += `كوبون الخصم: ${loyaltyCoupon.toFixed(2)} ${currency}\n`;
+    if (paymentFee > 0) {
+      const feeBearer = merchantPaymentFee > 0 ? 'تتحملها المنشأة' : 'على العميل';
+      invoiceText += `رسوم الخدمة: ${paymentFee.toFixed(2)} ${currency} (${feeBearer})\n`;
+    }
     invoiceText += '\n================================\n';
     invoiceText += `       ${storeInfo.footer || 'شكراً لزيارتكم!'}\n`;
     invoiceText += '================================\n';
