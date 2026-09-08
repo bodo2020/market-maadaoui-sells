@@ -61,6 +61,7 @@ export const customersNavigation: NavigationGroup = {
   title: "العملاء والتوصيل",
   items: [
     { label: "العملاء", href: "/customers", icon: Users },
+    { label: "مهامي مع العملاء", href: "/customer-tasks", icon: ClipboardList, adminOnly: true },
     { label: "سلات العملاء", href: "/customer-carts", icon: ShoppingCart },
     { label: "أماكن التوصيل العامة", href: "/delivery-locations", icon: MapPin },
     { label: "أماكن التوصيل للفروع", href: "/branch-delivery-zones", icon: Building2 },
