@@ -3,10 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
-import { closePosShift, getMyOpenPosShift, openPosShift, type PosShift } from "@/services/supabase/posShiftService";
+import {
+  closePosShiftV2,
+  getMyOpenPosShift,
+  getMyPosShiftReconciliationPreview,
+  openPosShift,
+  type PosShift,
+  type PosShiftReconciliationInput,
+  type PosShiftReconciliationPreview,
+} from "@/services/supabase/posShiftService";
 import { getPosCashSummary, type PosCashSummary } from "@/services/supabase/posCashService";
 import PosCashDrawerWidget from "@/components/POS/PosCashDrawerWidget";
-import PosShiftPaymentSummary from "@/components/POS/PosShiftPaymentSummary";
+import PosShiftReconciliationForm, { reconciliationVariance } from "@/components/POS/PosShiftReconciliationForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -43,12 +51,14 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openingCash, setOpeningCash] = useState("0.00");
-  const [closingCash, setClosingCash] = useState("");
   const [closingNotes, setClosingNotes] = useState("");
   const [closingOpen, setClosingOpen] = useState(false);
   const [closingSummary, setClosingSummary] = useState<PosShift | null>(null);
   const [switchRequested, setSwitchRequested] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [reconciliationPreview, setReconciliationPreview] = useState<PosShiftReconciliationPreview | null>(null);
+  const [reconciliationValues, setReconciliationValues] = useState<Record<string, string>>({});
+  const [reconciliationReasons, setReconciliationReasons] = useState<Record<string, string>>({});
 
   const device = useMemo(
     () => currentBranchId ? getLocalPosDevice(currentBranchId) : null,
@@ -113,36 +123,62 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
   };
 
   const openCloseDialog = async (switchEmployee = false) => {
+    if (!device || !shift) return;
     setSwitchRequested(switchEmployee);
     setClosingNotes("");
     setError(null);
-    try {
-      const cash = await refreshCash();
-      setClosingCash(Number(cash?.drawer_balance || 0).toFixed(2));
-    } catch (e: any) {
-      setCashSummary(null);
-      setError(e.message || "تعذر تحميل ملخص الوردية. أعد المحاولة قبل الإغلاق.");
-      setClosingCash("");
-      setClosingOpen(true);
-      return;
-    }
+    setReconciliationPreview(null);
+    setReconciliationValues({});
+    setReconciliationReasons({});
     setClosingOpen(true);
+    try {
+      const [cash, preview] = await Promise.all([
+        refreshCash(),
+        getMyPosShiftReconciliationPreview(device),
+      ]);
+      if (!cash || preview.shift_id !== shift.id) throw new Error("بيانات الوردية تغيرت. أعد فتح شاشة الإغلاق.");
+      setReconciliationPreview(preview);
+    } catch (e: any) {
+      setError(e.message || "تعذر تحميل تسوية وسائل الدفع. أعد المحاولة قبل الإغلاق.");
+      setReconciliationPreview(null);
+    }
+  };
+
+  const buildReconciliation = (): PosShiftReconciliationInput[] | null => {
+    if (!reconciliationPreview) return null;
+    const rows: PosShiftReconciliationInput[] = [];
+    for (const method of reconciliationPreview.methods) {
+      const raw = reconciliationValues[method.code] ?? "";
+      if (!raw.trim() || !Number.isFinite(Number(raw)) || (method.method_type === "cash" && Number(raw) < 0)) {
+        setError(`راجع المبلغ الفعلي لوسيلة ${method.name}.`);
+        return null;
+      }
+      const counted = Math.round(Number(raw) * 100) / 100;
+      const variance = reconciliationVariance(method.expected_amount, raw) ?? 0;
+      const reason = (reconciliationReasons[method.code] || "").trim();
+      if (Math.abs(variance) >= 0.01 && !reason) {
+        setError(`فيه فرق في ${method.name}. اكتب سبب الفرق قبل إغلاق الوردية.`);
+        return null;
+      }
+      rows.push({ code: method.code, counted_amount: counted, variance_reason: reason || null });
+    }
+    return rows;
   };
 
   const finishShift = async () => {
-    if (!device || !shift || !cashSummary || !closingCash.trim()) return;
-    const amount = Number(closingCash);
-    if (!Number.isFinite(amount) || amount < 0) {
-      setError("اكتب النقد الفعلي الموجود في الدرج عند الإغلاق.");
-      return;
-    }
-    setSubmitting(true);
+    if (!device || !shift || !cashSummary || !reconciliationPreview) return;
     setError(null);
+    const rows = buildReconciliation();
+    if (!rows) return;
+    setSubmitting(true);
     try {
-      const result = await closePosShift(device, shift.id, amount, closingNotes);
+      const result = await closePosShiftV2(device, shift.id, rows, closingNotes);
       setClosingSummary(result);
       setShift(null);
       setClosingOpen(false);
+      setReconciliationPreview(null);
+      setReconciliationValues({});
+      setReconciliationReasons({});
       await refreshCash();
     } catch (e: any) {
       setError(e.message || "تعذر إنهاء الوردية");
@@ -237,18 +273,31 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
     const held = suspendedCartCount();
     return (
       <div dir="rtl" className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <Card className="w-full max-w-md border-0 shadow-xl">
+        <Card className="w-full max-w-xl border-0 shadow-xl">
           <CardHeader><CardTitle>تم إنهاء الوردية</CardTitle><CardDescription>{closingSummary.employee_name || user?.name} · {closingSummary.device_name || device.device_name}</CardDescription></CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">بداية الوردية</div><strong>{money(closingSummary.opening_cash)}</strong></div>
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">المبيعات</div><strong>{money(closingSummary.sales_total)}</strong></div>
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">المتوقع</div><strong>{money(closingSummary.expected_cash)}</strong></div>
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">المعدود</div><strong>{money(closingSummary.closing_cash)}</strong></div>
+              <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">النقد المتوقع</div><strong>{money(closingSummary.expected_cash)}</strong></div>
+              <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">النقد المعدود</div><strong>{money(closingSummary.closing_cash)}</strong></div>
             </div>
             <div className={`rounded-2xl p-4 text-center ${Math.abs(diff) < 0.01 ? "bg-green-50 text-green-800" : diff > 0 ? "bg-blue-50 text-blue-800" : "bg-red-50 text-red-800"}`}>
               <div className="text-xs">فرق الصندوق</div><div className="mt-1 text-2xl font-bold">{money(diff)}</div>
             </div>
+            {!!closingSummary.payment_reconciliations?.length && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold">تسوية وسائل الدفع المحفوظة</h3>
+                {closingSummary.payment_reconciliations.map((row) => (
+                  <div key={row.code} className="grid grid-cols-3 gap-2 rounded-xl border p-3 text-xs">
+                    <div><span className="block text-slate-500">{row.name}</span><strong>{money(row.expected_amount)}</strong></div>
+                    <div><span className="block text-slate-500">المؤكد</span><strong>{money(row.counted_amount)}</strong></div>
+                    <div><span className="block text-slate-500">الفرق</span><strong className={Math.abs(row.variance_amount) >= 0.01 ? "text-amber-700" : "text-emerald-700"}>{money(row.variance_amount)}</strong></div>
+                    {row.variance_reason && <div className="col-span-3 rounded-lg bg-amber-50 px-2 py-1 text-amber-900">السبب: {row.variance_reason}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
             {held > 0 && <Alert><AlertTriangle className="h-4 w-4" /><AlertDescription>عندك {held} سلة معلقة. هتتحفظ باسمك والفرع الحالي ومش هتظهر للموظف التالي.</AlertDescription></Alert>}
             <Button className="h-12 w-full bg-[#005931] hover:bg-[#004a29]" onClick={() => void switchEmployeeNow()}><LogOut className="h-4 w-4" /> تبديل الموظف</Button>
             {!switchRequested && <Button variant="outline" className="h-11 w-full" onClick={() => void restartOwnShift()}><Play className="h-4 w-4" /> بدء وردية جديدة لنفسي</Button>}
@@ -258,10 +307,13 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
     );
   }
 
-  const currentExpected = Number(cashSummary?.drawer_balance || 0);
-  const counted = Number(closingCash || 0);
-  const previewDifference = Number.isFinite(counted) ? counted - currentExpected : 0;
   const heldCarts = suspendedCartCount();
+  const reconciliationReady = Boolean(reconciliationPreview) && reconciliationPreview!.methods.every((method) => {
+    const raw = reconciliationValues[method.code] ?? "";
+    if (!raw.trim() || !Number.isFinite(Number(raw)) || (method.method_type === "cash" && Number(raw) < 0)) return false;
+    const variance = reconciliationVariance(method.expected_amount, raw) ?? 0;
+    return Math.abs(variance) < 0.01 || Boolean((reconciliationReasons[method.code] || "").trim());
+  });
 
   return (
     <>
@@ -273,30 +325,34 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
       </div>
 
       <Dialog open={closingOpen} onOpenChange={open => !submitting && setClosingOpen(open)}>
-        <DialogContent dir="rtl" className="max-h-[92vh] overflow-y-auto sm:max-w-xl">
+        <DialogContent dir="rtl" className="max-h-[94vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{switchRequested ? "إنهاء الوردية وتبديل الموظف" : "إنهاء الوردية"}</DialogTitle>
+            <DialogTitle>{switchRequested ? "تسليم الوردية وتبديل الموظف" : "تسليم وإغلاق الوردية"}</DialogTitle>
             <DialogDescription>بدأت {shift ? new Date(shift.opened_at).toLocaleString("ar-EG") : ""} · {device.device_name}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-            {!cashSummary && <Button variant="outline" onClick={() => void openCloseDialog(switchRequested)}><RefreshCw className="h-4 w-4" /> إعادة تحميل ملخص الوردية</Button>}
-            {cashSummary && <PosShiftPaymentSummary summary={cashSummary} />}
+            {!reconciliationPreview && <Button variant="outline" onClick={() => void openCloseDialog(switchRequested)}><RefreshCw className="h-4 w-4" /> إعادة تحميل عهدة الوردية</Button>}
             {switchRequested && heldCarts > 0 && <Alert><AlertTriangle className="h-4 w-4" /><AlertDescription>فيه {heldCarts} سلة معلقة. بعد الإغلاق هتتحفظ لحساب {user?.name} فقط، والموظف الجديد هيبدأ بمساحة سلات منفصلة.</AlertDescription></Alert>}
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">رصيد الدرج المتوقع</div><strong>{money(currentExpected)}</strong></div>
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">مبيعات نقدي بالوردية</div><strong>{money(cashSummary?.cash_sales)}</strong></div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="closing-cash">النقد المعدود فعليًا في الدرج</Label>
-              <div className="relative"><Input id="closing-cash" inputMode="decimal" autoFocus value={closingCash} onChange={e => setClosingCash(e.target.value)} className="h-12 pl-16 text-lg" /><span className="absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">ج.م</span></div>
-            </div>
-            <div className={`rounded-xl p-3 text-sm ${Math.abs(previewDifference) < 0.01 ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}>
-              <div className="flex items-center justify-between"><span>الفرق قبل التأكيد</span><strong>{money(previewDifference)}</strong></div>
-            </div>
-            <div className="space-y-2"><Label htmlFor="closing-notes">ملاحظات — اختياري</Label><Textarea id="closing-notes" value={closingNotes} onChange={e => setClosingNotes(e.target.value)} placeholder="مثلاً: تم توريد جزء من النقد للخزنة" /></div>
-            <Button className="h-12 w-full" variant="destructive" disabled={submitting || !cashSummary || closingCash.trim()===""} onClick={() => void finishShift()}>
-              {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />} {switchRequested ? "إغلاق الوردية ثم التبديل" : "تأكيد إغلاق الوردية"}
+            {cashSummary && (
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">فواتير الوردية</div><strong>{cashSummary.sales_count}</strong></div>
+                <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">إجمالي المبيعات</div><strong>{money(cashSummary.sales_total)}</strong></div>
+              </div>
+            )}
+            {reconciliationPreview && (
+              <PosShiftReconciliationForm
+                preview={reconciliationPreview}
+                values={reconciliationValues}
+                reasons={reconciliationReasons}
+                onValueChange={(code, value) => setReconciliationValues((current) => ({ ...current, [code]: value }))}
+                onReasonChange={(code, value) => setReconciliationReasons((current) => ({ ...current, [code]: value }))}
+              />
+            )}
+            <div className="space-y-2"><Label htmlFor="closing-notes">ملاحظات عامة على التسليم — اختياري</Label><Textarea id="closing-notes" value={closingNotes} onChange={e => setClosingNotes(e.target.value)} placeholder="مثلاً: تم مراجعة إيصالات البطاقات وتحويلات المحافظ" /></div>
+            <div className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">عند التأكيد يتم حفظ Snapshot ثابت باسم وقيمة كل وسيلة دفع كما كانت وقت الإغلاق. أي تعديل لاحق في إعدادات الوسائل لن يغيّر تسوية الوردية القديمة.</div>
+            <Button className="h-12 w-full" variant="destructive" disabled={submitting || !reconciliationReady} onClick={() => void finishShift()}>
+              {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />} {switchRequested ? "تأكيد التسليم ثم تبديل الموظف" : "تأكيد التسوية وإغلاق الوردية"}
             </Button>
           </div>
         </DialogContent>
