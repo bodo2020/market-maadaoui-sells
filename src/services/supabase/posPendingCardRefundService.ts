@@ -10,6 +10,11 @@ export type BranchPendingPosCardRefund = {
   created_at: string;
   employee_name: string | null;
   device_name: string | null;
+  payment_method_id?: string | null;
+  payment_method_code?: string | null;
+  payment_method_name?: string | null;
+  payment_method_type?: "card" | "digital_wallet" | "bank_transfer" | "other" | string | null;
+  payment_reference?: string | null;
 };
 
 const rpc = supabase.rpc.bind(supabase) as unknown as (
@@ -21,7 +26,7 @@ export async function listBranchPendingPosCardRefunds(branchId: string): Promise
   const { data, error } = await rpc("list_branch_pending_pos_card_refunds", { p_branch_id: branchId });
   if (error) {
     if (error.message?.includes("REFUND_PERMISSION_DENIED")) return [];
-    throw new Error(error.message || "تعذر تحميل ردود البطاقة المعلقة");
+    throw new Error(error.message || "تعذر تحميل ردود الدفع الإلكتروني المعلقة");
   }
   return (Array.isArray(data) ? data : []) as BranchPendingPosCardRefund[];
 }
