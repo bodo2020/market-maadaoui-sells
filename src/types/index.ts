@@ -167,8 +167,11 @@ export interface Sale {
   id: string;
   invoice_number: string;
   date: string;
+  customer_id?: string | null;
   customer_name?: string;
   customer_phone?: string;
+  source_channel?: 'store' | 'online' | string;
+  loyalty_points_earned?: number;
   payment_method: 'cash' | 'card' | 'mixed';
   total: number;
   subtotal: number;
@@ -197,6 +200,8 @@ export interface OnlineOrder {
   notes?: string;
   updated_at: string;
   branch_id?: string;
+  source_channel?: 'online' | string;
+  loyalty_points_earned?: number;
 }
 
 export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'shipped' | 'delivered' | 'cancelled';
@@ -250,6 +255,10 @@ export interface POSTab {
   selectedCustomer: string;
   customerName: string;
   customerPhone: string;
+  customerMembershipNumber?: string;
+  customerBarcode?: string;
+  customerPoints?: number;
+  customerCredit?: number;
   search: string;
   searchResults: Product[];
   createdAt: Date | string;
@@ -280,8 +289,6 @@ export interface Purchase {
   created_at?: string;
   updated_at?: string;
 }
-
-
 
 export interface Expense {
   id: string;
