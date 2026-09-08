@@ -22,6 +22,9 @@ export type PosShift = {
   employee_name?: string;
   sales_count?: number;
   sales_total?: number;
+  product_discount_total?: number;
+  loyalty_discount_total?: number;
+  net_sales_total?: number;
   cash_movement?: number;
   drawer_balance?: number;
   drawer_balance_after?: number;
