@@ -74,6 +74,44 @@ export type CustomerFollowupPerformance = {
   }>;
 };
 
+export type CustomerCouponConversionDashboard = {
+  summary: {
+    window_days: number;
+    coupon_orders: number;
+    used_vouchers: number;
+    discount_used: number;
+    gross_sales_with_coupon: number;
+    net_sales_after_coupon: number;
+    cohort_created: number;
+    cohort_used: number;
+    cohort_redemption_rate: number;
+    active_vouchers: number;
+    active_value: number;
+  };
+  recent_conversions: Array<{
+    source: "store" | "online" | string;
+    purchase_id: string;
+    purchased_at: string;
+    gross_amount: number;
+    discount_amount: number;
+    net_amount: number;
+    customer_id: string | null;
+    name: string | null;
+    phone: string | null;
+    membership_number: string | null;
+    voucher_code: string | null;
+  }>;
+  top_customers: Array<{
+    customer_id: string;
+    name: string | null;
+    phone: string | null;
+    membership_number: string | null;
+    coupon_orders: number;
+    discount_used: number;
+    net_sales: number;
+  }>;
+};
+
 const rpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
   args?: Record<string, unknown>,
@@ -103,4 +141,14 @@ export async function fetchCustomerFollowupPerformance(customerId: string, branc
   });
   if (error) throw mapError(error.message);
   return data as CustomerFollowupPerformance;
+}
+
+export async function fetchCustomerCouponConversionDashboard(branchId?: string | null, days = 30, limit = 30): Promise<CustomerCouponConversionDashboard> {
+  const { data, error } = await rpc("get_customer_coupon_conversion_dashboard", {
+    p_branch_id: branchId || null,
+    p_days: days,
+    p_limit: limit,
+  });
+  if (error) throw mapError(error.message);
+  return data as CustomerCouponConversionDashboard;
 }
