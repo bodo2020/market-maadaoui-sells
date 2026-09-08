@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Banknote, Clock3, CreditCard, Landmark, ReceiptText, RefreshCw, WalletCards } from "lucide-react";
+import { Banknote, Clock3, Landmark, ReceiptText, RefreshCw, WalletCards } from "lucide-react";
+import PosShiftPaymentSummary from "@/components/POS/PosShiftPaymentSummary";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,8 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
       setSummary(next);
       setError(null);
     } catch (e: any) {
-      if (!quiet) setError(e.message || "تعذر قراءة رصيد درج الكاشير");
+      setError(e.message || "تعذر قراءة رصيد درج الكاشير");
+      setSummary(null);
     } finally {
       if (!quiet) setLoading(false);
     }
@@ -105,7 +107,7 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
           onClick={() => { setDialogOpen(true); void refresh(true); }}
         >
           <span className="flex items-center gap-2 text-slate-600"><Banknote className="h-4 w-4 text-[#005931]" /> الوردية والدرج</span>
-          <strong className="text-[#005931]">{loading && !summary ? "..." : money(summary?.drawer_balance)}</strong>
+          <strong className="text-[#005931]">{summary ? money(summary.drawer_balance) : loading ? "..." : "غير متاح"}</strong>
         </Button>
       </div>
 
@@ -113,11 +115,11 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
         <DialogContent dir="rtl" className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><WalletCards className="h-5 w-5 text-[#005931]" /> الوردية الحالية ودرج الكاشير</DialogTitle>
-            <DialogDescription>{device.device_name} · الأرقام من الفواتير وCash Ledger لنفس الوردية</DialogDescription>
+            <DialogDescription>{device.device_name} · المبيعات والتحصيل وحركات درج الكاشير خلال الوردية الحالية</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-
+            {summary && <>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-green-50 p-4 text-green-900">
                 <div className="text-xs">الرصيد المتوقع في الدرج</div>
@@ -129,12 +131,14 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl border p-3"><div className="flex items-center gap-1 text-xs text-slate-500"><ReceiptText className="h-3.5 w-3.5" /> الفواتير</div><strong className="mt-1 block text-lg">{summary?.sales_count ?? 0}</strong></div>
               <div className="rounded-xl border p-3"><div className="text-xs text-slate-500">إجمالي المبيعات</div><strong className="mt-1 block text-lg text-[#005931]">{money(summary?.sales_total)}</strong></div>
-              <div className="rounded-xl border p-3"><div className="flex items-center gap-1 text-xs text-slate-500"><Banknote className="h-3.5 w-3.5" /> نقدي</div><strong className="mt-1 block text-lg">{money(summary?.cash_paid_total)}</strong></div>
-              <div className="rounded-xl border p-3"><div className="flex items-center gap-1 text-xs text-slate-500"><CreditCard className="h-3.5 w-3.5" /> بطاقة</div><strong className="mt-1 block text-lg">{money(summary?.card_sales)}</strong></div>
+              <div className="rounded-xl border p-3"><div className="text-sm text-slate-500">إجمالي المحصل</div><strong className="mt-1 block text-lg">{money(summary.amount_charged_total)}</strong></div>
+              <div className="rounded-xl border p-3"><div className="text-sm text-slate-500">رسوم العميل / النشاط</div><strong className="mt-1 block text-sm">{money(summary.customer_payment_fees)} / {money(summary.merchant_payment_fees)}</strong></div>
             </div>
+
+            <PosShiftPaymentSummary summary={summary} />
 
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">بداية الوردية</div><strong>{money(summary?.opening_cash)}</strong></div>
@@ -145,9 +149,10 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">إضافات للدرج</div><strong>{money(summary?.transfers_in)}</strong></div>
             </div>
 
+            </>}
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => void refresh()} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث</Button>
-              <Button className="flex-1 bg-[#005931] hover:bg-[#004a29]" onClick={() => { setError(null); setDropOpen(true); }}><Landmark className="h-4 w-4" /> توريد للخزنة</Button>
+              <Button disabled={loading || !summary?.shift_id || !!error} className="flex-1 bg-[#005931] hover:bg-[#004a29]" onClick={() => { setError(null); setDropOpen(true); }}><Landmark className="h-4 w-4" /> توريد نقدي للخزنة</Button>
             </div>
           </div>
         </DialogContent>

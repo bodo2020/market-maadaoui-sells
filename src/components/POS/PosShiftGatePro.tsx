@@ -6,6 +6,7 @@ import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
 import { closePosShift, getMyOpenPosShift, openPosShift, type PosShift } from "@/services/supabase/posShiftService";
 import { getPosCashSummary, type PosCashSummary } from "@/services/supabase/posCashService";
 import PosCashDrawerWidget from "@/components/POS/PosCashDrawerWidget";
+import PosShiftPaymentSummary from "@/components/POS/PosShiftPaymentSummary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -118,14 +119,18 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
     try {
       const cash = await refreshCash();
       setClosingCash(Number(cash?.drawer_balance || 0).toFixed(2));
-    } catch {
+    } catch (e: any) {
+      setCashSummary(null);
+      setError(e.message || "تعذر تحميل ملخص الوردية. أعد المحاولة قبل الإغلاق.");
       setClosingCash("");
+      setClosingOpen(true);
+      return;
     }
     setClosingOpen(true);
   };
 
   const finishShift = async () => {
-    if (!device || !shift) return;
+    if (!device || !shift || !cashSummary || !closingCash.trim()) return;
     const amount = Number(closingCash);
     if (!Number.isFinite(amount) || amount < 0) {
       setError("اكتب النقد الفعلي الموجود في الدرج عند الإغلاق.");
@@ -268,13 +273,15 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
       </div>
 
       <Dialog open={closingOpen} onOpenChange={open => !submitting && setClosingOpen(open)}>
-        <DialogContent dir="rtl" className="sm:max-w-md">
+        <DialogContent dir="rtl" className="max-h-[92vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>{switchRequested ? "إنهاء الوردية وتبديل الموظف" : "إنهاء الوردية"}</DialogTitle>
             <DialogDescription>بدأت {shift ? new Date(shift.opened_at).toLocaleString("ar-EG") : ""} · {device.device_name}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+            {!cashSummary && <Button variant="outline" onClick={() => void openCloseDialog(switchRequested)}><RefreshCw className="h-4 w-4" /> إعادة تحميل ملخص الوردية</Button>}
+            {cashSummary && <PosShiftPaymentSummary summary={cashSummary} />}
             {switchRequested && heldCarts > 0 && <Alert><AlertTriangle className="h-4 w-4" /><AlertDescription>فيه {heldCarts} سلة معلقة. بعد الإغلاق هتتحفظ لحساب {user?.name} فقط، والموظف الجديد هيبدأ بمساحة سلات منفصلة.</AlertDescription></Alert>}
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">رصيد الدرج المتوقع</div><strong>{money(currentExpected)}</strong></div>
@@ -288,7 +295,7 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
               <div className="flex items-center justify-between"><span>الفرق قبل التأكيد</span><strong>{money(previewDifference)}</strong></div>
             </div>
             <div className="space-y-2"><Label htmlFor="closing-notes">ملاحظات — اختياري</Label><Textarea id="closing-notes" value={closingNotes} onChange={e => setClosingNotes(e.target.value)} placeholder="مثلاً: تم توريد جزء من النقد للخزنة" /></div>
-            <Button className="h-12 w-full" variant="destructive" disabled={submitting || closingCash.trim()===""} onClick={() => void finishShift()}>
+            <Button className="h-12 w-full" variant="destructive" disabled={submitting || !cashSummary || closingCash.trim()===""} onClick={() => void finishShift()}>
               {submitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />} {switchRequested ? "إغلاق الوردية ثم التبديل" : "تأكيد إغلاق الوردية"}
             </Button>
           </div>
