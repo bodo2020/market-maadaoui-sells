@@ -83,6 +83,7 @@ export interface Product {
   company_id?: string | null;
   branch_id?: string | null;
   barcode_type?: string | null;
+  default_weight_grams?: number | null;
 
   /** Legacy bulk fields kept temporarily for backward compatibility. */
   bulk_enabled: boolean;
