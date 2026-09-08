@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
 import { Sale } from "@/types";
-import { Printer, Save, FileText } from "lucide-react";
+import { Printer } from "lucide-react";
 import { printInvoice } from '@/services/supabase/saleService';
 import { bluetoothPrinterService } from '@/services/bluetoothPrinterService';
 
@@ -27,28 +27,19 @@ interface InvoiceDialogProps {
   };
 }
 
-const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ 
-  isOpen, 
-  onClose, 
-  sale, 
-  previewMode = false,
-  settings 
-}) => {
+const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, previewMode = false, settings }) => {
   if (!sale) return null;
 
-  // Combine current site config with any preview settings
-  const invoiceSettings = {
-    ...siteConfig.invoice,
-    ...(settings || {})
-  };
+  const invoiceSettings = { ...siteConfig.invoice, ...(settings || {}) };
+  const loyaltyCoupon = Number(sale.loyalty_voucher_amount || 0);
+  const amountPaid = Math.max(0, Number(sale.amount_due ?? (sale.total - loyaltyCoupon)));
 
   const handlePrint = async () => {
-    // Get store info from site config, overriding with preview settings if any
     const storeInfo = {
       name: siteConfig.name,
       address: siteConfig.address || "العنوان غير متوفر",
       phone: siteConfig.phone || "الهاتف غير متوفر",
-      vatNumber: siteConfig.vatNumber || "", // Use default empty string if not available
+      vatNumber: siteConfig.vatNumber || "",
       logo: invoiceSettings.logoChoice === 'store' ? siteConfig.logoUrl : invoiceSettings.customLogoUrl,
       website: invoiceSettings.website || "",
       footer: invoiceSettings.footer || "شكراً لزيارتكم!",
@@ -61,104 +52,57 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
       customLogoUrl: invoiceSettings.customLogoUrl || null,
       currency: siteConfig.currency || 'ج.م'
     };
-    
-    // Try Bluetooth printer first, fallback to regular print
+
     if (bluetoothPrinterService.isConnected()) {
       const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
       const success = await bluetoothPrinterService.printText(invoiceText);
       if (success) return;
     }
-    
-    // Fallback to regular print
     printInvoice(sale, storeInfo);
   };
 
-  // Format sale date
   const saleDate = new Date(sale.date);
   const formattedDate = saleDate.toLocaleDateString('ar-EG', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
-  // Apply font size based on settings
-  const fontSizeClass = {
-    small: "text-xs",
-    normal: "",
-    large: "text-lg"
-  }[invoiceSettings.fontSize || "normal"];
-
-  // Determine which logo to display in the preview
-  const logoUrl = invoiceSettings.logoChoice === 'store' 
-    ? siteConfig.logoUrl 
-    : invoiceSettings.logoChoice === 'custom' 
-      ? invoiceSettings.customLogoUrl 
-      : null;
+  const fontSizeClass = { small: "text-xs", normal: "", large: "text-lg" }[invoiceSettings.fontSize || "normal"];
+  const logoUrl = invoiceSettings.logoChoice === 'store'
+    ? siteConfig.logoUrl
+    : invoiceSettings.logoChoice === 'custom' ? invoiceSettings.customLogoUrl : null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      console.log("InvoiceDialog onOpenChange:", open);
-      if (!open) onClose();
-    }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className={`sm:max-w-xl max-h-[90vh] overflow-y-auto ${fontSizeClass}`}>
-        <DialogHeader>
-          <DialogTitle>{previewMode ? "معاينة الفاتورة" : "فاتورة المبيعات"}</DialogTitle>
-        </DialogHeader>
-        
-        <div className="invoice-preview p-4 border rounded-md bg-gray-50">
+        <DialogHeader><DialogTitle>{previewMode ? "معاينة الفاتورة" : "فاتورة المبيعات"}</DialogTitle></DialogHeader>
+
+        <div className="invoice-preview p-4 border rounded-md bg-gray-50" dir="rtl">
           <div className="text-center mb-6">
-            {logoUrl && (
-              <div className="flex justify-center mb-3">
-                <img src={logoUrl} alt="شعار المتجر" className="h-16 object-contain" />
-              </div>
-            )}
+            {logoUrl && <div className="flex justify-center mb-3"><img src={logoUrl} alt="شعار المتجر" className="h-16 object-contain" /></div>}
             <h2 className="text-xl font-bold">{siteConfig.name}</h2>
             {siteConfig.address && <p className="text-sm text-muted-foreground">{siteConfig.address}</p>}
             {siteConfig.phone && <p className="text-sm text-muted-foreground">هاتف: {siteConfig.phone}</p>}
             {invoiceSettings.website && <p className="text-sm text-muted-foreground">{invoiceSettings.website}</p>}
-            {invoiceSettings.showVat && siteConfig.vatNumber && (
-              <p className="text-sm text-muted-foreground">الرقم الضريبي: {siteConfig.vatNumber}</p>
-            )}
+            {invoiceSettings.showVat && siteConfig.vatNumber && <p className="text-sm text-muted-foreground">الرقم الضريبي: {siteConfig.vatNumber}</p>}
           </div>
-          
+
           <div className="flex justify-between items-start mb-6">
-            <div>
-              <p className="font-medium">رقم الفاتورة:</p>
-              <p className="text-lg font-bold">{sale.invoice_number}</p>
-            </div>
-            <div className="text-left">
-              <p className="font-medium">التاريخ:</p>
-              <p>{formattedDate}</p>
-            </div>
+            <div><p className="font-medium">رقم الفاتورة:</p><p className="text-lg font-bold">{sale.invoice_number}</p></div>
+            <div className="text-left"><p className="font-medium">التاريخ:</p><p>{formattedDate}</p></div>
           </div>
-          
+
           {sale.customer_name && (
-            <div className="mb-4">
-              <p className="font-medium">العميل:</p>
-              <p>{sale.customer_name}</p>
-              {sale.customer_phone && <p>هاتف: {sale.customer_phone}</p>}
-            </div>
+            <div className="mb-4"><p className="font-medium">العميل:</p><p>{sale.customer_name}</p>{sale.customer_phone && <p>هاتف: {sale.customer_phone}</p>}</div>
           )}
-          
+
           <div className="border-t border-b py-2 my-4">
             <table className="w-full">
-              <thead className="text-sm font-medium">
-                <tr className="border-b">
-                  <th className="text-right py-2 w-1/2">الصنف</th>
-                  <th className="text-center py-2">الكمية</th>
-                  <th className="text-center py-2">السعر</th>
-                  <th className="text-left py-2">المجموع</th>
-                </tr>
-              </thead>
+              <thead className="text-sm font-medium"><tr className="border-b"><th className="text-right py-2 w-1/2">الصنف</th><th className="text-center py-2">الكمية</th><th className="text-center py-2">السعر</th><th className="text-left py-2">المجموع</th></tr></thead>
               <tbody className="text-sm">
                 {sale.items.map((item, index) => (
                   <tr key={index} className="border-b border-dashed">
                     <td className="py-2">{item.product.name}</td>
-                    <td className="text-center py-2">
-                      {item.weight ? `${item.weight} كجم` : item.quantity}
-                    </td>
+                    <td className="text-center py-2">{item.weight ? `${item.weight} كجم` : item.quantity}</td>
                     <td className="text-center py-2">{item.price.toFixed(2)}</td>
                     <td className="text-left py-2">{item.total.toFixed(2)} {siteConfig.currency}</td>
                   </tr>
@@ -166,60 +110,30 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({
               </tbody>
             </table>
           </div>
-          
+
           <div className="text-left space-y-1 mt-4">
-            <div className="flex justify-between">
-              <span className="font-medium">المجموع الفرعي:</span>
-              <span>{sale.subtotal.toFixed(2)} {siteConfig.currency}</span>
-            </div>
-            {sale.discount > 0 && (
-              <div className="flex justify-between text-primary">
-                <span className="font-medium">الخصم:</span>
-                <span>- {sale.discount.toFixed(2)} {siteConfig.currency}</span>
-              </div>
-            )}
-            <div className="flex justify-between font-bold text-lg pt-2 border-t">
-              <span>الإجمالي:</span>
-              <span>{sale.total.toFixed(2)} {siteConfig.currency}</span>
-            </div>
-            
+            <div className="flex justify-between"><span className="font-medium">المجموع الفرعي:</span><span>{sale.subtotal.toFixed(2)} {siteConfig.currency}</span></div>
+            {sale.discount > 0 && <div className="flex justify-between text-primary"><span className="font-medium">خصومات المنتجات:</span><span>- {sale.discount.toFixed(2)} {siteConfig.currency}</span></div>}
+            <div className="flex justify-between pt-2 border-t"><span className="font-medium">الإجمالي بعد خصومات المنتجات:</span><span className="font-bold">{sale.total.toFixed(2)} {siteConfig.currency}</span></div>
+            {loyaltyCoupon > 0 && <div className="flex justify-between text-amber-700"><span className="font-medium">خصم كوبون الولاء:</span><span>- {loyaltyCoupon.toFixed(2)} {siteConfig.currency}</span></div>}
+            <div className="flex justify-between font-bold text-lg pt-2 border-t"><span>المدفوع فعليًا:</span><span>{amountPaid.toFixed(2)} {siteConfig.currency}</span></div>
+
             <div className="mt-4 text-sm text-muted-foreground">
-              <p>طريقة الدفع: {
-                sale.payment_method === 'cash' ? 'نقدي' : 
-                sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'
-              }</p>
-              {sale.cash_amount && <p>المبلغ النقدي: {sale.cash_amount.toFixed(2)} {siteConfig.currency}</p>}
-              {sale.card_amount && <p>مبلغ البطاقة: {sale.card_amount.toFixed(2)} {siteConfig.currency}</p>}
+              <p>طريقة الدفع: {sale.payment_method === 'cash' ? 'نقدي' : sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'}</p>
+              {Number(sale.cash_amount || 0) > 0 && <p>المبلغ النقدي: {Number(sale.cash_amount).toFixed(2)} {siteConfig.currency}</p>}
+              {Number(sale.card_amount || 0) > 0 && <p>مبلغ البطاقة: {Number(sale.card_amount).toFixed(2)} {siteConfig.currency}</p>}
+              {loyaltyCoupon > 0 && <p>كوبون الخصم: {loyaltyCoupon.toFixed(2)} {siteConfig.currency}</p>}
             </div>
           </div>
-          
-          {invoiceSettings.notes && (
-            <div className="text-sm mt-4 pt-2 border-t">
-              <p className="font-medium">ملاحظات:</p>
-              <p>{invoiceSettings.notes}</p>
-            </div>
-          )}
-          
-          {invoiceSettings.paymentInstructions && (
-            <div className="text-sm mt-2">
-              <p className="font-medium">تعليمات الدفع:</p>
-              <p>{invoiceSettings.paymentInstructions}</p>
-            </div>
-          )}
-          
-          <div className="text-center text-sm text-muted-foreground mt-8 pt-4 border-t">
-            <p>{invoiceSettings.footer || "شكراً لزيارتكم!"}</p>
-          </div>
+
+          {invoiceSettings.notes && <div className="text-sm mt-4 pt-2 border-t"><p className="font-medium">ملاحظات:</p><p>{invoiceSettings.notes}</p></div>}
+          {invoiceSettings.paymentInstructions && <div className="text-sm mt-2"><p className="font-medium">تعليمات الدفع:</p><p>{invoiceSettings.paymentInstructions}</p></div>}
+          <div className="text-center text-sm text-muted-foreground mt-8 pt-4 border-t"><p>{invoiceSettings.footer || "شكراً لزيارتكم!"}</p></div>
         </div>
-        
+
         <DialogFooter className="sm:justify-start">
-          <Button onClick={handlePrint} className="gap-2">
-            <Printer className="h-4 w-4" />
-            طباعة الفاتورة
-          </Button>
-          <Button variant="outline" onClick={onClose}>
-            إغلاق
-          </Button>
+          <Button onClick={handlePrint} className="gap-2"><Printer className="h-4 w-4" />طباعة الفاتورة</Button>
+          <Button variant="outline" onClick={onClose}>إغلاق</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
