@@ -80,6 +80,10 @@ function rpcError(message?: string) {
   if (message?.includes("FOLLOWUP_OUTCOME_NOTE_TOO_LONG")) return new Error("ملاحظة النتيجة طويلة جدًا.");
   if (message?.includes("FOLLOWUP_CANCEL_REASON_REQUIRED")) return new Error("اكتب سبب إلغاء المتابعة.");
   if (message?.includes("FOLLOWUP_ALREADY_CLOSED")) return new Error("المتابعة مقفولة بالفعل.");
+  if (message?.includes("CALLBACK_SCHEDULE_REQUIRED")) return new Error("حدد موعد إعادة التواصل مع العميل.");
+  if (message?.includes("CALLBACK_SCHEDULE_MUST_BE_FUTURE")) return new Error("موعد إعادة التواصل لازم يكون في المستقبل.");
+  if (message?.includes("CALLBACK_SCHEDULE_TOO_FAR")) return new Error("موعد إعادة التواصل لازم يكون خلال 90 يومًا.");
+  if (message?.includes("CALLBACK_ASSIGNEE_OUT_OF_SCOPE")) return new Error("مسؤول المتابعة الحالية لم يعد مؤهلًا لإدارة العملاء في هذا الفرع. أعد إسناد المهمة أولًا.");
   return new Error(message || "تعذر تنفيذ العملية.");
 }
 
@@ -201,6 +205,34 @@ export async function completeCustomerFollowupV2(
   });
   if (error) throw rpcError(error.message);
   return data as CustomerManagementWorkspace;
+}
+
+export async function completeCustomerFollowupV3(
+  interactionId: string,
+  outcomeCode: CustomerFollowupOutcomeCode,
+  outcomeNote?: string,
+  callbackAt?: string | null,
+  branchId?: string | null,
+): Promise<{
+  workspace: CustomerManagementWorkspace;
+  completed_interaction_id: string;
+  callback_created: boolean;
+  callback_interaction_id: string | null;
+}> {
+  const { data, error } = await rpc("complete_customer_followup_v3", {
+    p_interaction_id: interactionId,
+    p_outcome_code: outcomeCode,
+    p_outcome_note: outcomeNote?.trim() || null,
+    p_callback_at: callbackAt || null,
+    p_branch_id: branchId || null,
+  });
+  if (error) throw rpcError(error.message);
+  return data as {
+    workspace: CustomerManagementWorkspace;
+    completed_interaction_id: string;
+    callback_created: boolean;
+    callback_interaction_id: string | null;
+  };
 }
 
 export async function cancelCustomerFollowup(interactionId: string, reason: string, branchId?: string | null): Promise<CustomerManagementWorkspace> {
