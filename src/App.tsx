@@ -27,7 +27,8 @@ import ExpenseManagement from "@/pages/ExpenseManagement";
 import Settings from "@/pages/Settings";
 import OnlineOrders from "@/pages/OnlineOrders";
 import OrderDetails from "@/pages/OrderDetails";
-import SuppliersCustomers from "@/pages/SuppliersCustomers";
+import Customers from "@/pages/Customers";
+import Suppliers from "@/pages/Suppliers";
 import EmployeeManagement from "@/pages/EmployeeManagement";
 import CashTracking from "@/pages/CashTracking";
 import Banners from "@/pages/Banners";
@@ -43,7 +44,6 @@ import CreateProductCollection from "@/pages/CreateProductCollection";
 import EditProductCollection from "@/pages/EditProductCollection";
 import Returns from "@/pages/Returns";
 import CustomerProfile from "@/pages/CustomerProfile";
-import CRM from "@/pages/CRM";
 import Analytics from "@/pages/Analytics";
 import AIInsights from "@/pages/AIInsights";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
@@ -123,10 +123,10 @@ function App() {
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
               <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
-              <Route path="/customer-profile/:customerId" element={<ProtectedRoute><CustomerProfile /></ProtectedRoute>} />
-              <Route path="/suppliers-customers" element={<ProtectedRoute><SuppliersCustomers /></ProtectedRoute>} />
+              <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+              <Route path="/customers/:customerId" element={<ProtectedRoute><CustomerProfile /></ProtectedRoute>} />
+              <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
               <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
-              <Route path="/crm" element={<ProtectedRoute><CRM /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
               <Route path="/ai-insights" element={<ProtectedRoute><AIInsights /></ProtectedRoute>} />
               <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
