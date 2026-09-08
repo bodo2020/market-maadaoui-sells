@@ -1,4 +1,3 @@
-
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotificationStore } from "@/stores/notificationStore";
@@ -21,7 +20,7 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
   const location = useLocation();
   const currentPath = location.pathname;
   const { user } = useAuth();
-  const { unreadOrders, unreadReturns } = useNotificationStore();
+  const { unreadOrders, unreadReturns, customerTaskAlerts } = useNotificationStore();
   const isAdmin = user?.role === UserRole.ADMIN;
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
   const isCashier = user?.role === UserRole.CASHIER;
@@ -29,22 +28,15 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
 
   const renderItems = (items: SidebarItemData[]) => {
     return items.map(item => {
-      // Skip admin-only items for non-admin users (except super admin)
       if (item.adminOnly && !isAdmin && !isSuperAdmin) return null;
-      
-      // Skip cashier-only items for non-cashier users
       if (item.cashierOnly && !isCashier) return null;
-      
-      // Skip delivery-only items for non-delivery users
       if (item.deliveryOnly && !isDelivery) return null;
       
-      // For cashiers, only show specific routes (super admin sees everything)
       if (isCashier && !isSuperAdmin) {
         const allowedCashierRoutes = ['/', '/pos', '/online-orders', '/invoices'];
         if (!allowedCashierRoutes.includes(item.href)) return null;
       }
       
-      // ضبط الشارات (badges) بناءً على نوع الصفحة
       let badge = undefined;
       let secondaryBadge = undefined;
       
@@ -52,13 +44,13 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
         badge = unreadOrders;
       } else if (item.href === "/returns") {
         badge = unreadReturns;
+      } else if (item.href === "/customer-tasks") {
+        badge = customerTaskAlerts;
       } else if (item.badge) {
         badge = item.badge;
       }
       
-      if (item.secondaryBadge) {
-        secondaryBadge = item.secondaryBadge;
-      }
+      if (item.secondaryBadge) secondaryBadge = item.secondaryBadge;
       
       return (
         <SidebarItem
@@ -77,7 +69,6 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
 
   const renderSection = (title: string, items: SidebarItemData[]) => {
     const renderedItems = renderItems(items).filter(item => item !== null);
-    
     if (renderedItems.length === 0) return null;
     
     return (
@@ -89,9 +80,7 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
             </h3>
           </div>
         )}
-        <div className="space-y-1">
-          {renderedItems}
-        </div>
+        <div className="space-y-1">{renderedItems}</div>
       </div>
     );
   };
