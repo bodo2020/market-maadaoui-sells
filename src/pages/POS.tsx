@@ -99,7 +99,7 @@ export default function POS() {
   const [manualBarcodeMode, setManualBarcodeMode] = useState(false);
   const [pinnedProducts, setPinnedProducts] = useState<string[]>([]);
   const [showAllProducts, setShowAllProducts] = useState(false);
-  const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const barcodeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const cartScrollRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
