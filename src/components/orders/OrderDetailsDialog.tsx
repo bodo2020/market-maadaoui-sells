@@ -40,7 +40,6 @@ export function OrderDetailsDialog({
   const [assignDeliveryOpen, setAssignDeliveryOpen] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
 
-  // Fetch routing information
   const { data: routingInfo } = useQuery({
     queryKey: ["order-routing", order?.id],
     queryFn: async () => {
@@ -90,9 +89,7 @@ export function OrderDetailsDialog({
     
     try {
       setIsUpdatingShipping(true);
-      
       await changeOnlineOrderStatus(order.id, order.status, status);
-
       if (onStatusUpdated) onStatusUpdated();
       toast.success(`تم تحديث حالة الشحن إلى ${status === 'shipped' ? 'خرج للتوصيل' : 'تم التوصيل'}`);
     } catch (error) {
@@ -105,15 +102,11 @@ export function OrderDetailsDialog({
 
   const renderCustomerNameWithVerification = () => {
     if (!order.customer_name) return <span>عميل غير معروف</span>;
-    
     return (
       <div className="flex items-center gap-2">
-        <Link 
-          to={`/customer-profile/${order.customer_id || 'unknown'}`} 
-          className="text-primary hover:underline"
-        >
-          {order.customer_name}
-        </Link>
+        {order.customer_id ? (
+          <Link to={`/customers/${order.customer_id}`} className="text-primary hover:underline">{order.customer_name}</Link>
+        ) : <span>{order.customer_name}</span>}
         {order.customer_phone_verified && (
           <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 flex items-center gap-1">
             <Check size={14} className="text-blue-600" />
@@ -130,14 +123,8 @@ export function OrderDetailsDialog({
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center justify-between">
             <span>تجهيز المنتجات #{order.id.slice(0, 8)}</span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setInvoiceDialogOpen(true)}
-              className="gap-2"
-            >
-              <FileText className="h-4 w-4" />
-              طباعة الفاتورة
+            <Button variant="outline" size="sm" onClick={() => setInvoiceDialogOpen(true)} className="gap-2">
+              <FileText className="h-4 w-4" /> طباعة الفاتورة
             </Button>
           </DialogTitle>
         </DialogHeader>
@@ -148,98 +135,32 @@ export function OrderDetailsDialog({
               <h3 className="font-medium text-lg mb-3">المنتجات</h3>
               <OrderItemsList 
                 readOnly={snapshot.isPending || !!snapshot.error || snapshot.data?.checkout_version === 1 || ['shipped','delivered','cancelled'].includes(order.status)}
-                items={order.items} 
-                orderId={order.id}
-                onItemDeleted={onStatusUpdated}
-                onItemUpdated={onStatusUpdated}
+                items={order.items} orderId={order.id} onItemDeleted={onStatusUpdated} onItemUpdated={onStatusUpdated}
               />
             </div>
-
-            <OrderSummaryActions
-              order={order}
-              onUpdateStatus={() => setUpdateStatusOpen(true)}
-              onPaymentConfirm={() => setPaymentConfirmOpen(true)}
-              onAssignDelivery={() => setAssignDeliveryOpen(true)}
-              onUpdateShipping={updateShippingStatus}
-              isUpdatingShipping={isUpdatingShipping}
-            />
+            <OrderSummaryActions order={order} onUpdateStatus={() => setUpdateStatusOpen(true)} onPaymentConfirm={() => setPaymentConfirmOpen(true)} onAssignDelivery={() => setAssignDeliveryOpen(true)} onUpdateShipping={updateShippingStatus} isUpdatingShipping={isUpdatingShipping} />
           </div>
 
           <div className="w-full md:w-2/5 space-y-4">
-            {/* Routing Information Card */}
             {routingInfo && (
               <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  <h3 className="font-semibold text-blue-900 dark:text-blue-100">
-                    معلومات التوزيع
-                  </h3>
-                </div>
-                
+                <div className="flex items-center gap-2 mb-3"><MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400" /><h3 className="font-semibold text-blue-900 dark:text-blue-100">معلومات التوزيع</h3></div>
                 <div className="space-y-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">الفرع المخصص:</span>
-                    <p className="font-medium">{routingInfo.branches?.name}</p>
-                  </div>
-                  
-                  {routingInfo.neighborhoods && (
-                    <div>
-                      <span className="text-muted-foreground">منطقة التوصيل:</span>
-                      <p className="font-medium">
-                        {routingInfo.neighborhoods.name} - {routingInfo.neighborhoods.areas?.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {routingInfo.neighborhoods.areas?.cities?.name} - {routingInfo.neighborhoods.areas?.cities?.governorates?.name}
-                      </p>
-                    </div>
-                  )}
-                  
-                  <div>
-                    <span className="text-muted-foreground">سبب التوزيع:</span>
-                    <p className="text-xs">{routingInfo.routing_reason}</p>
-                  </div>
+                  <div><span className="text-muted-foreground">الفرع المخصص:</span><p className="font-medium">{routingInfo.branches?.name}</p></div>
+                  {routingInfo.neighborhoods && <div><span className="text-muted-foreground">منطقة التوصيل:</span><p className="font-medium">{routingInfo.neighborhoods.name} - {routingInfo.neighborhoods.areas?.name}</p><p className="text-xs text-muted-foreground">{routingInfo.neighborhoods.areas?.cities?.name} - {routingInfo.neighborhoods.areas?.cities?.governorates?.name}</p></div>}
+                  <div><span className="text-muted-foreground">سبب التوزيع:</span><p className="text-xs">{routingInfo.routing_reason}</p></div>
                 </div>
               </div>
             )}
-            
-            <CustomerInfoCards
-              customerName={renderCustomerNameWithVerification()}
-              customerEmail={order.customer_email}
-              customerPhone={order.customer_phone}
-              shippingAddress={order.shipping_address}
-              notes={order.notes}
-            />
+            <CustomerInfoCards customerName={renderCustomerNameWithVerification()} customerEmail={order.customer_email} customerPhone={order.customer_phone} shippingAddress={order.shipping_address} notes={order.notes} />
           </div>
         </div>
 
-        <UpdateOrderStatusDialog 
-          order={order}
-          open={updateStatusOpen}
-          onOpenChange={setUpdateStatusOpen}
-          onStatusUpdated={onStatusUpdated}
-        />
-
-        <PaymentConfirmationDialog
-          open={paymentConfirmOpen}
-          onOpenChange={setPaymentConfirmOpen}
-          orderId={order.id}
-          onConfirm={onStatusUpdated}
-        />
-
-        <AssignDeliveryPersonDialog
-          open={assignDeliveryOpen}
-          onOpenChange={setAssignDeliveryOpen}
-          orderId={order.id}
-          onConfirm={onStatusUpdated}
-        />
-
-        <OnlineOrderInvoiceDialog
-          isOpen={invoiceDialogOpen}
-          onClose={() => setInvoiceDialogOpen(false)}
-          order={order}
-        />
+        <UpdateOrderStatusDialog order={order} open={updateStatusOpen} onOpenChange={setUpdateStatusOpen} onStatusUpdated={onStatusUpdated} />
+        <PaymentConfirmationDialog open={paymentConfirmOpen} onOpenChange={setPaymentConfirmOpen} orderId={order.id} onConfirm={onStatusUpdated} />
+        <AssignDeliveryPersonDialog open={assignDeliveryOpen} onOpenChange={setAssignDeliveryOpen} orderId={order.id} onConfirm={onStatusUpdated} />
+        <OnlineOrderInvoiceDialog isOpen={invoiceDialogOpen} onClose={() => setInvoiceDialogOpen(false)} order={order} />
       </DialogContent>
     </Dialog>
   );
 }
-
