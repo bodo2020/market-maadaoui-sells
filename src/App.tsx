@@ -1,8 +1,7 @@
 import OrderNotifications from '@/components/orders/OrderNotifications';
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import Login from "@/pages/Login";
-import Dashboard from "@/pages/Dashboard";
 import ReportsV2 from "@/pages/ReportsV2";
 import NotFound from "@/pages/NotFound";
 import POSPro from "@/pages/POSPro";
@@ -50,15 +49,12 @@ import Barcode from "@/pages/Barcode";
 import DeliveryLocationsPage from "@/pages/DeliveryLocationsPage";
 import DeliveryLocations from "@/pages/DeliveryLocations";
 import BranchDeliveryZones from "@/pages/BranchDeliveryZones";
-import SalesDashboard from "@/pages/SalesDashboard";
 import OffersPage from "@/pages/OffersPage";
 import ProductCollections from "@/pages/ProductCollections";
 import CreateProductCollection from "@/pages/CreateProductCollection";
 import EditProductCollection from "@/pages/EditProductCollection";
 import Returns from "@/pages/Returns";
 import Customer360Profile from "@/pages/Customer360Profile";
-import Analytics from "@/pages/Analytics";
-import AIInsights from "@/pages/AIInsights";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
 import InventoryFullPage from "@/pages/InventoryFullPage";
 import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
@@ -115,6 +111,8 @@ const Customer360Workspace = () => (
   </>
 );
 
+const ReportsRedirect = () => <Navigate to="/reports" replace />;
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -127,8 +125,11 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><ReportsV2 /></ProtectedRoute>} />
+              <Route path="/analytics" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
+              <Route path="/ai-insights" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
+              <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
               <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
               <Route path="/tasks" element={<ProtectedRoute><OperationsTasksPage /></ProtectedRoute>} />
               <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
@@ -166,8 +167,6 @@ function App() {
               <Route path="/customers/:customerId" element={<ProtectedRoute><Customer360Workspace /></ProtectedRoute>} />
               <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
               <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
-              <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-              <Route path="/ai-insights" element={<ProtectedRoute><AIInsights /></ProtectedRoute>} />
               <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
               <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />
               <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
@@ -176,7 +175,6 @@ function App() {
               <Route path="/delivery-locations" element={<ProtectedRoute><DeliveryLocationsPage /></ProtectedRoute>} />
               <Route path="/delivery-locations/:id" element={<ProtectedRoute><DeliveryLocations /></ProtectedRoute>} />
               <Route path="/branch-delivery-zones" element={<ProtectedRoute><BranchDeliveryZones /></ProtectedRoute>} />
-              <Route path="/sales-dashboard" element={<ProtectedRoute><SalesDashboard /></ProtectedRoute>} />
               <Route path="/offers" element={<ProtectedRoute><OffersPage /></ProtectedRoute>} />
               <Route path="/product-collections" element={<ProtectedRoute><ProductCollections /></ProtectedRoute>} />
               <Route path="/product-collections/create" element={<ProtectedRoute><CreateProductCollection /></ProtectedRoute>} />
