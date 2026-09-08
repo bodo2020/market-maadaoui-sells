@@ -5,12 +5,17 @@ export type PosPaymentSummary = {
   code: string;
   name: string;
   method_type: string;
+  settlement_account_id: string | null;
   sale_count: number;
   base_amount: number;
   charged_amount: number;
   fee_amount: number;
   customer_fee_amount: number;
   merchant_fee_amount: number;
+  pending_refund_amount: number;
+  confirmed_refund_amount: number;
+  net_shift_amount: number;
+  account_balance: number | null;
 };
 
 export type PosCashSummary = {
@@ -72,6 +77,10 @@ export async function getPosCashSummary(device: LocalPosDevice): Promise<PosCash
     }
     return Number(value);
   };
+  const nullableAmount = (value: unknown): number | null => {
+    if (value === null || value === undefined) return null;
+    return amount(value);
+  };
   if (!Array.isArray(row.payment_breakdown)) {
     throw new Error("تفاصيل وسائل الدفع غير متاحة. أعد التحديث أو راجع مسؤول النظام.");
   }
@@ -82,12 +91,17 @@ export async function getPosCashSummary(device: LocalPosDevice): Promise<PosCash
       code: String(payment.code || "other"),
       name: String(payment.name || "وسيلة دفع"),
       method_type: String(payment.method_type || "other"),
+      settlement_account_id: payment.settlement_account_id ? String(payment.settlement_account_id) : null,
       sale_count: amount(payment.sale_count),
       base_amount: amount(payment.base_amount),
       charged_amount: amount(payment.charged_amount),
       fee_amount: amount(payment.fee_amount),
       customer_fee_amount: amount(payment.customer_fee_amount),
       merchant_fee_amount: amount(payment.merchant_fee_amount),
+      pending_refund_amount: amount(payment.pending_refund_amount),
+      confirmed_refund_amount: amount(payment.confirmed_refund_amount),
+      net_shift_amount: amount(payment.net_shift_amount),
+      account_balance: nullableAmount(payment.account_balance),
     };
   });
   return {
