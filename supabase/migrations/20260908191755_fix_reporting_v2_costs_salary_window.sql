@@ -1,0 +1,4 @@
+-- Production hotfix marker.
+-- The corrected Cairo-local salary payment window and bounded salary aggregation
+-- are already folded into 20260908191655_reporting_v2_costs_and_suppliers.sql
+-- so clean installations converge directly to the final function definition.
