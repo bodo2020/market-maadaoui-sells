@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { Toaster } from "@/components/ui/toaster";
 import Login from "@/pages/Login";
 import ReportsV2 from "@/pages/ReportsV2";
+import ReportsSalesV2 from "@/pages/ReportsSalesV2";
+import ReportsProfitabilityV2 from "@/pages/ReportsProfitabilityV2";
 import NotFound from "@/pages/NotFound";
 import POSPro from "@/pages/POSPro";
 import PosShiftGatePro from "@/components/POS/PosShiftGatePro";
@@ -127,6 +129,8 @@ function App() {
               <Route path="/" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute><ReportsV2 /></ProtectedRoute>} />
+              <Route path="/reports/sales" element={<ProtectedRoute><ReportsSalesV2 /></ProtectedRoute>} />
+              <Route path="/reports/profitability" element={<ProtectedRoute><ReportsProfitabilityV2 /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
               <Route path="/ai-insights" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
               <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
