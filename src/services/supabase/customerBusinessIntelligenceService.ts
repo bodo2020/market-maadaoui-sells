@@ -18,6 +18,18 @@ export type CustomerBusinessIntelligence = {
     is_abandoned: boolean;
     abandoned_threshold_hours: number;
   };
+  rfm: {
+    recency_days: number | null;
+    frequency: number;
+    monetary: number;
+    recency_score: number;
+    frequency_score: number;
+    monetary_score: number;
+    total_score: number;
+    max_score: number;
+    label: "champion" | "loyal" | "promising" | "at_risk" | "hibernating" | "high_value" | "regular" | "new_no_purchase" | string;
+    calculation: string;
+  };
   top_products: Array<{
     product_id: string | null;
     product_name: string;
@@ -41,15 +53,24 @@ const rpc = supabase.rpc.bind(supabase) as unknown as (
   args?: Record<string, unknown>,
 ) => Promise<{ data: unknown; error: { message?: string } | null }>;
 
+function mapError(message?: string) {
+  if (message?.includes("CUSTOMER_ACCESS_DENIED")) return new Error("ليس لديك صلاحية عرض تحليلات هذا العميل.");
+  if (message?.includes("CUSTOMER_NOT_FOUND")) return new Error("العميل غير موجود.");
+  return new Error(message || "تعذر تحميل ذكاء العميل.");
+}
+
 export async function fetchCustomerBusinessIntelligence(customerId: string, branchId?: string | null): Promise<CustomerBusinessIntelligence> {
-  const { data, error } = await rpc("get_customer_business_intelligence", {
-    p_customer_id: customerId,
-    p_branch_id: branchId || null,
-  });
-  if (error) {
-    if (error.message?.includes("CUSTOMER_ACCESS_DENIED")) throw new Error("ليس لديك صلاحية عرض تحليلات هذا العميل.");
-    if (error.message?.includes("CUSTOMER_NOT_FOUND")) throw new Error("العميل غير موجود.");
-    throw new Error(error.message || "تعذر تحميل ذكاء العميل.");
-  }
-  return data as CustomerBusinessIntelligence;
+  const args = { p_customer_id: customerId, p_branch_id: branchId || null };
+  const [intelligenceResult, rfmResult] = await Promise.all([
+    rpc("get_customer_business_intelligence", args),
+    rpc("get_customer_rfm_score", args),
+  ]);
+
+  if (intelligenceResult.error) throw mapError(intelligenceResult.error.message);
+  if (rfmResult.error) throw mapError(rfmResult.error.message);
+
+  return {
+    ...(intelligenceResult.data as Omit<CustomerBusinessIntelligence, "rfm">),
+    rfm: rfmResult.data as CustomerBusinessIntelligence["rfm"],
+  };
 }
