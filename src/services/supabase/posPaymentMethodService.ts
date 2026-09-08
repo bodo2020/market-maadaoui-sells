@@ -18,6 +18,7 @@ export type POSPaymentMethod = {
   require_reference: boolean;
   settlement_account_id?: string | null;
   metadata?: Record<string, unknown>;
+  updated_at?: string;
 };
 
 export type POSPaymentMethodDraft = Omit<POSPaymentMethod, "id" | "branch_id"> & {
@@ -42,6 +43,7 @@ function paymentMethodError(message?: string) {
   if (value.includes("PAYMENT_METHOD_ACCESS_DENIED")) return new Error("ليس لديك صلاحية عرض وسائل الدفع في هذا الفرع.");
   if (value.includes("PAYMENT_METHOD_MANAGE_DENIED")) return new Error("ليس لديك صلاحية إدارة وسائل الدفع في هذا الفرع.");
   if (value.includes("PAYMENT_METHOD_NOT_FOUND")) return new Error("وسيلة الدفع غير موجودة أو لا تخص الفرع الحالي.");
+  if (value.includes("PAYMENT_METHOD_STALE")) return new Error("إعدادات وسيلة الدفع اتغيرت بعد ما فتحت نافذة التعديل. حدّث القائمة وافتح الوسيلة من جديد قبل الحفظ حتى لا تستبدل إعدادات أحدث.");
   if (value.includes("PAYMENT_METHOD_CODE_EXISTS")) return new Error("كود وسيلة الدفع مستخدم بالفعل في هذا الفرع.");
   if (value.includes("CASH_PAYMENT_METHOD_PROTECTED")) return new Error("وسيلة الدفع النقدي أساسية ولا يمكن حذفها. يمكنك إيقافها من الإعدادات عند الحاجة.");
   if (value.includes("INVALID_PAYMENT_METHOD_CODE")) return new Error("كود وسيلة الدفع يجب أن يكون حروفًا إنجليزية أو أرقامًا وشرطة سفلية فقط.");
