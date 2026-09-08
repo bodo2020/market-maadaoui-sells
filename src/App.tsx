@@ -31,6 +31,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Purchases from "@/pages/Purchases";
 import Invoices from "@/pages/Invoices";
 import Finance from "@/pages/Finance";
+import PaymentMethods from "@/pages/PaymentMethods";
 import ExpenseManagement from "@/pages/ExpenseManagement";
 import Settings from "@/pages/Settings";
 import OnlineOrders from "@/pages/OnlineOrders";
@@ -147,6 +148,7 @@ function App() {
               <Route path="/purchases/:id" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
               <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
               <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
+              <Route path="/payment-methods" element={<ProtectedRoute><PaymentMethods /></ProtectedRoute>} />
               <Route path="/expenses" element={<ProtectedRoute><ExpenseManagement /></ProtectedRoute>} />
               <Route path="/expenses-salaries" element={<ProtectedRoute><ExpensesAndSalaries /></ProtectedRoute>} />
               <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
