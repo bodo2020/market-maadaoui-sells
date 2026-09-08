@@ -1,35 +1,61 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
 import FinanceSettlementCenterV2 from "@/components/finance/FinanceSettlementCenterV2";
 import { siteConfig } from "@/config/site";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Banknote,
   Calendar as CalendarIcon,
   CreditCard,
   Gift,
+  Landmark,
   Receipt,
   RotateCcw,
   Sparkles,
   Tag,
   TrendingUp,
   Wallet,
+  WalletCards,
 } from "lucide-react";
 import { fetchFinancialSummary, type PeriodType } from "@/services/supabase/financeService";
 import { fetchLoyaltyFinancialSummary } from "@/services/supabase/loyaltyFinanceService";
+import { fetchReportingPaymentsV2 } from "@/services/supabase/reportingPaymentsV2Service";
+import { useBranchStore } from "@/stores/branchStore";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import {
+  addDays,
+  endOfMonth,
+  format,
+  startOfDay,
+  startOfMonth,
+  startOfQuarter,
+  startOfWeek,
+  startOfYear,
+} from "date-fns";
 import { ar } from "date-fns/locale";
 
 function formatCurrency(amount: number): string {
   return `${siteConfig.currency} ${Number(amount || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2 })}`;
 }
 
+function formatOptionalCurrency(amount: number | null | undefined): string {
+  return amount == null ? "—" : formatCurrency(amount);
+}
+
 function formatNumber(amount: number): string {
   return Number(amount || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2 });
+}
+
+function paymentTypeLabel(type: string) {
+  if (type === "cash") return "نقدي";
+  if (type === "card") return "بطاقة";
+  if (type === "digital_wallet") return "محفظة إلكترونية";
+  if (type === "bank_transfer") return "تحويل بنكي";
+  return "دفع إلكتروني";
 }
 
 function MetricCard({
@@ -82,7 +108,24 @@ export default function Finance() {
   const [startDate, setStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date | undefined>(endOfMonth(new Date()));
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const currentBranchId = localStorage.getItem("currentBranchId") || undefined;
+  const { currentBranchId: storeBranchId } = useBranchStore();
+  const currentBranchId = storeBranchId || localStorage.getItem("currentBranchId") || undefined;
+
+  const paymentRange = useMemo(() => {
+    const now = new Date();
+    if (period === "custom") {
+      if (!startDate || !endDate) return null;
+      return {
+        from: startOfDay(startDate),
+        to: addDays(startOfDay(endDate), 1),
+      };
+    }
+    if (period === "day") return { from: startOfDay(now), to: now };
+    if (period === "week") return { from: startOfWeek(now, { weekStartsOn: 6 }), to: now };
+    if (period === "quarter") return { from: startOfQuarter(now), to: now };
+    if (period === "year") return { from: startOfYear(now), to: now };
+    return { from: startOfMonth(now), to: now };
+  }, [period, startDate, endDate]);
 
   const financeQuery = useQuery({
     queryKey: ["financialSummary", period, startDate?.toISOString(), endDate?.toISOString(), currentBranchId],
@@ -92,6 +135,18 @@ export default function Finance() {
   const loyaltyFinanceQuery = useQuery({
     queryKey: ["loyaltyFinancialSummary", period, startDate?.toISOString(), endDate?.toISOString(), currentBranchId],
     queryFn: () => fetchLoyaltyFinancialSummary(period, startDate, endDate, currentBranchId),
+  });
+
+  const paymentReportQuery = useQuery({
+    queryKey: [
+      "finance-payment-report-v2",
+      currentBranchId,
+      paymentRange?.from.toISOString(),
+      paymentRange?.to.toISOString(),
+    ],
+    enabled: Boolean(currentBranchId && paymentRange),
+    queryFn: () => fetchReportingPaymentsV2(currentBranchId!, paymentRange!.from, paymentRange!.to),
+    staleTime: 30_000,
   });
 
   const handleDateRangeChange = (value: PeriodType) => {
@@ -123,13 +178,30 @@ export default function Finance() {
   const grossLoyaltyDiscount = Number(data?.totals.loyalty_discounts_gross || 0);
   const loyaltyRestored = Number(data?.returns.loyalty_restored || 0);
 
+  const paymentData = paymentReportQuery.data;
+  const paymentMethods = paymentData?.methods || [];
+  const cashMethod = paymentMethods.find(method => method.method_type === "cash");
+  const electronicMethods = paymentMethods.filter(method => method.method_type !== "cash");
+  const visibleMethods = paymentMethods.filter(method =>
+    method.active ||
+    method.transactions > 0 ||
+    Math.abs(method.live_account_balance || 0) >= 0.005 ||
+    (method.settlement_count || 0) > 0,
+  );
+  const cashCollected = cashMethod?.gross_collected ?? Number(data?.pos.cash_collected || 0);
+  const electronicCollected = electronicMethods.reduce((sum, method) => sum + Number(method.gross_collected || 0), 0);
+  const electronicMerchantFees = electronicMethods.reduce((sum, method) => sum + Number(method.merchant_fees || 0), 0);
+  const electronicRefunds = electronicMethods.reduce((sum, method) => sum + Number(method.refunds || 0), 0);
+  const pendingElectronicRefunds = electronicMethods.reduce((sum, method) => sum + Number(method.pending_refund_amount || 0), 0);
+  const canViewFinancePaymentDetails = Boolean(paymentData?.permissions.can_view_finance);
+
   return (
     <MainLayout>
       <div dir="rtl" className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-black text-slate-950">الإدارة المالية</h1>
-            <p className="mt-1 text-sm text-slate-500">المبيعات والخصومات والتحصيل والولاء في صورة مالية واحدة.</p>
+            <p className="mt-1 text-sm text-slate-500">المبيعات والخصومات والتحصيل والولاء والتسويات في صورة مالية واحدة.</p>
           </div>
 
           <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
@@ -175,7 +247,7 @@ export default function Finance() {
         )}
 
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm leading-6 text-emerald-900">
-          <strong>خصومات الولاء لا تدخل الخزنة.</strong> قيمة كوبون الخصم تظهر كبند خصم مبيعات مستقل، بينما النقدي والبطاقة يعرضان المبلغ الذي تم تحصيله فعليًا فقط.
+          <strong>خصومات الولاء لا تدخل الخزنة.</strong> قيمة كوبون الخصم تظهر كبند خصم مبيعات مستقل، بينما وسائل الدفع تعرض ما تم تحصيله فعليًا، والرصيد الإلكتروني يظل في حساب التسوية حتى يتم توريده من مركز التسويات.
         </div>
 
         <section>
@@ -221,41 +293,112 @@ export default function Finance() {
         <section>
           <div className="mb-3 flex items-center gap-2">
             <Wallet className="text-primary" size={20} />
-            <h2 className="text-lg font-black">التحصيل الفعلي</h2>
+            <h2 className="text-lg font-black">التحصيل الفعلي ووسائل الدفع</h2>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+          {paymentReportQuery.isError && (
+            <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              تعذر تحميل التحليل الديناميكي لوسائل الدفع. بيانات المبيعات الأساسية ما زالت ظاهرة، ويمكن إعادة المحاولة بتحديث الصفحة.
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             <MetricCard
-              title="نقدي POS"
-              value={formatCurrency(data?.pos.cash_collected || 0)}
-              note="الفلوس التي دخلت درج الكاشير فعليًا."
+              title="تحصيل نقدي"
+              value={formatCurrency(cashCollected)}
+              note="النقد المحصل داخل الفترة؛ يظهر من Payment V2 عند توفره."
               icon={Banknote}
-              loading={loading}
+              loading={paymentReportQuery.isLoading && !cashMethod}
               tone="good"
             />
             <MetricCard
-              title="بطاقات POS"
-              value={formatCurrency(data?.pos.card_collected || 0)}
-              note="التحصيل بالبطاقة بعد خصم كوبونات الولاء."
+              title="تحصيل إلكتروني"
+              value={formatCurrency(electronicCollected)}
+              note="بطاقات ومحافظ وتحويلات بنكية من كل وسائل الدفع المسجلة."
+              icon={WalletCards}
+              loading={paymentReportQuery.isLoading}
+            />
+            <MetricCard
+              title="عمولات على المنشأة"
+              value={formatCurrency(electronicMerchantFees)}
+              note="رسوم الدفع التي تتحملها المنشأة، منفصلة عن المبلغ الذي دفعه العميل."
               icon={CreditCard}
-              loading={loading}
+              loading={paymentReportQuery.isLoading}
+              tone="danger"
             />
             <MetricCard
-              title="مرتجعات نقدي/بطاقة"
-              value={formatCurrency(data?.returns.net_customer_refunds || 0)}
-              note={`نقدي ${formatCurrency(data?.returns.cash_refunds || 0)} · بطاقة ${formatCurrency(data?.returns.card_refunds || 0)}.`}
+              title="رصيد إلكتروني غير مورد"
+              value={formatOptionalCurrency(paymentData?.summary.live_electronic_balance)}
+              note="الرصيد الحالي في حسابات التسوية قبل التحويل للبنك أو الخزنة."
+              icon={Landmark}
+              loading={paymentReportQuery.isLoading}
+              tone="loyalty"
+            />
+            <MetricCard
+              title="مرتجعات إلكترونية"
+              value={formatCurrency(electronicRefunds)}
+              note={`مؤكد داخل الفترة · معلق حاليًا ${formatCurrency(pendingElectronicRefunds)}.`}
               icon={RotateCcw}
-              loading={loading}
+              loading={paymentReportQuery.isLoading}
               tone="danger"
             />
             <MetricCard
-              title="المصروفات المسجلة"
-              value={formatCurrency(expenses)}
-              note="مصروفات النظام منفصلة عن خصومات الولاء."
-              icon={Wallet}
-              loading={financeQuery.isLoading}
-              tone="danger"
+              title="صافي تم توريده"
+              value={formatOptionalCurrency(paymentData?.summary.settled_net)}
+              note="صافي التسويات التي وصلت للبنك أو الخزنة خلال الفترة بعد الرسوم."
+              icon={Landmark}
+              loading={paymentReportQuery.isLoading}
+              tone="good"
             />
           </div>
+
+          {visibleMethods.length > 0 && (
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {visibleMethods.map(method => (
+                <Card key={method.code} className="border-slate-100 shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <strong className="text-sm text-slate-950">{method.name}</strong>
+                          <Badge variant={method.active ? "secondary" : "outline"}>{paymentTypeLabel(method.method_type)}</Badge>
+                          {!method.active && <Badge variant="outline">مؤرشفة</Badge>}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">{formatNumber(method.transactions)} عملية خلال الفترة</p>
+                      </div>
+                      <span className="text-lg font-black text-slate-950">{formatCurrency(method.gross_collected)}</span>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                      <div className="rounded-xl bg-slate-50 p-2">
+                        <span className="text-slate-500">صافي الحركة</span>
+                        <strong className="mt-1 block">{formatCurrency(method.net_period_movement)}</strong>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-2">
+                        <span className="text-slate-500">مرتجعات</span>
+                        <strong className="mt-1 block">{formatCurrency(method.refunds)}</strong>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-2">
+                        <span className="text-slate-500">عمولة المنشأة</span>
+                        <strong className="mt-1 block">{formatCurrency(method.merchant_fees)}</strong>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-2">
+                        <span className="text-slate-500">رصيد التسوية</span>
+                        <strong className="mt-1 block">{method.method_type === "cash" ? "درج/خزنة" : canViewFinancePaymentDetails ? formatOptionalCurrency(method.live_account_balance) : "—"}</strong>
+                      </div>
+                    </div>
+
+                    {method.method_type !== "cash" && canViewFinancePaymentDetails && (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs text-slate-500">
+                        <span>تم توريده بالفترة: <strong className="text-slate-800">{formatOptionalCurrency(method.settled_net)}</strong></span>
+                        <span>غير مورد: <strong className="text-slate-800">{formatOptionalCurrency(method.unsettled_balance)}</strong></span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </section>
 
         <FinanceSettlementCenterV2 />
