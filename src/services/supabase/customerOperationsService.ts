@@ -7,6 +7,23 @@ export type CustomerPrioritySignal = {
 
 export type CustomerOperationsCenter = {
   attribution_window_days: number;
+  queue_state?: {
+    active: Array<{
+      id: string;
+      customer_id: string;
+      action_type: "handled" | "snoozed";
+      suppress_until: string;
+      note: string | null;
+      created_by: string | null;
+      created_by_name: string | null;
+      created_at: string;
+    }>;
+    summary: {
+      active_count: number;
+      handled_today: number;
+      snoozed_active: number;
+    };
+  };
   summary: {
     window_days: number;
     completed_followups: number;
@@ -149,7 +166,7 @@ function mapError(message?: string) {
 }
 
 export async function fetchCustomerOperationsCenter(branchId?: string | null, days = 30, limit = 50): Promise<CustomerOperationsCenter> {
-  const { data, error } = await rpc("get_customer_operations_center", {
+  const { data, error } = await rpc("get_customer_operations_center_v2", {
     p_branch_id: branchId || null,
     p_days: days,
     p_limit: limit,
