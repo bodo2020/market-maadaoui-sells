@@ -16,6 +16,7 @@ import CustomerOpportunityDock from "@/components/customers/CustomerOpportunityD
 import CustomerOperationsCenterDock from "@/components/customers/CustomerOperationsCenterDock";
 import CustomerFollowupPerformanceDock from "@/components/customers/CustomerFollowupPerformanceDock";
 import CustomerTeamWorkloadDock from "@/components/customers/CustomerTeamWorkloadDock";
+import CustomerMyTasksDock from "@/components/customers/CustomerMyTasksDock";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -91,6 +92,7 @@ const CashierPOS = () => (
 const CustomersWorkspace = () => (
   <>
     <CustomersAdvanced />
+    <CustomerMyTasksDock />
     <CustomerTeamWorkloadDock />
     <CustomerOperationsCenterDock />
     <CustomerOpportunityDock />
@@ -100,6 +102,7 @@ const CustomersWorkspace = () => (
 const Customer360Workspace = () => (
   <>
     <Customer360Profile />
+    <CustomerMyTasksDock />
     <CustomerFollowupPerformanceDock />
     <CustomerInsightsDock />
     <CustomerManagementDock />
