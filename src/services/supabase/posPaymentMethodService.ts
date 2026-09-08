@@ -24,6 +24,14 @@ export type POSPaymentMethodDraft = Omit<POSPaymentMethod, "id" | "branch_id"> &
   id?: string;
 };
 
+export type POSPaymentMethodDeleteResult = {
+  id: string;
+  code: string;
+  name: string;
+  action: "deleted" | "archived";
+  used_in_history: boolean;
+};
+
 const rpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
   args: Record<string, unknown>,
@@ -35,6 +43,7 @@ function paymentMethodError(message?: string) {
   if (value.includes("PAYMENT_METHOD_MANAGE_DENIED")) return new Error("ليس لديك صلاحية إدارة وسائل الدفع في هذا الفرع.");
   if (value.includes("PAYMENT_METHOD_NOT_FOUND")) return new Error("وسيلة الدفع غير موجودة أو لا تخص الفرع الحالي.");
   if (value.includes("PAYMENT_METHOD_CODE_EXISTS")) return new Error("كود وسيلة الدفع مستخدم بالفعل في هذا الفرع.");
+  if (value.includes("CASH_PAYMENT_METHOD_PROTECTED")) return new Error("وسيلة الدفع النقدي أساسية ولا يمكن حذفها. يمكنك إيقافها من الإعدادات عند الحاجة.");
   if (value.includes("INVALID_PAYMENT_METHOD_CODE")) return new Error("كود وسيلة الدفع يجب أن يكون حروفًا إنجليزية أو أرقامًا وشرطة سفلية فقط.");
   if (value.includes("INVALID_PAYMENT_METHOD_NAME")) return new Error("اكتب اسمًا واضحًا لوسيلة الدفع.");
   if (value.includes("INVALID_PAYMENT_METHOD_TYPE")) return new Error("نوع وسيلة الدفع غير صحيح.");
@@ -49,6 +58,7 @@ function normalize(row: POSPaymentMethod): POSPaymentMethod {
     sort_order: Number(row.sort_order || 0),
     fee_value: Number(row.fee_value || 0),
     require_reference: Boolean(row.require_reference),
+    metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
   };
 }
 
@@ -65,6 +75,15 @@ export async function savePOSPaymentMethod(branchId: string, method: POSPaymentM
   });
   if (error) throw paymentMethodError(error.message);
   return normalize(data as POSPaymentMethod);
+}
+
+export async function deletePOSPaymentMethod(branchId: string, methodId: string): Promise<POSPaymentMethodDeleteResult> {
+  const { data, error } = await rpc("delete_pos_payment_method", {
+    p_branch_id: branchId,
+    p_method_id: methodId,
+  });
+  if (error) throw paymentMethodError(error.message);
+  return data as POSPaymentMethodDeleteResult;
 }
 
 export function calculatePOSPaymentFee(method: POSPaymentMethod | null | undefined, baseAmount: number) {
