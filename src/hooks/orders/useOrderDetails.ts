@@ -203,7 +203,7 @@ export function useOrderDetails(orderId: string) {
       const { error, data } = await supabase
         .from('online_orders')
         .update({ 
-          status: selectedStatus as string,
+          status: selectedStatus,
           updated_at: currentTime,
           cashier_id: cashierId
         })
