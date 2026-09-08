@@ -20,7 +20,13 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
   const location = useLocation();
   const currentPath = location.pathname;
   const { user } = useAuth();
-  const { unreadOrders, unreadReturns, customerTaskAlerts } = useNotificationStore();
+  const {
+    unreadOrders,
+    unreadReturns,
+    customerTaskAlerts,
+    operationsTaskAlerts,
+    operationsTaskOverdue,
+  } = useNotificationStore();
   const isAdmin = user?.role === UserRole.ADMIN;
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
   const isCashier = user?.role === UserRole.CASHIER;
@@ -33,7 +39,7 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
       if (item.deliveryOnly && !isDelivery) return null;
       
       if (isCashier && !isSuperAdmin) {
-        const allowedCashierRoutes = ['/', '/pos', '/online-orders', '/invoices'];
+        const allowedCashierRoutes = ['/', '/pos', '/tasks', '/online-orders', '/invoices'];
         if (!allowedCashierRoutes.includes(item.href)) return null;
       }
       
@@ -46,11 +52,14 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
         badge = unreadReturns;
       } else if (item.href === "/customer-tasks") {
         badge = customerTaskAlerts;
+      } else if (item.href === "/tasks") {
+        badge = operationsTaskAlerts;
+        secondaryBadge = operationsTaskOverdue;
       } else if (item.badge) {
         badge = item.badge;
       }
       
-      if (item.secondaryBadge) secondaryBadge = item.secondaryBadge;
+      if (item.secondaryBadge && !secondaryBadge) secondaryBadge = item.secondaryBadge;
       
       return (
         <SidebarItem
