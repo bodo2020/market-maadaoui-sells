@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ShoppingCart,
   Sparkles,
+  Target,
   TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,17 @@ const cadenceLabel: Record<string, string> = {
   monthly: "شهري تقريبًا",
   occasional: "شراء متباعد",
   unknown: "بيانات غير كافية",
+};
+
+const rfmLabel: Record<string, string> = {
+  champion: "عميل بطل",
+  loyal: "وفي",
+  promising: "واعد",
+  at_risk: "معرض للتوقف",
+  hibernating: "خامل",
+  high_value: "عالي القيمة",
+  regular: "منتظم",
+  new_no_purchase: "جديد بدون شراء",
 };
 
 export default function CustomerInsightsDock() {
@@ -65,7 +77,7 @@ export default function CustomerInsightsDock() {
               <BarChart3 className="h-5 w-5 text-[#005931]" />
               ذكاء العميل
             </SheetTitle>
-            <SheetDescription>تحليل نمط الشراء والسلة وأهم المنتجات والأقسام من البيانات الفعلية.</SheetDescription>
+            <SheetDescription>تحليل نمط الشراء والسلة وأهم المنتجات والأقسام وRFM من البيانات الفعلية.</SheetDescription>
           </SheetHeader>
 
           <div className="mt-5 flex justify-end">
@@ -84,6 +96,19 @@ export default function CustomerInsightsDock() {
             <Card className="mt-4"><CardContent className="p-8 text-center text-sm text-muted-foreground">{(query.error as Error)?.message || "تعذر تحميل التحليل."}</CardContent></Card>
           ) : (
             <div className="mt-4 space-y-4">
+              <section className="rounded-2xl border bg-slate-950 p-4 text-white">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2"><Target className="h-5 w-5 text-emerald-300" /><div><div className="font-black">RFM Score</div><div className="text-xs text-slate-300">حداثة الشراء + التكرار + القيمة المالية</div></div></div>
+                  <Badge className="bg-white/10 text-white hover:bg-white/10">{rfmLabel[data.rfm.label] || data.rfm.label}</Badge>
+                </div>
+                <div className="mt-4 grid grid-cols-4 gap-2 text-center">
+                  <div className="rounded-xl bg-white/10 p-3"><div className="text-[10px] text-slate-300">Recency</div><div className="mt-1 text-xl font-black">{data.rfm.recency_score}/5</div><div className="text-[10px] text-slate-400">{data.rfm.recency_days == null ? "—" : `${num(data.rfm.recency_days)} يوم`}</div></div>
+                  <div className="rounded-xl bg-white/10 p-3"><div className="text-[10px] text-slate-300">Frequency</div><div className="mt-1 text-xl font-black">{data.rfm.frequency_score}/5</div><div className="text-[10px] text-slate-400">{num(data.rfm.frequency)} عملية</div></div>
+                  <div className="rounded-xl bg-white/10 p-3"><div className="text-[10px] text-slate-300">Monetary</div><div className="mt-1 text-xl font-black">{data.rfm.monetary_score}/5</div><div className="text-[10px] text-slate-400">{money(data.rfm.monetary)}</div></div>
+                  <div className="rounded-xl bg-emerald-400/15 p-3"><div className="text-[10px] text-emerald-200">الإجمالي</div><div className="mt-1 text-xl font-black text-emerald-200">{data.rfm.total_score}/{data.rfm.max_score}</div><div className="text-[10px] text-emerald-300">RFM</div></div>
+                </div>
+              </section>
+
               <section className="grid grid-cols-2 gap-3">
                 <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="h-4 w-4 text-[#005931]" />نمط الشراء</div><div className="mt-2 font-black">{cadenceLabel[data.purchase_pattern.cadence] || data.purchase_pattern.cadence}</div><div className="mt-1 text-xs text-muted-foreground">{data.purchase_pattern.average_days_between_purchases != null ? `متوسط ${num(data.purchase_pattern.average_days_between_purchases)} يوم بين المشتريات` : "نحتاج عمليتي شراء مكتملتين على الأقل"}</div></CardContent></Card>
                 <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock className="h-4 w-4 text-[#005931]" />الشراء القادم المتوقع</div><div className="mt-2 font-black">{data.purchase_pattern.prediction_ready ? date(data.purchase_pattern.predicted_next_purchase_at) : "لسه بدري للتوقع"}</div><div className="mt-1 text-xs text-muted-foreground">آخر شراء: {date(data.purchase_pattern.last_purchase_at)}</div></CardContent></Card>
