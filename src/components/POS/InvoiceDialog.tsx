@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,11 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
 
   const invoiceSettings = { ...siteConfig.invoice, ...(settings || {}) };
   const loyaltyCoupon = Number(sale.loyalty_voucher_amount || 0);
-  const amountPaid = Math.max(0, Number(sale.amount_due ?? (sale.total - loyaltyCoupon)));
+  const paymentFee = Number((sale as any).payment_fee_amount || 0);
+  const customerPaymentFee = Number((sale as any).customer_payment_fee_amount || 0);
+  const merchantPaymentFee = Number((sale as any).merchant_payment_fee_amount || 0);
+  const paymentName = String((sale as any).payment_method_name || (sale.payment_method === 'cash' ? 'نقدي' : sale.payment_method === 'card' ? 'بطاقة بنكية' : 'مختلط'));
+  const amountPaid = Math.max(0, Number((sale as any).amount_charged ?? sale.amount_due ?? (sale.total - loyaltyCoupon + customerPaymentFee)));
 
   const handlePrint = async () => {
     const storeInfo = {
@@ -115,14 +118,16 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
             <div className="flex justify-between"><span className="font-medium">المجموع الفرعي:</span><span>{sale.subtotal.toFixed(2)} {siteConfig.currency}</span></div>
             {sale.discount > 0 && <div className="flex justify-between text-primary"><span className="font-medium">خصومات المنتجات:</span><span>- {sale.discount.toFixed(2)} {siteConfig.currency}</span></div>}
             <div className="flex justify-between pt-2 border-t"><span className="font-medium">الإجمالي بعد خصومات المنتجات:</span><span className="font-bold">{sale.total.toFixed(2)} {siteConfig.currency}</span></div>
-            {loyaltyCoupon > 0 && <div className="flex justify-between text-amber-700"><span className="font-medium">خصم كوبون الولاء:</span><span>- {loyaltyCoupon.toFixed(2)} {siteConfig.currency}</span></div>}
+            {loyaltyCoupon > 0 && <div className="flex justify-between text-amber-700"><span className="font-medium">كوبون الخصم:</span><span>- {loyaltyCoupon.toFixed(2)} {siteConfig.currency}</span></div>}
+            {customerPaymentFee > 0 && <div className="flex justify-between text-amber-700"><span className="font-medium">رسوم وسيلة الدفع:</span><span>+ {customerPaymentFee.toFixed(2)} {siteConfig.currency}</span></div>}
             <div className="flex justify-between font-bold text-lg pt-2 border-t"><span>المدفوع فعليًا:</span><span>{amountPaid.toFixed(2)} {siteConfig.currency}</span></div>
 
-            <div className="mt-4 text-sm text-muted-foreground">
-              <p>طريقة الدفع: {sale.payment_method === 'cash' ? 'نقدي' : sale.payment_method === 'card' ? 'بطاقة' : 'مختلط'}</p>
+            <div className="mt-4 rounded-xl bg-white p-3 text-sm text-muted-foreground">
+              <p><strong className="text-foreground">طريقة الدفع:</strong> {paymentName}</p>
+              {(sale as any).payment_reference && <p>مرجع العملية: {(sale as any).payment_reference}</p>}
               {Number(sale.cash_amount || 0) > 0 && <p>المبلغ النقدي: {Number(sale.cash_amount).toFixed(2)} {siteConfig.currency}</p>}
-              {Number(sale.card_amount || 0) > 0 && <p>مبلغ البطاقة: {Number(sale.card_amount).toFixed(2)} {siteConfig.currency}</p>}
               {loyaltyCoupon > 0 && <p>كوبون الخصم: {loyaltyCoupon.toFixed(2)} {siteConfig.currency}</p>}
+              {paymentFee > 0 && <p>رسوم الخدمة: {paymentFee.toFixed(2)} {siteConfig.currency} · {merchantPaymentFee > 0 ? "تتحملها المنشأة" : "على العميل"}</p>}
             </div>
           </div>
 
