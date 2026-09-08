@@ -17,23 +17,21 @@ import {
   MapPin,
   FolderOpen,
   Tag,
-  TrendingUp,
   DollarSign,
   FileText,
   RefreshCw,
   Settings,
   QrCode,
-  Activity,
   Calendar,
-  Sparkles,
   FileSpreadsheet,
+  BarChart3,
 } from "lucide-react";
 import { NavigationGroup } from "./types";
 
 export const mainNavigation: NavigationGroup = {
   title: "الرئيسية",
   items: [
-    { label: "لوحة التحكم", href: "/", icon: LayoutDashboard },
+    { label: "لوحة التحكم", href: "/dashboard", icon: LayoutDashboard },
     { label: "نقطة البيع", href: "/pos", icon: ShoppingCart },
     { label: "المهام", href: "/tasks", icon: ClipboardList },
     { label: "الطلبات الإلكترونية", href: "/online-orders", icon: ShoppingBag },
@@ -72,14 +70,12 @@ export const customersNavigation: NavigationGroup = {
 };
 
 export const financeNavigation: NavigationGroup = {
-  title: "المالية والتحليلات",
+  title: "المالية والتقارير",
   items: [
+    { label: "التقارير والتحليلات", href: "/reports", icon: BarChart3 },
     { label: "المالية", href: "/finance", icon: DollarSign },
     { label: "وسائل الدفع", href: "/payment-methods", icon: WalletCards },
     { label: "المصروفات والرواتب", href: "/expenses-salaries", icon: FileText },
-    { label: "التحليلات", href: "/analytics", icon: Activity },
-    { label: "تحليلات الذكاء الاصطناعي", href: "/ai-insights", icon: Sparkles },
-    { label: "المبيعات", href: "/sales-dashboard", icon: TrendingUp },
     { label: "تتبع النقدية", href: "/cash-tracking", icon: Wallet, adminOnly: true },
     { label: "المرتجعات", href: "/returns", icon: RefreshCw },
   ],
