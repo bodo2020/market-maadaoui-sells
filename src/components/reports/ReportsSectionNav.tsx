@@ -1,11 +1,13 @@
 import { NavLink } from "react-router-dom";
-import { BarChart3, ReceiptText, TrendingUp } from "lucide-react";
+import { BarChart3, ReceiptText, RotateCcw, TrendingUp, WalletCards } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/reports", label: "النظرة العامة", icon: BarChart3, end: true },
   { href: "/reports/sales", label: "المبيعات", icon: ReceiptText },
   { href: "/reports/profitability", label: "الربحية", icon: TrendingUp },
+  { href: "/reports/payments", label: "وسائل الدفع", icon: WalletCards },
+  { href: "/reports/returns", label: "المرتجعات", icon: RotateCcw },
 ];
 
 export default function ReportsSectionNav() {
