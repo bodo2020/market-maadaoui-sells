@@ -196,10 +196,15 @@ export default function PosShiftGate({ children }: { children: ReactNode }) {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">الرصيد الافتتاحي</div><strong>{money(closingSummary.opening_cash)}</strong></div>
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">مبيعات الوردية</div><strong>{money(closingSummary.sales_total)}</strong></div>
+              <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">المبيعات قبل كوبونات الولاء</div><strong>{money(closingSummary.sales_total)}</strong></div>
+              <div className="rounded-xl bg-red-50 p-3"><div className="text-red-600">خصومات المنتجات</div><strong className="text-red-700">- {money(closingSummary.product_discount_total)}</strong></div>
+              <div className="rounded-xl bg-amber-50 p-3"><div className="text-amber-700">خصومات كوبونات الولاء</div><strong className="text-amber-800">- {money(closingSummary.loyalty_discount_total)}</strong></div>
+              <div className="rounded-xl bg-emerald-50 p-3"><div className="text-emerald-700">صافي المبيعات</div><strong className="text-emerald-800">{money(closingSummary.net_sales_total)}</strong></div>
+              <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">عدد الفواتير</div><strong>{Number(closingSummary.sales_count || 0).toLocaleString('ar-EG')}</strong></div>
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">النقد المتوقع</div><strong>{money(closingSummary.expected_cash)}</strong></div>
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">النقد الفعلي</div><strong>{money(closingSummary.closing_cash)}</strong></div>
             </div>
+            <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-xs leading-5 text-amber-900">كوبونات الولاء خصم مبيعات وليست نقدًا؛ لذلك لا تدخل في رصيد الدرج ولا تسبب فرق صندوق.</div>
             <div className={`rounded-2xl p-4 text-center ${diff === 0 ? "bg-green-50 text-green-800" : diff > 0 ? "bg-blue-50 text-blue-800" : "bg-red-50 text-red-800"}`}>
               <div className="text-xs">فرق الصندوق المسجل كتسوية</div><div className="mt-1 text-2xl font-bold">{money(diff)}</div>
             </div>
