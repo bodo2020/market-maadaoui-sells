@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CreditCard, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, WalletCards } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,10 @@ import { listBranchPendingPosCardRefunds, type BranchPendingPosCardRefund } from
 
 function money(value: number) {
   return `${Number(value || 0).toFixed(2)} ج.م`;
+}
+
+function methodName(row: BranchPendingPosCardRefund) {
+  return row.payment_method_name || "وسيلة الدفع الإلكترونية";
 }
 
 export default function PosPendingCardRefunds() {
@@ -30,7 +34,7 @@ export default function PosPendingCardRefunds() {
       setRows(await listBranchPendingPosCardRefunds(currentBranchId));
       setError(null);
     } catch (e: any) {
-      if (!quiet) setError(e.message || "تعذر تحميل ردود البطاقة المعلقة");
+      if (!quiet) setError(e.message || "تعذر تحميل ردود الدفع الإلكتروني المعلقة");
     } finally {
       if (!quiet) setLoading(false);
     }
@@ -56,7 +60,7 @@ export default function PosPendingCardRefunds() {
   const confirm = async (row: BranchPendingPosCardRefund) => {
     const reference = (references[row.id] || "").trim();
     if (reference.length < 3) {
-      setError("اكتب مرجع رد البطاقة قبل التأكيد.");
+      setError(`اكتب مرجع رد ${methodName(row)} قبل التأكيد.`);
       return;
     }
     try {
@@ -66,7 +70,7 @@ export default function PosPendingCardRefunds() {
       setRows(prev => prev.filter(item => item.id !== row.id));
       setReferences(prev => { const next = { ...prev }; delete next[row.id]; return next; });
     } catch (e: any) {
-      setError(e.message || "تعذر تأكيد رد البطاقة");
+      setError(e.message || `تعذر تأكيد رد ${methodName(row)}`);
     } finally {
       setConfirmingId(null);
     }
@@ -83,14 +87,14 @@ export default function PosPendingCardRefunds() {
         className="fixed right-3 top-32 z-[70] border-amber-300 bg-amber-50 text-amber-900 shadow-md backdrop-blur hover:bg-amber-100 hover:text-amber-950"
         onClick={() => { setOpen(true); void load(); }}
       >
-        <CreditCard className="h-4 w-4" /> ردود بطاقة معلقة <Badge className="bg-amber-700 text-white">{rows.length}</Badge>
+        <WalletCards className="h-4 w-4" /> ردود إلكترونية معلقة <Badge className="bg-amber-700 text-white">{rows.length}</Badge>
       </Button>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" dir="rtl" className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader className="text-right">
-            <SheetTitle>ردود بطاقة معلقة</SheetTitle>
-            <SheetDescription>نفّذ الرد على جهاز/مزود البطاقة، ثم سجل مرجع العملية هنا لإكمال المرتجع ماليًا.</SheetDescription>
+            <SheetTitle>ردود دفع إلكترونية معلقة</SheetTitle>
+            <SheetDescription>نفّذ الرد على نفس وسيلة الدفع الأصلية، ثم سجل مرجع العملية هنا لإكمال المرتجع ماليًا وتحديث حساب التسوية.</SheetDescription>
           </SheetHeader>
 
           {error && <Alert variant="destructive" className="mt-4"><AlertTriangle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
@@ -103,13 +107,15 @@ export default function PosPendingCardRefunds() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-bold">{row.invoice_number}</div>
+                    <div className="mt-1"><Badge variant="outline" className="bg-white">{methodName(row)}</Badge></div>
                     <div className="mt-1 text-xs text-muted-foreground">{row.employee_name || "الكاشير"}{row.device_name ? ` · ${row.device_name}` : ""}</div>
                     <div className="mt-1 text-xs text-muted-foreground">{new Date(row.created_at).toLocaleString("ar-EG")}</div>
+                    {row.payment_reference && <div className="mt-1 text-xs text-muted-foreground">مرجع البيع: {row.payment_reference}</div>}
                   </div>
                   <div className="text-xl font-black text-amber-900">{money(row.amount)}</div>
                 </div>
                 <div className="mt-4 space-y-2">
-                  <Label htmlFor={`refund-ref-${row.id}`}>مرجع رد البطاقة</Label>
+                  <Label htmlFor={`refund-ref-${row.id}`}>مرجع رد {methodName(row)}</Label>
                   <Input
                     id={`refund-ref-${row.id}`}
                     value={references[row.id] || ""}
@@ -117,7 +123,7 @@ export default function PosPendingCardRefunds() {
                     placeholder="مثال: REF-123456"
                   />
                   <Button className="w-full bg-[#005931] hover:bg-[#004a29]" disabled={confirmingId === row.id || (references[row.id] || "").trim().length < 3} onClick={() => void confirm(row)}>
-                    {confirmingId === row.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />} تأكيد رد البطاقة
+                    {confirmingId === row.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <WalletCards className="h-4 w-4" />} تأكيد رد {methodName(row)}
                   </Button>
                 </div>
               </div>
