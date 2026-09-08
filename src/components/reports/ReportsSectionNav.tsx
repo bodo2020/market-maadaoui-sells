@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { BarChart3, Boxes, Clock, PackageSearch, ReceiptText, RotateCcw, TrendingUp, WalletCards } from "lucide-react";
+import { BarChart3, Boxes, Clock, PackageSearch, ReceiptText, RotateCcw, ShoppingCart, TrendingUp, WalletCards } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -11,6 +11,7 @@ const items = [
   { href: "/reports/products", label: "المنتجات", icon: PackageSearch },
   { href: "/reports/inventory", label: "المخزون", icon: Boxes },
   { href: "/reports/shifts", label: "الكاشير والورديات", icon: Clock },
+  { href: "/reports/online", label: "الأونلاين", icon: ShoppingCart },
 ];
 
 export default function ReportsSectionNav() {
