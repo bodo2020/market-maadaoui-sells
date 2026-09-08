@@ -17,6 +17,7 @@ import CustomerOperationsCenterDock from "@/components/customers/CustomerOperati
 import CustomerFollowupPerformanceDock from "@/components/customers/CustomerFollowupPerformanceDock";
 import CustomerTeamWorkloadDock from "@/components/customers/CustomerTeamWorkloadDock";
 import CustomerMyTasksDock from "@/components/customers/CustomerMyTasksDock";
+import CustomerTaskNotifications from "@/components/customers/CustomerTaskNotifications";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -117,6 +118,7 @@ function App() {
         <AuthProvider>
           <TooltipProvider>
             <OrderNotifications />
+            <CustomerTaskNotifications />
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
