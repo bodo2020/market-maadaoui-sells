@@ -70,6 +70,9 @@ export async function saveProductEditor(
     is_offer: Boolean(product.is_offer),
     track_expiry: Boolean(product.track_expiry),
     barcode_type: product.barcode_type || "normal",
+    default_weight_grams: Number(product.default_weight_grams) > 0
+      ? Math.min(100000, Math.max(1, Math.round(Number(product.default_weight_grams))))
+      : 250,
     base_unit: product.unit_of_measure?.trim() || (product.barcode_type === "scale" ? "كجم" : "قطعة"),
   };
 

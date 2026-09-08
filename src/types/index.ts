@@ -83,6 +83,7 @@ export interface Product {
   company_id?: string | null;
   branch_id?: string | null;
   barcode_type?: string | null;
+  default_weight_grams?: number | null;
 
   /** Legacy bulk fields kept temporarily for backward compatibility. */
   bulk_enabled: boolean;
@@ -197,6 +198,90 @@ export interface OnlineOrder {
   updated_at: string;
   branch_id?: string;
 }
+
+export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready' | 'shipped' | 'delivered' | 'cancelled';
+export type OrderPaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+
+export interface OrderItem {
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  price: number;
+  total?: number;
+  image_url?: string | null;
+  barcode?: string | null;
+  shelf_location?: string | null;
+  is_bulk?: boolean;
+  is_weight_based?: boolean;
+  bulk_quantity?: number | null;
+}
+
+export interface Order {
+  id: string;
+  created_at: string;
+  updated_at?: string;
+  total: number;
+  status: OrderStatus;
+  payment_status: OrderPaymentStatus;
+  payment_method?: string | null;
+  shipping_address?: string | null;
+  shipping_cost?: number | null;
+  items: OrderItem[];
+  customer_id?: string | null;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  customer_phone_verified?: boolean;
+  notes?: string | null;
+  tracking_number?: string | null;
+  delivery_person?: string | null;
+  governorate?: string | null;
+  city?: string | null;
+  area?: string | null;
+  neighborhood?: string | null;
+  branch_id?: string | null;
+  cashier_id?: string | null;
+}
+
+export interface POSTab {
+  id: string;
+  tabName: string;
+  cartItems: CartItem[];
+  selectedCustomer: string;
+  customerName: string;
+  customerPhone: string;
+  search: string;
+  searchResults: Product[];
+  createdAt: Date | string;
+}
+
+export interface PurchaseItem {
+  id?: string;
+  purchase_id?: string;
+  product_id?: string | null;
+  product_name?: string | null;
+  quantity: number;
+  price?: number;
+  purchase_price?: number;
+  total?: number;
+}
+
+export interface Purchase {
+  id: string;
+  supplier_id: string;
+  invoice_number: string;
+  date: string;
+  total: number;
+  paid: number;
+  description?: string | null;
+  invoice_file_url?: string | null;
+  items?: PurchaseItem[];
+  branch_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+
 
 export interface Expense {
   id: string;

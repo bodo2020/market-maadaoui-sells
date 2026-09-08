@@ -31,7 +31,7 @@ import {
 export function CustomerAnalytics() {
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ["customers"],
-    queryFn: fetchCustomers,
+    queryFn: () => fetchCustomers(),
   });
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery({

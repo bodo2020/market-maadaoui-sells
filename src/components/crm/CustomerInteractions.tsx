@@ -51,7 +51,7 @@ export function CustomerInteractions() {
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
-    queryFn: fetchCustomers,
+    queryFn: () => fetchCustomers(),
   });
 
   const form = useForm({

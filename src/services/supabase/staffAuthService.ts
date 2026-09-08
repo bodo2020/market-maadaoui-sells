@@ -127,7 +127,7 @@ async function fetchStaffProfile(identity: StaffIdentity, effectiveRole: UserRol
     phone: data.phone || "",
     email: data.email || undefined,
     created_at: data.created_at,
-    active: data.active !== false,
+    active: (data.active as boolean) !== false,
     shifts: shifts || [],
   };
 }

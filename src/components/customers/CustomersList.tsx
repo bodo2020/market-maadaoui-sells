@@ -27,7 +27,7 @@ export default function CustomersList({ searchTerm: externalSearchTerm }: Custom
   
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ["customers"],
-    queryFn: fetchCustomers
+    queryFn: () => fetchCustomers()
   });
   
   const deleteMutation = useMutation({
