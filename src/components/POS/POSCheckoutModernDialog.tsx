@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Banknote, Check, CreditCard, Gift, PackageCheck, RefreshCw, ScanLine, Smartphone, Ticket, WalletCards, X } from "lucide-react";
+import { AlertTriangle, Check, Gift, PackageCheck, RefreshCw, ScanLine, Ticket, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import InvoiceDialog from "@/components/POS/InvoiceDialog";
+import PaymentMethodBrand from "@/components/payments/PaymentMethodBrand";
 import type { CartItem, Sale } from "@/types";
 import { siteConfig } from "@/config/site";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,13 +47,6 @@ type Props = {
 
 function money(value: number) {
   return `${Number(value || 0).toFixed(2)} ${siteConfig.currency}`;
-}
-
-function paymentIcon(type: POSPaymentMethod["method_type"]) {
-  if (type === "cash") return Banknote;
-  if (type === "card") return CreditCard;
-  if (type === "digital_wallet") return Smartphone;
-  return WalletCards;
 }
 
 export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId, items, total, onRepriced, onSaleCommitted, onStartNewSale }: Props) {
@@ -344,7 +338,7 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
               <section className="rounded-3xl border p-4">
                 <div className="mb-3"><div className="text-xs font-bold text-[#005931]">3 · وسيلة الدفع</div><div className="font-black">اختر طريقة التحصيل</div></div>
                 {loadingMethods ? <div className="flex justify-center py-5"><RefreshCw className="h-5 w-5 animate-spin text-[#005931]" /></div> : activeMethods.length === 0 ? <Alert variant="destructive"><AlertDescription>لا توجد وسيلة دفع مفعلة للفرع. فعّل واحدة من صفحة وسائل الدفع.</AlertDescription></Alert> : (
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{activeMethods.map(method => { const Icon = paymentIcon(method.method_type); const active = method.id === methodId; return <button key={method.id} type="button" onClick={() => { setMethodId(method.id); setPaymentReference(""); }} className={`rounded-2xl border p-3 text-center transition ${active ? "border-[#005931] bg-emerald-50 text-[#005931] ring-1 ring-[#005931]/20" : "bg-white hover:bg-slate-50"}`}><Icon className="mx-auto h-5 w-5" /><div className="mt-2 text-sm font-black">{method.name}</div>{method.fee_type !== "none" && method.fee_value > 0 && <div className="mt-1 text-[10px]">رسوم {method.fee_type === "percent" ? `${method.fee_value}%` : money(method.fee_value)}</div>}</button>; })}</div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{activeMethods.map(method => { const active = method.id === methodId; return <button key={method.id} type="button" onClick={() => { setMethodId(method.id); setPaymentReference(""); }} className={`flex min-h-[104px] flex-col items-center justify-center rounded-2xl border p-3 text-center transition ${active ? "border-[#005931] bg-emerald-50 text-[#005931] ring-1 ring-[#005931]/20" : "bg-white hover:bg-slate-50"}`}><PaymentMethodBrand method={method} compact className="border-0 shadow-none" /><div className="mt-2 text-sm font-black">{method.name}</div>{method.fee_type !== "none" && method.fee_value > 0 && <div className="mt-1 text-[10px]">رسوم {method.fee_type === "percent" ? `${method.fee_value}%` : money(method.fee_value)}</div>}</button>; })}</div>
                 )}
                 {selectedMethod?.require_reference && <div className="mt-3 space-y-2"><Label>الرقم المرجعي للعملية</Label><Input value={paymentReference} onChange={e => setPaymentReference(e.target.value)} placeholder="رقم العملية / الإيصال" dir="ltr" /></div>}
                 {selectedMethod && paymentPreview.fee > 0 && <div className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-950"><div className="flex justify-between"><span>رسوم {selectedMethod.name}</span><strong>{money(paymentPreview.fee)}</strong></div><div className="mt-1 text-xs">{selectedMethod.fee_bearer === "customer" ? "تُضاف على المبلغ المطلوب من العميل." : "تتحملها المنشأة وتُخصم من صافي الربح."}</div></div>}
