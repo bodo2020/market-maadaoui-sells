@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Banknote, CheckCircle2, CreditCard, RefreshCw, RotateCcw, Scale } from "lucide-react";
+import { AlertTriangle, Banknote, CheckCircle2, CreditCard, Gift, RefreshCw, RotateCcw, Scale } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,13 +34,35 @@ function estimateLineRefund(line: PosReturnPreviewLine, quantity: number) {
 }
 
 function estimateSplit(preview: PosReturnPreview, currentReturnTotal: number) {
-  if (currentReturnTotal <= 0 || preview.sale_total <= 0) return { cash: 0, card: 0 };
-  const targetTotal = round2(preview.returned_total + currentReturnTotal);
-  const targetCash = targetTotal >= preview.sale_total - 0.009
-    ? Number(preview.cash_amount || 0)
-    : Math.min(Number(preview.cash_amount || 0), round2(targetTotal * Number(preview.cash_amount || 0) / Number(preview.sale_total || 1)));
-  const cash = Math.max(0, Math.min(currentReturnTotal, round2(targetCash - Number(preview.returned_cash || 0))));
-  return { cash, card: round2(currentReturnTotal - cash) };
+  if (currentReturnTotal <= 0 || preview.sale_total <= 0) return { cash: 0, card: 0, loyalty: 0, customerMoney: 0 };
+
+  const targetTotal = round2(Number(preview.returned_total || 0) + currentReturnTotal);
+  const originalLoyalty = Math.max(0, Math.min(Number(preview.loyalty_voucher_amount || 0), Number(preview.sale_total || 0)));
+  const targetLoyalty = originalLoyalty > 0
+    ? targetTotal >= Number(preview.sale_total) - 0.009
+      ? originalLoyalty
+      : Math.min(originalLoyalty, round2(targetTotal * originalLoyalty / Number(preview.sale_total || 1)))
+    : 0;
+  const loyalty = Math.max(0, round2(targetLoyalty - Number(preview.returned_loyalty || 0)));
+  const customerMoney = Math.max(0, round2(currentReturnTotal - loyalty));
+
+  const paidTotal = Math.max(0, Number(preview.amount_paid ?? (preview.sale_total - originalLoyalty)));
+  const originalCash = preview.payment_method === "cash"
+    ? paidTotal
+    : preview.payment_method === "card"
+      ? 0
+      : Math.max(0, Math.min(paidTotal, Number(preview.cash_amount || 0)));
+
+  const targetPaid = Math.max(0, round2(targetTotal - targetLoyalty));
+  const targetCash = paidTotal <= 0
+    ? 0
+    : targetTotal >= Number(preview.sale_total) - 0.009
+      ? originalCash
+      : Math.min(originalCash, round2(targetPaid * originalCash / paidTotal));
+  const cash = Math.max(0, Math.min(customerMoney, round2(targetCash - Number(preview.returned_cash || 0))));
+  const card = Math.max(0, round2(customerMoney - cash));
+
+  return { cash, card, loyalty, customerMoney };
 }
 
 type Props = {
@@ -103,7 +125,10 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
     () => round2(selectedLines.reduce((sum, row) => sum + estimateLineRefund(row.line, row.quantity), 0)),
     [selectedLines],
   );
-  const split = useMemo(() => preview ? estimateSplit(preview, returnTotal) : { cash: 0, card: 0 }, [preview, returnTotal]);
+  const split = useMemo(
+    () => preview ? estimateSplit(preview, returnTotal) : { cash: 0, card: 0, loyalty: 0, customerMoney: 0 },
+    [preview, returnTotal],
+  );
 
   const allAvailableSelected = Boolean(preview?.lines.filter(line => line.available_quantity > 0).length)
     && preview!.lines.filter(line => line.available_quantity > 0).every(line => selected[line.line_index]);
@@ -177,7 +202,7 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
       <DialogContent dir="rtl" className="max-h-[94vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader className="text-right">
           <DialogTitle className="flex items-center gap-2"><RotateCcw className="h-5 w-5 text-[#005931]" /> مرتجع سريع من الفاتورة</DialogTitle>
-          <DialogDescription>{sale?.invoice_number || "الفاتورة"} · المرتجع مرتبط بالوردية والجهاز الحاليين ويتم تسجيله Atomic.</DialogDescription>
+          <DialogDescription>{sale?.invoice_number || "الفاتورة"} · المبلغ المدفوع وكوبون الخصم يتم إرجاع كل جزء إلى مصدره تلقائيًا.</DialogDescription>
         </DialogHeader>
 
         {loading ? (
@@ -190,15 +215,21 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
               <div className="mt-1 text-2xl font-black">{money(result.total_amount)}</div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Gift className="h-4 w-4" /> رجع لكوبون الخصم</div><div className="mt-1 text-xl font-black text-amber-700">{money(result.refund_loyalty_amount)}</div></div>
               <div className="rounded-2xl border p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4" /> رد نقدي من الدرج</div><div className="mt-1 text-xl font-black">{money(result.refund_cash_amount)}</div></div>
               <div className="rounded-2xl border p-4"><div className="flex items-center gap-2 text-xs text-muted-foreground"><CreditCard className="h-4 w-4" /> رد بطاقة</div><div className="mt-1 text-xl font-black">{money(result.refund_card_amount)}</div></div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm">
+              <div className="flex items-center justify-between"><span className="text-muted-foreground">إجمالي يرجع للعميل كفلوس</span><strong>{money(result.refund_customer_money)}</strong></div>
+              {result.refund_loyalty_amount > 0 && <p className="mt-2 text-xs leading-5 text-slate-500">جزء كوبون الخصم رجع لنفس الكوبون، لذلك لا يخرج من درج الكاشير ولا من البطاقة.</p>}
             </div>
 
             {result.refund_card_amount > 0 && !cardConfirmed && result.card_refund_pending && (
               <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-4">
                 <div className="font-bold text-amber-900">متبقي تأكيد رد البطاقة</div>
-                <p className="text-sm leading-6 text-amber-800">نفّذ رد {money(result.refund_card_amount)} على جهاز/مزود البطاقة، وبعدها اكتب رقم مرجع العملية هنا. المخزون والجزء النقدي تم تسجيلهم بالفعل.</p>
+                <p className="text-sm leading-6 text-amber-800">نفّذ رد {money(result.refund_card_amount)} على جهاز/مزود البطاقة، وبعدها اكتب رقم مرجع العملية هنا. المخزون والجزء النقدي وكوبون الخصم تم تسجيلهم بالفعل.</p>
                 <div className="space-y-2"><Label>مرجع رد البطاقة</Label><Input value={providerReference} onChange={event => setProviderReference(event.target.value)} placeholder="مثال: REF-123456" /></div>
                 <Button className="w-full bg-[#005931] hover:bg-[#004a29]" disabled={confirmingCard || providerReference.trim().length < 3} onClick={() => void confirmCard()}>
                   {confirmingCard ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} تأكيد رد البطاقة
@@ -206,7 +237,7 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
               </div>
             )}
 
-            {(cardConfirmed || result.refund_card_amount === 0) && <Alert className="border-emerald-200 bg-emerald-50"><CheckCircle2 className="h-4 w-4 text-emerald-700" /><AlertDescription>المرتجع مكتمل ماليًا ومخزنيًا.</AlertDescription></Alert>}
+            {(cardConfirmed || result.refund_card_amount === 0) && <Alert className="border-emerald-200 bg-emerald-50"><CheckCircle2 className="h-4 w-4 text-emerald-700" /><AlertDescription>المرتجع مكتمل ماليًا ومخزنيًا، وتمت إعادة جزء الولاء للكوبون إن وجد.</AlertDescription></Alert>}
             <Button variant="outline" className="h-11 w-full" onClick={() => onOpenChange(false)}>إغلاق</Button>
           </div>
         ) : preview ? (
@@ -215,10 +246,16 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">قيمة الفاتورة</div><strong>{money(preview.sale_total)}</strong></div>
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">مرتجع سابق</div><strong>{money(preview.returned_total)}</strong></div>
+              <div className="rounded-xl bg-amber-50 p-3"><div className="text-[11px] text-amber-700">كوبون الخصم</div><strong className="text-amber-800">{money(preview.loyalty_voucher_amount)}</strong></div>
+              <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">المدفوع فعليًا</div><strong>{money(preview.amount_paid)}</strong></div>
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">متبقي للإرجاع</div><strong className="text-[#005931]">{money(preview.remaining_total)}</strong></div>
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">طريقة الدفع</div><strong>{preview.payment_method === "mixed" ? "مختلط" : preview.payment_method === "card" ? "بطاقة" : "نقدي"}</strong></div>
             </div>
+
+            {preview.returned_total > 0 && (
+              <div className="rounded-xl border bg-white p-3 text-xs text-muted-foreground">
+                مرتجعات سابقة: {money(preview.returned_total)} · رجع منها للكوبون {money(preview.returned_loyalty)} · رجع كفلوس {money(preview.returned_customer_money)}
+              </div>
+            )}
 
             <div className="flex items-center justify-between gap-3">
               <div className="font-bold">اختر المنتجات والكميات</div>
@@ -263,10 +300,12 @@ export default function PosQuickReturnDialog({ open, onOpenChange, sale, onSucce
 
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="flex items-center justify-between text-sm"><span>إجمالي المرتجع المتوقع</span><strong className="text-xl">{money(returnTotal)}</strong></div>
-              <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3">
+              <div className="mt-3 grid grid-cols-1 gap-2 border-t pt-3 sm:grid-cols-3">
+                <div className="rounded-xl bg-amber-50 p-3"><div className="flex items-center gap-1 text-xs text-amber-700"><Gift className="h-3.5 w-3.5" /> يرجع لكوبون الخصم</div><strong className="text-amber-800">{money(split.loyalty)}</strong></div>
                 <div className="rounded-xl bg-white p-3"><div className="flex items-center gap-1 text-xs text-muted-foreground"><Banknote className="h-3.5 w-3.5" /> من درج الكاشير</div><strong>{money(split.cash)}</strong></div>
                 <div className="rounded-xl bg-white p-3"><div className="flex items-center gap-1 text-xs text-muted-foreground"><CreditCard className="h-3.5 w-3.5" /> رد بطاقة</div><strong>{money(split.card)}</strong></div>
               </div>
+              {split.loyalty > 0 && <p className="mt-3 text-xs leading-5 text-slate-500">الكوبون لا يُرد كاش. الجزء الخاص به يرجع لرصيد نفس كوبون الخصم، والمبلغ المدفوع فقط هو الذي يُرد نقدي/بطاقة.</p>}
             </div>
 
             <Button className="h-12 w-full bg-[#005931] hover:bg-[#004a29]" disabled={submitting || returnTotal <= 0 || reason.trim().length < 3} onClick={() => void submit()}>
