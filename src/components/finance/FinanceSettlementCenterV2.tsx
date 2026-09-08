@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftRight, Banknote, Building2, Landmark, RefreshCw, ShieldCheck, WalletCards } from "lucide-react";
 import PaymentMethodBrand from "@/components/payments/PaymentMethodBrand";
 import FinanceCashHandoffCenterV2 from "@/components/finance/FinanceCashHandoffCenterV2";
+import FinanceRefundTaskCenter from "@/components/finance/FinanceRefundTaskCenter";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -133,6 +134,7 @@ export default function FinanceSettlementCenterV2() {
 
   return (
     <>
+      <FinanceRefundTaskCenter />
       <FinanceCashHandoffCenterV2 />
 
       <section dir="rtl" className="space-y-4">
