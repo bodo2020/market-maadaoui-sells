@@ -108,7 +108,7 @@ export async function preflightPosCart(branchId: string, items: CartItem[]): Pro
   const result = data as PosPreflightResult | PosPreflightFailure;
   if (!result.ok) {
     invalidatePosPreflightCache(branchId);
-    throw new Error(failureMessage(result));
+    throw new Error(failureMessage(result as PosPreflightFailure));
   }
   if (!Array.isArray(result.items)) throw new Error("نتيجة مراجعة السلة غير مكتملة.");
 
