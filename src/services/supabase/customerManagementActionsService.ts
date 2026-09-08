@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type CustomerFollowupType = "call" | "email" | "meeting" | "whatsapp";
+export type CustomerFollowupOutcomeCode = "reached" | "no_answer" | "interested" | "not_interested" | "issue_resolved" | "callback_requested" | "wrong_number";
 
 export type CustomerPendingFollowup = {
   id: string;
@@ -45,6 +46,8 @@ export type CustomerManagementWorkspace = {
     assigned_to_name?: string | null;
     completed_at?: string | null;
     completed_by?: string | null;
+    outcome_code?: CustomerFollowupOutcomeCode | null;
+    outcome_note?: string | null;
   }>;
   pending_followups: CustomerPendingFollowup[];
   audit: Array<{
@@ -73,6 +76,8 @@ function rpcError(message?: string) {
   if (message?.includes("FOLLOWUP_SCHEDULE_REQUIRED")) return new Error("حدد موعد المتابعة.");
   if (message?.includes("INVALID_FOLLOWUP_SUBJECT")) return new Error("اكتب عنوانًا واضحًا للمتابعة.");
   if (message?.includes("FOLLOWUP_OUTCOME_REQUIRED")) return new Error("اكتب نتيجة المتابعة قبل إغلاقها.");
+  if (message?.includes("INVALID_FOLLOWUP_OUTCOME_CODE")) return new Error("اختر نتيجة متابعة صحيحة.");
+  if (message?.includes("FOLLOWUP_OUTCOME_NOTE_TOO_LONG")) return new Error("ملاحظة النتيجة طويلة جدًا.");
   if (message?.includes("FOLLOWUP_CANCEL_REASON_REQUIRED")) return new Error("اكتب سبب إلغاء المتابعة.");
   if (message?.includes("FOLLOWUP_ALREADY_CLOSED")) return new Error("المتابعة مقفولة بالفعل.");
   return new Error(message || "تعذر تنفيذ العملية.");
@@ -176,6 +181,22 @@ export async function completeCustomerFollowup(interactionId: string, outcome: s
   const { data, error } = await rpc("complete_customer_followup", {
     p_interaction_id: interactionId,
     p_outcome: outcome,
+    p_branch_id: branchId || null,
+  });
+  if (error) throw rpcError(error.message);
+  return data as CustomerManagementWorkspace;
+}
+
+export async function completeCustomerFollowupV2(
+  interactionId: string,
+  outcomeCode: CustomerFollowupOutcomeCode,
+  outcomeNote?: string,
+  branchId?: string | null,
+): Promise<CustomerManagementWorkspace> {
+  const { data, error } = await rpc("complete_customer_followup_v2", {
+    p_interaction_id: interactionId,
+    p_outcome_code: outcomeCode,
+    p_outcome_note: outcomeNote?.trim() || null,
     p_branch_id: branchId || null,
   });
   if (error) throw rpcError(error.message);
