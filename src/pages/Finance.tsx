@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import MainLayout from "@/components/layout/MainLayout";
+import FinanceSettlementCenterV2 from "@/components/finance/FinanceSettlementCenterV2";
 import { siteConfig } from "@/config/site";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -256,6 +257,8 @@ export default function Finance() {
             />
           </div>
         </section>
+
+        <FinanceSettlementCenterV2 />
 
         <section className="grid gap-4 lg:grid-cols-2">
           <Card className="border-slate-100 shadow-sm">
