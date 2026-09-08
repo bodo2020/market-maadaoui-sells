@@ -56,11 +56,13 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
       currency: siteConfig.currency || 'ج.م'
     };
 
-    if (bluetoothPrinterService.isConnected()) {
-      const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
-      const success = await bluetoothPrinterService.printText(invoiceText);
-      if (success) return;
-    }
+    // Use one receipt generator for BLE and browser printing so modern payment
+    // names, references, loyalty discounts and fees stay identical everywhere.
+    const invoiceText = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
+    const success = await bluetoothPrinterService.printText(invoiceText);
+    if (success) return;
+
+    // Last-resort fallback when the browser blocks the lightweight print window.
     printInvoice(sale, storeInfo);
   };
 
