@@ -5,25 +5,29 @@ export type CustomerPrioritySignal = {
   [key: string]: unknown;
 };
 
+export type CustomerOpportunityQueueAction = {
+  id: string;
+  customer_id: string;
+  action_type: "handled" | "snoozed";
+  suppress_until: string;
+  note: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+};
+
+export type CustomerOpportunityQueueState = {
+  active: CustomerOpportunityQueueAction[];
+  summary: {
+    active_count: number;
+    handled_today: number;
+    snoozed_active: number;
+  };
+};
+
 export type CustomerOperationsCenter = {
   attribution_window_days: number;
-  queue_state?: {
-    active: Array<{
-      id: string;
-      customer_id: string;
-      action_type: "handled" | "snoozed";
-      suppress_until: string;
-      note: string | null;
-      created_by: string | null;
-      created_by_name: string | null;
-      created_at: string;
-    }>;
-    summary: {
-      active_count: number;
-      handled_today: number;
-      snoozed_active: number;
-    };
-  };
+  queue_state?: CustomerOpportunityQueueState;
   summary: {
     window_days: number;
     completed_followups: number;
@@ -161,7 +165,11 @@ const rpc = supabase.rpc.bind(supabase) as unknown as (
 
 function mapError(message?: string) {
   if (message?.includes("CUSTOMER_ACCESS_DENIED")) return new Error("ليس لديك صلاحية عرض مركز تشغيل العملاء.");
+  if (message?.includes("CUSTOMER_MANAGE_DENIED")) return new Error("ليس لديك صلاحية إدارة فرص العملاء.");
   if (message?.includes("CUSTOMER_NOT_FOUND")) return new Error("العميل غير موجود.");
+  if (message?.includes("INVALID_OPPORTUNITY_ACTION")) return new Error("إجراء الفرصة غير صحيح.");
+  if (message?.includes("INVALID_SNOOZE_HOURS")) return new Error("مدة الغفوة غير مدعومة.");
+  if (message?.includes("OPPORTUNITY_NOTE_TOO_LONG")) return new Error("ملاحظة الإجراء طويلة جدًا.");
   return new Error(message || "تعذر تحميل تحليلات المتابعة.");
 }
 
@@ -202,4 +210,51 @@ export async function fetchCustomerFollowupOutcomeDashboard(branchId?: string | 
   });
   if (error) throw mapError(error.message);
   return data as CustomerFollowupOutcomeDashboard;
+}
+
+export async function fetchCustomerOpportunityQueueState(branchId?: string | null): Promise<CustomerOpportunityQueueState> {
+  const { data, error } = await rpc("get_customer_opportunity_queue_state", {
+    p_branch_id: branchId || null,
+  });
+  if (error) throw mapError(error.message);
+  return data as CustomerOpportunityQueueState;
+}
+
+export async function setCustomerOpportunityQueueAction(params: {
+  customerId: string;
+  actionType: "handled" | "snoozed";
+  snoozeHours?: 4 | 24 | 72 | 168;
+  note?: string;
+  branchId?: string | null;
+}): Promise<{
+  id: string;
+  customer_id: string;
+  action_type: "handled" | "snoozed";
+  suppress_until: string;
+  hours: number;
+}> {
+  const { data, error } = await rpc("set_customer_opportunity_queue_action", {
+    p_customer_id: params.customerId,
+    p_action_type: params.actionType,
+    p_snooze_hours: params.actionType === "snoozed" ? params.snoozeHours || 24 : null,
+    p_note: params.note?.trim() || null,
+    p_branch_id: params.branchId || null,
+  });
+  if (error) throw mapError(error.message);
+  return data as {
+    id: string;
+    customer_id: string;
+    action_type: "handled" | "snoozed";
+    suppress_until: string;
+    hours: number;
+  };
+}
+
+export async function clearCustomerOpportunityQueueAction(customerId: string, branchId?: string | null): Promise<{ customer_id: string; cleared: number }> {
+  const { data, error } = await rpc("clear_customer_opportunity_queue_action", {
+    p_customer_id: customerId,
+    p_branch_id: branchId || null,
+  });
+  if (error) throw mapError(error.message);
+  return data as { customer_id: string; cleared: number };
 }
