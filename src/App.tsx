@@ -7,6 +7,8 @@ import ReportsSalesV2 from "@/pages/ReportsSalesV2";
 import ReportsProfitabilityV2 from "@/pages/ReportsProfitabilityV2";
 import ReportsPaymentsV2 from "@/pages/ReportsPaymentsV2";
 import ReportsReturnsV2 from "@/pages/ReportsReturnsV2";
+import ReportsProductsV2 from "@/pages/ReportsProductsV2";
+import ReportsInventoryV2 from "@/pages/ReportsInventoryV2";
 import NotFound from "@/pages/NotFound";
 import POSPro from "@/pages/POSPro";
 import PosShiftGatePro from "@/components/POS/PosShiftGatePro";
@@ -135,6 +137,8 @@ function App() {
               <Route path="/reports/profitability" element={<ProtectedRoute><ReportsProfitabilityV2 /></ProtectedRoute>} />
               <Route path="/reports/payments" element={<ProtectedRoute><ReportsPaymentsV2 /></ProtectedRoute>} />
               <Route path="/reports/returns" element={<ProtectedRoute><ReportsReturnsV2 /></ProtectedRoute>} />
+              <Route path="/reports/products" element={<ProtectedRoute><ReportsProductsV2 /></ProtectedRoute>} />
+              <Route path="/reports/inventory" element={<ProtectedRoute><ReportsInventoryV2 /></ProtectedRoute>} />
               <Route path="/analytics" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
               <Route path="/ai-insights" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
               <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
