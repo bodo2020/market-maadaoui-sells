@@ -18,12 +18,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useBranchStore } from "@/stores/branchStore";
-import { completeCustomerFollowupV2, type CustomerFollowupOutcomeCode } from "@/services/supabase/customerManagementActionsService";
+import { completeCustomerFollowupV3, type CustomerFollowupOutcomeCode } from "@/services/supabase/customerManagementActionsService";
 import { fetchMyCustomerFollowupInbox, type MyCustomerFollowupTask } from "@/services/supabase/customerMyTasksService";
 
 const outcomeLabels: Record<CustomerFollowupOutcomeCode, string> = {
@@ -62,6 +64,12 @@ function formatDateTime(value: string) {
   }
 }
 
+function localDateTimeAfter(hours: number) {
+  const target = new Date(Date.now() + hours * 60 * 60 * 1000);
+  const local = new Date(target.getTime() - target.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 function normalizeWhatsApp(phone?: string | null) {
   const raw = String(phone || "").replace(/\D/g, "");
   if (!raw) return "";
@@ -85,6 +93,7 @@ export default function CustomerMyTasksDock() {
   const [selectedTask, setSelectedTask] = useState<MyCustomerFollowupTask | null>(null);
   const [outcome, setOutcome] = useState<CustomerFollowupOutcomeCode>("reached");
   const [note, setNote] = useState("");
+  const [callbackAt, setCallbackAt] = useState(localDateTimeAfter(24));
   const [saving, setSaving] = useState(false);
 
   const query = useQuery({
@@ -117,23 +126,34 @@ export default function CustomerMyTasksDock() {
     setSelectedTask(task);
     setOutcome("reached");
     setNote("");
+    setCallbackAt(localDateTimeAfter(24));
     setResultOpen(true);
   };
 
   const saveResult = async () => {
     if (!selectedTask || saving) return;
+    let callbackIso: string | null = null;
+    if (outcome === "callback_requested") {
+      if (!callbackAt) return toast.error("حدد موعد إعادة التواصل.");
+      const parsed = new Date(callbackAt);
+      if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) return toast.error("اختار موعد إعادة تواصل في المستقبل.");
+      callbackIso = parsed.toISOString();
+    }
+
     setSaving(true);
     try {
-      await completeCustomerFollowupV2(
+      const result = await completeCustomerFollowupV3(
         selectedTask.interaction_id,
         outcome,
         note.trim() || undefined,
+        callbackIso,
         currentBranchId || null,
       );
-      toast.success("تم تسجيل نتيجة المتابعة وإغلاق المهمة.");
+      toast.success(result.callback_created ? "تم إغلاق المهمة وإنشاء متابعة جديدة تلقائيًا." : "تم تسجيل نتيجة المتابعة وإغلاق المهمة.");
       setResultOpen(false);
       setSelectedTask(null);
       setNote("");
+      setCallbackAt(localDateTimeAfter(24));
       await refreshRelated();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر تسجيل نتيجة المتابعة.");
@@ -251,6 +271,13 @@ export default function CustomerMyTasksDock() {
                 <SelectTrigger><SelectValue placeholder="اختر النتيجة" /></SelectTrigger>
                 <SelectContent>{Object.entries(outcomeLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
               </Select>
+              {outcome === "callback_requested" && (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
+                  <Label>موعد إعادة التواصل</Label>
+                  <Input className="mt-1 bg-white" type="datetime-local" value={callbackAt} onChange={event => setCallbackAt(event.target.value)} />
+                  <p className="mt-1 text-[11px] text-blue-700">هتتعمل متابعة جديدة تلقائيًا لنفس المسؤول.</p>
+                </div>
+              )}
               <Textarea value={note} onChange={event => setNote(event.target.value)} placeholder="ملاحظة اختيارية عن نتيجة التواصل..." className="min-h-24" />
             </div>
           )}
