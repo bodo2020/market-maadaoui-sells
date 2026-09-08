@@ -13,6 +13,8 @@ import POSCustomerLoyaltyBridge from "@/components/POS/POSCustomerLoyaltyBridge"
 import CustomerManagementDock from "@/components/customers/CustomerManagementDock";
 import CustomerInsightsDock from "@/components/customers/CustomerInsightsDock";
 import CustomerOpportunityDock from "@/components/customers/CustomerOpportunityDock";
+import CustomerOperationsCenterDock from "@/components/customers/CustomerOperationsCenterDock";
+import CustomerFollowupPerformanceDock from "@/components/customers/CustomerFollowupPerformanceDock";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -88,6 +90,7 @@ const CashierPOS = () => (
 const CustomersWorkspace = () => (
   <>
     <CustomersAdvanced />
+    <CustomerOperationsCenterDock />
     <CustomerOpportunityDock />
   </>
 );
@@ -95,6 +98,7 @@ const CustomersWorkspace = () => (
 const Customer360Workspace = () => (
   <>
     <Customer360Profile />
+    <CustomerFollowupPerformanceDock />
     <CustomerInsightsDock />
     <CustomerManagementDock />
   </>
