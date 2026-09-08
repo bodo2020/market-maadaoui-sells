@@ -6,6 +6,7 @@ export type CustomerOpportunityBoard = {
     coupon_ready: number;
     due_or_overdue: number;
     under_watch: number;
+    pending_followups: number;
   };
   abandoned_carts: Array<{
     id: string;
@@ -44,6 +45,22 @@ export type CustomerOpportunityBoard = {
     membership_number: string | null;
     management_status: string;
     last_admin_action_at: string | null;
+  }>;
+  followups: Array<{
+    interaction_id: string;
+    id: string;
+    name: string | null;
+    phone: string | null;
+    membership_number: string | null;
+    type: "call" | "email" | "meeting" | "whatsapp";
+    subject: string;
+    description: string | null;
+    priority: "low" | "medium" | "high" | string;
+    scheduled_at: string;
+    assigned_to: string | null;
+    assigned_to_name: string | null;
+    overdue: boolean;
+    overdue_hours: number;
   }>;
 };
 
