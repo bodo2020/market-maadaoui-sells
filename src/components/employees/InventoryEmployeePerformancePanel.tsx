@@ -22,6 +22,7 @@ function rangeFor(days: number) {
 const number = (value: number) => Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2 });
 const pct = (value: number | null) => value == null ? "—" : `${Number(value).toLocaleString("ar-EG", { maximumFractionDigits: 1 })}%`;
 const money = (value: number) => `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
+const duration = (value: number | null) => value == null ? "—" : `${number(value)} د`;
 
 export default function InventoryEmployeePerformancePanel({ employeeId, branchId }: { employeeId: string; branchId: string | null }) {
   const [days, setDays] = useState(30);
@@ -40,7 +41,7 @@ export default function InventoryEmployeePerformancePanel({ employeeId, branchId
     { label: "نسبة إنجاز الجرد", value: pct(p.counts.completion_rate), icon: PackageCheck },
     { label: "فروق تم اكتشافها", value: number(p.counts.discrepancy), icon: Scale },
     { label: "القيمة المطلقة للفروق", value: money(p.counts.abs_variance_value), icon: Scale },
-    { label: "متوسط زمن العد النشط", value: `${number(p.counts.avg_active_minutes)} د`, icon: Clock3 },
+    { label: "متوسط زمن العد النشط", value: duration(p.counts.avg_active_minutes), icon: Clock3 },
     { label: "مهام جرد متأخرة", value: number(p.counts.overdue_open + p.recounts.overdue_open), icon: AlertTriangle },
     { label: "إعادة عد منفذة", value: `${number(p.recounts.submitted)} / ${number(p.recounts.assigned)}`, icon: RefreshCcw },
     { label: "تأكيد Peer Recount", value: pct(p.peer_review.confirmation_rate), icon: ShieldCheck },
@@ -86,9 +87,10 @@ export default function InventoryEmployeePerformancePanel({ employeeId, branchId
             <div className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Recount مسند</span><span className="font-semibold">{number(p.recounts.assigned)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Recount منفذ</span><span className="font-semibold">{number(p.recounts.submitted)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">مطابق للرصيد</span><span className="font-semibold">{number(p.recounts.matched)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">ما زال به فرق</span><span className="font-semibold">{number(p.recounts.discrepancy)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">متوسط زمن التنفيذ</span><span className="font-semibold">{number(p.recounts.avg_active_minutes)} د</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">مطابق للنظام</span><span className="font-semibold">{number(p.recounts.matched_system)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">أكد وجود الفرق</span><span className="font-semibold">{number(p.recounts.confirmed_variance)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">تعارض مع العد الأول</span><span className="font-semibold">{number(p.recounts.conflicting)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">متوسط زمن التنفيذ النشط</span><span className="font-semibold">{duration(p.recounts.avg_active_minutes)}</span></div>
             </div>
           </div>
 
@@ -106,6 +108,7 @@ export default function InventoryEmployeePerformancePanel({ employeeId, branchId
         <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 text-sm leading-6 text-blue-950">
           <div className="flex items-center gap-2 font-black"><CheckCheck className="h-4 w-4" />قراءة المؤشرات بشكل صحيح</div>
           <p className="mt-1">عدد الفروق وقيمتها ليست عقوبة على الموظف؛ الموظف الجيد قد يكتشف فرقًا حقيقيًا كان مخفيًا. المؤشر الأقوى عند وجود فرق هو نتيجة Peer Recount وسجل الموافقة على تعديل المخزون.</p>
+          <p className="mt-1">متوسط الزمن لا يظهر إلا للمهام التي بدأت فعليًا بزر البدء، لذلك وقت الانتظار قبل بدء المهمة لا يدخل في تقييم سرعة التنفيذ.</p>
           <p className="mt-1">القيمة المطلقة للفروق تعرض حجم المخزون الذي احتاج مراجعة خلال الفترة ولا تعني أن الموظف تسبب في هذه القيمة.</p>
         </div>
       </CardContent>
