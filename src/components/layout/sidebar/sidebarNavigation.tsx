@@ -86,7 +86,7 @@ export const financeNavigation: NavigationGroup = {
     { label: "المالية", href: "/finance", icon: DollarSign },
     { label: "وسائل الدفع", href: "/payment-methods", icon: WalletCards },
     { label: "مسير الرواتب", href: "/hr/payroll", icon: DollarSign, adminOnly: true },
-    { label: "المصروفات", href: "/expenses-salaries", icon: FileText },
+    { label: "المصروفات", href: "/expenses", icon: FileText },
     { label: "تتبع النقدية", href: "/cash-tracking", icon: Wallet, adminOnly: true },
     { label: "المرتجعات", href: "/returns", icon: RefreshCw },
   ],
