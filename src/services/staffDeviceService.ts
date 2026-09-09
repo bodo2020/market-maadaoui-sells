@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type StaffDeviceType = "personal" | "shared" | "remote";
+export type StaffDeviceApprovalStatus = "pending" | "approved" | "rejected";
 
 export type StaffDevice = {
   id: string;
@@ -13,10 +14,31 @@ export type StaffDevice = {
   platform: string | null;
   metadata: Record<string, unknown>;
   active: boolean;
-  trusted_at: string;
+  trusted_at: string | null;
   last_seen_at: string | null;
   revoked_at: string | null;
   revoke_reason: string | null;
+  approval_status: StaffDeviceApprovalStatus;
+  requested_at: string;
+  approved_at: string | null;
+  approved_by: string | null;
+  rejected_at: string | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
+};
+
+export type StaffDeviceApprovalItem = {
+  device_id: string;
+  user_id: string;
+  employee_name: string;
+  username: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
+  device_name: string;
+  device_type: StaffDeviceType;
+  platform: string | null;
+  metadata: Record<string, unknown>;
+  requested_at: string;
 };
 
 export type StaffDevicePairing = {
@@ -33,6 +55,7 @@ export type StaffDevicePairing = {
 export type RedeemedStaffDevice = {
   ok: boolean;
   code?: string;
+  approval_status?: StaffDeviceApprovalStatus;
   device_id?: string;
   device_token?: string;
   device_key?: string;
@@ -42,7 +65,8 @@ export type RedeemedStaffDevice = {
   employee_name?: string;
   branch_id?: string | null;
   branch_name?: string | null;
-  trusted_at?: string;
+  trusted_at?: string | null;
+  requested_at?: string;
 };
 
 const rpc = supabase.rpc.bind(supabase) as unknown as (
@@ -75,6 +99,22 @@ export async function getEmployeeStaffDevices(employeeId: string, branchId?: str
   return (Array.isArray(data) ? data : []) as StaffDevice[];
 }
 
+export async function listPendingStaffDeviceApprovals(limit = 100): Promise<StaffDeviceApprovalItem[]> {
+  const { data, error } = await rpc("list_pending_staff_device_approvals_v1", { p_limit: limit });
+  if (error) throw new Error(error.message || "تعذر تحميل طلبات اعتماد الأجهزة");
+  return (Array.isArray(data) ? data : []) as StaffDeviceApprovalItem[];
+}
+
+export async function approveStaffDevice(deviceId: string): Promise<void> {
+  const { error } = await rpc("approve_staff_device_v1", { p_device_id: deviceId });
+  if (error) throw new Error(error.message || "تعذر اعتماد الجهاز");
+}
+
+export async function rejectStaffDevice(deviceId: string, reason: string): Promise<void> {
+  const { error } = await rpc("reject_staff_device_v1", { p_device_id: deviceId, p_reason: reason });
+  if (error) throw new Error(error.message || "تعذر رفض الجهاز");
+}
+
 export async function revokeStaffDevice(deviceId: string, reason?: string): Promise<void> {
   const { error } = await rpc("revoke_staff_device_v1", {
     p_device_id: deviceId,
@@ -101,7 +141,7 @@ export async function redeemStaffDevicePairing(params: {
     p_device_type: params.deviceType || null,
     p_metadata: params.metadata || {},
   });
-  if (error) throw new Error(error.message || "تعذر تفعيل الجهاز");
+  if (error) throw new Error(error.message || "تعذر تسجيل الجهاز");
   return data as RedeemedStaffDevice;
 }
 
@@ -111,7 +151,7 @@ export async function validateMyStaffDevice(deviceId: string, deviceToken: strin
     p_device_token: deviceToken,
   });
   if (error) throw new Error(error.message || "تعذر التحقق من الجهاز");
-  return data as { trusted: boolean; code?: string; [key: string]: unknown };
+  return data as { trusted: boolean; code?: string; reason?: string; [key: string]: unknown };
 }
 
 const DEVICE_KEY_STORAGE = "staffDeviceKey:v1";
@@ -134,7 +174,9 @@ export function saveTrustedStaffDevice(device: RedeemedStaffDevice): void {
     branch_id: device.branch_id || null,
     device_name: device.device_name || "جهاز موظف",
     device_type: device.device_type || "personal",
-    trusted_at: device.trusted_at || new Date().toISOString(),
+    trusted_at: device.trusted_at || null,
+    approval_status: device.approval_status || "pending",
+    requested_at: device.requested_at || new Date().toISOString(),
   }));
 }
 
@@ -145,7 +187,9 @@ export function getLocalTrustedStaffDevice(): {
   branch_id: string | null;
   device_name: string;
   device_type: StaffDeviceType;
-  trusted_at: string;
+  trusted_at: string | null;
+  approval_status?: StaffDeviceApprovalStatus;
+  requested_at?: string;
 } | null {
   try {
     const raw = localStorage.getItem(TRUSTED_DEVICE_STORAGE);
