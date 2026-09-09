@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
 import NotificationCampaignComposer from "@/components/notifications/NotificationCampaignComposer";
+import NotificationCampaignHistory from "@/components/notifications/NotificationCampaignHistory";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -208,6 +209,8 @@ export default function NotificationsCenterV2() {
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm"><span className="font-black text-[#005931]">{sourceBreakdown.tasks.toLocaleString("ar-EG")}</span><span className="mr-2 font-semibold text-emerald-900">مهمة قابلة للتنفيذ</span></div>
           </div>
         )}
+
+        <NotificationCampaignHistory branchId={currentBranchId || null} />
 
         <Card className="border-slate-200/80 shadow-sm">
           <CardContent className="p-3 md:p-4">
