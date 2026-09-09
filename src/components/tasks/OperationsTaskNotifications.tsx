@@ -8,6 +8,10 @@ import { useNotificationStore } from "@/stores/notificationStore";
 import {
   fetchOperationsTasks,
   isCashHandoffVarianceTask,
+  isInventoryAdjustmentReviewTask,
+  isInventoryCountTask,
+  isInventoryRecountTask,
+  isInventoryTask,
   isRefundTransferTask,
   isShiftReconciliationTask,
   type OperationsTask,
@@ -15,10 +19,48 @@ import {
 
 function tasksPath(tasks: OperationsTask[]) {
   if (!tasks.length) return "/tasks";
+  if (tasks.every(isInventoryTask)) return "/tasks?type=inventory";
   if (tasks.every(isCashHandoffVarianceTask)) return "/tasks?type=cash_handoff";
   if (tasks.every(isShiftReconciliationTask)) return "/tasks?type=shift";
   if (tasks.every(isRefundTransferTask)) return "/tasks?type=refund";
   return "/tasks";
+}
+
+function singleTaskCopy(task: OperationsTask) {
+  if (isInventoryCountTask(task)) {
+    return {
+      title: "مهمة جرد يومي جديدة",
+      description: `${task.title}${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+    };
+  }
+  if (isInventoryRecountTask(task)) {
+    return {
+      title: "مهمة إعادة عد مخزون متاحة",
+      description: `${task.title}${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+    };
+  }
+  if (isInventoryAdjustmentReviewTask(task)) {
+    return {
+      title: "فرق جرد يحتاج اعتماد",
+      description: `${task.title}${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+    };
+  }
+  if (isCashHandoffVarianceTask(task)) {
+    return {
+      title: "مهمة مراجعة فرق استلام نقدية متاحة للاستلام",
+      description: `${task.cashier_name || "كاشير"} · فرق ${Number(task.variance_amount ?? task.amount ?? 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+    };
+  }
+  if (isShiftReconciliationTask(task)) {
+    return {
+      title: "مهمة مراجعة فرق وردية متاحة للاستلام",
+      description: `${task.payment_method_name || task.method_code || "وسيلة دفع"} · فرق ${Number(task.variance_amount ?? task.amount ?? 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+    };
+  }
+  return {
+    title: "مهمة رد مبلغ جديدة متاحة للاستلام",
+    description: `${task.payment_method_name || "دفع إلكتروني"} · ${Number(task.amount || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+  };
 }
 
 export default function OperationsTaskNotifications() {
@@ -56,26 +98,9 @@ export default function OperationsTaskNotifications() {
       const storageKey = `operations-task-open:${user.id}:${currentBranchId}:${signature}`;
       if (!sessionStorage.getItem(storageKey)) {
         sessionStorage.setItem(storageKey, "1");
-        const first = available[0];
-        const cashReview = isCashHandoffVarianceTask(first);
-        const shiftReview = isShiftReconciliationTask(first);
-        const title = available.length > 1
-          ? "مهام تشغيلية جديدة متاحة للاستلام"
-          : cashReview
-            ? "مهمة مراجعة فرق استلام نقدية متاحة للاستلام"
-            : shiftReview
-              ? "مهمة مراجعة فرق وردية متاحة للاستلام"
-              : "مهمة رد مبلغ جديدة متاحة للاستلام";
-        const description = available.length === 1
-          ? cashReview
-            ? `${first.cashier_name || "كاشير"} · فرق ${Number(first.variance_amount ?? first.amount ?? 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${first.reference_number ? ` · ${first.reference_number}` : ""}`
-            : shiftReview
-              ? `${first.payment_method_name || first.method_code || "وسيلة دفع"} · فرق ${Number(first.variance_amount ?? first.amount ?? 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${first.reference_number ? ` · ${first.reference_number}` : ""}`
-              : `${first.payment_method_name || "دفع إلكتروني"} · ${Number(first.amount || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${first.reference_number ? ` · ${first.reference_number}` : ""}`
-          : `${available.length.toLocaleString("ar-EG")} مهام متاحة للفريق في الفرع الحالي`;
-
-        toast.warning(title, {
-          description,
+        const single = available.length === 1 ? singleTaskCopy(available[0]) : null;
+        toast.warning(single?.title || "مهام تشغيلية جديدة متاحة للاستلام", {
+          description: single?.description || `${available.length.toLocaleString("ar-EG")} مهام متاحة للفريق في الفرع الحالي`,
           duration: 10000,
           action: { label: "فتح المهام", onClick: () => navigate(tasksPath(available)) },
         });
