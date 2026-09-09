@@ -63,6 +63,15 @@ export interface NotificationCampaignDetailsV3 {
   recipients: NotificationCampaignRecipientV3[];
 }
 
+export interface NotificationCampaignResendResultV3 {
+  campaign_id: string;
+  resend_of: string;
+  resend_mode: "unread_only" | "same_recipients";
+  recipient_count: number;
+  in_app_created: number;
+  in_app_primary: boolean;
+}
+
 export async function fetchNotificationCampaignHistoryV3(
   branchId: string | null,
   limit = 20,
@@ -90,4 +99,24 @@ export async function fetchNotificationCampaignDetailsV3(campaignId: string): Pr
   });
   if (error) throw error;
   return data as NotificationCampaignDetailsV3;
+}
+
+export async function resendNotificationCampaignV3(
+  campaignId: string,
+  unreadOnly = true,
+): Promise<NotificationCampaignResendResultV3> {
+  const { data, error } = await (supabase as any).rpc("resend_notification_campaign_v3", {
+    p_campaign_id: campaignId,
+    p_unread_only: unreadOnly,
+  });
+  if (error) throw error;
+  const raw: any = data || {};
+  return {
+    campaign_id: String(raw.campaign_id || ""),
+    resend_of: String(raw.resend_of || campaignId),
+    resend_mode: raw.resend_mode === "same_recipients" ? "same_recipients" : "unread_only",
+    recipient_count: Number(raw.recipient_count || 0),
+    in_app_created: Number(raw.in_app_created || 0),
+    in_app_primary: Boolean(raw.in_app_primary),
+  };
 }
