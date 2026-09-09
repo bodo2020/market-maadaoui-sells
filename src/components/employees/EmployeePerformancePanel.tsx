@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CalendarCheck2, CheckCircle2, ClipboardCheck, Clock3, Gauge, ListChecks, PackageCheck, Timer, UserX } from "lucide-react";
 import CashierPerformancePanel from "@/components/employees/CashierPerformancePanel";
 import InventoryEmployeePerformancePanel from "@/components/employees/InventoryEmployeePerformancePanel";
+import DeliveryEmployeePerformancePanel from "@/components/employees/DeliveryEmployeePerformancePanel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getHrEmployeePerformanceDetail } from "@/services/hrPerformanceService";
@@ -81,6 +82,7 @@ export default function EmployeePerformancePanel({ employeeId, branchId }: { emp
 
       <CashierPerformancePanel employeeId={employeeId} branchId={branchId} />
       <InventoryEmployeePerformancePanel employeeId={employeeId} branchId={branchId} />
+      <DeliveryEmployeePerformancePanel employeeId={employeeId} branchId={branchId} />
     </div>
   );
 }
