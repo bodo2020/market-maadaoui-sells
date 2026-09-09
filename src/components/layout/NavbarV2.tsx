@@ -1,8 +1,7 @@
-import { Bell, ChevronDown, Check, Menu, Settings, Store, UserRound, LogOut, BriefcaseBusiness, KeyRound, ReceiptText, Clock3, LockKeyhole, Repeat2 } from "lucide-react";
+import { Bell, ChevronDown, Check, Menu, Settings, Store, UserRound, LogOut, BriefcaseBusiness, KeyRound, ReceiptText, LockKeyhole } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,9 +25,7 @@ function resolveTitle(pathname: string) {
   return parent?.[1] || "ماركت المعداوي";
 }
 
-function emitPosAction(name: string) {
-  window.dispatchEvent(new CustomEvent(name));
-}
+function emitPosAction(name: string) { window.dispatchEvent(new CustomEvent(name)); }
 
 export default function NavbarV2({ onMenuClick, isMobile = false }: { onMenuClick?: () => void; isMobile?: boolean }) {
   const { user, logout, branchOptions, switchBranch } = useAuth();
@@ -61,41 +58,14 @@ export default function NavbarV2({ onMenuClick, isMobile = false }: { onMenuClic
       <div className="flex min-h-[68px] items-center gap-2 px-3 md:px-5">
         {isMobile && <Button variant="outline" size="icon" className="h-11 w-11 shrink-0 rounded-2xl" onClick={onMenuClick}><Menu className="h-5 w-5" /><span className="sr-only">القائمة</span></Button>}
         <div className="min-w-0 flex-1"><div className="truncate text-base font-black text-slate-950 md:text-lg">{title}</div><div className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">{user?.name || "الموظف"} · {roleLabel}</div></div>
-
         <div className="flex items-center gap-1.5 md:gap-2">
-          {branchOptions.length > 1 ? <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="outline" className="h-11 max-w-[180px] gap-2 rounded-2xl px-3"><Store className="h-4 w-4 shrink-0" /><span className="hidden truncate sm:inline">{currentBranchName || "اختر الفرع"}</span><ChevronDown className="h-4 w-4 shrink-0" /></Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64" dir="rtl"><DropdownMenuLabel>فروع العمل</DropdownMenuLabel><DropdownMenuSeparator />{branchOptions.map(branch => <DropdownMenuItem key={branch.branch_id} onClick={() => void changeBranch(branch.branch_id)} className="gap-2"><Store className="h-4 w-4" /><div className="min-w-0 flex-1"><div className="truncate font-bold">{branch.branch_name}</div><div className="text-[11px] text-muted-foreground">{branch.role_name_ar}</div></div>{branch.branch_id === currentBranchId && <Check className="mr-auto h-4 w-4 text-[#005931]" />}</DropdownMenuItem>)}</DropdownMenuContent>
-          </DropdownMenu> : currentBranchName ? <div className="hidden h-11 items-center gap-2 rounded-2xl border px-3 text-sm text-slate-600 md:flex"><Store className="h-4 w-4" /><span className="max-w-[150px] truncate">{currentBranchName}</span></div> : null}
-
+          {branchOptions.length > 1 ? <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="h-11 max-w-[180px] gap-2 rounded-2xl px-3"><Store className="h-4 w-4 shrink-0" /><span className="hidden truncate sm:inline">{currentBranchName || "اختر الفرع"}</span><ChevronDown className="h-4 w-4 shrink-0" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-64" dir="rtl"><DropdownMenuLabel>فروع العمل</DropdownMenuLabel><DropdownMenuSeparator />{branchOptions.map(branch => <DropdownMenuItem key={branch.branch_id} onClick={() => void changeBranch(branch.branch_id)} className="gap-2"><Store className="h-4 w-4" /><div className="min-w-0 flex-1"><div className="truncate font-bold">{branch.branch_name}</div><div className="text-[11px] text-muted-foreground">{branch.role_name_ar}</div></div>{branch.branch_id === currentBranchId && <Check className="mr-auto h-4 w-4 text-[#005931]" />}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu> : currentBranchName ? <div className="hidden h-11 items-center gap-2 rounded-2xl border px-3 text-sm text-slate-600 md:flex"><Store className="h-4 w-4" /><span className="max-w-[150px] truncate">{currentBranchName}</span></div> : null}
           <Button variant="outline" size="icon" className="relative h-11 w-11 rounded-2xl" onClick={() => navigate("/notifications")} aria-label="الإشعارات"><Bell className="h-5 w-5" />{unread > 0 && <span className="absolute -left-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white">{unread > 99 ? "99+" : unread}</span>}</Button>
           {actionRequired > 0 && <Button variant="outline" className="hidden h-11 rounded-2xl border-amber-200 bg-amber-50 px-3 text-amber-800 lg:flex" onClick={() => navigate("/tasks")}><BriefcaseBusiness className="ml-2 h-4 w-4" />{actionRequired.toLocaleString("ar-EG")} إجراء</Button>}
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="ghost" className="h-11 gap-2 rounded-2xl px-1.5 sm:px-2"><Avatar className="h-9 w-9"><AvatarFallback className="bg-[#005931] font-black text-white">{user?.name?.trim().charAt(0) || "م"}</AvatarFallback></Avatar><div className="hidden max-w-[130px] text-right lg:block"><div className="truncate text-xs font-black">{user?.name}</div><div className="truncate text-[10px] text-muted-foreground">{roleLabel}</div></div><ChevronDown className="hidden h-4 w-4 sm:block" /></Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64" dir="rtl">
-              <DropdownMenuLabel><div className="font-black">{user?.name}</div><div className="mt-1 text-[11px] font-normal text-muted-foreground">{roleLabel} · {currentBranchName || "بدون فرع"}</div></DropdownMenuLabel><DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/account")}><UserRound className="ml-2 h-4 w-4" />الملف الشخصي والحساب</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/account")}><KeyRound className="ml-2 h-4 w-4" />تغيير PIN</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/my-hr")}><BriefcaseBusiness className="ml-2 h-4 w-4" />بوابة الموظف</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate("/settings")}><Settings className="ml-2 h-4 w-4" />الإعدادات</DropdownMenuItem><DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-700 focus:text-red-700" onClick={() => void logout()}><LogOut className="ml-2 h-4 w-4" />تسجيل الخروج</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" className="h-11 gap-2 rounded-2xl px-1.5 sm:px-2"><Avatar className="h-9 w-9"><AvatarFallback className="bg-[#005931] font-black text-white">{user?.name?.trim().charAt(0) || "م"}</AvatarFallback></Avatar><div className="hidden max-w-[130px] text-right lg:block"><div className="truncate text-xs font-black">{user?.name}</div><div className="truncate text-[10px] text-muted-foreground">{roleLabel}</div></div><ChevronDown className="hidden h-4 w-4 sm:block" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-64" dir="rtl"><DropdownMenuLabel><div className="font-black">{user?.name}</div><div className="mt-1 text-[11px] font-normal text-muted-foreground">{roleLabel} · {currentBranchName || "بدون فرع"}</div></DropdownMenuLabel><DropdownMenuSeparator /><DropdownMenuItem onClick={() => navigate("/account")}><UserRound className="ml-2 h-4 w-4" />الملف الشخصي والحساب</DropdownMenuItem><DropdownMenuItem onClick={() => navigate("/account")}><KeyRound className="ml-2 h-4 w-4" />تغيير PIN</DropdownMenuItem><DropdownMenuItem onClick={() => navigate("/my-hr")}><BriefcaseBusiness className="ml-2 h-4 w-4" />بوابة الموظف</DropdownMenuItem><DropdownMenuItem onClick={() => navigate("/settings")}><Settings className="ml-2 h-4 w-4" />الإعدادات</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="text-red-700 focus:text-red-700" onClick={() => void logout()}><LogOut className="ml-2 h-4 w-4" />تسجيل الخروج</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
         </div>
       </div>
-
-      {isPos && <div className="border-t border-slate-100 bg-slate-50/95 px-2 py-2 md:px-5">
-        <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <span className="hidden shrink-0 text-[11px] font-black text-slate-400 md:inline">تشغيل الكاشير</span>
-          <Button size="sm" variant="outline" className="h-9 shrink-0 rounded-xl bg-white" onClick={() => emitPosAction("pos:open-invoices")}><ReceiptText className="ml-1.5 h-4 w-4" />الفواتير</Button>
-          <Button size="sm" variant="outline" className="h-9 shrink-0 rounded-xl bg-white" onClick={() => emitPosAction("pos:open-shift")}><Clock3 className="ml-1.5 h-4 w-4" />الوردية</Button>
-          <Button size="sm" variant="outline" className="h-9 shrink-0 rounded-xl bg-white" onClick={() => emitPosAction("pos:lock")}><LockKeyhole className="ml-1.5 h-4 w-4" />قفل</Button>
-          <Button size="sm" variant="outline" className="h-9 shrink-0 rounded-xl border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100 hover:text-amber-900" onClick={() => emitPosAction("pos:switch-employee")}><Repeat2 className="ml-1.5 h-4 w-4" />تبديل الموظف</Button>
-          <div className="mr-auto hidden text-[11px] text-slate-400 md:block">الأزرار دي تفضل ثابتة حتى أثناء فتح السلة</div>
-        </div>
-      </div>}
-
+      {isPos && <div className="border-t border-slate-100 bg-slate-50/95 px-2 py-2 md:px-5"><div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><span className="hidden shrink-0 text-[11px] font-black text-slate-400 md:inline">تشغيل الكاشير</span><Button size="sm" variant="outline" className="h-9 shrink-0 rounded-xl bg-white" onClick={() => emitPosAction("pos:open-invoices")}><ReceiptText className="ml-1.5 h-4 w-4" />الفواتير</Button><Button size="sm" variant="outline" className="h-9 shrink-0 rounded-xl bg-white" onClick={() => emitPosAction("pos:lock")}><LockKeyhole className="ml-1.5 h-4 w-4" />قفل</Button><div className="mr-auto text-[11px] text-slate-400">الوردية وتبديل الموظف في شريط التشغيل الحالي لحين نقلهم بدون التأثير على التسوية</div></div></div>}
       {!isPos && actionRequired > 0 && <div className="flex items-center justify-between border-t border-amber-100 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 lg:hidden"><span>عندك {actionRequired.toLocaleString("ar-EG")} إجراء يحتاج متابعة</span><button className="font-black underline" onClick={() => navigate("/tasks")}>فتح المهام</button></div>}
     </header>
   );
