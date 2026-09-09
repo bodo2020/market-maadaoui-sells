@@ -98,9 +98,9 @@ export default function EmployeeManagement() {
             <div>
               <div className="font-black text-[#005931]">تفعيل أجهزة الموظفين بموافقة السوبر أدمن</div>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                من صف الموظف اضغط <strong>«اعتماد / إدارة الجهاز»</strong> وأنشئ رابط التسجيل. بعد أن يسجل الموظف جهازه، سيظهر الطلب هنا للسوبر أدمن، ولن يعمل الجهاز في الحضور قبل الموافقة.
+                من صف الموظف اضغط <strong>«اعتماد / إدارة الجهاز»</strong> وأنشئ رابط التسجيل. بعد أن يسجل الموظف جهازه، يظهر الطلب هنا تلقائيًا للسوبر أدمن، ويصل له إشعار داخل النظام للمراجعة.
               </p>
-              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><Smartphone className="h-4 w-4" />لا يوجد اعتماد ذاتي، ولا تحتاج لتسجيل حساب السوبر أدمن على جهاز الموظف.</div>
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><Smartphone className="h-4 w-4" />أجهزة الموظفين العادية تحتاج موافقة منفصلة. السوبر أدمن فقط يقدر يعتمد جهازه الشخصي الحالي مباشرة من صفحة التفعيل، بدون تسجيل حسابه على أجهزة الموظفين.</div>
             </div>
           </div>
         </div>
