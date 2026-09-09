@@ -11,6 +11,7 @@ import { EmployeeFilters } from '@/components/employees/EmployeeFilters';
 import { EmployeeFormDialog } from '@/components/employees/EmployeeFormDialog';
 import { DeleteEmployeeDialog } from '@/components/employees/DeleteEmployeeDialog';
 import { ShiftHistoryDialog } from '@/components/employees/ShiftHistoryDialog';
+import StaffDeviceApprovalDock from '@/components/employees/StaffDeviceApprovalDock';
 
 export default function EmployeeManagement() {
   const {
@@ -95,14 +96,16 @@ export default function EmployeeManagement() {
           <div className="flex items-start gap-3">
             <div className="rounded-lg bg-[#005931]/10 p-2 text-[#005931]"><ShieldCheck className="h-5 w-5" /></div>
             <div>
-              <div className="font-black text-[#005931]">تفعيل واعتماد أجهزة الموظفين</div>
+              <div className="font-black text-[#005931]">تفعيل أجهزة الموظفين بموافقة السوبر أدمن</div>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                من صف الموظف اضغط <strong>«اعتماد / إدارة الجهاز»</strong>، ثم أنشئ جلسة ربط. سيظهر رابط وكود 6 أرقام لتفعيل الجهاز، وبعد نجاح التفعيل سيظهر الجهاز كـ«موثوق» ويمكن استخدامه للحضور والانصراف.
+                من صف الموظف اضغط <strong>«اعتماد / إدارة الجهاز»</strong> وأنشئ رابط التسجيل. بعد أن يسجل الموظف جهازه، سيظهر الطلب هنا للسوبر أدمن، ولن يعمل الجهاز في الحضور قبل الموافقة.
               </p>
-              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><Smartphone className="h-4 w-4" />لا تحتاج لتسجيل حساب السوبر أدمن على جهاز الموظف.</div>
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><Smartphone className="h-4 w-4" />لا يوجد اعتماد ذاتي، ولا تحتاج لتسجيل حساب السوبر أدمن على جهاز الموظف.</div>
             </div>
           </div>
         </div>
+
+        <StaffDeviceApprovalDock />
 
         <EmployeeStats
           employees={employees}
