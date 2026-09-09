@@ -22,6 +22,16 @@ export type AttendanceSnapshot = {
     early_departure_grace_minutes: number;
     break_minutes: number;
   };
+  approved_leave: null | {
+    id: string;
+    request_id: string;
+    leave_type: "annual" | "casual" | "sick" | "unpaid" | "other";
+    start_date: string;
+    end_date: string;
+    partial_day: "none" | "first_half" | "second_half";
+    approved_at: string;
+    coverage: "full_day" | "partial_day";
+  };
   active_session: null | {
     id: string;
     branch_id: string;
@@ -178,12 +188,8 @@ export function getBrowserLocation(): Promise<{ latitude: number; longitude: num
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (position) => resolve({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracyM: position.coords.accuracy,
-      }),
-      (error) => {
+      position => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude, accuracyM: position.coords.accuracy }),
+      error => {
         const message = error.code === error.PERMISSION_DENIED
           ? "اسمح للموقع باستخدام GPS لتسجيل الحضور"
           : error.code === error.TIMEOUT
