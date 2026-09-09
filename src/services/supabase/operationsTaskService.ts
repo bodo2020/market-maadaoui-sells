@@ -7,7 +7,7 @@ export type OperationsTask = {
   id: string;
   branch_id: string;
   task_type: string;
-  source_kind: "pos_refund" | "online_refund" | "shift_reconciliation" | "cash_handoff" | "inventory_count" | "inventory_recount" | "inventory_adjustment" | string;
+  source_kind: "pos_refund" | "online_refund" | "shift_reconciliation" | "cash_handoff" | "inventory_count" | "inventory_recount" | "inventory_adjustment" | "inventory_transfer_dispatch" | "inventory_transfer_receive" | "inventory_transfer_variance" | string;
   source_id: string;
   return_id?: string | null;
   sale_id?: string | null;
@@ -116,8 +116,28 @@ export function isInventoryTask(task: Pick<OperationsTask, "task_type" | "source
   return isInventoryCountTask(task) || isInventoryRecountTask(task) || isInventoryAdjustmentReviewTask(task);
 }
 
+export function isInventoryTransferDispatchTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return task.task_type === "inventory_transfer_dispatch" || task.source_kind === "inventory_transfer_dispatch";
+}
+
+export function isInventoryTransferReceiveTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return task.task_type === "inventory_transfer_receive" || task.source_kind === "inventory_transfer_receive";
+}
+
+export function isInventoryTransferVarianceTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return task.task_type === "inventory_transfer_variance_review" || task.source_kind === "inventory_transfer_variance";
+}
+
+export function isInventoryTransferTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return isInventoryTransferDispatchTask(task) || isInventoryTransferReceiveTask(task) || isInventoryTransferVarianceTask(task);
+}
+
+export function isInventoryTransferActionTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return isInventoryTransferDispatchTask(task) || isInventoryTransferReceiveTask(task);
+}
+
 export function isOperationsReviewTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
-  return isShiftReconciliationTask(task) || isCashHandoffVarianceTask(task);
+  return isShiftReconciliationTask(task) || isCashHandoffVarianceTask(task) || isInventoryTransferVarianceTask(task);
 }
 
 export async function fetchOperationsTasks(branchId: string, scope: OperationsTaskScope = "all", limit = 250): Promise<OperationsTask[]> {
