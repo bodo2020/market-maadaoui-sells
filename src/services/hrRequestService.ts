@@ -43,6 +43,17 @@ export type HrRequest = {
   fulfilled_at?: string | null;
 };
 
+export class HrRequestBackendUnavailableError extends Error {
+  constructor() {
+    super("خدمة طلبات الموارد البشرية لم يتم تفعيلها على الخادم بعد.");
+    this.name = "HrRequestBackendUnavailableError";
+  }
+}
+
+export function isHrRequestBackendUnavailable(error: unknown) {
+  return error instanceof HrRequestBackendUnavailableError;
+}
+
 type RpcError = { message?: string } | null;
 const rpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
@@ -52,7 +63,7 @@ const rpc = supabase.rpc.bind(supabase) as unknown as (
 function hrRequestError(message?: string) {
   const value = message || "";
   if (value.includes("Could not find the function") || value.includes("PGRST202")) {
-    return new Error("خدمة طلبات الموارد البشرية لم يتم تفعيلها على الخادم بعد.");
+    return new HrRequestBackendUnavailableError();
   }
   if (value.includes("AUTH_REQUIRED")) return new Error("انتهت جلسة تسجيل الدخول. سجّل الدخول مرة أخرى.");
   if (value.includes("HR_BRANCH_ACCESS_DENIED")) return new Error("الفرع الحالي خارج نطاق صلاحيتك.");
