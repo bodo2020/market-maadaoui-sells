@@ -46,7 +46,7 @@ export const productsNavigation: NavigationGroup = {
     { label: "الباركود", href: "/barcode", icon: QrCode },
     { label: "الشركات", href: "/companies", icon: Building2 },
     { label: "إدارة المخزون", href: "/inventory", icon: Warehouse },
-    { label: "الجرد", href: "/daily-inventory", icon: ClipboardList },
+    { label: "مركز الجرد", href: "/daily-inventory", icon: ClipboardList },
     { label: "استيراد المخزون", href: "/inventory-import", icon: FileSpreadsheet },
     { label: "إدارة الصلاحيات", href: "/expiry-management", icon: Calendar },
     { label: "الموردون", href: "/suppliers", icon: Truck },
