@@ -16,6 +16,9 @@ export type InventoryAuditGenerationResult = {
   reason?: string;
 };
 
+export type InventoryAdjustmentReason = "theft" | "damage" | "breakage" | "receiving_error" | "selling_error" | "previous_error" | "unknown";
+export type InventoryAdjustmentRejectionReason = "counting_error" | "insufficient_evidence" | "investigation_required" | "other";
+
 export type InventoryAuditTaskDetail = {
   task_id: string;
   task_type: string;
@@ -35,13 +38,21 @@ export type InventoryAuditTaskDetail = {
   assigned_at?: string | null;
   count_status?: string | null;
   is_recount?: boolean;
-  system_expected?: number | null;
+  system_expected_at_recount?: number | null;
   first_count?: number | null;
   first_variance?: number | null;
   recount?: number | null;
   recount_variance?: number | null;
   verification_status?: string | null;
+  purchase_price_snapshot?: number | null;
   variance_value?: number | null;
+  post_recount_movement?: number | null;
+  current_system_quantity?: number | null;
+  current_expected_quantity?: number | null;
+  projected_physical_quantity?: number | null;
+  current_adjustment_delta?: number | null;
+  movement_ledger_gap?: number | null;
+  allowed_reason_codes?: InventoryAdjustmentReason[];
 };
 
 export type InventoryCountSubmissionResult = {
@@ -53,6 +64,17 @@ export type InventoryCountSubmissionResult = {
   idempotent?: boolean;
 };
 
+export type InventoryAdjustmentResult = {
+  task_id: string;
+  status: string;
+  decision: "approved" | "rejected" | string;
+  adjustment_delta?: number;
+  quantity_before?: number;
+  quantity_after?: number;
+  request_id?: string;
+  idempotent?: boolean;
+};
+
 function inventoryAuditError(message?: string) {
   const value = message || "";
   if (value.includes("AUTH_REQUIRED")) return new Error("انتهت جلسة تسجيل الدخول. سجّل الدخول مرة أخرى.");
@@ -61,10 +83,16 @@ function inventoryAuditError(message?: string) {
   if (value.includes("INVENTORY_TASK_NOT_OWNER") || value.includes("TASK_NOT_OWNER")) return new Error("مهمة الجرد ليست مسندة لك.");
   if (value.includes("INVENTORY_SELF_RECOUNT_DENIED")) return new Error("لا يمكنك إعادة عد منتج قمت بعدّه في المرة الأولى. يجب أن يراجعه موظف آخر.");
   if (value.includes("INVALID_ACTUAL_COUNT")) return new Error("أدخل كمية فعلية صحيحة، موجبة أو صفر، وبحد أقصى 3 منازل عشرية.");
-  if (value.includes("INVENTORY_MOVEMENT_LEDGER_GAP")) return new Error("تعذر مطابقة حركات المخزون أثناء العد. لم يتم اعتماد النتيجة؛ حدّث المهمة وأعد المحاولة.");
+  if (value.includes("INVENTORY_MOVEMENT_LEDGER_GAP")) return new Error("تعذر مطابقة حركات المخزون أثناء المراجعة. لم يتم تغيير المخزون؛ حدّث المهمة وأعد المحاولة.");
   if (value.includes("INVENTORY_ROW_MISSING")) return new Error("سجل مخزون المنتج لم يعد موجودًا في الفرع.");
   if (value.includes("TASK_NOT_SUBMITTABLE")) return new Error("المهمة لا تقبل تسليم العد في حالتها الحالية.");
-  if (value.includes("INVENTORY_ADJUSTMENT_REVIEW_DENIED")) return new Error("ليس لديك صلاحية عرض اعتماد تسوية المخزون.");
+  if (value.includes("INVENTORY_ADJUSTMENT_REVIEW_DENIED")) return new Error("ليس لديك صلاحية اعتماد تسوية المخزون.");
+  if (value.includes("INVALID_INVENTORY_ADJUSTMENT_REASON")) return new Error("اختر سببًا صحيحًا لتسوية المخزون.");
+  if (value.includes("INVALID_INVENTORY_REJECTION_REASON")) return new Error("اختر سببًا صحيحًا لرفض التسوية.");
+  if (value.includes("INVENTORY_ADJUSTMENT_NOTE_REQUIRED")) return new Error("اكتب ملاحظة توضح قرار المراجعة.");
+  if (value.includes("INVENTORY_ADJUSTMENT_ALREADY_RECONCILED")) return new Error("الرصيد أصبح مطابقًا بالفعل ولا يحتاج تسوية.");
+  if (value.includes("INVENTORY_ADJUSTMENT_NOT_REQUIRED")) return new Error("نتيجة إعادة العد لا تتطلب تسوية مخزون.");
+  if (value.includes("INVENTORY_RECOUNT_INCOMPLETE")) return new Error("إعادة العد غير مكتملة ولا يمكن اعتماد التسوية.");
   return new Error(message || "تعذر تنفيذ إجراء الجرد.");
 }
 
@@ -102,4 +130,26 @@ export async function submitInventoryRecountV2(taskId: string, actualCount: numb
   });
   if (error) throw inventoryAuditError(error.message);
   return data as InventoryCountSubmissionResult;
+}
+
+export async function approveInventoryAdjustmentV2(taskId: string, reasonCode: InventoryAdjustmentReason, note: string) {
+  const requestId = crypto.randomUUID();
+  const { data, error } = await rpc("approve_inventory_adjustment_v2", {
+    p_task_id: taskId,
+    p_request_id: requestId,
+    p_reason_code: reasonCode,
+    p_note: note.trim(),
+  });
+  if (error) throw inventoryAuditError(error.message);
+  return data as InventoryAdjustmentResult;
+}
+
+export async function rejectInventoryAdjustmentV2(taskId: string, reasonCode: InventoryAdjustmentRejectionReason, note: string) {
+  const { data, error } = await rpc("reject_inventory_adjustment_v2", {
+    p_task_id: taskId,
+    p_reason_code: reasonCode,
+    p_note: note.trim(),
+  });
+  if (error) throw inventoryAuditError(error.message);
+  return data as InventoryAdjustmentResult;
 }
