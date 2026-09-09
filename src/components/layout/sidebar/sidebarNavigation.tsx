@@ -24,6 +24,7 @@ import {
   QrCode,
   Calendar,
   FileSpreadsheet,
+  ArrowLeftRight,
 } from "lucide-react";
 import { NavigationGroup } from "./types";
 
@@ -46,6 +47,7 @@ export const productsNavigation: NavigationGroup = {
     { label: "الباركود", href: "/barcode", icon: QrCode },
     { label: "الشركات", href: "/companies", icon: Building2 },
     { label: "إدارة المخزون", href: "/inventory", icon: Warehouse },
+    { label: "تحويلات المخزون", href: "/inventory-transfers", icon: ArrowLeftRight },
     { label: "مركز الجرد", href: "/daily-inventory", icon: ClipboardList },
     { label: "استيراد المخزون", href: "/inventory-import", icon: FileSpreadsheet },
     { label: "إدارة الصلاحيات", href: "/expiry-management", icon: Calendar },
