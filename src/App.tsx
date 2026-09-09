@@ -68,8 +68,6 @@ import EditProductCollection from "@/pages/EditProductCollection";
 import Returns from "@/pages/Returns";
 import Customer360Profile from "@/pages/Customer360Profile";
 import DailyInventoryPage from "@/pages/DailyInventoryPage";
-import InventoryFullPage from "@/pages/InventoryFullPage";
-import InventoryHistoryPage from "@/pages/InventoryHistoryPage";
 import ExpiryManagement from "@/pages/ExpiryManagement";
 import ExpensesAndSalaries from "@/pages/ExpensesAndSalaries";
 import CustomerCartsPage from "@/pages/CustomerCartsPage";
@@ -91,6 +89,7 @@ const CashierPOS = () => (
 const CustomersWorkspace = () => (<><CustomersAdvanced /><CustomerMyTasksDock /><CustomerTeamWorkloadDock /><CustomerOperationsCenterDock /><CustomerOpportunityDock /></>);
 const Customer360Workspace = () => (<><Customer360Profile /><CustomerMyTasksDock /><CustomerFollowupPerformanceDock /><CustomerInsightsDock /><CustomerManagementDock /></>);
 const ReportsRedirect = () => <Navigate to="/reports" replace />;
+const InventoryAuditRedirect = () => <Navigate to="/daily-inventory" replace />;
 
 function App() {
   return (
@@ -131,8 +130,8 @@ function App() {
           <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
           <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
           <Route path="/daily-inventory" element={<ProtectedRoute><DailyInventoryPage /></ProtectedRoute>} />
-          <Route path="/inventory-full" element={<ProtectedRoute><InventoryFullPage /></ProtectedRoute>} />
-          <Route path="/inventory-history" element={<ProtectedRoute><InventoryHistoryPage /></ProtectedRoute>} />
+          <Route path="/inventory-full" element={<ProtectedRoute><InventoryAuditRedirect /></ProtectedRoute>} />
+          <Route path="/inventory-history" element={<ProtectedRoute><InventoryAuditRedirect /></ProtectedRoute>} />
           <Route path="/inventory-import" element={<ProtectedRoute><InventoryImport /></ProtectedRoute>} />
           <Route path="/expiry-management" element={<ProtectedRoute><ExpiryManagement /></ProtectedRoute>} />
           <Route path="/supplier-purchases" element={<ProtectedRoute><SupplierPurchases /></ProtectedRoute>} />
