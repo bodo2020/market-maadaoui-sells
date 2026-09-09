@@ -1,0 +1,5 @@
+-- Production migration history marker.
+-- The initial Online Orders + Customer Service employee performance RPC was introduced
+-- in this production migration and immediately refined by the following v2 migration.
+-- The complete replay-safe function definition is intentionally kept in v2 so a fresh
+-- migration run reaches the same final Production contract without preserving a stale API.
