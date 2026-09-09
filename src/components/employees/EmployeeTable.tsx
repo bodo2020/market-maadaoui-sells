@@ -25,7 +25,8 @@ import {
   Trash2,
   Loader2,
   ShieldCheck,
-  UserRoundCog
+  UserRoundCog,
+  Smartphone,
 } from "lucide-react";
 import { User, UserRole } from "@/types";
 
@@ -70,6 +71,7 @@ export function EmployeeTable({
           <TableHead>الدور</TableHead>
           <TableHead>رقم الهاتف</TableHead>
           <TableHead>الحالة</TableHead>
+          <TableHead>الجهاز</TableHead>
           <TableHead>ساعات العمل</TableHead>
           <TableHead>الوردية</TableHead>
           <TableHead className="text-left">خيارات</TableHead>
@@ -83,6 +85,7 @@ export function EmployeeTable({
               <TableCell><div className="h-4 w-16 bg-muted animate-pulse rounded"></div></TableCell>
               <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded"></div></TableCell>
               <TableCell><div className="h-4 w-20 bg-muted animate-pulse rounded"></div></TableCell>
+              <TableCell><div className="h-8 w-28 bg-muted animate-pulse rounded"></div></TableCell>
               <TableCell><div className="h-4 w-16 bg-muted animate-pulse rounded"></div></TableCell>
               <TableCell><div className="h-4 w-24 bg-muted animate-pulse rounded"></div></TableCell>
               <TableCell><div className="h-4 w-8 bg-muted animate-pulse rounded"></div></TableCell>
@@ -90,7 +93,7 @@ export function EmployeeTable({
           ))
         ) : employees.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
               لم يتم العثور على موظفين مطابقين
             </TableCell>
           </TableRow>
@@ -114,6 +117,17 @@ export function EmployeeTable({
                 ) : (
                   <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">خارج الوردية</span>
                 )}
+              </TableCell>
+              <TableCell>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-[#005931]/25 text-[#005931] hover:bg-[#005931]/5"
+                  onClick={() => navigate(`/employees/${employee.id}/devices`)}
+                >
+                  <Smartphone className="ml-2 h-4 w-4" />
+                  اعتماد / إدارة الجهاز
+                </Button>
               </TableCell>
               <TableCell>{getTotalHoursWorked(employee).toFixed(1)} ساعة</TableCell>
               <TableCell>
