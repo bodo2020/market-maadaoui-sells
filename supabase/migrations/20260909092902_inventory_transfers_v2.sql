@@ -1,0 +1,3 @@
+-- Production migration history marker.
+-- This was an intermediate Inventory Transfers V2 contract and was replaced
+-- by the canonical consolidation in 20260909093529_inventory_transfers_v2_consolidation_final.sql.
