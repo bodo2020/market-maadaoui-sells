@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Clock3, LogOut, MonitorSmartphone, Play, RefreshCw, Store, WalletCards } from "lucide-react";
+import { AlertTriangle, LogOut, MonitorSmartphone, Play, RefreshCw, Store, WalletCards } from "lucide-react";
 
 function money(value: number | null | undefined) {
   return `${Number(value || 0).toFixed(2)} ج.م`;
@@ -198,6 +198,17 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
     await loadShift();
   };
 
+  useEffect(() => {
+    const openShift = () => { void openCloseDialog(false); };
+    const switchEmployee = () => { void openCloseDialog(true); };
+    window.addEventListener("pos:open-shift", openShift);
+    window.addEventListener("pos:switch-employee", switchEmployee);
+    return () => {
+      window.removeEventListener("pos:open-shift", openShift);
+      window.removeEventListener("pos:switch-employee", switchEmployee);
+    };
+  }, [device?.device_id, shift?.id]);
+
   if (loading) {
     return (
       <div dir="rtl" className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -319,10 +330,6 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
     <>
       {children}
       <PosCashDrawerWidget device={device} />
-      <div dir="rtl" className="fixed bottom-4 left-4 z-50 flex gap-2">
-        <Button variant="outline" className="bg-white shadow-lg" onClick={() => void openCloseDialog(false)}><Clock3 className="h-4 w-4" /> الوردية</Button>
-        <Button variant="outline" className="bg-white shadow-lg" onClick={() => void openCloseDialog(true)}><LogOut className="h-4 w-4" /> تبديل الموظف</Button>
-      </div>
 
       <Dialog open={closingOpen} onOpenChange={open => !submitting && setClosingOpen(open)}>
         <DialogContent dir="rtl" className="max-h-[94vh] overflow-y-auto sm:max-w-3xl">
