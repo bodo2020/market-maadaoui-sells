@@ -22,7 +22,7 @@ import {
   PackagePlus,
   PackageSearch,
   Pencil,
-  PlusMinus,
+  Scale,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -546,7 +546,7 @@ export default function InventoryManagement() {
                                 {canManage && product.linked_product ? (
                                   <>
                                     <Button size="sm" variant="ghost" onClick={() => openPolicy(product)} title="حدود وتنبيه"><BellRing className="h-4 w-4" /></Button>
-                                    <Button size="sm" variant="ghost" onClick={() => openAdjustment(product)} title="تسوية يدوية"><PlusMinus className="h-4 w-4" /></Button>
+                                    <Button size="sm" variant="ghost" onClick={() => openAdjustment(product)} title="تسوية يدوية"><Scale className="h-4 w-4" /></Button>
                                     <Button size="sm" variant="ghost" onClick={() => navigate(`/products/edit/${product.product_id}`)} title="تعديل المنتج"><Pencil className="h-4 w-4" /></Button>
                                   </>
                                 ) : null}
@@ -581,7 +581,7 @@ export default function InventoryManagement() {
                         <div className="mt-3 flex gap-2">
                           <Button size="sm" variant="outline" className="flex-1" onClick={() => setMovementProduct(product)}><History className="ml-2 h-4 w-4" /> الحركات</Button>
                           {canManage && product.linked_product ? <Button size="sm" variant="outline" onClick={() => openPolicy(product)}><BellRing className="h-4 w-4" /></Button> : null}
-                          {canManage && product.linked_product ? <Button size="sm" onClick={() => openAdjustment(product)}><PlusMinus className="h-4 w-4" /></Button> : null}
+                          {canManage && product.linked_product ? <Button size="sm" onClick={() => openAdjustment(product)}><Scale className="h-4 w-4" /></Button> : null}
                         </div>
                       </div>
                     ))}
@@ -729,7 +729,7 @@ export default function InventoryManagement() {
             </div>
           </div>
           <DialogFooter className="gap-2 sm:justify-start">
-            <Button onClick={submitAdjustment} disabled={busy}>{busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <PlusMinus className="ml-2 h-4 w-4" />} تنفيذ التسوية</Button>
+            <Button onClick={submitAdjustment} disabled={busy}>{busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Scale className="ml-2 h-4 w-4" />} تنفيذ التسوية</Button>
             <Button variant="outline" onClick={closeAdjustment} disabled={busy}>إلغاء</Button>
           </DialogFooter>
         </DialogContent>
