@@ -251,6 +251,7 @@ export interface Order {
   neighborhood?: string | null;
   branch_id?: string | null;
   cashier_id?: string | null;
+  return_status?: 'none' | 'partial' | 'full';
 }
 
 export interface POSTab {

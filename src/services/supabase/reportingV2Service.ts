@@ -178,7 +178,7 @@ export async function fetchReportingOverviewV2(
   from: Date,
   to: Date,
 ): Promise<ReportingOverviewV2> {
-  const { data, error } = await supabase.rpc("get_reporting_overview_v2", {
+  const { data, error } = await supabase.rpc("get_reporting_overview_v2" as any, {
     p_branch_id: branchId,
     p_from: from.toISOString(),
     p_to: to.toISOString(),
