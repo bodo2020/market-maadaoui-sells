@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, Check, Menu, Settings, Store, UserRound, LogOut, BriefcaseBusiness, KeyRound, ReceiptText, LockKeyhole, Clock3, Repeat2, Vault, ShieldCheck } from "lucide-react";
+import { Bell, ChevronDown, Check, Menu, Settings, Store, UserRound, LogOut, BriefcaseBusiness, KeyRound, ReceiptText, LockKeyhole, Clock3, Repeat2, Vault, ShieldCheck, Landmark } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -37,6 +37,7 @@ export default function NavbarV2({ onMenuClick, isMobile = false }: { onMenuClic
   const title = resolveTitle(location.pathname);
   const isPos = location.pathname === "/" || location.pathname === "/pos";
   const isTasks = location.pathname === "/tasks";
+  const isFinance = location.pathname === "/finance";
   const currentBranch = branchOptions.find(branch => branch.branch_id === currentBranchId);
   const roleLabel = currentBranch?.role_name_ar || (user?.role === "super_admin" ? "مدير النظام" : "موظف");
 
@@ -99,7 +100,16 @@ export default function NavbarV2({ onMenuClick, isMobile = false }: { onMenuClic
         </div>
       </div>}
 
-      {!isPos && !isTasks && actionRequired > 0 && <div className="flex items-center justify-between border-t border-amber-100 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 lg:hidden"><span>عندك {actionRequired.toLocaleString("ar-EG")} إجراء يحتاج متابعة</span><button className="font-black underline" onClick={() => navigate("/tasks")}>فتح المهام</button></div>}
+      {isFinance && <div className="border-t border-slate-100 bg-slate-50/95 px-2 py-2 md:px-5">
+        <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <span className="hidden shrink-0 text-[11px] font-black text-slate-400 md:inline">إدارة الأموال</span>
+          <Button size="sm" className="h-9 shrink-0 rounded-xl bg-[#005931] hover:bg-[#004526]" onClick={() => emitAction("finance:open-treasury")}><Vault className="ml-1.5 h-4 w-4" />الخزن والأرصدة</Button>
+          <Button size="sm" variant="outline" className="h-9 shrink-0 rounded-xl bg-white" onClick={() => navigate("/payment-methods")}><Landmark className="ml-1.5 h-4 w-4" />وسائل الدفع</Button>
+          <Button size="sm" variant="outline" className="h-9 shrink-0 rounded-xl bg-white" onClick={() => navigate("/cash-tracking")}><BriefcaseBusiness className="ml-1.5 h-4 w-4" />تتبع النقدية</Button>
+        </div>
+      </div>}
+
+      {!isPos && !isTasks && !isFinance && actionRequired > 0 && <div className="flex items-center justify-between border-t border-amber-100 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 lg:hidden"><span>عندك {actionRequired.toLocaleString("ar-EG")} إجراء يحتاج متابعة</span><button className="font-black underline" onClick={() => navigate("/tasks")}>فتح المهام</button></div>}
     </header>
   );
 }
