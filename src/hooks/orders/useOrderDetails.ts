@@ -206,7 +206,7 @@ export function useOrderDetails(orderId: string) {
           status: selectedStatus,
           updated_at: currentTime,
           cashier_id: cashierId
-        })
+        } as any)
         .eq('id', orderId)
         .select();
       
