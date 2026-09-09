@@ -34,6 +34,8 @@ export type OperationsTask = {
   created_at: string;
   updated_at: string;
   metadata?: Record<string, unknown> | null;
+  inventory_session_kind?: string | null;
+  inventory_session_id?: string | null;
   invoice_number?: string | null;
   reference_number?: string | null;
   customer_name?: string | null;
@@ -58,6 +60,41 @@ export type OperationsTaskEvent = {
   note?: string | null;
   metadata?: Record<string, unknown> | null;
   created_at: string;
+};
+
+export type OperationsTaskDashboardSummary = {
+  active_total: number;
+  my_active: number;
+  available_open: number;
+  due_soon: number;
+  overdue: number;
+  returned_for_recount: number;
+  approval_pending: number;
+  high_or_urgent: number;
+  inventory_daily_active: number;
+  inventory_full_active: number;
+  inventory_spot_active: number;
+  completed_today: number;
+};
+
+export type OperationsTaskDashboard = {
+  branch_id: string;
+  generated_at: string;
+  summary: OperationsTaskDashboardSummary;
+  by_source: Record<string, number>;
+  inventory_by_session_kind: Record<string, number>;
+  top_overdue: Array<{
+    id: string;
+    title: string;
+    source_kind: string;
+    status: string;
+    priority: string;
+    claimed_by?: string | null;
+    claimed_by_name?: string | null;
+    due_at?: string | null;
+    minutes_overdue: number;
+    action_url?: string | null;
+  }>;
 };
 
 type RpcError = { message?: string } | null;
@@ -144,6 +181,12 @@ export async function fetchOperationsTasks(branchId: string, scope: OperationsTa
   const { data, error } = await rpc("list_operations_tasks", { p_branch_id: branchId, p_scope: scope, p_limit: limit });
   if (error) throw operationsTaskError(error.message);
   return Array.isArray(data) ? (data as OperationsTask[]) : [];
+}
+
+export async function fetchOperationsTaskDashboard(branchId: string): Promise<OperationsTaskDashboard> {
+  const { data, error } = await rpc("get_operations_task_dashboard_v1", { p_branch_id: branchId });
+  if (error) throw operationsTaskError(error.message);
+  return data as OperationsTaskDashboard;
 }
 
 export async function fetchOperationsTaskEvents(taskId: string): Promise<OperationsTaskEvent[]> {
