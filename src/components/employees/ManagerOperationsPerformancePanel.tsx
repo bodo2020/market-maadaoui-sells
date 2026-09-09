@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Banknote, Bike, Boxes, Headphones, PackageCheck, ReceiptText, ShoppingBag, UsersRound } from "lucide-react";
+import { AlertTriangle, Banknote, Bike, Boxes, Headphones, ReceiptText, ShoppingBag, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import OnlineOrderSlaPolicyCard from "@/components/employees/OnlineOrderSlaPolicyCard";
 import { getHrManagerOperationsPerformance } from "@/services/hrManagerOperationsPerformanceService";
 
 const num = (value: number) => Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2 });
@@ -43,6 +44,8 @@ export default function ManagerOperationsPerformancePanel({ branchId, from, to }
           <Metric icon={Headphones} label="متابعات العملاء" value={`${num(s.customer_service.closed)} / ${num(s.customer_service.assigned)}`} sub={`${num(s.customer_service.overdue_open)} متأخرة`} warn={s.customer_service.overdue_open > 0} />
           <Metric icon={AlertTriangle} label="تحتاج تدخل" value={num(s.employees_needing_attention)} warn={s.employees_needing_attention > 0} />
         </div>
+
+        <OnlineOrderSlaPolicyCard branchId={branchId} />
 
         {attentionEmployees.length > 0 && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
