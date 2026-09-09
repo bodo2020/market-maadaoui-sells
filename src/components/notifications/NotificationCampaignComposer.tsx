@@ -220,6 +220,7 @@ export default function NotificationCampaignComposer({ onSent }: Props) {
     onSuccess: result => {
       void queryClient.invalidateQueries({ queryKey: ["notification-center-v2"] });
       void queryClient.invalidateQueries({ queryKey: ["notification-target-preview-v3"] });
+      void queryClient.invalidateQueries({ queryKey: ["notification-campaign-history-v3"] });
       toast.success("تم إرسال الإشعار داخل التطبيق", {
         description: `تم إنشاء ${result.in_app_created.toLocaleString("ar-EG")} إشعار من أصل ${result.recipient_count.toLocaleString("ar-EG")} مستلم.`,
       });
