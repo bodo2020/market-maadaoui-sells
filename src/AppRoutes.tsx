@@ -45,6 +45,7 @@ import CompanyDetails from "@/pages/CompanyDetails";
 import Purchases from "@/pages/Purchases";
 import Invoices from "@/pages/Invoices";
 import Finance from "@/pages/Finance";
+import FinanceControlCenterV2 from "@/pages/FinanceControlCenterV2";
 import PaymentMethods from "@/pages/PaymentMethods";
 import ExpenseManagement from "@/pages/ExpenseManagement";
 import Settings from "@/pages/Settings";
@@ -157,6 +158,7 @@ export default function AppRoutes() {
       <Route path="/purchases/:id" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
       <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
       <Route path="/finance" element={<ProtectedRoute><FinanceWorkspace /></ProtectedRoute>} />
+      <Route path="/finance/control-center" element={<ProtectedRoute><FinanceControlCenterV2 /></ProtectedRoute>} />
       <Route path="/payment-methods" element={<ProtectedRoute><PaymentMethods /></ProtectedRoute>} />
       <Route path="/expenses" element={<ProtectedRoute><ExpenseManagement /></ProtectedRoute>} />
       <Route path="/expenses-salaries" element={<ProtectedRoute><ExpensesAndSalaries /></ProtectedRoute>} />
