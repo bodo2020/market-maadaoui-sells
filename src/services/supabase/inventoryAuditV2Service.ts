@@ -14,6 +14,8 @@ export type InventoryAuditGenerationResult = {
   audit_date: string;
   idempotent?: boolean;
   reason?: string;
+  items_per_employee_requested?: number;
+  generator_version?: number;
 };
 
 export type InventoryAdjustmentReason = "theft" | "damage" | "breakage" | "receiving_error" | "selling_error" | "previous_error" | "unknown";
@@ -96,10 +98,11 @@ function inventoryAuditError(message?: string) {
   return new Error(message || "تعذر تنفيذ إجراء الجرد.");
 }
 
-export async function ensureDailyInventoryAuditTasksV2(branchId: string, itemsPerEmployee = 5) {
-  const { data, error } = await rpc("ensure_daily_inventory_audit_tasks_v2", {
+// Kept under the V2 client name for backward compatibility. The server now owns the
+// daily 5–10 item selection so old callers cannot accidentally force a fixed count.
+export async function ensureDailyInventoryAuditTasksV2(branchId: string, _itemsPerEmployee = 5) {
+  const { data, error } = await rpc("ensure_daily_inventory_audit_tasks_v3", {
     p_branch_id: branchId,
-    p_items_per_employee: itemsPerEmployee,
     p_audit_date: null,
   });
   if (error) throw inventoryAuditError(error.message);
