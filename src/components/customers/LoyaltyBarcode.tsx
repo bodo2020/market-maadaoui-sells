@@ -22,10 +22,12 @@ export default function LoyaltyBarcode({ value }: { value: string }) {
   const quiet = 10;
   const width = (bits.length + quiet * 2) * moduleWidth;
   return (
-    <svg viewBox={`0 0 ${width} 84`} className="w-full max-w-md" role="img" aria-label={`باركود العميل ${value}`} dir="ltr">
-      <rect width={width} height="84" fill="white" />
-      {bits.split("").map((bit, index) => bit === "1" ? <rect key={index} x={(index + quiet) * moduleWidth} y="4" width={moduleWidth} height="64" fill="black" /> : null)}
-      <text x={width / 2} y="80" textAnchor="middle" fontSize="10" fontFamily="monospace" fill="black" letterSpacing="2">{value}</text>
-    </svg>
+    <div dir="ltr">
+      <svg viewBox={`0 0 ${width} 84`} className="w-full max-w-md" role="img" aria-label={`باركود العميل ${value}`}>
+        <rect width={width} height="84" fill="white" />
+        {bits.split("").map((bit, index) => bit === "1" ? <rect key={index} x={(index + quiet) * moduleWidth} y="4" width={moduleWidth} height="64" fill="black" /> : null)}
+        <text x={width / 2} y="80" textAnchor="middle" fontSize="10" fontFamily="monospace" fill="black" letterSpacing="2">{value}</text>
+      </svg>
+    </div>
   );
 }

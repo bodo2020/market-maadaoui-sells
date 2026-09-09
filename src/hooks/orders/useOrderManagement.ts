@@ -235,7 +235,7 @@ export const useOrderManagement = (activeTab: string) => {
           notes: item.notes || '',
           tracking_number: item.tracking_number || null,
           delivery_person: item.delivery_person || null,
-          return_status: (item.return_status === 'partial' || item.return_status === 'full') ? item.return_status : 'none',
+          return_status: ((item as any).return_status === 'partial' || (item as any).return_status === 'full') ? (item as any).return_status : 'none',
           governorate,
           city,
           area,

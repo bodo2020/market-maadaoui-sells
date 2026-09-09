@@ -82,8 +82,8 @@ const summarizeInsights = (insights: ReportingInsightV2[]) => {
 export async function fetchReportingInsightsV2(branchId: string, from: Date, to: Date): Promise<ReportingInsightsV2> {
   const [baseResult, transferAlerts] = await Promise.all([
     supabase.rpc(
-      "get_reporting_insights_v2" as never,
-      { p_branch_id: branchId, p_from: from.toISOString(), p_to: to.toISOString() } as never,
+      "get_reporting_insights_v2" as any,
+      { p_branch_id: branchId, p_from: from.toISOString(), p_to: to.toISOString() } as any,
     ),
     fetchInventoryTransferSmartAlertsV2(branchId, from, to),
   ]);

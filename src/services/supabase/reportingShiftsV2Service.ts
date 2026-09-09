@@ -264,12 +264,12 @@ export async function fetchReportingShiftsV2(
   limit = 100,
 ): Promise<ReportingShiftsV2> {
   const [core, reconciliations] = await Promise.all([
-    supabase.rpc("get_reporting_shifts_v2" as never, {
+    supabase.rpc("get_reporting_shifts_v2" as any, {
       p_branch_id: branchId,
       p_from: from.toISOString(),
       p_to: to.toISOString(),
       p_limit: limit,
-    } as never),
+    } as any),
     fetchReportingShiftReconciliationsV2(branchId, from, to, 2000),
   ]);
 
