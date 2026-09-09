@@ -37,6 +37,7 @@ import CategoriesPage from "@/pages/CategoriesPage";
 import AddProduct from "@/pages/AddProduct";
 import ProductManagement from "@/pages/ProductManagement";
 import InventoryManagement from "@/pages/InventoryManagement";
+import InventoryTransfersV2 from "@/pages/InventoryTransfersV2";
 import SupplierPurchases from "@/pages/SupplierPurchases";
 import Companies from "@/pages/Companies";
 import CompanyDetails from "@/pages/CompanyDetails";
@@ -129,6 +130,7 @@ function App() {
           <Route path="/products/edit/:id" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
           <Route path="/add-product" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
           <Route path="/inventory" element={<ProtectedRoute><InventoryManagement /></ProtectedRoute>} />
+          <Route path="/inventory-transfers" element={<ProtectedRoute><InventoryTransfersV2 /></ProtectedRoute>} />
           <Route path="/daily-inventory" element={<ProtectedRoute><DailyInventoryPage /></ProtectedRoute>} />
           <Route path="/inventory-full" element={<ProtectedRoute><InventoryAuditRedirect /></ProtectedRoute>} />
           <Route path="/inventory-history" element={<ProtectedRoute><InventoryAuditRedirect /></ProtectedRoute>} />
