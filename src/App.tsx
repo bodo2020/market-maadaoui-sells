@@ -55,6 +55,7 @@ import OrderDetails from "@/pages/OrderDetails";
 import CustomersAdvanced from "@/pages/CustomersAdvanced";
 import CustomerMyTasksPage from "@/pages/CustomerMyTasksPage";
 import OperationsTasksPage from "@/pages/OperationsTasksPage";
+import NotificationsCenterV2 from "@/pages/NotificationsCenterV2";
 import Suppliers from "@/pages/Suppliers";
 import EmployeeManagement from "@/pages/EmployeeManagement";
 import CashTracking from "@/pages/CashTracking";
@@ -122,6 +123,7 @@ function App() {
           <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
           <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute><OperationsTasksPage /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><NotificationsCenterV2 /></ProtectedRoute>} />
           <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
           <Route path="/categories/:id" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
           <Route path="/categories/:id/:subId" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
