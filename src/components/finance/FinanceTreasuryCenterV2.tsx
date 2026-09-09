@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Banknote, Building2, CheckCircle2, Landmark, Loader2, RefreshCw, ShieldCheck, Vault, WalletCards } from "lucide-react";
+import { AlertTriangle, Banknote, Building2, Landmark, Loader2, RefreshCw, ShieldCheck, Vault, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,12 @@ export default function FinanceTreasuryCenterV2() {
     staleTime: 10_000,
   });
 
+  useEffect(() => {
+    const openTreasury = () => setOpen(true);
+    window.addEventListener("finance:open-treasury", openTreasury);
+    return () => window.removeEventListener("finance:open-treasury", openTreasury);
+  }, []);
+
   const data = query.data;
   const cashAccounts = data?.cash_accounts || [];
   const paymentAccounts = data?.payment_accounts || [];
@@ -92,13 +98,7 @@ export default function FinanceTreasuryCenterV2() {
       if (!source.assignable) throw new Error("مصدر الصرف لا يوجد له مسؤول حاليًا.");
       if (Number(source.balance || 0) + 0.005 < Number(linkAdvance.amount || 0)) throw new Error("رصيد المصدر أقل من قيمة السلفة.");
       if (linkNote.trim().length < 3) throw new Error("اكتب ملاحظة توضح مراجعة مصدر الصرف القديم.");
-      return delegateLegacySalaryAdvanceSource({
-        advanceId: linkAdvance.advance_id,
-        sourceKind: source.source_kind,
-        sourceAccountId: source.account_id,
-        note: linkNote.trim(),
-        reference: linkReference.trim() || linkAdvance.payout_reference || null,
-      });
+      return delegateLegacySalaryAdvanceSource({ advanceId: linkAdvance.advance_id, sourceKind: source.source_kind, sourceAccountId: source.account_id, note: linkNote.trim(), reference: linkReference.trim() || linkAdvance.payout_reference || null });
     },
     onSuccess: async result => {
       toast.success(`تم إرسال مهمة مراجعة الصرف إلى ${result.responsible_user_name}. لن يُخصم المبلغ إلا بعد تأكيده.`);
@@ -113,30 +113,10 @@ export default function FinanceTreasuryCenterV2() {
   const renderCashAccount = (account: TreasuryCashAccount) => (
     <div key={account.account_id} className="rounded-2xl border bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2"><strong>{account.name}</strong><Badge variant="outline">{accountTypeLabel(account.account_type)}</Badge></div>
-          <div className="mt-2 text-2xl font-black">{money(account.balance)}</div>
-          <div className="mt-1 text-xs text-muted-foreground">آخر حركة: {dt(account.last_movement_at)}</div>
-        </div>
+        <div><div className="flex flex-wrap items-center gap-2"><strong>{account.name}</strong><Badge variant="outline">{accountTypeLabel(account.account_type)}</Badge></div><div className="mt-2 text-2xl font-black">{money(account.balance)}</div><div className="mt-1 text-xs text-muted-foreground">آخر حركة: {dt(account.last_movement_at)}</div></div>
         <div className="min-w-[220px] text-sm">
           <div className="mb-1 text-xs font-semibold text-muted-foreground">المسؤول عن العهدة</div>
-          {account.account_type === "pos_drawer" ? (
-            <div className="rounded-xl bg-slate-50 p-3">
-              <div className="font-bold">{account.responsible_user_name || "لا توجد وردية مفتوحة"}</div>
-              <div className="mt-1 text-xs text-muted-foreground">يتحدد تلقائيًا من صاحب الوردية المفتوحة</div>
-            </div>
-          ) : account.account_type === "branch_safe" && canManage ? (
-            <Select
-              value={account.responsible_user_id || "__none__"}
-              onValueChange={value => custodianMutation.mutate({ accountKind: "cash", accountId: account.account_id, userId: value === "__none__" ? null : value })}
-              disabled={custodianMutation.isPending}
-            >
-              <SelectTrigger><SelectValue placeholder="حدد مسؤول الخزنة" /></SelectTrigger>
-              <SelectContent><SelectItem value="__none__">بدون مسؤول</SelectItem>{staff.map(user => <SelectItem key={user.user_id} value={user.user_id}>{user.name}</SelectItem>)}</SelectContent>
-            </Select>
-          ) : (
-            <div className="rounded-xl bg-slate-50 p-3 font-bold">{account.responsible_user_name || "غير محدد"}</div>
-          )}
+          {account.account_type === "pos_drawer" ? <div className="rounded-xl bg-slate-50 p-3"><div className="font-bold">{account.responsible_user_name || "لا توجد وردية مفتوحة"}</div><div className="mt-1 text-xs text-muted-foreground">يتحدد تلقائيًا من صاحب الوردية المفتوحة</div></div> : account.account_type === "branch_safe" && canManage ? <Select value={account.responsible_user_id || "__none__"} onValueChange={value => custodianMutation.mutate({ accountKind: "cash", accountId: account.account_id, userId: value === "__none__" ? null : value })} disabled={custodianMutation.isPending}><SelectTrigger><SelectValue placeholder="حدد مسؤول الخزنة" /></SelectTrigger><SelectContent><SelectItem value="__none__">بدون مسؤول</SelectItem>{staff.map(user => <SelectItem key={user.user_id} value={user.user_id}>{user.name}</SelectItem>)}</SelectContent></Select> : <div className="rounded-xl bg-slate-50 p-3 font-bold">{account.responsible_user_name || "غير محدد"}</div>}
         </div>
       </div>
     </div>
@@ -145,48 +125,24 @@ export default function FinanceTreasuryCenterV2() {
   const renderPaymentAccount = (account: TreasuryPaymentAccount) => (
     <div key={account.account_id} className="rounded-2xl border bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2"><strong>{account.name}</strong><Badge variant="outline">{accountTypeLabel(account.account_type)}</Badge></div>
-          <div className="mt-2 text-2xl font-black">{money(account.balance)}</div>
-          <div className="mt-1 text-xs text-muted-foreground">آخر حركة: {dt(account.last_movement_at)}</div>
-        </div>
-        {account.account_type === "bank" ? <div className="min-w-[220px]">
-          <div className="mb-1 text-xs font-semibold text-muted-foreground">المسؤول عن الحساب</div>
-          {canManage ? <Select value={account.responsible_user_id || "__none__"} onValueChange={value => custodianMutation.mutate({ accountKind: "payment", accountId: account.account_id, userId: value === "__none__" ? null : value })} disabled={custodianMutation.isPending}><SelectTrigger><SelectValue placeholder="حدد المسؤول" /></SelectTrigger><SelectContent><SelectItem value="__none__">بدون مسؤول</SelectItem>{staff.map(user => <SelectItem key={user.user_id} value={user.user_id}>{user.name}</SelectItem>)}</SelectContent></Select> : <div className="rounded-xl bg-slate-50 p-3 font-bold">{account.responsible_user_name || "غير محدد"}</div>}
-        </div> : <div className="max-w-[240px] rounded-xl bg-blue-50 p-3 text-xs leading-5 text-blue-800">حساب تسوية إلكترونية، وليس خزنة صرف. يتم نقله للبنك أو الخزنة من مركز التسويات.</div>}
+        <div><div className="flex flex-wrap items-center gap-2"><strong>{account.name}</strong><Badge variant="outline">{accountTypeLabel(account.account_type)}</Badge></div><div className="mt-2 text-2xl font-black">{money(account.balance)}</div><div className="mt-1 text-xs text-muted-foreground">آخر حركة: {dt(account.last_movement_at)}</div></div>
+        {account.account_type === "bank" ? <div className="min-w-[220px]"><div className="mb-1 text-xs font-semibold text-muted-foreground">المسؤول عن الحساب</div>{canManage ? <Select value={account.responsible_user_id || "__none__"} onValueChange={value => custodianMutation.mutate({ accountKind: "payment", accountId: account.account_id, userId: value === "__none__" ? null : value })} disabled={custodianMutation.isPending}><SelectTrigger><SelectValue placeholder="حدد المسؤول" /></SelectTrigger><SelectContent><SelectItem value="__none__">بدون مسؤول</SelectItem>{staff.map(user => <SelectItem key={user.user_id} value={user.user_id}>{user.name}</SelectItem>)}</SelectContent></Select> : <div className="rounded-xl bg-slate-50 p-3 font-bold">{account.responsible_user_name || "غير محدد"}</div>}</div> : <div className="max-w-[240px] rounded-xl bg-blue-50 p-3 text-xs leading-5 text-blue-800">حساب تسوية إلكترونية، وليس خزنة صرف. يتم نقله للبنك أو الخزنة من مركز التسويات.</div>}
       </div>
     </div>
   );
 
   return <>
-    <Button className="fixed bottom-5 right-5 z-40 gap-2 rounded-full px-5 shadow-2xl" onClick={() => setOpen(true)}>
-      <Vault className="h-4 w-4" />الخزن والأرصدة
-      {(data?.unlinked_salary_advances?.length || 0) > 0 && <Badge variant="destructive" className="mr-1">{data?.unlinked_salary_advances.length}</Badge>}
-    </Button>
-
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent dir="rtl" className="max-h-[90vh] max-w-6xl overflow-y-auto">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><Vault className="h-5 w-5" />مركز الخزن والأرصدة — {currentBranchName || "الفرع الحالي"}</DialogTitle></DialogHeader>
         {!currentBranchId ? <div className="p-8 text-center text-muted-foreground">اختر الفرع أولًا.</div> : query.isLoading ? <div className="flex justify-center p-10"><Loader2 className="h-8 w-8 animate-spin" /></div> : query.isError ? <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">{query.error instanceof Error ? query.error.message : "تعذر تحميل مركز الخزن"}</div> : <div className="space-y-6">
           <div className="flex justify-end"><Button size="sm" variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button></div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Vault className="h-4 w-4" />خزنة الفرع</div><div className="mt-2 text-xl font-black">{money(totals.branchSafe)}</div></CardContent></Card>
-            <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Banknote className="h-4 w-4" />أدراج الكاشير</div><div className="mt-2 text-xl font-black">{money(totals.drawers)}</div></CardContent></Card>
-            <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><WalletCards className="h-4 w-4" />تحصيل أونلاين نقدي</div><div className="mt-2 text-xl font-black">{money(totals.onlineCash)}</div></CardContent></Card>
-            <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Landmark className="h-4 w-4" />البنوك</div><div className="mt-2 text-xl font-black">{money(totals.banks)}</div></CardContent></Card>
-            <Card><CardContent className="p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Building2 className="h-4 w-4" />تسويات إلكترونية</div><div className="mt-2 text-xl font-black">{money(totals.clearing)}</div></CardContent></Card>
-          </div>
-
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Card><CardContent className="p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Vault className="h-4 w-4" />خزنة الفرع</div><div className="mt-2 text-xl font-black">{money(totals.branchSafe)}</div></CardContent></Card><Card><CardContent className="p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Banknote className="h-4 w-4" />أدراج الكاشير</div><div className="mt-2 text-xl font-black">{money(totals.drawers)}</div></CardContent></Card><Card><CardContent className="p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><WalletCards className="h-4 w-4" />تحصيل أونلاين نقدي</div><div className="mt-2 text-xl font-black">{money(totals.onlineCash)}</div></CardContent></Card><Card><CardContent className="p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Landmark className="h-4 w-4" />البنوك</div><div className="mt-2 text-xl font-black">{money(totals.banks)}</div></CardContent></Card><Card><CardContent className="p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Building2 className="h-4 w-4" />تسويات إلكترونية</div><div className="mt-2 text-xl font-black">{money(totals.clearing)}</div></CardContent></Card></div>
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><strong>قاعدة العهدة:</strong> اختيار خزنة لا يخصم المبلغ. يتم إنشاء مهمة تلقائيًا لمسؤول الخزنة، والخصم من الـLedger يحدث فقط بعد أن يؤكد أنه صرف الفلوس فعليًا. درج الـPOS يتبع الكاشير صاحب الوردية المفتوحة.</div>
-
           <section className="space-y-3"><div className="flex items-center gap-2"><Vault className="h-5 w-5" /><h3 className="font-black">الخزن النقدية وأدراج الكاشير</h3></div><div className="grid gap-3 lg:grid-cols-2">{cashAccounts.map(renderCashAccount)}</div></section>
           <section className="space-y-3"><div className="flex items-center gap-2"><Landmark className="h-5 w-5" /><h3 className="font-black">البنوك وحسابات التسوية</h3></div><div className="grid gap-3 lg:grid-cols-2">{paymentAccounts.length ? paymentAccounts.map(renderPaymentAccount) : <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">لا توجد حسابات بنكية/تسوية ظاهرة للفرع.</div>}</div></section>
-
           {(data?.pending_disbursements?.length || 0) > 0 && <section className="space-y-3"><h3 className="font-black">عمليات صرف بانتظار مسؤول الخزنة</h3><div className="space-y-2">{data?.pending_disbursements.map(item => <div key={item.task_id} className="flex flex-col gap-2 rounded-2xl border bg-amber-50/60 p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-bold">{item.employee_name} · {money(item.amount)}</div><div className="mt-1 text-xs text-muted-foreground">{item.source_account_name} → المسؤول: {item.responsible_user_name}</div></div><Badge variant="outline">{item.status}</Badge></div>)}</div></section>}
-
           {(data?.unlinked_salary_advances?.length || 0) > 0 && <section className="space-y-3"><div className="flex items-center gap-2 text-amber-800"><AlertTriangle className="h-5 w-5" /><h3 className="font-black">سلف قديمة بدون مصدر صرف</h3></div><div className="space-y-2">{data?.unlinked_salary_advances.map(advance => <div key={advance.advance_id} className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-black">{advance.employee_name} · {money(advance.amount)}</div><div className="mt-1 text-xs text-amber-800">مصروفة بتاريخ {dt(advance.paid_at)} لكن لا يوجد قيد يوضح خرجت من أي خزنة. المرجع: {advance.payout_reference || "—"}</div></div>{canManage && <Button size="sm" variant="outline" onClick={() => { setLinkAdvance(advance); setSourceId(""); setLinkNote(""); setLinkReference(advance.payout_reference || ""); }}>تحديد المصدر ومراجعته</Button>}</div>)}</div></section>}
-
           <section className="space-y-3"><h3 className="font-black">آخر الحركات على الخزن والحسابات</h3><div className="max-h-72 space-y-2 overflow-y-auto">{(data?.recent_movements || []).map(item => <div key={`${item.ledger_kind}-${item.id}`} className="flex items-start justify-between gap-3 rounded-xl border p-3"><div><div className="font-semibold">{item.account_name}</div><div className="mt-1 text-xs text-muted-foreground">{item.description || item.entry_type} · {dt(item.created_at)}{item.actor_name ? ` · ${item.actor_name}` : ""}</div></div><div className={`font-black ${Number(item.signed_amount) < 0 ? "text-red-700" : "text-emerald-700"}`}>{Number(item.signed_amount) > 0 ? "+" : ""}{money(item.signed_amount)}</div></div>)}{(data?.recent_movements || []).length === 0 && <div className="rounded-xl border border-dashed p-5 text-center text-sm text-muted-foreground">لا توجد حركات مسجلة.</div>}</div></section>
         </div>}
       </DialogContent>
