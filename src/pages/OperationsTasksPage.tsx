@@ -35,6 +35,7 @@ import {
   completeOperationsTask,
   completeRefundTransferTask,
   failOperationsTask,
+  fetchOperationsTaskDashboard,
   fetchOperationsTaskEvents,
   fetchOperationsTasks,
   isCashHandoffVarianceTask,
@@ -187,8 +188,19 @@ export default function OperationsTasksPage() {
     refetchOnWindowFocus: true,
   });
 
+  const dashboardQuery = useQuery({
+    queryKey: ["operations-task-dashboard", currentBranchId],
+    enabled: Boolean(currentBranchId),
+    queryFn: () => fetchOperationsTaskDashboard(currentBranchId as string),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
   useEffect(() => {
-    if (generationQuery.data) void query.refetch();
+    if (generationQuery.data) {
+      void query.refetch();
+      void dashboardQuery.refetch();
+    }
   }, [generationQuery.data?.session_id, generationQuery.data?.generated]);
 
   const historyQuery = useQuery({
@@ -215,6 +227,16 @@ export default function OperationsTasksPage() {
   const varianceActive = rawData.filter(task => isShiftReconciliationTask(task) && !["completed", "cancelled"].includes(task.status)).length;
   const cashHandoffActive = rawData.filter(task => isCashHandoffVarianceTask(task) && !["completed", "cancelled"].includes(task.status)).length;
   const inventoryActive = rawData.filter(task => isInventoryTask(task) && !["completed", "cancelled"].includes(task.status)).length;
+  const dashboardSummary = dashboardQuery.data?.summary;
+  const dashboardCards = dashboardSummary ? [
+    { label: "مهامي", value: dashboardSummary.my_active, tone: "bg-blue-50 text-blue-900 border-blue-100" },
+    { label: "متأخرة", value: dashboardSummary.overdue, tone: "bg-red-50 text-red-900 border-red-100" },
+    { label: "خلال ساعة", value: dashboardSummary.due_soon, tone: "bg-amber-50 text-amber-900 border-amber-100" },
+    { label: "إعادة جرد", value: dashboardSummary.returned_for_recount, tone: "bg-orange-50 text-orange-900 border-orange-100" },
+    { label: "تحتاج اعتماد", value: dashboardSummary.approval_pending, tone: "bg-violet-50 text-violet-900 border-violet-100" },
+    { label: "جرد يومي", value: dashboardSummary.inventory_daily_active, tone: "bg-cyan-50 text-cyan-900 border-cyan-100" },
+    { label: "جرد شامل", value: dashboardSummary.inventory_full_active, tone: "bg-slate-50 text-slate-900 border-slate-200" },
+  ] : [];
 
   const changeTypeFilter = (value: TaskTypeFilter) => {
     const next = new URLSearchParams(searchParams);
@@ -222,10 +244,14 @@ export default function OperationsTasksPage() {
     setSearchParams(next, { replace: true });
   };
 
+  const refreshAll = async () => {
+    await Promise.all([query.refetch(), dashboardQuery.refetch()]);
+  };
+
   const run = async (taskId: string, action: () => Promise<unknown>, success: string) => {
     setBusyId(taskId);
-    try { await action(); toast.success(success); await query.refetch(); }
-    catch (error) { toast.error(error instanceof Error ? error.message : "تعذر تنفيذ الإجراء."); await query.refetch(); }
+    try { await action(); toast.success(success); await refreshAll(); }
+    catch (error) { toast.error(error instanceof Error ? error.message : "تعذر تنفيذ الإجراء."); await refreshAll(); }
     finally { setBusyId(null); }
   };
 
@@ -240,7 +266,7 @@ export default function OperationsTasksPage() {
       setInventoryTask(task);
       setInventoryDetail(detail);
       setActualCount(""); setCountNote(""); setBarcodeCheck(""); setAdjustmentReason("unknown"); setRejectionReason("insufficient_evidence"); setAdjustmentNote("");
-      await query.refetch();
+      await refreshAll();
     } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر فتح مهمة الجرد."); }
     finally { setBusyId(null); }
   };
@@ -269,7 +295,7 @@ export default function OperationsTasksPage() {
       } else {
         toast.warning("تم تسجيل إعادة العد وتحويل الحالة لمراجعة واعتماد المخزون.");
       }
-      closeInventoryDialog(); await query.refetch();
+      closeInventoryDialog(); await refreshAll();
     } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر تسليم نتيجة الجرد."); }
     finally { setBusyId(null); }
   };
@@ -282,7 +308,7 @@ export default function OperationsTasksPage() {
     try {
       const result = await approveInventoryAdjustmentV2(inventoryTask.id, adjustmentReason, adjustmentNote);
       toast.success(`تم اعتماد التسوية: ${formatQty(result.quantity_before)} ← ${formatQty(result.quantity_after)}.`);
-      closeInventoryDialog(); await query.refetch();
+      closeInventoryDialog(); await refreshAll();
     } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر اعتماد تسوية المخزون."); }
     finally { setBusyId(null); }
   };
@@ -294,7 +320,7 @@ export default function OperationsTasksPage() {
     try {
       await rejectInventoryAdjustmentV2(inventoryTask.id, rejectionReason, adjustmentNote);
       toast.success("تم رفض التسوية وإرجاع مهمة العد للموظف لإعادة الجرد. لم يتم تغيير المخزون.");
-      closeInventoryDialog(); await query.refetch();
+      closeInventoryDialog(); await refreshAll();
     } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر رفض التسوية."); }
     finally { setBusyId(null); }
   };
@@ -303,7 +329,7 @@ export default function OperationsTasksPage() {
     if (!completeRefundTask || busyId) return;
     if (providerReference.trim().length < 3) return toast.error("اكتب رقم العملية أو المرجع.");
     const task = completeRefundTask; setBusyId(task.id);
-    try { await completeRefundTransferTask(task.id, providerReference); toast.success("تم تأكيد تحويل مبلغ المرتجع وتسجيل الحركة المالية."); setCompleteRefundTask(null); setProviderReference(""); await query.refetch(); }
+    try { await completeRefundTransferTask(task.id, providerReference); toast.success("تم تأكيد تحويل مبلغ المرتجع وتسجيل الحركة المالية."); setCompleteRefundTask(null); setProviderReference(""); await refreshAll(); }
     catch (error) { toast.error(error instanceof Error ? error.message : "تعذر تأكيد التحويل."); }
     finally { setBusyId(null); }
   };
@@ -312,7 +338,7 @@ export default function OperationsTasksPage() {
     if (!completeReviewTask || busyId) return;
     if (resolutionNote.trim().length < 3) return toast.error("اكتب نتيجة المراجعة قبل الإغلاق.");
     const task = completeReviewTask; setBusyId(task.id);
-    try { await completeOperationsTask(task.id, resolutionNote); toast.success("تم إغلاق المراجعة وتوثيق النتيجة."); setCompleteReviewTask(null); setResolutionNote(""); await query.refetch(); }
+    try { await completeOperationsTask(task.id, resolutionNote); toast.success("تم إغلاق المراجعة وتوثيق النتيجة."); setCompleteReviewTask(null); setResolutionNote(""); await refreshAll(); }
     catch (error) { toast.error(error instanceof Error ? error.message : "تعذر إغلاق المراجعة."); }
     finally { setBusyId(null); }
   };
@@ -321,7 +347,7 @@ export default function OperationsTasksPage() {
     if (!failTask || busyId) return;
     if (failureReason.trim().length < 3) return toast.error("اكتب سبب تعذر التنفيذ.");
     const task = failTask; setBusyId(task.id);
-    try { await failOperationsTask(task.id, failureReason); toast.success("تم تسجيل سبب تعذر التنفيذ ويمكن إعادة المحاولة أو إرجاع المهمة."); setFailTask(null); setFailureReason(""); await query.refetch(); }
+    try { await failOperationsTask(task.id, failureReason); toast.success("تم تسجيل سبب تعذر التنفيذ ويمكن إعادة المحاولة أو إرجاع المهمة."); setFailTask(null); setFailureReason(""); await refreshAll(); }
     catch (error) { toast.error(error instanceof Error ? error.message : "تعذر تسجيل المشكلة."); }
     finally { setBusyId(null); }
   };
@@ -380,9 +406,10 @@ export default function OperationsTasksPage() {
         <section className="rounded-3xl border bg-white p-5 shadow-sm md:p-7">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div><div className="flex items-center gap-2"><PackageCheck className="h-6 w-6 text-[#005931]" /><h1 className="text-2xl font-black">مركز المهام التشغيلية</h1></div><p className="mt-2 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · مرتجعات، تسويات، عهد نقدية، وجرد يومي أعمى في طابور واحد.</p></div>
-            <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
+            <Button variant="outline" onClick={() => void refreshAll()} disabled={query.isFetching || dashboardQuery.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching || dashboardQuery.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
           </div>
           {generationQuery.data && <div className="mt-4 rounded-2xl border border-cyan-100 bg-cyan-50/70 p-3 text-sm text-cyan-950">جرد اليوم: {generationQuery.data.generated > 0 ? `تم توزيع ${generationQuery.data.generated} مهمة` : `${generationQuery.data.existing || 0} مهمة موجودة بالفعل`} على {generationQuery.data.eligible_staff} موظف مؤهل.</div>}
+          {dashboardCards.length > 0 && <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">{dashboardCards.map(card => <div key={card.label} className={`rounded-2xl border p-3 ${card.tone}`}><div className="text-xs font-semibold opacity-70">{card.label}</div><div className="mt-1 text-2xl font-black">{Number(card.value || 0).toLocaleString("ar-EG")}</div></div>)}</div>}
           <div className="mt-5 flex flex-wrap gap-2">
             <Button size="sm" variant={typeFilter === "all" ? "default" : "outline"} onClick={() => changeTypeFilter("all")}>الكل <Badge variant="secondary" className="mr-2">{active.length}</Badge></Button>
             <Button size="sm" variant={typeFilter === "inventory" ? "default" : "outline"} onClick={() => changeTypeFilter("inventory")}><ClipboardCheck className="ml-1 h-4 w-4" />الجرد <Badge variant="secondary" className="mr-2">{inventoryActive}</Badge></Button>
