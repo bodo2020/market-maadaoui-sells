@@ -5,7 +5,14 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { useNotificationStore } from "@/stores/notificationStore";
-import { fetchOperationsTasks, isShiftReconciliationTask } from "@/services/supabase/operationsTaskService";
+import { fetchOperationsTasks, isRefundTransferTask, isShiftReconciliationTask, type OperationsTask } from "@/services/supabase/operationsTaskService";
+
+function tasksPath(tasks: OperationsTask[]) {
+  if (!tasks.length) return "/tasks";
+  if (tasks.every(isShiftReconciliationTask)) return "/tasks?type=shift";
+  if (tasks.every(isRefundTransferTask)) return "/tasks?type=refund";
+  return "/tasks";
+}
 
 export default function OperationsTaskNotifications() {
   const navigate = useNavigate();
@@ -58,7 +65,7 @@ export default function OperationsTaskNotifications() {
         toast.warning(title, {
           description,
           duration: 10000,
-          action: { label: "فتح المهام", onClick: () => navigate("/tasks") },
+          action: { label: "فتح المهام", onClick: () => navigate(tasksPath(available)) },
         });
       }
     }
@@ -71,7 +78,7 @@ export default function OperationsTaskNotifications() {
         toast.error("فيه مهام تشغيلية تجاوزت وقت التنفيذ", {
           description: `${overdue.length.toLocaleString("ar-EG")} مهمة متأخرة تحتاج متابعة`,
           duration: 12000,
-          action: { label: "عرض المتأخرة", onClick: () => navigate("/tasks") },
+          action: { label: "عرض المتأخرة", onClick: () => navigate(tasksPath(overdue)) },
         });
       }
     }
