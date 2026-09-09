@@ -11,6 +11,7 @@ import {
   Truck,
   Users,
   UserCheck,
+  UserRound,
   Wallet,
   WalletCards,
   Image,
@@ -37,6 +38,7 @@ export const mainNavigation: NavigationGroup = {
   items: [
     { label: "التقارير والتحليلات", href: "/reports", icon: LayoutDashboard },
     { label: "نقطة البيع", href: "/pos", icon: ShoppingCart },
+    { label: "بوابة الموظف", href: "/my-hr", icon: UserRound },
     { label: "الحضور والانصراف", href: "/attendance", icon: Clock3 },
     { label: "المهام", href: "/tasks", icon: ClipboardList },
     { label: "مركز الموافقات", href: "/approvals", icon: ShieldCheck },
