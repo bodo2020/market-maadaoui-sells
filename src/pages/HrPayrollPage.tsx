@@ -7,6 +7,7 @@ import {
   Calculator,
   CheckCircle2,
   Clock3,
+  Landmark,
   Loader2,
   LockKeyhole,
   Plus,
@@ -14,6 +15,7 @@ import {
   Send,
   ShieldCheck,
   UserRoundCog,
+  Vault,
   WalletCards,
 } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
@@ -33,13 +35,17 @@ import {
   decideHrPayroll,
   generatePayrollRun,
   getPayrollWorkspace,
-  markPayrollPaid,
   saveCompensationProfile,
   submitPayrollForHrReview,
   type CompensationDirectoryItem,
   type PayrollItem,
   type PayrollStatus,
 } from "@/services/hrPayrollService";
+import {
+  delegateHrPayrollPayment,
+  fetchFinancePayoutSourcesV2,
+  type FinancePayoutSourceV2,
+} from "@/services/supabase/financeTreasuryV2Service";
 
 const months = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -63,6 +69,7 @@ const warningLabels: Record<string, string> = {
 const money = (value?: number | null) => `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
 const num = (value?: number | null) => Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2 });
 const minutes = (value?: number | null) => Number(value || 0).toLocaleString("ar-EG");
+const sourceLabel = (source: FinancePayoutSourceV2) => source.source_kind === "branch_safe" ? "خزنة فرع" : source.source_kind === "pos_drawer" ? "درج POS" : "حساب بنكي";
 
 export default function HrPayrollPage() {
   const { currentBranchId, currentBranchName } = useBranchStore();
@@ -80,7 +87,9 @@ export default function HrPayrollPage() {
   const [decision, setDecision] = useState<{ stage: "hr" | "finance"; value: "approved" | "rejected" } | null>(null);
   const [decisionNote, setDecisionNote] = useState("");
   const [payOpen, setPayOpen] = useState(false);
+  const [paymentSourceId, setPaymentSourceId] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
+  const [paymentNote, setPaymentNote] = useState("");
 
   const query = useQuery({
     queryKey: ["hr-payroll-v2", currentBranchId, month, year],
@@ -96,6 +105,15 @@ export default function HrPayrollPage() {
   const compensation = data?.compensation?.items || [];
   const missingCompensation = useMemo(() => compensation.filter(item => !item.configured), [compensation]);
   const scheduleWarnings = useMemo(() => items.filter(item => !item.schedule_ready).length, [items]);
+
+  const payoutSourcesQuery = useQuery({
+    queryKey: ["finance-payout-sources-v2", currentBranchId, "payroll", run?.id],
+    enabled: Boolean(currentBranchId && payOpen && run?.status === "locked" && !run?.payment_delegated_task_id),
+    queryFn: () => fetchFinancePayoutSourcesV2(currentBranchId as string),
+    staleTime: 10_000,
+    retry: false,
+  });
+  const selectedPaySource = (payoutSourcesQuery.data || []).find(source => source.account_id === paymentSourceId);
 
   const refresh = async () => { await query.refetch(); };
 
@@ -160,22 +178,41 @@ export default function HrPayrollPage() {
 
   const payMutation = useMutation({
     mutationFn: async () => {
-      if (!run) throw new Error("المسير غير جاهز.");
+      if (!run || run.status !== "locked") throw new Error("المسير غير جاهز للصرف.");
+      if (run.payment_delegated_task_id) throw new Error("المسير مرسل بالفعل لمسؤول العهدة.");
+      if (!selectedPaySource) throw new Error("اختر مصدر الصرف.");
+      if (!selectedPaySource.assignable || !selectedPaySource.responsible_user_id) throw new Error("مصدر الصرف لا يوجد له مسؤول عهدة حالي.");
+      if (Number(selectedPaySource.balance || 0) + 0.005 < Number(run.total_net || 0)) throw new Error("رصيد المصدر أقل من صافي المسير.");
       if (paymentReference.trim().length < 2) throw new Error("أدخل مرجع الصرف.");
-      return markPayrollPaid(run.id, paymentReference.trim());
+      if (paymentNote.trim().length < 3) throw new Error("اكتب ملاحظة لمسؤول العهدة.");
+      return delegateHrPayrollPayment({
+        runId: run.id,
+        sourceKind: selectedPaySource.source_kind,
+        sourceAccountId: selectedPaySource.account_id,
+        reference: paymentReference.trim(),
+        note: paymentNote.trim(),
+      });
     },
-    onSuccess: async () => {
-      toast.success("تم تسجيل صرف المسير وتحديث أقساط السلف المستحقة.");
-      setPayOpen(false); setPaymentReference("");
+    onSuccess: async result => {
+      toast.success(`تم إرسال مسير الرواتب إلى ${result.responsible_user_name}. لن يُخصم أي مبلغ قبل تأكيده الفعلي.`);
+      setPayOpen(false); setPaymentSourceId(""); setPaymentReference(""); setPaymentNote("");
       await refresh();
     },
-    onError: error => toast.error(error instanceof Error ? error.message : "تعذر تسجيل الصرف"),
+    onError: error => toast.error(error instanceof Error ? error.message : "تعذر إرسال المسير للصرف"),
   });
 
   const openComp = (employee: CompensationDirectoryItem) => {
     setCompEmployee(employee);
     setBaseSalary(employee.base_salary == null ? "" : String(employee.base_salary));
     setEffectiveFrom(employee.effective_from || `${year}-${String(month).padStart(2, "0")}-01`);
+  };
+
+  const openPay = () => {
+    if (!run) return;
+    setPaymentSourceId("");
+    setPaymentReference(run.payment_reference || `PAYROLL-${run.year}-${String(run.month).padStart(2, "0")}`);
+    setPaymentNote("");
+    setPayOpen(true);
   };
 
   if (query.isLoading) return <MainLayout><div className="flex min-h-[480px] items-center justify-center"><Loader2 className="h-9 w-9 animate-spin text-[#005931]" /></div></MainLayout>;
@@ -187,7 +224,7 @@ export default function HrPayrollPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="flex items-center gap-2"><Banknote className="h-7 w-7 text-[#005931]" /><h1 className="text-2xl font-black">مسير الرواتب</h1></div>
-              <p className="mt-2 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · حساب موثق من الراتب والحضور والإجازات والسلف والتسويات، ثم HR → Finance → Lock → Paid.</p>
+              <p className="mt-2 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · الراتب والحضور والإجازات والسلف والتسويات، ثم HR → Finance → Lock → عهدة الصرف → Paid.</p>
             </div>
             <div className="flex flex-wrap items-end gap-2">
               <div className="w-36"><Label className="mb-1 block text-xs">الشهر</Label><Select value={String(month)} onValueChange={v => setMonth(Number(v))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{months.map((label, i) => <SelectItem key={label} value={String(i + 1)}>{label}</SelectItem>)}</SelectContent></Select></div>
@@ -210,7 +247,7 @@ export default function HrPayrollPage() {
                     <CardContent className="p-5">
                       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                         <div>
-                          <div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-black">مسير {months[run.month - 1]} {run.year}</h2><Badge variant="outline" className={statusMeta[run.status].className}>{statusMeta[run.status].label}</Badge></div>
+                          <div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-black">مسير {months[run.month - 1]} {run.year}</h2><Badge variant="outline" className={statusMeta[run.status].className}>{statusMeta[run.status].label}</Badge>{run.status === "locked" && run.payment_delegated_task_id && <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-800">بانتظار مسؤول العهدة</Badge>}</div>
                           <p className="mt-1 text-xs text-muted-foreground">الفترة: {run.period_start} ← {run.period_end}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -218,11 +255,14 @@ export default function HrPayrollPage() {
                           {run.status === "draft" && <Button onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending || missingCompensation.length > 0}><Send className="ml-2 h-4 w-4" />إرسال لـHR</Button>}
                           {run.status === "hr_review" && <><Button variant="destructive" onClick={() => setDecision({ stage: "hr", value: "rejected" })}>إرجاع للمراجعة</Button><Button onClick={() => setDecision({ stage: "hr", value: "approved" })}><ShieldCheck className="ml-2 h-4 w-4" />اعتماد HR</Button></>}
                           {run.status === "finance_review" && <><Button variant="destructive" onClick={() => setDecision({ stage: "finance", value: "rejected" })}>إرجاع للمراجعة</Button><Button onClick={() => setDecision({ stage: "finance", value: "approved" })}><LockKeyhole className="ml-2 h-4 w-4" />اعتماد وقفل مالي</Button></>}
-                          {run.status === "locked" && <Button onClick={() => setPayOpen(true)}><WalletCards className="ml-2 h-4 w-4" />تسجيل الصرف</Button>}
+                          {run.status === "locked" && !run.payment_delegated_task_id && <Button onClick={openPay}><WalletCards className="ml-2 h-4 w-4" />إرسال للصرف</Button>}
+                          {run.status === "locked" && run.payment_delegated_task_id && <Button variant="outline" disabled><Clock3 className="ml-2 h-4 w-4" />بانتظار تأكيد العهدة</Button>}
                         </div>
                       </div>
                     </CardContent>
                   </Card>
+
+                  {run.status === "locked" && run.payment_delegated_task_id && <Card className="border-blue-200 bg-blue-50"><CardContent className="p-5"><div className="flex items-center gap-2 font-black text-blue-900"><Vault className="h-5 w-5" />تم إسناد صرف المسير</div><p className="mt-1 text-sm text-blue-800">المصدر: <strong>{run.payment_account_name_snapshot || "مصدر العهدة المحدد"}</strong> · المرجع: {run.payment_reference || "—"}. لم يتم خصم المبلغ بعد؛ يتحول المسير إلى Paid فقط بعد تأكيد مسؤول العهدة.</p></CardContent></Card>}
 
                   {missingCompensation.length > 0 && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><div className="flex items-center gap-2 font-black"><AlertTriangle className="h-5 w-5" />المسير غير جاهز للمراجعة</div><p className="mt-1">يوجد {missingCompensation.length.toLocaleString("ar-EG")} موظف بدون راتب أساسي. أدخل الرواتب من تبويب إعداد رواتب الموظفين ثم أعد الحساب.</p></div>}
                   {scheduleWarnings > 0 && <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><div className="flex items-center gap-2 font-black"><Clock3 className="h-5 w-5" />حماية من خصم غياب خاطئ</div><p className="mt-1">{scheduleWarnings.toLocaleString("ar-EG")} موظف ليس لديه جدول ورديات صالح للفترة؛ النظام لم يطبق عليهم خصم غياب تلقائيًا.</p></div>}
@@ -238,7 +278,7 @@ export default function HrPayrollPage() {
                     {items.map(item => <PayrollEmployeeCard key={item.id} item={item} editable={run.status === "draft"} onAdjustment={() => setAdjustItem(item)} />)}
                   </div>
 
-                  {run.status === "paid" && <Card className="border-emerald-200 bg-emerald-50"><CardContent className="p-5"><div className="flex items-center gap-2 font-black text-emerald-900"><CheckCircle2 className="h-5 w-5" />تم صرف المسير</div><p className="mt-1 text-sm text-emerald-800">مرجع الصرف: {run.payment_reference || "—"} · تم تثبيت الرواتب وتحديث أقساط السلف المستحقة.</p></CardContent></Card>}
+                  {run.status === "paid" && <Card className="border-emerald-200 bg-emerald-50"><CardContent className="p-5"><div className="flex items-center gap-2 font-black text-emerald-900"><CheckCircle2 className="h-5 w-5" />تم صرف المسير وتسجيل الحركة المالية</div><p className="mt-1 text-sm text-emerald-800">المصدر: {run.payment_account_name_snapshot || "—"} · مرجع الصرف: {run.payment_reference || "—"} · تم تثبيت الرواتب وتحديث أقساط السلف المستحقة.</p></CardContent></Card>}
                 </>
               )}
             </TabsContent>
@@ -263,8 +303,26 @@ export default function HrPayrollPage() {
         <DialogContent dir="rtl" className="max-w-md"><DialogHeader><DialogTitle>{decision?.stage === "hr" ? "قرار مراجعة الموارد البشرية" : "قرار المراجعة المالية"}</DialogTitle></DialogHeader><div className="space-y-3"><div className={`rounded-xl p-3 text-sm ${decision?.value === "approved" ? "bg-emerald-50 text-emerald-900" : "bg-red-50 text-red-900"}`}>{decision?.value === "approved" ? (decision.stage === "finance" ? "الاعتماد المالي سيقفل المسير ويمنع إعادة الحساب." : "اعتماد HR سيرسل المسير للمراجعة المالية.") : "رفض المرحلة سيعيد المسير إلى Draft للتصحيح وإعادة الحساب."}</div><div><Label>{decision?.value === "rejected" ? "سبب الإرجاع" : "ملاحظة (اختياري)"}</Label><Textarea value={decisionNote} onChange={e => setDecisionNote(e.target.value)} /></div></div><DialogFooter><Button variant="outline" onClick={() => setDecision(null)}>إلغاء</Button><Button variant={decision?.value === "rejected" ? "destructive" : "default"} onClick={() => decisionMutation.mutate()} disabled={decisionMutation.isPending}>{decisionMutation.isPending && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}{decision?.value === "approved" ? "اعتماد" : "إرجاع للمسودة"}</Button></DialogFooter></DialogContent>
       </Dialog>
 
-      <Dialog open={payOpen} onOpenChange={setPayOpen}>
-        <DialogContent dir="rtl" className="max-w-md"><DialogHeader><DialogTitle>تسجيل صرف المسير</DialogTitle></DialogHeader><div className="space-y-3"><div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">هذه الخطوة تثبت حالة الرواتب كـPaid وتستهلك أقساط السلف المدرجة فقط. لا تسحب من خزنة أو حساب بنكي تلقائيًا.</div><div><Label>مرجع الصرف</Label><Input value={paymentReference} onChange={e => setPaymentReference(e.target.value)} placeholder="مثال: BANK-SEP-2026 أو CASH-001" /></div></div><DialogFooter><Button variant="outline" onClick={() => setPayOpen(false)}>إلغاء</Button><Button onClick={() => payMutation.mutate()} disabled={payMutation.isPending}><WalletCards className="ml-2 h-4 w-4" />تأكيد Paid</Button></DialogFooter></DialogContent>
+      <Dialog open={payOpen} onOpenChange={open => { if (!payMutation.isPending) setPayOpen(open); }}>
+        <DialogContent dir="rtl" className="max-w-xl">
+          <DialogHeader><DialogTitle>إرسال مسير الرواتب للصرف</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><div className="flex items-center justify-between gap-3"><div><div className="font-black text-emerald-950">صافي المسير</div><div className="mt-1 text-xs text-emerald-800">{run ? `${months[run.month - 1]} ${run.year}` : ""}</div></div><div className="text-2xl font-black text-emerald-950">{money(run?.total_net)}</div></div></div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><strong>اختيار المصدر لا يخصم الفلوس.</strong> سيتم إنشاء مهمة لمسؤول الخزنة/الحساب، وفقط عند تأكيده بعد التسليم أو التحويل يتم إنشاء القيد المالي وتحويل المسير إلى Paid.</div>
+            <div className="space-y-2">
+              <Label>مصدر صرف الرواتب</Label>
+              <Select value={paymentSourceId} onValueChange={setPaymentSourceId} disabled={payoutSourcesQuery.isLoading || payMutation.isPending}>
+                <SelectTrigger><SelectValue placeholder={payoutSourcesQuery.isLoading ? "جاري تحميل الخزن والحسابات..." : "اختر خزنة / درج POS / بنك"} /></SelectTrigger>
+                <SelectContent>{(payoutSourcesQuery.data || []).map(source => <SelectItem key={source.account_id} value={source.account_id} disabled={!source.assignable || Number(source.balance || 0) + 0.005 < Number(run?.total_net || 0)}>{source.name} · {sourceLabel(source)} · {money(source.balance)} · {source.responsible_user_name || "بدون مسؤول"}</SelectItem>)}</SelectContent>
+              </Select>
+              {payoutSourcesQuery.isError && <div className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{payoutSourcesQuery.error instanceof Error ? payoutSourcesQuery.error.message : "تعذر تحميل مصادر الصرف."}</div>}
+              {selectedPaySource && <div className="grid gap-2 rounded-2xl bg-slate-50 p-4 text-sm sm:grid-cols-3"><div><span className="block text-xs text-muted-foreground">النوع</span><strong>{sourceLabel(selectedPaySource)}</strong></div><div><span className="block text-xs text-muted-foreground">المسؤول</span><strong>{selectedPaySource.responsible_user_name || "غير محدد"}</strong></div><div><span className="block text-xs text-muted-foreground">الرصيد الحالي</span><strong className={Number(selectedPaySource.balance || 0) + 0.005 >= Number(run?.total_net || 0) ? "text-emerald-700" : "text-red-700"}>{money(selectedPaySource.balance)}</strong></div>{selectedPaySource.source_kind === "pos_drawer" && <div className="sm:col-span-3 text-xs text-amber-700">مسؤول درج POS هو صاحب الوردية المفتوحة حاليًا؛ لو انتهت ورديته قبل التأكيد سيُرفض الخصم تلقائيًا.</div>}</div>}
+            </div>
+            <div className="space-y-2"><Label>مرجع الصرف</Label><Input value={paymentReference} onChange={e => setPaymentReference(e.target.value)} placeholder="مثال: PAYROLL-2026-09 / رقم التحويل" disabled={payMutation.isPending} /></div>
+            <div className="space-y-2"><Label>ملاحظة لمسؤول العهدة</Label><Textarea rows={4} value={paymentNote} onChange={e => setPaymentNote(e.target.value)} placeholder="طريقة التسليم أو التحويل والتعليمات التي يجب مراجعتها قبل التأكيد..." disabled={payMutation.isPending} /></div>
+          </div>
+          <DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={() => setPayOpen(false)} disabled={payMutation.isPending}>إلغاء</Button><Button onClick={() => payMutation.mutate()} disabled={payMutation.isPending || !selectedPaySource || !selectedPaySource.assignable || Number(selectedPaySource.balance || 0) + 0.005 < Number(run?.total_net || 0) || paymentReference.trim().length < 2 || paymentNote.trim().length < 3}>{payMutation.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : selectedPaySource?.source_kind === "bank" ? <Landmark className="ml-2 h-4 w-4" /> : <Vault className="ml-2 h-4 w-4" />}إرسال لمسؤول العهدة</Button></DialogFooter>
+        </DialogContent>
       </Dialog>
     </MainLayout>
   );
