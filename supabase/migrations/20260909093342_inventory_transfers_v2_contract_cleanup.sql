@@ -1,0 +1,3 @@
+-- Production migration history marker.
+-- This cleanup removed an experimental overload/status model. The final
+-- canonical contract is defined in 20260909093529_inventory_transfers_v2_consolidation_final.sql.
