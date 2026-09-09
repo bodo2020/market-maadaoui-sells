@@ -24,6 +24,7 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  ShieldCheck,
   UserRoundCog
 } from "lucide-react";
 import { User, UserRole } from "@/types";
@@ -145,6 +146,10 @@ export function EmployeeTable({
                     <DropdownMenuItem onClick={() => navigate(`/employees/${employee.id}`)}>
                       <UserRoundCog className="ml-2 h-4 w-4" />
                       الملف الوظيفي 360°
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate(`/employees/${employee.id}/devices`)}>
+                      <ShieldCheck className="ml-2 h-4 w-4" />
+                      الأجهزة الموثوقة
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onEditClick(employee)}>
                       <Pencil className="ml-2 h-4 w-4" />
