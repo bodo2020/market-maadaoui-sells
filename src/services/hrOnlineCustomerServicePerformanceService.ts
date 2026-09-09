@@ -28,7 +28,13 @@ export interface HrOnlineCustomerServicePerformance {
     sla: {
       enabled: boolean;
       rate: number | null;
-      reason: string;
+      overall_rate: number | null;
+      first_response_rate: number | null;
+      preparation_rate: number | null;
+      evaluated_samples: number;
+      first_response_target_minutes: number;
+      preparation_target_minutes: number;
+      reason: string | null;
     };
   };
   customer_service: {
