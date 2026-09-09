@@ -9,6 +9,7 @@ export interface NotificationAudiencePreviewV2 {
   total: number;
   in_app_eligible: number;
   push_eligible: number;
+  push_sender_ready: boolean;
   whatsapp_marketing_eligible: number;
   whatsapp_sender_ready: boolean;
 }
@@ -59,6 +60,7 @@ export async function previewNotificationAudienceV2(
     total: Number(raw.total || 0),
     in_app_eligible: Number(raw.in_app_eligible || 0),
     push_eligible: Number(raw.push_eligible || 0),
+    push_sender_ready: Boolean(raw.push_sender_ready),
     whatsapp_marketing_eligible: Number(raw.whatsapp_marketing_eligible || 0),
     whatsapp_sender_ready: Boolean(raw.whatsapp_sender_ready),
   };
