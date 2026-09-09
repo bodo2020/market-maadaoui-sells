@@ -11,6 +11,7 @@ import {
   Play,
   RefreshCw,
   RotateCcw,
+  Scale,
   UserRoundCheck,
   WalletCards,
 } from "lucide-react";
@@ -27,17 +28,22 @@ import { useBranchStore } from "@/stores/branchStore";
 import { siteConfig } from "@/config/site";
 import {
   claimOperationsTask,
+  completeOperationsTask,
   completeRefundTransferTask,
   failOperationsTask,
   fetchOperationsTaskEvents,
   fetchOperationsTasks,
+  isRefundTransferTask,
+  isShiftReconciliationTask,
   releaseOperationsTask,
   startOperationsTask,
   type OperationsTask,
   type OperationsTaskEvent,
 } from "@/services/supabase/operationsTaskService";
 
-const formatMoney = (value: number) => `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siteConfig.currency}`;
+const formatMoney = (value: number | null | undefined) =>
+  `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siteConfig.currency}`;
+
 const formatDateTime = (value?: string | null) => {
   if (!value) return "—";
   try {
@@ -45,15 +51,6 @@ const formatDateTime = (value?: string | null) => {
   } catch {
     return "—";
   }
-};
-
-const statusLabel: Record<string, string> = {
-  open: "متاحة للجميع",
-  claimed: "تم الاستلام",
-  in_progress: "جاري التحويل",
-  completed: "تم التحويل",
-  failed: "تعذر التحويل",
-  cancelled: "ملغاة",
 };
 
 const statusClass: Record<string, string> = {
@@ -65,13 +62,33 @@ const statusClass: Record<string, string> = {
   cancelled: "border-slate-200 bg-slate-50 text-slate-500",
 };
 
+function statusLabel(task: OperationsTask) {
+  const review = isShiftReconciliationTask(task);
+  if (task.status === "open") return "متاحة للجميع";
+  if (task.status === "claimed") return "تم الاستلام";
+  if (task.status === "in_progress") return review ? "قيد المراجعة" : "جاري التحويل";
+  if (task.status === "completed") return review ? "تمت المراجعة" : "تم التحويل";
+  if (task.status === "failed") return review ? "تعذر المراجعة" : "تعذر التحويل";
+  if (task.status === "cancelled") return "ملغاة";
+  return task.status;
+}
+
+function sourceLabel(task: OperationsTask) {
+  if (isShiftReconciliationTask(task)) return "فرق تسوية وردية";
+  if (task.source_kind === "pos_refund") return "مرتجع POS";
+  if (task.source_kind === "online_refund") return "مرتجع أونلاين";
+  return "مهمة تشغيلية";
+}
+
 export default function OperationsTasksPage() {
   const { currentBranchId, currentBranchName } = useBranchStore();
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [completeTask, setCompleteTask] = useState<OperationsTask | null>(null);
+  const [completeRefundTask, setCompleteRefundTask] = useState<OperationsTask | null>(null);
+  const [completeReviewTask, setCompleteReviewTask] = useState<OperationsTask | null>(null);
   const [failTask, setFailTask] = useState<OperationsTask | null>(null);
   const [historyTask, setHistoryTask] = useState<OperationsTask | null>(null);
   const [providerReference, setProviderReference] = useState("");
+  const [resolutionNote, setResolutionNote] = useState("");
   const [failureReason, setFailureReason] = useState("");
 
   const query = useQuery({
@@ -79,6 +96,7 @@ export default function OperationsTasksPage() {
     enabled: Boolean(currentBranchId),
     queryFn: () => fetchOperationsTasks(currentBranchId as string, "all", 250),
     refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const historyQuery = useQuery({
@@ -91,8 +109,10 @@ export default function OperationsTasksPage() {
   const available = useMemo(() => data.filter(task => task.status === "open"), [data]);
   const mine = useMemo(() => data.filter(task => task.is_mine && ["claimed", "in_progress", "failed"].includes(task.status)), [data]);
   const inProgress = useMemo(() => data.filter(task => ["claimed", "in_progress", "failed"].includes(task.status)), [data]);
-  const overdue = useMemo(() => data.filter(task => task.is_overdue), [data]);
+  const overdue = useMemo(() => data.filter(task => task.is_overdue && !["completed", "cancelled"].includes(task.status)), [data]);
   const completed = useMemo(() => data.filter(task => task.status === "completed"), [data]);
+  const refundActive = useMemo(() => data.filter(task => isRefundTransferTask(task) && !["completed", "cancelled"].includes(task.status)).length, [data]);
+  const varianceActive = useMemo(() => data.filter(task => isShiftReconciliationTask(task) && !["completed", "cancelled"].includes(task.status)).length, [data]);
 
   const run = async (taskId: string, action: () => Promise<unknown>, success: string) => {
     setBusyId(taskId);
@@ -108,15 +128,15 @@ export default function OperationsTasksPage() {
     }
   };
 
-  const submitComplete = async () => {
-    if (!completeTask || busyId) return;
+  const submitRefundComplete = async () => {
+    if (!completeRefundTask || busyId) return;
     if (providerReference.trim().length < 3) return toast.error("اكتب رقم العملية أو المرجع.");
-    const task = completeTask;
+    const task = completeRefundTask;
     setBusyId(task.id);
     try {
       await completeRefundTransferTask(task.id, providerReference);
       toast.success("تم تأكيد تحويل مبلغ المرتجع وتسجيل الحركة المالية.");
-      setCompleteTask(null);
+      setCompleteRefundTask(null);
       setProviderReference("");
       await query.refetch();
     } catch (error) {
@@ -127,14 +147,35 @@ export default function OperationsTasksPage() {
     }
   };
 
+  const submitReviewComplete = async () => {
+    if (!completeReviewTask || busyId) return;
+    if (resolutionNote.trim().length < 3) return toast.error("اكتب نتيجة المراجعة قبل الإغلاق.");
+    const task = completeReviewTask;
+    setBusyId(task.id);
+    try {
+      await completeOperationsTask(task.id, resolutionNote);
+      toast.success("تم إغلاق مراجعة فرق الوردية وتوثيق النتيجة.");
+      setCompleteReviewTask(null);
+      setResolutionNote("");
+      await query.refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر إغلاق المراجعة.");
+      await query.refetch();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const submitFailure = async () => {
     if (!failTask || busyId) return;
-    if (failureReason.trim().length < 3) return toast.error("اكتب سبب تعذر التحويل.");
+    if (failureReason.trim().length < 3) return toast.error("اكتب سبب تعذر التنفيذ.");
     const task = failTask;
     setBusyId(task.id);
     try {
       await failOperationsTask(task.id, failureReason);
-      toast.success("تم تسجيل تعذر التحويل. المهمة مازالت عندك ويمكن إعادة المحاولة أو إرجاعها للمجموعة.");
+      toast.success(isShiftReconciliationTask(task)
+        ? "تم تسجيل سبب تعذر المراجعة. المهمة مازالت مسندة لك ويمكن إعادة المحاولة أو إرجاعها للمجموعة."
+        : "تم تسجيل تعذر التحويل. المهمة مازالت مسندة لك ويمكن إعادة المحاولة أو إرجاعها للمجموعة.");
       setFailTask(null);
       setFailureReason("");
       await query.refetch();
@@ -147,89 +188,98 @@ export default function OperationsTasksPage() {
 
   const TaskCard = ({ task }: { task: OperationsTask }) => {
     const busy = busyId === task.id;
+    const review = isShiftReconciliationTask(task);
+    const refund = isRefundTransferTask(task);
+    const resolution = typeof task.metadata?.resolution_note === "string" ? task.metadata.resolution_note : null;
+
     return (
       <Card className={`overflow-hidden ${task.is_overdue && task.status !== "completed" ? "border-red-200 shadow-[0_8px_30px_rgba(220,38,38,.08)]" : ""}`}>
         <CardContent className="p-4 md:p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className={statusClass[task.status] || ""}>{statusLabel[task.status] || task.status}</Badge>
-                <Badge variant="outline">{task.source_kind === "pos_refund" ? "مرتجع POS" : "مرتجع أونلاين"}</Badge>
-                {task.is_overdue && task.status !== "completed" && <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700"><AlertTriangle className="ml-1 h-3.5 w-3.5" />متأخرة</Badge>}
-              </div>
-
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-lg font-black text-slate-950">{task.title}</h3>
-                  <div className="mt-1 text-xs text-muted-foreground">{task.reference_number ? `مرجع: ${task.reference_number}` : "مرتجع إلكتروني"} · أُنشئت {formatDateTime(task.created_at)}</div>
-                </div>
-                <div className="text-2xl font-black text-[#005931]">{formatMoney(task.amount)}</div>
-              </div>
-
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl bg-slate-50 p-3">
-                  <div className="text-[11px] text-muted-foreground">وسيلة الرد</div>
-                  <div className="mt-1 flex items-center gap-2 font-bold"><WalletCards className="h-4 w-4 text-[#005931]" />{task.payment_method_name || task.payment_method_code || "إلكتروني"}</div>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-3">
-                  <div className="text-[11px] text-muted-foreground">العميل</div>
-                  <div className="mt-1 truncate font-bold">{task.customer_name || "غير مرتبط"}</div>
-                  {task.customer_phone && <div className="mt-0.5 text-xs text-muted-foreground" dir="ltr">{task.customer_phone}</div>}
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-3">
-                  <div className="text-[11px] text-muted-foreground">المسؤول</div>
-                  <div className="mt-1 font-bold">{task.claimed_by_name || "متاحة للفريق"}</div>
-                </div>
-                <div className={`rounded-2xl p-3 ${task.is_overdue && task.status !== "completed" ? "bg-red-50" : "bg-slate-50"}`}>
-                  <div className="text-[11px] text-muted-foreground">الموعد الداخلي</div>
-                  <div className={`mt-1 flex items-center gap-2 font-bold ${task.is_overdue && task.status !== "completed" ? "text-red-700" : ""}`}><Clock3 className="h-4 w-4" />{formatDateTime(task.due_at)}</div>
-                </div>
-              </div>
-
-              {task.failure_reason && <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-sm text-red-800"><AlertTriangle className="ml-2 inline h-4 w-4" />{task.failure_reason}</div>}
-              {task.provider_reference && task.status === "completed" && <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-800">رقم العملية: <span className="font-black" dir="ltr">{task.provider_reference}</span></div>}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className={statusClass[task.status] || ""}>{statusLabel(task)}</Badge>
+              <Badge variant="outline" className={review ? "border-violet-200 bg-violet-50 text-violet-800" : ""}>{sourceLabel(task)}</Badge>
+              {task.is_overdue && task.status !== "completed" && (
+                <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700"><AlertTriangle className="ml-1 h-3.5 w-3.5" />متأخرة</Badge>
+              )}
             </div>
+
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-lg font-black text-slate-950">{task.title}</h3>
+                <div className="mt-1 text-xs text-muted-foreground">{task.reference_number || task.invoice_number || "بدون مرجع"} · أُنشئت {formatDateTime(task.created_at)}</div>
+              </div>
+              <div className={`text-2xl font-black ${review ? "text-violet-700" : "text-[#005931]"}`}>{formatMoney(task.amount)}</div>
+            </div>
+
+            {review ? (
+              <>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">وسيلة الدفع</div><div className="mt-1 flex items-center gap-2 font-bold"><Scale className="h-4 w-4 text-violet-700" />{task.payment_method_name || task.method_code || "غير محددة"}</div></div>
+                  <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">الكاشير</div><div className="mt-1 font-bold">{task.cashier_name || "غير متاح"}</div></div>
+                  <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">المتوقع</div><div className="mt-1 font-black">{formatMoney(task.expected_amount)}</div></div>
+                  <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">المؤكد</div><div className="mt-1 font-black">{formatMoney(task.counted_amount)}</div></div>
+                  <div className={`rounded-2xl p-3 ${Number(task.variance_amount || 0) ? "bg-red-50" : "bg-emerald-50"}`}><div className="text-[11px] text-muted-foreground">الفرق</div><div className={`mt-1 font-black ${Number(task.variance_amount || 0) ? "text-red-700" : "text-emerald-700"}`}>{formatMoney(task.variance_amount)}</div></div>
+                </div>
+                {task.variance_reason && <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900"><strong>سبب الفرق عند الإغلاق:</strong> {task.variance_reason}</div>}
+                <div className="mt-3 rounded-2xl border border-violet-100 bg-violet-50/60 p-3 text-xs leading-5 text-violet-900">إغلاق هذه المهمة يوثّق نتيجة المراجعة فقط، ولا يسجل حركة مالية إضافية ولا يغيّر الفاتورة أو تسوية الوردية الأصلية.</div>
+              </>
+            ) : (
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">وسيلة الرد</div><div className="mt-1 flex items-center gap-2 font-bold"><WalletCards className="h-4 w-4 text-[#005931]" />{task.payment_method_name || task.payment_method_code || "إلكتروني"}</div></div>
+                <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">العميل</div><div className="mt-1 truncate font-bold">{task.customer_name || "غير مرتبط"}</div>{task.customer_phone && <div className="mt-0.5 text-xs text-muted-foreground" dir="ltr">{task.customer_phone}</div>}</div>
+                <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">المسؤول</div><div className="mt-1 font-bold">{task.claimed_by_name || "متاحة للفريق"}</div></div>
+                <div className={`rounded-2xl p-3 ${task.is_overdue && task.status !== "completed" ? "bg-red-50" : "bg-slate-50"}`}><div className="text-[11px] text-muted-foreground">الموعد الداخلي</div><div className={`mt-1 flex items-center gap-2 font-bold ${task.is_overdue && task.status !== "completed" ? "text-red-700" : ""}`}><Clock3 className="h-4 w-4" />{formatDateTime(task.due_at)}</div></div>
+              </div>
+            )}
+
+            {review && (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">المسؤول</div><div className="mt-1 font-bold">{task.claimed_by_name || "متاحة للفريق"}</div></div>
+                <div className={`rounded-2xl p-3 ${task.is_overdue && task.status !== "completed" ? "bg-red-50" : "bg-slate-50"}`}><div className="text-[11px] text-muted-foreground">الموعد الداخلي</div><div className={`mt-1 flex items-center gap-2 font-bold ${task.is_overdue && task.status !== "completed" ? "text-red-700" : ""}`}><Clock3 className="h-4 w-4" />{formatDateTime(task.due_at)}</div></div>
+              </div>
+            )}
+
+            {task.failure_reason && <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-sm text-red-800"><AlertTriangle className="ml-2 inline h-4 w-4" />{task.failure_reason}</div>}
+            {refund && task.provider_reference && task.status === "completed" && <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-800">رقم العملية: <span className="font-black" dir="ltr">{task.provider_reference}</span></div>}
+            {review && resolution && task.status === "completed" && <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900"><strong>نتيجة المراجعة:</strong> {resolution}</div>}
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
             {task.status === "open" && (
-              <Button
-                className="bg-[#005931] hover:bg-[#004a29]"
-                disabled={busy || !task.can_claim}
-                onClick={() => run(task.id, () => claimOperationsTask(task.id), "تم استلام المهمة وأصبحت في «مهامي».")}
-              >
-                {busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <UserRoundCheck className="ml-2 h-4 w-4" />}
-                {task.can_claim ? "استلام المهمة" : "غير مخول بالاستلام"}
+              <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy || !task.can_claim} onClick={() => run(task.id, () => claimOperationsTask(task.id), "تم استلام المهمة وأصبحت في «مهامي».")}>
+                {busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <UserRoundCheck className="ml-2 h-4 w-4" />}{task.can_claim ? "استلام المهمة" : "غير مخول بالاستلام"}
               </Button>
             )}
 
             {task.is_mine && task.status === "claimed" && (
-              <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), "بدأ تنفيذ التحويل.")}>
-                <Play className="ml-2 h-4 w-4" />بدء التحويل
+              <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), review ? "بدأت مراجعة فرق الوردية." : "بدأ تنفيذ التحويل.")}>
+                <Play className="ml-2 h-4 w-4" />{review ? "بدء المراجعة" : "بدء التحويل"}
               </Button>
             )}
 
             {task.is_mine && task.status === "failed" && (
-              <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), "تم فتح محاولة جديدة للتحويل.")}>
+              <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), review ? "تم فتح محاولة مراجعة جديدة." : "تم فتح محاولة جديدة للتحويل.")}>
                 <RotateCcw className="ml-2 h-4 w-4" />إعادة المحاولة
               </Button>
             )}
 
-            {task.is_mine && task.status === "in_progress" && (
+            {task.is_mine && task.status === "in_progress" && review && (
               <>
-                <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => { setProviderReference(""); setCompleteTask(task); }}>
-                  <CheckCircle2 className="ml-2 h-4 w-4" />تأكيد التحويل
-                </Button>
-                <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" disabled={busy} onClick={() => { setFailureReason(""); setFailTask(task); }}>
-                  <AlertTriangle className="ml-2 h-4 w-4" />تعذر التحويل
-                </Button>
+                <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => { setResolutionNote(""); setCompleteReviewTask(task); }}><CheckCircle2 className="ml-2 h-4 w-4" />إغلاق المراجعة</Button>
+                <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" disabled={busy} onClick={() => { setFailureReason(""); setFailTask(task); }}><AlertTriangle className="ml-2 h-4 w-4" />تعذر المراجعة</Button>
+              </>
+            )}
+
+            {task.is_mine && task.status === "in_progress" && refund && (
+              <>
+                <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => { setProviderReference(""); setCompleteRefundTask(task); }}><CheckCircle2 className="ml-2 h-4 w-4" />تأكيد التحويل</Button>
+                <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" disabled={busy} onClick={() => { setFailureReason(""); setFailTask(task); }}><AlertTriangle className="ml-2 h-4 w-4" />تعذر التحويل</Button>
               </>
             )}
 
             {task.can_release && ["claimed", "in_progress", "failed"].includes(task.status) && (
-              <Button variant="outline" disabled={busy} onClick={() => run(task.id, () => releaseOperationsTask(task.id, "إرجاع للمجموعة"), "رجعت المهمة للمجموعة وأصبحت متاحة للاستلام.")}>
-                <RotateCcw className="ml-2 h-4 w-4" />إرجاع للمجموعة
-              </Button>
+              <Button variant="outline" disabled={busy} onClick={() => run(task.id, () => releaseOperationsTask(task.id, "إرجاع للمجموعة"), "رجعت المهمة للمجموعة وأصبحت متاحة للاستلام.")}><RotateCcw className="ml-2 h-4 w-4" />إرجاع للمجموعة</Button>
             )}
 
             <Button variant="ghost" onClick={() => setHistoryTask(task)}><History className="ml-2 h-4 w-4" />السجل</Button>
@@ -251,11 +301,10 @@ export default function OperationsTasksPage() {
             <div>
               <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs text-emerald-50"><CircleDollarSign className="h-3.5 w-3.5" /> مركز المهام المشترك</div>
               <h1 className="text-2xl font-black md:text-3xl">المهام</h1>
-              <p className="mt-2 max-w-2xl text-sm text-emerald-100">{currentBranchName || "الفرع الحالي"} · مهام تحويل مبالغ المرتجعات تظهر لكل الفريق المؤهل حتى يستلمها شخص واحد، وبعدها تتقفل عليه حتى التنفيذ أو الإرجاع للمجموعة.</p>
+              <p className="mt-2 max-w-3xl text-sm text-emerald-100">{currentBranchName || "الفرع الحالي"} · طابور موحد لمهام رد المبالغ ومراجعة فروق تسوية الورديات. المهمة تظل متاحة للفريق المؤهل حتى يستلمها موظف واحد، ثم تُوثق كل خطوة في سجلها.</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs"><span className="rounded-full bg-white/10 px-3 py-1">مرتجعات نشطة: {refundActive.toLocaleString("ar-EG")}</span><span className="rounded-full bg-white/10 px-3 py-1">فروق ورديات: {varianceActive.toLocaleString("ar-EG")}</span></div>
             </div>
-            <Button variant="secondary" className="bg-white text-[#005931] hover:bg-emerald-50" onClick={() => void query.refetch()} disabled={query.isFetching}>
-              <RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث
-            </Button>
+            <Button variant="secondary" className="bg-white text-[#005931] hover:bg-emerald-50" onClick={() => void query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
           </div>
         </section>
 
@@ -267,20 +316,14 @@ export default function OperationsTasksPage() {
           <Card><CardContent className="p-4"><CheckCircle2 className="h-5 w-5 text-slate-600" /><div className="mt-2 text-2xl font-black">{completed.length}</div><div className="text-xs text-muted-foreground">مكتملة</div></CardContent></Card>
         </section>
 
-        {query.isLoading ? (
-          <div className="flex min-h-80 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#005931]" /></div>
-        ) : query.isError ? (
+        {query.isLoading ? <div className="flex min-h-80 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#005931]" /></div> : query.isError ? (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">{(query.error as Error)?.message || "تعذر تحميل المهام."}</div>
         ) : (
           <Tabs defaultValue={available.length ? "available" : mine.length ? "mine" : "active"}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 md:grid-cols-5">
-              <TabsTrigger value="available">متاحة ({available.length})</TabsTrigger>
-              <TabsTrigger value="mine">مهامي ({mine.length})</TabsTrigger>
-              <TabsTrigger value="active">قيد التنفيذ ({inProgress.length})</TabsTrigger>
-              <TabsTrigger value="overdue">متأخرة ({overdue.length})</TabsTrigger>
-              <TabsTrigger value="completed">مكتملة ({completed.length})</TabsTrigger>
+              <TabsTrigger value="available">متاحة ({available.length})</TabsTrigger><TabsTrigger value="mine">مهامي ({mine.length})</TabsTrigger><TabsTrigger value="active">قيد التنفيذ ({inProgress.length})</TabsTrigger><TabsTrigger value="overdue">متأخرة ({overdue.length})</TabsTrigger><TabsTrigger value="completed">مكتملة ({completed.length})</TabsTrigger>
             </TabsList>
-            <TabsContent className="mt-4" value="available"><TaskList tasks={available} empty="لا توجد مهام تحويل متاحة حاليًا." /></TabsContent>
+            <TabsContent className="mt-4" value="available"><TaskList tasks={available} empty="لا توجد مهام متاحة حاليًا." /></TabsContent>
             <TabsContent className="mt-4" value="mine"><TaskList tasks={mine} empty="لم تستلم أي مهمة حاليًا." /></TabsContent>
             <TabsContent className="mt-4" value="active"><TaskList tasks={inProgress} empty="لا توجد مهام قيد التنفيذ." /></TabsContent>
             <TabsContent className="mt-4" value="overdue"><TaskList tasks={overdue} empty="ممتاز، لا توجد مهام متأخرة." /></TabsContent>
@@ -289,58 +332,27 @@ export default function OperationsTasksPage() {
         )}
       </div>
 
-      <Dialog open={Boolean(completeTask)} onOpenChange={open => !open && setCompleteTask(null)}>
-        <DialogContent dir="rtl" className="sm:max-w-md">
-          <DialogHeader className="text-right"><DialogTitle>تأكيد تحويل مبلغ المرتجع</DialogTitle></DialogHeader>
-          {completeTask && (
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-emerald-50 p-4">
-                <div className="text-xs text-emerald-700">المبلغ المطلوب</div>
-                <div className="mt-1 text-2xl font-black text-[#005931]">{formatMoney(completeTask.amount)}</div>
-                <div className="mt-2 text-sm">{completeTask.payment_method_name || "وسيلة دفع إلكترونية"}</div>
-              </div>
-              <div>
-                <Label>رقم العملية / المرجع</Label>
-                <Input className="mt-1" dir="ltr" value={providerReference} onChange={event => setProviderReference(event.target.value)} placeholder="Transaction ID / Reference" autoFocus />
-                <p className="mt-1 text-[11px] text-muted-foreground">تأكيد المهمة يسجل رد المبلغ على حساب وسيلة الدفع ويغلق حالة المرتجع المالية.</p>
-              </div>
-            </div>
-          )}
-          <DialogFooter className="gap-2 sm:justify-start">
-            <Button className="bg-[#005931] hover:bg-[#004a29]" onClick={() => void submitComplete()} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}تأكيد التحويل</Button>
-            <Button variant="outline" onClick={() => setCompleteTask(null)}>إلغاء</Button>
-          </DialogFooter>
+      <Dialog open={Boolean(completeRefundTask)} onOpenChange={open => !open && setCompleteRefundTask(null)}>
+        <DialogContent dir="rtl" className="sm:max-w-md"><DialogHeader className="text-right"><DialogTitle>تأكيد تحويل مبلغ المرتجع</DialogTitle></DialogHeader>
+          {completeRefundTask && <div className="space-y-4"><div className="rounded-2xl bg-emerald-50 p-4"><div className="text-xs text-emerald-700">المبلغ المطلوب</div><div className="mt-1 text-2xl font-black text-[#005931]">{formatMoney(completeRefundTask.amount)}</div><div className="mt-2 text-sm">{completeRefundTask.payment_method_name || "وسيلة دفع إلكترونية"}</div></div><div><Label>رقم العملية / المرجع</Label><Input className="mt-1" dir="ltr" value={providerReference} onChange={event => setProviderReference(event.target.value)} placeholder="Transaction ID / Reference" autoFocus /><p className="mt-1 text-[11px] text-muted-foreground">التأكيد يستخدم مسار رد المبلغ المالي الأصلي ويغلق المهمة دون تسجيل حركة مكررة.</p></div></div>}
+          <DialogFooter className="gap-2 sm:justify-start"><Button className="bg-[#005931] hover:bg-[#004a29]" onClick={() => void submitRefundComplete()} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}تأكيد التحويل</Button><Button variant="outline" onClick={() => setCompleteRefundTask(null)}>إلغاء</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(completeReviewTask)} onOpenChange={open => !open && setCompleteReviewTask(null)}>
+        <DialogContent dir="rtl" className="sm:max-w-lg"><DialogHeader className="text-right"><DialogTitle>إغلاق مراجعة فرق الوردية</DialogTitle></DialogHeader>
+          {completeReviewTask && <div className="space-y-4"><div className="grid grid-cols-3 gap-2 rounded-2xl bg-violet-50 p-4 text-center"><div><div className="text-[11px] text-violet-600">المتوقع</div><strong>{formatMoney(completeReviewTask.expected_amount)}</strong></div><div><div className="text-[11px] text-violet-600">المؤكد</div><strong>{formatMoney(completeReviewTask.counted_amount)}</strong></div><div><div className="text-[11px] text-violet-600">الفرق</div><strong className="text-red-700">{formatMoney(completeReviewTask.variance_amount)}</strong></div></div><div><Label>نتيجة المراجعة</Label><Textarea className="mt-1 min-h-28" value={resolutionNote} onChange={event => setResolutionNote(event.target.value)} placeholder="مثال: تمت مراجعة المستندات وتبين أن الفرق ناتج عن..." autoFocus /><p className="mt-1 text-[11px] text-muted-foreground">إغلاق المراجعة يوثّق النتيجة فقط ولا يعدّل الرصيد أو التسوية الأصلية.</p></div></div>}
+          <DialogFooter className="gap-2 sm:justify-start"><Button className="bg-[#005931] hover:bg-[#004a29]" onClick={() => void submitReviewComplete()} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}إغلاق المراجعة</Button><Button variant="outline" onClick={() => setCompleteReviewTask(null)}>إلغاء</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={Boolean(failTask)} onOpenChange={open => !open && setFailTask(null)}>
-        <DialogContent dir="rtl" className="sm:max-w-md">
-          <DialogHeader className="text-right"><DialogTitle>تعذر تنفيذ التحويل</DialogTitle></DialogHeader>
-          <div>
-            <Label>سبب المشكلة</Label>
-            <Textarea className="mt-1 min-h-28" value={failureReason} onChange={event => setFailureReason(event.target.value)} placeholder="مثال: رقم المحفظة غير صحيح، العملية مرفوضة من المزود..." />
-          </div>
-          <DialogFooter className="gap-2 sm:justify-start">
-            <Button variant="destructive" onClick={() => void submitFailure()} disabled={Boolean(busyId)}><AlertTriangle className="ml-2 h-4 w-4" />تسجيل المشكلة</Button>
-            <Button variant="outline" onClick={() => setFailTask(null)}>إلغاء</Button>
-          </DialogFooter>
-        </DialogContent>
+        <DialogContent dir="rtl" className="sm:max-w-md"><DialogHeader className="text-right"><DialogTitle>{failTask && isShiftReconciliationTask(failTask) ? "تعذر إتمام المراجعة" : "تعذر تنفيذ التحويل"}</DialogTitle></DialogHeader><div><Label>سبب المشكلة</Label><Textarea className="mt-1 min-h-28" value={failureReason} onChange={event => setFailureReason(event.target.value)} placeholder={failTask && isShiftReconciliationTask(failTask) ? "اكتب سبب عدم القدرة على إنهاء المراجعة الآن..." : "مثال: رقم المحفظة غير صحيح، العملية مرفوضة من المزود..."} /></div><DialogFooter className="gap-2 sm:justify-start"><Button variant="destructive" onClick={() => void submitFailure()} disabled={Boolean(busyId)}><AlertTriangle className="ml-2 h-4 w-4" />تسجيل المشكلة</Button><Button variant="outline" onClick={() => setFailTask(null)}>إلغاء</Button></DialogFooter></DialogContent>
       </Dialog>
 
       <Dialog open={Boolean(historyTask)} onOpenChange={open => !open && setHistoryTask(null)}>
-        <DialogContent dir="rtl" className="sm:max-w-lg">
-          <DialogHeader className="text-right"><DialogTitle>سجل المهمة</DialogTitle></DialogHeader>
-          {historyQuery.isLoading ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-[#005931]" /></div> : (
-            <div className="max-h-[55vh] space-y-3 overflow-y-auto">
-              {(historyQuery.data || []).length ? (historyQuery.data as OperationsTaskEvent[]).map(event => (
-                <div key={event.id} className="rounded-2xl border bg-slate-50 p-3">
-                  <div className="flex items-center justify-between gap-3"><div className="font-bold">{event.actor_name || "النظام"}</div><div className="text-xs text-muted-foreground">{formatDateTime(event.created_at)}</div></div>
-                  <div className="mt-1 text-xs font-semibold text-[#005931]">{event.event_type}</div>
-                  {event.note && <div className="mt-2 text-sm text-slate-700">{event.note}</div>}
-                </div>
-              )) : <div className="py-10 text-center text-sm text-muted-foreground">لا يوجد سجل إضافي.</div>}
-            </div>
-          )}
+        <DialogContent dir="rtl" className="sm:max-w-lg"><DialogHeader className="text-right"><DialogTitle>سجل المهمة</DialogTitle></DialogHeader>
+          {historyQuery.isLoading ? <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-[#005931]" /></div> : <div className="max-h-[55vh] space-y-3 overflow-y-auto">{(historyQuery.data || []).length ? (historyQuery.data as OperationsTaskEvent[]).map(event => <div key={event.id} className="rounded-2xl border bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><div className="font-bold">{event.actor_name || "النظام"}</div><div className="text-xs text-muted-foreground">{formatDateTime(event.created_at)}</div></div><div className="mt-1 text-xs font-semibold text-[#005931]">{event.event_type}</div>{event.note && <div className="mt-2 text-sm text-slate-700">{event.note}</div>}</div>) : <div className="py-10 text-center text-sm text-muted-foreground">لا يوجد سجل إضافي.</div>}</div>}
         </DialogContent>
       </Dialog>
     </MainLayout>
