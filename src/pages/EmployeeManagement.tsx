@@ -12,6 +12,7 @@ import { EmployeeFormDialog } from '@/components/employees/EmployeeFormDialog';
 import { DeleteEmployeeDialog } from '@/components/employees/DeleteEmployeeDialog';
 import { ShiftHistoryDialog } from '@/components/employees/ShiftHistoryDialog';
 import StaffDeviceApprovalDock from '@/components/employees/StaffDeviceApprovalDock';
+import EmployeePerformanceDock from '@/components/employees/EmployeePerformanceDock';
 
 export default function EmployeeManagement() {
   const {
@@ -106,6 +107,8 @@ export default function EmployeeManagement() {
         </div>
 
         <StaffDeviceApprovalDock />
+
+        <EmployeePerformanceDock />
 
         <EmployeeStats
           employees={employees}
