@@ -46,7 +46,6 @@ export default function ApprovalCenterNotifications() {
         payload => {
           const signal = payload.new as { branch_id?: string | null };
           if (signal.branch_id && signal.branch_id !== currentBranchId) return;
-          void query.refetch();
           void queryClient.invalidateQueries({ queryKey: ["approval-center-v1", currentBranchId] });
         },
       )
@@ -55,7 +54,7 @@ export default function ApprovalCenterNotifications() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [currentBranchId, query, queryClient, setApprovalAlerts, user?.id]);
+  }, [currentBranchId, queryClient, setApprovalAlerts, user?.id]);
 
   return null;
 }
