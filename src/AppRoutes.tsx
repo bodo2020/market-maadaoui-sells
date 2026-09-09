@@ -60,6 +60,7 @@ import EmployeeManagement from "@/pages/EmployeeManagement";
 import Employee360Page from "@/pages/Employee360Page";
 import EmployeeDevicesPage from "@/pages/EmployeeDevicesPage";
 import StaffDeviceActivationPage from "@/pages/StaffDeviceActivationPage";
+import StaffAccountPage from "@/pages/StaffAccountPage";
 import AttendancePage from "@/pages/AttendancePage";
 import MyHRPortalPage from "@/pages/MyHRPortalPage";
 import HrLeaveCalendarPage from "@/pages/HrLeaveCalendarPage";
@@ -123,6 +124,7 @@ export default function AppRoutes() {
       <Route path="/ai-insights" element={<ProtectedRoute><ReportsInsightsV2 /></ProtectedRoute>} />
       <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
       <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
+      <Route path="/account" element={<ProtectedRoute><StaffAccountPage /></ProtectedRoute>} />
       <Route path="/my-hr" element={<ProtectedRoute><MyHRPortalPage /></ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute><AttendanceWorkspace /></ProtectedRoute>} />
       <Route path="/hr/leave-calendar" element={<ProtectedRoute><HrLeaveCalendarPage /></ProtectedRoute>} />
