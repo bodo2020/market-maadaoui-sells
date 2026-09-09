@@ -20,7 +20,7 @@ export interface HrInventoryPerformance {
     match_rate: number | null;
     abs_variance_units: number;
     abs_variance_value: number;
-    avg_active_minutes: number;
+    avg_active_minutes: number | null;
     completed_on_time: number;
     overdue_open: number;
   };
@@ -28,11 +28,12 @@ export interface HrInventoryPerformance {
     assigned: number;
     submitted: number;
     completion_rate: number | null;
-    matched: number;
-    discrepancy: number;
+    matched_system: number;
+    confirmed_variance: number;
+    conflicting: number;
     abs_variance_units: number;
     abs_variance_value: number;
-    avg_active_minutes: number;
+    avg_active_minutes: number | null;
     overdue_open: number;
   };
   peer_review: {
@@ -67,6 +68,7 @@ export async function getHrInventoryPerformance(params: {
     if (text.includes("permission_denied")) throw new Error("ليس لديك صلاحية عرض مؤشرات الجرد للموظف.");
     if (text.includes("employee_out_of_scope")) throw new Error("الموظف خارج نطاق الفرع الحالي.");
     if (text.includes("date_range_too_large")) throw new Error("الفترة القصوى لعرض مؤشرات الجرد سنة واحدة.");
+    if (text.includes("invalid_date_range")) throw new Error("الفترة الزمنية غير صحيحة.");
     throw new Error(text || "تعذر تحميل مؤشرات الجرد للموظف.");
   }
 
