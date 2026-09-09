@@ -17,7 +17,7 @@ extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [db]
-# Port to use for the local database URL.
+# Port to use for the database URL.
 port = 54322
 # The database major version to use has to match production.
 major_version = 15
@@ -71,6 +71,11 @@ verify_jwt = false
 # Device token + per-user PIN are the custom authentication factors for a registered POS terminal.
 # The function validates both server-side before minting a normal Supabase staff session.
 [functions.pos-quick-login]
+verify_jwt = false
+
+# Called only by the private database push queue. The function validates a generated worker secret
+# before accessing service-role RPCs, so user JWT verification is intentionally disabled.
+[functions.process-push-notifications]
 verify_jwt = false
 
 [vector]
