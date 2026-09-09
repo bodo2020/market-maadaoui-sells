@@ -104,6 +104,9 @@ const rejectionReasonLabels: Record<InventoryAdjustmentRejectionReason, string> 
 
 function statusLabel(task: OperationsTask) {
   if (isInventoryTask(task)) {
+    const returnedForRecount = task.metadata?.returned_from_approval === true;
+    if (returnedForRecount && task.status === "claimed") return "مطلوب إعادة العد";
+    if (returnedForRecount && task.status === "in_progress") return "إعادة العد جارية";
     if (task.status === "open") return "متاحة للمراجعة";
     if (task.status === "claimed") return "مسندة";
     if (task.status === "in_progress") return isInventoryAdjustmentReviewTask(task) ? "قيد الاعتماد" : "جاري العد";
@@ -121,7 +124,12 @@ function statusLabel(task: OperationsTask) {
 }
 
 function sourceLabel(task: OperationsTask) {
-  if (isInventoryCountTask(task)) return "جرد يومي";
+  if (isInventoryCountTask(task)) {
+    if (task.metadata?.returned_from_approval === true) return "إعادة جرد";
+    if (task.metadata?.session_kind === "full") return "جرد شامل";
+    if (task.metadata?.session_kind === "spot") return "جرد سريع";
+    return "جرد يومي";
+  }
   if (isInventoryRecountTask(task)) return "إعادة عد مستقلة";
   if (isInventoryAdjustmentReviewTask(task)) return "اعتماد فرق مخزون";
   if (isCashHandoffVarianceTask(task)) return "فرق استلام نقدية";
@@ -164,7 +172,7 @@ export default function OperationsTasksPage() {
     queryKey: ["daily-inventory-audit-v2", currentBranchId],
     enabled: Boolean(currentBranchId),
     queryFn: async () => {
-      try { return await ensureDailyInventoryAuditTasksV2(currentBranchId as string, 5); }
+      try { return await ensureDailyInventoryAuditTasksV2(currentBranchId as string); }
       catch { return null; }
     },
     staleTime: 10 * 60_000,
@@ -246,14 +254,21 @@ export default function OperationsTasksPage() {
     if (inventoryDetail.barcode && barcodeCheck.trim() !== inventoryDetail.barcode.trim()) return toast.error("امسح باركود المنتج الصحيح قبل تسجيل الكمية.");
     const parsed = Number(actualCount);
     if (!Number.isFinite(parsed) || parsed < 0) return toast.error("أدخل الكمية الفعلية التي وجدتها.");
+    const returnedForRecount = inventoryTask.metadata?.returned_from_approval === true;
     setBusyId(inventoryTask.id);
     try {
       const result = isInventoryRecountTask(inventoryTask)
         ? await submitInventoryRecountV2(inventoryTask.id, parsed, countNote)
         : await submitInventoryCountV2(inventoryTask.id, parsed, countNote);
-      if (result.result === "matched" || result.result === "matched_system") toast.success(result.result === "matched" ? "تم تسجيل الجرد والكمية مطابقة." : "إعادة العد طابقت النظام وتم إغلاق الفرق بدون تعديل مخزون.");
-      else if (result.result === "discrepancy") toast.warning("تم تسجيل فرق الجرد وإنشاء إعادة عد مستقلة لموظف آخر.");
-      else toast.warning("تم تسجيل إعادة العد وتحويل الحالة لمراجعة واعتماد المخزون.");
+      if (result.result === "matched" || result.result === "matched_system") {
+        toast.success(returnedForRecount ? "تم تسجيل إعادة الجرد والكمية أصبحت مطابقة للنظام." : result.result === "matched" ? "تم تسجيل الجرد والكمية مطابقة." : "إعادة العد طابقت النظام وتم إغلاق الفرق بدون تعديل مخزون.");
+      } else if (returnedForRecount && result.adjustment_review_task_id) {
+        toast.warning("تم تسجيل إعادة الجرد وإرجاع الحالة للمدير للمراجعة من جديد.");
+      } else if (result.result === "discrepancy") {
+        toast.warning("تم تسجيل فرق الجرد وإنشاء إعادة عد مستقلة لموظف آخر.");
+      } else {
+        toast.warning("تم تسجيل إعادة العد وتحويل الحالة لمراجعة واعتماد المخزون.");
+      }
       closeInventoryDialog(); await query.refetch();
     } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر تسليم نتيجة الجرد."); }
     finally { setBusyId(null); }
@@ -278,7 +293,7 @@ export default function OperationsTasksPage() {
     setBusyId(inventoryTask.id);
     try {
       await rejectInventoryAdjustmentV2(inventoryTask.id, rejectionReason, adjustmentNote);
-      toast.success("تم رفض التسوية وإغلاق المراجعة بدون تغيير المخزون.");
+      toast.success("تم رفض التسوية وإرجاع مهمة العد للموظف لإعادة الجرد. لم يتم تغيير المخزون.");
       closeInventoryDialog(); await query.refetch();
     } catch (error) { toast.error(error instanceof Error ? error.message : "تعذر رفض التسوية."); }
     finally { setBusyId(null); }
@@ -318,12 +333,15 @@ export default function OperationsTasksPage() {
     const cashReview = isCashHandoffVarianceTask(task);
     const refund = isRefundTransferTask(task);
     const resolution = typeof task.metadata?.resolution_note === "string" ? task.metadata.resolution_note : null;
+    const returnedForRecount = task.metadata?.returned_from_approval === true;
+    const returnNote = typeof task.metadata?.return_note === "string" ? task.metadata.return_note : null;
     return (
       <Card className={`overflow-hidden ${task.is_overdue && task.status !== "completed" ? "border-red-200 shadow-[0_8px_30px_rgba(220,38,38,.08)]" : ""}`}>
         <CardContent className="p-4 md:p-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline" className={statusClass[task.status] || ""}>{statusLabel(task)}</Badge>
             <Badge variant="outline" className={inventory ? "border-cyan-200 bg-cyan-50 text-cyan-800" : review ? "border-violet-200 bg-violet-50 text-violet-800" : ""}>{sourceLabel(task)}</Badge>
+            {returnedForRecount && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800"><RotateCcw className="ml-1 h-3.5 w-3.5" />راجعة من المراجعة</Badge>}
             {task.is_overdue && task.status !== "completed" && <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700"><AlertTriangle className="ml-1 h-3.5 w-3.5" />متأخرة</Badge>}
           </div>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -338,10 +356,11 @@ export default function OperationsTasksPage() {
             <div className="rounded-2xl bg-red-50 p-3"><div className="text-[11px] text-muted-foreground">الفرق</div><div className="mt-1 font-black text-red-700">{formatMoney(task.variance_amount)}</div></div>
           </div>}
           {task.description && <p className="mt-3 text-sm leading-6 text-muted-foreground">{task.description}</p>}
+          {returnedForRecount && returnNote && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>ملاحظة المراجع:</strong> {returnNote}</div>}
           {resolution && <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">نتيجة المراجعة: {resolution}</div>}
           <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
             {task.status === "open" && task.can_claim && !isInventoryAdjustmentReviewTask(task) && <Button disabled={busy} onClick={() => run(task.id, () => claimOperationsTask(task.id), "تم استلام المهمة.")}><UserRoundCheck className="ml-2 h-4 w-4" />استلام</Button>}
-            {inventory && task.status !== "completed" && (task.is_mine || task.can_claim || isInventoryAdjustmentReviewTask(task)) && <Button disabled={busy} onClick={() => openInventory(task)} className="bg-cyan-700 hover:bg-cyan-800"><ClipboardCheck className="ml-2 h-4 w-4" />{isInventoryAdjustmentReviewTask(task) ? "مراجعة واعتماد" : isInventoryRecountTask(task) ? "فتح إعادة العد" : "فتح الجرد"}</Button>}
+            {inventory && task.status !== "completed" && (task.is_mine || task.can_claim || isInventoryAdjustmentReviewTask(task)) && <Button disabled={busy} onClick={() => openInventory(task)} className="bg-cyan-700 hover:bg-cyan-800"><ClipboardCheck className="ml-2 h-4 w-4" />{isInventoryAdjustmentReviewTask(task) ? "مراجعة واعتماد" : returnedForRecount ? "فتح إعادة الجرد" : isInventoryRecountTask(task) ? "فتح إعادة العد" : "فتح الجرد"}</Button>}
             {!inventory && task.is_mine && task.status === "claimed" && <Button variant="outline" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), review ? "بدأت المراجعة." : "بدأ تنفيذ المهمة.")}><Play className="ml-2 h-4 w-4" />بدء</Button>}
             {!inventory && task.is_mine && ["claimed", "in_progress", "failed"].includes(task.status) && refund && <Button disabled={busy} onClick={() => { setCompleteRefundTask(task); setProviderReference(""); }}><CheckCircle2 className="ml-2 h-4 w-4" />تأكيد التحويل</Button>}
             {!inventory && task.is_mine && ["claimed", "in_progress", "failed"].includes(task.status) && review && <Button disabled={busy} onClick={() => { setCompleteReviewTask(task); setResolutionNote(""); }}><Scale className="ml-2 h-4 w-4" />إغلاق المراجعة</Button>}
@@ -385,6 +404,7 @@ export default function OperationsTasksPage() {
             <div className="flex gap-4 rounded-2xl border bg-slate-50 p-4">{inventoryDetail.image_url ? <img src={inventoryDetail.image_url} alt="" className="h-20 w-20 rounded-xl object-cover" /> : <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-white"><PackageCheck className="h-8 w-8 text-muted-foreground" /></div>}<div className="min-w-0"><h3 className="text-lg font-black">{inventoryDetail.product_name}</h3><p className="mt-1 text-sm text-muted-foreground">باركود: {inventoryDetail.barcode || "غير مسجل"}</p><p className="text-sm text-muted-foreground">الرف: {inventoryDetail.shelf_location || "غير محدد"} · الوحدة: {inventoryDetail.unit_of_measure || "قطعة"}</p></div></div>
 
             {inventoryDetail.blind_count ? <>
+              {inventoryTask?.metadata?.returned_from_approval === true && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><strong>إعادة جرد مطلوبة:</strong> المراجعة السابقة رفضت التسوية. أعد العد من البداية بشكل أعمى، ولا تعتمد على أي رقم سابق. {typeof inventoryTask.metadata?.return_note === "string" && <span className="mt-1 block">ملاحظة المراجع: {inventoryTask.metadata.return_note}</span>}</div>}
               <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-950"><strong>Blind Count:</strong> رصيد النظام ونتيجة أي عد سابق مخفيان بالكامل. عدّ الموجود فعليًا فقط.</div>
               {inventoryDetail.barcode && <div className="space-y-2"><Label htmlFor="inventory-barcode">تحقق من المنتج بالباركود</Label><div className="relative"><ScanLine className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input id="inventory-barcode" autoFocus value={barcodeCheck} onChange={e => setBarcodeCheck(e.target.value)} placeholder="امسح الباركود أو اكتبه" className="pr-9" /></div></div>}
               <div className="space-y-2"><Label htmlFor="actual-count">الكمية الموجودة فعليًا ({inventoryDetail.unit_of_measure || "وحدة"})</Label><Input id="actual-count" type="number" inputMode="decimal" min="0" step="0.001" value={actualCount} onChange={e => setActualCount(e.target.value)} placeholder="0" /></div>
