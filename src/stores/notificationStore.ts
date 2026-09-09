@@ -9,6 +9,7 @@ interface NotificationState {
   customerTaskAlerts: number;
   operationsTaskAlerts: number;
   operationsTaskOverdue: number;
+  approvalAlerts: number;
   
   setUnreadOrders: (count: number) => void;
   setUnreadReturns: (count: number) => void;
@@ -17,6 +18,7 @@ interface NotificationState {
   setCustomerTaskAlerts: (count: number) => void;
   setOperationsTaskAlerts: (count: number) => void;
   setOperationsTaskOverdue: (count: number) => void;
+  setApprovalAlerts: (count: number) => void;
   
   markOrdersAsRead: () => void;
   markReturnsAsRead: () => void;
@@ -39,6 +41,7 @@ export const useNotificationStore = create<NotificationState>()(
       customerTaskAlerts: 0,
       operationsTaskAlerts: 0,
       operationsTaskOverdue: 0,
+      approvalAlerts: 0,
       
       setUnreadOrders: (count) => set({ unreadOrders: count }),
       setUnreadReturns: (count) => set({ unreadReturns: count }),
@@ -47,6 +50,7 @@ export const useNotificationStore = create<NotificationState>()(
       setCustomerTaskAlerts: (count) => set({ customerTaskAlerts: Math.max(0, Number(count || 0)) }),
       setOperationsTaskAlerts: (count) => set({ operationsTaskAlerts: Math.max(0, Number(count || 0)) }),
       setOperationsTaskOverdue: (count) => set({ operationsTaskOverdue: Math.max(0, Number(count || 0)) }),
+      setApprovalAlerts: (count) => set({ approvalAlerts: Math.max(0, Number(count || 0)) }),
       
       markOrdersAsRead: () => set({ unreadOrders: 0 }),
       markReturnsAsRead: () => set({ unreadReturns: 0 }),
