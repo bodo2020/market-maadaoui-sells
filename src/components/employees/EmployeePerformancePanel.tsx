@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CalendarCheck2, CheckCircle2, ClipboardCheck, Clock3, Gauge, ListChecks, PackageCheck, Timer, UserX } from "lucide-react";
+import CashierPerformancePanel from "@/components/employees/CashierPerformancePanel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getHrEmployeePerformanceDetail } from "@/services/hrPerformanceService";
@@ -76,6 +77,8 @@ export default function EmployeePerformancePanel({ employeeId, branchId }: { emp
           <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 text-sm leading-6 text-blue-950"><div className="flex items-center gap-2 font-black"><CheckCircle2 className="h-4 w-4" />تفسير المؤشرات</div><p className="mt-1">الغياب يُحتسب فقط من يوم وردية مسند فعليًا، بدون Check-in وبدون إجازة كاملة معتمدة. لو لا يوجد Schedule، لا نفترض غيابًا.</p><p className="mt-1">دقة الجرد = نسبة مهام العد التي طابقت الرصيد المتوقع. اكتشاف فرق حقيقي قد يكون دليلًا على جودة المراجعة، لذلك لا يُستخدم الرقم وحده للحكم على الموظف.</p></div>
         </CardContent>
       </Card>
+
+      <CashierPerformancePanel employeeId={employeeId} branchId={branchId} />
     </div>
   );
 }
