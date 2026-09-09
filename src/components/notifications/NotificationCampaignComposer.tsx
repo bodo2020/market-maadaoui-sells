@@ -5,9 +5,7 @@ import {
   CheckCircle2,
   Loader2,
   Megaphone,
-  MessageCircle,
   Send,
-  ShieldCheck,
   Smartphone,
   Users,
 } from "lucide-react";
@@ -17,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
@@ -61,6 +60,7 @@ export default function NotificationCampaignComposer({ onSent }: Props) {
   const [category, setCategory] = useState("system");
   const [actionUrl, setActionUrl] = useState("");
   const [actionLabel, setActionLabel] = useState("");
+  const [sendPush, setSendPush] = useState(false);
 
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
 
@@ -84,6 +84,11 @@ export default function NotificationCampaignComposer({ onSent }: Props) {
     if (!isSuperAdmin && audience === "customers_all") setAudience("staff_branch");
   }, [audience, isSuperAdmin]);
 
+  useEffect(() => {
+    const preview = previewQuery.data;
+    setSendPush(Boolean(preview?.push_sender_ready && preview.push_eligible > 0));
+  }, [audience, previewQuery.data?.push_eligible, previewQuery.data?.push_sender_ready]);
+
   const validation = useMemo(() => {
     if (!title.trim()) return "اكتب عنوان الإشعار";
     if (title.trim().length > 120) return "العنوان بحد أقصى 120 حرف";
@@ -103,13 +108,16 @@ export default function NotificationCampaignComposer({ onSent }: Props) {
       severity,
       actionUrl: actionUrl.trim() || null,
       actionLabel: actionLabel.trim() || null,
-      channels: ["in_app"],
+      channels: sendPush ? ["in_app", "push"] : ["in_app"],
       deliveryType: audience === "customers_all" ? "marketing" : "transactional",
     }),
     onSuccess: result => {
       queryClient.invalidateQueries({ queryKey: ["notification-center-v2"] });
+      const pushPart = result.push_queued > 0
+        ? ` وتم تجهيز ${result.push_queued.toLocaleString("ar-EG")} Push للإرسال.`
+        : "";
       toast.success("تم إرسال الإشعار", {
-        description: `تم إنشاء ${result.in_app_created.toLocaleString("ar-EG")} إشعار داخل النظام.`,
+        description: `تم إنشاء ${result.in_app_created.toLocaleString("ar-EG")} إشعار داخل النظام.${pushPart}`,
       });
       setOpen(false);
       setTitle("");
@@ -119,6 +127,7 @@ export default function NotificationCampaignComposer({ onSent }: Props) {
       setSeverity("normal");
       setCategory("system");
       setAudience("staff_branch");
+      setSendPush(false);
       onSent?.();
     },
     onError: (error: any) => toast.error("تعذر إرسال الإشعار", { description: error?.message || "راجع الصلاحيات والبيانات وحاول مرة أخرى." }),
@@ -127,6 +136,7 @@ export default function NotificationCampaignComposer({ onSent }: Props) {
   if (permissionQuery.isLoading || permissionQuery.data !== true) return null;
 
   const preview = previewQuery.data;
+  const pushAvailable = Boolean(preview?.push_sender_ready && preview.push_eligible > 0);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -138,7 +148,7 @@ export default function NotificationCampaignComposer({ onSent }: Props) {
       <DialogContent dir="rtl" className="max-h-[92vh] max-w-2xl overflow-y-auto sm:rounded-[24px]">
         <DialogHeader className="text-right">
           <DialogTitle className="flex items-center gap-2 text-xl font-black"><BellRing className="h-5 w-5 text-[#005931]" /> إرسال إشعار جديد</DialogTitle>
-          <DialogDescription className="text-right leading-6">الإشعار يتسجل من المصدر الموحد، ويظهر للمستلمين فور تحديث مركز الإشعارات.</DialogDescription>
+          <DialogDescription className="text-right leading-6">الإشعار يظهر داخل مركز الإشعارات، ويمكن إرساله Push للأجهزة المسجلة عند تفعيل قناة Firebase.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
@@ -152,7 +162,7 @@ export default function NotificationCampaignComposer({ onSent }: Props) {
               {isSuperAdmin && (
                 <button type="button" onClick={() => { setAudience("customers_all"); setCategory("marketing"); setSeverity("info"); }} className={`rounded-2xl border p-4 text-right transition ${audience === "customers_all" ? "border-[#005931] bg-emerald-50 ring-1 ring-[#005931]/10" : "border-slate-200 hover:bg-slate-50"}`}>
                   <div className="flex items-center gap-2 font-black"><Megaphone className="h-4 w-4" /> كل العملاء</div>
-                  <div className="mt-1 text-xs leading-5 text-muted-foreground">Broadcast للعملاء النشطين. واتساب لاحقًا يقتصر على من وافق صراحة.</div>
+                  <div className="mt-1 text-xs leading-5 text-muted-foreground">Broadcast للعملاء النشطين. الـPush التسويقي يصل فقط لمن فعّل الإشعارات والتسويق.</div>
                 </button>
               )}
             </div>
@@ -164,11 +174,10 @@ export default function NotificationCampaignComposer({ onSent }: Props) {
             ) : previewQuery.isError ? (
               <div className="text-sm text-red-700">تعذر حساب الجمهور المتاح.</div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-3 gap-3">
                 <div><div className="text-xl font-black">{(preview?.total || 0).toLocaleString("ar-EG")}</div><div className="text-[11px] text-muted-foreground">إجمالي الجمهور</div></div>
                 <div><div className="text-xl font-black text-[#005931]">{(preview?.in_app_eligible || 0).toLocaleString("ar-EG")}</div><div className="text-[11px] text-muted-foreground">داخل النظام</div></div>
-                <div><div className="text-xl font-black text-slate-700">{(preview?.push_eligible || 0).toLocaleString("ar-EG")}</div><div className="text-[11px] text-muted-foreground">Push مؤهل</div></div>
-                <div><div className="text-xl font-black text-emerald-600">{(preview?.whatsapp_marketing_eligible || 0).toLocaleString("ar-EG")}</div><div className="text-[11px] text-muted-foreground">واتساب Opt‑in</div></div>
+                <div><div className="text-xl font-black text-slate-700">{(preview?.push_eligible || 0).toLocaleString("ar-EG")}</div><div className="text-[11px] text-muted-foreground">أجهزة Push مؤهلة</div></div>
               </div>
             )}
           </div>
@@ -209,26 +218,30 @@ export default function NotificationCampaignComposer({ onSent }: Props) {
 
           <div className="space-y-2">
             <Label>قنوات الإرسال</Label>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2">
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
                 <div className="flex items-center gap-2 font-black text-[#005931]"><CheckCircle2 className="h-4 w-4" /> داخل النظام</div>
-                <div className="mt-1 text-[11px] leading-5 text-emerald-900/70">مفعّل الآن ويُرسل فعليًا.</div>
+                <div className="mt-1 text-[11px] leading-5 text-emerald-900/70">مفعّل دائمًا، ويحفظ حالة القراءة على السيرفر.</div>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 opacity-75">
-                <div className="flex items-center gap-2 font-black text-slate-700"><Smartphone className="h-4 w-4" /> Push</div>
-                <div className="mt-1 text-[11px] leading-5 text-muted-foreground">الـQueue جاهزة، ويحتاج Device Tokens وWorker.</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 opacity-75">
-                <div className="flex items-center gap-2 font-black text-emerald-700"><MessageCircle className="h-4 w-4" /> WhatsApp</div>
-                <div className="mt-1 text-[11px] leading-5 text-muted-foreground">جاهز للربط المباشر بـMeta Cloud API بعد الاعتماد.</div>
+              <div className={`rounded-2xl border p-3 ${pushAvailable ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className={`flex items-center gap-2 font-black ${pushAvailable ? "text-[#005931]" : "text-slate-700"}`}><Smartphone className="h-4 w-4" /> Push Notification</div>
+                    <div className="mt-1 text-[11px] leading-5 text-muted-foreground">
+                      {preview?.push_sender_ready
+                        ? preview.push_eligible > 0 ? `${preview.push_eligible.toLocaleString("ar-EG")} جهاز جاهز للاستلام.` : "لا توجد أجهزة مسجلة لهذا الجمهور بعد."
+                        : "قناة Firebase لم تُفعّل للإرسال بعد."}
+                    </div>
+                  </div>
+                  <Switch checked={sendPush} onCheckedChange={setSendPush} disabled={!pushAvailable} aria-label="إرسال Push" />
+                </div>
               </div>
             </div>
           </div>
 
           {audience === "customers_all" && (
-            <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-              <div><strong>حماية التسويق:</strong> الإشعار داخل التطبيق يصل للحسابات المرتبطة فقط. وعند تفعيل واتساب مستقبلًا لن يدخل الإرسال إلا العميل المسجل له Marketing Opt‑in صريح.</div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+              <strong>حماية التسويق:</strong> الـPush الخاص بالعروض والسلة المتروكة لا يدخل Queue إلا للعميل الذي فعّل Push ووافق على الإشعارات التسويقية، مع احترام Quiet Hours.
             </div>
           )}
         </div>
