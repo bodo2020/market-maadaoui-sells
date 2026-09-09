@@ -28,6 +28,7 @@ import {
   BellRing,
   ShieldCheck,
   Network,
+  Clock3,
 } from "lucide-react";
 import { NavigationGroup } from "./types";
 
@@ -36,6 +37,7 @@ export const mainNavigation: NavigationGroup = {
   items: [
     { label: "التقارير والتحليلات", href: "/reports", icon: LayoutDashboard },
     { label: "نقطة البيع", href: "/pos", icon: ShoppingCart },
+    { label: "الحضور والانصراف", href: "/attendance", icon: Clock3 },
     { label: "المهام", href: "/tasks", icon: ClipboardList },
     { label: "مركز الموافقات", href: "/approvals", icon: ShieldCheck },
     { label: "مركز الإشعارات", href: "/notifications", icon: BellRing },
