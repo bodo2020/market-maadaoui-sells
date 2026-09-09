@@ -126,7 +126,7 @@ export async function getHrEmployeePerformanceDetail(params: {
   from: string;
   to: string;
 }): Promise<HrEmployeePerformanceDetail> {
-  const { data, error } = await rpc("get_hr_employee_performance_v1", {
+  const { data, error } = await rpc("get_hr_employee_performance_detail_v1", {
     p_employee_id: params.employeeId,
     p_branch_id: params.branchId,
     p_from: params.from,
