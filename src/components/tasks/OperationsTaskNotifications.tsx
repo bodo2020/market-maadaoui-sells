@@ -12,6 +12,11 @@ import {
   isInventoryCountTask,
   isInventoryRecountTask,
   isInventoryTask,
+  isInventoryTransferActionTask,
+  isInventoryTransferDispatchTask,
+  isInventoryTransferReceiveTask,
+  isInventoryTransferTask,
+  isInventoryTransferVarianceTask,
   isRefundTransferTask,
   isShiftReconciliationTask,
   type OperationsTask,
@@ -19,6 +24,8 @@ import {
 
 function tasksPath(tasks: OperationsTask[]) {
   if (!tasks.length) return "/tasks";
+  if (tasks.every(isInventoryTransferActionTask)) return "/inventory-transfers";
+  if (tasks.every(isInventoryTransferVarianceTask)) return "/tasks";
   if (tasks.every(isInventoryTask)) return "/tasks?type=inventory";
   if (tasks.every(isCashHandoffVarianceTask)) return "/tasks?type=cash_handoff";
   if (tasks.every(isShiftReconciliationTask)) return "/tasks?type=shift";
@@ -27,39 +34,75 @@ function tasksPath(tasks: OperationsTask[]) {
 }
 
 function singleTaskCopy(task: OperationsTask) {
+  if (isInventoryTransferDispatchTask(task)) {
+    return {
+      title: "تحويل مخزون يحتاج تجهيز وشحن",
+      description: `${task.title}${typeof task.metadata?.transfer_number === "string" ? ` · ${task.metadata.transfer_number}` : ""}`,
+      actionLabel: "فتح التحويلات",
+      path: "/inventory-transfers",
+    };
+  }
+  if (isInventoryTransferReceiveTask(task)) {
+    return {
+      title: "تحويل مخزون وصل ويحتاج استلام",
+      description: `${task.title}${typeof task.metadata?.transfer_number === "string" ? ` · ${task.metadata.transfer_number}` : ""}`,
+      actionLabel: "تسجيل الاستلام",
+      path: "/inventory-transfers",
+    };
+  }
+  if (isInventoryTransferVarianceTask(task)) {
+    return {
+      title: "فرق استلام تحويل مخزون يحتاج مراجعة",
+      description: `${task.title}${typeof task.metadata?.transfer_number === "string" ? ` · ${task.metadata.transfer_number}` : ""}`,
+      actionLabel: "فتح المراجعة",
+      path: "/tasks",
+    };
+  }
   if (isInventoryCountTask(task)) {
     return {
       title: "مهمة جرد يومي جديدة",
       description: `${task.title}${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+      actionLabel: "فتح المهام",
+      path: "/tasks?type=inventory",
     };
   }
   if (isInventoryRecountTask(task)) {
     return {
       title: "مهمة إعادة عد مخزون متاحة",
       description: `${task.title}${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+      actionLabel: "فتح المهام",
+      path: "/tasks?type=inventory",
     };
   }
   if (isInventoryAdjustmentReviewTask(task)) {
     return {
       title: "فرق جرد يحتاج اعتماد",
       description: `${task.title}${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+      actionLabel: "فتح المهام",
+      path: "/tasks?type=inventory",
     };
   }
   if (isCashHandoffVarianceTask(task)) {
     return {
       title: "مهمة مراجعة فرق استلام نقدية متاحة للاستلام",
       description: `${task.cashier_name || "كاشير"} · فرق ${Number(task.variance_amount ?? task.amount ?? 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+      actionLabel: "فتح المهام",
+      path: "/tasks?type=cash_handoff",
     };
   }
   if (isShiftReconciliationTask(task)) {
     return {
       title: "مهمة مراجعة فرق وردية متاحة للاستلام",
       description: `${task.payment_method_name || task.method_code || "وسيلة دفع"} · فرق ${Number(task.variance_amount ?? task.amount ?? 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+      actionLabel: "فتح المهام",
+      path: "/tasks?type=shift",
     };
   }
   return {
     title: "مهمة رد مبلغ جديدة متاحة للاستلام",
     description: `${task.payment_method_name || "دفع إلكتروني"} · ${Number(task.amount || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${task.reference_number ? ` · ${task.reference_number}` : ""}`,
+    actionLabel: "فتح المهام",
+    path: "/tasks?type=refund",
   };
 }
 
@@ -102,7 +145,10 @@ export default function OperationsTaskNotifications() {
         toast.warning(single?.title || "مهام تشغيلية جديدة متاحة للاستلام", {
           description: single?.description || `${available.length.toLocaleString("ar-EG")} مهام متاحة للفريق في الفرع الحالي`,
           duration: 10000,
-          action: { label: "فتح المهام", onClick: () => navigate(tasksPath(available)) },
+          action: {
+            label: single?.actionLabel || "فتح المهام",
+            onClick: () => navigate(single?.path || tasksPath(available)),
+          },
         });
       }
     }
@@ -112,10 +158,14 @@ export default function OperationsTaskNotifications() {
       const storageKey = `operations-task-overdue:${user.id}:${currentBranchId}:${signature}`;
       if (!sessionStorage.getItem(storageKey)) {
         sessionStorage.setItem(storageKey, "1");
+        const transferOnly = overdue.every(isInventoryTransferTask);
         toast.error("فيه مهام تشغيلية تجاوزت وقت التنفيذ", {
           description: `${overdue.length.toLocaleString("ar-EG")} مهمة متأخرة تحتاج متابعة`,
           duration: 12000,
-          action: { label: "عرض المتأخرة", onClick: () => navigate(tasksPath(overdue)) },
+          action: {
+            label: transferOnly && overdue.every(isInventoryTransferActionTask) ? "فتح التحويلات" : "عرض المتأخرة",
+            onClick: () => navigate(tasksPath(overdue)),
+          },
         });
       }
     }
