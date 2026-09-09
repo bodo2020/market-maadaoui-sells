@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -41,6 +42,8 @@ import {
   type OperationsTaskEvent,
 } from "@/services/supabase/operationsTaskService";
 
+type TaskTypeFilter = "all" | "refund" | "shift";
+
 const formatMoney = (value: number | null | undefined) =>
   `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siteConfig.currency}`;
 
@@ -80,8 +83,16 @@ function sourceLabel(task: OperationsTask) {
   return "مهمة تشغيلية";
 }
 
+function normalizeTypeFilter(value: string | null): TaskTypeFilter {
+  if (value === "refund") return "refund";
+  if (value === "shift" || value === "shift_variance_review" || value === "shift_reconciliation") return "shift";
+  return "all";
+}
+
 export default function OperationsTasksPage() {
   const { currentBranchId, currentBranchName } = useBranchStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const typeFilter = normalizeTypeFilter(searchParams.get("type"));
   const [busyId, setBusyId] = useState<string | null>(null);
   const [completeRefundTask, setCompleteRefundTask] = useState<OperationsTask | null>(null);
   const [completeReviewTask, setCompleteReviewTask] = useState<OperationsTask | null>(null);
@@ -105,14 +116,27 @@ export default function OperationsTasksPage() {
     queryFn: () => fetchOperationsTaskEvents(historyTask!.id),
   });
 
-  const data = query.data || [];
+  const rawData = query.data || [];
+  const data = useMemo(() => {
+    if (typeFilter === "refund") return rawData.filter(isRefundTransferTask);
+    if (typeFilter === "shift") return rawData.filter(isShiftReconciliationTask);
+    return rawData;
+  }, [rawData, typeFilter]);
+
   const available = useMemo(() => data.filter(task => task.status === "open"), [data]);
   const mine = useMemo(() => data.filter(task => task.is_mine && ["claimed", "in_progress", "failed"].includes(task.status)), [data]);
   const inProgress = useMemo(() => data.filter(task => ["claimed", "in_progress", "failed"].includes(task.status)), [data]);
   const overdue = useMemo(() => data.filter(task => task.is_overdue && !["completed", "cancelled"].includes(task.status)), [data]);
   const completed = useMemo(() => data.filter(task => task.status === "completed"), [data]);
-  const refundActive = useMemo(() => data.filter(task => isRefundTransferTask(task) && !["completed", "cancelled"].includes(task.status)).length, [data]);
-  const varianceActive = useMemo(() => data.filter(task => isShiftReconciliationTask(task) && !["completed", "cancelled"].includes(task.status)).length, [data]);
+  const refundActive = useMemo(() => rawData.filter(task => isRefundTransferTask(task) && !["completed", "cancelled"].includes(task.status)).length, [rawData]);
+  const varianceActive = useMemo(() => rawData.filter(task => isShiftReconciliationTask(task) && !["completed", "cancelled"].includes(task.status)).length, [rawData]);
+
+  const changeTypeFilter = (value: TaskTypeFilter) => {
+    const next = new URLSearchParams(searchParams);
+    if (value === "all") next.delete("type");
+    else next.set("type", value);
+    setSearchParams(next, { replace: true });
+  };
 
   const run = async (taskId: string, action: () => Promise<unknown>, success: string) => {
     setBusyId(taskId);
@@ -199,16 +223,11 @@ export default function OperationsTasksPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline" className={statusClass[task.status] || ""}>{statusLabel(task)}</Badge>
               <Badge variant="outline" className={review ? "border-violet-200 bg-violet-50 text-violet-800" : ""}>{sourceLabel(task)}</Badge>
-              {task.is_overdue && task.status !== "completed" && (
-                <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700"><AlertTriangle className="ml-1 h-3.5 w-3.5" />متأخرة</Badge>
-              )}
+              {task.is_overdue && task.status !== "completed" && <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700"><AlertTriangle className="ml-1 h-3.5 w-3.5" />متأخرة</Badge>}
             </div>
 
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-lg font-black text-slate-950">{task.title}</h3>
-                <div className="mt-1 text-xs text-muted-foreground">{task.reference_number || task.invoice_number || "بدون مرجع"} · أُنشئت {formatDateTime(task.created_at)}</div>
-              </div>
+              <div><h3 className="text-lg font-black text-slate-950">{task.title}</h3><div className="mt-1 text-xs text-muted-foreground">{task.reference_number || task.invoice_number || "بدون مرجع"} · أُنشئت {formatDateTime(task.created_at)}</div></div>
               <div className={`text-2xl font-black ${review ? "text-violet-700" : "text-[#005931]"}`}>{formatMoney(task.amount)}</div>
             </div>
 
@@ -233,55 +252,19 @@ export default function OperationsTasksPage() {
               </div>
             )}
 
-            {review && (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">المسؤول</div><div className="mt-1 font-bold">{task.claimed_by_name || "متاحة للفريق"}</div></div>
-                <div className={`rounded-2xl p-3 ${task.is_overdue && task.status !== "completed" ? "bg-red-50" : "bg-slate-50"}`}><div className="text-[11px] text-muted-foreground">الموعد الداخلي</div><div className={`mt-1 flex items-center gap-2 font-bold ${task.is_overdue && task.status !== "completed" ? "text-red-700" : ""}`}><Clock3 className="h-4 w-4" />{formatDateTime(task.due_at)}</div></div>
-              </div>
-            )}
-
+            {review && <div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">المسؤول</div><div className="mt-1 font-bold">{task.claimed_by_name || "متاحة للفريق"}</div></div><div className={`rounded-2xl p-3 ${task.is_overdue && task.status !== "completed" ? "bg-red-50" : "bg-slate-50"}`}><div className="text-[11px] text-muted-foreground">الموعد الداخلي</div><div className={`mt-1 flex items-center gap-2 font-bold ${task.is_overdue && task.status !== "completed" ? "text-red-700" : ""}`}><Clock3 className="h-4 w-4" />{formatDateTime(task.due_at)}</div></div></div>}
             {task.failure_reason && <div className="mt-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-sm text-red-800"><AlertTriangle className="ml-2 inline h-4 w-4" />{task.failure_reason}</div>}
             {refund && task.provider_reference && task.status === "completed" && <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-800">رقم العملية: <span className="font-black" dir="ltr">{task.provider_reference}</span></div>}
             {review && resolution && task.status === "completed" && <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900"><strong>نتيجة المراجعة:</strong> {resolution}</div>}
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2 border-t pt-4">
-            {task.status === "open" && (
-              <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy || !task.can_claim} onClick={() => run(task.id, () => claimOperationsTask(task.id), "تم استلام المهمة وأصبحت في «مهامي».")}>
-                {busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <UserRoundCheck className="ml-2 h-4 w-4" />}{task.can_claim ? "استلام المهمة" : "غير مخول بالاستلام"}
-              </Button>
-            )}
-
-            {task.is_mine && task.status === "claimed" && (
-              <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), review ? "بدأت مراجعة فرق الوردية." : "بدأ تنفيذ التحويل.")}>
-                <Play className="ml-2 h-4 w-4" />{review ? "بدء المراجعة" : "بدء التحويل"}
-              </Button>
-            )}
-
-            {task.is_mine && task.status === "failed" && (
-              <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), review ? "تم فتح محاولة مراجعة جديدة." : "تم فتح محاولة جديدة للتحويل.")}>
-                <RotateCcw className="ml-2 h-4 w-4" />إعادة المحاولة
-              </Button>
-            )}
-
-            {task.is_mine && task.status === "in_progress" && review && (
-              <>
-                <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => { setResolutionNote(""); setCompleteReviewTask(task); }}><CheckCircle2 className="ml-2 h-4 w-4" />إغلاق المراجعة</Button>
-                <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" disabled={busy} onClick={() => { setFailureReason(""); setFailTask(task); }}><AlertTriangle className="ml-2 h-4 w-4" />تعذر المراجعة</Button>
-              </>
-            )}
-
-            {task.is_mine && task.status === "in_progress" && refund && (
-              <>
-                <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => { setProviderReference(""); setCompleteRefundTask(task); }}><CheckCircle2 className="ml-2 h-4 w-4" />تأكيد التحويل</Button>
-                <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" disabled={busy} onClick={() => { setFailureReason(""); setFailTask(task); }}><AlertTriangle className="ml-2 h-4 w-4" />تعذر التحويل</Button>
-              </>
-            )}
-
-            {task.can_release && ["claimed", "in_progress", "failed"].includes(task.status) && (
-              <Button variant="outline" disabled={busy} onClick={() => run(task.id, () => releaseOperationsTask(task.id, "إرجاع للمجموعة"), "رجعت المهمة للمجموعة وأصبحت متاحة للاستلام.")}><RotateCcw className="ml-2 h-4 w-4" />إرجاع للمجموعة</Button>
-            )}
-
+            {task.status === "open" && <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy || !task.can_claim} onClick={() => run(task.id, () => claimOperationsTask(task.id), "تم استلام المهمة وأصبحت في «مهامي».")}>{busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <UserRoundCheck className="ml-2 h-4 w-4" />}{task.can_claim ? "استلام المهمة" : "غير مخول بالاستلام"}</Button>}
+            {task.is_mine && task.status === "claimed" && <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), review ? "بدأت مراجعة فرق الوردية." : "بدأ تنفيذ التحويل.")}><Play className="ml-2 h-4 w-4" />{review ? "بدء المراجعة" : "بدء التحويل"}</Button>}
+            {task.is_mine && task.status === "failed" && <Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), review ? "تم فتح محاولة مراجعة جديدة." : "تم فتح محاولة جديدة للتحويل.")}><RotateCcw className="ml-2 h-4 w-4" />إعادة المحاولة</Button>}
+            {task.is_mine && task.status === "in_progress" && review && <><Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => { setResolutionNote(""); setCompleteReviewTask(task); }}><CheckCircle2 className="ml-2 h-4 w-4" />إغلاق المراجعة</Button><Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" disabled={busy} onClick={() => { setFailureReason(""); setFailTask(task); }}><AlertTriangle className="ml-2 h-4 w-4" />تعذر المراجعة</Button></>}
+            {task.is_mine && task.status === "in_progress" && refund && <><Button className="bg-[#005931] hover:bg-[#004a29]" disabled={busy} onClick={() => { setProviderReference(""); setCompleteRefundTask(task); }}><CheckCircle2 className="ml-2 h-4 w-4" />تأكيد التحويل</Button><Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" disabled={busy} onClick={() => { setFailureReason(""); setFailTask(task); }}><AlertTriangle className="ml-2 h-4 w-4" />تعذر التحويل</Button></>}
+            {task.can_release && ["claimed", "in_progress", "failed"].includes(task.status) && <Button variant="outline" disabled={busy} onClick={() => run(task.id, () => releaseOperationsTask(task.id, "إرجاع للمجموعة"), "رجعت المهمة للمجموعة وأصبحت متاحة للاستلام.")}><RotateCcw className="ml-2 h-4 w-4" />إرجاع للمجموعة</Button>}
             <Button variant="ghost" onClick={() => setHistoryTask(task)}><History className="ml-2 h-4 w-4" />السجل</Button>
           </div>
         </CardContent>
@@ -289,9 +272,7 @@ export default function OperationsTasksPage() {
     );
   };
 
-  const TaskList = ({ tasks, empty }: { tasks: OperationsTask[]; empty: string }) => (
-    <div className="space-y-3">{tasks.length ? tasks.map(task => <TaskCard key={task.id} task={task} />) : <div className="rounded-3xl border border-dashed bg-white p-12 text-center text-sm text-muted-foreground">{empty}</div>}</div>
-  );
+  const TaskList = ({ tasks, empty }: { tasks: OperationsTask[]; empty: string }) => <div className="space-y-3">{tasks.length ? tasks.map(task => <TaskCard key={task.id} task={task} />) : <div className="rounded-3xl border border-dashed bg-white p-12 text-center text-sm text-muted-foreground">{empty}</div>}</div>;
 
   return (
     <MainLayout>
@@ -308,6 +289,14 @@ export default function OperationsTasksPage() {
           </div>
         </section>
 
+        <section className="flex flex-wrap items-center gap-2 rounded-2xl border bg-white p-2 shadow-sm">
+          <span className="px-2 text-xs font-semibold text-muted-foreground">نوع المهمة</span>
+          <Button size="sm" variant={typeFilter === "all" ? "default" : "ghost"} onClick={() => changeTypeFilter("all")}>الكل</Button>
+          <Button size="sm" variant={typeFilter === "refund" ? "default" : "ghost"} onClick={() => changeTypeFilter("refund")}><WalletCards className="ml-1 h-4 w-4" />المرتجعات</Button>
+          <Button size="sm" variant={typeFilter === "shift" ? "default" : "ghost"} onClick={() => changeTypeFilter("shift")}><Scale className="ml-1 h-4 w-4" />فروق الورديات</Button>
+          {typeFilter !== "all" && <Badge variant="secondary" className="mr-auto">يعرض {data.length.toLocaleString("ar-EG")} مهمة</Badge>}
+        </section>
+
         <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <Card><CardContent className="p-4"><UserRoundCheck className="h-5 w-5 text-[#005931]" /><div className="mt-2 text-2xl font-black">{available.length}</div><div className="text-xs text-muted-foreground">متاحة للجميع</div></CardContent></Card>
           <Card><CardContent className="p-4"><WalletCards className="h-5 w-5 text-blue-600" /><div className="mt-2 text-2xl font-black">{mine.length}</div><div className="text-xs text-muted-foreground">مهامي</div></CardContent></Card>
@@ -316,18 +305,14 @@ export default function OperationsTasksPage() {
           <Card><CardContent className="p-4"><CheckCircle2 className="h-5 w-5 text-slate-600" /><div className="mt-2 text-2xl font-black">{completed.length}</div><div className="text-xs text-muted-foreground">مكتملة</div></CardContent></Card>
         </section>
 
-        {query.isLoading ? <div className="flex min-h-80 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#005931]" /></div> : query.isError ? (
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">{(query.error as Error)?.message || "تعذر تحميل المهام."}</div>
-        ) : (
-          <Tabs defaultValue={available.length ? "available" : mine.length ? "mine" : "active"}>
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 md:grid-cols-5">
-              <TabsTrigger value="available">متاحة ({available.length})</TabsTrigger><TabsTrigger value="mine">مهامي ({mine.length})</TabsTrigger><TabsTrigger value="active">قيد التنفيذ ({inProgress.length})</TabsTrigger><TabsTrigger value="overdue">متأخرة ({overdue.length})</TabsTrigger><TabsTrigger value="completed">مكتملة ({completed.length})</TabsTrigger>
-            </TabsList>
-            <TabsContent className="mt-4" value="available"><TaskList tasks={available} empty="لا توجد مهام متاحة حاليًا." /></TabsContent>
-            <TabsContent className="mt-4" value="mine"><TaskList tasks={mine} empty="لم تستلم أي مهمة حاليًا." /></TabsContent>
-            <TabsContent className="mt-4" value="active"><TaskList tasks={inProgress} empty="لا توجد مهام قيد التنفيذ." /></TabsContent>
-            <TabsContent className="mt-4" value="overdue"><TaskList tasks={overdue} empty="ممتاز، لا توجد مهام متأخرة." /></TabsContent>
-            <TabsContent className="mt-4" value="completed"><TaskList tasks={completed} empty="لا توجد مهام مكتملة لعرضها." /></TabsContent>
+        {query.isLoading ? <div className="flex min-h-80 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#005931]" /></div> : query.isError ? <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">{(query.error as Error)?.message || "تعذر تحميل المهام."}</div> : (
+          <Tabs key={typeFilter} defaultValue={available.length ? "available" : mine.length ? "mine" : "active"}>
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1 md:grid-cols-5"><TabsTrigger value="available">متاحة ({available.length})</TabsTrigger><TabsTrigger value="mine">مهامي ({mine.length})</TabsTrigger><TabsTrigger value="active">قيد التنفيذ ({inProgress.length})</TabsTrigger><TabsTrigger value="overdue">متأخرة ({overdue.length})</TabsTrigger><TabsTrigger value="completed">مكتملة ({completed.length})</TabsTrigger></TabsList>
+            <TabsContent className="mt-4" value="available"><TaskList tasks={available} empty="لا توجد مهام متاحة حاليًا ضمن هذا النوع." /></TabsContent>
+            <TabsContent className="mt-4" value="mine"><TaskList tasks={mine} empty="لم تستلم أي مهمة ضمن هذا النوع حاليًا." /></TabsContent>
+            <TabsContent className="mt-4" value="active"><TaskList tasks={inProgress} empty="لا توجد مهام قيد التنفيذ ضمن هذا النوع." /></TabsContent>
+            <TabsContent className="mt-4" value="overdue"><TaskList tasks={overdue} empty="ممتاز، لا توجد مهام متأخرة ضمن هذا النوع." /></TabsContent>
+            <TabsContent className="mt-4" value="completed"><TaskList tasks={completed} empty="لا توجد مهام مكتملة ضمن هذا النوع." /></TabsContent>
           </Tabs>
         )}
       </div>
