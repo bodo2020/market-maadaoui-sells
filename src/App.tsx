@@ -1,4 +1,5 @@
 import OrderNotifications from '@/components/orders/OrderNotifications';
+import ApprovalCenterNotifications from "@/components/approvals/ApprovalCenterNotifications";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import Login from "@/pages/Login";
@@ -100,7 +101,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router><AuthProvider><TooltipProvider>
-        <OrderNotifications /><CustomerTaskNotifications /><OperationsTaskNotifications /><InventoryTransferSmartAlertNotifications />
+        <OrderNotifications /><CustomerTaskNotifications /><OperationsTaskNotifications /><InventoryTransferSmartAlertNotifications /><ApprovalCenterNotifications />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
