@@ -116,6 +116,9 @@ export async function getHrTeamPerformance(params: {
   return data as HrPerformanceResult;
 }
 
+/** Backward-compatible name already used by EmployeePerformanceDock. */
+export const getHrEmployeePerformance = getHrTeamPerformance;
+
 /** Detailed, explainable performance for one employee. */
 export async function getHrEmployeePerformanceDetail(params: {
   employeeId: string;
