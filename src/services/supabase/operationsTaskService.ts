@@ -7,7 +7,7 @@ export type OperationsTask = {
   id: string;
   branch_id: string;
   task_type: string;
-  source_kind: "pos_refund" | "online_refund" | "shift_reconciliation" | string;
+  source_kind: "pos_refund" | "online_refund" | "shift_reconciliation" | "cash_handoff" | string;
   source_id: string;
   return_id?: string | null;
   sale_id?: string | null;
@@ -93,6 +93,14 @@ export function isRefundTransferTask(task: Pick<OperationsTask, "task_type" | "s
 
 export function isShiftReconciliationTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
   return task.task_type === "shift_variance_review" || task.source_kind === "shift_reconciliation";
+}
+
+export function isCashHandoffVarianceTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return task.task_type === "cash_handoff_variance_review" || task.source_kind === "cash_handoff";
+}
+
+export function isOperationsReviewTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return isShiftReconciliationTask(task) || isCashHandoffVarianceTask(task);
 }
 
 export async function fetchOperationsTasks(branchId: string, scope: OperationsTaskScope = "all", limit = 250): Promise<OperationsTask[]> {
