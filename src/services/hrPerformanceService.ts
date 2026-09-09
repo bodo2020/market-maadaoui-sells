@@ -9,7 +9,11 @@ export type HrPerformanceEmployee = {
   work_mode: string | null;
   employment_status: string | null;
   attendance_days: number;
+  scheduled_days: number;
   approved_leave_days: number;
+  attended_scheduled_days: number;
+  absence_days: number;
+  attendance_rate: number | null;
   worked_hours: number;
   late_days: number;
   late_minutes: number;
@@ -33,7 +37,12 @@ export type HrPerformanceResult = {
   to: string;
   summary: {
     employees: number;
+    employees_with_schedule: number;
     attendance_days: number;
+    scheduled_days: number;
+    approved_leave_days: number;
+    absence_days: number;
+    attendance_rate: number | null;
     worked_hours: number;
     late_minutes: number;
     completed_tasks: number;
@@ -59,6 +68,11 @@ export interface HrEmployeePerformanceDetail {
     checkins: number;
     completed_sessions: number;
     worked_minutes: number;
+    scheduled_days: number;
+    approved_leave_days: number;
+    attended_scheduled_days: number;
+    absence_days: number;
+    attendance_rate: number | null;
     late_sessions: number;
     late_minutes: number;
     early_departure_sessions: number;
@@ -101,7 +115,6 @@ function performanceError(message?: string) {
   return new Error(text || "تعذر تحميل مؤشرات الأداء.");
 }
 
-/** Manager/team overview for a branch. */
 export async function getHrTeamPerformance(params: {
   branchId: string;
   from: string;
@@ -116,10 +129,8 @@ export async function getHrTeamPerformance(params: {
   return data as HrPerformanceResult;
 }
 
-/** Backward-compatible name already used by EmployeePerformanceDock. */
 export const getHrEmployeePerformance = getHrTeamPerformance;
 
-/** Detailed, explainable performance for one employee. */
 export async function getHrEmployeePerformanceDetail(params: {
   employeeId: string;
   branchId: string;
