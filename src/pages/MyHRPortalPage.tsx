@@ -7,7 +7,6 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock3,
-  History,
   Loader2,
   ShieldCheck,
   Smartphone,
@@ -15,6 +14,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
+import HrRequestsSelfService from "@/components/hr/HrRequestsSelfService";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -125,9 +125,7 @@ export default function MyHRPortalPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2 font-black"><History className="h-5 w-5 text-[#005931]" />طلبات الموارد البشرية</div><p className="mt-1 text-sm text-muted-foreground">الإجازات، السلف، وتصحيح الحضور ستكون هنا بنفس حساب الموظف وبمسار اعتماد موحد. لن يتم إظهار أزرار إرسال قبل تفعيل الـBackend الآمن.</p></div><Badge variant="outline">قيد التجهيز الآمن</Badge></CardContent>
-        </Card>
+        <HrRequestsSelfService />
       </div>
     </MainLayout>
   );
