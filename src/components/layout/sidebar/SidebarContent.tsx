@@ -26,6 +26,7 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
     customerTaskAlerts,
     operationsTaskAlerts,
     operationsTaskOverdue,
+    approvalAlerts,
   } = useNotificationStore();
   const isAdmin = user?.role === UserRole.ADMIN;
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
@@ -55,6 +56,8 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
       } else if (item.href === "/tasks") {
         badge = operationsTaskAlerts;
         secondaryBadge = operationsTaskOverdue;
+      } else if (item.href === "/approvals") {
+        badge = approvalAlerts;
       } else if (item.badge) {
         badge = item.badge;
       }
