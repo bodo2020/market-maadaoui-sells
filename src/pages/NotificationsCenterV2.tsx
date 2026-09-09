@@ -12,7 +12,6 @@ import {
   Filter,
   Inbox,
   Loader2,
-  MessageCircle,
   PackageX,
   RefreshCw,
   ShieldAlert,
@@ -24,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
+import NotificationCampaignComposer from "@/components/notifications/NotificationCampaignComposer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -179,10 +179,11 @@ export default function NotificationsCenterV2() {
               <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded-full bg-white/10 px-3 py-1.5">{currentBranchName || "الفرع الحالي"}</span>
                 <span className="rounded-full bg-white/10 px-3 py-1.5"><Smartphone className="ml-1 inline h-3.5 w-3.5" /> In‑App جاهز</span>
-                <span className="rounded-full bg-white/10 px-3 py-1.5"><MessageCircle className="ml-1 inline h-3.5 w-3.5" /> WhatsApp-ready</span>
+                <span className="rounded-full bg-white/10 px-3 py-1.5"><BellRing className="ml-1 inline h-3.5 w-3.5" /> Push جاهز معماريًا</span>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              <NotificationCampaignComposer onSent={() => void query.refetch()} />
               <Button variant="secondary" className="rounded-xl" onClick={() => void query.refetch()} disabled={query.isFetching}>
                 {query.isFetching ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <RefreshCw className="ml-2 h-4 w-4" />} تحديث الآن
               </Button>
@@ -283,7 +284,7 @@ export default function NotificationsCenterV2() {
 
         <section className="grid gap-3 lg:grid-cols-3">
           <div className="rounded-2xl border bg-white p-4"><div className="flex items-center gap-2 font-black"><Smartphone className="h-4 w-4 text-[#005931]" /> داخل النظام</div><p className="mt-2 text-xs leading-6 text-muted-foreground">المصدر الأساسي للتنبيهات، مع حالة قراءة محفوظة على السيرفر بدل المتصفح.</p></div>
-          <div className="rounded-2xl border bg-white p-4"><div className="flex items-center gap-2 font-black"><MessageCircle className="h-4 w-4 text-emerald-600" /> WhatsApp Business</div><p className="mt-2 text-xs leading-6 text-muted-foreground">القناة مجهزة معماريًا. العروض لا تُرسل إلا بعد Marketing Opt‑in، ورسائل الطلبات تظل Transactional منفصلة.</p></div>
+          <div className="rounded-2xl border bg-white p-4"><div className="flex items-center gap-2 font-black"><BellRing className="h-4 w-4 text-emerald-600" /> Push Notifications</div><p className="mt-2 text-xs leading-6 text-muted-foreground">الأحداث المؤهلة تدخل Queue مركزية، وتُرسل للأجهزة المسجلة فقط مع احترام تفضيلات العميل وساعات الهدوء.</p></div>
           <div className="rounded-2xl border bg-white p-4"><div className="flex items-center gap-2 font-black"><Sparkles className="h-4 w-4 text-amber-600" /> تصعيد ذكي</div><p className="mt-2 text-xs leading-6 text-muted-foreground">التنبيهات المرتبطة بمهام تظهر فقط للموظف صاحب المهمة أو من لديه صلاحية استلامها.</p></div>
         </section>
       </div>
