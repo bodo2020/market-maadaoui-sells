@@ -9,6 +9,7 @@ import ReportsPaymentsV2 from "@/pages/ReportsPaymentsV2";
 import ReportsReturnsV2 from "@/pages/ReportsReturnsV2";
 import ReportsProductsV2 from "@/pages/ReportsProductsV2";
 import ReportsInventoryV2 from "@/pages/ReportsInventoryV2";
+import ReportsInventoryTransfersV2 from "@/pages/ReportsInventoryTransfersV2";
 import ReportsShiftsV2 from "@/pages/ReportsShiftsV2";
 import ReportsOnlineV2 from "@/pages/ReportsOnlineV2";
 import ReportsCustomersV2 from "@/pages/ReportsCustomersV2";
@@ -108,6 +109,7 @@ function App() {
           <Route path="/reports/returns" element={<ProtectedRoute><ReportsReturnsV2 /></ProtectedRoute>} />
           <Route path="/reports/products" element={<ProtectedRoute><ReportsProductsV2 /></ProtectedRoute>} />
           <Route path="/reports/inventory" element={<ProtectedRoute><ReportsInventoryV2 /></ProtectedRoute>} />
+          <Route path="/reports/inventory-transfers" element={<ProtectedRoute><ReportsInventoryTransfersV2 /></ProtectedRoute>} />
           <Route path="/reports/shifts" element={<ProtectedRoute><ReportsShiftsV2 /></ProtectedRoute>} />
           <Route path="/reports/online" element={<ProtectedRoute><ReportsOnlineV2 /></ProtectedRoute>} />
           <Route path="/reports/customers" element={<ProtectedRoute><ReportsCustomersV2 /></ProtectedRoute>} />
