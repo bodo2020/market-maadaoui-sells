@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
 import NotificationCampaignComposer from "@/components/notifications/NotificationCampaignComposer";
+import NotificationCampaignHistory from "@/components/notifications/NotificationCampaignHistory";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
