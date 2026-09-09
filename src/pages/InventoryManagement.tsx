@@ -1,34 +1,39 @@
-
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  Activity,
+  AlertTriangle,
+  ArrowDownLeft,
+  ArrowUpRight,
+  BarChart3,
+  BellRing,
+  Boxes,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  Clock3,
+  FileSpreadsheet,
+  History,
+  Loader2,
+  Package,
+  PackagePlus,
+  PackageSearch,
+  Pencil,
+  PlusMinus,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  Truck,
+  Warehouse,
+} from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
-import { siteConfig } from "@/config/site";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -37,897 +42,738 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Search, 
-  Plus, 
-  Package, 
-  AlertTriangle,
-  Filter,
-  Download,
-  Truck,
-  Loader2,
-  Bell,
-  Edit,
-  PlusCircle
-} from "lucide-react";
-import { Product } from "@/types";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useToast } from "@/hooks/use-toast";
-import { fetchProducts, updateProduct } from "@/services/supabase/productService";
-import { checkLowStockProducts, showLowStockToasts } from "@/services/notificationService";
-import { fetchInventoryWithAlerts } from "@/services/supabase/inventoryService";
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
-import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { useBranchStore } from "@/stores/branchStore";
+import { siteConfig } from "@/config/site";
+import {
+  adjustInventoryStockV2,
+  fetchInventoryControlCenterV2,
+  fetchInventoryProductMovementsV2,
+  setInventoryStockPolicyV2,
+  type InventoryAdjustmentReason,
+  type InventoryControlProductV2,
+  type InventoryControlStatus,
+} from "@/services/supabase/inventoryControlCenterV2Service";
 
-const getBranchId = () => (typeof window !== 'undefined' ? localStorage.getItem('currentBranchId') : null);
+const PAGE_SIZE = 40;
+
+const formatQty = (value: number | null | undefined) =>
+  Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 3 });
+
+const formatMoney = (value: number | null | undefined) =>
+  `${Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 2 })} ${siteConfig.currency}`;
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "—";
+  try {
+    return new Intl.DateTimeFormat("ar-EG", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(value));
+  } catch {
+    return "—";
+  }
+}
+
+const adjustmentReasonLabels: Record<InventoryAdjustmentReason, string> = {
+  manual_correction: "تصحيح رصيد يدوي",
+  receiving_correction: "تصحيح استلام",
+  damage: "تالف",
+  breakage: "كسر",
+  loss: "فقد / عجز",
+  internal_use: "استخدام داخلي",
+  opening_balance: "رصيد افتتاحي",
+  other: "سبب آخر",
+};
+
+const movementSourceLabels: Record<string, string> = {
+  manual_inventory_adjustment: "تسوية يدوية",
+  inventory_audit_adjustment: "تسوية جرد معتمدة",
+  inventory_quantity_update: "حركة مخزون",
+};
+
+const statusLabels: Record<InventoryControlStatus, string> = {
+  all: "كل المخزون",
+  healthy: "سليم",
+  low_stock: "منخفض",
+  out_of_stock: "نافد",
+  overstock: "تكدس",
+  no_movement: "راكد 30 يوم",
+  coverage_risk: "تغطية منخفضة",
+  alerts: "تنبيهات مفعلة",
+};
+
+function stockBadge(product: InventoryControlProductV2) {
+  if (product.stock_status === "out_of_stock") {
+    return <Badge className="border-red-200 bg-red-50 text-red-700 hover:bg-red-50">نافد</Badge>;
+  }
+  if (product.stock_status === "low_stock") {
+    return <Badge className="border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-50">مخزون منخفض</Badge>;
+  }
+  if (product.stock_status === "coverage_risk") {
+    return <Badge className="border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-50">تغطية منخفضة</Badge>;
+  }
+  if (product.stock_status === "overstock") {
+    return <Badge className="border-violet-200 bg-violet-50 text-violet-800 hover:bg-violet-50">تكدس</Badge>;
+  }
+  if (product.stock_status === "no_movement") {
+    return <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">راكد 30 يوم</Badge>;
+  }
+  return <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50">سليم</Badge>;
+}
+
+function movementReasonLabel(reason?: string | null) {
+  if (!reason) return null;
+  return adjustmentReasonLabels[reason as InventoryAdjustmentReason] || reason;
+}
 
 export default function InventoryManagement() {
-  const [inventory, setInventory] = useState<any[]>([]);
-  const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [isAddStockDialogOpen, setIsAddStockDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [stockToAdd, setStockToAdd] = useState(0);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [currentBranch, setCurrentBranch] = useState<string>("");
-  const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  
-  useEffect(() => {
-    loadBranches();
-  }, []);
+  const { currentBranchId, currentBranchName } = useBranchStore();
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<InventoryControlStatus>("all");
+  const [categoryId, setCategoryId] = useState("all");
+  const [page, setPage] = useState(0);
+
+  const [policyProduct, setPolicyProduct] = useState<InventoryControlProductV2 | null>(null);
+  const [minStock, setMinStock] = useState("");
+  const [maxStock, setMaxStock] = useState("");
+  const [alertEnabled, setAlertEnabled] = useState(false);
+
+  const [adjustProduct, setAdjustProduct] = useState<InventoryControlProductV2 | null>(null);
+  const [adjustDelta, setAdjustDelta] = useState("");
+  const [adjustReason, setAdjustReason] = useState<InventoryAdjustmentReason>("manual_correction");
+  const [adjustNote, setAdjustNote] = useState("");
+  const [adjustRequestId, setAdjustRequestId] = useState("");
+
+  const [movementProduct, setMovementProduct] = useState<InventoryControlProductV2 | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (currentBranch) {
-      loadProducts();
-      
-      // Check for low stock and display notifications
-      const checkStock = async () => {
-        await checkLowStockProducts();
-        showLowStockToasts();
-      };
-      
-      checkStock();
-    }
-  }, [currentBranch]);
+    const timer = window.setTimeout(() => setSearch(searchInput.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
-  // Add effect to reload data when returning from edit page
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && currentBranch) {
-        loadProducts();
-      }
-    };
+    setPage(0);
+  }, [search, status, categoryId, currentBranchId]);
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [currentBranch]);
+  const query = useQuery({
+    queryKey: ["inventory-control-center-v2", currentBranchId, search, status, categoryId, page],
+    enabled: Boolean(currentBranchId),
+    queryFn: () =>
+      fetchInventoryControlCenterV2(currentBranchId as string, {
+        search,
+        status,
+        categoryId: categoryId === "all" ? null : categoryId,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+      }),
+    refetchOnWindowFocus: true,
+    staleTime: 20_000,
+  });
 
-  const loadBranches = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('branches')
-        .select('id, name')
-        .eq('active', true)
-        .order('created_at', { ascending: true });
+  const movementQuery = useQuery({
+    queryKey: ["inventory-product-movements-v2", currentBranchId, movementProduct?.product_id],
+    enabled: Boolean(currentBranchId && movementProduct?.product_id),
+    queryFn: () => fetchInventoryProductMovementsV2(currentBranchId as string, movementProduct!.product_id, 100),
+  });
 
-      if (error) throw error;
+  const data = query.data;
+  const summary = data?.summary;
+  const canManage = Boolean(data?.permissions.can_manage);
+  const totalPages = Math.max(1, Math.ceil(Number(data?.total_filtered || 0) / PAGE_SIZE));
+  const activePage = Math.min(page + 1, totalPages);
 
-      setBranches(data || []);
-      
-      // تعيين الفرع الحالي من localStorage أو أول فرع
-      const savedBranchId = getBranchId();
-      if (savedBranchId && data?.some(b => b.id === savedBranchId)) {
-        setCurrentBranch(savedBranchId);
-      } else if (data && data.length > 0) {
-        setCurrentBranch(data[0].id);
-        localStorage.setItem('currentBranchId', data[0].id);
-        localStorage.setItem('currentBranchName', data[0].name);
-      }
-    } catch (error) {
-      console.error("Error loading branches:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء تحميل الفروع",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleBranchChange = (branchId: string) => {
-    setCurrentBranch(branchId);
-    const branch = branches.find(b => b.id === branchId);
-    if (branch) {
-      localStorage.setItem('currentBranchId', branchId);
-      localStorage.setItem('currentBranchName', branch.name);
-    }
-  };
-
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
-      if (!currentBranch) return;
-
-      // التحقق من نوع الفرع
-      const { data: branchData } = await supabase
-        .from('branches')
-        .select('branch_type, independent_inventory')
-        .eq('id', currentBranch)
-        .single();
-
-      const isIndependentInventory = branchData?.independent_inventory === true;
-
-      // الخطوة 1: جلب المنتجات حسب نوع الفرع
-      let allProducts: any[] = [];
-      const PAGE_SIZE = 1000;
-      let from = 0;
-      
-      if (isIndependentInventory) {
-        // للفروع المستقلة: جلب فقط المنتجات التي لها inventory في هذا الفرع
-        while (true) {
-          const { data, error } = await supabase
-            .from('products')
-            .select(`
-              id,
-              name,
-              barcode,
-              price,
-              purchase_price,
-              image_urls,
-              shelf_location,
-              expiry_date,
-              unit_of_measure,
-              inventory!inner(branch_id)
-            `)
-            .eq('inventory.branch_id', currentBranch)
-            .order('name')
-            .range(from, from + PAGE_SIZE - 1);
-
-          if (error) throw error;
-          if (!data || data.length === 0) break;
-          
-          allProducts = allProducts.concat(data);
-          
-          if (data.length < PAGE_SIZE) break;
-          from += PAGE_SIZE;
-        }
-      } else {
-        // للفروع العادية: جلب كل المنتجات
-        while (true) {
-          const { data, error } = await supabase
-            .from('products')
-            .select(`
-              id,
-              name,
-              barcode,
-              price,
-              purchase_price,
-              image_urls,
-              shelf_location,
-              expiry_date,
-              unit_of_measure
-            `)
-            .order('name')
-            .range(from, from + PAGE_SIZE - 1);
-
-          if (error) throw error;
-          if (!data || data.length === 0) break;
-          
-          allProducts = allProducts.concat(data);
-          
-          if (data.length < PAGE_SIZE) break;
-          from += PAGE_SIZE;
-        }
-      }
-
-      // الخطوة 2: جلب المخزون للفرع الحالي مع pagination
-      let inventoryData: any[] = [];
-      from = 0;
-      
-      while (true) {
-        const { data, error } = await supabase
-          .from('inventory')
-          .select('product_id, quantity')
-          .eq('branch_id', currentBranch)
-          .range(from, from + PAGE_SIZE - 1);
-
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        
-        inventoryData = inventoryData.concat(data);
-        
-        if (data.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-      }
-
-      // الخطوة 3: جلب إعدادات التنبيهات مع pagination
-      let alertsData: any[] = [];
-      from = 0;
-      
-      while (true) {
-        const { data, error } = await supabase
-          .from('inventory_alerts')
-          .select('product_id, min_stock_level, alert_enabled')
-          .range(from, from + PAGE_SIZE - 1);
-
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        
-        alertsData = alertsData.concat(data);
-        
-        if (data.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-      }
-
-      // إنشاء Maps للوصول السريع
-      const inventoryMap = new Map(inventoryData.map(inv => [inv.product_id, inv.quantity]));
-      const alertsMap = new Map(alertsData.map(a => [a.product_id, a]));
-
-      // دمج البيانات: جميع المنتجات مع الكمية من المخزون (0 إذا لم توجد)
-      const formattedInventory = allProducts.map(product => {
-        const quantity = inventoryMap.get(product.id) || 0;
-        const alert = alertsMap.get(product.id);
-        
-        return {
-          id: product.id,
-          name: product.name,
-          barcode: product.barcode,
-          price: product.price || 0,
-          purchase_price: product.purchase_price || 0,
-          quantity: quantity,
-          image_urls: product.image_urls,
-          shelf_location: product.shelf_location,
-          expiry_date: product.expiry_date,
-          unit_of_measure: product.unit_of_measure,
-          inventory_alerts: alert,
-          branch_id: currentBranch
-        };
-      });
-
-      // فلترة المنتجات منخفضة المخزون
-      const lowStock = formattedInventory.filter(product => {
-        const alert = product.inventory_alerts;
-        if (!alert || !alert.alert_enabled || !alert.min_stock_level) return false;
-        return (product.quantity || 0) < alert.min_stock_level;
-      });
-
-      setInventory(formattedInventory);
-      setLowStockProducts(lowStock);
-    } catch (error) {
-      console.error("Error loading products:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء تحميل المنتجات",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const filteredInventory = inventory.filter(product => 
-    (product.name && product.name.toLowerCase().includes(search.toLowerCase())) || 
-    (product.barcode && product.barcode.toString().includes(search))
+  const inventorySourceDifferent = Boolean(
+    data && data.inventory_source_branch_id && data.inventory_source_branch_id !== data.branch_id,
   );
 
-  
-  const handleAddStock = async () => {
-    if (selectedProduct && stockToAdd > 0) {
-      setLoading(true);
-      try {
-        // تحديث أو إنشاء سجل المخزون
-        const { error } = await supabase
-          .from('inventory')
-          .upsert({ 
-            product_id: selectedProduct.id,
-            branch_id: currentBranch,
-            quantity: (selectedProduct.quantity || 0) + stockToAdd,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'product_id,branch_id' });
+  const openPolicy = (product: InventoryControlProductV2) => {
+    setPolicyProduct(product);
+    setMinStock(String(product.min_stock_level ?? 0));
+    setMaxStock(product.max_stock_level == null ? "" : String(product.max_stock_level));
+    setAlertEnabled(Boolean(product.alert_enabled));
+  };
 
-        if (error) throw error;
-        
-        // Reload data to get updated inventory
-        await loadProducts();
-        
-        toast({
-          title: "تم بنجاح",
-          description: `تم إضافة ${stockToAdd} وحدات إلى المخزون`,
-        });
-        
-        setIsAddStockDialogOpen(false);
-        setStockToAdd(0);
-        setSelectedProduct(null);
-      } catch (error) {
-        console.error("Error updating stock:", error);
-        toast({
-          title: "خطأ",
-          description: "حدث خطأ أثناء تحديث المخزون",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
+  const closePolicy = () => {
+    setPolicyProduct(null);
+    setMinStock("");
+    setMaxStock("");
+    setAlertEnabled(false);
+  };
+
+  const savePolicy = async () => {
+    if (!currentBranchId || !policyProduct || busy) return;
+    const minValue = Number(minStock);
+    const maxValue = maxStock.trim() === "" ? null : Number(maxStock);
+    if (!Number.isFinite(minValue) || minValue < 0) return toast.error("أدخل حدًا أدنى صحيحًا.");
+    if (maxValue !== null && (!Number.isFinite(maxValue) || maxValue < minValue)) {
+      return toast.error("الحد الأقصى يجب ألا يقل عن الحد الأدنى.");
     }
-  };
-
-  const handleAddProduct = () => {
-    navigate("/add-product");
-  };
-
-  const exportToExcel = async () => {
+    setBusy(true);
     try {
-      setLoading(true);
-      
-      const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'نظام إدارة المتاجر';
-      workbook.created = new Date();
-      
-      const worksheet = workbook.addWorksheet('جرد المنتجات');
-      
-      // إضافة العناوين
-      worksheet.addRow([
-        'اسم المنتج',
-        'الباركود', 
-        'سعر البيع',
-        'سعر الشراء',
-        'الكمية المتاحة',
-        'القيمة الإجمالية',
-        'موقع الرف',
-        'تاريخ الصلاحية',
-        'حالة المخزون'
-      ]);
-      
-      // تنسيق العناوين
-      const headerRow = worksheet.getRow(1);
-      headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
-      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '4472C4' } };
-      headerRow.alignment = { horizontal: 'center' };
-      
-      // إضافة البيانات
-      inventory.forEach(product => {
-        const quantity = product.quantity || 0;
-        const purchasePrice = product.purchase_price || 0;
-        const salePrice = product.price || 0;
-        const totalValue = quantity * purchasePrice;
-        
-        // تحديد حالة المخزون
-        let stockStatus = 'متوفر';
-        if (quantity === 0) {
-          stockStatus = 'غير متوفر';
-        } else if (product.inventory_alerts?.alert_enabled && 
-                   product.inventory_alerts?.min_stock_level && 
-                   quantity < product.inventory_alerts.min_stock_level) {
-          stockStatus = 'منخفض';
-        }
-        
-        worksheet.addRow([
-          product.name,
-          product.barcode || '',
-          salePrice,
-          purchasePrice,
-          quantity,
-          totalValue,
-          product.shelf_location || '',
-          product.expiry_date ? new Date(product.expiry_date).toLocaleDateString('ar-EG') : '',
-          stockStatus
-        ]);
-      });
-      
-      // تحديد عرض الأعمدة
-      worksheet.columns = [
-        { width: 30 }, // اسم المنتج
-        { width: 15 }, // الباركود
-        { width: 12 }, // سعر البيع
-        { width: 12 }, // سعر الشراء
-        { width: 12 }, // الكمية
-        { width: 15 }, // القيمة الإجمالية
-        { width: 15 }, // موقع الرف
-        { width: 15 }, // تاريخ الصلاحية
-        { width: 12 }  // حالة المخزون
-      ];
-      
-      // إضافة مجموع في النهاية
-      const totalProducts = inventory.length;
-      const totalQuantity = inventory.reduce((sum, product) => sum + (product.quantity || 0), 0);
-      const totalValue = inventory.reduce((sum, product) => sum + ((product.quantity || 0) * (product.purchase_price || 0)), 0);
-      
-      worksheet.addRow([]);
-      worksheet.addRow(['المجموع الكلي:', '', '', '', totalQuantity, totalValue, '', '', `${totalProducts} منتج`]);
-      
-      // تنسيق صف المجموع
-      const summaryRow = worksheet.getRow(worksheet.rowCount);
-      summaryRow.font = { bold: true };
-      summaryRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E7E6E6' } };
-      
-      // إنشاء الملف وحفظه
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-      });
-      
-      const fileName = `جرد_المنتجات_${new Date().toISOString().split('T')[0]}.xlsx`;
-      saveAs(blob, fileName);
-      
-      toast({
-        title: "تم بنجاح",
-        description: "تم تصدير بيانات المخزون إلى ملف Excel",
-      });
-      
+      await setInventoryStockPolicyV2(
+        currentBranchId,
+        policyProduct.product_id,
+        minValue,
+        maxValue,
+        alertEnabled,
+      );
+      toast.success("تم تحديث سياسة المخزون والتنبيه.");
+      closePolicy();
+      await query.refetch();
     } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء تصدير البيانات",
-        variant: "destructive"
-      });
+      toast.error(error instanceof Error ? error.message : "تعذر تحديث سياسة المخزون.");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
-  
+
+  const openAdjustment = (product: InventoryControlProductV2) => {
+    setAdjustProduct(product);
+    setAdjustDelta("");
+    setAdjustReason("manual_correction");
+    setAdjustNote("");
+    setAdjustRequestId(crypto.randomUUID());
+  };
+
+  const closeAdjustment = () => {
+    setAdjustProduct(null);
+    setAdjustDelta("");
+    setAdjustReason("manual_correction");
+    setAdjustNote("");
+    setAdjustRequestId("");
+  };
+
+  const submitAdjustment = async () => {
+    if (!currentBranchId || !adjustProduct || !adjustRequestId || busy) return;
+    const delta = Number(adjustDelta);
+    if (!Number.isFinite(delta) || delta === 0 || Math.round(delta * 1000) !== delta * 1000) {
+      return toast.error("أدخل فرق كمية صحيحًا، مثل 3 أو -1 أو 0.5.");
+    }
+    if (adjustNote.trim().length < 3) return toast.error("اكتب ملاحظة واضحة تشرح سبب التسوية.");
+    if (adjustProduct.quantity + delta < 0) return toast.error("التسوية ستجعل الرصيد أقل من صفر.");
+    setBusy(true);
+    try {
+      const result = await adjustInventoryStockV2(
+        adjustRequestId,
+        currentBranchId,
+        adjustProduct.product_id,
+        delta,
+        adjustReason,
+        adjustNote,
+      );
+      toast.success(
+        `تمت التسوية: ${formatQty(result.quantity_before)} ← ${formatQty(result.quantity_after)} ${adjustProduct.unit_of_measure}`,
+      );
+      closeAdjustment();
+      await query.refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر تنفيذ تسوية المخزون.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const summaryCards = useMemo(
+    () => [
+      {
+        key: "all" as InventoryControlStatus,
+        label: "أصناف المخزون",
+        value: summary?.sku_rows || 0,
+        detail: `${formatQty(summary?.positive_stock_rows)} برصيد موجب`,
+        icon: Boxes,
+      },
+      {
+        key: "out_of_stock" as InventoryControlStatus,
+        label: "نافد",
+        value: summary?.out_of_stock_rows || 0,
+        detail: "يحتاج توريد أو مراجعة",
+        icon: PackageSearch,
+      },
+      {
+        key: "low_stock" as InventoryControlStatus,
+        label: "مخزون منخفض",
+        value: summary?.low_stock_rows || 0,
+        detail: `${formatQty(summary?.alerting_rows)} بتنبيه مفعّل`,
+        icon: AlertTriangle,
+      },
+      {
+        key: "no_movement" as InventoryControlStatus,
+        label: "راكد 30 يوم",
+        value: summary?.no_movement_rows || 0,
+        detail: "رصيد موجب بلا بيع POS",
+        icon: Clock3,
+      },
+      {
+        key: "overstock" as InventoryControlStatus,
+        label: "أعلى من الحد الأقصى",
+        value: summary?.overstock_rows || 0,
+        detail: "مرشح للنقل أو تقليل الشراء",
+        icon: Warehouse,
+      },
+    ],
+    [summary],
+  );
+
+  if (!currentBranchId) {
+    return (
+      <MainLayout>
+        <div className="mx-auto max-w-4xl p-6" dir="rtl">
+          <Card>
+            <CardContent className="flex min-h-56 flex-col items-center justify-center gap-3 text-center">
+              <Warehouse className="h-10 w-10 text-muted-foreground" />
+              <h1 className="text-xl font-semibold">اختر فرعًا أولًا</h1>
+              <p className="text-sm text-muted-foreground">مركز المخزون يعمل داخل سياق الفرع المصرح لك به.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">إدارة المخزون</h1>
-          {branches.length > 1 && (
-            <div className="flex items-center gap-2">
-              <Label>الفرع:</Label>
-              <Select value={currentBranch} onValueChange={handleBranchChange}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="اختر الفرع" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map(branch => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      <div className="space-y-5 p-4 md:p-6" dir="rtl">
+        <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+          <div className="bg-gradient-to-l from-emerald-950 via-emerald-900 to-emerald-800 px-5 py-6 text-white md:px-7">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="border-white/20 bg-white/10 text-white hover:bg-white/10">Inventory Control V2</Badge>
+                  <Badge className="border-white/20 bg-white/10 text-white hover:bg-white/10">{currentBranchName || data?.branch_name || "الفرع الحالي"}</Badge>
+                </div>
+                <h1 className="text-2xl font-bold md:text-3xl">مركز التحكم في المخزون</h1>
+                <p className="max-w-3xl text-sm leading-6 text-emerald-50/90">
+                  الرصيد، حدود المخزون، التنبيهات، حركة 30 يوم، الجرد وسجل التغييرات في مكان واحد. أي تسوية يدوية تمر الآن عبر سجل حركات قابل للمراجعة.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={() => navigate("/daily-inventory")}>
+                  <ClipboardCheck className="ml-2 h-4 w-4" />
+                  مركز الجرد
+                </Button>
+                <Button variant="secondary" onClick={() => navigate("/supplier-purchases")}>
+                  <Truck className="ml-2 h-4 w-4" />
+                  مشتريات الموردين
+                </Button>
+                <Button variant="outline" className="border-white/25 bg-white/5 text-white hover:bg-white/15 hover:text-white" onClick={() => query.refetch()}>
+                  <RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
+                  تحديث
+                </Button>
+              </div>
             </div>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Filter className="ml-2 h-4 w-4" />
-            تصفية
-          </Button>
-          {(user?.role === 'admin' || user?.role === 'super_admin') && (
-            <Button 
-              variant="outline" 
-              onClick={exportToExcel}
-              disabled={loading || inventory.length === 0}
-            >
-              <Download className="ml-2 h-4 w-4" />
-              تصدير Excel
-            </Button>
-          )}
-          <Button 
-            variant="default"
-            onClick={() => {
-              setSelectedProduct(null);
-              setStockToAdd(0);
-              setIsAddStockDialogOpen(true);
-            }}
-            disabled={loading}
-          >
-            <Truck className="ml-2 h-4 w-4" />
-            إضافة مخزون
-          </Button>
-          <Button 
-            variant="default" 
-            onClick={handleAddProduct}
-          >
-            <PlusCircle className="ml-2 h-4 w-4" />
-            إضافة منتج
-          </Button>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي المنتجات</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{inventory.length}</div>
-            <p className="text-xs text-muted-foreground">منتج مسجل في النظام</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">إجمالي كمية المخزون</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {inventory.reduce((total, product) => total + (product.quantity || 0), 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">وحدة متوفرة في المخزون</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">قيمة المخزون</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {inventory.reduce((total, product) => total + (product.purchase_price * (product.quantity || 0)), 0).toFixed(2)} {siteConfig.currency}
-            </div>
-            <p className="text-xs text-muted-foreground">القيمة الإجمالية بسعر الشراء</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">منتجات منخفضة المخزون</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-500">{lowStockProducts.length}</div>
-            <p className="text-xs text-muted-foreground">منتجات تحتاج إلى تجديد المخزون</p>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {lowStockProducts.length > 0 && (
-        <Card className="mb-6 border-yellow-200 bg-yellow-50">
-          <CardHeader className="pb-3">
-            <div className="flex items-center">
-              <AlertTriangle className="text-yellow-500 ml-2 h-5 w-5" />
-              <CardTitle>تنبيه المخزون المنخفض</CardTitle>
-            </div>
-            <CardDescription>
-              المنتجات التالية تحتاج إلى تجديد المخزون
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border bg-white">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[80px]">صورة</TableHead>
-                    <TableHead>المنتج</TableHead>
-                    <TableHead>الباركود</TableHead>
-                    <TableHead>موقع الرف</TableHead>
-                    <TableHead>المخزون الحالي</TableHead>
-                    <TableHead>الإجراء</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {lowStockProducts.map(product => (
-                    <TableRow key={product.id}>
-                      <TableCell>
-                        <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center">
-                          <img 
-                            src={product.image_urls ? product.image_urls[0] : "/placeholder.svg"} 
-                            alt={product.name}
-                            className="h-6 w-6 object-contain"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>{product.barcode}</TableCell>
-                      <TableCell>
-                        {product.shelf_location ? (
-                          <Badge variant="outline">{product.shelf_location}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">غير محدد</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                          {product.quantity || 0} وحدة
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            onClick={() => {
-                              setSelectedProduct(product);
-                              setStockToAdd(0);
-                              setIsAddStockDialogOpen(true);
-                            }}
-                            disabled={loading}
-                          >
-                            <Plus className="ml-2 h-4 w-4" />
-                            إضافة مخزون
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => navigate(`/add-product?id=${product.id}`)}
-                          >
-                            <Edit className="ml-2 h-4 w-4" />
-                            تعديل
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-center">
+          </div>
+
+          <div className="grid gap-3 border-t bg-muted/25 p-4 md:grid-cols-2 xl:grid-cols-4">
+            <button onClick={() => navigate("/reports/inventory")} className="flex items-center gap-3 rounded-xl border bg-background p-3 text-right transition hover:border-emerald-300 hover:shadow-sm">
+              <div className="rounded-lg bg-emerald-50 p-2 text-emerald-700"><BarChart3 className="h-5 w-5" /></div>
+              <div><p className="font-medium">تقارير المخزون</p><p className="text-xs text-muted-foreground">القيمة والحركة والمخاطر</p></div>
+            </button>
+            <button onClick={() => navigate("/inventory-import")} className="flex items-center gap-3 rounded-xl border bg-background p-3 text-right transition hover:border-emerald-300 hover:shadow-sm">
+              <div className="rounded-lg bg-blue-50 p-2 text-blue-700"><FileSpreadsheet className="h-5 w-5" /></div>
+              <div><p className="font-medium">استيراد المخزون</p><p className="text-xs text-muted-foreground">ملفات Excel والاستيراد المنظم</p></div>
+            </button>
+            <button onClick={() => navigate("/tasks?type=inventory")} className="flex items-center gap-3 rounded-xl border bg-background p-3 text-right transition hover:border-emerald-300 hover:shadow-sm">
+              <div className="rounded-lg bg-amber-50 p-2 text-amber-700"><ShieldCheck className="h-5 w-5" /></div>
+              <div><p className="font-medium">مهام الفروق</p><p className="text-xs text-muted-foreground">{formatQty(summary?.pending_audit_tasks)} مهمة جرد ومراجعة</p></div>
+            </button>
+            <button onClick={() => navigate("/add-product")} className="flex items-center gap-3 rounded-xl border bg-background p-3 text-right transition hover:border-emerald-300 hover:shadow-sm">
+              <div className="rounded-lg bg-violet-50 p-2 text-violet-700"><PackagePlus className="h-5 w-5" /></div>
+              <div><p className="font-medium">منتج جديد</p><p className="text-xs text-muted-foreground">إضافة منتج وربطه بالمخزون</p></div>
+            </button>
+          </div>
+        </section>
+
+        {inventorySourceDifferent && data ? (
+          <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <CardTitle>جميع المنتجات</CardTitle>
-              <CardDescription>إدارة مخزون المنتجات</CardDescription>
+              <p className="font-medium">هذا الفرع يستخدم مخزونًا مشتركًا</p>
+              <p className="mt-1 text-blue-800">مصدر الرصيد الفعلي: <strong>{data.inventory_source_branch_name}</strong>. التعديلات هنا تُطبق على مصدر المخزون المعتمد تلقائيًا.</p>
             </div>
-            <Package className="h-5 w-5 text-muted-foreground" />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2 mb-6">
-            <Input 
-              placeholder="ابحث بالاسم أو الباركود" 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="max-w-sm"
-            />
-            <Button variant="outline">
-              <Search className="ml-2 h-4 w-4" />
-              بحث
-            </Button>
+        ) : null}
+
+        {Number(summary?.unlinked_inventory_rows || 0) > 0 ? (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-medium">جودة بيانات تحتاج مراجعة</p>
+              <p className="mt-1">يوجد {formatQty(summary?.unlinked_inventory_rows)} سجل مخزون غير مرتبط حاليًا بصف منتج في الكتالوج. لم يتم حذفها أو تعديلها تلقائيًا.</p>
+            </div>
           </div>
-          
-          {loading ? (
-            <div className="flex justify-center items-center p-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[80px]">صورة</TableHead>
-                    <TableHead>المنتج</TableHead>
-                    <TableHead>الباركود</TableHead>
-                    <TableHead>موقع الرف</TableHead>
-                    <TableHead>سعر الشراء</TableHead>
-                    <TableHead>المخزون</TableHead>
-                    <TableHead>القيمة</TableHead>
-                    <TableHead>تاريخ الصلاحية</TableHead>
-                    <TableHead>آخر تحديث</TableHead>
-                    <TableHead className="text-left">الإجراء</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredInventory.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                        لا توجد منتجات مطابقة للبحث
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredInventory.map(product => (
-                      <TableRow key={product.id}>
-                        <TableCell>
-                          <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center">
-                            <img 
-                              src={product.image_urls ? product.image_urls[0] : "/placeholder.svg"} 
-                              alt={product.name}
-                              className="h-6 w-6 object-contain"
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>{product.barcode}</TableCell>
-                        <TableCell>
-                          {product.shelf_location ? (
-                            <Badge variant="outline">{product.shelf_location}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">غير محدد</span>
-                          )}
-                        </TableCell>
-                        <TableCell>{product.purchase_price} {siteConfig.currency}</TableCell>
-                         <TableCell>
-                           {(() => {
-                             const alert = product.inventory_alerts;
-                             const currentQuantity = product.quantity || 0;
-                             const hasAlert = alert && alert.alert_enabled && alert.min_stock_level;
-                             
-                             if (currentQuantity === 0) {
-                               return (
-                                 <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
-                                   غير متوفر
-                                 </span>
-                               );
-                             }
-                             
-                             if (hasAlert && currentQuantity < alert.min_stock_level) {
-                               return (
-                                 <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">
-                                   {currentQuantity} وحدة (منخفض)
-                                 </span>
-                               );
-                             }
-                             
-                             if (hasAlert && currentQuantity === alert.min_stock_level) {
-                               return (
-                                 <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
-                                   {currentQuantity} وحدة (حد أدنى)
-                                 </span>
-                               );
-                             }
-                             
-                             return (
-                               <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                                 {currentQuantity} وحدة
-                               </span>
-                             );
-                           })()}
-                         </TableCell>
-                         <TableCell>
-                           {(product.purchase_price * (product.quantity || 0)).toFixed(2)} {siteConfig.currency}
-                         </TableCell>
-                         <TableCell>
-                           {product.expiry_date ? (
-                             <Badge 
-                               variant={
-                                 new Date(product.expiry_date) < new Date() ? "destructive" :
-                                 new Date(product.expiry_date) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) ? "secondary" :
-                                 new Date(product.expiry_date) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? "default" : 
-                                 "outline"
-                               }
-                             >
-                               {new Date(product.expiry_date).toLocaleDateString('ar-EG')}
-                             </Badge>
-                           ) : (
-                             <span className="text-muted-foreground text-sm">غير محدد</span>
-                           )}
-                         </TableCell>
-                        <TableCell>
-                          {typeof product.updated_at === 'string' 
-                            ? new Date(product.updated_at).toLocaleDateString('ar-EG')
-                            : product.updated_at
-                              ? product.updated_at.toLocaleDateString('ar-EG')
-                              : '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => {
-                                setSelectedProduct(product);
-                                setStockToAdd(0);
-                                setIsAddStockDialogOpen(true);
-                              }}
-                              disabled={loading}
-                            >
-                              <Plus className="ml-2 h-4 w-4" />
-                              إضافة
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => navigate(`/add-product?id=${product.id}`)}
-                            >
-                              <Edit className="ml-2 h-4 w-4" />
-                              تعديل
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* Add Stock Dialog */}
-      <Dialog open={isAddStockDialogOpen} onOpenChange={setIsAddStockDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>إضافة مخزون</DialogTitle>
-            <DialogDescription>
-              أدخل كمية المخزون المراد إضافتها
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
-            <div className="grid gap-4 py-4 px-1">
-              {!selectedProduct ? (
-                <div className="space-y-2">
-                  <Label htmlFor="productSelect">اختر المنتج</Label>
-                  <select 
-                    id="productSelect"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2"
-                    onChange={(e) => {
-                      const product = inventory.find(p => p.id === e.target.value);
-                      setSelectedProduct(product || null);
-                    }}
-                    disabled={loading}
-                  >
-                    <option value="">-- اختر المنتج --</option>
-                    {inventory.map(product => (
-                      <option key={product.id} value={product.id}>
-                        {product.name}
-                      </option>
+        ) : null}
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {summaryCards.map((card) => {
+            const Icon = card.icon;
+            const active = status === card.key;
+            return (
+              <button
+                key={card.key}
+                onClick={() => setStatus(card.key)}
+                className={`rounded-2xl border bg-card p-4 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? "border-emerald-400 ring-2 ring-emerald-100" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{card.label}</p>
+                    <p className="mt-1 text-2xl font-bold">{formatQty(card.value)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{card.detail}</p>
+                  </div>
+                  <div className="rounded-xl bg-muted p-2.5"><Icon className="h-5 w-5" /></div>
+                </div>
+              </button>
+            );
+          })}
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> المخزون التشغيلي</CardTitle>
+                  <CardDescription>بحث وفلترة Server-side بدل تحميل الكتالوج كاملًا داخل المتصفح.</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <Badge variant="outline">قيمة الشراء {formatMoney(summary?.purchase_value)}</Badge>
+                  <Badge variant="outline">قيمة البيع {formatMoney(summary?.retail_value)}</Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2 md:grid-cols-[1fr_180px_200px_auto]">
+                <div className="relative">
+                  <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="ابحث بالاسم أو الباركود أو الرف..." className="pr-9" />
+                </div>
+                <Select value={status} onValueChange={(value) => setStatus(value as InventoryControlStatus)}>
+                  <SelectTrigger><SelectValue placeholder="حالة المخزون" /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(statusLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger><SelectValue placeholder="كل الأقسام" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">كل الأقسام</SelectItem>
+                    {(data?.categories || []).map((category) => (
+                      <SelectItem key={category.id} value={category.id}>{category.name} ({formatQty(category.products)})</SelectItem>
                     ))}
-                  </select>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={() => { setSearchInput(""); setSearch(""); setStatus("all"); setCategoryId("all"); }}>
+                  <SlidersHorizontal className="ml-2 h-4 w-4" /> مسح الفلاتر
+                </Button>
+              </div>
+
+              {query.isLoading ? (
+                <div className="flex min-h-80 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-emerald-700" /></div>
+              ) : query.isError ? (
+                <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50 text-center">
+                  <AlertTriangle className="h-8 w-8 text-red-600" />
+                  <p className="font-medium text-red-900">تعذر تحميل المخزون</p>
+                  <p className="max-w-lg text-sm text-red-700">{query.error instanceof Error ? query.error.message : "حدث خطأ غير متوقع."}</p>
+                  <Button variant="outline" onClick={() => query.refetch()}>إعادة المحاولة</Button>
+                </div>
+              ) : !(data?.products || []).length ? (
+                <div className="flex min-h-72 flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-center">
+                  <PackageSearch className="h-9 w-9 text-muted-foreground" />
+                  <p className="font-medium">لا توجد نتائج بهذه الفلاتر</p>
+                  <p className="text-sm text-muted-foreground">جرّب تغيير البحث أو حالة المخزون.</p>
                 </div>
               ) : (
-                <div className="flex items-center gap-3 p-3 border rounded-md">
-                  <div className="h-12 w-12 rounded bg-gray-100 flex items-center justify-center">
-                    <img 
-                      src={selectedProduct.image_urls ? selectedProduct.image_urls[0] : "/placeholder.svg"} 
-                      alt={selectedProduct.name}
-                      className="h-8 w-8 object-contain"
-                    />
+                <>
+                  <div className="hidden overflow-hidden rounded-xl border md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40">
+                          <TableHead className="text-right">المنتج</TableHead>
+                          <TableHead className="text-right">الرصيد</TableHead>
+                          <TableHead className="text-right">الحالة</TableHead>
+                          <TableHead className="text-right">بيع 30 يوم</TableHead>
+                          <TableHead className="text-right">القيمة</TableHead>
+                          <TableHead className="text-right">آخر جرد</TableHead>
+                          <TableHead className="text-right">إجراءات</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data!.products.map((product) => (
+                          <TableRow key={product.product_id}>
+                            <TableCell>
+                              <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/40">
+                                  {product.image_url ? <img src={product.image_url} alt="" className="h-full w-full object-cover" /> : <Package className="h-5 w-5 text-muted-foreground" />}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="max-w-[260px] truncate font-medium">{product.product_name}</p>
+                                  <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                                    <span>{product.barcode || "بدون باركود"}</span>
+                                    <span>{product.shelf_location ? `رف ${product.shelf_location}` : product.category_name}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <p className="font-semibold">{formatQty(product.quantity)} <span className="text-xs font-normal text-muted-foreground">{product.unit_of_measure}</span></p>
+                              <p className="mt-1 text-xs text-muted-foreground">حد أدنى {formatQty(product.min_stock_level)}</p>
+                            </TableCell>
+                            <TableCell>{stockBadge(product)}</TableCell>
+                            <TableCell>
+                              <p>{formatQty(product.net_sold_30d)}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">{product.days_cover == null ? "لا توجد تغطية محسوبة" : `يكفي ${formatQty(product.days_cover)} يوم`}</p>
+                            </TableCell>
+                            <TableCell>
+                              <p>{formatMoney(product.purchase_value)}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">شراء</p>
+                            </TableCell>
+                            <TableCell><span className="text-sm text-muted-foreground">{formatDateTime(product.last_audit_at)}</span></TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button size="sm" variant="ghost" onClick={() => setMovementProduct(product)} title="سجل الحركات"><History className="h-4 w-4" /></Button>
+                                {canManage && product.linked_product ? (
+                                  <>
+                                    <Button size="sm" variant="ghost" onClick={() => openPolicy(product)} title="حدود وتنبيه"><BellRing className="h-4 w-4" /></Button>
+                                    <Button size="sm" variant="ghost" onClick={() => openAdjustment(product)} title="تسوية يدوية"><PlusMinus className="h-4 w-4" /></Button>
+                                    <Button size="sm" variant="ghost" onClick={() => navigate(`/products/edit/${product.product_id}`)} title="تعديل المنتج"><Pencil className="h-4 w-4" /></Button>
+                                  </>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
+
+                  <div className="space-y-3 md:hidden">
+                    {data!.products.map((product) => (
+                      <div key={product.product_id} className="rounded-xl border p-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/40">
+                            {product.image_url ? <img src={product.image_url} alt="" className="h-full w-full object-cover" /> : <Package className="h-5 w-5 text-muted-foreground" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium">{product.product_name}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{product.barcode || "بدون باركود"} · {product.category_name}</p>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              {stockBadge(product)}
+                              <Badge variant="outline">{formatQty(product.quantity)} {product.unit_of_measure}</Badge>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-muted/35 p-2 text-xs">
+                          <div><span className="text-muted-foreground">بيع 30 يوم</span><p className="mt-0.5 font-medium">{formatQty(product.net_sold_30d)}</p></div>
+                          <div><span className="text-muted-foreground">قيمة الشراء</span><p className="mt-0.5 font-medium">{formatMoney(product.purchase_value)}</p></div>
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          <Button size="sm" variant="outline" className="flex-1" onClick={() => setMovementProduct(product)}><History className="ml-2 h-4 w-4" /> الحركات</Button>
+                          {canManage && product.linked_product ? <Button size="sm" variant="outline" onClick={() => openPolicy(product)}><BellRing className="h-4 w-4" /></Button> : null}
+                          {canManage && product.linked_product ? <Button size="sm" onClick={() => openAdjustment(product)}><PlusMinus className="h-4 w-4" /></Button> : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-muted-foreground">عرض {formatQty(page * PAGE_SIZE + 1)}–{formatQty(Math.min((page + 1) * PAGE_SIZE, data!.total_filtered))} من {formatQty(data!.total_filtered)} نتيجة</p>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" disabled={page <= 0 || query.isFetching} onClick={() => setPage((value) => Math.max(0, value - 1))}><ChevronRight className="ml-1 h-4 w-4" /> السابق</Button>
+                      <Badge variant="outline">صفحة {formatQty(activePage)} / {formatQty(totalPages)}</Badge>
+                      <Button variant="outline" size="sm" disabled={page + 1 >= totalPages || query.isFetching} onClick={() => setPage((value) => value + 1)}>التالي <ChevronLeft className="mr-1 h-4 w-4" /></Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base"><Activity className="h-5 w-5" /> نبض المخزون</CardTitle>
+                <CardDescription>مؤشرات تشغيلية من الرصيد الحالي وحركة آخر 30 يوم.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setStatus("coverage_risk")} className="rounded-xl border p-3 text-right hover:bg-muted/40">
+                    <p className="text-xs text-muted-foreground">تغطية ≤ 14 يوم</p><p className="mt-1 text-xl font-bold">{formatQty(summary?.coverage_risk_rows)}</p>
+                  </button>
+                  <button onClick={() => setStatus("alerts")} className="rounded-xl border p-3 text-right hover:bg-muted/40">
+                    <p className="text-xs text-muted-foreground">تنبيهات مفعلة</p><p className="mt-1 text-xl font-bold">{formatQty(summary?.alerting_rows)}</p>
+                  </button>
+                </div>
+                <div className="rounded-xl bg-emerald-50 p-3 text-emerald-950">
+                  <p className="text-xs text-emerald-700">قيمة المخزون بسعر الشراء</p>
+                  <p className="mt-1 text-xl font-bold">{formatMoney(summary?.purchase_value)}</p>
+                  <p className="mt-1 text-xs text-emerald-700">هامش محتمل على الرصيد الحالي: {formatMoney(summary?.potential_margin_value)}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-lg border p-2.5"><p className="text-xs text-muted-foreground">جلسات جرد نشطة</p><p className="mt-1 font-semibold">{formatQty(summary?.active_audit_sessions)}</p></div>
+                  <div className="rounded-lg border p-2.5"><p className="text-xs text-muted-foreground">حركات Ledger</p><p className="mt-1 font-semibold">{formatQty(summary?.movement_ledger_rows)}</p></div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-2">
                   <div>
-                    <h4 className="font-medium">{selectedProduct.name}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      المخزون الحالي: {selectedProduct.quantity || 0} وحدة
-                    </p>
+                    <CardTitle className="flex items-center gap-2 text-base"><History className="h-5 w-5" /> آخر الحركات</CardTitle>
+                    <CardDescription>الحركات المسجلة منذ تفعيل Movement Ledger V2.</CardDescription>
                   </div>
+                  {query.isFetching ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
                 </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="stockAmount">الكمية المراد إضافتها</Label>
-                <Input 
-                  id="stockAmount" 
-                  type="number" 
-                  min="1"
-                  value={stockToAdd}
-                  onChange={(e) => setStockToAdd(parseInt(e.target.value) || 0)}
-                  disabled={loading}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="purchasePrice">سعر الشراء للوحدة</Label>
-                <Input 
-                  id="purchasePrice" 
-                  type="number" 
-                  min="0"
-                  defaultValue={selectedProduct?.purchase_price}
-                  disabled
-                />
-              </div>
-              
-              {selectedProduct && stockToAdd > 0 && (
-                <div className="p-3 bg-primary/10 rounded-md">
-                  <p className="text-sm">
-                    إجمالي التكلفة: {(selectedProduct.purchase_price * stockToAdd).toFixed(2)} {siteConfig.currency}
-                  </p>
-                  <p className="text-sm">
-                    المخزون بعد الإضافة: {(selectedProduct.quantity || 0) + stockToAdd} وحدة
-                  </p>
-                </div>
-              )}
+              </CardHeader>
+              <CardContent>
+                {(data?.recent_movements || []).length ? (
+                  <div className="space-y-2">
+                    {data!.recent_movements.slice(0, 8).map((movement) => {
+                      const positive = movement.quantity_delta > 0;
+                      return (
+                        <div key={movement.id} className="rounded-xl border p-3">
+                          <div className="flex items-start gap-2">
+                            <div className={`mt-0.5 rounded-lg p-1.5 ${positive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                              {positive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="truncate text-sm font-medium">{movement.product_name}</p>
+                                <span className={`whitespace-nowrap text-sm font-bold ${positive ? "text-emerald-700" : "text-red-700"}`}>{positive ? "+" : ""}{formatQty(movement.quantity_delta)}</span>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">{movementSourceLabels[movement.source] || movement.source} · {formatDateTime(movement.changed_at)}</p>
+                              {movement.note ? <p className="mt-1 line-clamp-2 text-xs">{movement.note}</p> : null}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">لم تُسجل حركات في Ledger V2 بعد.</div>
+                )}
+                <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+                  السجل ليس Backfill تاريخيًا؛ يبدأ من {formatDateTime(data?.data_quality.movement_ledger_started_at)}. تحليل الركود بالأعلى يعتمد على فواتير POS V2 لآخر 30 يوم، وليس على هذا السجل وحده.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      </div>
+
+      <Dialog open={Boolean(policyProduct)} onOpenChange={(open) => !open && closePolicy()}>
+        <DialogContent className="sm:max-w-lg" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>حدود وتنبيهات المخزون</DialogTitle>
+            <DialogDescription>{policyProduct?.product_name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2"><Label>الحد الأدنى</Label><Input type="number" step="0.001" min="0" value={minStock} onChange={(event) => setMinStock(event.target.value)} /></div>
+              <div className="space-y-2"><Label>الحد الأقصى</Label><Input type="number" step="0.001" min="0" value={maxStock} onChange={(event) => setMaxStock(event.target.value)} placeholder="اتركه فارغًا لتعطيله" /></div>
             </div>
-          </ScrollArea>
-          <DialogFooter>
-            <Button 
-              type="submit" 
-              onClick={handleAddStock}
-              disabled={!selectedProduct || stockToAdd <= 0 || loading}
-            >
-              {loading && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
-              إضافة المخزون
-            </Button>
+            <div className="flex items-center justify-between rounded-xl border p-3">
+              <div><p className="font-medium">تفعيل تنبيه انخفاض المخزون</p><p className="mt-1 text-xs text-muted-foreground">يظهر في فلتر التنبيهات عندما يصل الرصيد للحد الأدنى أو أقل.</p></div>
+              <Switch checked={alertEnabled} onCheckedChange={setAlertEnabled} />
+            </div>
+            <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">الرصيد الحالي: <strong className="text-foreground">{formatQty(policyProduct?.quantity)} {policyProduct?.unit_of_measure}</strong></div>
+          </div>
+          <DialogFooter className="gap-2 sm:justify-start">
+            <Button onClick={savePolicy} disabled={busy}>{busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <BellRing className="ml-2 h-4 w-4" />} حفظ</Button>
+            <Button variant="outline" onClick={closePolicy} disabled={busy}>إلغاء</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(adjustProduct)} onOpenChange={(open) => !open && closeAdjustment()}>
+        <DialogContent className="sm:max-w-xl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تسوية يدوية للمخزون</DialogTitle>
+            <DialogDescription>{adjustProduct?.product_name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              التسوية اليدوية مخصصة للتصحيح والتالف والفقد والاستخدام الداخلي. <strong>استلام المورد الطبيعي يُسجل من مشتريات الموردين</strong> حتى تظل التكلفة والمستندات صحيحة.
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>فرق الكمية</Label>
+                <Input type="number" step="0.001" value={adjustDelta} onChange={(event) => setAdjustDelta(event.target.value)} placeholder="مثال: 5 أو -2" />
+                <p className="text-xs text-muted-foreground">موجب للإضافة، سالب للخصم.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>السبب</Label>
+                <Select value={adjustReason} onValueChange={(value) => setAdjustReason(value as InventoryAdjustmentReason)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{Object.entries(adjustmentReasonLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2"><Label>ملاحظة إلزامية</Label><Textarea value={adjustNote} onChange={(event) => setAdjustNote(event.target.value)} placeholder="اكتب ما حدث ولماذا يتم تعديل الرصيد..." rows={3} /></div>
+            <div className="grid grid-cols-3 gap-2 rounded-xl bg-muted/40 p-3 text-center text-sm">
+              <div><p className="text-xs text-muted-foreground">الحالي</p><p className="mt-1 font-bold">{formatQty(adjustProduct?.quantity)}</p></div>
+              <div><p className="text-xs text-muted-foreground">التغيير</p><p className="mt-1 font-bold">{formatQty(Number(adjustDelta) || 0)}</p></div>
+              <div><p className="text-xs text-muted-foreground">بعد التسوية</p><p className="mt-1 font-bold">{formatQty(Number(adjustProduct?.quantity || 0) + (Number(adjustDelta) || 0))}</p></div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:justify-start">
+            <Button onClick={submitAdjustment} disabled={busy}>{busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <PlusMinus className="ml-2 h-4 w-4" />} تنفيذ التسوية</Button>
+            <Button variant="outline" onClick={closeAdjustment} disabled={busy}>إلغاء</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(movementProduct)} onOpenChange={(open) => !open && setMovementProduct(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5" /> سجل حركات المنتج</DialogTitle>
+            <DialogDescription>{movementProduct?.product_name} · الرصيد الحالي {formatQty(movementProduct?.quantity)} {movementProduct?.unit_of_measure}</DialogDescription>
+          </DialogHeader>
+          {movementQuery.isLoading ? (
+            <div className="flex min-h-52 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          ) : movementQuery.isError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{movementQuery.error instanceof Error ? movementQuery.error.message : "تعذر تحميل سجل الحركات."}</div>
+          ) : (movementQuery.data || []).length ? (
+            <div className="space-y-2 py-2">
+              {(movementQuery.data || []).map((movement) => {
+                const positive = movement.quantity_delta > 0;
+                const reason = movementReasonLabel(movement.reason_code);
+                return (
+                  <div key={movement.id} className="rounded-xl border p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className={`rounded-lg p-2 ${positive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{positive ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownLeft className="h-5 w-5" />}</div>
+                        <div>
+                          <p className="font-medium">{movementSourceLabels[movement.source] || movement.source}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(movement.changed_at)} · {movement.actor_name || "النظام"}</p>
+                          {reason ? <Badge variant="outline" className="mt-2">{reason}</Badge> : null}
+                        </div>
+                      </div>
+                      <div className="text-left sm:text-right">
+                        <p className={`text-lg font-bold ${positive ? "text-emerald-700" : "text-red-700"}`}>{positive ? "+" : ""}{formatQty(movement.quantity_delta)}</p>
+                        <p className="text-xs text-muted-foreground">{formatQty(movement.quantity_before)} ← {formatQty(movement.quantity_after)}</p>
+                      </div>
+                    </div>
+                    {movement.note ? <p className="mt-3 rounded-lg bg-muted/40 p-2.5 text-sm">{movement.note}</p> : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">لا توجد حركات لهذا المنتج منذ تفعيل Movement Ledger V2.</div>
+          )}
         </DialogContent>
       </Dialog>
     </MainLayout>
