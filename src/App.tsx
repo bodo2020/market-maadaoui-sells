@@ -32,6 +32,7 @@ import CustomerTeamWorkloadDock from "@/components/customers/CustomerTeamWorkloa
 import CustomerMyTasksDock from "@/components/customers/CustomerMyTasksDock";
 import CustomerTaskNotifications from "@/components/customers/CustomerTaskNotifications";
 import OperationsTaskNotifications from "@/components/tasks/OperationsTaskNotifications";
+import InventoryTransferSmartAlertNotifications from "@/components/inventory/InventoryTransferSmartAlertNotifications";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -97,7 +98,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router><AuthProvider><TooltipProvider>
-        <OrderNotifications /><CustomerTaskNotifications /><OperationsTaskNotifications />
+        <OrderNotifications /><CustomerTaskNotifications /><OperationsTaskNotifications /><InventoryTransferSmartAlertNotifications />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
