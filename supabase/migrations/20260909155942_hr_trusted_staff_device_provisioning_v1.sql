@@ -1,0 +1,27 @@
+-- Applied to production as Supabase migration 20260909155942.
+-- Trusted staff devices are stored in the private schema and are only reachable through locked-down RPCs.
+-- The authoritative migration is recorded in supabase_migrations.schema_migrations under
+-- name: hr_trusted_staff_device_provisioning_v1.
+--
+-- Core objects:
+-- private.hr_device_pairings
+-- private.hr_staff_devices
+-- public.create_staff_device_pairing_v1
+-- public.redeem_staff_device_pairing_v1
+-- public.get_employee_staff_devices_v1
+-- public.validate_my_staff_device_v1
+-- public.revoke_staff_device_v1
+--
+-- Security contract:
+-- * pairing creation requires an authenticated manager with HR/device scope (or super admin)
+-- * only the one-time redeem RPC is callable before sign-in
+-- * redeem requires both a 256-bit opaque token and a 6-digit one-time code
+-- * the opaque token and resulting device token are stored as SHA-256 hashes only
+-- * the 6-digit code is stored with bcrypt/crypt and pairing attempts are capped
+-- * pairings expire within 5-30 minutes and are single-use
+-- * private tables have RLS enabled and no anon/authenticated table grants
+-- * device revocation is audited
+--
+-- This marker file keeps Git history aligned with the production migration version.
+-- Full executable SQL is retained in Supabase migration history to avoid accidentally replaying
+-- an already-applied production security migration from two independently edited copies.
