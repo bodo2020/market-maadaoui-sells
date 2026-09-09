@@ -145,6 +145,30 @@ export async function redeemStaffDevicePairing(params: {
   return data as RedeemedStaffDevice;
 }
 
+export async function quickTrustMyStaffDevice(params: {
+  branchId?: string | null;
+  deviceKey: string;
+  deviceName: string;
+  platform?: string | null;
+  deviceType?: StaffDeviceType;
+  metadata?: Record<string, unknown>;
+}): Promise<RedeemedStaffDevice> {
+  const { data, error } = await rpc("quick_trust_my_staff_device_v1", {
+    p_branch_id: params.branchId || null,
+    p_device_key: params.deviceKey,
+    p_device_name: params.deviceName,
+    p_platform: params.platform || null,
+    p_device_type: params.deviceType || "personal",
+    p_metadata: params.metadata || {},
+  });
+  if (error) {
+    const message = error.message || "تعذر اعتماد الجهاز الحالي";
+    if (message.includes("SUPER_ADMIN_REQUIRED")) throw new Error("الاعتماد المباشر متاح للسوبر أدمن فقط.");
+    throw new Error(message);
+  }
+  return data as RedeemedStaffDevice;
+}
+
 export async function validateMyStaffDevice(deviceId: string, deviceToken: string) {
   const { data, error } = await rpc("validate_my_staff_device_v1", {
     p_device_id: deviceId,
