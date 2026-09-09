@@ -39,6 +39,16 @@ export type PayrollRun = {
   paid_by?: string | null;
   paid_at?: string | null;
   payment_reference?: string | null;
+  payment_source_kind?: "branch_safe" | "pos_drawer" | "bank" | null;
+  payment_cash_account_id?: string | null;
+  payment_payment_account_id?: string | null;
+  payment_account_name_snapshot?: string | null;
+  payment_responsible_user_id?: string | null;
+  payment_requested_by?: string | null;
+  payment_requested_at?: string | null;
+  payment_delegated_task_id?: string | null;
+  payment_cash_ledger_id?: string | null;
+  payment_payment_ledger_id?: string | null;
   total_base: number;
   total_earnings: number;
   total_deductions: number;
@@ -129,6 +139,7 @@ function payrollError(message?: string) {
   if (value.includes("INVALID_BASE_SALARY")) return new Error("قيمة الراتب الأساسي غير صحيحة.");
   if (value.includes("INVALID_PAYROLL_ADJUSTMENT")) return new Error("راجع نوع وقيمة وسبب التسوية.");
   if (value.includes("PAYROLL_REJECTION_NOTE_REQUIRED")) return new Error("اكتب سبب الإرجاع قبل رفض المسير.");
+  if (value.includes("PAYROLL_DELEGATION_REQUIRED")) return new Error("صرف الرواتب يجب أن يمر عبر خزنة أو حساب مسؤول عهدة، وليس Paid مباشر.");
   return new Error(message || "تعذر تنفيذ عملية الرواتب.");
 }
 
