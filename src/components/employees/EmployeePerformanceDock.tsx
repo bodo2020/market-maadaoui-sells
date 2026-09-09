@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CalendarCheck2, CheckCircle2, Clock3, Gauge, ListChecks, RefreshCw, TimerOff, UserX, UsersRound } from "lucide-react";
+import { AlertTriangle, CalendarCheck2, CheckCircle2, Clock3, Gauge, RefreshCw, TimerOff, UserX, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useBranchStore } from "@/stores/branchStore";
 import { getHrEmployeePerformance } from "@/services/hrPerformanceService";
 import ManagerOperationsPerformancePanel from "@/components/employees/ManagerOperationsPerformancePanel";
+import ManagerPeriodComparisonPanel from "@/components/employees/ManagerPeriodComparisonPanel";
 
 const isoDate = (d: Date) => {
   const y = d.getFullYear();
@@ -107,9 +108,10 @@ export default function EmployeePerformanceDock() {
         </CardContent>
       </Card>
 
-      {currentBranchId && from && to && from <= to && (
+      {currentBranchId && from && to && from <= to && <>
+        <ManagerPeriodComparisonPanel branchId={currentBranchId} from={from} to={to} />
         <ManagerOperationsPerformancePanel branchId={currentBranchId} from={from} to={to} />
-      )}
+      </>}
     </div>
   );
 }
