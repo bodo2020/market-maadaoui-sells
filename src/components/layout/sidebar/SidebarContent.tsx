@@ -39,7 +39,7 @@ export function SidebarContent({ collapsed }: SidebarContentProps) {
       if (item.deliveryOnly && !isDelivery) return null;
       
       if (isCashier && !isSuperAdmin) {
-        const allowedCashierRoutes = ['/', '/pos', '/tasks', '/online-orders', '/invoices'];
+        const allowedCashierRoutes = ['/', '/pos', '/tasks', '/notifications', '/online-orders', '/invoices'];
         if (!allowedCashierRoutes.includes(item.href)) return null;
       }
       
