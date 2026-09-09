@@ -1,5 +1,5 @@
-
 import React from 'react';
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -24,7 +24,7 @@ import {
   Pencil,
   Trash2,
   Loader2,
-  Users
+  UserRoundCog
 } from "lucide-react";
 import { User, UserRole } from "@/types";
 
@@ -59,6 +59,8 @@ export function EmployeeTable({
   handleStartShift,
   handleEndShift
 }: EmployeeTableProps) {
+  const navigate = useNavigate();
+
   return (
     <Table>
       <TableHeader>
@@ -94,12 +96,15 @@ export function EmployeeTable({
         ) : (
           employees.map(employee => (
             <TableRow key={employee.id}>
-              <TableCell className="font-medium">{employee.name}</TableCell>
+              <TableCell className="font-medium">
+                <button className="text-right hover:text-[#005931] hover:underline" onClick={() => navigate(`/employees/${employee.id}`)}>{employee.name}</button>
+              </TableCell>
               <TableCell>
                 {employee.role === UserRole.ADMIN && "مدير"}
                 {employee.role === UserRole.CASHIER && "كاشير"}
                 {employee.role === UserRole.EMPLOYEE && "موظف"}
                 {employee.role === UserRole.DELIVERY && "مندوب توصيل"}
+                {!Object.values(UserRole).includes(employee.role as UserRole) && employee.role}
               </TableCell>
               <TableCell>{employee.phone || "-"}</TableCell>
               <TableCell>
@@ -112,34 +117,20 @@ export function EmployeeTable({
               <TableCell>{getTotalHoursWorked(employee).toFixed(1)} ساعة</TableCell>
               <TableCell>
                 {startShiftMutation.isPending || endShiftMutation.isPending ? (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    disabled
-                  >
+                  <Button variant="outline" size="sm" disabled>
                     <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                     جارِ المعالجة...
                   </Button>
                 ) : hasActiveShift(employee) ? (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="text-red-500 border-red-200 hover:bg-red-50"
-                    onClick={() => {
-                      const shiftId = getActiveShiftId(employee);
-                      if (shiftId) handleEndShift(shiftId);
-                    }}
-                  >
+                  <Button variant="outline" size="sm" className="text-red-500 border-red-200 hover:bg-red-50" onClick={() => {
+                    const shiftId = getActiveShiftId(employee);
+                    if (shiftId) handleEndShift(shiftId);
+                  }}>
                     <Clock className="ml-2 h-4 w-4" />
                     إنهاء الوردية
                   </Button>
                 ) : (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="text-green-500 border-green-200 hover:bg-green-50"
-                    onClick={() => handleStartShift(employee.id)}
-                  >
+                  <Button variant="outline" size="sm" className="text-green-500 border-green-200 hover:bg-green-50" onClick={() => handleStartShift(employee.id)}>
                     <AlarmClockCheck className="ml-2 h-4 w-4" />
                     بدء وردية
                   </Button>
@@ -147,28 +138,23 @@ export function EmployeeTable({
               </TableCell>
               <TableCell>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
+                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>خيارات</DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate(`/employees/${employee.id}`)}>
+                      <UserRoundCog className="ml-2 h-4 w-4" />
+                      الملف الوظيفي 360°
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onEditClick(employee)}>
                       <Pencil className="ml-2 h-4 w-4" />
-                      تعديل
+                      تعديل بيانات الدخول
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => onShiftClick(employee)}
-                    >
+                    <DropdownMenuItem onClick={() => onShiftClick(employee)}>
                       <Clock className="ml-2 h-4 w-4" />
                       سجل الورديات
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      className="text-destructive"
-                      onClick={() => onDeleteClick(employee)}
-                    >
+                    <DropdownMenuItem className="text-destructive" onClick={() => onDeleteClick(employee)}>
                       <Trash2 className="ml-2 h-4 w-4" />
                       حذف
                     </DropdownMenuItem>
