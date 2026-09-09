@@ -24,4 +24,4 @@ end;
 $function$;
 
 revoke all on function public.adjust_branch_inventory(uuid,uuid,uuid,numeric) from public,anon;
-grant execute on function public.adjust_branch_inventory(uuid,uuid,uuid,numeric) to authenticated;
+grant execute on function public.adjust_branch_inventory(uuid,uuid,uuid,numeric) to authenticated,service_role;
