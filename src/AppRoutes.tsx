@@ -29,6 +29,8 @@ import CustomerFollowupPerformanceDock from "@/components/customers/CustomerFoll
 import CustomerTeamWorkloadDock from "@/components/customers/CustomerTeamWorkloadDock";
 import CustomerMyTasksDock from "@/components/customers/CustomerMyTasksDock";
 import HrTaskExecutionDock from "@/components/hr/HrTaskExecutionDock";
+import FinanceTreasuryCenterV2 from "@/components/finance/FinanceTreasuryCenterV2";
+import TreasuryDisbursementDock from "@/components/finance/TreasuryDisbursementDock";
 import AttendanceApprovedLeaveBanner from "@/components/hr/AttendanceApprovedLeaveBanner";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
@@ -90,8 +92,9 @@ const CashierPOS = () => (
 );
 const CustomersWorkspace = () => (<><CustomersAdvanced /><CustomerMyTasksDock /><CustomerTeamWorkloadDock /><CustomerOperationsCenterDock /><CustomerOpportunityDock /></>);
 const Customer360Workspace = () => (<><Customer360Profile /><CustomerMyTasksDock /><CustomerFollowupPerformanceDock /><CustomerInsightsDock /><CustomerManagementDock /></>);
-const OperationsTasksWorkspace = () => (<><OperationsTasksPage /><HrTaskExecutionDock /></>);
+const OperationsTasksWorkspace = () => (<><OperationsTasksPage /><HrTaskExecutionDock /><TreasuryDisbursementDock /></>);
 const AttendanceWorkspace = () => (<><AttendancePage /><AttendanceApprovedLeaveBanner /></>);
+const FinanceWorkspace = () => (<><Finance /><FinanceTreasuryCenterV2 /></>);
 const ReportsRedirect = () => <Navigate to="/reports" replace />;
 const InventoryAuditRedirect = () => <Navigate to="/daily-inventory" replace />;
 
@@ -151,7 +154,7 @@ export default function AppRoutes() {
       <Route path="/company/:id" element={<ProtectedRoute><CompanyDetails /></ProtectedRoute>} />
       <Route path="/purchases/:id" element={<ProtectedRoute><Purchases /></ProtectedRoute>} />
       <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
-      <Route path="/finance" element={<ProtectedRoute><Finance /></ProtectedRoute>} />
+      <Route path="/finance" element={<ProtectedRoute><FinanceWorkspace /></ProtectedRoute>} />
       <Route path="/payment-methods" element={<ProtectedRoute><PaymentMethods /></ProtectedRoute>} />
       <Route path="/expenses" element={<ProtectedRoute><ExpenseManagement /></ProtectedRoute>} />
       <Route path="/expenses-salaries" element={<ProtectedRoute><ExpensesAndSalaries /></ProtectedRoute>} />
