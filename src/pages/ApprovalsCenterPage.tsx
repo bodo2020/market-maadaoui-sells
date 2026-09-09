@@ -9,12 +9,14 @@ import {
   ClipboardCheck,
   Clock3,
   Loader2,
+  MapPinCheck,
   RefreshCw,
   ShieldCheck,
   WalletCards,
   Warehouse,
 } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
+import AttendanceExceptionDecisionDialog from "@/components/attendance/AttendanceExceptionDecisionDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +55,7 @@ const formatQty = (value?: number | null) => Number(value || 0).toLocaleString("
 
 const sourceMeta = (sourceKind: string) => {
   if (sourceKind === "inventory_adjustment") return { label: "اعتماد فرق مخزون", icon: Warehouse, className: "border-cyan-200 bg-cyan-50 text-cyan-800" };
+  if (sourceKind === "attendance_exception") return { label: "استثناء حضور", icon: MapPinCheck, className: "border-emerald-200 bg-emerald-50 text-emerald-800" };
   if (sourceKind === "shift_reconciliation") return { label: "فرق وردية", icon: WalletCards, className: "border-violet-200 bg-violet-50 text-violet-800" };
   if (sourceKind === "cash_handoff") return { label: "فرق عهدة نقدية", icon: WalletCards, className: "border-amber-200 bg-amber-50 text-amber-800" };
   if (sourceKind === "inventory_transfer_variance") return { label: "فرق تحويل مخزون", icon: ClipboardCheck, className: "border-blue-200 bg-blue-50 text-blue-800" };
@@ -81,8 +84,9 @@ export default function ApprovalsCenterPage() {
   const { currentBranchId, currentBranchName } = useBranchStore();
   const [scope, setScope] = useState<ApprovalScope>("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [decisionTask, setDecisionTask] = useState<ApprovalItem | null>(null);
-  const [generalDecisionTask, setGeneralDecisionTask] = useState<ApprovalItem | null>(null);
+  const [inventoryTask, setInventoryTask] = useState<ApprovalItem | null>(null);
+  const [attendanceTask, setAttendanceTask] = useState<ApprovalItem | null>(null);
+  const [generalTask, setGeneralTask] = useState<ApprovalItem | null>(null);
   const [inventoryDetail, setInventoryDetail] = useState<InventoryAuditTaskDetail | null>(null);
   const [adjustmentReason, setAdjustmentReason] = useState<InventoryAdjustmentReason>("unknown");
   const [rejectionReason, setRejectionReason] = useState<InventoryAdjustmentRejectionReason>("insufficient_evidence");
@@ -104,17 +108,19 @@ export default function ApprovalsCenterPage() {
     setBusyId(item.id);
     try {
       if (item.status === "open" && item.can_claim) await claimOperationsTask(item.id);
-      try { await startOperationsTask(item.id); } catch { /* may already be in progress */ }
+      try { await startOperationsTask(item.id); } catch { /* may already be started */ }
 
       if (item.source_kind === "inventory_adjustment") {
         const detail = await fetchInventoryAuditTaskV2(item.id);
-        setDecisionTask(item);
+        setInventoryTask(item);
         setInventoryDetail(detail);
         setAdjustmentReason("unknown");
         setRejectionReason("insufficient_evidence");
         setNote("");
+      } else if (item.source_kind === "attendance_exception") {
+        setAttendanceTask(item);
       } else {
-        setGeneralDecisionTask(item);
+        setGeneralTask(item);
         setGeneralNote("");
       }
       await query.refetch();
@@ -126,25 +132,26 @@ export default function ApprovalsCenterPage() {
     }
   };
 
-  const closeDecision = () => {
-    setDecisionTask(null);
+  const closeInventory = () => {
+    setInventoryTask(null);
     setInventoryDetail(null);
     setNote("");
   };
 
-  const closeGeneralDecision = () => {
-    setGeneralDecisionTask(null);
+  const closeGeneral = () => {
+    setGeneralTask(null);
     setGeneralNote("");
   };
 
   const submitGeneralDecision = async () => {
-    if (!generalDecisionTask || busyId) return;
+    if (!generalTask || busyId) return;
+    if (generalTask.source_kind === "attendance_exception") return toast.error("استثناءات الحضور يجب اعتمادها أو رفضها من نموذج الحضور المتخصص.");
     if (generalNote.trim().length < 3) return toast.error("اكتب نتيجة المراجعة قبل الإغلاق.");
-    setBusyId(generalDecisionTask.id);
+    setBusyId(generalTask.id);
     try {
-      await completeOperationsTask(generalDecisionTask.id, generalNote);
+      await completeOperationsTask(generalTask.id, generalNote);
       toast.success("تم تسجيل قرار المراجعة وإغلاق الموافقة بنجاح.");
-      closeGeneralDecision();
+      closeGeneral();
       await query.refetch();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر تسجيل قرار المراجعة.");
@@ -155,16 +162,14 @@ export default function ApprovalsCenterPage() {
   };
 
   const approveInventory = async () => {
-    if (!decisionTask || !inventoryDetail || busyId) return;
+    if (!inventoryTask || !inventoryDetail || busyId) return;
     if (note.trim().length < 3) return toast.error("اكتب ملاحظة توضح سبب الاعتماد.");
-    if (Math.abs(Number(inventoryDetail.movement_ledger_gap || 0)) > 0.001) {
-      return toast.error("يوجد فرق في Movement Ledger. الاعتماد متوقف لحماية المخزون.");
-    }
-    setBusyId(decisionTask.id);
+    if (Math.abs(Number(inventoryDetail.movement_ledger_gap || 0)) > 0.001) return toast.error("يوجد فرق في Movement Ledger. الاعتماد متوقف لحماية المخزون.");
+    setBusyId(inventoryTask.id);
     try {
-      const result = await approveInventoryAdjustmentV2(decisionTask.id, adjustmentReason, note);
+      const result = await approveInventoryAdjustmentV2(inventoryTask.id, adjustmentReason, note);
       toast.success(`تم اعتماد التسوية: ${formatQty(result.quantity_before)} ← ${formatQty(result.quantity_after)}.`);
-      closeDecision();
+      closeInventory();
       await query.refetch();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر اعتماد التسوية.");
@@ -174,13 +179,13 @@ export default function ApprovalsCenterPage() {
   };
 
   const rejectInventory = async () => {
-    if (!decisionTask || busyId) return;
+    if (!inventoryTask || busyId) return;
     if (note.trim().length < 3) return toast.error("اكتب ملاحظة توضح سبب الرفض.");
-    setBusyId(decisionTask.id);
+    setBusyId(inventoryTask.id);
     try {
-      await rejectInventoryAdjustmentV2(decisionTask.id, rejectionReason, note);
+      await rejectInventoryAdjustmentV2(inventoryTask.id, rejectionReason, note);
       toast.success("تم رفض التسوية وإرجاع مهمة الجرد للموظف لإعادة العد، بدون تعديل المخزون.");
-      closeDecision();
+      closeInventory();
       await query.refetch();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر رفض التسوية.");
@@ -209,9 +214,7 @@ export default function ApprovalsCenterPage() {
               <div className="flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-[#005931]" /><h1 className="text-2xl font-black">مركز الموافقات</h1></div>
               <p className="mt-2 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · كل القرارات التي تحتاج مراجعة وصلاحية إدارية في Inbox واحد.</p>
             </div>
-            <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
-              <RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث
-            </Button>
+            <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
@@ -220,11 +223,7 @@ export default function ApprovalsCenterPage() {
 
           <Tabs value={scope} onValueChange={value => setScope(value as ApprovalScope)} dir="rtl" className="mt-5">
             <TabsList className="h-auto flex-wrap justify-start gap-1 rounded-2xl bg-slate-100 p-1.5">
-              <TabsTrigger value="pending">معلقة</TabsTrigger>
-              <TabsTrigger value="mine">عندي</TabsTrigger>
-              <TabsTrigger value="overdue">متأخرة</TabsTrigger>
-              <TabsTrigger value="completed">مكتملة</TabsTrigger>
-              <TabsTrigger value="all">الكل</TabsTrigger>
+              <TabsTrigger value="pending">معلقة</TabsTrigger><TabsTrigger value="mine">عندي</TabsTrigger><TabsTrigger value="overdue">متأخرة</TabsTrigger><TabsTrigger value="completed">مكتملة</TabsTrigger><TabsTrigger value="all">الكل</TabsTrigger>
             </TabsList>
           </Tabs>
         </section>
@@ -255,19 +254,11 @@ export default function ApprovalsCenterPage() {
                       </div>
                       <h3 className="mt-3 text-lg font-black text-slate-950">{item.title}</h3>
                       {item.description && <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>}
-                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span>أُنشئت: {formatDateTime(item.created_at)}</span>
-                        {item.due_at && <span>SLA: {formatDateTime(item.due_at)}</span>}
-                        {item.claimed_by_name && <span>المراجع: {item.claimed_by_name}</span>}
-                        {item.completed_by_name && <span>أغلقها: {item.completed_by_name}</span>}
-                      </div>
+                      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>أُنشئت: {formatDateTime(item.created_at)}</span>{item.due_at && <span>SLA: {formatDateTime(item.due_at)}</span>}{item.claimed_by_name && <span>المراجع: {item.claimed_by_name}</span>}{item.completed_by_name && <span>أغلقها: {item.completed_by_name}</span>}</div>
                       {item.resolution_note && <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">القرار: {item.resolution_note}</div>}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
-                      {active && <Button disabled={busyId === item.id} onClick={() => openApproval(item)}>
-                        {busyId === item.id ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : item.source_kind === "inventory_adjustment" ? <ShieldCheck className="ml-2 h-4 w-4" /> : <ClipboardCheck className="ml-2 h-4 w-4" />}
-                        {item.source_kind === "inventory_adjustment" ? (item.is_mine ? "فتح القرار" : "استلام ومراجعة") : (item.is_mine ? "تسجيل القرار" : "استلام وتسجيل القرار")}
-                      </Button>}
+                      {active && <Button disabled={busyId === item.id} onClick={() => openApproval(item)}>{busyId === item.id ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="ml-2 h-4 w-4" />}{item.is_mine ? "فتح القرار" : "استلام ومراجعة"}</Button>}
                       {!active && item.action_url && <Button variant="outline" onClick={() => navigate(item.action_url!)}><ArrowLeft className="ml-2 h-4 w-4" />فتح المصدر</Button>}
                     </div>
                   </div>
@@ -278,52 +269,28 @@ export default function ApprovalsCenterPage() {
         )}
       </div>
 
-      <Dialog open={Boolean(decisionTask)} onOpenChange={open => !open && closeDecision()}>
+      <Dialog open={Boolean(inventoryTask)} onOpenChange={open => !open && closeInventory()}>
         <DialogContent dir="rtl" className="max-w-2xl">
           <DialogHeader><DialogTitle>قرار اعتماد فرق المخزون</DialogTitle></DialogHeader>
           {!inventoryDetail ? <div className="flex min-h-40 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" /></div> : <div className="space-y-4">
             <div className="rounded-2xl border bg-slate-50 p-4"><h3 className="font-black">{inventoryDetail.product_name}</h3><p className="mt-1 text-sm text-muted-foreground">باركود: {inventoryDetail.barcode || "غير مسجل"} · الرف: {inventoryDetail.shelf_location || "غير محدد"}</p></div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">رصيد النظام</div><div className="mt-1 text-xl font-black">{formatQty(inventoryDetail.current_system_quantity)}</div></div>
-              <div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">الرصيد الفعلي المتوقع</div><div className="mt-1 text-xl font-black">{formatQty(inventoryDetail.projected_physical_quantity)}</div></div>
-              <div className="rounded-xl bg-cyan-50 p-3"><div className="text-xs text-muted-foreground">التسوية المقترحة</div><div className="mt-1 text-xl font-black text-cyan-900">{Number(inventoryDetail.current_adjustment_delta || 0) > 0 ? "+" : ""}{formatQty(inventoryDetail.current_adjustment_delta)}</div></div>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <div className="rounded-xl border p-3"><div className="text-xs text-muted-foreground">العد الأول</div><div className="mt-1 font-black">{formatQty(inventoryDetail.first_count)}</div></div>
-              <div className="rounded-xl border p-3"><div className="text-xs text-muted-foreground">إعادة العد</div><div className="mt-1 font-black">{formatQty(inventoryDetail.recount)}</div></div>
-              <div className="rounded-xl border p-3"><div className="text-xs text-muted-foreground">حركات لاحقة</div><div className="mt-1 font-black">{formatQty(inventoryDetail.post_recount_movement)}</div></div>
-            </div>
+            <div className="grid gap-2 sm:grid-cols-3"><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">رصيد النظام</div><div className="mt-1 text-xl font-black">{formatQty(inventoryDetail.current_system_quantity)}</div></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">الرصيد الفعلي المتوقع</div><div className="mt-1 text-xl font-black">{formatQty(inventoryDetail.projected_physical_quantity)}</div></div><div className="rounded-xl bg-cyan-50 p-3"><div className="text-xs text-muted-foreground">التسوية المقترحة</div><div className="mt-1 text-xl font-black text-cyan-900">{Number(inventoryDetail.current_adjustment_delta || 0) > 0 ? "+" : ""}{formatQty(inventoryDetail.current_adjustment_delta)}</div></div></div>
+            <div className="grid gap-2 sm:grid-cols-3"><div className="rounded-xl border p-3"><div className="text-xs text-muted-foreground">العد الأول</div><div className="mt-1 font-black">{formatQty(inventoryDetail.first_count)}</div></div><div className="rounded-xl border p-3"><div className="text-xs text-muted-foreground">إعادة العد</div><div className="mt-1 font-black">{formatQty(inventoryDetail.recount)}</div></div><div className="rounded-xl border p-3"><div className="text-xs text-muted-foreground">حركات لاحقة</div><div className="mt-1 font-black">{formatQty(inventoryDetail.post_recount_movement)}</div></div></div>
             {Math.abs(Number(inventoryDetail.movement_ledger_gap || 0)) > 0.001 && <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-800">Movement Ledger غير مطابق بفارق {formatQty(inventoryDetail.movement_ledger_gap)}. الاعتماد متوقف تلقائيًا.</div>}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label>سبب الاعتماد</Label><Select value={adjustmentReason} onValueChange={value => setAdjustmentReason(value as InventoryAdjustmentReason)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(adjustmentReasonLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
-              <div className="space-y-2"><Label>سبب الرفض</Label><Select value={rejectionReason} onValueChange={value => setRejectionReason(value as InventoryAdjustmentRejectionReason)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(rejectionReasonLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
-            </div>
+            <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>سبب الاعتماد</Label><Select value={adjustmentReason} onValueChange={value => setAdjustmentReason(value as InventoryAdjustmentReason)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(adjustmentReasonLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>سبب الرفض</Label><Select value={rejectionReason} onValueChange={value => setRejectionReason(value as InventoryAdjustmentRejectionReason)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(rejectionReasonLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div></div>
             <div className="space-y-2"><Label>ملاحظة القرار</Label><Textarea value={note} onChange={event => setNote(event.target.value)} placeholder="اشرح ما راجعته وسبب القرار..." /></div>
           </div>}
-          <DialogFooter className="gap-2 sm:justify-start">
-            <Button variant="outline" onClick={closeDecision}>إغلاق</Button>
-            <Button variant="destructive" onClick={rejectInventory} disabled={Boolean(busyId)}>رفض وإعادة الجرد</Button>
-            <Button onClick={approveInventory} disabled={Boolean(busyId) || Math.abs(Number(inventoryDetail?.movement_ledger_gap || 0)) > 0.001}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}اعتماد التسوية</Button>
-          </DialogFooter>
+          <DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={closeInventory}>إغلاق</Button><Button variant="destructive" onClick={rejectInventory} disabled={Boolean(busyId)}>رفض وإعادة الجرد</Button><Button onClick={approveInventory} disabled={Boolean(busyId) || Math.abs(Number(inventoryDetail?.movement_ledger_gap || 0)) > 0.001}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}اعتماد التسوية</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(generalDecisionTask)} onOpenChange={open => !open && closeGeneralDecision()}>
+      <AttendanceExceptionDecisionDialog task={attendanceTask} onClose={() => setAttendanceTask(null)} onDone={() => query.refetch()} />
+
+      <Dialog open={Boolean(generalTask)} onOpenChange={open => !open && closeGeneral()}>
         <DialogContent dir="rtl" className="max-w-lg">
           <DialogHeader><DialogTitle>تسجيل قرار المراجعة</DialogTitle></DialogHeader>
-          {generalDecisionTask && <div className="space-y-4">
-            <div className="rounded-2xl border bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={sourceMeta(generalDecisionTask.source_kind).className}>{sourceMeta(generalDecisionTask.source_kind).label}</Badge>{generalDecisionTask.is_overdue && <Badge variant="destructive">متأخرة</Badge>}</div>
-              <h3 className="mt-3 font-black">{generalDecisionTask.title}</h3>
-              {generalDecisionTask.description && <p className="mt-1 text-sm leading-6 text-muted-foreground">{generalDecisionTask.description}</p>}
-            </div>
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">هذا النوع لا يغيّر مخزونًا أو حركة مالية من مركز الموافقات؛ يتم فقط توثيق نتيجة المراجعة وإغلاق المهمة بنفس مسار النظام الحالي.</div>
-            <div className="space-y-2"><Label>نتيجة المراجعة</Label><Textarea autoFocus value={generalNote} onChange={event => setGeneralNote(event.target.value)} placeholder="اكتب ما تم التحقق منه والقرار النهائي..." /></div>
-          </div>}
-          <DialogFooter className="gap-2 sm:justify-start">
-            <Button variant="outline" onClick={closeGeneralDecision}>إلغاء</Button>
-            <Button onClick={submitGeneralDecision} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}تسجيل القرار وإغلاق</Button>
-          </DialogFooter>
+          {generalTask && <div className="space-y-4"><div className="rounded-2xl border bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={sourceMeta(generalTask.source_kind).className}>{sourceMeta(generalTask.source_kind).label}</Badge>{generalTask.is_overdue && <Badge variant="destructive">متأخرة</Badge>}</div><h3 className="mt-3 font-black">{generalTask.title}</h3>{generalTask.description && <p className="mt-1 text-sm leading-6 text-muted-foreground">{generalTask.description}</p>}</div><div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">هذا النوع لا يغيّر مخزونًا أو حركة مالية من مركز الموافقات؛ يتم فقط توثيق نتيجة المراجعة وإغلاق المهمة بنفس مسار النظام الحالي.</div><div className="space-y-2"><Label>نتيجة المراجعة</Label><Textarea autoFocus value={generalNote} onChange={event => setGeneralNote(event.target.value)} placeholder="اكتب ما تم التحقق منه والقرار النهائي..." /></div></div>}
+          <DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={closeGeneral}>إلغاء</Button><Button onClick={submitGeneralDecision} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}تسجيل القرار وإغلاق</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </MainLayout>
