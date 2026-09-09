@@ -61,6 +61,7 @@ import StaffDeviceActivationPage from "@/pages/StaffDeviceActivationPage";
 import AttendancePage from "@/pages/AttendancePage";
 import MyHRPortalPage from "@/pages/MyHRPortalPage";
 import HrLeaveCalendarPage from "@/pages/HrLeaveCalendarPage";
+import HrPayrollPage from "@/pages/HrPayrollPage";
 import OrganizationStructurePage from "@/pages/OrganizationStructurePage";
 import CashTracking from "@/pages/CashTracking";
 import Banners from "@/pages/Banners";
@@ -121,6 +122,7 @@ export default function AppRoutes() {
       <Route path="/my-hr" element={<ProtectedRoute><MyHRPortalPage /></ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute><AttendanceWorkspace /></ProtectedRoute>} />
       <Route path="/hr/leave-calendar" element={<ProtectedRoute><HrLeaveCalendarPage /></ProtectedRoute>} />
+      <Route path="/hr/payroll" element={<ProtectedRoute><HrPayrollPage /></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><OperationsTasksWorkspace /></ProtectedRoute>} />
       <Route path="/approvals" element={<ProtectedRoute><ApprovalsCenterPage /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><NotificationsCenterV2 /></ProtectedRoute>} />
