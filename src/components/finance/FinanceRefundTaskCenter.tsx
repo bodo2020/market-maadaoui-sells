@@ -7,12 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { siteConfig } from "@/config/site";
-import { fetchOperationsTasks, type OperationsTask } from "@/services/supabase/operationsTaskService";
+import { fetchOperationsTasks, isRefundTransferTask, type OperationsTask } from "@/services/supabase/operationsTaskService";
 import { useBranchStore } from "@/stores/branchStore";
 
 const money = (value: number | null | undefined) =>
   `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siteConfig.currency}`;
-
 const activeStatuses = new Set(["open", "claimed", "in_progress", "failed"]);
 
 function slaLabel(task: OperationsTask) {
@@ -41,15 +40,12 @@ function sortTasks(a: OperationsTask, b: OperationsTask) {
   const priorityRank: Record<string, number> = { urgent: 0, high: 1, normal: 2 };
   const priorityDiff = (priorityRank[a.priority] ?? 3) - (priorityRank[b.priority] ?? 3);
   if (priorityDiff !== 0) return priorityDiff;
-  const aDue = a.due_at ? new Date(a.due_at).getTime() : Number.MAX_SAFE_INTEGER;
-  const bDue = b.due_at ? new Date(b.due_at).getTime() : Number.MAX_SAFE_INTEGER;
-  return aDue - bDue;
+  return (a.due_at ? new Date(a.due_at).getTime() : Number.MAX_SAFE_INTEGER) - (b.due_at ? new Date(b.due_at).getTime() : Number.MAX_SAFE_INTEGER);
 }
 
 export default function FinanceRefundTaskCenter() {
   const navigate = useNavigate();
   const { currentBranchId } = useBranchStore();
-
   const query = useQuery({
     queryKey: ["finance-refund-task-center", currentBranchId],
     enabled: Boolean(currentBranchId),
@@ -60,7 +56,7 @@ export default function FinanceRefundTaskCenter() {
   });
 
   const active = useMemo(
-    () => (query.data || []).filter(task => activeStatuses.has(task.status)).sort(sortTasks),
+    () => (query.data || []).filter(task => isRefundTransferTask(task) && activeStatuses.has(task.status)).sort(sortTasks),
     [query.data],
   );
   const available = useMemo(() => active.filter(task => task.status === "open"), [active]);
@@ -68,11 +64,7 @@ export default function FinanceRefundTaskCenter() {
   const overdue = useMemo(() => active.filter(task => task.is_overdue), [active]);
   const dueSoon = useMemo(() => {
     const now = Date.now();
-    return active.filter(task => {
-      if (!task.due_at || task.is_overdue) return false;
-      const remaining = new Date(task.due_at).getTime() - now;
-      return remaining > 0 && remaining <= 60 * 60 * 1000;
-    });
+    return active.filter(task => task.due_at && !task.is_overdue && new Date(task.due_at).getTime() - now <= 60 * 60 * 1000);
   }, [active]);
   const activeAmount = useMemo(() => active.reduce((sum, task) => sum + Number(task.amount || 0), 0), [active]);
   const preview = active.slice(0, 4);
@@ -83,80 +75,32 @@ export default function FinanceRefundTaskCenter() {
     <section dir="rtl" className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <WalletCards className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-black">مهام رد المبالغ الإلكترونية</h2>
-            <Badge variant="secondary">SLA 4h</Badge>
-            {overdue.length > 0 && <Badge className="bg-red-600">{overdue.length.toLocaleString("ar-EG")} متأخرة</Badge>}
-          </div>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-500">
-            كل مرتجع إلكتروني يحتاج تحويل فعلي يظل ظاهرًا للفريق حتى يستلمه موظف. بعد الاستلام ينتقل لمسؤول المهمة، ويظل الـSLA محسوبًا حتى تأكيد رقم عملية التحويل.
-          </p>
+          <div className="flex flex-wrap items-center gap-2"><WalletCards className="h-5 w-5 text-primary" /><h2 className="text-lg font-black">مهام رد المبالغ الإلكترونية</h2><Badge variant="secondary">SLA 4h</Badge>{overdue.length > 0 && <Badge className="bg-red-600">{overdue.length.toLocaleString("ar-EG")} متأخرة</Badge>}</div>
+          <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-500">كل مرتجع إلكتروني يحتاج تحويل فعلي يظل ظاهرًا للفريق حتى يستلمه موظف. لا يدخل هنا أي فرق وردية أو مهمة تشغيلية أخرى.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}>
-            <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} /> تحديث
-          </Button>
-          <Button onClick={() => navigate("/tasks")}>
-            فتح مركز المهام <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </div>
+        <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} /> تحديث</Button><Button onClick={() => navigate("/tasks")}>فتح مركز المهام <ArrowLeft className="h-4 w-4" /></Button></div>
       </div>
 
-      {query.isError && (
-        <Alert variant="destructive"><AlertDescription>{query.error instanceof Error ? query.error.message : "تعذر تحميل مهام رد المبالغ."}</AlertDescription></Alert>
-      )}
+      {query.isError && <Alert variant="destructive"><AlertDescription>{query.error instanceof Error ? query.error.message : "تعذر تحميل مهام رد المبالغ."}</AlertDescription></Alert>}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-slate-100 shadow-sm"><CardContent className="p-4"><p className="text-xs text-slate-500">متاحة للفريق</p><strong className="mt-1 block text-2xl">{available.length.toLocaleString("ar-EG")}</strong><p className="mt-1 text-[11px] text-slate-400">تظهر للجميع حتى أول استلام</p></CardContent></Card>
-        <Card className="border-slate-100 shadow-sm"><CardContent className="p-4"><p className="text-xs text-slate-500">مهامي الحالية</p><strong className="mt-1 block text-2xl text-blue-700">{mine.length.toLocaleString("ar-EG")}</strong><p className="mt-1 text-[11px] text-slate-400">مسندة لحسابك وتنتظر التنفيذ</p></CardContent></Card>
-        <Card className={`shadow-sm ${overdue.length ? "border-red-200 bg-red-50/40" : "border-slate-100"}`}><CardContent className="p-4"><p className="text-xs text-slate-500">متأخرة / أقل من ساعة</p><strong className={`mt-1 block text-2xl ${overdue.length ? "text-red-700" : "text-amber-700"}`}>{overdue.length.toLocaleString("ar-EG")} / {dueSoon.length.toLocaleString("ar-EG")}</strong><p className="mt-1 text-[11px] text-slate-400">أولوية متابعة المالية</p></CardContent></Card>
+        <Card className="border-slate-100 shadow-sm"><CardContent className="p-4"><p className="text-xs text-slate-500">متاحة للفريق</p><strong className="mt-1 block text-2xl">{available.length.toLocaleString("ar-EG")}</strong><p className="mt-1 text-[11px] text-slate-400">حتى أول استلام</p></CardContent></Card>
+        <Card className="border-slate-100 shadow-sm"><CardContent className="p-4"><p className="text-xs text-slate-500">مهامي الحالية</p><strong className="mt-1 block text-2xl text-blue-700">{mine.length.toLocaleString("ar-EG")}</strong><p className="mt-1 text-[11px] text-slate-400">تنتظر التنفيذ</p></CardContent></Card>
+        <Card className={`shadow-sm ${overdue.length ? "border-red-200 bg-red-50/40" : "border-slate-100"}`}><CardContent className="p-4"><p className="text-xs text-slate-500">متأخرة / أقل من ساعة</p><strong className={`mt-1 block text-2xl ${overdue.length ? "text-red-700" : "text-amber-700"}`}>{overdue.length.toLocaleString("ar-EG")} / {dueSoon.length.toLocaleString("ar-EG")}</strong><p className="mt-1 text-[11px] text-slate-400">أولوية المالية</p></CardContent></Card>
         <Card className="border-slate-100 shadow-sm"><CardContent className="p-4"><p className="text-xs text-slate-500">إجمالي مبالغ معلقة</p><strong className="mt-1 block text-xl text-[#005931]">{money(activeAmount)}</strong><p className="mt-1 text-[11px] text-slate-400">لا تُعتبر محولة قبل التأكيد</p></CardContent></Card>
       </div>
 
-      {query.isLoading ? (
-        <Card className="h-36 animate-pulse border-slate-100 bg-slate-50" />
-      ) : active.length === 0 ? (
+      {query.isLoading ? <Card className="h-36 animate-pulse border-slate-100 bg-slate-50" /> : active.length === 0 ? (
         <Alert className="border-emerald-200 bg-emerald-50"><CheckCircle2 className="h-4 w-4 text-emerald-700" /><AlertDescription className="text-emerald-800">لا توجد حاليًا مبالغ مرتجعات إلكترونية تنتظر التحويل.</AlertDescription></Alert>
       ) : (
-        <Card className="border-slate-100 shadow-sm">
-          <CardHeader className="pb-2"><CardTitle className="text-base">الأولوية الآن</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {preview.map(task => {
-              const critical = task.is_overdue;
-              const soon = !critical && task.due_at && new Date(task.due_at).getTime() - Date.now() <= 60 * 60 * 1000;
-              return (
-                <button
-                  key={task.id}
-                  type="button"
-                  onClick={() => navigate("/tasks")}
-                  className={`flex w-full flex-col gap-3 rounded-2xl border p-3 text-right transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between ${critical ? "border-red-200 bg-red-50/50" : soon ? "border-amber-200 bg-amber-50/40" : "border-slate-100"}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <strong className="truncate">{task.title}</strong>
-                      <Badge variant="outline">{task.payment_method_name || task.payment_method_code || "إلكتروني"}</Badge>
-                      <Badge variant="outline" className={critical ? "border-red-200 text-red-700" : soon ? "border-amber-200 text-amber-700" : ""}>
-                        <Clock3 className="ml-1 h-3.5 w-3.5" /> {slaLabel(task)}
-                      </Badge>
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                      <span>{task.reference_number || task.invoice_number || "مرتجع إلكتروني"}</span>
-                      <span>{task.customer_name || "عميل غير مرتبط"}</span>
-                      <span className="inline-flex items-center gap-1"><UserRoundCheck className="h-3.5 w-3.5" />{task.claimed_by_name || "متاحة للفريق"}</span>
-                      <span>{statusLabel(task)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {critical && <AlertTriangle className="h-5 w-5 text-red-600" />}
-                    <strong className="whitespace-nowrap text-lg text-[#005931]">{money(task.amount)}</strong>
-                  </div>
-                </button>
-              );
-            })}
-            {active.length > preview.length && <Button variant="ghost" className="w-full" onClick={() => navigate("/tasks")}>عرض كل {active.length.toLocaleString("ar-EG")} مهمة</Button>}
-          </CardContent>
-        </Card>
+        <Card className="border-slate-100 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-base">الأولوية الآن</CardTitle></CardHeader><CardContent className="space-y-2">
+          {preview.map(task => {
+            const critical = task.is_overdue;
+            const soon = !critical && task.due_at && new Date(task.due_at).getTime() - Date.now() <= 60 * 60 * 1000;
+            return <button key={task.id} type="button" onClick={() => navigate("/tasks")} className={`flex w-full flex-col gap-3 rounded-2xl border p-3 text-right transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between ${critical ? "border-red-200 bg-red-50/50" : soon ? "border-amber-200 bg-amber-50/40" : "border-slate-100"}`}><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong className="truncate">{task.title}</strong><Badge variant="outline">{task.payment_method_name || task.payment_method_code || "إلكتروني"}</Badge><Badge variant="outline" className={critical ? "border-red-200 text-red-700" : soon ? "border-amber-200 text-amber-700" : ""}><Clock3 className="ml-1 h-3.5 w-3.5" /> {slaLabel(task)}</Badge></div><div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500"><span>{task.reference_number || task.invoice_number || "مرتجع إلكتروني"}</span><span>{task.customer_name || "عميل غير مرتبط"}</span><span className="inline-flex items-center gap-1"><UserRoundCheck className="h-3.5 w-3.5" />{task.claimed_by_name || "متاحة للفريق"}</span><span>{statusLabel(task)}</span></div></div><div className="flex items-center gap-2">{critical && <AlertTriangle className="h-5 w-5 text-red-600" />}<strong className="whitespace-nowrap text-lg text-[#005931]">{money(task.amount)}</strong></div></button>;
+          })}
+          {active.length > preview.length && <Button variant="ghost" className="w-full" onClick={() => navigate("/tasks")}>عرض كل {active.length.toLocaleString("ar-EG")} مهمة مرتجع</Button>}
+        </CardContent></Card>
       )}
     </section>
   );
