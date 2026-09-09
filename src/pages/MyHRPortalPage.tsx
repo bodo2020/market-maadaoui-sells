@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import HrRequestsSelfService from "@/components/hr/HrRequestsSelfService";
+import EmployeeWalletSelfCard from "@/components/hr/EmployeeWalletSelfCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -124,6 +125,8 @@ export default function MyHRPortalPage() {
             </div>}
           </CardContent>
         </Card>
+
+        <EmployeeWalletSelfCard />
 
         <HrRequestsSelfService />
       </div>
