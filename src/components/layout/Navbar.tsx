@@ -1,6 +1,21 @@
-import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Bell, BellDot, User, LogOut, Check, Store, ChevronDown, Truck, TriangleAlert } from "lucide-react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  Bell,
+  BellDot,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  CircleAlert,
+  Inbox,
+  LogOut,
+  PackageX,
+  Store,
+  Truck,
+  User,
+  WalletCards,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,107 +26,114 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { useNavigate } from "react-router-dom";
 import {
-  getNotifications,
-  markNotificationAsRead,
-  markAllNotificationsAsRead,
-  checkLowStockProducts,
-  showLowStockToasts,
-  StockNotification,
-} from "@/services/notificationService";
-import {
-  fetchInventoryTransferSmartAlertsV2,
-  InventoryTransferSmartAlertV2,
-} from "@/services/supabase/inventoryTransferSmartAlertsV2Service";
-import { ScrollArea } from "@/components/ui/scroll-area";
+  fetchNotificationCenterV2,
+  markAllNotificationsReadV2,
+  markNotificationReadV2,
+  type NotificationCenterItemV2,
+} from "@/services/supabase/notificationCenterV2Service";
 
-const transferReadKey = (userId: string, branchId: string, alert: InventoryTransferSmartAlertV2) =>
-  `inventory-transfer-alert-read:${userId}:${branchId}:${alert.id}:${alert.metric_value}`;
+function itemIcon(item: NotificationCenterItemV2) {
+  if (item.category === "inventory") return PackageX;
+  if (item.category === "inventory_transfers") return Truck;
+  if (item.category === "finance") return WalletCards;
+  if (item.severity === "critical") return AlertTriangle;
+  return CircleAlert;
+}
+
+function itemTone(item: NotificationCenterItemV2) {
+  if (item.severity === "critical") return {
+    icon: "bg-red-100 text-red-700",
+    unread: "bg-red-50/80",
+    dot: "bg-red-500",
+    label: "عاجل",
+  };
+  if (item.severity === "high") return {
+    icon: "bg-amber-100 text-amber-700",
+    unread: "bg-amber-50/80",
+    dot: "bg-amber-500",
+    label: "مهم",
+  };
+  return {
+    icon: "bg-emerald-50 text-[#005931]",
+    unread: "bg-emerald-50/50",
+    dot: "bg-[#005931]",
+    label: "تنبيه",
+  };
+}
+
+function relativeTime(value?: string | null) {
+  if (!value) return "الآن";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "الآن";
+  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
+  if (minutes < 1) return "الآن";
+  if (minutes < 60) return `${minutes.toLocaleString("ar-EG")} د`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours.toLocaleString("ar-EG")} س`;
+  return `${Math.floor(hours / 24).toLocaleString("ar-EG")} يوم`;
+}
 
 export default function Navbar() {
   const { user, logout, branchOptions, switchBranch } = useAuth();
   const { currentBranchId, currentBranchName } = useBranchStore();
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState<StockNotification[]>([]);
+  const queryClient = useQueryClient();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const [switchingBranchId, setSwitchingBranchId] = useState<string | null>(null);
-  const [transferReadVersion, setTransferReadVersion] = useState(0);
 
   const currentBranchContext = branchOptions.find(branch => branch.branch_id === currentBranchId);
-  const canSeeNotifications = user?.role === 'super_admin' || Boolean(currentBranchContext?.permissions?.includes('inventory.view'));
+  const canSeeNotifications = Boolean(user?.id && currentBranchId);
 
-  const transferAlertsQuery = useQuery({
-    queryKey: ["inventory-transfer-smart-alerts", currentBranchId],
-    enabled: Boolean(user?.id && currentBranchId && canSeeNotifications),
-    queryFn: () => fetchInventoryTransferSmartAlertsV2(currentBranchId as string),
+  const notificationQuery = useQuery({
+    queryKey: ["notification-center-v2", currentBranchId, "preview"],
+    enabled: canSeeNotifications,
+    queryFn: () => fetchNotificationCenterV2(currentBranchId, "all", null, 12),
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     retry: false,
-    staleTime: 30_000,
+    staleTime: 20_000,
   });
 
-  const transferAlerts = (transferAlertsQuery.data?.alerts || [])
-    .filter(alert => alert.severity === "critical" || alert.severity === "warning")
-    .sort((a, b) => b.priority - a.priority);
+  const items = (notificationQuery.data?.items || []).filter(item => item.status === "active").slice(0, 8);
+  const unreadCount = notificationQuery.data?.summary.unread || 0;
+  const criticalCount = notificationQuery.data?.summary.critical || 0;
+  const actionCount = notificationQuery.data?.summary.action_required || 0;
 
-  const isTransferRead = (alert: InventoryTransferSmartAlertV2) => {
-    if (!user?.id || !currentBranchId) return true;
-    void transferReadVersion;
-    return localStorage.getItem(transferReadKey(user.id, currentBranchId, alert)) === "1";
+  const refreshNotifications = () => {
+    queryClient.invalidateQueries({ queryKey: ["notification-center-v2"] });
   };
-
-  const loadNotifications = () => {
-    setNotifications(getNotifications());
-  };
-
-  useEffect(() => {
-    loadNotifications();
-
-    const checkStock = async () => {
-      await checkLowStockProducts();
-      showLowStockToasts();
-      loadNotifications();
-    };
-
-    checkStock();
-    const interval = setInterval(checkStock, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login");
   };
 
-  const handleNotificationClick = (notification: StockNotification) => {
-    markNotificationAsRead(notification.id);
-    loadNotifications();
-    navigate('/inventory');
-    setNotificationsOpen(false);
-  };
-
-  const handleTransferNotificationClick = (alert: InventoryTransferSmartAlertV2) => {
-    if (user?.id && currentBranchId) {
-      localStorage.setItem(transferReadKey(user.id, currentBranchId, alert), "1");
-      setTransferReadVersion(version => version + 1);
+  const handleNotificationClick = async (item: NotificationCenterItemV2) => {
+    if (!item.read_at) {
+      try {
+        await markNotificationReadV2(item.id);
+      } catch {
+        // Opening the relevant screen is more important than blocking on read-state sync.
+      }
     }
-    navigate(alert.href || '/reports/inventory-transfers');
+    refreshNotifications();
     setNotificationsOpen(false);
+    navigate(item.action_url || "/notifications");
   };
 
-  const handleMarkAllAsRead = () => {
-    markAllNotificationsAsRead();
-    if (user?.id && currentBranchId) {
-      transferAlerts.forEach(alert => {
-        localStorage.setItem(transferReadKey(user.id, currentBranchId, alert), "1");
-      });
-      setTransferReadVersion(version => version + 1);
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllNotificationsReadV2(currentBranchId);
+      refreshNotifications();
+    } catch {
+      // Keep the dropdown usable if the read-state request fails transiently.
     }
-    loadNotifications();
   };
 
   const handleBranchChange = async (branchId: string) => {
@@ -120,21 +142,21 @@ export default function Navbar() {
       setSwitchingBranchId(branchId);
       await switchBranch(branchId);
       setBranchDropdownOpen(false);
-      // Existing pages have several branch-keyed stores and queries. A controlled reload
-      // guarantees that every module rehydrates from the newly validated branch context.
       window.location.reload();
     } finally {
       setSwitchingBranchId(null);
     }
   };
 
-  const stockUnreadCount = notifications.filter(n => !n.read).length;
-  const transferUnreadCount = transferAlerts.filter(alert => !isTransferRead(alert)).length;
-  const unreadCount = stockUnreadCount + transferUnreadCount;
-  const roleLabel = currentBranchContext?.role_name_ar || (user?.role === 'super_admin' ? 'مدير النظام' : 'موظف');
+  const openNotificationCenter = () => {
+    setNotificationsOpen(false);
+    navigate("/notifications");
+  };
+
+  const roleLabel = currentBranchContext?.role_name_ar || (user?.role === "super_admin" ? "مدير النظام" : "موظف");
 
   return (
-    <header className="border-b bg-white py-3 px-6 flex items-center justify-between sticky top-0 z-30 min-h-[60px]">
+    <header className="sticky top-0 z-30 flex min-h-[60px] items-center justify-between border-b bg-white px-6 py-3">
       <div className="flex items-center">
         <h2 className="text-lg font-medium">لوحة التحكم</h2>
       </div>
@@ -145,7 +167,7 @@ export default function Navbar() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2 px-3 py-1.5">
                 <Store className="h-4 w-4" />
-                <span className="font-medium">{currentBranchName || 'اختر الفرع'}</span>
+                <span className="font-medium">{currentBranchName || "اختر الفرع"}</span>
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -157,7 +179,7 @@ export default function Navbar() {
                   key={branch.branch_id}
                   disabled={Boolean(switchingBranchId)}
                   onClick={() => void handleBranchChange(branch.branch_id)}
-                  className={currentBranchId === branch.branch_id ? 'bg-accent' : ''}
+                  className={currentBranchId === branch.branch_id ? "bg-accent" : ""}
                 >
                   <Store className="ml-2 h-4 w-4" />
                   <div className="min-w-0 flex-1">
@@ -183,93 +205,104 @@ export default function Navbar() {
         {canSeeNotifications && (
           <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative" aria-label="مركز الإشعارات">
                 {unreadCount > 0 ? (
                   <>
-                    <BellDot size={20} className="text-yellow-500" />
-                    <span className="absolute top-0 right-0 min-w-4 h-4 px-1 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center">
-                      {unreadCount > 99 ? '99+' : unreadCount}
+                    <BellDot size={21} className={criticalCount > 0 ? "text-red-600" : "text-[#005931]"} />
+                    <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                   </>
                 ) : (
-                  <Bell size={20} />
+                  <Bell size={21} />
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-96">
-              <DropdownMenuLabel className="flex items-center justify-between">
-                <span>مركز الإشعارات</span>
-                {unreadCount > 0 && (
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllAsRead}>
-                    <Check className="ml-1 h-3 w-3" /> تعيين الكل كمقروء
-                  </Button>
-                )}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
 
-              <ScrollArea className="h-[360px]">
-                {transferAlerts.length === 0 && notifications.length === 0 ? (
-                  <div className="py-6 px-2 text-center text-muted-foreground">لا توجد إشعارات</div>
+            <DropdownMenuContent align="end" className="w-[390px] max-w-[calc(100vw-24px)] overflow-hidden p-0" dir="rtl">
+              <div className="bg-[#005931] p-4 text-white">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 font-black"><Inbox className="h-4 w-4" /> مركز الإشعارات</div>
+                    <div className="mt-1 text-[11px] text-emerald-100">{currentBranchName || "الفرع الحالي"}</div>
+                  </div>
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 bg-white/10 text-xs text-white hover:bg-white/20 hover:text-white"
+                      onClick={() => void handleMarkAllAsRead()}
+                    >
+                      <Check className="ml-1 h-3.5 w-3.5" /> قراءة الكل
+                    </Button>
+                  )}
+                </div>
+                <div className="mt-3 flex gap-2 text-[10px]">
+                  <span className="rounded-full bg-white/10 px-2.5 py-1">{unreadCount.toLocaleString("ar-EG")} غير مقروء</span>
+                  {criticalCount > 0 && <span className="rounded-full bg-red-500/30 px-2.5 py-1">{criticalCount.toLocaleString("ar-EG")} عاجل</span>}
+                  {actionCount > 0 && <span className="rounded-full bg-amber-400/20 px-2.5 py-1">{actionCount.toLocaleString("ar-EG")} يحتاج إجراء</span>}
+                </div>
+              </div>
+
+              <ScrollArea className="h-[380px] bg-white">
+                {notificationQuery.isLoading ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">جاري مزامنة الإشعارات...</div>
+                ) : notificationQuery.isError ? (
+                  <div className="p-7 text-center">
+                    <AlertTriangle className="mx-auto h-6 w-6 text-amber-600" />
+                    <p className="mt-2 text-sm font-bold">تعذر تحديث الإشعارات</p>
+                    <button className="mt-1 text-xs text-[#005931] underline" onClick={() => void notificationQuery.refetch()}>إعادة المحاولة</button>
+                  </div>
+                ) : items.length === 0 ? (
+                  <div className="p-9 text-center">
+                    <Check className="mx-auto h-7 w-7 text-emerald-600" />
+                    <p className="mt-2 text-sm font-bold">كل شيء هادئ حاليًا</p>
+                    <p className="mt-1 text-xs text-muted-foreground">لا توجد تنبيهات نشطة لهذا الفرع.</p>
+                  </div>
                 ) : (
-                  <>
-                    {transferAlerts.length > 0 && (
-                      <div className="px-2 pb-1 pt-2 text-[11px] font-bold text-muted-foreground">تحويلات المخزون</div>
-                    )}
-                    {transferAlerts.map(alert => {
-                      const read = isTransferRead(alert);
-                      const critical = alert.severity === 'critical';
+                  <div className="py-1">
+                    {items.map(item => {
+                      const Icon = itemIcon(item);
+                      const tone = itemTone(item);
+                      const unread = !item.read_at;
                       return (
                         <DropdownMenuItem
-                          key={alert.id}
-                          className={`p-3 cursor-pointer ${!read ? (critical ? 'bg-red-50' : 'bg-amber-50') : ''}`}
-                          onClick={() => handleTransferNotificationClick(alert)}
+                          key={item.id}
+                          className={`cursor-pointer rounded-none border-b border-slate-100 p-3.5 focus:bg-slate-50 ${unread ? tone.unread : ""}`}
+                          onClick={() => void handleNotificationClick(item)}
                         >
-                          <div className="flex gap-3 items-start w-full">
-                            <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${critical ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {critical ? <TriangleAlert className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
+                          <div className="flex w-full gap-3">
+                            <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tone.icon}`}>
+                              <Icon className="h-4 w-4" />
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-start justify-between gap-2">
-                                <p className="text-sm font-bold leading-5">{alert.title}</p>
-                                {!read && <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${critical ? 'bg-red-500' : 'bg-amber-500'}`} />}
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <p className="line-clamp-1 text-sm font-black leading-5">{item.title}</p>
+                                  {unread && <span className={`h-2 w-2 shrink-0 rounded-full ${tone.dot}`} />}
+                                </div>
+                                <span className="shrink-0 text-[10px] text-muted-foreground">{relativeTime(item.updated_at || item.created_at)}</span>
                               </div>
-                              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{alert.message}</p>
-                              <p className="mt-1 text-[10px] font-semibold text-muted-foreground">{critical ? 'عاجل' : 'تحذير'} · أولوية {alert.priority}</p>
+                              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.body}</p>
+                              <div className="mt-1.5 flex items-center gap-2 text-[10px] font-semibold text-muted-foreground">
+                                <span>{tone.label}</span>
+                                {item.requires_action && <span className="text-amber-700">· يحتاج إجراء</span>}
+                              </div>
                             </div>
                           </div>
                         </DropdownMenuItem>
                       );
                     })}
-
-                    {transferAlerts.length > 0 && notifications.length > 0 && <DropdownMenuSeparator className="my-1" />}
-                    {notifications.length > 0 && (
-                      <div className="px-2 pb-1 pt-2 text-[11px] font-bold text-muted-foreground">المخزون المنخفض</div>
-                    )}
-                    {notifications.map(notification => (
-                      <DropdownMenuItem
-                        key={notification.id}
-                        className={`p-3 cursor-pointer ${!notification.read ? 'bg-yellow-50' : ''}`}
-                        onClick={() => handleNotificationClick(notification)}
-                      >
-                        <div className="flex gap-3 items-start w-full">
-                          <div className={`h-2 w-2 mt-2 rounded-full ${!notification.read ? 'bg-yellow-500' : 'bg-gray-200'}`} />
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start">
-                              <p className="font-medium text-sm">تنبيه المخزون المنخفض</p>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(notification.createdAt).toLocaleDateString('ar-EG')}
-                              </span>
-                            </div>
-                            <p className="text-sm mt-1">
-                              المنتج "{notification.product.name}" منخفض المخزون ({notification.product.quantity} وحدة متبقية)
-                            </p>
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </>
+                  </div>
                 )}
               </ScrollArea>
+
+              <div className="border-t bg-slate-50 p-2">
+                <Button variant="ghost" className="w-full justify-between rounded-xl text-[#005931]" onClick={openNotificationCenter}>
+                  <span className="font-bold">فتح مركز الإشعارات بالكامل</span>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -279,11 +312,11 @@ export default function Navbar() {
             <Button variant="ghost" className="flex items-center gap-2">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary text-primary-foreground">
-                  {user?.name ? user.name.charAt(0) : 'أ'}
+                  {user?.name ? user.name.charAt(0) : "أ"}
                 </AvatarFallback>
               </Avatar>
               <div className="text-right">
-                <p className="text-sm font-medium">{user?.name || 'المستخدم'}</p>
+                <p className="text-sm font-medium">{user?.name || "المستخدم"}</p>
                 <p className="text-xs text-muted-foreground">{roleLabel}</p>
               </div>
             </Button>
@@ -295,7 +328,7 @@ export default function Navbar() {
               <User className="ml-2 h-4 w-4" />
               <span>الملف الشخصي</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>الإعدادات</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/settings")}>الإعدادات</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void handleLogout()}>
               <LogOut className="ml-2 h-4 w-4" />
