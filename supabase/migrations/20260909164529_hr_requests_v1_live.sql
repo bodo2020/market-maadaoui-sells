@@ -1,0 +1,47 @@
+-- Applied live to Supabase project qzvpayjaadbmpayeglon (marketpos) on 2026-09-09.
+--
+-- This marker records the HR Requests V1 desired/live state that was installed through
+-- the connected Supabase SQL interface and verified transactionally before frontend rollout.
+-- The feature deliberately keeps HR records in the private schema and exposes only secured RPCs.
+--
+-- Private objects created:
+--   private.hr_requests
+--   private.hr_leave_periods
+--   private.hr_salary_advances
+--
+-- Public authenticated RPC boundary:
+--   submit_my_hr_request_v1(uuid,text,jsonb,text)
+--   get_my_hr_requests_v1(uuid,integer)
+--   cancel_my_hr_request_v1(uuid)
+--   get_hr_request_for_review_v1(uuid)
+--   decide_hr_request_v1(uuid,text,text,jsonb)
+--   complete_hr_salary_advance_payout_v1(uuid,text,text)
+--   apply_hr_attendance_correction_v1(uuid,text)
+--
+-- Workflow integration:
+--   hr_request                    -> Approval Center / HR reviewer
+--   hr_salary_advance_payout      -> finance.manage execution task
+--   hr_attendance_correction_apply-> hr.attendance.manage / branch.manage_staff execution task
+--
+-- Generic complete_operations_task explicitly rejects the three specialized HR task types.
+-- Approval Center notification routing includes hr_request and opens /approvals.
+--
+-- Security state verified after installation:
+--   * anon cannot EXECUTE submit/decision RPCs
+--   * authenticated can execute only the guarded RPC boundary
+--   * anon/authenticated have no direct SELECT on private.hr_requests
+--   * private HR tables have RLS enabled and direct grants revoked
+--
+-- Transactional tests performed with rollback/no persistent fixtures:
+--   1) Leave: submit -> approve -> approved leave period created.
+--   2) Salary advance: 1200 / 3 months -> approval -> finance payout -> fulfilled,
+--      monthly deduction 400 and outstanding principal 1200.
+--   3) Attendance correction: 2026-01-15 09:00-17:00 Cairo -> approve -> apply ->
+--      completed attendance session, 480 worked minutes.
+--
+-- Supabase Security Advisor was run after the change. New private tables only report the
+-- expected informational RLS-without-policy notice because direct Data API access is revoked;
+-- the project still has unrelated legacy security warnings tracked separately.
+--
+-- The earlier supabase/hr_requests_v1.draft.sql remains a historical design draft and must not
+-- be used as the production source of truth for the completed reviewer/execution workflow.
