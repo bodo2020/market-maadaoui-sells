@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowRight, BadgeCheck, BriefcaseBusiness, Building2, CalendarDays, Save, UserRoundCog, UsersRound } from "lucide-react";
+import { ArrowRight, BadgeCheck, BriefcaseBusiness, Building2, Save, UserRoundCog } from "lucide-react";
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
+import EmployeePerformancePanel from "@/components/employees/EmployeePerformancePanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -83,8 +84,14 @@ export default function Employee360Page() {
     });
   }, [profileQuery.data]);
 
-  const filteredTeams = useMemo(() => structureQuery.data?.teams.filter((t) => !form.department_id || t.department_id === form.department_id) || [], [structureQuery.data, form.department_id]);
-  const filteredTitles = useMemo(() => structureQuery.data?.job_titles.filter((j) => !form.department_id || j.department_id === form.department_id) || [], [structureQuery.data, form.department_id]);
+  const filteredTeams = useMemo(
+    () => structureQuery.data?.teams.filter((t) => !form.department_id || t.department_id === form.department_id) || [],
+    [structureQuery.data, form.department_id],
+  );
+  const filteredTitles = useMemo(
+    () => structureQuery.data?.job_titles.filter((j) => !form.department_id || j.department_id === form.department_id) || [],
+    [structureQuery.data, form.department_id],
+  );
   const managers = managersQuery.data?.items.filter((m) => m.id !== employeeId && m.employment_status !== "terminated") || [];
 
   const saveMutation = useMutation({
@@ -126,7 +133,8 @@ export default function Employee360Page() {
         </div>
 
         <Tabs defaultValue="employment" className="space-y-4">
-          <TabsList className="grid w-full max-w-2xl grid-cols-3"><TabsTrigger value="employment">البيانات الوظيفية</TabsTrigger><TabsTrigger value="contact">الحساب والفروع</TabsTrigger><TabsTrigger value="future">الحضور والمالية</TabsTrigger></TabsList>
+          <TabsList className="grid w-full max-w-2xl grid-cols-3"><TabsTrigger value="employment">البيانات الوظيفية</TabsTrigger><TabsTrigger value="contact">الحساب والفروع</TabsTrigger><TabsTrigger value="performance">الأداء والحضور</TabsTrigger></TabsList>
+
           <TabsContent value="employment">
             <Card><CardHeader><CardTitle>الملف الوظيفي</CardTitle><CardDescription>المسمى الوظيفي منفصل عن صلاحيات النظام. تغيير هذا القسم لا يمنح صلاحية تلقائيًا.</CardDescription></CardHeader><CardContent className="grid gap-5 md:grid-cols-2">
               <div><Label>الرقم الوظيفي</Label><Input value={form.employee_code || ""} onChange={(e) => setForm({ ...form, employee_code: e.target.value })} /></div>
@@ -145,17 +153,14 @@ export default function Employee360Page() {
 
           <TabsContent value="contact">
             <div className="grid gap-4 lg:grid-cols-2">
-              <Card><CardHeader><CardTitle>الحساب</CardTitle><CardDescription>بيانات الدخول الأساسية الحالية. تطوير Device Provisioning سيكون فوق هذا الملف.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-2 gap-4"><div><div className="text-xs text-muted-foreground">اسم المستخدم</div><div className="font-semibold">{user.username}</div></div><div><div className="text-xs text-muted-foreground">Role النظام</div><div className="font-semibold">{user.role}</div></div><div><div className="text-xs text-muted-foreground">الهاتف</div><div className="font-semibold">{user.phone || "—"}</div></div><div><div className="text-xs text-muted-foreground">البريد</div><div className="font-semibold">{user.email || "—"}</div></div></div></CardContent></Card>
+              <Card><CardHeader><CardTitle>الحساب</CardTitle><CardDescription>بيانات الدخول الأساسية للحساب، بينما الأجهزة الموثوقة تتم إدارتها كطبقة أمان مستقلة.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-2 gap-4"><div><div className="text-xs text-muted-foreground">اسم المستخدم</div><div className="font-semibold">{user.username}</div></div><div><div className="text-xs text-muted-foreground">Role النظام</div><div className="font-semibold">{user.role}</div></div><div><div className="text-xs text-muted-foreground">الهاتف</div><div className="font-semibold">{user.phone || "—"}</div></div><div><div className="text-xs text-muted-foreground">البريد</div><div className="font-semibold">{user.email || "—"}</div></div></div></CardContent></Card>
               <Card><CardHeader><CardTitle>الفروع المسموحة</CardTitle><CardDescription>الفرع الوظيفي الأساسي لا يلغي صلاحيات الوصول للفروع الأخرى.</CardDescription></CardHeader><CardContent className="space-y-3">{data.branches?.map((b: any) => <div key={b.branch_id} className="flex items-center justify-between rounded-lg border p-3"><div><div className="font-semibold">{b.branch_name}</div><div className="text-xs text-muted-foreground">{b.role}</div></div>{b.is_primary && <Badge>أساسي</Badge>}</div>)}{!data.branches?.length && <p className="text-sm text-muted-foreground">لا توجد فروع مرتبطة.</p>}<Separator /><div><Label>الفرع الوظيفي الأساسي</Label><Select value={form.primary_branch_id || "none"} onValueChange={(v) => setForm({ ...form, primary_branch_id: v === "none" ? null : v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">غير محدد</SelectItem>{data.branches?.filter((b:any) => b.active).map((b:any) => <SelectItem key={b.branch_id} value={b.branch_id}>{b.branch_name}</SelectItem>)}</SelectContent></Select></div>{primaryBranch && <p className="text-xs text-muted-foreground">الفرع الحالي: {primaryBranch.branch_name}</p>}</CardContent></Card>
             </div>
           </TabsContent>
 
-          <TabsContent value="future">
-            <div className="grid gap-4 lg:grid-cols-3">
-              <Card><CardHeader><CalendarDays className="mb-2 h-8 w-8 text-[#005931]" /><CardTitle>الحضور والانصراف</CardTitle><CardDescription>المرحلة التالية: Trusted Device + Geofence للفرع، وسياسة مستقلة للـRemote/Hybrid.</CardDescription></CardHeader></Card>
-              <Card><CardHeader><UsersRound className="mb-2 h-8 w-8 text-[#005931]" /><CardTitle>الأداء والمهام</CardTitle><CardDescription>سيتم ربط مؤشرات الموظف مباشرة بالـTask Center والـSLA والاعتمادات الموجودة بالفعل.</CardDescription></CardHeader></Card>
-              <Card><CardHeader><BriefcaseBusiness className="mb-2 h-8 w-8 text-[#005931]" /><CardTitle>الراتب وبطاقة الموظف</CardTitle><CardDescription>Payroll + Employee Wallet + الآجل وبدل الأكل سيضافوا كـLedgers منفصلة قابلة للمراجعة.</CardDescription></CardHeader></Card>
-            </div>
+          <TabsContent value="performance" className="space-y-4">
+            <EmployeePerformancePanel employeeId={employeeId} branchId={branchId} />
+            <Card><CardHeader><BriefcaseBusiness className="mb-2 h-8 w-8 text-[#005931]" /><CardTitle>الراتب وبطاقة الموظف</CardTitle><CardDescription>Payroll + Employee Wallet + الآجل وبدل الأكل يظلوا طبقات مالية مستقلة قابلة للمراجعة، ولن ندخلهم في Performance Score غامض.</CardDescription></CardHeader></Card>
           </TabsContent>
         </Tabs>
       </div>
