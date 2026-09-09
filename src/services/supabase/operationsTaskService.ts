@@ -7,7 +7,7 @@ export type OperationsTask = {
   id: string;
   branch_id: string;
   task_type: string;
-  source_kind: "pos_refund" | "online_refund" | string;
+  source_kind: "pos_refund" | "online_refund" | "shift_reconciliation" | string;
   source_id: string;
   return_id?: string | null;
   sale_id?: string | null;
@@ -15,6 +15,7 @@ export type OperationsTask = {
   payment_method_id?: string | null;
   payment_method_code?: string | null;
   payment_method_name?: string | null;
+  method_code?: string | null;
   amount: number;
   priority: "normal" | "high" | "urgent" | string;
   status: OperationsTaskStatus;
@@ -37,6 +38,12 @@ export type OperationsTask = {
   reference_number?: string | null;
   customer_name?: string | null;
   customer_phone?: string | null;
+  shift_id?: string | null;
+  cashier_name?: string | null;
+  expected_amount?: number | null;
+  counted_amount?: number | null;
+  variance_amount?: number | null;
+  variance_reason?: string | null;
   is_mine: boolean;
   is_overdue: boolean;
   can_claim: boolean;
@@ -63,7 +70,7 @@ function operationsTaskError(message?: string) {
   const value = message || "";
   if (value.includes("AUTH_REQUIRED")) return new Error("انتهت جلسة تسجيل الدخول. سجّل الدخول مرة أخرى.");
   if (value.includes("TASK_BRANCH_ACCESS_DENIED")) return new Error("الفرع الحالي خارج نطاق صلاحيتك.");
-  if (value.includes("TASK_CLAIM_DENIED")) return new Error("ليس لديك صلاحية استلام مهمة تحويل المرتجع.");
+  if (value.includes("TASK_CLAIM_DENIED") || value.includes("TASK_ACTION_DENIED")) return new Error("ليس لديك صلاحية تنفيذ هذه المهمة.");
   if (value.includes("TASK_ALREADY_CLAIMED")) return new Error("المهمة استلمها موظف آخر بالفعل. تم تحديث القائمة.");
   if (value.includes("TASK_NOT_OWNER")) return new Error("المهمة لم تعد مسندة لك. تم تحديث القائمة.");
   if (value.includes("TASK_NOT_FOUND")) return new Error("المهمة لم تعد موجودة.");
@@ -71,19 +78,25 @@ function operationsTaskError(message?: string) {
   if (value.includes("TASK_NOT_RELEASABLE")) return new Error("المهمة لا يمكن إرجاعها للطابور في حالتها الحالية.");
   if (value.includes("TASK_RELEASE_DENIED")) return new Error("لا يمكنك إرجاع مهمة موظف آخر للطابور.");
   if (value.includes("TASK_NOT_COMPLETABLE")) return new Error("المهمة لا يمكن إتمامها في حالتها الحالية.");
-  if (value.includes("TASK_FAILURE_REASON_REQUIRED")) return new Error("اكتب سبب تعذر التحويل.");
+  if (value.includes("TASK_COMPLETION_NOTE_REQUIRED")) return new Error("اكتب نتيجة المراجعة قبل إغلاق المهمة.");
+  if (value.includes("TASK_REQUIRES_SPECIAL_COMPLETION")) return new Error("هذه المهمة يجب إتمامها من مسار تأكيد التحويل.");
+  if (value.includes("TASK_FAILURE_REASON_REQUIRED")) return new Error("اكتب سبب تعذر التنفيذ.");
   if (value.includes("PROVIDER_REFERENCE_REQUIRED")) return new Error("اكتب رقم العملية أو المرجع قبل تأكيد التحويل.");
   if (value.includes("REFUND_NOT_PENDING")) return new Error("رد المبلغ لم يعد معلقًا لدى مزود الدفع.");
   if (value.includes("REFUND_PERMISSION_DENIED") || value.includes("ONLINE_DIGITAL_SETTLE_DENIED")) return new Error("ليس لديك صلاحية تأكيد رد المبلغ بهذه الوسيلة.");
   return new Error(message || "تعذر تنفيذ الإجراء على المهمة.");
 }
 
+export function isRefundTransferTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return task.task_type === "refund_transfer" || task.source_kind === "pos_refund" || task.source_kind === "online_refund";
+}
+
+export function isShiftReconciliationTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return task.task_type === "shift_variance_review" || task.source_kind === "shift_reconciliation";
+}
+
 export async function fetchOperationsTasks(branchId: string, scope: OperationsTaskScope = "all", limit = 250): Promise<OperationsTask[]> {
-  const { data, error } = await rpc("list_operations_tasks", {
-    p_branch_id: branchId,
-    p_scope: scope,
-    p_limit: limit,
-  });
+  const { data, error } = await rpc("list_operations_tasks", { p_branch_id: branchId, p_scope: scope, p_limit: limit });
   if (error) throw operationsTaskError(error.message);
   return Array.isArray(data) ? (data as OperationsTask[]) : [];
 }
@@ -114,6 +127,12 @@ export async function releaseOperationsTask(taskId: string, note?: string) {
 
 export async function failOperationsTask(taskId: string, reason: string) {
   const { data, error } = await rpc("fail_operations_task", { p_task_id: taskId, p_reason: reason.trim() });
+  if (error) throw operationsTaskError(error.message);
+  return data as Record<string, unknown>;
+}
+
+export async function completeOperationsTask(taskId: string, note: string) {
+  const { data, error } = await rpc("complete_operations_task", { p_task_id: taskId, p_note: note.trim() });
   if (error) throw operationsTaskError(error.message);
   return data as Record<string, unknown>;
 }
