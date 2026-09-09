@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { BarChart3, Boxes, BrainCircuit, Clock, FileDown, PackageSearch, ReceiptText, RotateCcw, ShoppingCart, TrendingUp, Users, WalletCards, Wallet } from "lucide-react";
+import { ArrowLeftRight, BarChart3, Boxes, BrainCircuit, Clock, FileDown, PackageSearch, ReceiptText, RotateCcw, ShoppingCart, TrendingUp, Users, WalletCards, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
@@ -10,6 +10,7 @@ const items = [
   { href: "/reports/returns", label: "المرتجعات", icon: RotateCcw },
   { href: "/reports/products", label: "المنتجات", icon: PackageSearch },
   { href: "/reports/inventory", label: "المخزون", icon: Boxes },
+  { href: "/reports/inventory-transfers", label: "تحويلات المخزون", icon: ArrowLeftRight },
   { href: "/reports/shifts", label: "الكاشير والورديات", icon: Clock },
   { href: "/reports/online", label: "الأونلاين", icon: ShoppingCart },
   { href: "/reports/customers", label: "العملاء", icon: Users },
