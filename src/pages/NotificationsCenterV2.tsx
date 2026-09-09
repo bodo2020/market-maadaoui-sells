@@ -210,6 +210,8 @@ export default function NotificationsCenterV2() {
           </div>
         )}
 
+        <NotificationCampaignHistory branchId={currentBranchId || null} />
+
         <Card className="border-slate-200/80 shadow-sm">
           <CardContent className="p-3 md:p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
