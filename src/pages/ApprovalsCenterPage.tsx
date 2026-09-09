@@ -29,7 +29,7 @@ import {
   type ApprovalItem,
   type ApprovalScope,
 } from "@/services/supabase/approvalCenterV1Service";
-import { claimOperationsTask, startOperationsTask } from "@/services/supabase/operationsTaskService";
+import { claimOperationsTask, completeOperationsTask, startOperationsTask } from "@/services/supabase/operationsTaskService";
 import {
   approveInventoryAdjustmentV2,
   fetchInventoryAuditTaskV2,
@@ -82,10 +82,12 @@ export default function ApprovalsCenterPage() {
   const [scope, setScope] = useState<ApprovalScope>("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [decisionTask, setDecisionTask] = useState<ApprovalItem | null>(null);
+  const [generalDecisionTask, setGeneralDecisionTask] = useState<ApprovalItem | null>(null);
   const [inventoryDetail, setInventoryDetail] = useState<InventoryAuditTaskDetail | null>(null);
   const [adjustmentReason, setAdjustmentReason] = useState<InventoryAdjustmentReason>("unknown");
   const [rejectionReason, setRejectionReason] = useState<InventoryAdjustmentRejectionReason>("insufficient_evidence");
   const [note, setNote] = useState("");
+  const [generalNote, setGeneralNote] = useState("");
 
   const query = useQuery({
     queryKey: ["approval-center-v1", currentBranchId, scope],
@@ -99,20 +101,22 @@ export default function ApprovalsCenterPage() {
   const items = useMemo(() => query.data?.items || [], [query.data?.items]);
 
   const openApproval = async (item: ApprovalItem) => {
-    if (item.source_kind !== "inventory_adjustment") {
-      navigate(item.action_url || "/tasks");
-      return;
-    }
     setBusyId(item.id);
     try {
       if (item.status === "open" && item.can_claim) await claimOperationsTask(item.id);
       try { await startOperationsTask(item.id); } catch { /* may already be in progress */ }
-      const detail = await fetchInventoryAuditTaskV2(item.id);
-      setDecisionTask(item);
-      setInventoryDetail(detail);
-      setAdjustmentReason("unknown");
-      setRejectionReason("insufficient_evidence");
-      setNote("");
+
+      if (item.source_kind === "inventory_adjustment") {
+        const detail = await fetchInventoryAuditTaskV2(item.id);
+        setDecisionTask(item);
+        setInventoryDetail(detail);
+        setAdjustmentReason("unknown");
+        setRejectionReason("insufficient_evidence");
+        setNote("");
+      } else {
+        setGeneralDecisionTask(item);
+        setGeneralNote("");
+      }
       await query.refetch();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر فتح الموافقة.");
@@ -126,6 +130,28 @@ export default function ApprovalsCenterPage() {
     setDecisionTask(null);
     setInventoryDetail(null);
     setNote("");
+  };
+
+  const closeGeneralDecision = () => {
+    setGeneralDecisionTask(null);
+    setGeneralNote("");
+  };
+
+  const submitGeneralDecision = async () => {
+    if (!generalDecisionTask || busyId) return;
+    if (generalNote.trim().length < 3) return toast.error("اكتب نتيجة المراجعة قبل الإغلاق.");
+    setBusyId(generalDecisionTask.id);
+    try {
+      await completeOperationsTask(generalDecisionTask.id, generalNote);
+      toast.success("تم تسجيل قرار المراجعة وإغلاق الموافقة بنجاح.");
+      closeGeneralDecision();
+      await query.refetch();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر تسجيل قرار المراجعة.");
+      await query.refetch();
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const approveInventory = async () => {
@@ -239,10 +265,10 @@ export default function ApprovalsCenterPage() {
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
                       {active && <Button disabled={busyId === item.id} onClick={() => openApproval(item)}>
-                        {busyId === item.id ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : item.source_kind === "inventory_adjustment" ? <ShieldCheck className="ml-2 h-4 w-4" /> : <ArrowLeft className="ml-2 h-4 w-4" />}
-                        {item.source_kind === "inventory_adjustment" ? (item.is_mine ? "فتح القرار" : "استلام ومراجعة") : "فتح المسار"}
+                        {busyId === item.id ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : item.source_kind === "inventory_adjustment" ? <ShieldCheck className="ml-2 h-4 w-4" /> : <ClipboardCheck className="ml-2 h-4 w-4" />}
+                        {item.source_kind === "inventory_adjustment" ? (item.is_mine ? "فتح القرار" : "استلام ومراجعة") : (item.is_mine ? "تسجيل القرار" : "استلام وتسجيل القرار")}
                       </Button>}
-                      {!active && item.action_url && <Button variant="outline" onClick={() => navigate(item.action_url!)}>فتح المصدر</Button>}
+                      {!active && item.action_url && <Button variant="outline" onClick={() => navigate(item.action_url!)}><ArrowLeft className="ml-2 h-4 w-4" />فتح المصدر</Button>}
                     </div>
                   </div>
                 </CardContent>
@@ -278,6 +304,25 @@ export default function ApprovalsCenterPage() {
             <Button variant="outline" onClick={closeDecision}>إغلاق</Button>
             <Button variant="destructive" onClick={rejectInventory} disabled={Boolean(busyId)}>رفض وإعادة الجرد</Button>
             <Button onClick={approveInventory} disabled={Boolean(busyId) || Math.abs(Number(inventoryDetail?.movement_ledger_gap || 0)) > 0.001}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}اعتماد التسوية</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(generalDecisionTask)} onOpenChange={open => !open && closeGeneralDecision()}>
+        <DialogContent dir="rtl" className="max-w-lg">
+          <DialogHeader><DialogTitle>تسجيل قرار المراجعة</DialogTitle></DialogHeader>
+          {generalDecisionTask && <div className="space-y-4">
+            <div className="rounded-2xl border bg-slate-50 p-4">
+              <div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={sourceMeta(generalDecisionTask.source_kind).className}>{sourceMeta(generalDecisionTask.source_kind).label}</Badge>{generalDecisionTask.is_overdue && <Badge variant="destructive">متأخرة</Badge>}</div>
+              <h3 className="mt-3 font-black">{generalDecisionTask.title}</h3>
+              {generalDecisionTask.description && <p className="mt-1 text-sm leading-6 text-muted-foreground">{generalDecisionTask.description}</p>}
+            </div>
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">هذا النوع لا يغيّر مخزونًا أو حركة مالية من مركز الموافقات؛ يتم فقط توثيق نتيجة المراجعة وإغلاق المهمة بنفس مسار النظام الحالي.</div>
+            <div className="space-y-2"><Label>نتيجة المراجعة</Label><Textarea autoFocus value={generalNote} onChange={event => setGeneralNote(event.target.value)} placeholder="اكتب ما تم التحقق منه والقرار النهائي..." /></div>
+          </div>}
+          <DialogFooter className="gap-2 sm:justify-start">
+            <Button variant="outline" onClick={closeGeneralDecision}>إلغاء</Button>
+            <Button onClick={submitGeneralDecision} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}تسجيل القرار وإغلاق</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
