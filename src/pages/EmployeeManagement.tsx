@@ -1,10 +1,9 @@
-
 import React from 'react';
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
+import { ShieldCheck, Smartphone } from "lucide-react";
 import { useEmployeeManagement } from '@/hooks/employees/useEmployeeManagement';
 
-// Import the refactored components
 import { EmployeeActions } from '@/components/employees/EmployeeActions';
 import { EmployeeStats } from '@/components/employees/EmployeeStats';
 import { EmployeeTableContainer } from '@/components/employees/EmployeeTableContainer';
@@ -71,8 +70,8 @@ export default function EmployeeManagement() {
       <MainLayout>
         <div className="flex flex-col items-center justify-center h-64">
           <p className="text-destructive text-lg">حدث خطأ أثناء تحميل البيانات</p>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="mt-4"
             onClick={() => queryClient.invalidateQueries({ queryKey: ['employees'] })}
           >
@@ -82,87 +81,102 @@ export default function EmployeeManagement() {
       </MainLayout>
     );
   }
-  
+
   return (
     <MainLayout>
-      <EmployeeActions 
-        onAddClick={() => setIsAddDialogOpen(true)}
-        onFilterClick={() => setIsFilterDialogOpen(true)}
-        onExportClick={handleExportEmployees}
-      />
-      
-      <EmployeeStats 
-        employees={employees}
-        isLoading={isLoading}
-        getEmployeesOnShift={getEmployeesOnShift}
-        getTotalHours={getTotalHours}
-        getAverageHours={getAverageHours}
-      />
-      
-      <EmployeeTableContainer
-        employees={filteredEmployees}
-        isLoading={isLoading}
-        search={search}
-        setSearch={setSearch}
-        startShiftMutation={startShiftMutation}
-        endShiftMutation={endShiftMutation}
-        onEditClick={handleEditClick}
-        onDeleteClick={handleDeleteClick}
-        onShiftClick={handleShiftClick}
-        hasActiveShift={hasActiveShift}
-        getActiveShiftId={getActiveShiftId}
-        getTotalHoursWorked={getTotalHoursWorked}
-        handleStartShift={handleStartShift}
-        handleEndShift={handleEndShift}
-      />
-      
-      <EmployeeFormDialog 
-        isOpen={isAddDialogOpen}
-        setIsOpen={setIsAddDialogOpen}
-        formData={formData}
-        handleInputChange={handleInputChange}
-        handleSelectChange={handleSelectChange}
-        handleSubmit={handleAddEmployee}
-        isEdit={false}
-        isMutating={createUserMutation.isPending}
-      />
-      
-      <EmployeeFormDialog 
-        isOpen={isEditDialogOpen}
-        setIsOpen={setIsEditDialogOpen}
-        formData={formData}
-        handleInputChange={handleInputChange}
-        handleSelectChange={handleSelectChange}
-        handleSubmit={handleEditEmployee}
-        isEdit={true}
-        isMutating={updateUserMutation.isPending}
-      />
-      
-      <DeleteEmployeeDialog 
-        isOpen={isDeleteDialogOpen}
-        setIsOpen={setIsDeleteDialogOpen}
-        handleDelete={handleDeleteEmployee}
-        isDeleting={deleteUserMutation.isPending}
-      />
-      
-      <ShiftHistoryDialog 
-        isOpen={isShiftDialogOpen}
-        setIsOpen={setIsShiftDialogOpen}
-        employee={selectedEmployee}
-      />
-      
-      <EmployeeFilters 
-        isOpen={isFilterDialogOpen}
-        setIsOpen={setIsFilterDialogOpen}
-        filterRole={filterRole}
-        setFilterRole={setFilterRole}
-        filterActive={filterActive}
-        setFilterActive={setFilterActive}
-        filterShift={filterShift}
-        setFilterShift={setFilterShift}
-        applyFilters={applyFilters}
-        resetFilters={resetFilters}
-      />
+      <div dir="rtl" className="space-y-4">
+        <EmployeeActions
+          onAddClick={() => setIsAddDialogOpen(true)}
+          onFilterClick={() => setIsFilterDialogOpen(true)}
+          onExportClick={handleExportEmployees}
+        />
+
+        <div className="rounded-xl border border-[#005931]/20 bg-[#005931]/5 p-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-[#005931]/10 p-2 text-[#005931]"><ShieldCheck className="h-5 w-5" /></div>
+            <div>
+              <div className="font-black text-[#005931]">تفعيل واعتماد أجهزة الموظفين</div>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                من صف الموظف اضغط <strong>«اعتماد / إدارة الجهاز»</strong>، ثم أنشئ جلسة ربط. سيظهر رابط وكود 6 أرقام لتفعيل الجهاز، وبعد نجاح التفعيل سيظهر الجهاز كـ«موثوق» ويمكن استخدامه للحضور والانصراف.
+              </p>
+              <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><Smartphone className="h-4 w-4" />لا تحتاج لتسجيل حساب السوبر أدمن على جهاز الموظف.</div>
+            </div>
+          </div>
+        </div>
+
+        <EmployeeStats
+          employees={employees}
+          isLoading={isLoading}
+          getEmployeesOnShift={getEmployeesOnShift}
+          getTotalHours={getTotalHours}
+          getAverageHours={getAverageHours}
+        />
+
+        <EmployeeTableContainer
+          employees={filteredEmployees}
+          isLoading={isLoading}
+          search={search}
+          setSearch={setSearch}
+          startShiftMutation={startShiftMutation}
+          endShiftMutation={endShiftMutation}
+          onEditClick={handleEditClick}
+          onDeleteClick={handleDeleteClick}
+          onShiftClick={handleShiftClick}
+          hasActiveShift={hasActiveShift}
+          getActiveShiftId={getActiveShiftId}
+          getTotalHoursWorked={getTotalHoursWorked}
+          handleStartShift={handleStartShift}
+          handleEndShift={handleEndShift}
+        />
+
+        <EmployeeFormDialog
+          isOpen={isAddDialogOpen}
+          setIsOpen={setIsAddDialogOpen}
+          formData={formData}
+          handleInputChange={handleInputChange}
+          handleSelectChange={handleSelectChange}
+          handleSubmit={handleAddEmployee}
+          isEdit={false}
+          isMutating={createUserMutation.isPending}
+        />
+
+        <EmployeeFormDialog
+          isOpen={isEditDialogOpen}
+          setIsOpen={setIsEditDialogOpen}
+          formData={formData}
+          handleInputChange={handleInputChange}
+          handleSelectChange={handleSelectChange}
+          handleSubmit={handleEditEmployee}
+          isEdit={true}
+          isMutating={updateUserMutation.isPending}
+        />
+
+        <DeleteEmployeeDialog
+          isOpen={isDeleteDialogOpen}
+          setIsOpen={setIsDeleteDialogOpen}
+          handleDelete={handleDeleteEmployee}
+          isDeleting={deleteUserMutation.isPending}
+        />
+
+        <ShiftHistoryDialog
+          isOpen={isShiftDialogOpen}
+          setIsOpen={setIsShiftDialogOpen}
+          employee={selectedEmployee}
+        />
+
+        <EmployeeFilters
+          isOpen={isFilterDialogOpen}
+          setIsOpen={setIsFilterDialogOpen}
+          filterRole={filterRole}
+          setFilterRole={setFilterRole}
+          filterActive={filterActive}
+          setFilterActive={setFilterActive}
+          filterShift={filterShift}
+          setFilterShift={setFilterShift}
+          applyFilters={applyFilters}
+          resetFilters={resetFilters}
+        />
+      </div>
     </MainLayout>
   );
 }
