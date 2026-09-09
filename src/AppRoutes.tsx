@@ -57,6 +57,7 @@ import Employee360Page from "@/pages/Employee360Page";
 import EmployeeDevicesPage from "@/pages/EmployeeDevicesPage";
 import StaffDeviceActivationPage from "@/pages/StaffDeviceActivationPage";
 import AttendancePage from "@/pages/AttendancePage";
+import MyHRPortalPage from "@/pages/MyHRPortalPage";
 import OrganizationStructurePage from "@/pages/OrganizationStructurePage";
 import CashTracking from "@/pages/CashTracking";
 import Banners from "@/pages/Banners";
@@ -113,6 +114,7 @@ export default function AppRoutes() {
       <Route path="/ai-insights" element={<ProtectedRoute><ReportsInsightsV2 /></ProtectedRoute>} />
       <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
       <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
+      <Route path="/my-hr" element={<ProtectedRoute><MyHRPortalPage /></ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute><AttendancePage /></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><OperationsTasksPage /></ProtectedRoute>} />
       <Route path="/approvals" element={<ProtectedRoute><ApprovalsCenterPage /></ProtectedRoute>} />
