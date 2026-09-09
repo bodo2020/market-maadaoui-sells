@@ -28,6 +28,7 @@ import CustomerOperationsCenterDock from "@/components/customers/CustomerOperati
 import CustomerFollowupPerformanceDock from "@/components/customers/CustomerFollowupPerformanceDock";
 import CustomerTeamWorkloadDock from "@/components/customers/CustomerTeamWorkloadDock";
 import CustomerMyTasksDock from "@/components/customers/CustomerMyTasksDock";
+import HrTaskExecutionDock from "@/components/hr/HrTaskExecutionDock";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -83,9 +84,9 @@ import InventoryImport from "@/pages/InventoryImport";
 const CashierPOS = () => (
   <PosShiftGatePro><PosRuntimeGuard><PosWorkspaceRecoveryGate><><POSPro /><POSCustomerLoyaltyBridge /><PosRecentSales /></></PosWorkspaceRecoveryGate></PosRuntimeGuard></PosShiftGatePro>
 );
-
 const CustomersWorkspace = () => (<><CustomersAdvanced /><CustomerMyTasksDock /><CustomerTeamWorkloadDock /><CustomerOperationsCenterDock /><CustomerOpportunityDock /></>);
 const Customer360Workspace = () => (<><Customer360Profile /><CustomerMyTasksDock /><CustomerFollowupPerformanceDock /><CustomerInsightsDock /><CustomerManagementDock /></>);
+const OperationsTasksWorkspace = () => (<><OperationsTasksPage /><HrTaskExecutionDock /></>);
 const ReportsRedirect = () => <Navigate to="/reports" replace />;
 const InventoryAuditRedirect = () => <Navigate to="/daily-inventory" replace />;
 
@@ -116,7 +117,7 @@ export default function AppRoutes() {
       <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
       <Route path="/my-hr" element={<ProtectedRoute><MyHRPortalPage /></ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute><AttendancePage /></ProtectedRoute>} />
-      <Route path="/tasks" element={<ProtectedRoute><OperationsTasksPage /></ProtectedRoute>} />
+      <Route path="/tasks" element={<ProtectedRoute><OperationsTasksWorkspace /></ProtectedRoute>} />
       <Route path="/approvals" element={<ProtectedRoute><ApprovalsCenterPage /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><NotificationsCenterV2 /></ProtectedRoute>} />
       <Route path="/categories" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
