@@ -96,6 +96,7 @@ export const adminNavigation: NavigationGroup = {
   title: "الإدارة والإعدادات",
   items: [
     { label: "إدارة الموظفين", href: "/employees", icon: UserCheck, adminOnly: true },
+    { label: "جدولة الورديات", href: "/hr/shifts", icon: Clock3, adminOnly: true },
     { label: "تقويم الإجازات", href: "/hr/leave-calendar", icon: CalendarCheck2, adminOnly: true },
     { label: "الهيكل التنظيمي", href: "/organization", icon: Network, adminOnly: true },
     { label: "الإعدادات", href: "/settings", icon: Settings },
