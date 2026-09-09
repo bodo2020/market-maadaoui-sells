@@ -7,7 +7,7 @@ export type OperationsTask = {
   id: string;
   branch_id: string;
   task_type: string;
-  source_kind: "pos_refund" | "online_refund" | "shift_reconciliation" | "cash_handoff" | string;
+  source_kind: "pos_refund" | "online_refund" | "shift_reconciliation" | "cash_handoff" | "inventory_count" | "inventory_recount" | "inventory_adjustment" | string;
   source_id: string;
   return_id?: string | null;
   sale_id?: string | null;
@@ -79,11 +79,12 @@ function operationsTaskError(message?: string) {
   if (value.includes("TASK_RELEASE_DENIED")) return new Error("لا يمكنك إرجاع مهمة موظف آخر للطابور.");
   if (value.includes("TASK_NOT_COMPLETABLE")) return new Error("المهمة لا يمكن إتمامها في حالتها الحالية.");
   if (value.includes("TASK_COMPLETION_NOTE_REQUIRED")) return new Error("اكتب نتيجة المراجعة قبل إغلاق المهمة.");
-  if (value.includes("TASK_REQUIRES_SPECIAL_COMPLETION")) return new Error("هذه المهمة يجب إتمامها من مسار تأكيد التحويل.");
+  if (value.includes("TASK_REQUIRES_SPECIAL_COMPLETION")) return new Error("هذه المهمة لها مسار إتمام مخصص ولا يمكن إغلاقها من الإجراء العام.");
   if (value.includes("TASK_FAILURE_REASON_REQUIRED")) return new Error("اكتب سبب تعذر التنفيذ.");
   if (value.includes("PROVIDER_REFERENCE_REQUIRED")) return new Error("اكتب رقم العملية أو المرجع قبل تأكيد التحويل.");
   if (value.includes("REFUND_NOT_PENDING")) return new Error("رد المبلغ لم يعد معلقًا لدى مزود الدفع.");
   if (value.includes("REFUND_PERMISSION_DENIED") || value.includes("ONLINE_DIGITAL_SETTLE_DENIED")) return new Error("ليس لديك صلاحية تأكيد رد المبلغ بهذه الوسيلة.");
+  if (value.includes("INVENTORY_SELF_RECOUNT_DENIED")) return new Error("لا يمكنك استلام إعادة عد لمنتج قمت بعدّه في المرة الأولى.");
   return new Error(message || "تعذر تنفيذ الإجراء على المهمة.");
 }
 
@@ -97,6 +98,22 @@ export function isShiftReconciliationTask(task: Pick<OperationsTask, "task_type"
 
 export function isCashHandoffVarianceTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
   return task.task_type === "cash_handoff_variance_review" || task.source_kind === "cash_handoff";
+}
+
+export function isInventoryCountTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return task.task_type === "inventory_daily_count" || task.source_kind === "inventory_count";
+}
+
+export function isInventoryRecountTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return task.task_type === "inventory_variance_recount" || task.source_kind === "inventory_recount";
+}
+
+export function isInventoryAdjustmentReviewTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return task.task_type === "inventory_adjustment_review" || task.source_kind === "inventory_adjustment";
+}
+
+export function isInventoryTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return isInventoryCountTask(task) || isInventoryRecountTask(task) || isInventoryAdjustmentReviewTask(task);
 }
 
 export function isOperationsReviewTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
