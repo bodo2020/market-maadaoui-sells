@@ -35,6 +35,7 @@ const severityMeta: Record<InsightSeverity, { label: string; card: string; badge
 
 const categoryLabels: Record<string, string> = {
   inventory: "المخزون",
+  inventory_transfers: "تحويلات المخزون",
   returns: "المرتجعات",
   shifts: "الورديات",
   online: "الأونلاين",
@@ -48,6 +49,9 @@ const metric = (insight: ReportingInsightV2) => {
   if (insight.metric_unit === "EGP") return `${value.toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siteConfig.currency}`;
   if (insight.metric_unit === "rows") return `${value.toLocaleString("ar-EG")} صف`;
   if (insight.metric_unit === "orders") return `${value.toLocaleString("ar-EG")} طلب`;
+  if (insight.metric_unit === "days") return `${value.toLocaleString("ar-EG", { maximumFractionDigits: 1 })} يوم`;
+  if (insight.metric_unit === "hours") return `${value.toLocaleString("ar-EG", { maximumFractionDigits: 1 })} ساعة`;
+  if (insight.metric_unit === "transfers") return `${value.toLocaleString("ar-EG")} تحويل`;
   if (insight.metric_unit === "not_available") return "غير متاح";
   return value.toLocaleString("ar-EG", { maximumFractionDigits: 2 });
 };
