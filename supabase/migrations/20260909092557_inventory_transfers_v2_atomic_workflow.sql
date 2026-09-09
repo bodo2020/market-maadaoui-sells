@@ -1,0 +1,5 @@
+-- Production migration history marker.
+-- This experimental transfer workflow was applied in production and then
+-- superseded by 20260909093529_inventory_transfers_v2_consolidation_final.sql.
+-- Keep this versioned file so repository history matches production without
+-- reintroducing the superseded overloads/status model on fresh environments.
