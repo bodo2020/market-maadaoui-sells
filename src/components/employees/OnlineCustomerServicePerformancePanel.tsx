@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Clock3, Headphones, PackageCheck, RefreshCw, Timer, Workflow } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, Headphones, PackageCheck, RefreshCw, ShieldCheck, Timer, Workflow } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,6 +51,7 @@ export default function OnlineCustomerServicePerformancePanel({ employeeId, bran
     { label: "تغييرات حالة نفذها", value: number(p.orders.status_transitions), icon: Workflow },
     { label: "متوسط أول استجابة", value: duration(p.orders.avg_first_response_minutes), icon: Clock3 },
     { label: "متوسط تجهيز الطلب", value: duration(p.orders.avg_preparation_minutes), icon: Timer },
+    { label: "SLA الطلبات", value: p.orders.sla.enabled ? pct(p.orders.sla.overall_rate) : "غير مفعّل", icon: ShieldCheck },
     { label: "إلغاءات نفذها", value: number(p.orders.cancelled), icon: AlertTriangle },
     { label: "متابعات مسندة", value: number(p.customer_service.assigned), icon: Headphones },
     { label: "إغلاق المتابعات المسندة", value: pct(p.customer_service.completion_rate), icon: CheckCircle2 },
@@ -101,7 +102,15 @@ export default function OnlineCustomerServicePerformancePanel({ employeeId, bran
               <div className="flex justify-between"><span className="text-muted-foreground">متوسط أول استجابة</span><span className="font-semibold">{duration(p.orders.avg_first_response_minutes)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">عينات التجهيز</span><span className="font-semibold">{number(p.orders.preparation_samples)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">متوسط preparing → ready</span><span className="font-semibold">{duration(p.orders.avg_preparation_minutes)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">SLA الطلبات</span><span className="font-semibold">{p.orders.sla.enabled ? pct(p.orders.sla.rate) : "غير مفعّل"}</span></div>
+              <div className="mt-3 border-t pt-3 font-bold">SLA</div>
+              {p.orders.sla.enabled ? <>
+                <div className="flex justify-between"><span className="text-muted-foreground">هدف أول استجابة</span><span className="font-semibold">{number(p.orders.sla.first_response_target_minutes)} د</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">الالتزام بأول استجابة</span><span className="font-semibold">{pct(p.orders.sla.first_response_rate)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">هدف التجهيز</span><span className="font-semibold">{number(p.orders.sla.preparation_target_minutes)} د</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">الالتزام بالتجهيز</span><span className="font-semibold">{pct(p.orders.sla.preparation_rate)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">SLA إجمالي</span><span className="font-black text-[#005931]">{pct(p.orders.sla.overall_rate)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">عينات مقيمة</span><span className="font-semibold">{number(p.orders.sla.evaluated_samples)}</span></div>
+              </> : <div className="rounded-lg bg-slate-50 p-2 text-xs text-muted-foreground">غير مفعّل لهذا الفرع. يمكن للمدير تحديد الأهداف وتفعيله من «تشغيل الفريق حسب التخصص».</div>}
             </div>
           </div>
 
@@ -130,7 +139,7 @@ export default function OnlineCustomerServicePerformancePanel({ employeeId, bran
           <p className="mt-1">أول استجابة تُنسب فقط لأول موظف معروف تعامل مع الطلب. السجلات القديمة بدون changed_by لا تدخل في تقييم أي شخص.</p>
           <p className="mt-1">زمن التجهيز من preparing إلى ready هو مؤشر للعملية التي أغلقها الموظف، وليس دليلًا أن كل زمن التجهيز كان عمله منفردًا.</p>
           <p className="mt-1">الإلغاء والمرتجع سياق للمراجعة فقط، ولا يعتبران خطأ على الموظف تلقائيًا.</p>
-          {!p.orders.sla.enabled && <p className="mt-1 font-semibold">SLA الطلبات لن يظهر كنسبة حتى نعرّف Policy فعلية للفرع بدل وضع هدف افتراضي.</p>}
+          <p className="mt-1">SLA لا يحسب إلا عند تفعيل سياسة الفرع وعلى العينات التي لها timestamps موثوقة؛ تغيير الهدف يعيد تقييم التاريخ حسب السياسة الحالية ولا يغير بيانات الطلب.</p>
         </div>
       </CardContent>
     </Card>
