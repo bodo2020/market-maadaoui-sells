@@ -29,6 +29,7 @@ import CustomerFollowupPerformanceDock from "@/components/customers/CustomerFoll
 import CustomerTeamWorkloadDock from "@/components/customers/CustomerTeamWorkloadDock";
 import CustomerMyTasksDock from "@/components/customers/CustomerMyTasksDock";
 import HrTaskExecutionDock from "@/components/hr/HrTaskExecutionDock";
+import AttendanceApprovedLeaveBanner from "@/components/hr/AttendanceApprovedLeaveBanner";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
 import CategoriesPage from "@/pages/CategoriesPage";
@@ -87,6 +88,7 @@ const CashierPOS = () => (
 const CustomersWorkspace = () => (<><CustomersAdvanced /><CustomerMyTasksDock /><CustomerTeamWorkloadDock /><CustomerOperationsCenterDock /><CustomerOpportunityDock /></>);
 const Customer360Workspace = () => (<><Customer360Profile /><CustomerMyTasksDock /><CustomerFollowupPerformanceDock /><CustomerInsightsDock /><CustomerManagementDock /></>);
 const OperationsTasksWorkspace = () => (<><OperationsTasksPage /><HrTaskExecutionDock /></>);
+const AttendanceWorkspace = () => (<><AttendancePage /><AttendanceApprovedLeaveBanner /></>);
 const ReportsRedirect = () => <Navigate to="/reports" replace />;
 const InventoryAuditRedirect = () => <Navigate to="/daily-inventory" replace />;
 
@@ -116,7 +118,7 @@ export default function AppRoutes() {
       <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
       <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
       <Route path="/my-hr" element={<ProtectedRoute><MyHRPortalPage /></ProtectedRoute>} />
-      <Route path="/attendance" element={<ProtectedRoute><AttendancePage /></ProtectedRoute>} />
+      <Route path="/attendance" element={<ProtectedRoute><AttendanceWorkspace /></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><OperationsTasksWorkspace /></ProtectedRoute>} />
       <Route path="/approvals" element={<ProtectedRoute><ApprovalsCenterPage /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><NotificationsCenterV2 /></ProtectedRoute>} />
