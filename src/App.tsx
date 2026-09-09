@@ -60,6 +60,8 @@ import ApprovalsCenterPage from "@/pages/ApprovalsCenterPage";
 import NotificationsCenterV2 from "@/pages/NotificationsCenterV2";
 import Suppliers from "@/pages/Suppliers";
 import EmployeeManagement from "@/pages/EmployeeManagement";
+import Employee360Page from "@/pages/Employee360Page";
+import OrganizationStructurePage from "@/pages/OrganizationStructurePage";
 import CashTracking from "@/pages/CashTracking";
 import Banners from "@/pages/Banners";
 import AddBanner from "@/pages/AddBanner";
@@ -164,6 +166,8 @@ function App() {
           <Route path="/suppliers" element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />
           <Route path="/customer-carts" element={<ProtectedRoute><CustomerCartsPage /></ProtectedRoute>} />
           <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
+          <Route path="/employees/:employeeId" element={<ProtectedRoute><Employee360Page /></ProtectedRoute>} />
+          <Route path="/organization" element={<ProtectedRoute><OrganizationStructurePage /></ProtectedRoute>} />
           <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />
           <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
           <Route path="/banners/add" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
