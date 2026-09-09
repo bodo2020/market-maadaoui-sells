@@ -1,0 +1,3 @@
+-- Production migration history marker.
+-- Direct browser writes were disabled here in production. The canonical
+-- grants/revokes are restated in 20260909093529_inventory_transfers_v2_consolidation_final.sql.
