@@ -25,6 +25,7 @@ import {
   Calendar,
   FileSpreadsheet,
   ArrowLeftRight,
+  BellRing,
 } from "lucide-react";
 import { NavigationGroup } from "./types";
 
@@ -34,6 +35,7 @@ export const mainNavigation: NavigationGroup = {
     { label: "التقارير والتحليلات", href: "/reports", icon: LayoutDashboard },
     { label: "نقطة البيع", href: "/pos", icon: ShoppingCart },
     { label: "المهام", href: "/tasks", icon: ClipboardList },
+    { label: "مركز الإشعارات", href: "/notifications", icon: BellRing },
     { label: "الطلبات الإلكترونية", href: "/online-orders", icon: ShoppingBag },
     { label: "الفواتير", href: "/invoices", icon: Receipt },
   ],
