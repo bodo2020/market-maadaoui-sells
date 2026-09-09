@@ -1,0 +1,17 @@
+alter table private.customer_cleanup_archive enable row level security;
+alter table private.inventory_movements_v2 enable row level security;
+alter table private.inventory_audit_sessions_v2 enable row level security;
+alter table private.inventory_audit_counts_v2 enable row level security;
+alter table private.inventory_audit_recounts_v2 enable row level security;
+alter table private.product_delete_audit_v2 enable row level security;
+alter table private.notification_events_v2 enable row level security;
+alter table private.notification_preferences_v2 enable row level security;
+alter table private.notification_delivery_queue_v2 enable row level security;
+alter table private.notification_campaigns_v2 enable row level security;
+alter table private.customer_whatsapp_consent_v2 enable row level security;
+alter table private.notification_devices_v2 enable row level security;
+alter table private.notification_worker_settings_v2 enable row level security;
+alter table private.hr_employee_wallet_accounts enable row level security;
+alter table private.hr_employee_wallet_ledger enable row level security;
+alter table private.online_order_sla_policies_v1 enable row level security;
+alter table private.online_order_sla_policy_audit_v1 enable row level security;
