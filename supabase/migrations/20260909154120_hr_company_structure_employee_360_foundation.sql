@@ -1,0 +1,29 @@
+-- Applied to production as Supabase migration 20260909154120.
+-- Authoritative SQL is retained in Supabase migration history under:
+-- hr_company_structure_employee_360_foundation.
+--
+-- This production migration introduced the private HR foundation:
+-- private.hr_organizations
+-- private.hr_departments
+-- private.hr_teams
+-- private.hr_job_titles
+-- private.hr_employee_profiles
+-- private.hr_audit_log
+--
+-- It also introduced the secured public RPC boundary:
+-- get_hr_structure_v1
+-- get_hr_employee_directory_v1
+-- get_hr_employee_profile_v1
+-- save_hr_employee_profile_v1
+-- save_hr_department_v1
+-- save_hr_team_v1
+-- save_hr_job_title_v1
+--
+-- Seeded organization: elmadawy_market / المعداوي ماركت
+-- Seeded departments: management, operations, pos, inventory, procurement, finance,
+-- hr, online, delivery, marketing, it.
+-- Seeded HR permissions: hr.view, hr.manage_employees, hr.manage_structure.
+--
+-- Private HR tables have RLS enabled and direct anon/authenticated access revoked.
+-- The marker is intentionally non-replaying because the full migration is already registered
+-- and live in production under the same version.
