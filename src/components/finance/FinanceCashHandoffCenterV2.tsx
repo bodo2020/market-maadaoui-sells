@@ -83,6 +83,9 @@ export default function FinanceCashHandoffCenterV2() {
         queryClient.invalidateQueries({ queryKey: ["financialSummary"] }),
         queryClient.invalidateQueries({ queryKey: ["reporting-shifts-v2", currentBranchId] }),
         queryClient.invalidateQueries({ queryKey: ["reporting-overview-v2", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["operations-tasks", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["operations-task-alerts", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["finance-shift-variance-task-center", currentBranchId] }),
       ]);
     } catch (error: any) {
       toast({ title: "تعذر استلام النقدية", description: error.message || "راجع المبلغ وحاول مرة أخرى.", variant: "destructive" });
