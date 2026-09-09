@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { useNotificationStore } from "@/stores/notificationStore";
-import { fetchOperationsTasks } from "@/services/supabase/operationsTaskService";
+import { fetchOperationsTasks, isShiftReconciliationTask } from "@/services/supabase/operationsTaskService";
 
 export default function OperationsTaskNotifications() {
   const navigate = useNavigate();
@@ -22,18 +22,9 @@ export default function OperationsTaskNotifications() {
     refetchOnWindowFocus: true,
   });
 
-  const available = useMemo(
-    () => (query.data || []).filter(task => task.status === "open"),
-    [query.data],
-  );
-  const mine = useMemo(
-    () => (query.data || []).filter(task => task.is_mine && ["claimed", "in_progress", "failed"].includes(task.status)),
-    [query.data],
-  );
-  const overdue = useMemo(
-    () => (query.data || []).filter(task => task.is_overdue && !["completed", "cancelled"].includes(task.status)),
-    [query.data],
-  );
+  const available = useMemo(() => (query.data || []).filter(task => task.status === "open"), [query.data]);
+  const mine = useMemo(() => (query.data || []).filter(task => task.is_mine && ["claimed", "in_progress", "failed"].includes(task.status)), [query.data]);
+  const overdue = useMemo(() => (query.data || []).filter(task => task.is_overdue && !["completed", "cancelled"].includes(task.status)), [query.data]);
 
   useEffect(() => {
     if (!user?.id || !currentBranchId) {
@@ -43,8 +34,6 @@ export default function OperationsTaskNotifications() {
     }
     if (!query.data) return;
 
-    // Shared work remains visible to everyone until somebody claims it.
-    // After claiming, it stays highlighted only for the employee who owns it.
     setOperationsTaskAlerts(available.length + mine.length);
     setOperationsTaskOverdue(overdue.length);
 
@@ -54,17 +43,22 @@ export default function OperationsTaskNotifications() {
       if (!sessionStorage.getItem(storageKey)) {
         sessionStorage.setItem(storageKey, "1");
         const first = available[0];
+        const shiftReview = isShiftReconciliationTask(first);
+        const title = available.length > 1
+          ? "مهام تشغيلية جديدة متاحة للاستلام"
+          : shiftReview
+            ? "مهمة مراجعة فرق وردية متاحة للاستلام"
+            : "مهمة رد مبلغ جديدة متاحة للاستلام";
         const description = available.length === 1
-          ? `${first.payment_method_name || "دفع إلكتروني"} · ${Number(first.amount || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${first.reference_number ? ` · ${first.reference_number}` : ""}`
+          ? shiftReview
+            ? `${first.payment_method_name || first.method_code || "وسيلة دفع"} · فرق ${Number(first.variance_amount ?? first.amount ?? 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${first.reference_number ? ` · ${first.reference_number}` : ""}`
+            : `${first.payment_method_name || "دفع إلكتروني"} · ${Number(first.amount || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م${first.reference_number ? ` · ${first.reference_number}` : ""}`
           : `${available.length.toLocaleString("ar-EG")} مهام متاحة للفريق في الفرع الحالي`;
 
-        toast.warning("مهمة رد مبلغ جديدة متاحة للاستلام", {
+        toast.warning(title, {
           description,
           duration: 10000,
-          action: {
-            label: "فتح المهام",
-            onClick: () => navigate("/tasks"),
-          },
+          action: { label: "فتح المهام", onClick: () => navigate("/tasks") },
         });
       }
     }
@@ -74,13 +68,10 @@ export default function OperationsTaskNotifications() {
       const storageKey = `operations-task-overdue:${user.id}:${currentBranchId}:${signature}`;
       if (!sessionStorage.getItem(storageKey)) {
         sessionStorage.setItem(storageKey, "1");
-        toast.error("فيه مهام رد مبالغ تجاوزت وقت التنفيذ", {
+        toast.error("فيه مهام تشغيلية تجاوزت وقت التنفيذ", {
           description: `${overdue.length.toLocaleString("ar-EG")} مهمة متأخرة تحتاج متابعة`,
           duration: 12000,
-          action: {
-            label: "عرض المتأخرة",
-            onClick: () => navigate("/tasks"),
-          },
+          action: { label: "عرض المتأخرة", onClick: () => navigate("/tasks") },
         });
       }
     }
