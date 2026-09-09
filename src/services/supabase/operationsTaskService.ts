@@ -54,7 +54,10 @@ export type OperationsTaskEvent = {
 };
 
 type RpcError = { message?: string } | null;
-const rpc = supabase.rpc as unknown as (name: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: RpcError }>;
+const rpc = supabase.rpc.bind(supabase) as unknown as (
+  name: string,
+  args?: Record<string, unknown>,
+) => Promise<{ data: unknown; error: RpcError }>;
 
 function operationsTaskError(message?: string) {
   const value = message || "";
