@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
   CheckCheck,
@@ -11,10 +11,22 @@ import {
   MailOpen,
   Megaphone,
   RefreshCw,
+  Repeat2,
   Send,
   UserRoundCheck,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,12 +34,15 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import {
   fetchNotificationCampaignDetailsV3,
   fetchNotificationCampaignHistoryV3,
+  resendNotificationCampaignV3,
   type NotificationCampaignHistoryItemV3,
 } from "@/services/supabase/notificationCampaignHistoryV3Service";
 
 interface Props {
   branchId: string | null;
 }
+
+type ResendMode = "unread" | "all";
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -53,7 +68,9 @@ function statValue(value: number) {
 }
 
 export default function NotificationCampaignHistory({ branchId }: Props) {
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [resendMode, setResendMode] = useState<ResendMode | null>(null);
 
   const history = useQuery({
     queryKey: ["notification-campaign-history-v3", branchId],
@@ -70,6 +87,30 @@ export default function NotificationCampaignHistory({ branchId }: Props) {
     queryFn: () => fetchNotificationCampaignDetailsV3(selectedId as string),
     staleTime: 10_000,
     retry: false,
+  });
+
+  const resend = useMutation({
+    mutationFn: async (mode: ResendMode) => {
+      if (!selectedId) throw new Error("NOTIFICATION_CAMPAIGN_NOT_SELECTED");
+      return resendNotificationCampaignV3(selectedId, mode === "unread");
+    },
+    onSuccess: result => {
+      void queryClient.invalidateQueries({ queryKey: ["notification-campaign-history-v3"] });
+      void queryClient.invalidateQueries({ queryKey: ["notification-campaign-details-v3"] });
+      void queryClient.invalidateQueries({ queryKey: ["notification-center-v2"] });
+      setResendMode(null);
+      toast.success("تم إنشاء حملة إعادة الإرسال", {
+        description: `تم إرسال ${result.in_app_created.toLocaleString("ar-EG")} إشعار داخل التطبيق من أصل ${result.recipient_count.toLocaleString("ar-EG")} مستلم متاح.`,
+      });
+    },
+    onError: (error: any) => {
+      const message = String(error?.message || error || "");
+      toast.error("تعذر إعادة إرسال الحملة", {
+        description: message.includes("NO_NOTIFICATION_RECIPIENTS_TO_RESEND")
+          ? "لا يوجد مستلمون متاحون حاليًا لهذا الاختيار."
+          : "راجع الصلاحيات وحالة المستلمين وحاول مرة تانية.",
+      });
+    },
   });
 
   const items = history.data?.items || [];
@@ -124,7 +165,7 @@ export default function NotificationCampaignHistory({ branchId }: Props) {
                 return (
                   <button key={item.id} type="button" onClick={() => setSelectedId(item.id)} className="group block w-full p-4 text-right transition hover:bg-emerald-50/35 md:p-5">
                     <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-[#005931]"><Megaphone className="h-4.5 w-4.5" /></span>
+                      <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-[#005931]"><Megaphone className="h-4 w-4" /></span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                           <div className="min-w-0">
@@ -188,6 +229,30 @@ export default function NotificationCampaignHistory({ branchId }: Props) {
                 <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-center"><Clock3 className="mx-auto h-4 w-4 text-amber-700" /><div className="mt-1 text-xl font-black text-amber-800">{statValue(details.data.stats.unread_count)}</div><div className="text-[10px] text-amber-800/70">لم يقرأ</div></div>
               </div>
 
+              <section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
+                <div className="flex items-center gap-2 font-black text-[#005931]"><Repeat2 className="h-4 w-4" /> إعادة الإرسال</div>
+                <p className="mt-1 text-xs leading-5 text-emerald-900/70">كل إعادة إرسال تُحفظ كحملة جديدة مستقلة، والمستلمون غير النشطين حاليًا يتم تخطيهم بأمان.</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <Button
+                    type="button"
+                    className="rounded-xl bg-[#005931] hover:bg-[#004728]"
+                    disabled={details.data.stats.unread_count <= 0 || resend.isPending}
+                    onClick={() => setResendMode("unread")}
+                  >
+                    <Clock3 className="ml-2 h-4 w-4" /> إرسال لغير المقروءين ({statValue(details.data.stats.unread_count)})
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl bg-white"
+                    disabled={details.data.stats.created_count <= 0 || resend.isPending}
+                    onClick={() => setResendMode("all")}
+                  >
+                    <Repeat2 className="ml-2 h-4 w-4" /> إعادة لنفس المستلمين
+                  </Button>
+                </div>
+              </section>
+
               <section>
                 <div className="mb-3 flex items-center justify-between">
                   <h4 className="font-black">حالة المستلمين</h4>
@@ -220,6 +285,30 @@ export default function NotificationCampaignHistory({ branchId }: Props) {
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={Boolean(resendMode)} onOpenChange={open => { if (!open) setResendMode(null); }}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader className="text-right">
+            <AlertDialogTitle>تأكيد إعادة إرسال الإشعار</AlertDialogTitle>
+            <AlertDialogDescription className="text-right leading-6">
+              {resendMode === "unread"
+                ? "هيتم إنشاء حملة جديدة بنفس الرسالة وإرسالها فقط للمستلمين اللي لسه ماقروش الحملة الأصلية، بشرط إن حساباتهم ما زالت متاحة."
+                : "هيتم إنشاء حملة جديدة بنفس الرسالة لنفس مستلمي الحملة الأصلية اللي حساباتهم ما زالت متاحة حاليًا."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:justify-start">
+            <AlertDialogAction
+              className="bg-[#005931] hover:bg-[#004728]"
+              disabled={resend.isPending}
+              onClick={() => resendMode && resend.mutate(resendMode)}
+            >
+              {resend.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Send className="ml-2 h-4 w-4" />}
+              تأكيد الإرسال
+            </AlertDialogAction>
+            <AlertDialogCancel disabled={resend.isPending}>إلغاء</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
