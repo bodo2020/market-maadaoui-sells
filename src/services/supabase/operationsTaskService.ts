@@ -7,7 +7,7 @@ export type OperationsTask = {
   id: string;
   branch_id: string;
   task_type: string;
-  source_kind: "pos_refund" | "online_refund" | "shift_reconciliation" | "cash_handoff" | "inventory_count" | "inventory_recount" | "inventory_adjustment" | "inventory_transfer_dispatch" | "inventory_transfer_receive" | "inventory_transfer_variance" | string;
+  source_kind: "pos_refund" | "online_refund" | "shift_reconciliation" | "cash_handoff" | "inventory_count" | "inventory_recount" | "inventory_adjustment" | "inventory_transfer_dispatch" | "inventory_transfer_receive" | "inventory_transfer_variance" | "attendance_exception" | string;
   source_id: string;
   return_id?: string | null;
   sale_id?: string | null;
@@ -177,10 +177,18 @@ export function isOperationsReviewTask(task: Pick<OperationsTask, "task_type" | 
   return isShiftReconciliationTask(task) || isCashHandoffVarianceTask(task) || isInventoryTransferVarianceTask(task);
 }
 
+export function isAttendanceExceptionTask(task: Pick<OperationsTask, "source_kind">) {
+  return task.source_kind === "attendance_exception";
+}
+
 export async function fetchOperationsTasks(branchId: string, scope: OperationsTaskScope = "all", limit = 250): Promise<OperationsTask[]> {
   const { data, error } = await rpc("list_operations_tasks", { p_branch_id: branchId, p_scope: scope, p_limit: limit });
   if (error) throw operationsTaskError(error.message);
-  return Array.isArray(data) ? (data as OperationsTask[]) : [];
+  const rows = Array.isArray(data) ? (data as OperationsTask[]) : [];
+  // Attendance exceptions use an approve/reject RPC that can create an attendance
+  // session from the original request timestamp. Keep them out of the generic task
+  // UI so they cannot be released/failed/treated like ordinary operational work.
+  return rows.filter(task => !isAttendanceExceptionTask(task));
 }
 
 export async function fetchOperationsTaskDashboard(branchId: string): Promise<OperationsTaskDashboard> {
