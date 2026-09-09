@@ -128,6 +128,25 @@ export type TreasuryPayoutTaskDetail = {
   parent_task_id?: string | null;
 };
 
+export type PayrollTreasuryTaskDetail = {
+  task: { id: string; status: string; claimed_by?: string | null; created_at: string };
+  payroll: {
+    id: string;
+    month: number;
+    year: number;
+    total_net: number;
+    status: string;
+  };
+  source: {
+    kind: TreasurySourceKind;
+    account_id: string;
+    account_name: string;
+    responsible_user_id: string;
+    balance: number;
+  };
+  reference?: string | null;
+};
+
 type RpcError = { message?: string } | null;
 const rpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
@@ -149,7 +168,17 @@ function treasuryError(message?: string) {
   if (value.includes("HR_PAYOUT_ALREADY_DELEGATED")) return new Error("السلفة مرسلة بالفعل لمسؤول خزنة آخر. انتظر القرار أو أعدها للمالية بعد الرفض.");
   if (value.includes("HR_ADVANCE_NOT_PENDING_PAYOUT")) return new Error("السلفة لم تعد في مرحلة انتظار الصرف.");
   if (value.includes("HR_ADVANCE_NOT_UNLINKED")) return new Error("السلفة القديمة مرتبطة بالفعل بمصدر صرف أو ليست مؤهلة للتسوية.");
+  if (value.includes("PAYROLL_PAYMENT_SOURCE_REQUIRED")) return new Error("اختر خزنة أو درج كاشير أو حسابًا بنكيًا لصرف المسير.");
+  if (value.includes("PAYROLL_PAYMENT_SOURCE_UNAVAILABLE")) return new Error("مصدر صرف الرواتب لم يعد متاحًا لهذا الفرع.");
+  if (value.includes("PAYROLL_PAYMENT_SOURCE_HAS_NO_RESPONSIBLE")) return new Error("مصدر الصرف ليس له مسؤول عهدة حالي. عيّن المسؤول أولًا أو افتح وردية الدرج.");
+  if (value.includes("PAYROLL_INSUFFICIENT_BALANCE")) return new Error("رصيد مصدر الصرف أقل من صافي مسير الرواتب.");
+  if (value.includes("PAYROLL_ALREADY_DELEGATED")) return new Error("المسير مرسل بالفعل لمسؤول عهدة آخر. انتظر التأكيد أو الرفض.");
+  if (value.includes("PAYROLL_PAYMENT_NOTE_REQUIRED")) return new Error("اكتب ملاحظة واضحة لمسؤول العهدة.");
+  if (value.includes("PAYROLL_PAYMENT_REFERENCE_REQUIRED")) return new Error("أدخل مرجع صرف واضحًا للمسير.");
+  if (value.includes("PAYROLL_NOT_LOCKED")) return new Error("المسير يجب أن يكون معتمدًا ومقفلًا قبل إرساله للصرف.");
+  if (value.includes("PAYROLL_PAYMENT_DENIED")) return new Error("ليس لديك صلاحية إسناد صرف مسير الرواتب.");
   if (value.includes("TREASURY_TASK_NOT_OWNER")) return new Error("مهمة الصرف ليست مسندة لحسابك.");
+  if (value.includes("TREASURY_TASK_ACCESS_DENIED")) return new Error("ليس لديك صلاحية فتح مهمة الصرف هذه.");
   if (value.includes("TREASURY_RESPONSIBILITY_CHANGED")) return new Error("مسؤولية الخزنة تغيرت بعد إنشاء المهمة. أعد العملية إلى المالية لإسنادها من جديد.");
   if (value.includes("TREASURY_DRAWER_SHIFT_CHANGED")) return new Error("وردية هذا الدرج تغيرت. لا يمكن الخصم من درج لم يعد في عهدتك.");
   if (value.includes("TREASURY_INSUFFICIENT_BALANCE")) return new Error("الرصيد الحالي لا يكفي للصرف. لم يتم خصم أي مبلغ.");
@@ -206,6 +235,35 @@ export async function delegateHrSalaryAdvancePayout(input: {
   return data as { ok: boolean; idempotent?: boolean; delegated_task_id: string; responsible_user_id: string; responsible_user_name: string; source_account_name: string; amount: number };
 }
 
+export async function delegateHrPayrollPayment(input: {
+  runId: string;
+  sourceKind: TreasurySourceKind;
+  sourceAccountId: string;
+  note: string;
+  reference: string;
+}) {
+  const { data, error } = await rpc("delegate_hr_payroll_payment_v4", {
+    p_run_id: input.runId,
+    p_source_kind: input.sourceKind,
+    p_source_account_id: input.sourceAccountId,
+    p_note: input.note.trim(),
+    p_reference: input.reference.trim(),
+  });
+  if (error) throw treasuryError(error.message);
+  return data as {
+    ok: boolean;
+    idempotent?: boolean;
+    delegated_task_id: string;
+    responsible_user_id: string;
+    responsible_user_name: string;
+    source_account_name: string;
+    balance: number;
+    amount: number;
+    month: number;
+    year: number;
+  };
+}
+
 export async function delegateLegacySalaryAdvanceSource(input: {
   advanceId: string;
   sourceKind: TreasurySourceKind;
@@ -230,6 +288,12 @@ export async function getTreasuryPayoutTask(taskId: string): Promise<TreasuryPay
   return data as TreasuryPayoutTaskDetail;
 }
 
+export async function getPayrollTreasuryTask(taskId: string): Promise<PayrollTreasuryTaskDetail> {
+  const { data, error } = await rpc("get_my_hr_treasury_payroll_task_v1", { p_task_id: taskId });
+  if (error) throw treasuryError(error.message);
+  return data as PayrollTreasuryTaskDetail;
+}
+
 export async function confirmTreasuryPayout(taskId: string, note: string, reference?: string | null) {
   const { data, error } = await rpc("confirm_hr_treasury_payout_v1", {
     p_task_id: taskId,
@@ -240,8 +304,33 @@ export async function confirmTreasuryPayout(taskId: string, note: string, refere
   return data as { ok: boolean; idempotent?: boolean; advance_id: string; amount: number; source_account_name: string; source_balance_after: number; legacy_reconciliation?: boolean };
 }
 
+export async function confirmPayrollTreasuryPayout(taskId: string, note: string, reference?: string | null) {
+  const { data, error } = await rpc("confirm_hr_treasury_payroll_v1", {
+    p_task_id: taskId,
+    p_note: note.trim(),
+    p_reference: reference?.trim() || null,
+  });
+  if (error) throw treasuryError(error.message);
+  return data as {
+    ok: boolean;
+    idempotent?: boolean;
+    run?: Record<string, unknown>;
+    amount?: number;
+    source_kind?: TreasurySourceKind;
+    source_account_id?: string;
+    source_account_name?: string;
+    source_balance_after?: number;
+  };
+}
+
 export async function rejectTreasuryPayout(taskId: string, reason: string) {
   const { data, error } = await rpc("reject_hr_treasury_payout_v1", { p_task_id: taskId, p_reason: reason.trim() });
   if (error) throw treasuryError(error.message);
   return data as { ok: boolean; advance_id: string; status: string; legacy_reconciliation?: boolean };
+}
+
+export async function rejectPayrollTreasuryPayout(taskId: string, reason: string) {
+  const { data, error } = await rpc("reject_hr_treasury_payroll_v1", { p_task_id: taskId, p_reason: reason.trim() });
+  if (error) throw treasuryError(error.message);
+  return data as { ok: boolean; run_id: string; status: "locked" };
 }
