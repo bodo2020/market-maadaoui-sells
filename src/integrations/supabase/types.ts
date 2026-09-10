@@ -509,6 +509,7 @@ export type Database = {
           branch_id: string
           created_at: string
           currency: string
+          custodian_user_id: string | null
           device_id: string | null
           id: string
           name: string
@@ -520,6 +521,7 @@ export type Database = {
           branch_id: string
           created_at?: string
           currency?: string
+          custodian_user_id?: string | null
           device_id?: string | null
           id?: string
           name: string
@@ -531,6 +533,7 @@ export type Database = {
           branch_id?: string
           created_at?: string
           currency?: string
+          custodian_user_id?: string | null
           device_id?: string | null
           id?: string
           name?: string
@@ -542,6 +545,13 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_accounts_custodian_user_id_fkey"
+            columns: ["custodian_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
           {
@@ -1617,14 +1627,18 @@ export type Database = {
       }
       expenses: {
         Row: {
+          actual_fee_amount: number
           amount: number
           branch_id: string | null
           created_at: string | null
           created_by: string | null
           date: string
           description: string
+          expected_fee_amount: number
+          fee_saving_amount: number
           id: string
           paid_from_account_id: string | null
+          paid_from_payment_account_id: string | null
           payment_method: string | null
           receipt_url: string | null
           shift_id: string | null
@@ -1634,16 +1648,21 @@ export type Database = {
           void_reason: string | null
           voided_at: string | null
           voided_by: string | null
+          wallet_operation_id: string | null
         }
         Insert: {
+          actual_fee_amount?: number
           amount: number
           branch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           date: string
           description: string
+          expected_fee_amount?: number
+          fee_saving_amount?: number
           id?: string
           paid_from_account_id?: string | null
+          paid_from_payment_account_id?: string | null
           payment_method?: string | null
           receipt_url?: string | null
           shift_id?: string | null
@@ -1653,16 +1672,21 @@ export type Database = {
           void_reason?: string | null
           voided_at?: string | null
           voided_by?: string | null
+          wallet_operation_id?: string | null
         }
         Update: {
+          actual_fee_amount?: number
           amount?: number
           branch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           date?: string
           description?: string
+          expected_fee_amount?: number
+          fee_saving_amount?: number
           id?: string
           paid_from_account_id?: string | null
+          paid_from_payment_account_id?: string | null
           payment_method?: string | null
           receipt_url?: string | null
           shift_id?: string | null
@@ -1672,6 +1696,7 @@ export type Database = {
           void_reason?: string | null
           voided_at?: string | null
           voided_by?: string | null
+          wallet_operation_id?: string | null
         }
         Relationships: [
           {
@@ -1693,6 +1718,13 @@ export type Database = {
             columns: ["paid_from_account_id"]
             isOneToOne: false
             referencedRelation: "cash_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_paid_from_payment_account_id_fkey"
+            columns: ["paid_from_payment_account_id"]
+            isOneToOne: false
+            referencedRelation: "payment_accounts"
             referencedColumns: ["id"]
           },
           {
@@ -3142,6 +3174,7 @@ export type Database = {
           branch_id: string
           created_at: string
           currency: string
+          custodian_user_id: string | null
           id: string
           name: string
           provider_code: string
@@ -3153,6 +3186,7 @@ export type Database = {
           branch_id: string
           created_at?: string
           currency?: string
+          custodian_user_id?: string | null
           id?: string
           name: string
           provider_code: string
@@ -3164,6 +3198,7 @@ export type Database = {
           branch_id?: string
           created_at?: string
           currency?: string
+          custodian_user_id?: string | null
           id?: string
           name?: string
           provider_code?: string
@@ -3175,6 +3210,13 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_accounts_custodian_user_id_fkey"
+            columns: ["custodian_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -3427,7 +3469,12 @@ export type Database = {
           clearing_account_id: string
           created_at: string
           created_by: string | null
+          destination_cash_ledger_entry_id: string | null
+          destination_payment_ledger_entry_id: string | null
+          destination_responsible_user_id: string | null
+          failure_reason: string | null
           fee_amount: number
+          fee_ledger_entry_id: string | null
           gross_amount: number
           id: string
           net_amount: number
@@ -3435,12 +3482,20 @@ export type Database = {
           payment_method: string
           payment_method_name_snapshot: string | null
           provider_reference: string | null
+          received_at: string | null
+          receiver_confirmed_by: string | null
+          receiver_note: string | null
+          receiver_task_id: string | null
           request_fingerprint: string | null
           request_id: string | null
+          requested_at: string | null
           settled_at: string
           source_account_name_snapshot: string | null
+          source_net_ledger_entry_id: string | null
+          status: string
           target_account_name_snapshot: string | null
           target_kind: string
+          updated_at: string
         }
         Insert: {
           bank_account_id?: string | null
@@ -3449,7 +3504,12 @@ export type Database = {
           clearing_account_id: string
           created_at?: string
           created_by?: string | null
+          destination_cash_ledger_entry_id?: string | null
+          destination_payment_ledger_entry_id?: string | null
+          destination_responsible_user_id?: string | null
+          failure_reason?: string | null
           fee_amount?: number
+          fee_ledger_entry_id?: string | null
           gross_amount: number
           id?: string
           net_amount: number
@@ -3457,12 +3517,20 @@ export type Database = {
           payment_method: string
           payment_method_name_snapshot?: string | null
           provider_reference?: string | null
+          received_at?: string | null
+          receiver_confirmed_by?: string | null
+          receiver_note?: string | null
+          receiver_task_id?: string | null
           request_fingerprint?: string | null
           request_id?: string | null
+          requested_at?: string | null
           settled_at?: string
           source_account_name_snapshot?: string | null
+          source_net_ledger_entry_id?: string | null
+          status?: string
           target_account_name_snapshot?: string | null
           target_kind?: string
+          updated_at?: string
         }
         Update: {
           bank_account_id?: string | null
@@ -3471,7 +3539,12 @@ export type Database = {
           clearing_account_id?: string
           created_at?: string
           created_by?: string | null
+          destination_cash_ledger_entry_id?: string | null
+          destination_payment_ledger_entry_id?: string | null
+          destination_responsible_user_id?: string | null
+          failure_reason?: string | null
           fee_amount?: number
+          fee_ledger_entry_id?: string | null
           gross_amount?: number
           id?: string
           net_amount?: number
@@ -3479,12 +3552,20 @@ export type Database = {
           payment_method?: string
           payment_method_name_snapshot?: string | null
           provider_reference?: string | null
+          received_at?: string | null
+          receiver_confirmed_by?: string | null
+          receiver_note?: string | null
+          receiver_task_id?: string | null
           request_fingerprint?: string | null
           request_id?: string | null
+          requested_at?: string | null
           settled_at?: string
           source_account_name_snapshot?: string | null
+          source_net_ledger_entry_id?: string | null
+          status?: string
           target_account_name_snapshot?: string | null
           target_kind?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -3520,6 +3601,55 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_settlements_destination_cash_ledger_entry_id_fkey"
+            columns: ["destination_cash_ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "cash_ledger"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_settlements_destination_payment_ledger_entry_id_fkey"
+            columns: ["destination_payment_ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "payment_ledger"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_settlements_destination_responsible_user_id_fkey"
+            columns: ["destination_responsible_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_settlements_fee_ledger_entry_id_fkey"
+            columns: ["fee_ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "payment_ledger"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_settlements_receiver_confirmed_by_fkey"
+            columns: ["receiver_confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_settlements_receiver_task_id_fkey"
+            columns: ["receiver_task_id"]
+            isOneToOne: false
+            referencedRelation: "operations_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_settlements_source_net_ledger_entry_id_fkey"
+            columns: ["source_net_ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "payment_ledger"
             referencedColumns: ["id"]
           },
         ]
@@ -6379,6 +6509,16 @@ export type Database = {
         }
         Returns: Json
       }
+      add_hr_payroll_adjustment_v2: {
+        Args: {
+          p_adjustment_type: string
+          p_amount: number
+          p_code: string
+          p_note: string
+          p_payroll_item_id: string
+        }
+        Returns: Json
+      }
       adjust_branch_inventory: {
         Args: {
           p_branch_id: string
@@ -6408,6 +6548,10 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_hr_attendance_correction_v1: {
+        Args: { p_note: string; p_task_id: string }
+        Returns: Json
+      }
       approve_inventory_adjustment_v2: {
         Args: {
           p_note: string
@@ -6421,6 +6565,7 @@ export type Database = {
         Args: { p_refund_source?: string; p_return_id: string }
         Returns: Json
       }
+      approve_staff_device_v1: { Args: { p_device_id: string }; Returns: Json }
       auto_transfer_from_hub: {
         Args: {
           p_product_id: string
@@ -6453,6 +6598,10 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_finance_transfer_v2: {
+        Args: { p_reason: string; p_transfer_id: string }
+        Returns: Json
+      }
       cancel_inventory_audit_session_v2: {
         Args: { p_note?: string; p_session_id: string }
         Returns: Json
@@ -6461,12 +6610,30 @@ export type Database = {
         Args: { p_reason: string; p_transfer_id: string }
         Returns: Json
       }
+      cancel_my_hr_request_v1: { Args: { p_request_id: string }; Returns: Json }
       cash_drop_to_safe: {
         Args: {
           p_amount: number
           p_device_id: string
           p_device_token: string
           p_note?: string
+        }
+        Returns: Json
+      }
+      change_my_staff_app_pin_v1: {
+        Args: { p_current_pin: string; p_new_pin: string }
+        Returns: Json
+      }
+      charge_employee_wallet_purchase_v1: {
+        Args: {
+          p_amount: number
+          p_branch_id: string
+          p_description?: string
+          p_employee_id: string
+          p_idempotency_key: string
+          p_payment_mode: string
+          p_reference_id: string
+          p_reference_kind: string
         }
         Returns: Json
       }
@@ -6542,6 +6709,20 @@ export type Database = {
         }
         Returns: Json
       }
+      complete_hr_salary_advance_payout_v1: {
+        Args: { p_note: string; p_reference?: string; p_task_id: string }
+        Returns: Json
+      }
+      complete_hr_salary_advance_payout_v2: {
+        Args: {
+          p_note: string
+          p_reference?: string
+          p_source_account_id: string
+          p_source_kind: string
+          p_task_id: string
+        }
+        Returns: Json
+      }
       complete_operations_task: {
         Args: { p_note: string; p_task_id: string }
         Returns: Json
@@ -6560,8 +6741,39 @@ export type Database = {
         Args: { p_provider_reference: string; p_task_id: string }
         Returns: Json
       }
+      configure_employee_wallet_v1: {
+        Args: {
+          p_active?: boolean
+          p_benefit_monthly_allowance: number
+          p_branch_id: string
+          p_credit_limit: number
+          p_employee_id: string
+          p_payroll_deduction_enabled?: boolean
+        }
+        Returns: Json
+      }
+      confirm_finance_transfer_handover_v2: {
+        Args: { p_note: string; p_task_id: string }
+        Returns: Json
+      }
+      confirm_finance_transfer_receipt_v2: {
+        Args: { p_note: string; p_task_id: string }
+        Returns: Json
+      }
+      confirm_hr_treasury_payout_v1: {
+        Args: { p_note: string; p_reference?: string; p_task_id: string }
+        Returns: Json
+      }
+      confirm_hr_treasury_payroll_v1: {
+        Args: { p_note: string; p_reference?: string; p_task_id: string }
+        Returns: Json
+      }
       confirm_online_refund: {
         Args: { p_provider_reference?: string; p_refund_id: string }
+        Returns: Json
+      }
+      confirm_payment_settlement_receipt_v3: {
+        Args: { p_note: string; p_task_id: string }
         Returns: Json
       }
       confirm_pos_card_refund: {
@@ -6623,6 +6835,27 @@ export type Database = {
         }
         Returns: string
       }
+      create_finance_bank_account_v2: {
+        Args: {
+          p_branch_id: string
+          p_custodian_user_id?: string
+          p_name: string
+        }
+        Returns: Json
+      }
+      create_finance_transfer_v2: {
+        Args: {
+          p_amount: number
+          p_branch_id: string
+          p_destination_account_id: string
+          p_destination_ledger_kind: string
+          p_note: string
+          p_reference?: string
+          p_source_account_id: string
+          p_source_ledger_kind: string
+        }
+        Returns: Json
+      }
       create_inventory_audit_session_v2: {
         Args: {
           p_assignee_id?: string
@@ -6648,6 +6881,20 @@ export type Database = {
         Returns: Json
       }
       create_loyalty_voucher: { Args: { p_points: number }; Returns: Json }
+      create_payment_settlement_v3: {
+        Args: {
+          p_branch_id: string
+          p_fee_amount?: number
+          p_gross_amount: number
+          p_note?: string
+          p_provider_reference?: string
+          p_request_id: string
+          p_source_account_id: string
+          p_target_account_id: string
+          p_target_kind: string
+        }
+        Returns: Json
+      }
       create_pos_sale: {
         Args: { p_branch_id: string; p_request_id: string; p_sale: Json }
         Returns: Json
@@ -6667,7 +6914,98 @@ export type Database = {
         Args: { p_branch_id: string; p_request_id: string; p_sale: Json }
         Returns: Json
       }
+      create_staff_device_pairing_v1: {
+        Args: {
+          p_branch_id: string
+          p_device_type?: string
+          p_employee_id: string
+          p_expires_minutes?: number
+        }
+        Returns: Json
+      }
+      create_supplier_wallet_payment_v4: {
+        Args: {
+          p_actual_fee?: number
+          p_amount: number
+          p_apply_to_supplier?: boolean
+          p_branch_id: string
+          p_note?: string
+          p_payment_account_id: string
+          p_provider_reference?: string
+          p_purchase_id?: string
+          p_representative_id?: string
+          p_request_id: string
+          p_supplier_id: string
+        }
+        Returns: Json
+      }
       create_verification_codes_table: { Args: never; Returns: undefined }
+      create_wallet_expense_v4: {
+        Args: {
+          p_actual_fee?: number
+          p_amount: number
+          p_branch_id: string
+          p_date?: string
+          p_description?: string
+          p_payment_account_id: string
+          p_provider_reference?: string
+          p_receipt_url?: string
+          p_request_id: string
+          p_type: string
+        }
+        Returns: Json
+      }
+      decide_attendance_exception_v1: {
+        Args: { p_decision: string; p_exception_id: string; p_note?: string }
+        Returns: Json
+      }
+      decide_finance_payroll_v2: {
+        Args: { p_decision: string; p_note?: string; p_run_id: string }
+        Returns: Json
+      }
+      decide_hr_payroll_v2: {
+        Args: { p_decision: string; p_note?: string; p_run_id: string }
+        Returns: Json
+      }
+      decide_hr_request_v1: {
+        Args: {
+          p_approved_payload?: Json
+          p_decision: string
+          p_note: string
+          p_task_id: string
+        }
+        Returns: Json
+      }
+      delegate_hr_payroll_payment_v4: {
+        Args: {
+          p_note: string
+          p_reference: string
+          p_run_id: string
+          p_source_account_id: string
+          p_source_kind: string
+        }
+        Returns: Json
+      }
+      delegate_hr_salary_advance_payout_v3: {
+        Args: {
+          p_note: string
+          p_reference?: string
+          p_source_account_id: string
+          p_source_kind: string
+          p_task_id: string
+        }
+        Returns: Json
+      }
+      delegate_legacy_hr_salary_advance_source_v1: {
+        Args: {
+          p_advance_id: string
+          p_note: string
+          p_reference?: string
+          p_source_account_id: string
+          p_source_kind: string
+        }
+        Returns: Json
+      }
       delete_pos_payment_method: {
         Args: { p_branch_id: string; p_method_id: string }
         Returns: Json
@@ -6701,6 +7039,10 @@ export type Database = {
         }
         Returns: Json
       }
+      ensure_daily_inventory_audit_tasks_v3: {
+        Args: { p_audit_date?: string; p_branch_id: string }
+        Returns: Json
+      }
       fail_operations_task: {
         Args: { p_reason: string; p_task_id: string }
         Returns: Json
@@ -6717,7 +7059,19 @@ export type Database = {
           min_order_amount: number
         }[]
       }
+      generate_hr_payroll_run_v2: {
+        Args: { p_branch_id: string; p_month: number; p_year: number }
+        Returns: Json
+      }
       get_admin_role: { Args: never; Returns: string }
+      get_approval_center_v1: {
+        Args: { p_branch_id: string; p_limit?: number; p_scope?: string }
+        Returns: Json
+      }
+      get_attendance_exception_v1: {
+        Args: { p_exception_id: string }
+        Returns: Json
+      }
       get_branch_cash_overview: { Args: { p_branch_id: string }; Returns: Json }
       get_branch_for_neighborhood: {
         Args: { p_neighborhood_id: string }
@@ -6900,6 +7254,10 @@ export type Database = {
         Args: { p_branch_id?: string; p_customer_id: string }
         Returns: Json
       }
+      get_delivery_assignment_workspace_v1: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       get_delivery_price: {
         Args: { p_branch_id: string; p_neighborhood_id: string }
         Returns: {
@@ -6907,14 +7265,163 @@ export type Database = {
           price: number
         }[]
       }
+      get_employee_staff_devices_v1: {
+        Args: { p_branch_id?: string; p_employee_id: string }
+        Returns: Json
+      }
+      get_employee_wallet_admin_v1: {
+        Args: { p_branch_id: string; p_employee_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_finance_accounts_admin_v2: {
+        Args: { p_branch_id: string }
+        Returns: Json
+      }
       get_finance_cash_handoff_workspace_v2: {
         Args: { p_branch_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_finance_control_center_base_v3: {
+        Args: { p_branch_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_finance_control_center_v2: {
+        Args: { p_branch_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_finance_payout_sources_v1: {
+        Args: { p_branch_id: string }
+        Returns: Json
+      }
+      get_finance_payout_sources_v2: {
+        Args: { p_branch_id: string }
         Returns: Json
       }
       get_finance_settlement_workspace_v2: {
         Args: { p_branch_id: string; p_limit?: number }
         Returns: Json
       }
+      get_finance_settlement_workspace_v3: {
+        Args: { p_branch_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_finance_transfer_options_v2: {
+        Args: { p_branch_id: string }
+        Returns: Json
+      }
+      get_finance_transfers_v2: {
+        Args: { p_branch_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_finance_treasury_workspace_v1: {
+        Args: { p_branch_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_finance_treasury_workspace_v2: {
+        Args: { p_branch_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_finance_wallet_workspace_v4: {
+        Args: { p_branch_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_hr_cashier_performance_v1: {
+        Args: {
+          p_branch_id: string
+          p_employee_id: string
+          p_from: string
+          p_to: string
+        }
+        Returns: Json
+      }
+      get_hr_compensation_directory_v1: {
+        Args: { p_branch_id: string }
+        Returns: Json
+      }
+      get_hr_delivery_performance_v1: {
+        Args: {
+          p_branch_id: string
+          p_employee_id: string
+          p_from: string
+          p_to: string
+        }
+        Returns: Json
+      }
+      get_hr_employee_directory_v1: {
+        Args: {
+          p_branch_id?: string
+          p_department_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
+      get_hr_employee_performance_detail_v1: {
+        Args: {
+          p_branch_id: string
+          p_employee_id: string
+          p_from: string
+          p_to: string
+        }
+        Returns: Json
+      }
+      get_hr_employee_performance_v1: {
+        Args: { p_branch_id: string; p_from: string; p_to: string }
+        Returns: Json
+      }
+      get_hr_employee_profile_v1: {
+        Args: { p_branch_id?: string; p_employee_id: string }
+        Returns: Json
+      }
+      get_hr_inventory_performance_v1: {
+        Args: {
+          p_branch_id: string
+          p_employee_id: string
+          p_from: string
+          p_to: string
+        }
+        Returns: Json
+      }
+      get_hr_leave_calendar_v1: {
+        Args: { p_branch_id: string; p_from: string; p_to: string }
+        Returns: Json
+      }
+      get_hr_manager_team_operations_v1: {
+        Args: { p_branch_id: string; p_from: string; p_to: string }
+        Returns: Json
+      }
+      get_hr_manager_team_period_comparison_v1: {
+        Args: { p_branch_id: string; p_from: string; p_to: string }
+        Returns: Json
+      }
+      get_hr_online_customer_service_performance_v1: {
+        Args: {
+          p_branch_id: string
+          p_employee_id: string
+          p_from: string
+          p_to: string
+        }
+        Returns: Json
+      }
+      get_hr_payroll_treasury_queue_v1: {
+        Args: { p_branch_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_hr_payroll_workspace_v2: {
+        Args: { p_branch_id: string; p_month: number; p_year: number }
+        Returns: Json
+      }
+      get_hr_request_for_review_v1: {
+        Args: { p_task_id: string }
+        Returns: Json
+      }
+      get_hr_shift_scheduler_v1: {
+        Args: { p_branch_id: string }
+        Returns: Json
+      }
+      get_hr_structure_v1: { Args: { p_branch_id?: string }; Returns: Json }
       get_inventory_audit_dashboard_v2: {
         Args: { p_branch_id: string; p_limit?: number }
         Returns: Json
@@ -6965,8 +7472,26 @@ export type Database = {
       get_merged_cash_balance:
         | { Args: never; Returns: number }
         | { Args: { p_branch_id?: string }; Returns: number }
+      get_my_attendance_v1: { Args: { p_branch_id?: string }; Returns: Json }
       get_my_customer_followup_inbox: {
         Args: { p_branch_id?: string; p_upcoming_days?: number }
+        Returns: Json
+      }
+      get_my_employee_wallet_v1: { Args: { p_limit?: number }; Returns: Json }
+      get_my_finance_transfer_tasks_v2: {
+        Args: { p_branch_id?: string }
+        Returns: Json
+      }
+      get_my_hr_requests_v1: {
+        Args: { p_branch_id?: string; p_limit?: number }
+        Returns: Json
+      }
+      get_my_hr_treasury_payout_task_v1: {
+        Args: { p_task_id: string }
+        Returns: Json
+      }
+      get_my_hr_treasury_payroll_task_v1: {
+        Args: { p_task_id: string }
         Returns: Json
       }
       get_my_loyalty_card: { Args: never; Returns: Json }
@@ -6986,6 +7511,10 @@ export type Database = {
         Args: { p_device_id: string; p_device_token: string }
         Returns: Json
       }
+      get_my_payment_settlement_tasks_v3: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       get_my_pos_cash_summary: {
         Args: { p_device_id: string; p_device_token: string }
         Returns: Json
@@ -6997,6 +7526,7 @@ export type Database = {
       get_my_pos_workspace: { Args: { p_branch_id: string }; Returns: Json }
       get_my_purchase_history: { Args: { p_limit?: number }; Returns: Json[] }
       get_my_push_device_status_v2: { Args: never; Returns: Json }
+      get_my_staff_app_pin_status_v1: { Args: never; Returns: Json }
       get_my_staff_branches: {
         Args: never
         Returns: {
@@ -7033,6 +7563,14 @@ export type Database = {
         Returns: Json
       }
       get_online_money_overview: {
+        Args: { p_branch_id: string }
+        Returns: Json
+      }
+      get_online_order_sla_policy_v1: {
+        Args: { p_branch_id: string }
+        Returns: Json
+      }
+      get_operations_task_dashboard_v1: {
         Args: { p_branch_id: string }
         Returns: Json
       }
@@ -7210,6 +7748,10 @@ export type Database = {
         Args: { p_branch_id?: string; p_customer_id: string }
         Returns: Json
       }
+      get_supplier_ledger_v1: {
+        Args: { p_branch_id?: string; p_limit?: number; p_supplier_id: string }
+        Returns: Json
+      }
       has_branch_access: {
         Args: { _branch: string; _user: string }
         Returns: boolean
@@ -7248,6 +7790,10 @@ export type Database = {
       }
       list_operations_tasks: {
         Args: { p_branch_id: string; p_limit?: number; p_scope?: string }
+        Returns: Json
+      }
+      list_pending_staff_device_approvals_v1: {
+        Args: { p_limit?: number }
         Returns: Json
       }
       list_pos_devices: {
@@ -7314,6 +7860,19 @@ export type Database = {
         Args: { p_branch_id?: string }
         Returns: number
       }
+      mark_hr_payroll_paid_v2: {
+        Args: { p_payment_reference: string; p_run_id: string }
+        Returns: Json
+      }
+      mark_hr_payroll_paid_v3: {
+        Args: {
+          p_payment_reference: string
+          p_run_id: string
+          p_source_account_id: string
+          p_source_kind: string
+        }
+        Returns: Json
+      }
       mark_notification_read_v2: {
         Args: { p_notification_id: string }
         Returns: boolean
@@ -7350,6 +7909,18 @@ export type Database = {
         }
         Returns: Json
       }
+      post_employee_wallet_adjustment_v1: {
+        Args: {
+          p_benefit_delta: number
+          p_branch_id: string
+          p_description: string
+          p_employee_id: string
+          p_entry_type: string
+          p_idempotency_key: string
+          p_receivable_delta: number
+        }
+        Returns: Json
+      }
       preflight_pos_sale: {
         Args: { p_branch_id: string; p_items: Json }
         Returns: Json
@@ -7370,6 +7941,17 @@ export type Database = {
           p_payment_method?: string
           p_payment_reference?: string
           p_target_status?: string
+        }
+        Returns: Json
+      }
+      quick_trust_my_staff_device_v1: {
+        Args: {
+          p_branch_id?: string
+          p_device_key?: string
+          p_device_name?: string
+          p_device_type?: string
+          p_metadata?: Json
+          p_platform?: string
         }
         Returns: Json
       }
@@ -7403,6 +7985,16 @@ export type Database = {
       }
       reconcile_customer_checkout_attempt: {
         Args: { p_request_id: string }
+        Returns: Json
+      }
+      reconcile_hr_salary_advance_payout_source_v1: {
+        Args: {
+          p_advance_id: string
+          p_note: string
+          p_reference?: string
+          p_source_account_id: string
+          p_source_kind: string
+        }
         Returns: Json
       }
       record_customer_whatsapp_consent_v2: {
@@ -7446,6 +8038,18 @@ export type Database = {
         }
         Returns: Json
       }
+      redeem_staff_device_pairing_v1: {
+        Args: {
+          p_device_key: string
+          p_device_name: string
+          p_device_type?: string
+          p_metadata?: Json
+          p_pairing_code: string
+          p_pairing_token: string
+          p_platform?: string
+        }
+        Returns: Json
+      }
       register_pos_device: {
         Args: { p_branch_id: string; p_name: string }
         Returns: Json
@@ -7460,8 +8064,32 @@ export type Database = {
         }
         Returns: Json
       }
+      reject_finance_transfer_handover_v2: {
+        Args: { p_reason: string; p_task_id: string }
+        Returns: Json
+      }
+      reject_finance_transfer_receipt_v2: {
+        Args: { p_reason: string; p_task_id: string }
+        Returns: Json
+      }
+      reject_hr_treasury_payout_v1: {
+        Args: { p_reason: string; p_task_id: string }
+        Returns: Json
+      }
+      reject_hr_treasury_payroll_v1: {
+        Args: { p_reason: string; p_task_id: string }
+        Returns: Json
+      }
       reject_inventory_adjustment_v2: {
         Args: { p_note: string; p_reason_code: string; p_task_id: string }
+        Returns: Json
+      }
+      reject_payment_settlement_receipt_v3: {
+        Args: { p_reason: string; p_task_id: string }
+        Returns: Json
+      }
+      reject_staff_device_v1: {
+        Args: { p_device_id: string; p_reason?: string }
         Returns: Json
       }
       release_operations_task: {
@@ -7472,11 +8100,31 @@ export type Database = {
         Args: { p_expected_user_id: string; p_items: Json }
         Returns: undefined
       }
+      resend_notification_campaign_v3: {
+        Args: { p_campaign_id: string; p_unread_only?: boolean }
+        Returns: Json
+      }
+      reset_staff_app_pin_v1: {
+        Args: { p_branch_id?: string; p_user_id: string }
+        Returns: Json
+      }
       reset_staff_pos_pin: {
         Args: { p_branch_id: string; p_user_id: string }
         Returns: undefined
       }
+      retry_finance_transfer_receipt_v2: {
+        Args: { p_note: string; p_transfer_id: string }
+        Returns: Json
+      }
+      retry_payment_settlement_receipt_v3: {
+        Args: { p_note: string; p_settlement_id: string }
+        Returns: Json
+      }
       revoke_pos_device: { Args: { p_device_id: string }; Returns: undefined }
+      revoke_staff_device_v1: {
+        Args: { p_device_id: string; p_reason?: string }
+        Returns: undefined
+      }
       sales_summary_by_branch: {
         Args: { p_end?: string; p_start?: string }
         Returns: {
@@ -7486,6 +8134,82 @@ export type Database = {
           total_profit: number
           total_sales: number
         }[]
+      }
+      save_hr_compensation_profile_v1: {
+        Args: {
+          p_base_salary: number
+          p_branch_id: string
+          p_effective_from?: string
+          p_employee_id: string
+        }
+        Returns: Json
+      }
+      save_hr_department_v1: {
+        Args: {
+          p_active?: boolean
+          p_code: string
+          p_department_id: string
+          p_description?: string
+          p_name_ar: string
+          p_parent_department_id?: string
+          p_sort_order?: number
+        }
+        Returns: Json
+      }
+      save_hr_employee_profile_v1: {
+        Args: { p_branch_id: string; p_employee_id: string; p_profile: Json }
+        Returns: Json
+      }
+      save_hr_job_title_v1: {
+        Args: {
+          p_active?: boolean
+          p_code: string
+          p_default_work_mode?: string
+          p_department_id: string
+          p_grade?: string
+          p_job_title_id: string
+          p_name_ar: string
+        }
+        Returns: Json
+      }
+      save_hr_shift_assignment_v1: {
+        Args: {
+          p_active?: boolean
+          p_assignment_id: string
+          p_branch_id: string
+          p_effective_from: string
+          p_effective_to?: string
+          p_employee_id: string
+          p_shift_template_id: string
+          p_weekdays: number[]
+        }
+        Returns: Json
+      }
+      save_hr_shift_template_v1: {
+        Args: {
+          p_active?: boolean
+          p_branch_id: string
+          p_break_minutes?: number
+          p_early_departure_grace_minutes?: number
+          p_end_time: string
+          p_late_grace_minutes?: number
+          p_name_ar: string
+          p_start_time: string
+          p_template_id: string
+        }
+        Returns: Json
+      }
+      save_hr_team_v1: {
+        Args: {
+          p_active?: boolean
+          p_branch_id: string
+          p_department_id: string
+          p_description?: string
+          p_manager_user_id?: string
+          p_name_ar: string
+          p_team_id: string
+        }
+        Returns: Json
       }
       save_my_pos_workspace: {
         Args: {
@@ -7516,6 +8240,22 @@ export type Database = {
           p_parent_product_id: string
           p_variant: Json
           p_variant_id?: string
+        }
+        Returns: Json
+      }
+      save_supplier_representative_v1: {
+        Args: {
+          p_active?: boolean
+          p_branch_id: string
+          p_can_receive_payments?: boolean
+          p_name: string
+          p_notes?: string
+          p_payment_limit?: number
+          p_payout_destination?: string
+          p_payout_method?: string
+          p_phone?: string
+          p_representative_id?: string
+          p_supplier_id: string
         }
         Returns: Json
       }
@@ -7599,6 +8339,24 @@ export type Database = {
         Args: { p_address_id: string }
         Returns: undefined
       }
+      set_delivery_order_assignment_v1: {
+        Args: {
+          p_delivery_user_id: string
+          p_order_id: string
+          p_reason?: string
+          p_tracking_number?: string
+        }
+        Returns: Json
+      }
+      set_finance_account_custodian_v1: {
+        Args: {
+          p_account_id: string
+          p_account_kind: string
+          p_branch_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       set_inventory_stock_policy_v2: {
         Args: {
           p_alert_enabled?: boolean
@@ -7628,8 +8386,18 @@ export type Database = {
         Args: { p_branch_id: string; p_pin: string }
         Returns: undefined
       }
+      set_my_staff_app_pin_v1: { Args: { p_pin: string }; Returns: Json }
       set_my_whatsapp_marketing_consent_v2: {
         Args: { p_opt_in: boolean; p_source?: string }
+        Returns: Json
+      }
+      set_online_order_sla_policy_v1: {
+        Args: {
+          p_branch_id: string
+          p_enabled: boolean
+          p_first_response_target_minutes: number
+          p_preparation_target_minutes: number
+        }
         Returns: Json
       }
       set_product_variant_active: {
@@ -7648,17 +8416,54 @@ export type Database = {
         Args: { p_schema_name: string }
         Returns: undefined
       }
+      staff_attendance_check_in_v1: {
+        Args: {
+          p_accuracy_m?: number
+          p_attendance_mode?: string
+          p_branch_id: string
+          p_device_id: string
+          p_device_token: string
+          p_exception_reason?: string
+          p_latitude?: number
+          p_longitude?: number
+        }
+        Returns: Json
+      }
+      staff_attendance_check_out_v1: {
+        Args: {
+          p_accuracy_m?: number
+          p_device_id: string
+          p_device_token: string
+          p_latitude?: number
+          p_longitude?: number
+          p_session_id: string
+        }
+        Returns: Json
+      }
       staff_has_permission: {
         Args: { p_branch_id?: string; p_permission_code: string }
         Returns: boolean
       }
       start_operations_task: { Args: { p_task_id: string }; Returns: Json }
+      submit_hr_payroll_for_review_v2: {
+        Args: { p_run_id: string }
+        Returns: Json
+      }
       submit_inventory_count_v2: {
         Args: { p_actual_count: number; p_note?: string; p_task_id: string }
         Returns: Json
       }
       submit_inventory_recount_v2: {
         Args: { p_actual_count: number; p_note?: string; p_task_id: string }
+        Returns: Json
+      }
+      submit_my_hr_request_v1: {
+        Args: {
+          p_branch_id: string
+          p_payload: Json
+          p_reason: string
+          p_request_type: string
+        }
         Returns: Json
       }
       sync_my_notification_center_v2: {
@@ -7696,6 +8501,15 @@ export type Database = {
         Returns: Json
       }
       unregister_push_device_v2: { Args: { p_token: string }; Returns: boolean }
+      update_finance_bank_account_v2: {
+        Args: {
+          p_account_id: string
+          p_active: boolean
+          p_custodian_user_id: string
+          p_name: string
+        }
+        Returns: Json
+      }
       update_pos_device_runtime_settings: {
         Args: {
           p_auto_lock_minutes: number
@@ -7704,6 +8518,11 @@ export type Database = {
         }
         Returns: Json
       }
+      validate_my_staff_device_v1: {
+        Args: { p_device_id: string; p_device_token: string }
+        Returns: Json
+      }
+      verify_my_staff_app_pin_v1: { Args: { p_pin: string }; Returns: Json }
       verify_notification_worker_secret_v2: {
         Args: { p_secret: string }
         Returns: boolean
@@ -7719,6 +8538,10 @@ export type Database = {
       }
       void_branch_expense_atomic: {
         Args: { p_expense_id: string; p_reason?: string }
+        Returns: Json
+      }
+      void_supplier_wallet_payment_v4: {
+        Args: { p_operation_id: string; p_reason?: string }
         Returns: Json
       }
     }
