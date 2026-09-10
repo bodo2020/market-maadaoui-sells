@@ -57,6 +57,11 @@ function clearLivePosWorkspace() {
   localStorage.removeItem(POS_ACTIVE_TAB_KEY);
 }
 
+function clearStaffAppLockSession() {
+  const keys = Array.from({ length: sessionStorage.length }, (_, index) => sessionStorage.key(index)).filter(Boolean) as string[];
+  keys.filter(key => key.startsWith("staff-app-pin-unlocked:") || key.startsWith("staff-app-pin-locked:")).forEach(key => sessionStorage.removeItem(key));
+}
+
 function stashPosWorkspace(userId: string | null | undefined, branchId: string | null | undefined) {
   if (!userId || !branchId) {
     clearLivePosWorkspace();
@@ -125,6 +130,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setBranchSelectionRequired(false);
       localStorage.removeItem("user");
       clearLivePosWorkspace();
+      clearStaffAppLockSession();
       return;
     }
 

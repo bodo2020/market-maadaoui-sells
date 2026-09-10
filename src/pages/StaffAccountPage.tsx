@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
-import { changeMyStaffAppPin, getMyStaffAppPinStatus } from "@/services/staffAppPinService";
+import { changeMyStaffAppPin, getMyStaffAppPinStatus, superAdminSetStaffAppPin } from "@/services/staffAppPinService";
 import { getLocalTrustedStaffDevice } from "@/services/staffDeviceService";
 
 export default function StaffAccountPage() {
@@ -21,6 +21,7 @@ export default function StaffAccountPage() {
   const [confirmPin, setConfirmPin] = useState("");
   const device = getLocalTrustedStaffDevice();
   const branchContext = branchOptions.find(branch => branch.branch_id === currentBranchId);
+  const isSuperAdmin = user?.role === "super_admin";
 
   const pinQuery = useQuery({
     queryKey: ["my-staff-app-pin-status"],
@@ -30,15 +31,16 @@ export default function StaffAccountPage() {
 
   const pinMutation = useMutation({
     mutationFn: async () => {
-      if (!/^\d{4,6}$/.test(currentPin)) throw new Error("اكتب PIN الحالي من 4 إلى 6 أرقام.");
+      if (!isSuperAdmin && !/^\d{4,6}$/.test(currentPin)) throw new Error("اكتب PIN الحالي من 4 إلى 6 أرقام.");
       if (!/^\d{4,6}$/.test(newPin)) throw new Error("PIN الجديد يجب أن يكون من 4 إلى 6 أرقام.");
       if (newPin !== confirmPin) throw new Error("تأكيد PIN الجديد غير مطابق.");
-      if (newPin === currentPin) throw new Error("اختار PIN جديد مختلف عن الحالي.");
-      return changeMyStaffAppPin(currentPin, newPin);
+      if (!isSuperAdmin && newPin === currentPin) throw new Error("اختار PIN جديد مختلف عن الحالي.");
+      if (!user?.id) throw new Error("تعذر تحديد الحساب الحالي.");
+      return isSuperAdmin ? superAdminSetStaffAppPin(user.id, newPin) : changeMyStaffAppPin(currentPin, newPin);
     },
     onSuccess: async () => {
       setCurrentPin(""); setNewPin(""); setConfirmPin("");
-      toast.success("تم تغيير PIN الخاص بحسابك.");
+      toast.success(isSuperAdmin ? "تم تغيير PIN بصلاحية مدير النظام." : "تم تغيير PIN الخاص بحسابك.");
       await pinQuery.refetch();
     },
     onError: error => toast.error(error instanceof Error ? error.message : "تعذر تغيير PIN."),
@@ -79,13 +81,13 @@ export default function StaffAccountPage() {
             <CardHeader><CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-[#005931]" />تغيير PIN التطبيق</CardTitle><CardDescription>نفس PIN الخاص بحساب الموظف. لو عندك صلاحية POS، يتم استخدام نفس الرقم للدخول السريع أيضًا.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
               {pinQuery.isLoading ? <div className="flex min-h-32 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#005931]" /></div> : pinQuery.data?.locked ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">PIN مقفول مؤقتًا بسبب محاولات خاطئة. حاول بعد انتهاء مدة القفل.</div> : <>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="space-y-2"><Label>PIN الحالي</Label><Input type="password" inputMode="numeric" maxLength={6} value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/\D/g, ""))} placeholder="••••" /></div>
+                <div className={`grid gap-3 ${isSuperAdmin ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+                  {!isSuperAdmin && <div className="space-y-2"><Label>PIN الحالي</Label><Input type="password" inputMode="numeric" maxLength={6} value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/\D/g, ""))} placeholder="••••" /></div>}
                   <div className="space-y-2"><Label>PIN الجديد</Label><Input type="password" inputMode="numeric" maxLength={6} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, ""))} placeholder="••••" /></div>
                   <div className="space-y-2"><Label>تأكيد الجديد</Label><Input type="password" inputMode="numeric" maxLength={6} value={confirmPin} onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ""))} placeholder="••••" /></div>
                 </div>
-                <div className="rounded-2xl bg-emerald-50 p-4 text-xs leading-6 text-emerald-900">الـPIN لا يمكن قراءته بعد الحفظ. لو نسيته، المسؤول يقدر يعمل Reset فقط وبعدها أنت تنشئ PIN جديد بنفسك.</div>
-                <Button className="w-full bg-[#005931] hover:bg-[#004526]" disabled={pinMutation.isPending || !currentPin || !newPin || !confirmPin} onClick={() => pinMutation.mutate()}>{pinMutation.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <KeyRound className="ml-2 h-4 w-4" />}تغيير PIN</Button>
+                <div className="rounded-2xl bg-emerald-50 p-4 text-xs leading-6 text-emerald-900">{isSuperAdmin ? "مدير النظام يقدر يضع PIN جديد مباشرة بدون كتابة الرمز القديم. كل تغيير يتم تسجيله في سجل التدقيق." : "لو نسيت PIN، استخدم استرجاع الرمز من شاشة القفل باسم المستخدم وكلمة المرور ثم اختر PIN جديد."}</div>
+                <Button className="w-full bg-[#005931] hover:bg-[#004526]" disabled={pinMutation.isPending || (!isSuperAdmin && !currentPin) || !newPin || !confirmPin} onClick={() => pinMutation.mutate()}>{pinMutation.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <KeyRound className="ml-2 h-4 w-4" />}تغيير PIN</Button>
               </>}
             </CardContent>
           </Card>

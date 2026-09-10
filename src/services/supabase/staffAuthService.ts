@@ -255,6 +255,31 @@ export async function authenticateStaffUser(
   }
 }
 
+export async function reauthenticateCurrentStaff(
+  username: string,
+  password: string,
+  expectedUserId: string,
+): Promise<void> {
+  const normalizedUsername = username.trim();
+  if (!normalizedUsername || !password || !expectedUserId) throw new Error(GENERIC_LOGIN_ERROR);
+
+  const currentIdentity = await fetchMyIdentity();
+  if (currentIdentity.user_id !== expectedUserId || currentIdentity.username.trim() !== normalizedUsername) {
+    throw new Error(GENERIC_LOGIN_ERROR);
+  }
+
+  const result = await supabase.auth.signInWithPassword({
+    email: staffAuthEmail(normalizedUsername),
+    password,
+  });
+  if (result.error || !result.data.user || result.data.user.id !== expectedUserId) {
+    throw new Error(GENERIC_LOGIN_ERROR);
+  }
+
+  const identity = await fetchMyIdentity();
+  if (identity.user_id !== expectedUserId) throw new Error(GENERIC_LOGIN_ERROR);
+}
+
 export async function selectStaffBranch(branchId: string): Promise<StaffLoginState> {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !sessionData.session?.user) throw new Error("انتهت جلسة تسجيل الدخول. سجل دخولك مرة تانية.");

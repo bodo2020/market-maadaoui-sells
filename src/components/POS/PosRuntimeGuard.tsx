@@ -40,7 +40,7 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
   const armTimer = useCallback(() => {
     if (timerRef.current) window.clearTimeout(timerRef.current);
     const safeMinutes = Math.min(120, Math.max(1, Number(autoLockMinutes || DEFAULT_AUTO_LOCK_MINUTES)));
-    timerRef.current = window.setTimeout(() => { setPin(""); setError(null); setLocked(true); }, safeMinutes * 60 * 1000);
+    timerRef.current = window.setTimeout(() => { window.dispatchEvent(new CustomEvent("app:lock")); }, safeMinutes * 60 * 1000);
   }, [autoLockMinutes]);
 
   const applyRuntimeSettings = (status: Awaited<ReturnType<typeof getPosRuntimeStatus>>) => {
