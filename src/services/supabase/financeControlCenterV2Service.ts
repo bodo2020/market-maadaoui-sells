@@ -9,6 +9,10 @@ export type FinanceControlSummary = {
   gateway_clearing_balance: number;
   operational_cash_total: number;
   liquid_funds_total: number;
+  in_transit_amount: number;
+  in_transit_count: number;
+  funds_under_custody_total: number;
+  transfer_exception_count: number;
   active_salary_advance_outstanding: number;
   unlinked_salary_advance_amount: number;
   unlinked_salary_advance_count: number;
