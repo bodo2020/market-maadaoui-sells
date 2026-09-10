@@ -10,9 +10,16 @@ import {
   readPOSLoyaltyVoucher,
 } from "@/components/POS/POSCustomerLoyaltyBridge";
 
-export type ModernPOSPaymentSelection = {
+export type ModernPOSPaymentSplit = {
   paymentMethodId: string;
+  baseAmount: number;
+  reference?: string | null;
+};
+
+export type ModernPOSPaymentSelection = {
+  paymentMethodId?: string;
   paymentReference?: string | null;
+  splits?: ModernPOSPaymentSplit[];
 };
 
 type PendingModernSale = {
@@ -25,14 +32,17 @@ type PendingModernSale = {
 type RpcResult = { data: unknown; error: { message?: string; code?: string } | null };
 
 function key(userId: string, branchId: string, checkoutId: string) {
-  return `pos-sale-v2-request:${userId}:${branchId}:${checkoutId}`;
+  return `pos-sale-v3-request:${userId}:${branchId}:${checkoutId}`;
 }
 
 function friendly(message?: string) {
   const value = message || "";
-  if (value.includes("PAYMENT_METHOD_REQUIRED")) return "اختر وسيلة الدفع قبل تأكيد البيع.";
-  if (value.includes("PAYMENT_METHOD_UNAVAILABLE")) return "وسيلة الدفع دي متوقفة أو لم تعد متاحة في الفرع.";
-  if (value.includes("PAYMENT_REFERENCE_REQUIRED")) return "اكتب الرقم المرجعي لعملية الدفع قبل التأكيد.";
+  if (value.includes("PAYMENT_METHOD_REQUIRED") || value.includes("PAYMENT_SPLITS_REQUIRED")) return "اختر وسيلة دفع واحدة على الأقل قبل تأكيد البيع.";
+  if (value.includes("PAYMENT_METHOD_UNAVAILABLE")) return "إحدى وسائل الدفع متوقفة أو لم تعد متاحة في الفرع.";
+  if (value.includes("PAYMENT_REFERENCE_REQUIRED")) return "اكتب الرقم المرجعي لكل وسيلة دفع تتطلب مرجعًا.";
+  if (value.includes("DUPLICATE_PAYMENT_METHOD")) return "لا يمكن إضافة نفس وسيلة الدفع مرتين. عدّل مبلغها في نفس السطر.";
+  if (value.includes("ZERO_DUE_SPLITS_NOT_ALLOWED")) return "الفاتورة مغطاة بالكامل بالكوبون ولا تحتاج وسيلة دفع إضافية.";
+  if (value.includes("CASH_SPLIT_FEE_UNSUPPORTED")) return "وسيلة الدفع النقدية لا يمكن أن تحمل عمولة في الدفع المختلط.";
   if (value.includes("INSUFFICIENT_STOCK")) return "مخزون الفرع غير كافٍ. راجع الكميات قبل تأكيد البيع.";
   if (value.includes("PRICE_CHANGED")) return "اتغير سعر أو عرض في السلة. راجع الإجمالي ثم أكد مرة أخرى.";
   if (value.includes("POS_DEVICE_SHIFT_MISMATCH") || value.includes("SHIFT_NOT_OPEN")) return "لا توجد وردية POS مفتوحة على الجهاز الحالي.";
@@ -47,7 +57,7 @@ function friendly(message?: string) {
   if (value.includes("VOUCHER_BALANCE_CHANGED")) return "رصيد كوبون الخصم اتغير. امسحه مرة ثانية قبل التأكيد.";
   if (value.includes("REQUEST_CONFLICT")) return "فيه محاولة بيع سابقة مختلفة لنفس السلة. راجع الفاتورة السابقة قبل إعادة المحاولة.";
   if (value.includes("BRANCH_ACCESS_DENIED")) return "ليس لديك صلاحية تنفيذ بيع على الفرع الحالي.";
-  if (value.includes("INVALID_PAYMENT_SPLIT")) return "بيانات التحصيل غير متطابقة مع إجمالي الفاتورة.";
+  if (value.includes("INVALID_PAYMENT_SPLIT")) return "مجموع أجزاء الدفع لازم يساوي المبلغ المطلوب قبل الرسوم بالضبط.";
   return null;
 }
 
@@ -80,7 +90,6 @@ export async function submitModernPosSale(
 
   const branchId = sale.branch_id || localStorage.getItem("currentBranchId");
   if (!branchId) throw new Error("اختار الفرع قبل إتمام البيع.");
-  if (!selection.paymentMethodId) throw new Error("اختر وسيلة الدفع قبل تأكيد البيع.");
 
   const device = getLocalPosDevice(branchId);
   if (!device) throw new Error("هذا المتصفح غير مسجل كجهاز POS للفرع الحالي.");
@@ -93,6 +102,25 @@ export async function submitModernPosSale(
   const voucherAmount = voucher
     ? Math.max(0, Math.min(Number(voucher.remaining_value_egp || 0), Number(sale.total || 0)))
     : 0;
+  const baseDue = Math.max(0, Number((Number(sale.total || 0) - voucherAmount).toFixed(2)));
+
+  let splits = (selection.splits || []).map(part => ({
+    payment_method_id: part.paymentMethodId,
+    base_amount: Number(Number(part.baseAmount || 0).toFixed(2)),
+    reference: part.reference?.trim() || null,
+  })).filter(part => part.base_amount > 0);
+
+  if (!splits.length && baseDue > 0 && selection.paymentMethodId) {
+    splits = [{
+      payment_method_id: selection.paymentMethodId,
+      base_amount: baseDue,
+      reference: selection.paymentReference?.trim() || null,
+    }];
+  }
+  if (baseDue > 0 && !splits.length) throw new Error("اختر وسيلة دفع واحدة على الأقل قبل تأكيد البيع.");
+
+  const splitTotal = Number(splits.reduce((sum, part) => sum + part.base_amount, 0).toFixed(2));
+  if (Math.abs(splitTotal - baseDue) > 0.009) throw new Error("مجموع أجزاء الدفع لازم يساوي المبلغ المطلوب قبل الرسوم بالضبط.");
 
   const payload: Record<string, unknown> = {
     items: sale.items,
@@ -100,8 +128,7 @@ export async function submitModernPosSale(
     discount: sale.discount,
     total: sale.total,
     profit: sale.profit ?? 0,
-    payment_method_id: selection.paymentMethodId,
-    payment_reference: selection.paymentReference?.trim() || null,
+    payment_splits: splits,
     customer_id: customer?.customer_id || null,
     customer_barcode: customer?.barcode_token || null,
     customer_name: customer?.name || null,
@@ -124,9 +151,6 @@ export async function submitModernPosSale(
   }
 
   if (pending.fingerprint !== fingerprint) {
-    // Keep the same request id while the previous result is uncertain. The server
-    // now resolves an already-committed request first, so this cannot duplicate a sale.
-    // If the browser already knows the old request was confirmed, start a fresh id.
     pending = {
       requestId: pending.confirmed ? crypto.randomUUID() : (pending.requestId || crypto.randomUUID()),
       fingerprint,
@@ -135,7 +159,7 @@ export async function submitModernPosSale(
   }
   try { localStorage.setItem(storageKey, JSON.stringify(pending)); } catch { /* noop */ }
 
-  const call = async () => await (supabase.rpc as any)("create_pos_sale_v2", {
+  const call = async () => await (supabase.rpc as any)("create_pos_sale_v3", {
     p_request_id: pending.requestId,
     p_branch_id: branchId,
     p_sale: pending.payload,
