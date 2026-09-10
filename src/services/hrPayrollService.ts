@@ -96,6 +96,7 @@ export type PayrollPolicy = {
   auto_overtime_enabled: boolean;
   auto_absence_deduction: boolean;
   paid_leave_types: string[];
+  pay_day_of_month?: number | null;
 };
 
 export type PayrollWorkspace = {
@@ -122,6 +123,8 @@ function payrollError(message?: string) {
   if (value.includes("HR_BRANCH_ACCESS_DENIED")) return new Error("الفرع الحالي خارج نطاق صلاحيتك.");
   if (value.includes("PAYROLL_VIEW_DENIED")) return new Error("ليس لديك صلاحية عرض الرواتب.");
   if (value.includes("PAYROLL_COMPENSATION_DENIED")) return new Error("ليس لديك صلاحية تعديل راتب الموظف.");
+  if (value.includes("PAYROLL_POLICY_DENIED")) return new Error("ليس لديك صلاحية تعديل سياسة صرف الرواتب.");
+  if (value.includes("INVALID_PAY_DAY")) return new Error("يوم صرف الراتب يجب أن يكون من 1 إلى 31.");
   if (value.includes("PAYROLL_GENERATE_DENIED")) return new Error("ليس لديك صلاحية إنشاء مسير الرواتب.");
   if (value.includes("PAYROLL_ADJUSTMENT_DENIED")) return new Error("ليس لديك صلاحية إضافة تسوية على المسير.");
   if (value.includes("PAYROLL_SUBMIT_DENIED")) return new Error("ليس لديك صلاحية إرسال المسير للمراجعة.");
@@ -147,6 +150,12 @@ export async function getPayrollWorkspace(branchId: string, month: number, year:
   const { data, error } = await rpc("get_hr_payroll_workspace_v2", { p_branch_id: branchId, p_month: month, p_year: year });
   if (error) throw payrollError(error.message);
   return data as PayrollWorkspace;
+}
+
+export async function setPayrollPayDay(branchId: string, payDay: number) {
+  const { data, error } = await rpc("set_hr_payroll_pay_day_v1", { p_branch_id: branchId, p_pay_day: payDay });
+  if (error) throw payrollError(error.message);
+  return data as { ok: boolean; pay_day_of_month: number };
 }
 
 export async function saveCompensationProfile(employeeId: string, branchId: string, baseSalary: number, effectiveFrom: string) {
