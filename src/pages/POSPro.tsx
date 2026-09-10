@@ -663,63 +663,63 @@ export default function POSPro() {
   }, [createTab, checkoutOpen, cartItems.length, openCheckout, scannerOpen, weightProduct]);
 
   const cartPanel = (
-    <div className="flex min-h-0 flex-col gap-3 lg:h-full" dir="rtl">
+    <div className="flex min-h-0 flex-col gap-3 lg:gap-2 lg:h-full" dir="rtl">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold">السلة الحالية</h2>
+          <h2 className="text-lg font-bold lg:text-base">السلة الحالية</h2>
           <p className="text-xs text-muted-foreground">{cartItems.length} صنف · {unitsCount} وحدة/وزن</p>
         </div>
-        <div className="rounded-xl bg-emerald-50 px-3 py-2 text-left">
+        <div className="rounded-xl bg-emerald-50 px-3 py-2 text-left lg:px-2.5 lg:py-1.5">
           <div className="text-[11px] text-emerald-800/70">درج الكاشير</div>
           <div className="font-bold text-[#005931]">{cashSummary ? money(cashSummary.drawer_balance) : "—"}</div>
         </div>
       </div>
 
       {cartItems.length === 0 ? (
-        <div className="rounded-2xl border border-dashed py-12 text-center text-muted-foreground">
+        <div className="rounded-2xl border border-dashed py-12 text-center text-muted-foreground lg:py-8">
           <ShoppingCart className="mx-auto mb-3 h-9 w-9 opacity-30" />
           <p className="font-medium">السلة فاضية</p>
           <p className="mt-1 text-xs">امسح باركود أو اختر منتج</p>
         </div>
       ) : (
-        <div ref={cartScrollRef} className="relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:h-[15rem] lg:max-h-[15rem] lg:flex-none">
+        <div ref={cartScrollRef} className="relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:h-[15rem] lg:max-h-[15rem] lg:flex-none lg:space-y-1.5">
           {cartItems.map((item, index) => {
             const bulkPackSize = Number(item.product.bulk_quantity || 0);
             const bulkPacks = item.isBulk && bulkPackSize > 0 ? Math.max(1, Math.round(Number(item.quantity || 0) / bulkPackSize)) : 0;
             return (
-              <div data-pos-cart-item={index} key={`${item.product.id}-${item.isBulk ? "bulk" : item.weight != null ? `w-${index}` : "unit"}-${index}`} className="rounded-2xl border bg-white p-3 shadow-sm">
+              <div data-pos-cart-item={index} key={`${item.product.id}-${item.isBulk ? "bulk" : item.weight != null ? `w-${index}` : "unit"}-${index}`} className="rounded-2xl border bg-white p-3 shadow-sm lg:rounded-xl lg:p-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold">{item.product.name}</div>
-                    <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
+                    <div className="truncate font-semibold lg:text-sm lg:leading-5">{item.product.name}</div>
+                    <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground lg:mt-0.5 lg:gap-0.5 lg:text-[10px]">
                       {item.isBulk && <Badge variant="secondary">جملة · {bulkPacks} عبوة · {item.quantity} وحدة</Badge>}
                       {item.weight != null && <Badge variant="secondary">موزون</Badge>}
                       {!item.isBulk && item.weight == null && <span>{money(item.price)} / وحدة</span>}
                     </div>
                   </div>
                   <div className="text-left">
-                    <div className="font-bold">{money(item.total)}</div>
-                    <button type="button" aria-label="حذف الصنف" className="mt-2 rounded-lg p-1 text-red-500 hover:bg-red-50" onClick={() => setCartItems(cartItems.filter((_, i) => i !== index))}>
+                    <div className="font-bold lg:text-sm">{money(item.total)}</div>
+                    <button type="button" aria-label="حذف الصنف" className="mt-2 rounded-lg p-1 text-red-500 hover:bg-red-50 lg:mt-0.5 lg:p-0.5" onClick={() => setCartItems(cartItems.filter((_, i) => i !== index))}>
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
 
                 {!item.isBulk && item.weight == null && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => changeQuantity(index, -1)}><Minus className="h-4 w-4" /></Button>
-                    <Input key={`qty-${index}-${item.quantity}`} type="number" min={1} step={1} inputMode="numeric" defaultValue={item.quantity} className="h-9 w-20 text-center font-bold" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setNormalQuantity(index, next)) event.currentTarget.value = String(item.quantity); }} />
-                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => changeQuantity(index, 1)}><Plus className="h-4 w-4" /></Button>
+                  <div className="mt-3 flex items-center gap-2 lg:mt-1.5 lg:gap-1.5">
+                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 lg:h-7 lg:w-7" onClick={() => changeQuantity(index, -1)}><Minus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
+                    <Input key={`qty-${index}-${item.quantity}`} type="number" min={1} step={1} inputMode="numeric" defaultValue={item.quantity} className="h-9 w-20 text-center font-bold lg:h-7 lg:w-14 lg:text-sm" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setNormalQuantity(index, next)) event.currentTarget.value = String(item.quantity); }} />
+                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 lg:h-7 lg:w-7" onClick={() => changeQuantity(index, 1)}><Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
                     <span className="mr-auto text-xs text-muted-foreground">متاح {stockOf(item.product)}</span>
                   </div>
                 )}
 
                 {item.isBulk && (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 space-y-2 lg:mt-1.5 lg:space-y-1">
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => changeBulkPacks(index, -1)}><Minus className="h-4 w-4" /></Button>
-                      <Input key={`bulk-${index}-${bulkPacks}`} type="number" min={1} step={1} inputMode="numeric" defaultValue={bulkPacks} className="h-9 w-20 text-center font-bold" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setBulkPackCount(index, next)) event.currentTarget.value = String(bulkPacks); }} />
-                      <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => changeBulkPacks(index, 1)}><Plus className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 lg:h-7 lg:w-7" onClick={() => changeBulkPacks(index, -1)}><Minus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
+                      <Input key={`bulk-${index}-${bulkPacks}`} type="number" min={1} step={1} inputMode="numeric" defaultValue={bulkPacks} className="h-9 w-20 text-center font-bold lg:h-7 lg:w-14 lg:text-sm" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setBulkPackCount(index, next)) event.currentTarget.value = String(bulkPacks); }} />
+                      <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 lg:h-7 lg:w-7" onClick={() => changeBulkPacks(index, 1)}><Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
                       <span className="text-xs font-medium">عبوة × {bulkPackSize}</span>
                       <span className="mr-auto text-xs text-muted-foreground">متاح {stockOf(item.product)}</span>
                     </div>
@@ -728,9 +728,9 @@ export default function POSPro() {
                 )}
 
                 {item.weight != null && (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="mt-3 flex flex-wrap items-center gap-2 lg:mt-1.5 lg:gap-1.5">
                     <div className="flex items-center gap-1">
-                      <Input key={`weight-${index}-${Number(item.weight).toFixed(3)}`} type="number" min="0.001" step="0.001" inputMode="decimal" defaultValue={Number(item.weight).toFixed(3)} className="h-9 w-24 text-center font-bold" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setCartWeight(index, next)) event.currentTarget.value = Number(item.weight).toFixed(3); }} />
+                      <Input key={`weight-${index}-${Number(item.weight).toFixed(3)}`} type="number" min="0.001" step="0.001" inputMode="decimal" defaultValue={Number(item.weight).toFixed(3)} className="h-9 w-24 text-center font-bold lg:h-7 lg:w-20 lg:text-sm" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setCartWeight(index, next)) event.currentTarget.value = Number(item.weight).toFixed(3); }} />
                       <span className="text-xs">كجم</span>
                     </div>
                     <span className="text-xs text-muted-foreground">{money(item.price)} / كجم</span>
@@ -743,23 +743,23 @@ export default function POSPro() {
         </div>
       )}
 
-      <div className="shrink-0 space-y-3 border-t border-slate-100 pt-3">
-      <div className="rounded-2xl bg-slate-50 p-4">
-        {discount > 0 && <div className="flex items-center justify-between text-sm text-muted-foreground"><span>قبل الخصم</span><span>{money(originalSubtotal)}</span></div>}
-        {discount > 0 && <div className="mt-1 flex items-center justify-between text-sm text-emerald-700"><span>خصومات المنتجات</span><span>- {money(discount)}</span></div>}
-        <div className={`${discount > 0 ? "mt-3 border-t pt-3" : ""} flex items-center justify-between text-xl font-black`}><span>إجمالي المنتجات</span><span className="text-[#005931]">{money(total)}</span></div>
+      <div className="shrink-0 space-y-3 border-t border-slate-100 pt-3 lg:space-y-2 lg:pt-2">
+      <div className="rounded-2xl bg-slate-50 p-4 lg:rounded-xl lg:p-2.5">
+        {discount > 0 && <div className="flex items-center justify-between text-sm text-muted-foreground lg:text-xs"><span>قبل الخصم</span><span>{money(originalSubtotal)}</span></div>}
+        {discount > 0 && <div className="mt-1 flex items-center justify-between text-sm text-emerald-700 lg:text-xs"><span>خصومات المنتجات</span><span>- {money(discount)}</span></div>}
+        <div className={`${discount > 0 ? "mt-3 border-t pt-3" : ""} flex items-center justify-between text-xl font-black lg:text-lg`}><span>إجمالي المنتجات</span><span className="text-[#005931]">{money(total)}</span></div>
       </div>
 
-      <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 p-3 text-xs leading-5 text-emerald-950">
+      <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 p-3 text-xs leading-5 text-emerald-950 lg:hidden">
         العميل والنقاط وكوبون الخصم يتم ربطهم داخل <strong>إتمام البيع</strong>. البيع بدون عميل مسموح ولن ينتج عنه نقاط ولاء.
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" className="h-11" disabled={!cartItems.length} onClick={holdCurrentCart}><ShoppingCart className="ml-2 h-4 w-4" /> تعليق السلة</Button>
-        <Button variant="outline" className="h-11 text-red-600 hover:text-red-700" disabled={!cartItems.length} onClick={clearCurrentCart}><Trash2 className="ml-2 h-4 w-4" /> إلغاء السلة</Button>
+        <Button variant="outline" className="h-11 lg:h-9 lg:text-xs" disabled={!cartItems.length} onClick={holdCurrentCart}><ShoppingCart className="ml-2 h-4 w-4" /> تعليق السلة</Button>
+        <Button variant="outline" className="h-11 text-red-600 hover:text-red-700 lg:h-9 lg:text-xs" disabled={!cartItems.length} onClick={clearCurrentCart}><Trash2 className="ml-2 h-4 w-4" /> إلغاء السلة</Button>
       </div>
 
-      <Button className="h-14 w-full bg-[#005931] text-base hover:bg-[#004a29]" disabled={!cartItems.length || preflighting} onClick={() => void openCheckout()}>
+      <Button className="h-14 w-full bg-[#005931] text-base hover:bg-[#004a29] lg:h-11 lg:text-sm" disabled={!cartItems.length || preflighting} onClick={() => void openCheckout()}>
         {preflighting ? <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> : <CreditCard className="ml-2 h-5 w-5" />}
         {preflighting ? "مراجعة السلة..." : `إتمام البيع · ${money(total)}`}
       </Button>
