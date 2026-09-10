@@ -1,552 +1,280 @@
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  CalendarDays,
+  FileText,
+  Printer,
+  ReceiptText,
+  RefreshCw,
+  Search,
+  ShoppingBag,
+  Truck,
+  Undo2,
+  UserRound,
+  WalletCards,
+} from "lucide-react";
+import MainLayout from "@/components/layout/MainLayout";
+import InvoiceDialog from "@/components/POS/InvoiceDialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useBranchStore } from "@/stores/branchStore";
+import {
+  getPosInvoiceSale,
+  listPosInvoicesV2,
+  type PosInvoiceListItem,
+} from "@/services/supabase/posInvoiceService";
+import {
+  fetchSupplierPurchaseCenterV2,
+  type SupplierPurchaseRow,
+} from "@/services/supabase/supplierPurchasesV2Service";
+import { printSaleInvoice } from "@/services/retailPrintService";
+import type { Sale } from "@/types";
+import { siteConfig } from "@/config/site";
+import { toast } from "sonner";
 
-import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { fetchSales } from '@/services/supabase/saleService';
-import { fetchPurchases, getPurchaseWithItems } from '@/services/supabase/purchaseService';
-import { Sale, Purchase } from '@/types';
-import { FileText, Edit, Printer, CalendarRange, FileDown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import MainLayout from '@/components/layout/MainLayout';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import InvoiceEditDialog from '@/components/Invoice/InvoiceEditDialog';
-import InvoicePreviewDialog from '@/components/POS/InvoiceDialog';
-import { format } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useBranchStore } from '@/stores/branchStore';
+type InvoiceTab = "sales" | "purchases";
+type PaymentFilter = "all" | "cash" | "card" | "wallet" | "mixed";
+type ReturnFilter = "all" | "returned" | "pending" | "clean";
 
-const Invoices = () => {
+function money(value: unknown) {
+  return `${siteConfig.currency} ${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function dayKey(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("ar-EG", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function paymentKind(row: PosInvoiceListItem): Exclude<PaymentFilter, "all"> {
+  const type = String(row.payment_method_type || "").toLowerCase();
+  const code = String(row.payment_method_code || row.payment_method || "").toLowerCase();
+  if (code === "mixed" || type === "mixed") return "mixed";
+  if (code === "cash" || type === "cash") return "cash";
+  if (type.includes("wallet") || code.includes("vodafone") || code.includes("instapay")) return "wallet";
+  return "card";
+}
+
+function paymentBadge(row: PosInvoiceListItem) {
+  const kind = paymentKind(row);
+  const label = row.payment_method_name || (kind === "cash" ? "نقدي" : kind === "wallet" ? "محفظة إلكترونية" : kind === "mixed" ? "مختلط" : "بطاقة");
+  const className = kind === "cash"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    : kind === "wallet"
+      ? "border-violet-200 bg-violet-50 text-violet-700"
+      : kind === "mixed"
+        ? "border-amber-200 bg-amber-50 text-amber-700"
+        : "border-sky-200 bg-sky-50 text-sky-700";
+  return <Badge variant="outline" className={className}>{label}</Badge>;
+}
+
+function Metric({ icon: Icon, title, value, note }: { icon: typeof ReceiptText; title: string; value: string; note: string }) {
+  return (
+    <Card className="border-slate-100 shadow-sm">
+      <CardContent className="flex items-start justify-between gap-4 p-5">
+        <div><p className="text-xs font-bold text-slate-500">{title}</p><p className="mt-2 text-2xl font-black text-slate-950">{value}</p><p className="mt-2 text-[11px] text-slate-400">{note}</p></div>
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><Icon className="h-5 w-5" /></span>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function Invoices() {
+  const navigate = useNavigate();
   const { currentBranchId, currentBranchName } = useBranchStore();
-  const [searchQuery, setSearchQuery] = useState('');
+  const branchId = currentBranchId || localStorage.getItem("currentBranchId") || "";
+  const [tab, setTab] = useState<InvoiceTab>("sales");
+  const [search, setSearch] = useState("");
+  const [date, setDate] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
+  const [returnFilter, setReturnFilter] = useState<ReturnFilter>("all");
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
-  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
-  const [isPurchaseDetailsOpen, setIsPurchaseDetailsOpen] = useState(false);
-  const [invoiceType, setInvoiceType] = useState<'sales' | 'purchases'>('sales');
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [page, setPage] = useState(0);
-  const itemsPerPage = 50;
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [loadingSaleId, setLoadingSaleId] = useState<string | null>(null);
 
-  // Fetch sales with pagination
-  const { 
-    data: sales, 
-    isLoading: salesLoading, 
-    isError: salesError, 
-    refetch: refetchSales 
-  } = useQuery({
-    queryKey: ['sales', page, currentBranchId],
-    queryFn: () => fetchSales(currentBranchId || undefined, undefined, undefined, itemsPerPage, page * itemsPerPage),
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+  const salesQuery = useQuery({
+    queryKey: ["invoice-center-v2", branchId, search.trim()],
+    enabled: Boolean(branchId),
+    queryFn: () => listPosInvoicesV2(branchId, search.trim(), 220),
+    staleTime: 8_000,
   });
 
-  // Fetch all purchases (will be filtered by branch in fetchPurchases)
-  const { 
-    data: purchases, 
-    isLoading: purchasesLoading, 
-    isError: purchasesError 
-  } = useQuery({
-    queryKey: ['purchases', currentBranchId],
-    queryFn: () => fetchPurchases(currentBranchId || undefined)
+  const purchasesQuery = useQuery({
+    queryKey: ["supplier-purchase-center-v2", branchId],
+    enabled: Boolean(branchId),
+    queryFn: () => fetchSupplierPurchaseCenterV2(branchId, 220),
+    staleTime: 10_000,
   });
 
-  // Filter by search query and date
-  const filteredSales = React.useMemo(() => {
-    if (!sales) return [];
+  const sales = salesQuery.data || [];
+  const purchases = purchasesQuery.data?.purchases || [];
 
-    // First filter by search query
-    let filtered = sales.filter(sale => 
-      sale.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (sale.customer_name && sale.customer_name.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+  const filteredSales = useMemo(() => sales.filter(row => {
+    if (date && dayKey(row.sale_date) !== date) return false;
+    if (paymentFilter !== "all" && paymentKind(row) !== paymentFilter) return false;
+    if (returnFilter === "returned" && Number(row.return_count || 0) === 0) return false;
+    if (returnFilter === "pending" && Number(row.pending_refund_count || 0) === 0) return false;
+    if (returnFilter === "clean" && (Number(row.return_count || 0) > 0 || Number(row.pending_refund_count || 0) > 0)) return false;
+    return true;
+  }), [sales, date, paymentFilter, returnFilter]);
 
-    // Then filter by selected date if any
-    if (selectedDate) {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      filtered = filtered.filter(sale => {
-        const saleDate = new Date(sale.date).toISOString().split('T')[0];
-        return saleDate === dateStr;
-      });
-    }
+  const filteredPurchases = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return purchases.filter(row => {
+      if (date && dayKey(row.date) !== date) return false;
+      if (!q) return true;
+      return row.invoice_number.toLowerCase().includes(q) || row.supplier_name.toLowerCase().includes(q);
+    });
+  }, [purchases, search, date]);
 
-    return filtered;
-  }, [sales, searchQuery, selectedDate]);
+  const salesSummary = useMemo(() => ({
+    count: filteredSales.length,
+    collected: filteredSales.reduce((sum, row) => sum + Number(row.amount_charged || 0), 0),
+    returned: filteredSales.reduce((sum, row) => sum + Number(row.returned_amount || 0), 0),
+    pending: filteredSales.reduce((sum, row) => sum + Number(row.pending_refund_count || 0), 0),
+  }), [filteredSales]);
 
-  // Filter purchases by search query and date
-  const filteredPurchases = React.useMemo(() => {
-    if (!purchases) return [];
+  const purchaseSummary = useMemo(() => ({
+    count: filteredPurchases.length,
+    total: filteredPurchases.reduce((sum, row) => sum + Number(row.total || 0), 0),
+    outstanding: filteredPurchases.reduce((sum, row) => sum + Math.max(0, Number(row.outstanding || 0)), 0),
+    overdue: filteredPurchases.filter(row => row.overdue && row.status !== "voided").length,
+  }), [filteredPurchases]);
 
-    // First filter by search query
-    let filtered = purchases.filter(purchase => 
-      purchase.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (purchase.suppliers?.name && purchase.suppliers.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-
-    // Then filter by selected date if any
-    if (selectedDate) {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      filtered = filtered.filter(purchase => {
-        const purchaseDate = new Date(purchase.date).toISOString().split('T')[0];
-        return purchaseDate === dateStr;
-      });
-    }
-
-    return filtered;
-  }, [purchases, searchQuery, selectedDate]);
-
-  const handleEdit = (sale: Sale) => {
-    setSelectedSale(sale);
-    setIsEditDialogOpen(true);
-  };
-
-  const handlePreview = (sale: Sale) => {
-    setSelectedSale(sale);
-    setIsPreviewDialogOpen(true);
-  };
-
-  const handleViewPurchase = async (purchase: Purchase) => {
+  const loadSale = async (row: PosInvoiceListItem) => {
     try {
-      console.log("Loading purchase details for:", purchase.id);
-      const purchaseWithItems = await getPurchaseWithItems(purchase.id);
-      console.log("Purchase with items:", purchaseWithItems);
-      
-      if (purchaseWithItems) {
-        setSelectedPurchase(purchaseWithItems);
-        setIsPurchaseDetailsOpen(true);
-      } else {
-        console.log("No items found, showing basic purchase info");
-        setSelectedPurchase(purchase);
-        setIsPurchaseDetailsOpen(true);
-      }
+      setLoadingSaleId(row.sale_id);
+      return await getPosInvoiceSale(row.sale_id);
     } catch (error) {
-      console.error("Error fetching purchase details:", error);
-      // Show basic purchase info in case of error
-      setSelectedPurchase(purchase);
-      setIsPurchaseDetailsOpen(true);
+      console.error(error);
+      toast.error("تعذر تحميل نسخة الفاتورة المحفوظة");
+      return null;
+    } finally {
+      setLoadingSaleId(null);
     }
   };
 
-  const handleEditClose = () => {
-    setIsEditDialogOpen(false);
-    refetchSales(); // Refresh data after edit
+  const previewInvoice = async (row: PosInvoiceListItem) => {
+    const sale = await loadSale(row);
+    if (!sale) return;
+    setSelectedSale(sale);
+    setPreviewOpen(true);
   };
 
-  const handlePreviewClose = () => {
-    setIsPreviewDialogOpen(false);
+  const quickPrint = async (row: PosInvoiceListItem) => {
+    const sale = await loadSale(row);
+    if (!sale) return;
+    if (!printSaleInvoice(sale)) toast.error("اسمح بالنوافذ المنبثقة لفتح شاشة الطباعة");
   };
 
-  const handlePurchaseDetailsClose = () => {
-    setIsPurchaseDetailsOpen(false);
+  const resetFilters = () => {
+    setSearch(""); setDate(""); setPaymentFilter("all"); setReturnFilter("all");
   };
 
-  const handleRefreshPurchaseItems = async () => {
-    if (!selectedPurchase?.id) return;
-    try {
-      const refreshed = await getPurchaseWithItems(selectedPurchase.id);
-      if (refreshed) {
-        setSelectedPurchase(refreshed);
-      }
-    } catch (e) {
-      console.error('Failed to refresh purchase items', e);
-    }
-  };
+  const refreshing = salesQuery.isFetching || purchasesQuery.isFetching;
 
-  const handleInvoiceTypeChange = (value: 'sales' | 'purchases') => {
-    setInvoiceType(value);
-  };
-
-  const handleCalendarToggle = () => {
-    setIsCalendarOpen(!isCalendarOpen);
-  };
-
-  const handleDateSelect = (date: Date | undefined) => {
-    setSelectedDate(date);
-    setIsCalendarOpen(false);
-  };
-
-  const handleClearDate = () => {
-    setSelectedDate(undefined);
-  };
-
-  const isLoading = invoiceType === 'sales' ? salesLoading : purchasesLoading;
-  const isError = invoiceType === 'sales' ? salesError : purchasesError;
+  if (!branchId) {
+    return <MainLayout><div dir="rtl" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">اختر فرعًا لعرض مركز الفواتير.</div></MainLayout>;
+  }
 
   return (
     <MainLayout>
-      <div className="container mx-auto py-6 space-y-6 pb-20">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">إدارة الفواتير - {currentBranchName}</h1>
+      <div dir="rtl" className="space-y-6 pb-16">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#005931] text-white shadow-lg shadow-emerald-900/10"><ReceiptText className="h-6 w-6" /></span><div><h1 className="text-2xl font-black text-slate-950 sm:text-3xl">مركز الفواتير</h1><p className="mt-1 text-sm text-slate-500">{currentBranchName || "الفرع الحالي"} · عرض وإعادة طباعة النسخ المحفوظة بدون تعديل التاريخ المالي.</p></div></div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => { salesQuery.refetch(); purchasesQuery.refetch(); }} disabled={refreshing}><RefreshCw className={`ml-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />تحديث</Button>
+            <Button variant="outline" onClick={() => navigate("/it-center")}><Printer className="ml-2 h-4 w-4" />إعدادات الأجهزة والطابعات</Button>
+          </div>
         </div>
 
-        <Tabs defaultValue="sales" value={invoiceType} onValueChange={(value) => handleInvoiceTypeChange(value as 'sales' | 'purchases')} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="sales">فواتير المبيعات</TabsTrigger>
-            <TabsTrigger value="purchases">فواتير المشتريات</TabsTrigger>
-          </TabsList>
+        <div className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-2xl border bg-white p-1.5 shadow-sm">
+          <Button variant={tab === "sales" ? "default" : "ghost"} className={tab === "sales" ? "bg-[#005931] hover:bg-[#004725]" : ""} onClick={() => setTab("sales")}><ShoppingBag className="ml-2 h-4 w-4" />فواتير المبيعات</Button>
+          <Button variant={tab === "purchases" ? "default" : "ghost"} className={tab === "purchases" ? "bg-[#005931] hover:bg-[#004725]" : ""} onClick={() => setTab("purchases")}><Truck className="ml-2 h-4 w-4" />فواتير المشتريات</Button>
+        </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>بحث الفواتير</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <Input
-                  placeholder={invoiceType === 'sales' ? "ابحث عن رقم الفاتورة أو اسم العميل..." : "ابحث عن رقم الفاتورة أو اسم المورد..."}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="max-w-md"
-                />
-                
-                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                  <PopoverTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      className="flex items-center gap-2"
-                      onClick={handleCalendarToggle}
-                    >
-                      <CalendarRange className="h-5 w-5" />
-                      {selectedDate ? format(selectedDate, 'yyyy/MM/dd') : 'اختر تاريخ'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={handleDateSelect}
-                      initialFocus
-                      className="p-3 pointer-events-auto"
-                    />
-                    {selectedDate && (
-                      <div className="p-2 border-t flex justify-center">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={handleClearDate}
-                        >
-                          إلغاء التاريخ
-                        </Button>
-                      </div>
-                    )}
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-4">
-            {isLoading ? (
-              <div className="text-center py-8">جاري التحميل...</div>
-            ) : isError ? (
-              <div className="text-center py-8 text-red-500">حدث خطأ أثناء تحميل الفواتير</div>
-            ) : (
-              <div className="overflow-x-auto">
-                {invoiceType === 'sales' ? (
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 text-right">
-                        <th className="p-3 border">رقم الفاتورة</th>
-                        <th className="p-3 border">التاريخ</th>
-                        <th className="p-3 border">العميل</th>
-                        <th className="p-3 border">المبلغ</th>
-                        <th className="p-3 border">طريقة الدفع</th>
-                        <th className="p-3 border">إجراءات</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredSales && filteredSales.length > 0 ? (
-                        filteredSales.map((sale) => {
-                          const saleDate = new Date(sale.date);
-                          const formattedDate = saleDate.toLocaleDateString('ar-EG', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          });
-                          
-                          const paymentMethodText = 
-                            sale.payment_method === 'cash' ? 'نقدي' : 
-                            sale.payment_method === 'card' ? 'بطاقة' : 'مختلط';
-
-                          return (
-                            <tr key={sale.id} className="border-b hover:bg-gray-50">
-                              <td className="p-3 border">{sale.invoice_number}</td>
-                              <td className="p-3 border">{formattedDate}</td>
-                              <td className="p-3 border">{sale.customer_name || 'عميل عام'}</td>
-                              <td className="p-3 border">{sale.total.toFixed(2)}</td>
-                              <td className="p-3 border">{paymentMethodText}</td>
-                              <td className="p-3 border">
-                                <div className="flex gap-2">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    onClick={() => handleEdit(sale)}
-                                  >
-                                    <Edit className="h-4 w-4 ml-1" />
-                                    تعديل
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
-                                    onClick={() => handlePreview(sale)}
-                                  >
-                                    <FileText className="h-4 w-4 ml-1" />
-                                    عرض
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="p-3 text-center">
-                            لا توجد فواتير متطابقة مع معايير البحث
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                ) : (
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-gray-100 text-right">
-                        <th className="p-3 border">رقم الفاتورة</th>
-                        <th className="p-3 border">التاريخ</th>
-                        <th className="p-3 border">المورد</th>
-                        <th className="p-3 border">المبلغ الكلي</th>
-                        <th className="p-3 border">المبلغ المدفوع</th>
-                        <th className="p-3 border">الحالة</th>
-                        <th className="p-3 border">إجراءات</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredPurchases && filteredPurchases.length > 0 ? (
-                        filteredPurchases.map((purchase) => {
-                          const purchaseDate = new Date(purchase.date);
-                          const formattedDate = purchaseDate.toLocaleDateString('ar-EG', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          });
-                          
-                          const remaining = purchase.total - purchase.paid;
-                          const isPaid = remaining <= 0;
-
-                          return (
-                            <tr key={purchase.id} className="border-b hover:bg-gray-50">
-                              <td className="p-3 border">{purchase.invoice_number}</td>
-                              <td className="p-3 border">{formattedDate}</td>
-                              <td className="p-3 border">{purchase.suppliers?.name || 'غير محدد'}</td>
-                              <td className="p-3 border">{purchase.total.toFixed(2)}</td>
-                              <td className="p-3 border">{purchase.paid.toFixed(2)}</td>
-                              <td className="p-3 border">
-                                {isPaid ? (
-                                  <Badge className="bg-green-100 text-green-800 hover:bg-green-200">مدفوعة</Badge>
-                                ) : (
-                                  <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
-                                    متبقي {remaining.toFixed(2)}
-                                  </Badge>
-                                )}
-                              </td>
-                              <td className="p-3 border">
-                                <div className="flex gap-2">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => handleViewPurchase(purchase)}
-                                  >
-                                    <FileText className="h-4 w-4 ml-1" />
-                                    عرض
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={7} className="p-3 text-center">
-                            لا توجد فواتير متطابقة مع معايير البحث
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-            
-            {/* Pagination Controls */}
-            {!isLoading && !isError && (invoiceType === 'sales' ? filteredSales.length > 0 : filteredPurchases.length > 0) && (
-              <div className="flex justify-center items-center gap-4 mt-6">
-                <Button
-                  variant="outline"
-                  onClick={() => setPage(p => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                >
-                  السابق
-                </Button>
-                <span className="text-sm">
-                  صفحة {page + 1}
-                </span>
-                <Button
-                  variant="outline"
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={invoiceType === 'sales' 
-                    ? (filteredSales.length < itemsPerPage) 
-                    : (filteredPurchases.length < itemsPerPage)}
-                >
-                  التالي
-                </Button>
-              </div>
-            )}
+        {tab === "sales" ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Metric icon={ReceiptText} title="عدد الفواتير" value={salesSummary.count.toLocaleString("ar-EG")} note="حسب الفلاتر الحالية" />
+            <Metric icon={WalletCards} title="المبلغ المحصل" value={money(salesSummary.collected)} note="Amount charged المسجل بالفواتير" />
+            <Metric icon={Undo2} title="مرتجعات مسجلة" value={money(salesSummary.returned)} note="إجمالي قيمة المرتجعات المرتبطة" />
+            <Metric icon={AlertTriangle} title="استردادات معلقة" value={salesSummary.pending.toLocaleString("ar-EG")} note="عمليات تحتاج متابعة" />
           </div>
-        </Tabs>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Metric icon={FileText} title="فواتير المشتريات" value={purchaseSummary.count.toLocaleString("ar-EG")} note="حسب الفلاتر الحالية" />
+            <Metric icon={ShoppingBag} title="إجمالي المشتريات" value={money(purchaseSummary.total)} note="قيمة الفواتير المعروضة" />
+            <Metric icon={WalletCards} title="المتبقي للموردين" value={money(purchaseSummary.outstanding)} note="الرصيد المفتوح على الفواتير" />
+            <Metric icon={AlertTriangle} title="فواتير متأخرة" value={purchaseSummary.overdue.toLocaleString("ar-EG")} note="تجاوزت تاريخ الاستحقاق" />
+          </div>
+        )}
+
+        <Card className="border-slate-100 shadow-sm">
+          <CardContent className="p-4 sm:p-5">
+            <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_180px_180px_180px_auto]">
+              <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input className="h-11 pr-10" value={search} onChange={e => setSearch(e.target.value)} placeholder={tab === "sales" ? "رقم الفاتورة، العميل أو الهاتف..." : "رقم فاتورة الشراء أو المورد..."} /></div>
+              <div className="relative"><CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input className="h-11 pr-10" type="date" value={date} onChange={e => setDate(e.target.value)} /></div>
+              {tab === "sales" && <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={paymentFilter} onChange={e => setPaymentFilter(e.target.value as PaymentFilter)}><option value="all">كل وسائل الدفع</option><option value="cash">نقدي</option><option value="card">بطاقات</option><option value="wallet">محافظ إلكترونية</option><option value="mixed">مختلط</option></select>}
+              {tab === "sales" && <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={returnFilter} onChange={e => setReturnFilter(e.target.value as ReturnFilter)}><option value="all">كل حالات المرتجع</option><option value="clean">بدون مرتجع</option><option value="returned">به مرتجعات</option><option value="pending">استرداد معلق</option></select>}
+              <Button variant="ghost" className="h-11" onClick={resetFilters}>مسح الفلاتر</Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {tab === "sales" ? (
+          <SalesInvoices rows={filteredSales} loading={salesQuery.isLoading} error={salesQuery.isError ? (salesQuery.error as Error).message : ""} loadingSaleId={loadingSaleId} onPreview={previewInvoice} onPrint={quickPrint} onRetry={() => salesQuery.refetch()} />
+        ) : (
+          <PurchaseInvoices rows={filteredPurchases} loading={purchasesQuery.isLoading} error={purchasesQuery.isError ? (purchasesQuery.error as Error).message : ""} onOpenCenter={() => navigate("/supplier-purchases")} onRetry={() => purchasesQuery.refetch()} />
+        )}
+
+        <InvoiceDialog isOpen={previewOpen} onClose={() => setPreviewOpen(false)} sale={selectedSale} previewMode />
       </div>
-
-      {/* Invoice Edit Dialog */}
-      {selectedSale && (
-        <InvoiceEditDialog
-          isOpen={isEditDialogOpen}
-          onClose={handleEditClose}
-          sale={selectedSale}
-        />
-      )}
-
-      {/* Invoice Preview Dialog */}
-      {selectedSale && (
-        <InvoicePreviewDialog
-          isOpen={isPreviewDialogOpen}
-          onClose={handlePreviewClose}
-          sale={selectedSale}
-        />
-      )}
-
-      {/* Purchase Details Dialog (You can create a separate component for this) */}
-      {selectedPurchase && (
-        <div className={`fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center ${isPurchaseDetailsOpen ? 'block' : 'hidden'}`}>
-          <div className="bg-white rounded-lg p-6 m-4 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">تفاصيل فاتورة المشتريات</h2>
-              <Button variant="ghost" onClick={handlePurchaseDetailsClose}>إغلاق</Button>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div>
-                <p className="text-sm text-gray-500">رقم الفاتورة</p>
-                <p className="font-medium">{selectedPurchase.invoice_number}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">التاريخ</p>
-                <p className="font-medium">{new Date(selectedPurchase.date).toLocaleDateString('ar-EG')}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">المورد</p>
-                <p className="font-medium">{selectedPurchase.suppliers?.name || 'غير محدد'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">الحالة</p>
-                <p className="font-medium">
-                  {selectedPurchase.total <= selectedPurchase.paid ? (
-                    <Badge className="bg-green-100 text-green-800">مدفوعة بالكامل</Badge>
-                  ) : (
-                    <Badge className="bg-yellow-100 text-yellow-800">
-                      متبقي {(selectedPurchase.total - selectedPurchase.paid).toFixed(2)}
-                    </Badge>
-                  )}
-                </p>
-              </div>
-            </div>
-            
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold">المنتجات</h3>
-                <Button variant="outline" size="sm" onClick={handleRefreshPurchaseItems}>
-                  تحديث العناصر
-                </Button>
-              </div>
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="p-2 border text-right">المنتج</th>
-                    <th className="p-2 border text-right">الكمية</th>
-                    <th className="p-2 border text-right">السعر</th>
-                    <th className="p-2 border text-right">الإجمالي</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedPurchase.items && selectedPurchase.items.length > 0 ? (
-                    selectedPurchase.items.map((item, index) => (
-                      <tr key={index} className="border-b">
-                        <td className="p-2 border">
-                          <div>
-                            <p className="font-medium">{item.products?.name || 'منتج غير معروف'}</p>
-                            {item.batch_number && (
-                              <p className="text-sm text-gray-500">دفعة: {item.batch_number}</p>
-                            )}
-                            {item.expiry_date && (
-                              <p className="text-sm text-gray-500">
-                                الصلاحية: {new Date(item.expiry_date).toLocaleDateString('ar-EG')}
-                              </p>
-                            )}
-                            {item.shelf_location && (
-                              <p className="text-sm text-gray-500">الموقع: {item.shelf_location}</p>
-                            )}
-                            {item.notes && (
-                              <p className="text-sm text-gray-500">ملاحظات: {item.notes}</p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-2 border">{item.quantity}</td>
-                        <td className="p-2 border">{Number(item.price).toFixed(2)}</td>
-                        <td className="p-2 border">{Number(item.total || item.quantity * item.price).toFixed(2)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="p-4 text-center text-gray-500">
-                        لا توجد منتجات مسجلة لهذه الفاتورة
-                        <br />
-                        <small className="text-xs">هذه الفاتورة قد تكون تم إنشاؤها قبل تحديث النظام</small>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div></div>
-              <div className="space-y-2">
-                <div className="flex justify-between border-b pb-2">
-                  <span>الإجمالي:</span>
-                  <span className="font-semibold">{selectedPurchase.total.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between border-b pb-2">
-                  <span>المدفوع:</span>
-                  <span className="font-semibold">{selectedPurchase.paid.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-bold">
-                  <span>المتبقي:</span>
-                  <span>{(selectedPurchase.total - selectedPurchase.paid).toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-
-            {selectedPurchase.description && (
-              <div className="mt-4">
-                <h3 className="font-semibold mb-2">ملاحظات</h3>
-                <p className="bg-gray-50 p-3 rounded">{selectedPurchase.description}</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </MainLayout>
   );
-};
+}
 
-export default Invoices;
+function SalesInvoices({ rows, loading, error, loadingSaleId, onPreview, onPrint, onRetry }: {
+  rows: PosInvoiceListItem[]; loading: boolean; error: string; loadingSaleId: string | null;
+  onPreview: (row: PosInvoiceListItem) => void; onPrint: (row: PosInvoiceListItem) => void; onRetry: () => void;
+}) {
+  if (loading) return <Card><CardContent className="py-16 text-center text-slate-500">جارٍ تحميل الفواتير المحفوظة...</CardContent></Card>;
+  if (error) return <Card className="border-red-200 bg-red-50"><CardContent className="flex flex-col items-center gap-3 py-10 text-center text-red-800"><AlertTriangle className="h-6 w-6" /><p>{error || "تعذر تحميل الفواتير"}</p><Button variant="outline" onClick={onRetry}>إعادة المحاولة</Button></CardContent></Card>;
+  if (!rows.length) return <Card><CardContent className="py-16 text-center"><ReceiptText className="mx-auto h-10 w-10 text-slate-300" /><p className="mt-3 font-bold text-slate-600">لا توجد فواتير مطابقة</p><p className="mt-1 text-xs text-slate-400">غيّر البحث أو الفلاتر لعرض نتائج أخرى.</p></CardContent></Card>;
+
+  return <Card className="overflow-hidden border-slate-100 shadow-sm"><div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-4 py-4 text-right">الفاتورة</th><th className="px-4 py-4 text-right">التاريخ</th><th className="px-4 py-4 text-right">العميل</th><th className="px-4 py-4 text-right">الدفع</th><th className="px-4 py-4 text-left">المبلغ</th><th className="px-4 py-4 text-center">الأصناف</th><th className="px-4 py-4 text-center">المرتجعات</th><th className="px-4 py-4 text-left">الإجراءات</th></tr></thead><tbody>{rows.map(row => {
+    const busy = loadingSaleId === row.sale_id;
+    return <tr key={row.invoice_id} className="border-t border-slate-100 transition hover:bg-slate-50/70">
+      <td className="px-4 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><ReceiptText className="h-4 w-4" /></span><div><p className="font-black text-slate-900">#{row.invoice_number}</p>{row.payment_reference && <p className="mt-1 max-w-[170px] truncate text-[10px] text-slate-400">مرجع: {row.payment_reference}</p>}</div></div></td>
+      <td className="px-4 py-4 text-slate-600">{formatDateTime(row.sale_date)}</td>
+      <td className="px-4 py-4"><div className="flex items-center gap-2"><UserRound className="h-4 w-4 text-slate-400" /><div><p className="font-bold">{row.customer_name || "عميل عام"}</p>{row.customer_phone && <p className="text-[10px] text-slate-400">{row.customer_phone}</p>}</div></div></td>
+      <td className="px-4 py-4">{paymentBadge(row)}</td>
+      <td className="px-4 py-4 text-left"><p className="font-black text-slate-950">{money(row.amount_charged)}</p>{Number(row.customer_payment_fee_amount || 0) > 0 && <p className="text-[10px] text-amber-600">يشمل رسوم عميل {money(row.customer_payment_fee_amount)}</p>}</td>
+      <td className="px-4 py-4 text-center font-bold">{Number(row.item_count || 0).toLocaleString("ar-EG")}</td>
+      <td className="px-4 py-4 text-center">{Number(row.pending_refund_count || 0) > 0 ? <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">{row.pending_refund_count} معلق</Badge> : Number(row.return_count || 0) > 0 ? <Badge variant="outline" className="border-orange-200 bg-orange-50 text-orange-700">{row.return_count} مرتجع · {money(row.returned_amount)}</Badge> : <span className="text-xs text-slate-400">—</span>}</td>
+      <td className="px-4 py-4"><div className="flex justify-end gap-2"><Button size="sm" variant="outline" disabled={busy} onClick={() => onPreview(row)}><FileText className="ml-1.5 h-3.5 w-3.5" />عرض</Button><Button size="sm" className="bg-[#005931] hover:bg-[#004725]" disabled={busy} onClick={() => onPrint(row)}><Printer className="ml-1.5 h-3.5 w-3.5" />{busy ? "تحميل..." : "طباعة"}</Button></div></td>
+    </tr>;
+  })}</tbody></table></div></Card>;
+}
+
+function PurchaseInvoices({ rows, loading, error, onOpenCenter, onRetry }: { rows: SupplierPurchaseRow[]; loading: boolean; error: string; onOpenCenter: () => void; onRetry: () => void }) {
+  if (loading) return <Card><CardContent className="py-16 text-center text-slate-500">جارٍ تحميل فواتير المشتريات...</CardContent></Card>;
+  if (error) return <Card className="border-red-200 bg-red-50"><CardContent className="flex flex-col items-center gap-3 py-10 text-center text-red-800"><AlertTriangle className="h-6 w-6" /><p>{error || "تعذر تحميل فواتير المشتريات"}</p><Button variant="outline" onClick={onRetry}>إعادة المحاولة</Button></CardContent></Card>;
+  if (!rows.length) return <Card><CardContent className="py-16 text-center"><Truck className="mx-auto h-10 w-10 text-slate-300" /><p className="mt-3 font-bold text-slate-600">لا توجد فواتير مشتريات مطابقة</p></CardContent></Card>;
+
+  return <Card className="overflow-hidden border-slate-100 shadow-sm"><div className="overflow-x-auto"><table className="w-full min-w-[980px] text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-4 py-4 text-right">الفاتورة</th><th className="px-4 py-4 text-right">المورد</th><th className="px-4 py-4 text-right">التاريخ</th><th className="px-4 py-4 text-left">الإجمالي</th><th className="px-4 py-4 text-left">المدفوع</th><th className="px-4 py-4 text-left">المتبقي</th><th className="px-4 py-4 text-center">الحالة</th><th className="px-4 py-4 text-left">إجراء</th></tr></thead><tbody>{rows.map(row => <tr key={row.id} className="border-t border-slate-100 transition hover:bg-slate-50/70"><td className="px-4 py-4 font-black">#{row.invoice_number}</td><td className="px-4 py-4 font-bold">{row.supplier_name}</td><td className="px-4 py-4 text-slate-600">{formatDateTime(row.date)}</td><td className="px-4 py-4 text-left font-bold">{money(row.total)}</td><td className="px-4 py-4 text-left text-emerald-700">{money(row.paid)}</td><td className="px-4 py-4 text-left font-black">{money(row.outstanding)}</td><td className="px-4 py-4 text-center">{row.status === "voided" ? <Badge variant="secondary">ملغاة</Badge> : row.payment_status === "paid" ? <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">مدفوعة</Badge> : row.overdue ? <Badge className="bg-red-100 text-red-800 hover:bg-red-100">متأخرة</Badge> : <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">{row.payment_status === "partial" ? "مدفوعة جزئيًا" : "غير مدفوعة"}</Badge>}</td><td className="px-4 py-4 text-left"><Button size="sm" variant="outline" onClick={onOpenCenter}>فتح مركز الموردين</Button></td></tr>)}</tbody></table></div></Card>;
+}
