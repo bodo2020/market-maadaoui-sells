@@ -1,0 +1,70 @@
+name: Remove legacy POS lock once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/remove-legacy-pos-lock-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove dormant POS lock UI
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/POS/PosRuntimeGuard.tsx')
+          text = p.read_text()
+
+          replacements = [
+            ('import { AlertTriangle, Banknote, LockKeyhole, RefreshCw, ShieldAlert, WifiOff } from "lucide-react";', 'import { Banknote, RefreshCw, ShieldAlert, WifiOff } from "lucide-react";'),
+            ('import { createPosQuickSession, getLocalPosDevice } from "@/services/supabase/posDeviceService";', 'import { getLocalPosDevice } from "@/services/supabase/posDeviceService";'),
+            ('  const [locked, setLocked] = useState(false);\n  const [pin, setPin] = useState("");\n  const [unlocking, setUnlocking] = useState(false);\n  const [error, setError] = useState<string | null>(null);\n', ''),
+            ('    if (!device || !user?.id || !online || locked) return;', '    if (!device || !user?.id || !online) return;'),
+            ('  }, [device?.device_id, device?.device_token, user?.id, online, locked]);', '  }, [device?.device_id, device?.device_token, user?.id, online]);'),
+            ('    const activity = () => { if (!locked) armTimer(); };', '    const activity = () => armTimer();'),
+            ('  }, [locked, user?.id, currentBranchId, armTimer]);', '  }, [user?.id, currentBranchId, armTimer]);'),
+            ('    if (!device || !user?.id || !online || locked) return;', '    if (!device || !user?.id || !online) return;'),
+            ('  }, [device?.device_id, user?.id, online, locked, checkRuntime]);', '  }, [device?.device_id, user?.id, online, checkRuntime]);'),
+            ('  useEffect(() => { if (!locked) armTimer(); }, [autoLockMinutes, locked, armTimer]);', '  useEffect(() => { armTimer(); }, [autoLockMinutes, armTimer]);'),
+            ('  const cashWarningActive = online && !locked && !runtimeIssue && cashWarningThreshold != null && cashWarningThreshold > 0 && drawerBalance != null && drawerBalance >= cashWarningThreshold;', '  const cashWarningActive = online && !runtimeIssue && cashWarningThreshold != null && cashWarningThreshold > 0 && drawerBalance != null && drawerBalance >= cashWarningThreshold;'),
+            ('      {checkingRuntime && !locked && !runtimeIssue && <div className="pointer-events-none fixed left-3 top-32 z-[60] rounded-full bg-white/90 p-2 text-slate-400 shadow-sm"><RefreshCw className="h-3.5 w-3.5 animate-spin" /></div>}', '      {checkingRuntime && !runtimeIssue && <div className="pointer-events-none fixed left-3 top-32 z-[60] rounded-full bg-white/90 p-2 text-slate-400 shadow-sm"><RefreshCw className="h-3.5 w-3.5 animate-spin" /></div>}'),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected one match, got {count}: {old[:90]}')
+              text = text.replace(old, new, 1)
+
+          start = text.index('function PinKeypad(')
+          end = text.index('\n\nexport default function PosRuntimeGuard', start)
+          text = text[:start] + text[end+2:]
+
+          start = text.index('  const addDigit = (digit: string) =>')
+          end = text.index('\n\n  const cashWarningActive', start)
+          text = text[:start] + text[end+2:]
+
+          marker = '      {locked && !runtimeIssue && '
+          if marker not in text:
+              raise SystemExit('legacy locked render block not found')
+          start = text.index(marker)
+          end = text.index('\n    </>', start)
+          block = text[start:end]
+          text = text[:start] + text[end:]
+
+          p.write_text(text)
+          PY
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/POS/PosRuntimeGuard.tsx
+          git commit -m "refactor(lock): remove legacy POS-local lock screen"
+          git pull --rebase origin main
+          git push origin HEAD:main
