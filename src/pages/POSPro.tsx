@@ -103,6 +103,7 @@ export default function POSPro() {
   const activeTabIdRef = useRef(activeTabId);
   const searchRef = useRef<HTMLInputElement>(null);
   const cartScrollRef = useRef<HTMLDivElement>(null);
+  const desktopCartCardRef = useRef<HTMLDivElement>(null);
   const lastCartRevealIndexRef = useRef<number | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -117,6 +118,7 @@ export default function POSPro() {
   const [weightValue, setWeightValue] = useState("");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [preflighting, setPreflighting] = useState(false);
+  const [desktopCartHeight, setDesktopCartHeight] = useState<number | null>(null);
 
   const device = useMemo(
     () => currentBranchId ? getLocalPosDevice(currentBranchId) : null,
@@ -177,6 +179,33 @@ export default function POSPro() {
     revealCartItem(lastCartRevealIndexRef.current);
   }, [mobileCartOpen, revealCartItem]);
 
+  useEffect(() => {
+    let frame = 0;
+
+    const fitDesktopCartToViewport = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        if (window.innerWidth < 1024) {
+          setDesktopCartHeight(null);
+          return;
+        }
+
+        const card = desktopCartCardRef.current;
+        if (!card) return;
+        const top = card.getBoundingClientRect().top;
+        const bottomGap = 12;
+        const availableHeight = Math.max(320, Math.floor(window.innerHeight - top - bottomGap));
+        setDesktopCartHeight(availableHeight);
+      });
+    };
+
+    fitDesktopCartToViewport();
+    window.addEventListener("resize", fitDesktopCartToViewport);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", fitDesktopCartToViewport);
+    };
+  }, []);
   const refreshCash = useCallback(async () => {
     if (!device) {
       setCashSummary(null);
@@ -807,7 +836,7 @@ export default function POSPro() {
               </div>
             )}
           </div>
-          <Card className="hidden border-0 shadow-sm ring-1 ring-slate-200 lg:sticky lg:top-24 lg:block lg:h-[calc(100dvh-7rem)] lg:min-h-[440px] lg:overflow-hidden"><CardContent className="h-full min-h-0 p-4">{cartPanel}</CardContent></Card>
+          <Card ref={desktopCartCardRef} style={desktopCartHeight ? { height: String(desktopCartHeight) + "px" } : undefined} className="hidden border-0 shadow-sm ring-1 ring-slate-200 lg:sticky lg:top-24 lg:block lg:min-h-0 lg:overflow-hidden"><CardContent className="h-full min-h-0 p-4">{cartPanel}</CardContent></Card>
         </div>
       </div>
 
