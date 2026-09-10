@@ -38,9 +38,9 @@ export default function POSTabs({ tabs, activeTabId, onCreateTab, onCloseTab, on
   const heldCount = tabs.filter(tab => tab.id !== activeTabId && tab.cartItems.length > 0).length;
 
   return (
-    <div dir="rtl" className="rounded-2xl border bg-white p-1.5 shadow-sm">
-      <div className="flex items-stretch gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-[116px] shrink-0 flex-col justify-center rounded-xl bg-slate-50 px-2.5 py-1.5">
+    <div dir="rtl" className="rounded-xl border bg-white p-1 shadow-sm">
+      <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex h-11 min-w-[108px] shrink-0 flex-col justify-center rounded-lg bg-slate-50 px-2 py-1">
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-bold text-slate-600">السلات المفتوحة</span>
             <Badge variant="secondary" className="h-4 min-w-4 px-1 text-[9px]">{tabs.length}</Badge>
@@ -63,7 +63,7 @@ export default function POSTabs({ tabs, activeTabId, onCreateTab, onCloseTab, on
               onKeyDown={event => { if (event.key === "Enter" || event.key === " ") onSwitchTab(tab.id); }}
               onClick={() => onSwitchTab(tab.id)}
               className={cn(
-                "group flex h-14 min-w-[154px] shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border px-2.5 py-1.5 transition active:scale-[0.99]",
+                "group flex h-11 min-w-[148px] shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 transition active:scale-[0.99]",
                 isActive ? "border-[#005931]/30 bg-emerald-50 shadow-sm" : "border-transparent bg-slate-50 hover:border-slate-200 hover:bg-slate-100"
               )}
             >
@@ -93,7 +93,7 @@ export default function POSTabs({ tabs, activeTabId, onCreateTab, onCloseTab, on
           );
         })}
 
-        <Button variant="outline" size="sm" onClick={onCreateTab} className="h-14 shrink-0 gap-1 rounded-xl border-dashed px-3 text-xs">
+        <Button variant="outline" size="sm" onClick={onCreateTab} className="h-11 shrink-0 gap-1 rounded-lg border-dashed px-3 text-xs">
           <Plus className="h-3.5 w-3.5" /> سلة جديدة
         </Button>
       </div>

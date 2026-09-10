@@ -628,7 +628,7 @@ export default function POSPro() {
   }, [createTab, checkoutOpen, cartItems.length, openCheckout, scannerOpen, weightProduct]);
 
   const cartPanel = (
-    <div className="space-y-4" dir="rtl">
+    <div className="flex min-h-0 flex-col gap-3 lg:h-full" dir="rtl">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold">السلة الحالية</h2>
@@ -647,7 +647,7 @@ export default function POSPro() {
           <p className="mt-1 text-xs">امسح باركود أو اختر منتج</p>
         </div>
       ) : (
-        <div className="max-h-[46vh] space-y-2 overflow-y-auto pr-1">
+        <div className="max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">
           {cartItems.map((item, index) => {
             const bulkPackSize = Number(item.product.bulk_quantity || 0);
             const bulkPacks = item.isBulk && bulkPackSize > 0 ? Math.max(1, Math.round(Number(item.quantity || 0) / bulkPackSize)) : 0;
@@ -708,6 +708,7 @@ export default function POSPro() {
         </div>
       )}
 
+      <div className="shrink-0 space-y-3 border-t border-slate-100 pt-3">
       <div className="rounded-2xl bg-slate-50 p-4">
         {discount > 0 && <div className="flex items-center justify-between text-sm text-muted-foreground"><span>قبل الخصم</span><span>{money(originalSubtotal)}</span></div>}
         {discount > 0 && <div className="mt-1 flex items-center justify-between text-sm text-emerald-700"><span>خصومات المنتجات</span><span>- {money(discount)}</span></div>}
@@ -727,6 +728,7 @@ export default function POSPro() {
         {preflighting ? <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> : <CreditCard className="ml-2 h-5 w-5" />}
         {preflighting ? "مراجعة السلة..." : `إتمام البيع · ${money(total)}`}
       </Button>
+      </div>
     </div>
   );
 
@@ -744,10 +746,9 @@ export default function POSPro() {
           </div>
         </div>
 
-        <POSTabs tabs={tabs} activeTabId={activeTabId} onCreateTab={createTab} onCloseTab={closeTab} onSwitchTab={setActiveTabId} />
-
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_430px]">
-          <div className="min-w-0 space-y-4">
+          <div className="min-w-0 space-y-3">
+            <POSTabs tabs={tabs} activeTabId={activeTabId} onCreateTab={createTab} onCloseTab={closeTab} onSwitchTab={setActiveTabId} />
             <Card className="border-0 shadow-sm ring-1 ring-slate-200"><CardContent className="p-3 md:p-4">
               <div className="flex gap-2"><div className="relative flex-1"><Search className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" /><Input ref={searchRef} autoFocus value={search} onChange={event => setSearch(event.target.value)} onKeyDown={event => { if (event.key === "Enter" && search.trim()) void processBarcode(search); }} placeholder="امسح الباركود أو ابحث باسم المنتج" className="h-12 pr-10 text-base" /></div><Button variant="outline" className="h-12 px-4" onClick={() => setScannerOpen(true)}><ScanLine className="ml-2 h-5 w-5" /><span className="hidden sm:inline">كاميرا</span></Button></div>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><Barcode className="h-3.5 w-3.5" /> قارئ المنتجات جاهز</span><span className="hidden md:inline">F2 بحث</span><span className="hidden md:inline">F4 إتمام البيع</span><span className="hidden md:inline">Ctrl+N سلة جديدة</span></div>
@@ -771,7 +772,7 @@ export default function POSPro() {
               </div>
             )}
           </div>
-          <Card className="hidden h-fit border-0 shadow-sm ring-1 ring-slate-200 lg:sticky lg:top-24 lg:block"><CardContent className="p-4">{cartPanel}</CardContent></Card>
+          <Card className="hidden border-0 shadow-sm ring-1 ring-slate-200 lg:sticky lg:top-24 lg:block lg:h-[calc(100dvh-14rem)] lg:min-h-[440px] lg:overflow-hidden"><CardContent className="h-full min-h-0 p-4">{cartPanel}</CardContent></Card>
         </div>
       </div>
 
