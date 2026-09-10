@@ -183,6 +183,22 @@ function buildReceiptBody(sale: Sale, preferences: InvoicePrintPreferences, over
   const logo = resolveLogo(overrides);
   const barcodeUrl = preferences.showInvoiceBarcode ? invoiceBarcodeDataUrl(sale.invoice_number, preferences.paperSize) : "";
   const returns = Array.isArray(extra.invoice_returns) ? extra.invoice_returns : [];
+  const paymentBreakdown = Array.isArray(extra.payment_breakdown)
+    ? extra.payment_breakdown.filter((part: any) => Number(part?.charged_amount ?? part?.base_amount ?? 0) > 0)
+    : [];
+  const hasDetailedBreakdown = paymentBreakdown.length > 1;
+  const paymentBreakdownMarkup = hasDetailedBreakdown
+    ? paymentBreakdown.map((part: any) => {
+        const name = String(part?.name || part?.code || "وسيلة دفع");
+        const charged = Number(part?.charged_amount ?? part?.base_amount ?? 0);
+        const reference = String(part?.reference || "").trim();
+        const partCustomerFee = Number(part?.customer_fee_amount || 0);
+        return `
+          <div class="payment-part"><span>${esc(name)}</span><strong>${esc(money(charged, currency))}</strong></div>
+          ${reference ? `<div class="payment-part-sub"><span>مرجع ${esc(name)}</span><strong class="reference">${esc(reference)}</strong></div>` : ""}
+          ${partCustomerFee > 0 ? `<div class="payment-part-sub"><span>رسوم على العميل</span><strong>+ ${esc(money(partCustomerFee, currency))}</strong></div>` : ""}`;
+      }).join("")
+    : "";
   const is58 = preferences.paperSize === "58mm";
 
   const itemsMarkup = is58
@@ -234,9 +250,11 @@ function buildReceiptBody(sale: Sale, preferences: InvoicePrintPreferences, over
 
     <section class="payment-block">
       <div><span>طريقة الدفع</span><strong>${esc(paymentLabel(sale))}</strong></div>
-      ${extra.payment_reference ? `<div><span>مرجع العملية</span><strong class="reference">${esc(extra.payment_reference)}</strong></div>` : ""}
-      ${Number(extra.cash_amount || 0) > 0 && sale.payment_method === "mixed" ? `<div><span>نقدي</span><strong>${esc(money(extra.cash_amount, currency))}</strong></div>` : ""}
-      ${Number(extra.card_amount || 0) > 0 && sale.payment_method === "mixed" ? `<div><span>بطاقة / إلكتروني</span><strong>${esc(money(extra.card_amount, currency))}</strong></div>` : ""}
+      ${hasDetailedBreakdown ? paymentBreakdownMarkup : `
+        ${extra.payment_reference ? `<div><span>مرجع العملية</span><strong class="reference">${esc(extra.payment_reference)}</strong></div>` : ""}
+        ${Number(extra.cash_amount || 0) > 0 && sale.payment_method === "mixed" ? `<div><span>نقدي</span><strong>${esc(money(extra.cash_amount, currency))}</strong></div>` : ""}
+        ${Number(extra.card_amount || 0) > 0 && sale.payment_method === "mixed" ? `<div><span>بطاقة / إلكتروني</span><strong>${esc(money(extra.card_amount, currency))}</strong></div>` : ""}
+      `}
     </section>
 
     ${returns.length > 0 ? `
@@ -391,6 +409,8 @@ export function buildSaleInvoiceHtml(
         .paper-a4 .payment-block > div { font-size: 11px; }
         .payment-block strong { text-align: left; overflow-wrap: anywhere; }
         .payment-block .reference { direction: ltr; unicode-bidi: plaintext; font-size: .92em; }
+        .payment-block .payment-part { margin-top: 2px; font-weight: 800; }
+        .payment-block .payment-part-sub { padding-inline-start: 7px; font-size: .9em; }
 
         .return-note { margin-top: 5px; padding: 4px; border-top: 3px double #000; border-bottom: 3px double #000; text-align: center; font-size: 7.5px; line-height: 1.4; font-weight: 900; }
         .paper-80 .return-note { font-size: 8.5px; }
