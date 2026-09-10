@@ -74,7 +74,10 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
         (sale.payment_method === "cash" ? "نقدي" : sale.payment_method === "card" ? "بطاقة بنكية" : "دفع مختلط"),
     );
     const returns = Array.isArray(extra.invoice_returns) ? extra.invoice_returns : [];
-    return { extra, loyalty, customerFee, amountPaid, paymentName, returns };
+    const paymentBreakdown = Array.isArray(extra.payment_breakdown)
+      ? extra.payment_breakdown.filter((part: any) => Number(part?.charged_amount ?? part?.base_amount ?? 0) > 0)
+      : [];
+    return { extra, loyalty, customerFee, amountPaid, paymentName, returns, paymentBreakdown };
   }, [sale]);
 
   if (!sale || !meta) return null;
@@ -290,9 +293,28 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
 
               <section className="mt-2 space-y-1 border-b border-dashed border-black pb-2 text-[8px]">
                 <div className="flex justify-between gap-3"><span>طريقة الدفع</span><strong>{meta.paymentName}</strong></div>
-                {meta.extra.payment_reference && <div className="flex justify-between gap-3"><span>مرجع العملية</span><strong dir="ltr" className="break-all text-left">{meta.extra.payment_reference}</strong></div>}
-                {Number(meta.extra.cash_amount || 0) > 0 && sale.payment_method === "mixed" && <div className="flex justify-between gap-3"><span>نقدي</span><strong>{money(meta.extra.cash_amount)}</strong></div>}
-                {Number(meta.extra.card_amount || 0) > 0 && sale.payment_method === "mixed" && <div className="flex justify-between gap-3"><span>بطاقة / إلكتروني</span><strong>{money(meta.extra.card_amount)}</strong></div>}
+                {meta.paymentBreakdown.length > 1 ? (
+                  <div className="mt-1 space-y-1 border-t border-dashed border-black pt-1.5">
+                    {meta.paymentBreakdown.map((part: any, index: number) => {
+                      const charged = Number(part?.charged_amount ?? part?.base_amount ?? 0);
+                      const partCustomerFee = Number(part?.customer_fee_amount || 0);
+                      const partName = String(part?.name || part?.code || "وسيلة دفع");
+                      return (
+                        <div key={`${part?.payment_method_id || part?.code || "payment"}-${index}`} className="space-y-0.5">
+                          <div className="flex justify-between gap-3 font-bold"><span>{partName}</span><strong>{money(charged)}</strong></div>
+                          {part?.reference && <div className="flex justify-between gap-3 pr-2 text-[7px]"><span>المرجع</span><strong dir="ltr" className="break-all text-left">{String(part.reference)}</strong></div>}
+                          {partCustomerFee > 0 && <div className="flex justify-between gap-3 pr-2 text-[7px]"><span>رسوم على العميل</span><strong>+ {money(partCustomerFee)}</strong></div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <>
+                    {meta.extra.payment_reference && <div className="flex justify-between gap-3"><span>مرجع العملية</span><strong dir="ltr" className="break-all text-left">{meta.extra.payment_reference}</strong></div>}
+                    {Number(meta.extra.cash_amount || 0) > 0 && sale.payment_method === "mixed" && <div className="flex justify-between gap-3"><span>نقدي</span><strong>{money(meta.extra.cash_amount)}</strong></div>}
+                    {Number(meta.extra.card_amount || 0) > 0 && sale.payment_method === "mixed" && <div className="flex justify-between gap-3"><span>بطاقة / إلكتروني</span><strong>{money(meta.extra.card_amount)}</strong></div>}
+                  </>
+                )}
               </section>
 
               {meta.returns.length > 0 && (
