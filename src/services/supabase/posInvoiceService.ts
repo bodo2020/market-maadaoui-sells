@@ -21,6 +21,7 @@ export interface PosInvoiceListItem {
   payment_method_code?: string | null;
   payment_method_name?: string | null;
   payment_method_type?: string | null;
+  payment_kind?: "cash" | "card" | "wallet" | "mixed" | string;
   payment_fee_amount: number;
   customer_payment_fee_amount: number;
   merchant_payment_fee_amount: number;
@@ -30,6 +31,40 @@ export interface PosInvoiceListItem {
   return_count: number;
   pending_refund_count: number;
 }
+
+export type InvoiceCenterPaymentFilter = "all" | "cash" | "card" | "wallet" | "mixed";
+export type InvoiceCenterReturnFilter = "all" | "clean" | "returned" | "pending";
+
+export type InvoiceCenterSummaryV3 = {
+  invoice_count: number;
+  amount_charged: number;
+  invoice_total: number;
+  customer_payment_fees: number;
+  merchant_payment_fees: number;
+  returned_amount: number;
+  return_count: number;
+  pending_refund_count: number;
+};
+
+export type InvoiceCenterV3 = {
+  version: number;
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  summary: InvoiceCenterSummaryV3;
+  rows: PosInvoiceListItem[];
+};
+
+export type InvoiceCenterV3Filters = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  from?: string | null;
+  to?: string | null;
+  paymentKind?: InvoiceCenterPaymentFilter;
+  returnState?: InvoiceCenterReturnFilter;
+};
 
 function num(value: unknown) {
   const parsed = Number(value ?? 0);
@@ -51,6 +86,44 @@ function normalizeListRow(row: any): PosInvoiceListItem {
     returned_amount: num(row?.returned_amount),
     return_count: num(row?.return_count),
     pending_refund_count: num(row?.pending_refund_count),
+  };
+}
+
+function normalizeSummary(value: any): InvoiceCenterSummaryV3 {
+  return {
+    invoice_count: num(value?.invoice_count),
+    amount_charged: num(value?.amount_charged),
+    invoice_total: num(value?.invoice_total),
+    customer_payment_fees: num(value?.customer_payment_fees),
+    merchant_payment_fees: num(value?.merchant_payment_fees),
+    returned_amount: num(value?.returned_amount),
+    return_count: num(value?.return_count),
+    pending_refund_count: num(value?.pending_refund_count),
+  };
+}
+
+export async function fetchInvoiceCenterV3(branchId: string, filters: InvoiceCenterV3Filters = {}): Promise<InvoiceCenterV3> {
+  const { data, error } = await (supabase as any).rpc("get_invoice_center_v3", {
+    p_branch_id: branchId,
+    p_page: Math.max(1, Number(filters.page || 1)),
+    p_page_size: Math.min(100, Math.max(10, Number(filters.pageSize || 50))),
+    p_search: filters.search?.trim() || null,
+    p_from: filters.from || null,
+    p_to: filters.to || null,
+    p_payment_kind: filters.paymentKind || "all",
+    p_return_state: filters.returnState || "all",
+  });
+
+  if (error) throw error;
+  const payload = data || {};
+  return {
+    version: num(payload.version) || 3,
+    page: Math.max(1, num(payload.page) || 1),
+    page_size: Math.max(10, num(payload.page_size) || 50),
+    total: Math.max(0, num(payload.total)),
+    total_pages: Math.max(1, num(payload.total_pages) || 1),
+    summary: normalizeSummary(payload.summary),
+    rows: (Array.isArray(payload.rows) ? payload.rows : []).map(normalizeListRow),
   };
 }
 
