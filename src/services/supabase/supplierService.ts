@@ -2,6 +2,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Supplier } from "@/types";
 
+type RpcError = { message?: string; details?: string } | null;
+const rpc = supabase.rpc.bind(supabase) as unknown as (
+  name: string,
+  args?: Record<string, unknown>,
+) => Promise<{ data: unknown; error: RpcError }>;
+
 export async function fetchSuppliers() {
   try {
     console.log("Fetching suppliers...");
@@ -111,32 +117,44 @@ export async function getSupplierById(id: string) {
 
 export async function fetchSupplierTransactions(supplierId: string) {
   try {
-    const { data, error } = await supabase
-      .from("purchases")
-      .select("id, date, total, paid, invoice_number, description")
-      .eq("supplier_id", supplierId)
-      .order("date", { ascending: false });
+    const currentBranchId = localStorage.getItem("currentBranchId");
+    if (!currentBranchId || currentBranchId === "null") {
+      toast.error("يجب اختيار فرع أولاً");
+      return [];
+    }
+
+    const { data, error } = await rpc("get_supplier_ledger_v1", {
+      p_supplier_id: supplierId,
+      p_branch_id: currentBranchId,
+      p_limit: 300,
+    });
 
     if (error) {
-      console.error("Error fetching supplier transactions:", error);
+      console.error("Error fetching supplier ledger:", error);
       toast.error("فشل في جلب معاملات المورد");
       return [];
     }
 
-    const transactions = data.map(purchase => {
-      const remaining = purchase.total - purchase.paid;
+    const workspace = (data || {}) as {
+      entries?: Array<{
+        id: string;
+        created_at: string;
+        description?: string | null;
+        signed_amount: number | string;
+        invoice_number?: string | null;
+      }>;
+    };
+
+    return (workspace.entries || []).map(entry => {
+      const signedAmount = Number(entry.signed_amount || 0);
       return {
-        id: purchase.id,
-        date: purchase.date,
-        description: purchase.description || `فاتورة رقم ${purchase.invoice_number}`,
-        amount: Math.abs(remaining),
-        // If remaining > 0, we owe the supplier money (debt)
-        // If remaining < 0, the supplier owes us money (credit)
-        type: remaining > 0 ? "debt" : "credit"
+        id: entry.id,
+        date: entry.created_at,
+        description: entry.description || (entry.invoice_number ? `فاتورة رقم ${entry.invoice_number}` : "حركة على حساب المورد"),
+        amount: Math.abs(signedAmount),
+        type: signedAmount > 0 ? "debt" : "credit",
       };
     });
-
-    return transactions;
   } catch (error) {
     console.error("Unexpected error fetching supplier transactions:", error);
     toast.error("حدث خطأ غير متوقع");
