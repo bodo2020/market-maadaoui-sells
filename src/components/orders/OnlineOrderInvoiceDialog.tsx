@@ -15,8 +15,12 @@ interface OnlineOrderInvoiceDialogProps {
   order: Order | null;
 }
 
-interface EnrichedOrderItem extends OrderItem {
+interface EnrichedOrderItem {
+  product_id?: string;
   product_name: string;
+  quantity: number;
+  price: number;
+  total?: number;
 }
 
 
