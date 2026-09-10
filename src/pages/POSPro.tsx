@@ -102,6 +102,8 @@ export default function POSPro() {
   const [activeTabId, setActiveTabId] = useState(() => initialActiveTab(initial));
   const activeTabIdRef = useRef(activeTabId);
   const searchRef = useRef<HTMLInputElement>(null);
+  const cartScrollRef = useRef<HTMLDivElement>(null);
+  const lastCartRevealIndexRef = useRef<number | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [remoteSearchResults, setRemoteSearchResults] = useState<Product[] | null>(null);
@@ -147,6 +149,33 @@ export default function POSPro() {
 
   const setCartItems = (items: CartItem[]) => updateActiveTab({ cartItems: items });
   const setSearch = (value: string) => updateActiveTab({ search: value });
+
+  const revealCartItem = useCallback((index: number) => {
+    lastCartRevealIndexRef.current = index;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const container = cartScrollRef.current;
+        const row = container?.querySelector<HTMLElement>(`[data-pos-cart-item="${index}"]`);
+        if (!container || !row || container.clientHeight <= 0) return;
+
+        const rowTop = row.offsetTop;
+        const rowBottom = rowTop + row.offsetHeight;
+        const viewTop = container.scrollTop;
+        const viewBottom = viewTop + container.clientHeight;
+        if (rowTop >= viewTop + 8 && rowBottom <= viewBottom - 8) return;
+
+        const nextTop = rowTop < viewTop
+          ? Math.max(0, rowTop - 8)
+          : Math.max(0, rowBottom - container.clientHeight + 8);
+        container.scrollTo({ top: nextTop, behavior: "smooth" });
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!mobileCartOpen || lastCartRevealIndexRef.current == null) return;
+    revealCartItem(lastCartRevealIndexRef.current);
+  }, [mobileCartOpen, revealCartItem]);
 
   const refreshCash = useCallback(async () => {
     if (!device) {
@@ -235,8 +264,10 @@ export default function POSPro() {
         discount,
         total: (item.quantity + 1) * price,
       } : item));
+      revealCartItem(index);
     } else {
       setCartItems([...cartItems, { product, quantity: 1, price, discount, total: price, weight: null }]);
+      revealCartItem(cartItems.length);
     }
     setSearch("");
   };
@@ -263,6 +294,7 @@ export default function POSPro() {
         const quantity = item.quantity + pack;
         return { ...item, product, quantity, price: unitPrice, discount: bulkDiscount, total: (quantity / pack) * packPrice };
       }));
+      revealCartItem(index);
     } else {
       setCartItems([...cartItems, {
         product,
@@ -273,6 +305,7 @@ export default function POSPro() {
         isBulk: true,
         weight: null,
       }]);
+      revealCartItem(cartItems.length);
     }
     setSearch("");
   };
@@ -298,6 +331,7 @@ export default function POSPro() {
       discount: discountPerUnitOf(weightProduct, unitPrice),
       total: unitPrice * weight,
     }]);
+    revealCartItem(cartItems.length);
     setWeightProduct(null);
     setWeightValue("");
     setSearch("");
@@ -345,6 +379,7 @@ export default function POSPro() {
             discount: discountPerUnitOf(product, unitPrice),
             total: unitPrice * weight,
           }]);
+          revealCartItem(cartItems.length);
         }
       } else {
         chooseProduct(result.product);
@@ -354,7 +389,7 @@ export default function POSPro() {
     } catch (error: any) {
       toast({ title: "تعذر قراءة الباركود", description: error?.message || barcode, variant: "destructive" });
     }
-  }, [cartItems, cartUsageForProduct, toast]);
+  }, [cartItems, cartUsageForProduct, revealCartItem, toast]);
 
   useEffect(() => {
     if (checkoutOpen || weightProduct || scannerOpen) return;
@@ -647,12 +682,12 @@ export default function POSPro() {
           <p className="mt-1 text-xs">امسح باركود أو اختر منتج</p>
         </div>
       ) : (
-        <div className="max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">
+        <div ref={cartScrollRef} className="relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">
           {cartItems.map((item, index) => {
             const bulkPackSize = Number(item.product.bulk_quantity || 0);
             const bulkPacks = item.isBulk && bulkPackSize > 0 ? Math.max(1, Math.round(Number(item.quantity || 0) / bulkPackSize)) : 0;
             return (
-              <div key={`${item.product.id}-${item.isBulk ? "bulk" : item.weight != null ? `w-${index}` : "unit"}-${index}`} className="rounded-2xl border bg-white p-3 shadow-sm">
+              <div data-pos-cart-item={index} key={`${item.product.id}-${item.isBulk ? "bulk" : item.weight != null ? `w-${index}` : "unit"}-${index}`} className="rounded-2xl border bg-white p-3 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-semibold">{item.product.name}</div>
@@ -772,7 +807,7 @@ export default function POSPro() {
               </div>
             )}
           </div>
-          <Card className="hidden border-0 shadow-sm ring-1 ring-slate-200 lg:sticky lg:top-24 lg:block lg:h-[calc(100dvh-14rem)] lg:min-h-[440px] lg:overflow-hidden"><CardContent className="h-full min-h-0 p-4">{cartPanel}</CardContent></Card>
+          <Card className="hidden border-0 shadow-sm ring-1 ring-slate-200 lg:sticky lg:top-24 lg:block lg:h-[calc(100dvh-7rem)] lg:min-h-[440px] lg:overflow-hidden"><CardContent className="h-full min-h-0 p-4">{cartPanel}</CardContent></Card>
         </div>
       </div>
 
