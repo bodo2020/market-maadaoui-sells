@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  ArrowLeftRight,
   Banknote,
   Building2,
   History,
@@ -100,12 +101,13 @@ export default function FinanceControlCenterV2() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-black text-slate-950">مركز الماليات</h1>
-              <Badge className="bg-[#005931] hover:bg-[#005931]">V2</Badge>
+              <Badge className="bg-[#005931] hover:bg-[#005931]">V3</Badge>
             </div>
-            <p className="mt-1 text-sm text-slate-500">صورة واحدة لكل جنيه في الفرع: الخزن، أدراج الكاشير، البنوك، السلف، الرواتب ومهام الصرف.</p>
+            <p className="mt-1 text-sm text-slate-500">صورة واحدة لكل جنيه في الفرع: الخزن، أدراج الكاشير، البنوك، الأموال قيد النقل، السلف والرواتب.</p>
             <p className="mt-1 text-xs font-semibold text-slate-400">{currentBranchName || "الفرع الحالي"}</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => navigate("/finance/transfers")}><ArrowLeftRight className="ml-2 h-4 w-4" />تحويلات الخزن</Button>
             <Button variant="outline" onClick={() => navigate("/finance")}>التقارير المالية</Button>
             <Button variant="outline" onClick={() => navigate("/tasks")}>مهام الصرف</Button>
             <Button onClick={() => query.refetch()} disabled={query.isFetching} className="bg-[#005931] hover:bg-[#004426]">
@@ -126,15 +128,21 @@ export default function FinanceControlCenterV2() {
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
                   <div>
                     <div className="font-black text-amber-950">فيه {summary.attention_count} بند مالي يحتاج مراجعة</div>
-                    <div className="mt-1 text-sm text-amber-800">{summary.unlinked_salary_advance_count ? `${summary.unlinked_salary_advance_count} سلفة قديمة بلا مصدر صرف (${money(summary.unlinked_salary_advance_amount)}). ` : ""}{summary.failed_treasury_tasks ? `${summary.failed_treasury_tasks} مهمة صرف مرفوضة أو متعذرة.` : ""}</div>
+                    <div className="mt-1 text-sm text-amber-800">
+                      {summary.unlinked_salary_advance_count ? `${summary.unlinked_salary_advance_count} سلفة بلا مصدر صرف (${money(summary.unlinked_salary_advance_amount)}). ` : ""}
+                      {summary.failed_treasury_tasks ? `${summary.failed_treasury_tasks} مهمة صرف مرفوضة أو متعذرة. ` : ""}
+                      {summary.transfer_exception_count ? `${summary.transfer_exception_count} تحويل مالي في حالة استثناء ويظل مبلغه قيد النقل.` : ""}
+                    </div>
                   </div>
                 </div>
-                <Button variant="outline" className="border-amber-300 bg-white" onClick={() => navigate("/tasks")}>مراجعة المهام</Button>
+                <Button variant="outline" className="border-amber-300 bg-white" onClick={() => navigate(summary.transfer_exception_count ? "/finance/transfers" : "/tasks")}>مراجعة</Button>
               </div>
             )}
 
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <SummaryCard title="إجمالي السيولة المتاحة" value={money(summary.liquid_funds_total)} note="خزنة الفرع + أدراج POS + التحصيل النقدي + البنوك، بدون حسابات التسوية." icon={Banknote} />
+              <SummaryCard title="إجمالي الأموال تحت العهدة" value={money(summary.funds_under_custody_total)} note="السيولة الموجودة في الحسابات + أي مبلغ خرج من مصدر وما زال قيد النقل." icon={Banknote} />
+              <SummaryCard title="السيولة داخل الحسابات" value={money(summary.liquid_funds_total)} note="خزنة الفرع + أدراج POS + التحصيل النقدي + البنوك فقط." icon={Vault} />
+              <SummaryCard title="قيد النقل" value={money(summary.in_transit_amount)} note={`${summary.in_transit_count || 0} تحويل خرج من المصدر ولم يكتمل استلامه بعد.`} icon={ArrowLeftRight} danger={summary.transfer_exception_count > 0} />
               <SummaryCard title="خزنة الفرع" value={money(summary.branch_safe_balance)} note="الرصيد الفعلي من Ledger الخزنة الرئيسية." icon={Vault} />
               <SummaryCard title="أدراج الكاشير" value={money(summary.cashier_drawers_balance)} note="إجمالي أرصدة أدراج POS الحالية." icon={ReceiptText} />
               <SummaryCard title="البنوك" value={money(summary.bank_balance)} note="الأموال الموجودة في حسابات البنك الفعلية." icon={Landmark} />
@@ -145,7 +153,10 @@ export default function FinanceControlCenterV2() {
             </section>
 
             <section className="space-y-3">
-              <div><h2 className="text-lg font-black">العهد والسيولة</h2><p className="text-xs text-slate-500">كل حساب يظهر رصيده ومسؤول العهدة الحالي.</p></div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><h2 className="text-lg font-black">العهد والسيولة</h2><p className="text-xs text-slate-500">كل حساب يظهر رصيده ومسؤول العهدة الحالي.</p></div>
+                <Button variant="outline" size="sm" onClick={() => navigate("/finance/transfers")}><ArrowLeftRight className="ml-1 h-4 w-4" />نقل أموال بين العهد</Button>
+              </div>
               <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
                 {cashAccounts.map(account => (
                   <Card key={account.account_id}>
