@@ -20,6 +20,58 @@ export type PosReturnPreviewLine = {
   bulk_quantity: number | null;
 };
 
+export type PosPaymentBreakdownPart = {
+  part_order?: number;
+  payment_method_id?: string | null;
+  code?: string | null;
+  name?: string | null;
+  method_type?: "cash" | "card" | "digital_wallet" | "bank_transfer" | "other" | string | null;
+  settlement_account_id?: string | null;
+  base_amount: number;
+  fee_amount?: number;
+  customer_fee_amount?: number;
+  merchant_fee_amount?: number;
+  charged_amount?: number;
+  estimated_net_settlement?: number;
+  reference?: string | null;
+};
+
+export type PendingPosPaymentRefundV3 = {
+  id: string;
+  return_id: string;
+  sale_id?: string;
+  amount: number;
+  status: "pending" | "confirmed" | "completed" | "failed";
+  created_at?: string;
+  provider_reference?: string | null;
+  payment_method_id?: string | null;
+  payment_method_code?: string | null;
+  payment_method_name?: string | null;
+  payment_method_type?: string | null;
+  payment_reference?: string | null;
+  original_payment_reference?: string | null;
+};
+
+export type PosReturnPaymentPartV3 = {
+  id: string;
+  return_id: string;
+  sale_id: string;
+  sale_payment_part_id?: string;
+  payment_method_id?: string | null;
+  part_order?: number;
+  code?: string | null;
+  name?: string | null;
+  method_type?: string | null;
+  settlement_account_id?: string | null;
+  original_payment_reference?: string | null;
+  base_refund_amount: number;
+  status: "completed" | "pending" | "confirmed" | "failed";
+  provider_reference?: string | null;
+  confirmed_at?: string | null;
+  failed_at?: string | null;
+  failure_reason?: string | null;
+};
+
 export type PosReturnPreview = {
   sale_id: string;
   invoice_number: string;
@@ -31,6 +83,9 @@ export type PosReturnPreview = {
   payment_method_name?: string | null;
   payment_method_type?: "cash" | "card" | "digital_wallet" | "bank_transfer" | "other" | string | null;
   payment_reference?: string | null;
+  payment_breakdown?: PosPaymentBreakdownPart[];
+  pending_payment_refunds?: PendingPosPaymentRefundV3[];
+  return_version?: number;
   sale_total: number;
   loyalty_voucher_amount: number;
   amount_paid: number;
@@ -87,6 +142,9 @@ export type PosQuickReturnResult = {
   card_refund_pending: boolean;
   drawer_balance_after: number;
   idempotent: boolean;
+  return_version?: number;
+  refund_breakdown?: PosReturnPaymentPartV3[];
+  payment_refunds_pending?: PosReturnPaymentPartV3[];
   refund_payment_method_id?: string | null;
   refund_payment_method_code?: string | null;
   refund_payment_method_name?: string | null;
@@ -130,7 +188,7 @@ function friendlyReturnError(message?: string) {
   if (value.includes("DUPLICATE_RETURN_LINE")) return "تم تكرار نفس الصنف داخل طلب المرتجع.";
   if (value.includes("RETURN_AMOUNT_EXCEEDED")) return "قيمة المرتجعات تجاوزت قيمة الفاتورة الأصلية.";
   if (value.includes("RETURN_AMOUNT_INVALID")) return "قيمة المرتجع غير صحيحة.";
-  if (value.includes("REFUND_ALLOCATION_INVALID")) return "تعذر توزيع المرتجع بين كوبون الخصم والمبلغ المدفوع. أعد تحميل الفاتورة.";
+  if (value.includes("REFUND_ALLOCATION_INVALID")) return "تعذر توزيع المرتجع على وسائل الدفع الأصلية. أعد تحميل الفاتورة وحاول مرة أخرى.";
   if (value.includes("LOYALTY_RETURN_ALLOCATION_CHANGED")) return "رصيد كوبون الخصم اتغير أثناء المرتجع. أعد المحاولة بعد تحديث الفاتورة.";
   if (value.includes("RETURN_REQUEST_CONFLICT")) return "يوجد طلب مرتجع سابق مختلف لنفس المحاولة. راجع المرتجعات قبل إعادة التنفيذ.";
   if (value.includes("PROVIDER_REFERENCE_REQUIRED")) return "اكتب مرجع عملية الرد من مزود وسيلة الدفع.";
@@ -145,7 +203,7 @@ function deterministic(error?: { code?: string; message?: string } | null) {
 }
 
 export async function getPosSaleReturnPreview(saleId: string): Promise<PosReturnPreview> {
-  const { data, error } = await rpc("get_pos_sale_return_preview", { p_sale_id: saleId });
+  const { data, error } = await rpc("get_pos_sale_return_preview_v3", { p_sale_id: saleId });
   if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تحميل بيانات المرتجع");
   if (!data || typeof data !== "object") throw new Error("لم تصل بيانات الفاتورة للمرتجع.");
   return data as PosReturnPreview;
@@ -155,6 +213,12 @@ export async function listPendingPosCardRefunds(saleId: string): Promise<Pending
   const { data, error } = await rpc("list_pos_sale_pending_card_refunds", { p_sale_id: saleId });
   if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تحميل ردود الدفع الإلكتروني المعلقة");
   return (Array.isArray(data) ? data : []) as PendingPosCardRefund[];
+}
+
+export async function listPendingPosPaymentRefundsV3(saleId: string): Promise<PendingPosPaymentRefundV3[]> {
+  const { data, error } = await rpc("list_pos_sale_pending_payment_refunds_v3", { p_sale_id: saleId });
+  if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تحميل ردود وسائل الدفع المعلقة");
+  return (Array.isArray(data) ? data : []) as PendingPosPaymentRefundV3[];
 }
 
 export async function submitPosQuickReturn(
@@ -208,10 +272,12 @@ export async function submitPosQuickReturn(
     p_reason: cleanReason,
   };
 
-  let result = await rpc("create_pos_sale_return", args);
+  const useMixedRefundV3 = Array.isArray(preview.payment_breakdown) && preview.payment_breakdown.length > 1;
+  const rpcName = useMixedRefundV3 ? "create_pos_sale_return_v3" : "create_pos_sale_return";
+  let result = await rpc(rpcName, args);
   if (result.error && !deterministic(result.error) && (typeof navigator === "undefined" || navigator.onLine)) {
     await sleep(350);
-    result = await rpc("create_pos_sale_return", args);
+    result = await rpc(rpcName, args);
   }
 
   if (result.error) {
@@ -227,11 +293,12 @@ export async function submitPosQuickReturn(
   try { localStorage.removeItem(key); } catch { /* noop */ }
   invalidatePOSCatalogCache(preview.branch_id);
   invalidatePosPreflightCache(preview.branch_id);
+  const rawResult = result.data as PosQuickReturnResult;
   const confirmed = {
-    ...(result.data as PosQuickReturnResult),
+    ...rawResult,
     refund_payment_method_id: preview.payment_method_id || null,
     refund_payment_method_code: preview.payment_method_code || null,
-    refund_payment_method_name: preview.payment_method_name || (preview.payment_method === "cash" ? "نقدي" : "وسيلة الدفع الإلكترونية"),
+    refund_payment_method_name: preview.payment_method_name || (preview.payment_method === "cash" ? "نقدي" : preview.payment_method === "mixed" ? "دفع مختلط" : "وسيلة الدفع الإلكترونية"),
     refund_payment_method_type: preview.payment_method_type || preview.payment_method,
   } as PosQuickReturnResult;
   if (typeof window !== "undefined") {
@@ -251,5 +318,21 @@ export async function confirmPosCardRefund(refundId: string, providerReference: 
   if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تأكيد الرد الإلكتروني");
   if (!data || typeof data !== "object") throw new Error("لم يصل تأكيد الرد الإلكتروني.");
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pos:return-card-confirmed", { detail: { refundId, ...(data as Record<string, unknown>) } }));
+  return data as Record<string, unknown>;
+}
+
+export async function confirmPosPaymentRefundV3(refundId: string, providerReference: string) {
+  const reference = providerReference.trim();
+  if (reference.length < 3) throw new Error("اكتب مرجع عملية الرد من مزود وسيلة الدفع.");
+  const { data, error } = await rpc("confirm_pos_payment_refund_v3", {
+    p_refund_id: refundId,
+    p_provider_reference: reference,
+  });
+  if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تأكيد رد وسيلة الدفع");
+  if (!data || typeof data !== "object") throw new Error("لم يصل تأكيد رد وسيلة الدفع.");
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("pos:return-payment-confirmed", { detail: { refundId, ...(data as Record<string, unknown>) } }));
+    window.dispatchEvent(new CustomEvent("pos:cash-changed", { detail: { refundId, ...(data as Record<string, unknown>) } }));
+  }
   return data as Record<string, unknown>;
 }
