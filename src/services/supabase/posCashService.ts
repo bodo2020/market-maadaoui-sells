@@ -64,13 +64,12 @@ function cashError(message?: string) {
 }
 
 export async function getPosCashSummary(device: LocalPosDevice): Promise<PosCashSummary> {
-  const { data, error } = await rpc("get_my_pos_cash_summary", {
+  const { data, error } = await rpc("get_my_pos_cash_summary_v3", {
     p_device_id: device.device_id,
     p_device_token: device.device_token,
   });
   if (error || !data || typeof data !== "object") throw new Error(cashError(error?.message));
   const row = data as Record<string, unknown>;
-  // Missing or malformed financial data must not be shown as a zero balance.
   const amount = (value: unknown): number => {
     if ((typeof value !== "number" && typeof value !== "string") || String(value).trim() === "" || !Number.isFinite(Number(value))) {
       throw new Error("تعذر قراءة تفاصيل تحصيل الوردية. أعد التحديث قبل مراجعة الأرصدة.");
