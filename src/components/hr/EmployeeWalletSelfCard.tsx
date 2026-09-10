@@ -159,7 +159,7 @@ export default function EmployeeWalletSelfCard() {
             </div>
 
             {Number(attendance?.scheduled_days || 0) > 0 && Number(attendance?.absent_days || 0) > 0 && (
-              <div className="flex gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /><div>الغياب محسوب حتى تاريخ اليوم بناءً على جدول الورديات والحضور والإجازات المعتمدة.</div></div>
+              <div className="flex gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"><TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /><div>الغياب محسوب حتى آخر يوم مكتمل فقط، بناءً على جدول الورديات والحضور والإجازات المعتمدة.</div></div>
             )}
 
             <div>
