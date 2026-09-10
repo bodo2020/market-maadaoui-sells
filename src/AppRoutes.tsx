@@ -53,6 +53,7 @@ import FinanceAccountsV2 from "@/pages/FinanceAccountsV2";
 import PaymentMethods from "@/pages/PaymentMethods";
 import ExpenseManagement from "@/pages/ExpenseManagement";
 import Settings from "@/pages/Settings";
+import ITDeviceCenterV1 from "@/pages/ITDeviceCenterV1";
 import OnlineOrders from "@/pages/OnlineOrders";
 import OrderDetails from "@/pages/OrderDetails";
 import CustomersAdvanced from "@/pages/CustomersAdvanced";
@@ -171,6 +172,7 @@ export default function AppRoutes() {
       <Route path="/expenses-salaries" element={<ProtectedRoute><ExpensesAndSalaries /></ProtectedRoute>} />
       <Route path="/returns" element={<ProtectedRoute><Returns /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/it-center" element={<ProtectedRoute><ITDeviceCenterV1 /></ProtectedRoute>} />
       <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
       <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
       <Route path="/customers" element={<ProtectedRoute><CustomersWorkspace /></ProtectedRoute>} />
