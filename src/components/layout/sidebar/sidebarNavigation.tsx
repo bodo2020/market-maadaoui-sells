@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, ShoppingBag, Receipt, Package, Grid3X3, Building2, Warehouse, ClipboardList, Truck, Users,
   UserCheck, UserRound, Wallet, WalletCards, Image, MapPin, FolderOpen, Tag, DollarSign, FileText, RefreshCw, Settings, QrCode,
-  Calendar, CalendarCheck2, FileSpreadsheet, ArrowLeftRight, BellRing, ShieldCheck, Network, Clock3, Banknote, KeyRound, Vault,
+  Calendar, CalendarCheck2, FileSpreadsheet, ArrowLeftRight, BellRing, ShieldCheck, Network, Clock3, Banknote, KeyRound, Vault, Landmark,
 } from "lucide-react";
 import { NavigationGroup } from "./types";
 
@@ -53,6 +53,7 @@ export const financeNavigation: NavigationGroup = {
   items: [
     { label: "مركز الماليات", href: "/finance/control-center", icon: Vault },
     { label: "تحويلات الخزن والعهد", href: "/finance/transfers", icon: ArrowLeftRight },
+    { label: "إدارة الحسابات والعهد", href: "/finance/accounts", icon: Landmark },
     { label: "التقارير المالية والخزن", href: "/finance", icon: DollarSign },
     { label: "تتبع النقدية", href: "/cash-tracking", icon: Wallet, adminOnly: true },
     { label: "وسائل الدفع", href: "/payment-methods", icon: WalletCards },
