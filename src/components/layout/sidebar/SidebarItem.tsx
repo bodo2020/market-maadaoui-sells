@@ -1,8 +1,8 @@
-
 import { Link } from "react-router-dom";
 import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SidebarItemProps {
   icon: LucideIcon;
@@ -12,6 +12,7 @@ interface SidebarItemProps {
   collapsed?: boolean;
   badge?: number;
   secondaryBadge?: number;
+  onNavigate?: () => void;
 }
 
 export function SidebarItem({
@@ -21,65 +22,103 @@ export function SidebarItem({
   active,
   collapsed,
   badge,
-  secondaryBadge
+  secondaryBadge,
+  onNavigate,
 }: SidebarItemProps) {
-  const isExternalLink = href.startsWith('http');
-  
+  const isExternalLink = href.startsWith("http");
+  const hasBadge = Boolean(badge && badge > 0);
+  const hasSecondaryBadge = Boolean(secondaryBadge && secondaryBadge > 0);
+
   const sharedClassName = cn(
-    "flex items-center gap-3 px-3 py-2 text-muted-foreground transition-colors",
-    active && "bg-muted text-foreground font-medium",
-    !active && "hover:bg-muted hover:text-foreground"
+    "group relative flex min-h-11 items-center rounded-xl border px-3 text-sm font-semibold outline-none transition-all duration-200",
+    collapsed ? "mx-2 justify-center px-2" : "mx-2 gap-3",
+    active
+      ? "border-[#005931]/10 bg-[#005931] text-white shadow-[0_8px_24px_rgba(0,89,49,0.18)]"
+      : "border-transparent text-slate-600 hover:border-emerald-100 hover:bg-emerald-50/80 hover:text-[#005931]",
+    "focus-visible:ring-2 focus-visible:ring-[#005931]/30 focus-visible:ring-offset-1"
   );
 
   const iconElement = (
-    <div className="relative">
-      <Icon className="h-5 w-5" />
-      {badge && badge > 0 && (
-        <Badge
-          variant="destructive"
-          className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
-        >
-          {badge > 99 ? '99+' : badge}
-        </Badge>
+    <span
+      className={cn(
+        "relative grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors",
+        active
+          ? "bg-white/14 text-white"
+          : "bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-[#005931]"
       )}
-    </div>
+    >
+      <Icon className="h-[18px] w-[18px]" strokeWidth={2.2} />
+      {hasBadge && collapsed && (
+        <span className="absolute -left-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black leading-none text-white ring-2 ring-white">
+          {Number(badge) > 99 ? "99+" : badge}
+        </span>
+      )}
+    </span>
   );
 
   const labelElement = !collapsed && (
-    <div className="flex-1 relative">
-      <span>{label}</span>
-      {secondaryBadge && secondaryBadge > 0 && (
-        <Badge 
+    <span className="flex min-w-0 flex-1 items-center gap-2">
+      <span className="min-w-0 flex-1 truncate text-right">{label}</span>
+      {hasSecondaryBadge && (
+        <Badge
           variant="outline"
-          className="ml-2 bg-blue-100 text-blue-700 border-blue-200 text-xs"
+          className={cn(
+            "h-5 shrink-0 border-0 px-1.5 text-[10px] font-black",
+            active ? "bg-white/15 text-white" : "bg-sky-50 text-sky-700"
+          )}
         >
-          {secondaryBadge > 99 ? '99+' : secondaryBadge}
+          {Number(secondaryBadge) > 99 ? "99+" : secondaryBadge}
         </Badge>
       )}
-    </div>
+      {hasBadge && (
+        <Badge
+          variant="destructive"
+          className="h-5 min-w-5 shrink-0 justify-center border-0 px-1.5 text-[10px] font-black shadow-none"
+        >
+          {Number(badge) > 99 ? "99+" : badge}
+        </Badge>
+      )}
+    </span>
   );
 
-  if (isExternalLink) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener"
-        className={sharedClassName}
-      >
-        {iconElement}
-        {labelElement}
-      </a>
-    );
-  }
-
-  return (
+  const item = isExternalLink ? (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={sharedClassName}
+      onClick={onNavigate}
+      aria-label={label}
+    >
+      {iconElement}
+      {labelElement}
+    </a>
+  ) : (
     <Link
       to={href}
       className={sharedClassName}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      aria-label={label}
     >
       {iconElement}
       {labelElement}
     </Link>
+  );
+
+  if (!collapsed) return item;
+
+  return (
+    <Tooltip delayDuration={120}>
+      <TooltipTrigger asChild>{item}</TooltipTrigger>
+      <TooltipContent side="left" className="border-slate-200 bg-white font-bold text-slate-800 shadow-xl">
+        {label}
+        {(hasBadge || hasSecondaryBadge) && (
+          <span className="mr-2 text-xs text-slate-500">
+            {hasBadge ? `(${badge})` : ""} {hasSecondaryBadge ? `(${secondaryBadge})` : ""}
+          </span>
+        )}
+      </TooltipContent>
+    </Tooltip>
   );
 }
