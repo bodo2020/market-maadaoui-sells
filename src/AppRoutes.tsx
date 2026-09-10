@@ -47,6 +47,7 @@ import Purchases from "@/pages/Purchases";
 import Invoices from "@/pages/Invoices";
 import Finance from "@/pages/Finance";
 import FinanceControlCenterV2 from "@/pages/FinanceControlCenterV2";
+import FinanceWalletOperationsV4 from "@/pages/FinanceWalletOperationsV4";
 import FinanceTransfersV2 from "@/pages/FinanceTransfersV2";
 import FinanceAccountsV2 from "@/pages/FinanceAccountsV2";
 import PaymentMethods from "@/pages/PaymentMethods";
@@ -162,6 +163,7 @@ export default function AppRoutes() {
       <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
       <Route path="/finance" element={<ProtectedRoute><FinanceWorkspace /></ProtectedRoute>} />
       <Route path="/finance/control-center" element={<ProtectedRoute><FinanceControlCenterV2 /></ProtectedRoute>} />
+      <Route path="/finance/wallet-operations" element={<ProtectedRoute><FinanceWalletOperationsV4 /></ProtectedRoute>} />
       <Route path="/finance/transfers" element={<ProtectedRoute><FinanceTransfersV2 /></ProtectedRoute>} />
       <Route path="/finance/accounts" element={<ProtectedRoute><FinanceAccountsV2 /></ProtectedRoute>} />
       <Route path="/payment-methods" element={<ProtectedRoute><PaymentMethods /></ProtectedRoute>} />
