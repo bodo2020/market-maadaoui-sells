@@ -111,28 +111,41 @@ export async function getSupplierById(id: string) {
 
 export async function fetchSupplierTransactions(supplierId: string) {
   try {
-    const { data, error } = await supabase
-      .from("purchases")
-      .select("id, date, total, paid, invoice_number, description")
-      .eq("supplier_id", supplierId)
-      .order("date", { ascending: false });
+    const currentBranchId = localStorage.getItem("currentBranchId");
+    if (!currentBranchId || currentBranchId === "null") {
+      toast.error("يجب اختيار فرع أولاً");
+      return [];
+    }
+
+    // Supplier ledger is the source of truth (balance maintained by DB ledger trigger).
+    const rpc = supabase.rpc as unknown as (
+      fn: string,
+      args?: Record<string, unknown>
+    ) => Promise<{ data: any[] | null; error: any }>;
+
+    const { data, error } = await rpc("get_supplier_ledger_v1", {
+      p_supplier_id: supplierId,
+      p_branch_id: currentBranchId,
+    });
 
     if (error) {
-      console.error("Error fetching supplier transactions:", error);
+      console.error("Error fetching supplier ledger:", error);
       toast.error("فشل في جلب معاملات المورد");
       return [];
     }
 
-    const transactions = data.map(purchase => {
-      const remaining = purchase.total - purchase.paid;
+    const transactions = (data || []).map((entry: any) => {
+      const signed = Number(entry.signed_amount) || 0;
       return {
-        id: purchase.id,
-        date: purchase.date,
-        description: purchase.description || `فاتورة رقم ${purchase.invoice_number}`,
-        amount: Math.abs(remaining),
-        // If remaining > 0, we owe the supplier money (debt)
-        // If remaining < 0, the supplier owes us money (credit)
-        type: remaining > 0 ? "debt" : "credit"
+        id: entry.id,
+        date: entry.created_at,
+        description:
+          entry.description ||
+          entry.notes ||
+          (entry.reference_number ? `مرجع ${entry.reference_number}` : "قيد مورد"),
+        amount: Math.abs(signed),
+        // Positive signed_amount = we owe the supplier (debt), negative = credit
+        type: signed > 0 ? "debt" : "credit",
       };
     });
 

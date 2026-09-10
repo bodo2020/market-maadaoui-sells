@@ -84,7 +84,7 @@ export async function fetchReportingInsightsV2(branchId: string, from: Date, to:
     supabase.rpc(
       "get_reporting_insights_v2" as never,
       { p_branch_id: branchId, p_from: from.toISOString(), p_to: to.toISOString() } as never,
-    ),
+    ) as unknown as Promise<{ data: unknown; error: unknown }>,
     fetchInventoryTransferSmartAlertsV2(branchId, from, to),
   ]);
 

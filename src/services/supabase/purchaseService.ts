@@ -177,30 +177,7 @@ export async function createPurchase(purchaseData: any) {
       }
     }
 
-    if (purchase) {
-      const remainingAmount = purchaseData.total - purchaseData.paid;
-      if (remainingAmount !== 0) {
-        const { data: supplier, error: supplierError } = await supabase
-          .from("suppliers")
-          .select("balance")
-          .eq("id", purchaseData.supplier_id)
-          .single();
-
-        if (!supplierError && supplier) {
-          const currentBalance = supplier.balance || 0;
-          const newBalance = currentBalance + remainingAmount;
-
-          const { error: updateError } = await supabase
-            .from("suppliers")
-            .update({ balance: newBalance })
-            .eq("id", purchaseData.supplier_id);
-
-          if (updateError) {
-            console.error("Error updating supplier balance:", updateError);
-          }
-        }
-      }
-    }
+    // Supplier balance is maintained by the DB Supplier Ledger trigger — do not update it here.
 
     toast.success("تم إنشاء فاتورة الشراء بنجاح");
     return purchase as Purchase;
@@ -225,28 +202,7 @@ export async function deletePurchase(id: string) {
       return false;
     }
 
-    const remainingAmount = purchase.total - purchase.paid;
-    if (remainingAmount !== 0) {
-      const { data: supplier, error: supplierError } = await supabase
-        .from("suppliers")
-        .select("balance")
-        .eq("id", purchase.supplier_id)
-        .single();
-
-      if (!supplierError && supplier) {
-        const currentBalance = supplier.balance || 0;
-        const newBalance = currentBalance - remainingAmount;
-
-        const { error: updateError } = await supabase
-          .from("suppliers")
-          .update({ balance: newBalance })
-          .eq("id", purchase.supplier_id);
-
-        if (updateError) {
-          console.error("Error updating supplier balance during deletion:", updateError);
-        }
-      }
-    }
+    // Supplier balance is maintained by the DB Supplier Ledger trigger — do not update it here.
 
     const { error } = await supabase.from("purchases").delete().eq("id", id);
 

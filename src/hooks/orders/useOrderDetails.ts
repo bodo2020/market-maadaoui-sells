@@ -202,11 +202,11 @@ export function useOrderDetails(orderId: string) {
       
       const { error, data } = await supabase
         .from('online_orders')
-        .update({ 
+        .update({
           status: selectedStatus,
           updated_at: currentTime,
           cashier_id: cashierId
-        })
+        } as any)
         .eq('id', orderId)
         .select();
       
