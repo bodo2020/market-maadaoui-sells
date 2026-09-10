@@ -25,6 +25,9 @@ function pinError(message?: string) {
   if (value.includes("APP_PIN_LOCKED")) return new Error("تم قفل PIN مؤقتًا بسبب محاولات خاطئة متكررة.");
   if (value.includes("CURRENT_APP_PIN_INVALID")) return new Error("PIN الحالي غير صحيح.");
   if (value.includes("APP_PIN_RESET_DENIED")) return new Error("ليس لديك صلاحية إعادة تعيين PIN لهذا الموظف.");
+  if (value.includes("PASSWORD_REAUTH_REQUIRED")) return new Error("أكد اسم المستخدم وكلمة المرور مرة أخرى قبل تغيير PIN.");
+  if (value.includes("SUPER_ADMIN_REQUIRED")) return new Error("هذه العملية متاحة لمدير النظام فقط.");
+  if (value.includes("TARGET_STAFF_INACTIVE")) return new Error("حساب الموظف غير موجود أو غير نشط.");
   return new Error(message || "تعذر تنفيذ عملية PIN.");
 }
 
@@ -59,6 +62,21 @@ export async function changeMyStaffAppPin(currentPin: string, newPin: string) {
   });
   if (error) throw pinError(error.message);
   return data as { ok: boolean; changed: boolean };
+}
+
+export async function recoverMyStaffAppPin(newPin: string) {
+  const { data, error } = await rpc("recover_my_staff_app_pin_v2", { p_new_pin: newPin });
+  if (error) throw pinError(error.message);
+  return data as { ok: boolean; changed: boolean; verified_at?: string };
+}
+
+export async function superAdminSetStaffAppPin(userId: string, newPin: string) {
+  const { data, error } = await rpc("super_admin_set_staff_app_pin_v2", {
+    p_user_id: userId,
+    p_new_pin: newPin,
+  });
+  if (error) throw pinError(error.message);
+  return data as { ok: boolean; user_id: string; changed: boolean };
 }
 
 export async function resetStaffAppPin(userId: string, branchId?: string | null) {
