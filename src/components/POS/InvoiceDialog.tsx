@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { siteConfig } from "@/config/site";
 import type { Sale } from "@/types";
-import { Bluetooth, FileText, Printer, ReceiptText, X } from "lucide-react";
+import { Bluetooth, Printer, ReceiptText, X } from "lucide-react";
 import { bluetoothPrinterService } from "@/services/bluetoothPrinterService";
+import { buildCustomerInvoiceText } from "@/services/invoiceTextPrintService";
 import {
   getInvoicePrintPreferences,
   printSaleInvoice,
@@ -95,14 +96,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
   const handleQuickBlePrint = async () => {
     try {
       setBleBusy(true);
-      const storeInfo = {
-        name: siteConfig.name,
-        address: siteConfig.address,
-        phone: siteConfig.phone,
-        footer: invoiceSettings.footer || "شكراً لزيارتكم!",
-        currency: siteConfig.currency,
-      };
-      const text = bluetoothPrinterService.generateInvoiceText(sale, storeInfo);
+      const text = buildCustomerInvoiceText(sale, invoiceSettings.footer || undefined);
       const success = await bluetoothPrinterService.printText(text);
       if (!success) toast.info("استخدم الطباعة المصممة من الزر الرئيسي.");
     } finally {
