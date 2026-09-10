@@ -177,31 +177,7 @@ export async function createPurchase(purchaseData: any) {
       }
     }
 
-    if (purchase) {
-      const remainingAmount = purchaseData.total - purchaseData.paid;
-      if (remainingAmount !== 0) {
-        const { data: supplier, error: supplierError } = await supabase
-          .from("suppliers")
-          .select("balance")
-          .eq("id", purchaseData.supplier_id)
-          .single();
-
-        if (!supplierError && supplier) {
-          const currentBalance = supplier.balance || 0;
-          const newBalance = currentBalance + remainingAmount;
-
-          const { error: updateError } = await supabase
-            .from("suppliers")
-            .update({ balance: newBalance })
-            .eq("id", purchaseData.supplier_id);
-
-          if (updateError) {
-            console.error("Error updating supplier balance:", updateError);
-          }
-        }
-      }
-    }
-
+    // Supplier balance is maintained authoritatively by the database Supplier Ledger trigger.
     toast.success("تم إنشاء فاتورة الشراء بنجاح");
     return purchase as Purchase;
   } catch (error) {
@@ -213,41 +189,7 @@ export async function createPurchase(purchaseData: any) {
 
 export async function deletePurchase(id: string) {
   try {
-    const { data: purchase, error: purchaseError } = await supabase
-      .from("purchases")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (purchaseError) {
-      console.error("Error fetching purchase for deletion:", purchaseError);
-      toast.error("فشل في حذف فاتورة الشراء");
-      return false;
-    }
-
-    const remainingAmount = purchase.total - purchase.paid;
-    if (remainingAmount !== 0) {
-      const { data: supplier, error: supplierError } = await supabase
-        .from("suppliers")
-        .select("balance")
-        .eq("id", purchase.supplier_id)
-        .single();
-
-      if (!supplierError && supplier) {
-        const currentBalance = supplier.balance || 0;
-        const newBalance = currentBalance - remainingAmount;
-
-        const { error: updateError } = await supabase
-          .from("suppliers")
-          .update({ balance: newBalance })
-          .eq("id", purchase.supplier_id);
-
-        if (updateError) {
-          console.error("Error updating supplier balance during deletion:", updateError);
-        }
-      }
-    }
-
+    // Supplier balance reversal is handled by the database Supplier Ledger trigger.
     const { error } = await supabase.from("purchases").delete().eq("id", id);
 
     if (error) {
