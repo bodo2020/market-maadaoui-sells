@@ -26,3 +26,5 @@ jobs:
           git add src/components/POS/POSCheckoutModernDialog.tsx
           git commit -m "feat(pos): unify customer and employee barcode scan"
           git push
+
+# trigger
