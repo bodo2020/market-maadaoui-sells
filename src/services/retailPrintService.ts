@@ -73,19 +73,19 @@ function money(value: unknown, currency: string) {
   return `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 }
 
-function invoiceBarcodeDataUrl(invoiceNumber: string) {
+function invoiceBarcodeDataUrl(invoiceNumber: string, paperSize: InvoicePaperSize) {
   if (!invoiceNumber) return "";
   try {
     const canvas = document.createElement("canvas");
     JsBarcode(canvas, invoiceNumber, {
       format: "CODE128",
-      width: 1.3,
-      height: 34,
+      width: paperSize === "58mm" ? 1.15 : 1.35,
+      height: paperSize === "58mm" ? 30 : 36,
       displayValue: true,
-      fontSize: 10,
+      fontSize: paperSize === "58mm" ? 9 : 10,
       margin: 0,
       background: "#ffffff",
-      lineColor: "#111827",
+      lineColor: "#000000",
     });
     return canvas.toDataURL("image/png");
   } catch {
@@ -102,7 +102,9 @@ function paymentLabel(sale: Sale) {
 }
 
 function quantityLabel(item: Sale["items"][number]) {
-  if (Number(item.weight || 0) > 0) return `${Number(item.weight).toLocaleString("ar-EG", { maximumFractionDigits: 3 })} كجم`;
+  if (Number(item.weight || 0) > 0) {
+    return `${Number(item.weight).toLocaleString("ar-EG", { maximumFractionDigits: 3 })} كجم`;
+  }
   return Number(item.quantity || 0).toLocaleString("ar-EG", { maximumFractionDigits: 3 });
 }
 
@@ -113,96 +115,144 @@ function resolveLogo(overrides?: InvoiceBrandOverrides) {
   return siteConfig.logoUrl || siteConfig.logo || null;
 }
 
+function build58mmItems(sale: Sale, currency: string, compact: boolean) {
+  return `
+    <div class="items-58 ${compact ? "compact" : ""}">
+      <div class="items-heading">الأصناف</div>
+      ${sale.items.map((item) => {
+        const discount = Number(item.discount || 0);
+        return `
+          <div class="item-58">
+            <div class="item-58-name">${esc(item.product.name)}</div>
+            <div class="item-58-calc">
+              <span>${esc(quantityLabel(item))} × ${esc(money(item.price, currency))}</span>
+              <strong>${esc(money(item.total, currency))}</strong>
+            </div>
+            ${item.product.barcode || discount > 0 ? `
+              <div class="item-58-extra">
+                ${item.product.barcode ? `<span>باركود: ${esc(item.product.barcode)}</span>` : ""}
+                ${discount > 0 ? `<strong>خصم: ${esc(money(discount, currency))}</strong>` : ""}
+              </div>` : ""}
+          </div>`;
+      }).join("")}
+    </div>`;
+}
+
+function build80mmItems(sale: Sale, currency: string, compact: boolean) {
+  return `
+    <table class="items-80 ${compact ? "compact" : ""}">
+      <thead>
+        <tr>
+          <th class="product">الصنف</th>
+          <th class="qty">الكمية</th>
+          <th class="unit">سعر الوحدة</th>
+          <th class="total">الإجمالي</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sale.items.map((item) => {
+          const discount = Number(item.discount || 0);
+          return `
+            <tr>
+              <td class="product">
+                <strong>${esc(item.product.name)}</strong>
+                ${item.product.barcode ? `<small>${esc(item.product.barcode)}</small>` : ""}
+                ${discount > 0 ? `<small class="discount">خصم ${esc(money(discount, currency))}</small>` : ""}
+              </td>
+              <td class="qty">${esc(quantityLabel(item))}</td>
+              <td class="unit">${esc(money(item.price, currency))}</td>
+              <td class="total"><strong>${esc(money(item.total, currency))}</strong></td>
+            </tr>`;
+        }).join("")}
+      </tbody>
+    </table>`;
+}
+
 function buildReceiptBody(sale: Sale, preferences: InvoicePrintPreferences, overrides?: InvoiceBrandOverrides) {
   const currency = siteConfig.currency || "ج.م";
   const extra = sale as Sale & Record<string, any>;
   const loyalty = Number(extra.loyalty_voucher_amount || 0);
   const customerFee = Number(extra.customer_payment_fee_amount || 0);
-  const amountPaid = Math.max(0, Number(extra.amount_charged ?? extra.amount_due ?? (Number(sale.total || 0) - loyalty + customerFee)));
+  const amountPaid = Math.max(
+    0,
+    Number(extra.amount_charged ?? extra.amount_due ?? (Number(sale.total || 0) - loyalty + customerFee)),
+  );
   const invoiceDate = new Date(sale.date);
   const date = invoiceDate.toLocaleDateString("ar-EG", { year: "numeric", month: "2-digit", day: "2-digit" });
   const time = invoiceDate.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
   const logo = resolveLogo(overrides);
-  const barcodeUrl = preferences.showInvoiceBarcode ? invoiceBarcodeDataUrl(sale.invoice_number) : "";
+  const barcodeUrl = preferences.showInvoiceBarcode ? invoiceBarcodeDataUrl(sale.invoice_number, preferences.paperSize) : "";
   const returns = Array.isArray(extra.invoice_returns) ? extra.invoice_returns : [];
+  const is58 = preferences.paperSize === "58mm";
 
-  const itemRows = sale.items
-    .map((item, index) => {
-      const discount = Number(item.discount || 0);
-      return `
-        <tr>
-          <td class="index">${index + 1}</td>
-          <td class="item-name">
-            <strong>${esc(item.product.name)}</strong>
-            ${item.product.barcode ? `<small>${esc(item.product.barcode)}</small>` : ""}
-            ${discount > 0 ? `<small class="discount">خصم ${money(discount, currency)}</small>` : ""}
-          </td>
-          <td class="qty">${esc(quantityLabel(item))}</td>
-          <td class="price">${esc(money(item.price, currency))}</td>
-          <td class="line-total">${esc(money(item.total, currency))}</td>
-        </tr>`;
-    })
-    .join("");
+  const itemsMarkup = is58
+    ? build58mmItems(sale, currency, preferences.compactItems)
+    : build80mmItems(sale, currency, preferences.compactItems);
 
   return `
-    <div class="receipt-head">
+    <header class="receipt-head">
       ${preferences.showLogo && logo ? `<img class="logo" src="${esc(logo)}" alt="${esc(siteConfig.name)}" />` : ""}
       <h1>${esc(siteConfig.name)}</h1>
       <div class="tagline">مش مجرد ماركت</div>
-      ${siteConfig.address ? `<p>${esc(siteConfig.address)}</p>` : ""}
-      ${siteConfig.phone ? `<p>هاتف: ${esc(siteConfig.phone)}</p>` : ""}
-      ${(overrides?.showVat ?? siteConfig.invoice.showVat) && siteConfig.vatNumber ? `<p>الرقم الضريبي: ${esc(siteConfig.vatNumber)}</p>` : ""}
-      ${overrides?.website || siteConfig.invoice.website ? `<p>${esc(overrides?.website || siteConfig.invoice.website)}</p>` : ""}
-    </div>
+      <div class="store-lines">
+        ${siteConfig.address ? `<div>${esc(siteConfig.address)}</div>` : ""}
+        ${siteConfig.phone ? `<div>هاتف: ${esc(siteConfig.phone)}</div>` : ""}
+        ${(overrides?.showVat ?? siteConfig.invoice.showVat) && siteConfig.vatNumber ? `<div>الرقم الضريبي: ${esc(siteConfig.vatNumber)}</div>` : ""}
+        ${overrides?.website || siteConfig.invoice.website ? `<div>${esc(overrides?.website || siteConfig.invoice.website)}</div>` : ""}
+      </div>
+    </header>
 
-    <div class="document-title">
-      <div><span>فاتورة مبيعات</span><strong>#${esc(sale.invoice_number)}</strong></div>
-      <span class="status">مدفوعة</span>
-    </div>
+    <section class="invoice-identity">
+      <div class="identity-label">فاتورة مبيعات</div>
+      <div class="invoice-number">#${esc(sale.invoice_number)}</div>
+      <div class="paid-status">مدفوعة</div>
+    </section>
 
-    <div class="meta-grid">
+    <section class="meta-block">
       <div><span>التاريخ</span><strong>${esc(date)}</strong></div>
       <div><span>الوقت</span><strong>${esc(time)}</strong></div>
       <div><span>الكاشير</span><strong>${esc(sale.cashier_name || "—")}</strong></div>
-      <div><span>طريقة الدفع</span><strong>${esc(paymentLabel(sale))}</strong></div>
-    </div>
+      <div><span>الدفع</span><strong>${esc(paymentLabel(sale))}</strong></div>
+    </section>
 
     ${sale.customer_name || sale.customer_phone ? `
-      <div class="customer-box">
-        <span>العميل</span>
+      <section class="customer-line">
+        <span>العميل:</span>
         <strong>${esc(sale.customer_name || "عميل عام")}</strong>
-        ${sale.customer_phone ? `<small>${esc(sale.customer_phone)}</small>` : ""}
-      </div>` : ""}
+        ${sale.customer_phone ? `<bdi>${esc(sale.customer_phone)}</bdi>` : ""}
+      </section>` : ""}
 
-    <table class="items ${preferences.compactItems ? "compact" : ""}">
-      <thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
-      <tbody>${itemRows}</tbody>
-    </table>
+    ${itemsMarkup}
 
-    <div class="totals">
+    <section class="totals">
       <div><span>المجموع الفرعي</span><strong>${esc(money(sale.subtotal, currency))}</strong></div>
-      ${Number(sale.discount || 0) > 0 ? `<div class="minus"><span>خصومات المنتجات</span><strong>- ${esc(money(sale.discount, currency))}</strong></div>` : ""}
-      ${loyalty > 0 ? `<div class="minus"><span>كوبون/رصيد ولاء</span><strong>- ${esc(money(loyalty, currency))}</strong></div>` : ""}
-      ${customerFee > 0 ? `<div class="fee"><span>رسوم وسيلة الدفع</span><strong>+ ${esc(money(customerFee, currency))}</strong></div>` : ""}
-      <div class="grand"><span>المدفوع فعليًا</span><strong>${esc(money(amountPaid, currency))}</strong></div>
-    </div>
+      ${Number(sale.discount || 0) > 0 ? `<div><span>خصومات المنتجات</span><strong>- ${esc(money(sale.discount, currency))}</strong></div>` : ""}
+      ${loyalty > 0 ? `<div><span>كوبون / رصيد ولاء</span><strong>- ${esc(money(loyalty, currency))}</strong></div>` : ""}
+      ${customerFee > 0 ? `<div><span>رسوم وسيلة الدفع</span><strong>+ ${esc(money(customerFee, currency))}</strong></div>` : ""}
+      <div class="grand-total"><span>المدفوع فعليًا</span><strong>${esc(money(amountPaid, currency))}</strong></div>
+    </section>
 
-    <div class="payment-box">
+    <section class="payment-block">
       <div><span>طريقة الدفع</span><strong>${esc(paymentLabel(sale))}</strong></div>
-      ${extra.payment_reference ? `<div><span>مرجع العملية</span><strong>${esc(extra.payment_reference)}</strong></div>` : ""}
+      ${extra.payment_reference ? `<div><span>مرجع العملية</span><strong class="reference">${esc(extra.payment_reference)}</strong></div>` : ""}
       ${Number(extra.cash_amount || 0) > 0 && sale.payment_method === "mixed" ? `<div><span>نقدي</span><strong>${esc(money(extra.cash_amount, currency))}</strong></div>` : ""}
-      ${Number(extra.card_amount || 0) > 0 && sale.payment_method === "mixed" ? `<div><span>بطاقة</span><strong>${esc(money(extra.card_amount, currency))}</strong></div>` : ""}
-    </div>
+      ${Number(extra.card_amount || 0) > 0 && sale.payment_method === "mixed" ? `<div><span>بطاقة / إلكتروني</span><strong>${esc(money(extra.card_amount, currency))}</strong></div>` : ""}
+    </section>
 
-    ${returns.length > 0 ? `<div class="return-note">تحتوي الفاتورة على ${returns.length.toLocaleString("ar-EG")} عملية مرتجع مسجلة.</div>` : ""}
-    ${overrides?.notes || siteConfig.invoice.notes ? `<div class="note"><strong>ملاحظات</strong><p>${esc(overrides?.notes || siteConfig.invoice.notes)}</p></div>` : ""}
-    ${overrides?.paymentInstructions || siteConfig.invoice.paymentInstructions ? `<div class="note"><strong>تعليمات</strong><p>${esc(overrides?.paymentInstructions || siteConfig.invoice.paymentInstructions)}</p></div>` : ""}
+    ${returns.length > 0 ? `
+      <section class="return-note">
+        تنبيه: تحتوي الفاتورة على ${returns.length.toLocaleString("ar-EG")} عملية مرتجع مسجلة.
+      </section>` : ""}
+
+    ${overrides?.notes || siteConfig.invoice.notes ? `<section class="note"><strong>ملاحظات:</strong><p>${esc(overrides?.notes || siteConfig.invoice.notes)}</p></section>` : ""}
+    ${overrides?.paymentInstructions || siteConfig.invoice.paymentInstructions ? `<section class="note"><strong>تعليمات:</strong><p>${esc(overrides?.paymentInstructions || siteConfig.invoice.paymentInstructions)}</p></section>` : ""}
 
     ${barcodeUrl ? `<div class="invoice-barcode"><img src="${barcodeUrl}" alt="Invoice barcode" /></div>` : ""}
-    <div class="footer">
+
+    <footer class="footer">
       <strong>${esc(overrides?.footer || siteConfig.invoice.footer || "شكرًا لزيارتكم")}</strong>
       <span>احتفظ بالفاتورة للرجوع إليها عند الحاجة</span>
-    </div>`;
+    </footer>`;
 }
 
 export function buildSaleInvoiceHtml(
@@ -213,8 +263,11 @@ export function buildSaleInvoiceHtml(
   const paperSize = preferences.paperSize;
   const thermal = paperSize !== "a4";
   const width = paperSize === "58mm" ? "58mm" : paperSize === "80mm" ? "80mm" : "auto";
+  const bodyClass = paperSize === "58mm" ? "paper-58" : paperSize === "80mm" ? "paper-80" : "paper-a4";
   const copies = Array.from({ length: clampCopies(preferences.copies) }, (_, index) => `
-    <section class="receipt ${index < preferences.copies - 1 ? "copy-break" : ""}">${buildReceiptBody(sale, preferences, overrides)}</section>
+    <section class="receipt ${bodyClass} ${index < preferences.copies - 1 ? "copy-break" : ""}">
+      ${buildReceiptBody(sale, preferences, overrides)}
+    </section>
   `).join("");
 
   return `<!doctype html>
@@ -226,55 +279,145 @@ export function buildSaleInvoiceHtml(
       <style>
         @page { size: ${paperSize === "a4" ? "A4 portrait" : `${width} auto`}; margin: ${paperSize === "a4" ? "10mm" : "0"}; }
         * { box-sizing: border-box; }
-        body { margin: 0; background: #eef2f0; color: #111827; font-family: Cairo, Tahoma, Arial, sans-serif; direction: rtl; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .receipt { background: #fff; width: ${thermal ? width : "190mm"}; max-width: 100%; margin: ${thermal ? "0 auto" : "8mm auto"}; padding: ${paperSize === "58mm" ? "3mm" : thermal ? "4mm" : "12mm"}; border-radius: ${thermal ? "0" : "5mm"}; box-shadow: ${thermal ? "none" : "0 12px 40px rgba(15,23,42,.08)"}; }
+        html, body { margin: 0; padding: 0; }
+        body {
+          background: ${thermal ? "#ffffff" : "#f2f2f2"};
+          color: #000;
+          font-family: Cairo, Tahoma, Arial, sans-serif;
+          direction: rtl;
+          font-variant-numeric: tabular-nums;
+          -webkit-font-smoothing: none;
+          text-rendering: geometricPrecision;
+        }
+        .receipt {
+          background: #fff;
+          color: #000;
+          max-width: 100%;
+          margin: ${thermal ? "0 auto" : "8mm auto"};
+          overflow: hidden;
+        }
+        .paper-58 { width: 58mm; padding: 2.2mm 2.4mm 3mm; font-size: 9px; line-height: 1.35; }
+        .paper-80 { width: 80mm; padding: 2.8mm 3.2mm 3.5mm; font-size: 10px; line-height: 1.35; }
+        .paper-a4 { width: 190mm; padding: 10mm 12mm; border: 1px solid #000; font-size: 12px; line-height: 1.45; }
         .copy-break { break-after: page; page-break-after: always; }
-        .receipt-head { text-align: center; border-bottom: 2px solid #005931; padding-bottom: 10px; }
-        .logo { max-height: ${paperSize === "58mm" ? "34px" : "48px"}; max-width: 70%; object-fit: contain; margin: 0 auto 5px; }
-        h1 { font-size: ${paperSize === "58mm" ? "15px" : "20px"}; margin: 0; color: #005931; font-weight: 900; }
-        .tagline { font-size: 9px; font-weight: 800; margin-top: 2px; }
-        .receipt-head p { margin: 2px 0; color: #64748b; font-size: ${paperSize === "58mm" ? "8px" : "10px"}; }
-        .document-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px dashed #cbd5e1; }
-        .document-title div { display: grid; gap: 2px; }
-        .document-title span { font-size: 9px; color: #64748b; }
-        .document-title strong { font-size: ${paperSize === "58mm" ? "11px" : "14px"}; }
-        .document-title .status { color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 999px; padding: 3px 7px; font-weight: 800; }
-        .meta-grid { display: grid; grid-template-columns: repeat(${paperSize === "58mm" ? 2 : 4}, 1fr); gap: 6px; margin: 9px 0; }
-        .meta-grid div, .customer-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; display: grid; gap: 2px; min-width: 0; }
-        .meta-grid span, .customer-box span { font-size: 8px; color: #64748b; }
-        .meta-grid strong, .customer-box strong { font-size: 9px; overflow-wrap: anywhere; }
-        .customer-box { margin-bottom: 8px; }
-        .customer-box small { color: #64748b; font-size: 8px; }
+
+        .receipt-head { text-align: center; padding-bottom: 5px; border-bottom: 1.5px solid #000; }
+        .logo {
+          display: block;
+          max-height: 34px;
+          max-width: 55%;
+          object-fit: contain;
+          margin: 0 auto 3px;
+          filter: grayscale(1) contrast(1.85);
+          mix-blend-mode: multiply;
+        }
+        .paper-58 .logo { max-height: 27px; max-width: 50%; }
+        .paper-a4 .logo { max-height: 58px; }
+        h1 { margin: 0; color: #000; font-size: 18px; line-height: 1.15; font-weight: 900; letter-spacing: -.2px; }
+        .paper-58 h1 { font-size: 15px; }
+        .paper-a4 h1 { font-size: 24px; }
+        .tagline { margin-top: 2px; font-size: 8px; font-weight: 800; }
+        .paper-80 .tagline { font-size: 9px; }
+        .paper-a4 .tagline { font-size: 11px; }
+        .store-lines { margin-top: 4px; font-size: 7.5px; line-height: 1.45; }
+        .paper-80 .store-lines { font-size: 8.5px; }
+        .paper-a4 .store-lines { font-size: 10px; }
+
+        .invoice-identity { position: relative; text-align: center; padding: 6px 0 5px; border-bottom: 1px dashed #000; }
+        .identity-label { font-size: 8px; font-weight: 700; }
+        .invoice-number { margin-top: 1px; font-size: 13px; line-height: 1.15; font-weight: 900; overflow-wrap: anywhere; }
+        .paper-58 .invoice-number { font-size: 11.5px; }
+        .paper-80 .invoice-number { font-size: 14px; }
+        .paper-a4 .invoice-number { font-size: 18px; }
+        .paid-status { display: inline-block; margin-top: 4px; padding: 1px 6px; border: 1px solid #000; font-size: 7.5px; font-weight: 900; line-height: 1.35; }
+
+        .meta-block { padding: 5px 0; border-bottom: 1px dashed #000; display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; row-gap: 3px; }
+        .paper-80 .meta-block, .paper-a4 .meta-block { grid-template-columns: repeat(4, minmax(0,1fr)); }
+        .meta-block div { min-width: 0; }
+        .meta-block span { display: block; font-size: 7px; font-weight: 500; }
+        .meta-block strong { display: block; margin-top: 1px; font-size: 8.5px; font-weight: 900; overflow-wrap: anywhere; }
+        .paper-80 .meta-block span { font-size: 8px; }
+        .paper-80 .meta-block strong { font-size: 9px; }
+        .paper-a4 .meta-block span { font-size: 9px; }
+        .paper-a4 .meta-block strong { font-size: 11px; }
+
+        .customer-line { padding: 4px 0; border-bottom: 1px dashed #000; display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 5px; font-size: 8px; }
+        .customer-line strong { font-size: 9px; }
+        .customer-line bdi { direction: ltr; font-weight: 700; }
+
+        .items-heading { padding: 5px 0 3px; border-bottom: 1.5px solid #000; text-align: center; font-size: 8px; font-weight: 900; }
+        .item-58 { padding: 5px 0; border-bottom: 1px dashed #000; break-inside: avoid; page-break-inside: avoid; }
+        .items-58.compact .item-58 { padding: 3px 0; }
+        .item-58-name { font-size: 9px; line-height: 1.35; font-weight: 900; overflow-wrap: anywhere; }
+        .item-58-calc { margin-top: 2px; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; direction: rtl; }
+        .item-58-calc span { font-size: 7.7px; white-space: nowrap; }
+        .item-58-calc strong { font-size: 9.2px; white-space: nowrap; }
+        .item-58-extra { margin-top: 2px; display: flex; justify-content: space-between; gap: 5px; font-size: 6.8px; line-height: 1.3; overflow-wrap: anywhere; }
+        .item-58-extra strong { font-weight: 900; }
+
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .items th { color: #475569; font-size: ${paperSize === "58mm" ? "7px" : "9px"}; border-bottom: 1px solid #94a3b8; padding: 6px 2px; text-align: right; }
-        .items td { font-size: ${paperSize === "58mm" ? "8px" : "10px"}; padding: ${preferences.compactItems ? "4px 2px" : "7px 2px"}; border-bottom: 1px dashed #e2e8f0; vertical-align: top; }
-        .items .index { width: 5%; color: #94a3b8; }
-        .items .item-name { width: 39%; }
-        .items .qty { width: 18%; text-align: center; }
-        .items .price { width: 18%; text-align: center; }
-        .items .line-total { width: 20%; text-align: left; font-weight: 800; }
-        .item-name strong, .item-name small { display: block; }
-        .item-name small { color: #94a3b8; font-size: 7px; margin-top: 2px; }
-        .item-name .discount { color: #047857; }
-        .totals { margin-top: 10px; border-top: 2px solid #0f172a; padding-top: 7px; display: grid; gap: 5px; }
-        .totals > div, .payment-box > div { display: flex; justify-content: space-between; gap: 10px; font-size: ${paperSize === "58mm" ? "9px" : "11px"}; }
-        .totals .minus { color: #047857; }
-        .totals .fee { color: #b45309; }
-        .totals .grand { color: #fff; background: #005931; border-radius: 9px; padding: 8px; margin-top: 3px; font-size: ${paperSize === "58mm" ? "11px" : "14px"}; }
-        .payment-box { margin-top: 9px; padding: 8px; border: 1px solid #dbe4e0; background: #f6faf8; border-radius: 9px; display: grid; gap: 5px; }
-        .payment-box span { color: #64748b; }
-        .return-note { margin-top: 8px; border: 1px solid #fdba74; background: #fff7ed; color: #9a3412; border-radius: 8px; padding: 6px; font-size: 8px; font-weight: 700; text-align: center; }
-        .note { margin-top: 9px; border-top: 1px dashed #cbd5e1; padding-top: 7px; font-size: 8px; }
-        .note strong { color: #475569; }
-        .note p { margin: 3px 0 0; white-space: pre-wrap; }
-        .invoice-barcode { text-align: center; margin-top: 12px; }
-        .invoice-barcode img { max-width: 90%; height: auto; }
-        .footer { text-align: center; border-top: 1px dashed #94a3b8; margin-top: 10px; padding-top: 9px; display: grid; gap: 3px; }
-        .footer strong { color: #005931; font-size: ${paperSize === "58mm" ? "9px" : "11px"}; }
-        .footer span { color: #94a3b8; font-size: 7px; }
+        .items-80 { margin-top: 4px; }
+        .items-80 th { padding: 4px 2px; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; font-size: 7.8px; font-weight: 900; text-align: right; }
+        .items-80 td { padding: 5px 2px; border-bottom: 1px dashed #000; vertical-align: top; font-size: 8.5px; break-inside: avoid; page-break-inside: avoid; }
+        .items-80.compact td { padding-top: 3px; padding-bottom: 3px; }
+        .items-80 .product { width: 43%; text-align: right; }
+        .items-80 .qty { width: 16%; text-align: center; }
+        .items-80 .unit { width: 19%; text-align: center; }
+        .items-80 .total { width: 22%; text-align: left; }
+        .items-80 .product strong { display: block; font-size: 8.8px; line-height: 1.3; overflow-wrap: anywhere; }
+        .items-80 .product small { display: block; margin-top: 1px; font-size: 6.7px; line-height: 1.25; overflow-wrap: anywhere; }
+        .items-80 .product .discount { font-weight: 800; }
+        .paper-a4 .items-80 th { font-size: 10px; }
+        .paper-a4 .items-80 td { font-size: 11px; }
+        .paper-a4 .items-80 .product strong { font-size: 11px; }
+        .paper-a4 .items-80 .product small { font-size: 8px; }
+
+        .totals { margin-top: 5px; padding-top: 4px; border-top: 1.5px solid #000; display: grid; gap: 3px; }
+        .totals > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 8.5px; }
+        .paper-80 .totals > div { font-size: 9.5px; }
+        .paper-a4 .totals > div { font-size: 12px; }
+        .totals > div strong { white-space: nowrap; }
+        .grand-total { margin-top: 3px; padding: 5px 0 4px; border-top: 3px double #000; border-bottom: 3px double #000; font-size: 11px !important; font-weight: 900; }
+        .grand-total span { font-weight: 900; }
+        .grand-total strong { font-size: 12px; }
+        .paper-80 .grand-total { font-size: 13px !important; }
+        .paper-80 .grand-total strong { font-size: 14px; }
+        .paper-a4 .grand-total { font-size: 16px !important; }
+        .paper-a4 .grand-total strong { font-size: 18px; }
+
+        .payment-block { margin-top: 5px; padding: 4px 0; border-bottom: 1px dashed #000; display: grid; gap: 2px; }
+        .payment-block > div { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 8px; }
+        .paper-80 .payment-block > div { font-size: 9px; }
+        .paper-a4 .payment-block > div { font-size: 11px; }
+        .payment-block strong { text-align: left; overflow-wrap: anywhere; }
+        .payment-block .reference { direction: ltr; unicode-bidi: plaintext; font-size: .92em; }
+
+        .return-note { margin-top: 5px; padding: 4px; border-top: 3px double #000; border-bottom: 3px double #000; text-align: center; font-size: 7.5px; line-height: 1.4; font-weight: 900; }
+        .paper-80 .return-note { font-size: 8.5px; }
+        .paper-a4 .return-note { font-size: 10px; }
+        .note { margin-top: 5px; padding-top: 4px; border-top: 1px dashed #000; font-size: 7.5px; line-height: 1.45; }
+        .paper-80 .note { font-size: 8.5px; }
+        .paper-a4 .note { font-size: 10px; }
+        .note p { margin: 2px 0 0; white-space: pre-wrap; }
+
+        .invoice-barcode { margin-top: 7px; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+        .invoice-barcode img { display: block; max-width: 92%; height: auto; margin: 0 auto; filter: grayscale(1) contrast(2); }
+        .paper-58 .invoice-barcode img { max-width: 96%; }
+        .footer { margin-top: 6px; padding-top: 5px; border-top: 1.5px solid #000; text-align: center; display: grid; gap: 2px; }
+        .footer strong { color: #000; font-size: 9px; font-weight: 900; }
+        .paper-80 .footer strong { font-size: 10px; }
+        .paper-a4 .footer strong { font-size: 12px; }
+        .footer span { color: #000; font-size: 6.8px; }
+        .paper-80 .footer span { font-size: 7.5px; }
+        .paper-a4 .footer span { font-size: 9px; }
+
         @media print {
-          body { background: #fff; }
-          .receipt { margin: 0 auto; box-shadow: none; border-radius: 0; }
+          html, body { width: ${paperSize === "a4" ? "auto" : width}; min-width: 0; background: #fff !important; color: #000 !important; }
+          body { margin: 0 !important; padding: 0 !important; }
+          .receipt { margin: 0 auto !important; background: #fff !important; color: #000 !important; box-shadow: none !important; border-radius: 0 !important; }
+          .paper-58, .paper-80 { border: 0 !important; }
+          * { color: #000 !important; background-color: transparent !important; box-shadow: none !important; text-shadow: none !important; }
+          .logo, .invoice-barcode img { filter: grayscale(1) contrast(2) !important; }
         }
       </style>
     </head>
@@ -297,7 +440,11 @@ export function printSaleInvoice(
   popup.focus();
 
   const trigger = () => {
-    try { popup.print(); } catch { /* browser may block programmatic printing */ }
+    try {
+      popup.print();
+    } catch {
+      // Browser may block programmatic printing.
+    }
   };
   if (popup.document.readyState === "complete") window.setTimeout(trigger, 250);
   else popup.addEventListener("load", () => window.setTimeout(trigger, 250), { once: true });
