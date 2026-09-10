@@ -19,6 +19,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
+import PayrollPayDayCard from "@/components/hr/PayrollPayDayCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -233,6 +234,8 @@ export default function HrPayrollPage() {
             </div>
           </div>
         </section>
+
+        {currentBranchId && data && <PayrollPayDayCard branchId={currentBranchId} value={data.policy?.pay_day_of_month} onSaved={refresh} />}
 
         {query.isError ? <Card className="border-red-200 bg-red-50"><CardContent className="p-6 text-red-800">{query.error instanceof Error ? query.error.message : "تعذر تحميل مسير الرواتب."}</CardContent></Card> : (
           <Tabs defaultValue="payroll" dir="rtl">
