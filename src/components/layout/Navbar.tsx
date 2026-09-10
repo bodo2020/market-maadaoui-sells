@@ -219,7 +219,7 @@ export default function Navbar() {
               </Button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-[390px] max-w-[calc(100vw-24px)] overflow-hidden p-0" dir="rtl">
+            <DropdownMenuContent align="end" className="w-[390px] max-w-[calc(100vw-24px)] overflow-hidden p-0">
               <div className="bg-[#005931] p-4 text-white">
                 <div className="flex items-start justify-between gap-3">
                   <div>

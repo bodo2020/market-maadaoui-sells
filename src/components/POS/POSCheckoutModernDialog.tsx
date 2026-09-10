@@ -138,7 +138,7 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   useEffect(() => {
     if (!open) return;
     window.dispatchEvent(new CustomEvent("pos:modern-checkout-state", { detail: { open: true } }));
-    return () => window.dispatchEvent(new CustomEvent("pos:modern-checkout-state", { detail: { open: false } }));
+    return () => { window.dispatchEvent(new CustomEvent("pos:modern-checkout-state", { detail: { open: false } })); };
   }, [open]);
 
   useEffect(() => {
