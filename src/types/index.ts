@@ -251,6 +251,7 @@ export interface Order {
   neighborhood?: string | null;
   branch_id?: string | null;
   cashier_id?: string | null;
+  return_status?: 'none' | 'partial' | 'full';
 }
 
 export interface POSTab {
@@ -278,6 +279,11 @@ export interface PurchaseItem {
   price?: number;
   purchase_price?: number;
   total?: number;
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  shelf_location?: string | null;
+  notes?: string | null;
+  products?: { name?: string | null; track_expiry?: boolean | null } | null;
 }
 
 export interface Purchase {

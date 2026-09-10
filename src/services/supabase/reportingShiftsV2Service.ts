@@ -269,7 +269,7 @@ export async function fetchReportingShiftsV2(
       p_from: from.toISOString(),
       p_to: to.toISOString(),
       p_limit: limit,
-    } as never),
+    } as never) as unknown as Promise<{ data: unknown; error: unknown }>,
     fetchReportingShiftReconciliationsV2(branchId, from, to, 2000),
   ]);
 

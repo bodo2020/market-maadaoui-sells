@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { siteConfig } from "@/config/site";
-import { Order } from "@/types";
+import { Order, OrderItem } from "@/types";
 import { Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchStoreSettings } from "@/services/supabase/storeService";
