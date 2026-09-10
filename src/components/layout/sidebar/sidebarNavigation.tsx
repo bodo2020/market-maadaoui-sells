@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, ShoppingBag, Receipt, Package, Grid3X3, Building2, Warehouse, ClipboardList, Truck, Users,
   UserCheck, UserRound, Wallet, WalletCards, Image, MapPin, FolderOpen, Tag, DollarSign, FileText, RefreshCw, Settings, QrCode,
-  Calendar, CalendarCheck2, FileSpreadsheet, ArrowLeftRight, BellRing, ShieldCheck, Network, Clock3, Banknote, KeyRound, Vault, Landmark,
+  Calendar, CalendarCheck2, FileSpreadsheet, ArrowLeftRight, BellRing, ShieldCheck, Network, Clock3, Banknote, KeyRound, Vault, Landmark, MonitorCog,
 } from "lucide-react";
 import { NavigationGroup } from "./types";
 
@@ -85,6 +85,7 @@ export const reportsNavigation: NavigationGroup = {
 export const adminNavigation: NavigationGroup = {
   title: "الحساب والإعدادات",
   items: [
+    { label: "مركز IT والأجهزة", href: "/it-center", icon: MonitorCog, adminOnly: true },
     { label: "حسابي", href: "/account", icon: UserRound },
     { label: "تغيير PIN", href: "/account", icon: KeyRound },
     { label: "الإعدادات", href: "/settings", icon: Settings },
