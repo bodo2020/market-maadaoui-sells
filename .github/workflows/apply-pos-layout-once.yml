@@ -40,7 +40,6 @@ jobs:
           pos_path = Path("src/pages/POSPro.tsx")
           pos = pos_path.read_text()
           pos = replace_once(pos, '<div className="space-y-4" dir="rtl">', '<div className="flex min-h-0 flex-col gap-3 lg:h-full" dir="rtl">', "cart flex shell")
-          pos = replace_once(pos, '<div className="flex items-start justify-between gap-3">', '<div className="flex shrink-0 items-start justify-between gap-3">', "cart header")
           pos = replace_once(pos, 'className="max-h-[46vh] space-y-2 overflow-y-auto pr-1"', 'className="max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:min-h-0 lg:flex-1"', "cart items scroll")
           pos = replace_once(pos, '      <div className="rounded-2xl bg-slate-50 p-4">', '      <div className="shrink-0 space-y-3 border-t border-slate-100 pt-3">\n      <div className="rounded-2xl bg-slate-50 p-4">', "cart footer open")
           checkout_tail = '      </Button>\n    </div>\n  );\n\n  return ('
