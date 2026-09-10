@@ -682,7 +682,7 @@ export default function POSPro() {
           <p className="mt-1 text-xs">امسح باركود أو اختر منتج</p>
         </div>
       ) : (
-        <div ref={cartScrollRef} className="relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">
+        <div ref={cartScrollRef} className="relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:h-[15rem] lg:max-h-[15rem] lg:flex-none">
           {cartItems.map((item, index) => {
             const bulkPackSize = Number(item.product.bulk_quantity || 0);
             const bulkPacks = item.isBulk && bulkPackSize > 0 ? Math.max(1, Math.round(Number(item.quantity || 0) / bulkPackSize)) : 0;
