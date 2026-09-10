@@ -1,4 +1,5 @@
 name: Apply POS cart layout once
+# one-time POS layout migration
 
 on:
   push:
