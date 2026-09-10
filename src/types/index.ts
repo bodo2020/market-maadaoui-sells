@@ -296,6 +296,7 @@ export interface Purchase {
   description?: string | null;
   invoice_file_url?: string | null;
   items?: PurchaseItem[];
+  suppliers?: { name?: string | null } | null;
   branch_id?: string | null;
   created_at?: string;
   updated_at?: string;
