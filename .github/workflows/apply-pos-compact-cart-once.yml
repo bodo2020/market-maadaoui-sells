@@ -1,0 +1,73 @@
+name: Apply compact POS cart once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/apply-pos-compact-cart-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compact desktop POS cart
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/pages/POSPro.tsx')
+          text = p.read_text()
+          start = text.index('  const cartPanel = (')
+          end = text.index('\n\n  return (', start)
+          block = text[start:end]
+
+          replacements = [
+              ('flex min-h-0 flex-col gap-3 lg:h-full', 'flex min-h-0 flex-col gap-3 lg:gap-2 lg:h-full'),
+              ('<h2 className="text-lg font-bold">السلة الحالية</h2>', '<h2 className="text-lg font-bold lg:text-base">السلة الحالية</h2>'),
+              ('rounded-xl bg-emerald-50 px-3 py-2 text-left', 'rounded-xl bg-emerald-50 px-3 py-2 text-left lg:px-2.5 lg:py-1.5'),
+              ('rounded-2xl border border-dashed py-12 text-center text-muted-foreground', 'rounded-2xl border border-dashed py-12 text-center text-muted-foreground lg:py-8'),
+              ('relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:h-[15rem] lg:max-h-[15rem] lg:flex-none', 'relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:h-[15rem] lg:max-h-[15rem] lg:flex-none lg:space-y-1.5'),
+              ('rounded-2xl border bg-white p-3 shadow-sm', 'rounded-2xl border bg-white p-3 shadow-sm lg:rounded-xl lg:p-2'),
+              ('truncate font-semibold', 'truncate font-semibold lg:text-sm lg:leading-5'),
+              ('mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground', 'mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground lg:mt-0.5 lg:gap-0.5 lg:text-[10px]'),
+              ('<div className="font-bold">{money(item.total)}</div>', '<div className="font-bold lg:text-sm">{money(item.total)}</div>'),
+              ('mt-2 rounded-lg p-1 text-red-500 hover:bg-red-50', 'mt-2 rounded-lg p-1 text-red-500 hover:bg-red-50 lg:mt-0.5 lg:p-0.5'),
+              ('h-9 w-9 shrink-0', 'h-9 w-9 shrink-0 lg:h-7 lg:w-7'),
+              ('h-9 w-20 text-center font-bold', 'h-9 w-20 text-center font-bold lg:h-7 lg:w-14 lg:text-sm'),
+              ('h-9 w-24 text-center font-bold', 'h-9 w-24 text-center font-bold lg:h-7 lg:w-20 lg:text-sm'),
+              ('mt-3 flex items-center gap-2', 'mt-3 flex items-center gap-2 lg:mt-1.5 lg:gap-1.5'),
+              ('mt-3 space-y-2', 'mt-3 space-y-2 lg:mt-1.5 lg:space-y-1'),
+              ('mt-3 flex flex-wrap items-center gap-2', 'mt-3 flex flex-wrap items-center gap-2 lg:mt-1.5 lg:gap-1.5'),
+              ('<Minus className="h-4 w-4" />', '<Minus className="h-4 w-4 lg:h-3.5 lg:w-3.5" />'),
+              ('<Plus className="h-4 w-4" />', '<Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" />'),
+              ('shrink-0 space-y-3 border-t border-slate-100 pt-3', 'shrink-0 space-y-3 border-t border-slate-100 pt-3 lg:space-y-2 lg:pt-2'),
+              ('rounded-2xl bg-slate-50 p-4', 'rounded-2xl bg-slate-50 p-4 lg:rounded-xl lg:p-2.5'),
+              ('flex items-center justify-between text-sm text-muted-foreground', 'flex items-center justify-between text-sm text-muted-foreground lg:text-xs'),
+              ('mt-1 flex items-center justify-between text-sm text-emerald-700', 'mt-1 flex items-center justify-between text-sm text-emerald-700 lg:text-xs'),
+              ('flex items-center justify-between text-xl font-black', 'flex items-center justify-between text-xl font-black lg:text-lg'),
+              ('rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 p-3 text-xs leading-5 text-emerald-950', 'rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 p-3 text-xs leading-5 text-emerald-950 lg:hidden'),
+              ('variant="outline" className="h-11"', 'variant="outline" className="h-11 lg:h-9 lg:text-xs"'),
+              ('variant="outline" className="h-11 text-red-600 hover:text-red-700"', 'variant="outline" className="h-11 text-red-600 hover:text-red-700 lg:h-9 lg:text-xs"'),
+              ('className="h-14 w-full bg-[#005931] text-base hover:bg-[#004a29]"', 'className="h-14 w-full bg-[#005931] text-base hover:bg-[#004a29] lg:h-11 lg:text-sm"'),
+          ]
+
+          for old, new in replacements:
+              if old not in block:
+                  raise SystemExit(f'missing expected cart fragment: {old}')
+              block = block.replace(old, new)
+
+          text = text[:start] + block + text[end:]
+          p.write_text(text)
+          PY
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/POSPro.tsx
+          git commit -m "refactor(pos): compact desktop cart controls"
+          git pull --rebase origin main
+          git push origin HEAD:main
