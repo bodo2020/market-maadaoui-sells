@@ -5,6 +5,7 @@ import CashierPerformancePanel from "@/components/employees/CashierPerformancePa
 import InventoryEmployeePerformancePanel from "@/components/employees/InventoryEmployeePerformancePanel";
 import DeliveryEmployeePerformancePanel from "@/components/employees/DeliveryEmployeePerformancePanel";
 import OnlineCustomerServicePerformancePanel from "@/components/employees/OnlineCustomerServicePerformancePanel";
+import EmployeeWalletAdminPanel from "@/components/employees/EmployeeWalletAdminPanel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getHrEmployeePerformanceDetail } from "@/services/hrPerformanceService";
@@ -59,6 +60,8 @@ export default function EmployeePerformancePanel({ employeeId, branchId }: { emp
 
   return (
     <div className="space-y-4">
+      <EmployeeWalletAdminPanel employeeId={employeeId} branchId={branchId} />
+
       <Card>
         <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
           <div><CardTitle className="flex items-center gap-2"><ClipboardCheck className="h-5 w-5 text-[#005931]" />الأداء والالتزام</CardTitle><CardDescription>مؤشرات تشغيلية قابلة للتفسير من الجدول الفعلي والحضور والمهام، بدون درجة Productivity مصطنعة.</CardDescription></div>
