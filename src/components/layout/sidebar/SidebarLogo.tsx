@@ -11,11 +11,13 @@ interface SidebarLogoProps {
 
 export function SidebarLogo({ collapsed, toggleSidebar, showToggle = true }: SidebarLogoProps) {
   return (
-    <div className={cn("border-b border-slate-100", collapsed ? "p-3" : "p-4")}>
+    <div className={cn("border-b border-slate-100", collapsed ? "p-2.5" : "p-4")}>
       <div
         className={cn(
-          "flex items-center rounded-2xl bg-gradient-to-l from-emerald-50 via-white to-white",
-          collapsed ? "justify-center p-2" : "gap-3 border border-emerald-100/80 p-3 shadow-sm"
+          "rounded-2xl bg-gradient-to-l from-emerald-50 via-white to-white",
+          collapsed
+            ? "flex flex-col items-center gap-2 p-1.5"
+            : "flex items-center gap-3 border border-emerald-100/80 p-3 shadow-sm"
         )}
       >
         <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-sm">
@@ -42,10 +44,7 @@ export function SidebarLogo({ collapsed, toggleSidebar, showToggle = true }: Sid
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            className={cn(
-              "h-9 w-9 shrink-0 rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-[#005931]",
-              collapsed && "absolute mt-16"
-            )}
+            className="h-9 w-9 shrink-0 rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm hover:border-emerald-200 hover:bg-emerald-50 hover:text-[#005931]"
             aria-label={collapsed ? "توسيع القائمة الجانبية" : "تصغير القائمة الجانبية"}
             title={collapsed ? "توسيع القائمة" : "تصغير القائمة"}
           >
