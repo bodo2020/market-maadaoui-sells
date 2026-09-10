@@ -88,11 +88,6 @@ export default function PosRuntimeGuard({ children }: { children: ReactNode }) {
   const addDigit = (digit: string) => { setError(null); setPin(value => value.length >= 6 ? value : value + digit); };
   const lockNow = useCallback(() => { setPin(""); setError(null); setLocked(true); }, []);
 
-  useEffect(() => {
-    const onLock = () => { if (!locked && !runtimeIssue) lockNow(); };
-    window.addEventListener("pos:lock", onLock);
-    return () => window.removeEventListener("pos:lock", onLock);
-  }, [locked, runtimeIssue, lockNow]);
 
   const unlock = async () => {
     if (!device || !user?.id || pin.length < 4 || !online || unlocking) return;

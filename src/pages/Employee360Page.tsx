@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowRight, BadgeCheck, BriefcaseBusiness, Building2, Save, UserRoundCog } from "lucide-react";
+import { ArrowRight, BadgeCheck, BriefcaseBusiness, Building2, KeyRound, Save, ShieldCheck, UserRoundCog } from "lucide-react";
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { superAdminSetStaffAppPin } from "@/services/staffAppPinService";
 import EmployeePerformancePanel from "@/components/employees/EmployeePerformancePanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,7 +51,11 @@ export default function Employee360Page() {
   const navigate = useNavigate();
   const branchId = localStorage.getItem("currentBranchId");
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
   const [form, setForm] = useState<HrEmployeeProfilePayload>(emptyForm);
+  const [securityPin, setSecurityPin] = useState("");
+  const [securityPinConfirm, setSecurityPinConfirm] = useState("");
+  const isSuperAdmin = currentUser?.role === "super_admin";
 
   const profileQuery = useQuery({
     queryKey: ["hr-employee-profile", employeeId, branchId],
@@ -93,6 +99,21 @@ export default function Employee360Page() {
     [structureQuery.data, form.department_id],
   );
   const managers = managersQuery.data?.items.filter((m) => m.id !== employeeId && m.employment_status !== "terminated") || [];
+
+  const pinResetMutation = useMutation({
+    mutationFn: async () => {
+      if (!isSuperAdmin) throw new Error("هذه العملية متاحة لمدير النظام فقط.");
+      if (!/^\d{4,6}$/.test(securityPin)) throw new Error("PIN الجديد يجب أن يكون من 4 إلى 6 أرقام.");
+      if (securityPin !== securityPinConfirm) throw new Error("تأكيد PIN غير مطابق.");
+      return superAdminSetStaffAppPin(employeeId, securityPin);
+    },
+    onSuccess: () => {
+      setSecurityPin("");
+      setSecurityPinConfirm("");
+      toast.success("تم تعيين PIN جديد للموظف وتحديث PIN نقطة البيع أيضًا.");
+    },
+    onError: (e: any) => toast.error(e?.message || "تعذر تغيير PIN الموظف."),
+  });
 
   const saveMutation = useMutation({
     mutationFn: () => saveHrEmployeeProfile(employeeId, branchId, form),
@@ -154,6 +175,7 @@ export default function Employee360Page() {
           <TabsContent value="contact">
             <div className="grid gap-4 lg:grid-cols-2">
               <Card><CardHeader><CardTitle>الحساب</CardTitle><CardDescription>بيانات الدخول الأساسية للحساب، بينما الأجهزة الموثوقة تتم إدارتها كطبقة أمان مستقلة.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-2 gap-4"><div><div className="text-xs text-muted-foreground">اسم المستخدم</div><div className="font-semibold">{user.username}</div></div><div><div className="text-xs text-muted-foreground">Role النظام</div><div className="font-semibold">{user.role}</div></div><div><div className="text-xs text-muted-foreground">الهاتف</div><div className="font-semibold">{user.phone || "—"}</div></div><div><div className="text-xs text-muted-foreground">البريد</div><div className="font-semibold">{user.email || "—"}</div></div></div></CardContent></Card>
+              {isSuperAdmin && <Card className="border-emerald-100"><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#005931]" />أمان الحساب</CardTitle><CardDescription>مدير النظام يقدر يضع PIN جديد للموظف بدون معرفة الرمز القديم. الرمز موحّد للتطبيق ونقطة البيع وتُسجل العملية في سجل التدقيق.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="grid gap-3 sm:grid-cols-2"><div className="space-y-2"><Label>PIN الجديد</Label><Input type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={securityPin} onChange={(e) => setSecurityPin(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••" /></div><div className="space-y-2"><Label>تأكيد PIN</Label><Input type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={securityPinConfirm} onChange={(e) => setSecurityPinConfirm(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••" /></div></div><Button className="w-full bg-[#005931] hover:bg-[#004426]" disabled={pinResetMutation.isPending || !securityPin || !securityPinConfirm} onClick={() => pinResetMutation.mutate()}>{pinResetMutation.isPending ? "جاري التغيير..." : <><KeyRound className="ml-2 h-4 w-4" />تعيين PIN جديد</>}</Button></CardContent></Card>}
               <Card><CardHeader><CardTitle>الفروع المسموحة</CardTitle><CardDescription>الفرع الوظيفي الأساسي لا يلغي صلاحيات الوصول للفروع الأخرى.</CardDescription></CardHeader><CardContent className="space-y-3">{data.branches?.map((b: any) => <div key={b.branch_id} className="flex items-center justify-between rounded-lg border p-3"><div><div className="font-semibold">{b.branch_name}</div><div className="text-xs text-muted-foreground">{b.role}</div></div>{b.is_primary && <Badge>أساسي</Badge>}</div>)}{!data.branches?.length && <p className="text-sm text-muted-foreground">لا توجد فروع مرتبطة.</p>}<Separator /><div><Label>الفرع الوظيفي الأساسي</Label><Select value={form.primary_branch_id || "none"} onValueChange={(v) => setForm({ ...form, primary_branch_id: v === "none" ? null : v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">غير محدد</SelectItem>{data.branches?.filter((b:any) => b.active).map((b:any) => <SelectItem key={b.branch_id} value={b.branch_id}>{b.branch_name}</SelectItem>)}</SelectContent></Select></div>{primaryBranch && <p className="text-xs text-muted-foreground">الفرع الحالي: {primaryBranch.branch_name}</p>}</CardContent></Card>
             </div>
           </TabsContent>

@@ -80,7 +80,7 @@ export default function StaffAccountPage() {
           <Card className="rounded-3xl">
             <CardHeader><CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-[#005931]" />تغيير PIN التطبيق</CardTitle><CardDescription>نفس PIN الخاص بحساب الموظف. لو عندك صلاحية POS، يتم استخدام نفس الرقم للدخول السريع أيضًا.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
-              {pinQuery.isLoading ? <div className="flex min-h-32 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#005931]" /></div> : pinQuery.data?.locked ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">PIN مقفول مؤقتًا بسبب محاولات خاطئة. حاول بعد انتهاء مدة القفل.</div> : <>
+              {pinQuery.isLoading ? <div className="flex min-h-32 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#005931]" /></div> : pinQuery.data?.locked && !isSuperAdmin ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">PIN مقفول مؤقتًا بسبب محاولات خاطئة. استخدم استرجاع الرمز من شاشة القفل باليوزر والباسورد.</div> : <>
                 <div className={`grid gap-3 ${isSuperAdmin ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
                   {!isSuperAdmin && <div className="space-y-2"><Label>PIN الحالي</Label><Input type="password" inputMode="numeric" maxLength={6} value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/\D/g, ""))} placeholder="••••" /></div>}
                   <div className="space-y-2"><Label>PIN الجديد</Label><Input type="password" inputMode="numeric" maxLength={6} value={newPin} onChange={e => setNewPin(e.target.value.replace(/\D/g, ""))} placeholder="••••" /></div>
