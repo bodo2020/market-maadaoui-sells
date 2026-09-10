@@ -52,7 +52,7 @@ import {
   readPOSLoyaltyVoucher,
 } from "@/components/POS/POSCustomerLoyaltyBridge";
 
-type ScanTarget = "customer" | "voucher" | "employee" | null;
+type ScanTarget = "buyer" | "voucher" | null;
 type SplitDraft = { methodId: string; amount: string; reference: string };
 
 type Props = {
@@ -230,23 +230,25 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
     if (!currentBranchId || !barcode || !target) return;
     setError(null);
     try {
-      if (target === "customer") {
-        if (!isCustomerLoyaltyBarcode(barcode)) throw new Error("ده مش باركود عميل. امسح بطاقة العميل اللي تبدأ بـ 299.");
-        const linked = await lookupPOSLoyaltyCustomer(barcode, currentBranchId);
-        if (!linked) throw new Error("باركود العميل غير معروف.");
-        setEmployee(null);
-        storeCustomer(linked);
-        toast({ title: `تم ربط ${linked.name || "العميل"}`, description: `${Number(linked.points_balance || 0).toLocaleString("ar-EG")} نقطة متاحة` });
-      } else if (target === "employee") {
-        if (!isEmployeePurchaseBarcode(barcode)) throw new Error("ده مش باركود موظف. امسح بطاقة الموظف اللي تبدأ بـ 297.");
-        const linked = await lookupEmployeePurchaseCard(barcode, currentBranchId);
-        if (!linked) throw new Error("باركود الموظف غير معروف أو الحساب غير نشط.");
-        storeCustomer(null);
-        setEmployee(linked);
-        toast({
-          title: `تم ربط الموظف ${linked.name}`,
-          description: `آجل متاح ${money(linked.credit_available)} · ${Number(linked.points_balance || 0).toLocaleString("ar-EG")} نقطة`,
-        });
+      if (target === "buyer") {
+        if (isCustomerLoyaltyBarcode(barcode)) {
+          const linked = await lookupPOSLoyaltyCustomer(barcode, currentBranchId);
+          if (!linked) throw new Error("باركود الزبون غير معروف.");
+          setEmployee(null);
+          storeCustomer(linked);
+          toast({ title: `تم ربط ${linked.name || "الزبون"}`, description: `${Number(linked.points_balance || 0).toLocaleString("ar-EG")} نقطة متاحة` });
+        } else if (isEmployeePurchaseBarcode(barcode)) {
+          const linked = await lookupEmployeePurchaseCard(barcode, currentBranchId);
+          if (!linked) throw new Error("باركود الموظف غير معروف أو الحساب غير نشط.");
+          storeCustomer(null);
+          setEmployee(linked);
+          toast({
+            title: `تم ربط الموظف ${linked.name}`,
+            description: `آجل متاح ${money(linked.credit_available)} · ${Number(linked.points_balance || 0).toLocaleString("ar-EG")} نقطة`,
+          });
+        } else {
+          throw new Error("الباركود مش هوية زبون أو موظف. امسح بطاقة 299… أو 297….");
+        }
       } else {
         if (!customer) throw new Error("امسح بطاقة العميل الأول قبل كوبون الخصم.");
         if (!isLoyaltyVoucherBarcode(barcode)) throw new Error("ده مش باركود كوبون خصم. امسح كوبون الخصم اللي يبدأ بـ 298.");
@@ -509,14 +511,11 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
                 ) : (
                   <div className="space-y-3">
                     <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">ممكن تكمل بدون هوية. اربط عميل للولاء أو موظف لتفعيل نقاط الموظفين وخيار الآجل.</div>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      <Button variant={scanTarget === "customer" ? "default" : "outline"} className={scanTarget === "customer" ? "bg-[#005931]" : ""} onClick={() => beginScan("customer")}><ScanLine className="ml-2 h-4 w-4" />عميل</Button>
-                      <Button variant="outline" onClick={() => beginScan("customer", true)}>كاميرا عميل</Button>
-                      <Button variant={scanTarget === "employee" ? "default" : "outline"} className={scanTarget === "employee" ? "bg-amber-700 hover:bg-amber-800" : ""} onClick={() => beginScan("employee")}><UserRound className="ml-2 h-4 w-4" />موظف</Button>
-                      <Button variant="outline" onClick={() => beginScan("employee", true)}>كاميرا موظف</Button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant={scanTarget === "buyer" ? "default" : "outline"} className={scanTarget === "buyer" ? "bg-[#005931]" : ""} onClick={() => beginScan("buyer")}><ScanLine className="ml-2 h-4 w-4" />زبون / موظف</Button>
+                      <Button variant="outline" onClick={() => beginScan("buyer", true)}>كاميرا الهوية</Button>
                     </div>
-                    {scanTarget === "customer" && <div className="text-center text-xs font-semibold text-[#005931]">القارئ مخصص الآن لبطاقة العميل 299…</div>}
-                    {scanTarget === "employee" && <div className="text-center text-xs font-semibold text-amber-800">القارئ مخصص الآن لبطاقة الموظف 297…</div>}
+                    {scanTarget === "buyer" && <div className="text-center text-xs font-semibold text-[#005931]">امسح الباركود مباشرة؛ الكاشير يتعرف تلقائيًا على الزبون 299… أو الموظف 297…</div>}
                   </div>
                 )}
               </section>
