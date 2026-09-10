@@ -1,551 +1,251 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import JsBarcode from "jsbarcode";
+import {
+  AlertTriangle,
+  Barcode as BarcodeIcon,
+  Bluetooth,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+  Printer,
+  RefreshCw,
+  Search,
+  Settings2,
+  Tags,
+} from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Printer, Edit, Save, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { useBranchStore } from "@/stores/branchStore";
+import {
+  fetchAllProductManagementRows,
+  fetchProductManagementPage,
+  type ProductManagementRow,
+} from "@/services/supabase/productManagementService";
+import {
+  BARCODE_LABEL_SIZES,
+  getBarcodeLabelPreferences,
+  printBarcodeLabels,
+  saveBarcodeLabelPreferences,
+  type BarcodeLabelItem,
+  type BarcodeLabelPreferences,
+  type BarcodeLabelSize,
+} from "@/services/barcodeLabelPrintService";
+import { bluetoothPrinterService } from "@/services/bluetoothPrinterService";
+import { siteConfig } from "@/config/site";
 import { toast } from "sonner";
 
-import JsBarcode from "jsbarcode";
-import { fetchStoreSettings, StoreSettings } from "@/services/supabase/storeService";
+type BarcodeFilter = "all" | "ready" | "missing" | "scale";
 
-interface Product {
-  id: string;
-  name: string;
-  barcode?: string;
-  bulk_barcode?: string;
-  price: number;
-  bulk_price?: number;
-  is_bulk: boolean;
-  bulk_enabled: boolean;
-  company_id?: string;
-  companies?: {
-    name: string;
+function money(value: unknown) {
+  return `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siteConfig.currency}`;
+}
+
+function toLabelItem(row: ProductManagementRow): BarcodeLabelItem {
+  return {
+    id: row.row_key,
+    name: row.name,
+    barcode: row.barcode || "",
+    price: Number(row.offer_price && row.is_offer ? row.offer_price : row.price || 0),
+    unit: row.unit_of_measure,
+    barcodeType: row.barcode_type,
   };
 }
 
-
-// Simple Barcode Display Component
-const SimpleBarcodeDisplay = ({ value, productName, storeName, className }: { 
-  value: string; 
-  productName: string;
-  storeName: string;
-  className?: string;
-}) => {
+function BarcodePreview({ row, preferences }: { row: ProductManagementRow | null; preferences: BarcodeLabelPreferences }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const size = BARCODE_LABEL_SIZES[preferences.size];
 
   useEffect(() => {
-    if (canvasRef.current && value) {
-      try {
-        JsBarcode(canvasRef.current, value, {
-          format: 'CODE128',
-          width: 1.5,
-          height: 40,
-          displayValue: false,
-          background: 'white',
-          lineColor: 'black',
-          margin: 2
-        });
-      } catch (error) {
-        console.error('Error generating barcode:', error);
-      }
+    const canvas = canvasRef.current;
+    if (!canvas || !row?.barcode) return;
+    try {
+      JsBarcode(canvas, row.barcode, {
+        format: "CODE128",
+        width: size.width <= 30 ? 1.1 : 1.35,
+        height: size.height <= 20 ? 26 : 38,
+        displayValue: false,
+        margin: 0,
+      });
+    } catch {
+      const context = canvas.getContext("2d");
+      context?.clearRect(0, 0, canvas.width, canvas.height);
     }
-  }, [value]);
+  }, [row, preferences.size, size.height, size.width]);
+
+  if (!row) return <div className="flex h-52 items-center justify-center rounded-2xl border border-dashed text-sm text-slate-400">اختر منتجًا لمعاينة الملصق</div>;
+  if (!row.barcode) return <div className="flex h-52 flex-col items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 text-center text-sm text-amber-800"><AlertTriangle className="mb-2 h-6 w-6" /><strong>{row.name}</strong><span className="mt-1">هذا المنتج ليس له باركود قابل للطباعة.</span></div>;
 
   return (
-    <div className="space-y-1">
-      <canvas ref={canvasRef} className={className} />
-      <div className="text-xs text-center space-y-1">
-        <div className="font-medium">{productName}</div>
-        <div className="text-muted-foreground">{storeName}</div>
+    <div className="flex min-h-56 items-center justify-center rounded-2xl bg-slate-100 p-5">
+      <div className="flex flex-col items-center justify-center overflow-hidden border border-slate-200 bg-white p-2 text-center shadow-lg" style={{ width: `${Math.max(180, size.width * 6)}px`, aspectRatio: `${size.width}/${size.height}` }}>
+        {preferences.showStoreName && <div className="mb-1 max-w-full truncate text-[9px] font-black text-[#005931]">{siteConfig.name}</div>}
+        {preferences.showProductName && <div className="mb-1 max-w-full truncate text-xs font-black">{row.name}</div>}
+        <canvas ref={canvasRef} className="max-h-[55%] max-w-full" />
+        {preferences.showBarcodeText && <div className="mt-1 text-[9px] tracking-wide" dir="ltr">{row.barcode}</div>}
+        {preferences.showPrice && <div className="mt-1 text-sm font-black">{money(row.is_offer && row.offer_price ? row.offer_price : row.price)}{row.unit_of_measure ? <span className="mr-1 text-[8px] font-bold text-slate-500">/ {row.unit_of_measure}</span> : null}</div>}
       </div>
     </div>
   );
-};
+}
 
 export default function Barcode() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
-  const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
-  const [editingProduct, setEditingProduct] = useState<string | null>(null);
-  const [editingBarcode, setEditingBarcode] = useState({ barcode: '', bulk_barcode: '' });
+  const navigate = useNavigate();
+  const { currentBranchId, currentBranchName } = useBranchStore();
+  const branchId = currentBranchId || localStorage.getItem("currentBranchId") || "";
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<BarcodeFilter>("all");
+  const [selected, setSelected] = useState<Map<string, ProductManagementRow>>(new Map());
+  const [previewRow, setPreviewRow] = useState<ProductManagementRow | null>(null);
+  const [preferences, setPreferences] = useState<BarcodeLabelPreferences>(() => getBarcodeLabelPreferences());
+  const [printingAll, setPrintingAll] = useState(false);
+  const pageSize = 80;
+
+  useEffect(() => setPage(1), [search, filter, branchId]);
+
+  const query = useQuery({
+    queryKey: ["barcode-print-center-v2", branchId, search.trim(), page],
+    enabled: Boolean(branchId),
+    queryFn: () => fetchProductManagementPage({ search: search.trim(), page, pageSize }),
+    staleTime: 8_000,
+  });
+
+  const rows = query.data?.rows || [];
+  const total = Number(query.data?.total || 0);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const visibleRows = useMemo(() => rows.filter(row => {
+    if (filter === "ready") return Boolean(row.barcode);
+    if (filter === "missing") return !row.barcode;
+    if (filter === "scale") return row.barcode_type === "scale";
+    return true;
+  }), [rows, filter]);
 
   useEffect(() => {
-    fetchProducts();
-    fetchStoreData();
-  }, []);
-
-
-  const requestUSBDevice = async () => {
-    toast.info('تم تعطيل إعدادات الطابعة. الطباعة تتم عبر الويب.');
-  };
-
-  const requestBluetoothDevice = async () => {
-    toast.info('تم تعطيل إعدادات الطابعة. الطباعة تتم عبر الويب.');
-  };
-
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          barcode,
-          bulk_barcode,
-          price,
-          bulk_price,
-          is_bulk,
-          bulk_enabled,
-          company_id,
-          companies (
-            name
-          )
-        `)
-        .order('name');
-
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      toast.error('حدث خطأ في تحميل المنتجات');
-    } finally {
-      setLoading(false);
+    if (!previewRow || !visibleRows.some(row => row.row_key === previewRow.row_key)) {
+      setPreviewRow(visibleRows.find(row => row.barcode) || visibleRows[0] || null);
     }
+  }, [visibleRows, previewRow]);
+
+  const printerStatus = bluetoothPrinterService.getStatus();
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every(row => selected.has(row.row_key));
+  const selectedPrintable = Array.from(selected.values()).filter(row => Boolean(row.barcode));
+
+  const updatePreference = <K extends keyof BarcodeLabelPreferences>(key: K, value: BarcodeLabelPreferences[K]) => {
+    setPreferences(prev => saveBarcodeLabelPreferences({ ...prev, [key]: value }));
   };
 
-  const fetchStoreData = async () => {
-    try {
-      const settings = await fetchStoreSettings();
-      setStoreSettings(settings);
-    } catch (error) {
-      console.error('Error fetching store settings:', error);
-    }
+  const toggleRow = (row: ProductManagementRow) => {
+    setSelected(prev => {
+      const next = new Map(prev);
+      if (next.has(row.row_key)) next.delete(row.row_key);
+      else next.set(row.row_key, row);
+      return next;
+    });
+    setPreviewRow(row);
   };
 
-  const startEditing = (product: Product) => {
-    setEditingProduct(product.id);
-    setEditingBarcode({
-      barcode: product.barcode || '',
-      bulk_barcode: product.bulk_barcode || ''
+  const togglePage = () => {
+    setSelected(prev => {
+      const next = new Map(prev);
+      if (allVisibleSelected) visibleRows.forEach(row => next.delete(row.row_key));
+      else visibleRows.forEach(row => next.set(row.row_key, row));
+      return next;
     });
   };
 
-  const cancelEditing = () => {
-    setEditingProduct(null);
-    setEditingBarcode({ barcode: '', bulk_barcode: '' });
+  const printRows = (items: ProductManagementRow[]) => {
+    const printable = items.filter(row => row.barcode).map(toLabelItem);
+    if (!printable.length) return toast.error("لا توجد باركودات صالحة للطباعة في الاختيار الحالي.");
+    if (!printBarcodeLabels(printable, preferences)) return toast.error("المتصفح منع نافذة الطباعة. اسمح بالنوافذ المنبثقة للموقع.");
+    toast.success(`تم تجهيز ${printable.length.toLocaleString("ar-EG")} منتج للطباعة × ${preferences.copies.toLocaleString("ar-EG")} نسخة`);
   };
 
-  const saveBarcode = async (productId: string) => {
+  const printAllResults = async () => {
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({
-          barcode: editingBarcode.barcode || null,
-          bulk_barcode: editingBarcode.bulk_barcode || null
-        })
-        .eq('id', productId);
-
-      if (error) throw error;
-
-      // Update local state
-      setProducts(prev => prev.map(p => 
-        p.id === productId 
-          ? { ...p, barcode: editingBarcode.barcode, bulk_barcode: editingBarcode.bulk_barcode }
-          : p
-      ));
-
-      toast.success('تم حفظ الباركود بنجاح');
-      cancelEditing();
+      setPrintingAll(true);
+      let result = await fetchAllProductManagementRows({ search: search.trim() });
+      if (filter === "ready") result = result.filter(row => Boolean(row.barcode));
+      if (filter === "missing") result = result.filter(row => !row.barcode);
+      if (filter === "scale") result = result.filter(row => row.barcode_type === "scale");
+      printRows(result);
     } catch (error) {
-      console.error('Error saving barcode:', error);
-      toast.error('حدث خطأ في حفظ الباركود');
+      console.error(error);
+      toast.error("تعذر تجهيز كل النتائج للطباعة.");
+    } finally {
+      setPrintingAll(false);
     }
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.barcode?.includes(searchTerm) ||
-    product.bulk_barcode?.includes(searchTerm)
-  );
-
-  const toggleProductSelection = (productId: string) => {
-    const newSelected = new Set(selectedProducts);
-    if (newSelected.has(productId)) {
-      newSelected.delete(productId);
-    } else {
-      newSelected.add(productId);
-    }
-    setSelectedProducts(newSelected);
-  };
-
-  const printSelectedBarcodes = () => {
-    if (selectedProducts.size === 0) {
-      toast.error('يرجى اختيار منتج واحد على الأقل للطباعة');
-      return;
-    }
-
-    const items = products
-      .filter(p => selectedProducts.has(p.id))
-      .map(p => ({
-        name: p.name,
-        value: p.barcode || ''
-      }))
-      .filter(i => i.value);
-
-    if (items.length === 0) {
-      toast.error('لا توجد باركودات صالحة للطباعة');
-      return;
-    }
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('لا يمكن فتح نافذة الطباعة');
-      return;
-    }
-
-    const storeName = storeSettings?.name || '';
-
-    const generateDataURL = (value: string) => {
-      const canvas = document.createElement('canvas');
-      try {
-        JsBarcode(canvas, value, {
-          format: 'CODE128',
-          width: 2,
-          height: 60,
-          displayValue: false,
-          background: '#ffffff',
-          lineColor: '#000000',
-          margin: 0
-        });
-        return canvas.toDataURL('image/png');
-      } catch {
-        return '';
-      }
-    };
-
-    const labels = items.map(i => {
-      const url = generateDataURL(i.value);
-      return url ? `
-        <div class="label">
-          <img src="${url}" alt="${i.name}" />
-          <div class="meta">${i.name}${storeName ? ' — ' + storeName : ''}</div>
-        </div>
-      ` : '';
-    }).join('');
-
-    printWindow.document.write(`
-      <html dir="rtl" lang="ar">
-        <head>
-          <meta charSet="UTF-8" />
-          <title>طباعة باركود</title>
-          <style>
-            @page { size: 25mm auto; margin: 0; }
-            body { margin: 0; padding: 6px; font-family: Arial, sans-serif; }
-            .label { width: 25mm; max-width: 25mm; padding: 4px 0; text-align: center; page-break-inside: avoid; }
-            .label img { width: 100%; height: auto; display: block; }
-            .meta { font-size: 10px; margin-top: 4px; color: #111; }
-          </style>
-        </head>
-        <body>
-          ${labels}
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.onload = () => printWindow.print();
-
-    toast.success(`تم تجهيز ${items.length} باركود للطباعة`);
-    setSelectedProducts(new Set());
-  };
-
-  const printAllBarcodes = () => {
-    const items = filteredProducts
-      .map(p => ({ name: p.name, value: p.barcode || '' }))
-      .filter(i => i.value);
-
-    if (items.length === 0) {
-      toast.error('لا توجد باركودات للطباعة');
-      return;
-    }
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast.error('لا يمكن فتح نافذة الطباعة');
-      return;
-    }
-
-    const storeName = storeSettings?.name || '';
-
-    const generateDataURL = (value: string) => {
-      const canvas = document.createElement('canvas');
-      try {
-        JsBarcode(canvas, value, {
-          format: 'CODE128',
-          width: 2,
-          height: 60,
-          displayValue: false,
-          background: '#ffffff',
-          lineColor: '#000000',
-          margin: 0
-        });
-        return canvas.toDataURL('image/png');
-      } catch {
-        return '';
-      }
-    };
-
-    const labels = items.map(i => {
-      const url = generateDataURL(i.value);
-      return url ? `
-        <div class="label">
-          <img src="${url}" alt="${i.name}" />
-          <div class="meta">${i.name}${storeName ? ' — ' + storeName : ''}</div>
-        </div>
-      ` : '';
-    }).join('');
-
-    printWindow.document.write(`
-      <html dir="rtl" lang="ar">
-        <head>
-          <meta charSet="UTF-8" />
-          <title>طباعة جميع الباركود</title>
-          <style>
-            @page { size: 25mm auto; margin: 0; }
-            body { margin: 0; padding: 6px; font-family: Arial, sans-serif; }
-            .label { width: 25mm; max-width: 25mm; padding: 4px 0; text-align: center; page-break-inside: avoid; }
-            .label img { width: 100%; height: auto; display: block; }
-            .meta { font-size: 10px; margin-top: 4px; color: #111; }
-          </style>
-        </head>
-        <body>
-          ${labels}
-        </body>
-      </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.onload = () => printWindow.print();
-
-    toast.success(`تم تجهيز ${items.length} باركود للطباعة`);
-  };
+  if (!branchId) return <MainLayout><div dir="rtl" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">اختر فرعًا أولًا لفتح مركز طباعة الباركود.</div></MainLayout>;
 
   return (
     <MainLayout>
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">إدارة الباركود</h1>
+      <div dir="rtl" className="space-y-6 pb-16">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#005931] text-white shadow-lg shadow-emerald-900/10"><BarcodeIcon className="h-6 w-6" /></span>
+            <div><h1 className="text-2xl font-black text-slate-950 sm:text-3xl">مركز طباعة الباركود</h1><p className="mt-1 text-sm text-slate-500">{currentBranchName || "الفرع الحالي"} · ملصقات منتجات دقيقة ومهيأة لطابعات الرول.</p></div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
+            <Button variant="outline" onClick={() => navigate("/it-center")}><Settings2 className="ml-2 h-4 w-4" />الطابعات والأجهزة</Button>
+          </div>
         </div>
 
-        <Tabs defaultValue="products" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="products">المنتجات والباركود</TabsTrigger>
-          </TabsList>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="border-slate-100 shadow-sm"><CardContent className="p-5"><p className="text-xs font-bold text-slate-500">نتائج الكتالوج</p><p className="mt-2 text-2xl font-black">{total.toLocaleString("ar-EG")}</p><p className="mt-2 text-[11px] text-slate-400">من كتالوج الفرع الفعلي</p></CardContent></Card>
+          <Card className="border-slate-100 shadow-sm"><CardContent className="p-5"><p className="text-xs font-bold text-slate-500">المحدد</p><p className="mt-2 text-2xl font-black">{selected.size.toLocaleString("ar-EG")}</p><p className="mt-2 text-[11px] text-slate-400">منها {selectedPrintable.length.toLocaleString("ar-EG")} صالح للطباعة</p></CardContent></Card>
+          <Card className="border-slate-100 shadow-sm"><CardContent className="p-5"><p className="text-xs font-bold text-slate-500">مقاس الملصق</p><p className="mt-2 text-2xl font-black">{BARCODE_LABEL_SIZES[preferences.size].label}</p><p className="mt-2 text-[11px] text-slate-400">محفوظ على الجهاز الحالي</p></CardContent></Card>
+          <Card className="border-slate-100 shadow-sm"><CardContent className="p-5"><div className="flex items-center justify-between"><div><p className="text-xs font-bold text-slate-500">الطابعة</p><p className="mt-2 font-black">{printerStatus.name || "طباعة المتصفح"}</p><p className="mt-2 text-[11px] text-slate-400">{printerStatus.connected ? "متصلة حاليًا" : "اختر الطابعة من نافذة الطباعة"}</p></div><Bluetooth className={`h-5 w-5 ${printerStatus.connected ? "text-emerald-600" : "text-slate-300"}`} /></div></CardContent></Card>
+        </div>
 
-          <TabsContent value="products" className="space-y-4">
-            {/* Search and Controls */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Search className="h-5 w-5" />
-                  البحث والتحكم
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4 items-center">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="البحث بالاسم أو الباركود..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                  <Button 
-                    onClick={printSelectedBarcodes}
-                    disabled={selectedProducts.size === 0}
-                    variant="default"
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    طباعة المحدد ({selectedProducts.size})
-                  </Button>
-                  <Button 
-                    onClick={printAllBarcodes}
-                    variant="outline"
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    طباعة الكل ({filteredProducts.length})
-                  </Button>
-                </div>
-              </CardContent>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-4">
+            <Card className="border-slate-100 shadow-sm"><CardContent className="p-4 sm:p-5"><div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_180px_auto_auto]">
+              <div className="relative"><Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input className="h-11 pr-10" value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الباركود..." /></div>
+              <select className="h-11 rounded-md border border-input bg-background px-3 text-sm" value={filter} onChange={e => setFilter(e.target.value as BarcodeFilter)}><option value="all">كل المنتجات والوحدات</option><option value="ready">بباركود فقط</option><option value="missing">بدون باركود</option><option value="scale">باركود ميزان</option></select>
+              <Button className="h-11 bg-[#005931] hover:bg-[#004725]" disabled={!selectedPrintable.length} onClick={() => printRows(selectedPrintable)}><Printer className="ml-2 h-4 w-4" />طباعة المحدد ({selectedPrintable.length})</Button>
+              <Button variant="outline" className="h-11" disabled={printingAll || filter === "missing"} onClick={printAllResults}><Tags className="ml-2 h-4 w-4" />{printingAll ? "تجهيز..." : "طباعة كل النتائج"}</Button>
+            </div></CardContent></Card>
+
+            <Card className="overflow-hidden border-slate-100 shadow-sm">
+              <div className="flex items-center justify-between border-b bg-slate-50 px-4 py-3"><label className="flex cursor-pointer items-center gap-2 text-sm font-bold"><Checkbox checked={allVisibleSelected} onCheckedChange={togglePage} />تحديد الصفحة الحالية</label><span className="text-xs text-slate-500">{visibleRows.length.toLocaleString("ar-EG")} عنصر في الصفحة</span></div>
+              {query.isLoading ? <div className="py-16 text-center text-slate-500">جارٍ تحميل الكتالوج...</div> : query.isError ? <div className="flex flex-col items-center gap-3 py-12 text-center text-red-700"><AlertTriangle className="h-6 w-6" /><p>{(query.error as Error).message}</p><Button variant="outline" onClick={() => query.refetch()}>إعادة المحاولة</Button></div> : visibleRows.length === 0 ? <div className="py-16 text-center text-slate-500">لا توجد نتائج مطابقة.</div> : <div className="divide-y divide-slate-100">{visibleRows.map(row => {
+                const checked = selected.has(row.row_key);
+                return <div key={row.row_key} className={`grid cursor-pointer gap-3 p-4 transition sm:grid-cols-[auto_minmax(0,1fr)_150px_130px_auto] sm:items-center ${checked ? "bg-emerald-50/60" : "hover:bg-slate-50"}`} onClick={() => toggleRow(row)}>
+                  <Checkbox checked={checked} onCheckedChange={() => toggleRow(row)} onClick={event => event.stopPropagation()} />
+                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="truncate font-black text-slate-900">{row.name}</p>{row.record_type === "sale_unit" && <Badge variant="outline">وحدة بيع</Badge>}{row.barcode_type === "scale" && <Badge className="bg-violet-100 text-violet-700 hover:bg-violet-100">ميزان</Badge>}</div><p className="mt-1 text-xs text-slate-400">{row.parent_name ? `${row.parent_name} · ` : ""}{row.unit_of_measure || "قطعة"}</p></div>
+                  <div><span className="text-[10px] text-slate-400">الباركود</span>{row.barcode ? <p className="mt-1 truncate font-mono text-xs font-bold" dir="ltr">{row.barcode}</p> : <Badge className="mt-1 bg-amber-100 text-amber-800 hover:bg-amber-100">غير مسجل</Badge>}</div>
+                  <div><span className="text-[10px] text-slate-400">سعر البيع</span><p className="mt-1 font-black">{money(row.is_offer && row.offer_price ? row.offer_price : row.price)}</p></div>
+                  <div className="flex justify-end"><Button size="sm" variant="outline" disabled={!row.barcode} onClick={event => { event.stopPropagation(); setPreviewRow(row); printRows([row]); }}><Printer className="ml-1.5 h-3.5 w-3.5" />طباعة</Button></div>
+                </div>;
+              })}</div>}
+              <div className="flex items-center justify-between border-t bg-white px-4 py-3"><span className="text-xs text-slate-500">صفحة {page.toLocaleString("ar-EG")} من {totalPages.toLocaleString("ar-EG")}</span><div className="flex gap-2"><Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}><ChevronRight className="h-4 w-4" />السابق</Button><Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>التالي<ChevronLeft className="h-4 w-4" /></Button></div></div>
             </Card>
+          </div>
 
-            {/* Products Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <Card key={i} className="animate-pulse">
-                    <CardContent className="p-4">
-                      <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                      <div className="h-3 bg-gray-200 rounded w-2/3 mb-4"></div>
-                      <div className="h-20 bg-gray-200 rounded"></div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                filteredProducts.map((product) => (
-                  <Card 
-                    key={product.id} 
-                    className={`cursor-pointer transition-all ${
-                      selectedProducts.has(product.id) 
-                        ? 'ring-2 ring-primary bg-primary/5' 
-                        : 'hover:shadow-md'
-                    }`}
-                    onClick={() => toggleProductSelection(product.id)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-sm line-clamp-2">{product.name}</h3>
-                          {product.companies?.name && (
-                            <Badge variant="secondary" className="text-xs mt-1">
-                              {product.companies.name}
-                            </Badge>
-                          )}
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={selectedProducts.has(product.id)}
-                          onChange={() => toggleProductSelection(product.id)}
-                          className="mr-2"
-                        />
-                      </div>
-
-                      {editingProduct === product.id ? (
-                        <div className="space-y-3">
-                          <div className="space-y-2">
-                            <label className="text-xs font-medium">باركود القطعة</label>
-                            <Input
-                              value={editingBarcode.barcode}
-                              onChange={(e) => setEditingBarcode(prev => ({ ...prev, barcode: e.target.value }))}
-                              placeholder="أدخل باركود القطعة"
-                              className="text-xs"
-                            />
-                          </div>
-                          {product.bulk_enabled && (
-                            <div className="space-y-2">
-                              <label className="text-xs font-medium">باركود الجملة</label>
-                              <Input
-                                value={editingBarcode.bulk_barcode}
-                                onChange={(e) => setEditingBarcode(prev => ({ ...prev, bulk_barcode: e.target.value }))}
-                                placeholder="أدخل باركود الجملة"
-                                className="text-xs"
-                              />
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => saveBarcode(product.id)}>
-                              <Save className="h-3 w-3 mr-1" />
-                              حفظ
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={cancelEditing}>
-                              <X className="h-3 w-3 mr-1" />
-                              إلغاء
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {/* Edit Button */}
-                          <div className="flex justify-end">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                startEditing(product);
-                              }}
-                            >
-                              <Edit className="h-3 w-3 mr-1" />
-                              تعديل
-                            </Button>
-                          </div>
-
-                          {/* Regular Barcode */}
-                          {product.barcode && (
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-primary">قطعة</span>
-                              </div>
-                              <SimpleBarcodeDisplay 
-                                value={product.barcode}
-                                productName={product.name}
-                                storeName={storeSettings?.name || 'المتجر'}
-                                className="h-12 w-full"
-                              />
-                              <p className="text-xs text-center font-mono">{product.barcode}</p>
-                            </div>
-                          )}
-
-                          {/* Bulk Barcode */}
-                          {product.bulk_enabled && product.bulk_barcode && (
-                            <div className="space-y-2 pt-2 border-t">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-green-600">جملة</span>
-                              </div>
-                              <SimpleBarcodeDisplay 
-                                value={product.bulk_barcode}
-                                productName={`${product.name} (جملة)`}
-                                storeName={storeSettings?.name || 'المتجر'}
-                                className="h-12 w-full"
-                              />
-                              <p className="text-xs text-center font-mono">{product.bulk_barcode}</p>
-                            </div>
-                          )}
-
-                          {/* No Barcode */}
-                          {!product.barcode && !product.bulk_barcode && (
-                            <div className="text-center py-4 text-muted-foreground text-sm">
-                              لا يوجد باركود لهذا المنتج
-                              <br />
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
-                                className="mt-2"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  startEditing(product);
-                                }}
-                              >
-                                إضافة باركود
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
-
-            {!loading && filteredProducts.length === 0 && (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">لا توجد منتجات تطابق البحث</p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-        </Tabs>
+          <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+            <Card className="border-slate-100 shadow-sm"><CardContent className="space-y-5 p-5"><div><div className="flex items-center gap-2"><Package className="h-5 w-5 text-emerald-700" /><h2 className="font-black">تصميم الملصق</h2></div><p className="mt-1 text-xs leading-5 text-slate-500">المقاس والنسخ محفوظان محليًا لهذا الجهاز والطابعة.</p></div>
+              <label className="block space-y-2"><span className="text-xs font-bold text-slate-600">المقاس</span><select className="h-11 w-full rounded-xl border bg-white px-3 text-sm font-bold" value={preferences.size} onChange={e => updatePreference("size", e.target.value as BarcodeLabelSize)}>{Object.entries(BARCODE_LABEL_SIZES).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></label>
+              <label className="block space-y-2"><span className="text-xs font-bold text-slate-600">عدد النسخ لكل منتج</span><Input type="number" min={1} max={20} value={preferences.copies} onChange={e => updatePreference("copies", Number(e.target.value))} /></label>
+              <div className="space-y-3 rounded-2xl border p-4">
+                <label className="flex cursor-pointer items-center justify-between gap-3"><span className="text-sm font-bold">اسم المنتج</span><Checkbox checked={preferences.showProductName} onCheckedChange={v => updatePreference("showProductName", Boolean(v))} /></label>
+                <label className="flex cursor-pointer items-center justify-between gap-3"><span className="text-sm font-bold">السعر</span><Checkbox checked={preferences.showPrice} onCheckedChange={v => updatePreference("showPrice", Boolean(v))} /></label>
+                <label className="flex cursor-pointer items-center justify-between gap-3"><span className="text-sm font-bold">اسم الماركت</span><Checkbox checked={preferences.showStoreName} onCheckedChange={v => updatePreference("showStoreName", Boolean(v))} /></label>
+                <label className="flex cursor-pointer items-center justify-between gap-3"><span className="text-sm font-bold">رقم الباركود</span><Checkbox checked={preferences.showBarcodeText} onCheckedChange={v => updatePreference("showBarcodeText", Boolean(v))} /></label>
+              </div>
+              <BarcodePreview row={previewRow} preferences={preferences} />
+              {previewRow?.barcode && <Button className="h-11 w-full bg-[#005931] hover:bg-[#004725]" onClick={() => printRows([previewRow])}><Printer className="ml-2 h-4 w-4" />طباعة المعاينة</Button>}
+              <Button variant="outline" className="w-full" onClick={() => navigate("/products")}><BarcodeIcon className="ml-2 h-4 w-4" />تعديل بيانات المنتجات والباركود</Button>
+            </CardContent></Card>
+          </aside>
+        </div>
       </div>
     </MainLayout>
   );
