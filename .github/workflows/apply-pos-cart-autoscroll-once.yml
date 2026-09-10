@@ -1,3 +1,4 @@
+# one-time runner trigger
 name: Apply POS cart visibility once
 
 on:
@@ -75,83 +76,33 @@ jobs:
           start = text.index('  const addNormal = (product: Product) => {')
           end = text.index('\n  const addBulk = (product: Product) => {', start)
           block = text[start:end]
-          block = replace_once(
-              block,
-              '      } : item));\n    } else {',
-              '      } : item));\n      revealCartItem(index);\n    } else {',
-              'normal existing reveal',
-          )
-          block = replace_once(
-              block,
-              '      setCartItems([...cartItems, { product, quantity: 1, price, discount, total: price, weight: null }]);',
-              '      setCartItems([...cartItems, { product, quantity: 1, price, discount, total: price, weight: null }]);\n      revealCartItem(cartItems.length);',
-              'normal new reveal',
-          )
+          block = replace_once(block, '      } : item));\n    } else {', '      } : item));\n      revealCartItem(index);\n    } else {', 'normal existing reveal')
+          block = replace_once(block, '      setCartItems([...cartItems, { product, quantity: 1, price, discount, total: price, weight: null }]);', '      setCartItems([...cartItems, { product, quantity: 1, price, discount, total: price, weight: null }]);\n      revealCartItem(cartItems.length);', 'normal new reveal')
           text = text[:start] + block + text[end:]
 
           start = text.index('  const addBulk = (product: Product) => {')
           end = text.index('\n  const addWeight = () => {', start)
           block = text[start:end]
-          block = replace_once(
-              block,
-              '      }));\n    } else {',
-              '      }));\n      revealCartItem(index);\n    } else {',
-              'bulk existing reveal',
-          )
-          block = replace_once(
-              block,
-              '      }]);\n    }\n    setSearch("");',
-              '      }]);\n      revealCartItem(cartItems.length);\n    }\n    setSearch("");',
-              'bulk new reveal',
-          )
+          block = replace_once(block, '      }));\n    } else {', '      }));\n      revealCartItem(index);\n    } else {', 'bulk existing reveal')
+          block = replace_once(block, '      }]);\n    }\n    setSearch("");', '      }]);\n      revealCartItem(cartItems.length);\n    }\n    setSearch("");', 'bulk new reveal')
           text = text[:start] + block + text[end:]
 
           start = text.index('  const addWeight = () => {')
           end = text.index('\n  const chooseProduct = (product: Product) => {', start)
           block = text[start:end]
-          block = replace_once(
-              block,
-              '    }]);\n    setWeightProduct(null);',
-              '    }]);\n    revealCartItem(cartItems.length);\n    setWeightProduct(null);',
-              'manual weight reveal',
-          )
+          block = replace_once(block, '    }]);\n    setWeightProduct(null);', '    }]);\n    revealCartItem(cartItems.length);\n    setWeightProduct(null);', 'manual weight reveal')
           text = text[:start] + block + text[end:]
 
           start = text.index('  const processBarcode = useCallback(async (raw: string) => {')
           end = text.index('\n  useEffect(() => {\n    if (checkoutOpen || weightProduct || scannerOpen) return;', start)
           block = text[start:end]
-          block = replace_once(
-              block,
-              '          }]);\n        }\n      } else {',
-              '          }]);\n          revealCartItem(cartItems.length);\n        }\n      } else {',
-              'scale barcode reveal',
-          )
-          block = replace_once(
-              block,
-              '  }, [cartItems, cartUsageForProduct, toast]);',
-              '  }, [cartItems, cartUsageForProduct, revealCartItem, toast]);',
-              'barcode deps',
-          )
+          block = replace_once(block, '          }]);\n        }\n      } else {', '          }]);\n          revealCartItem(cartItems.length);\n        }\n      } else {', 'scale barcode reveal')
+          block = replace_once(block, '  }, [cartItems, cartUsageForProduct, toast]);', '  }, [cartItems, cartUsageForProduct, revealCartItem, toast]);', 'barcode deps')
           text = text[:start] + block + text[end:]
 
-          text = replace_once(
-              text,
-              '<div className="max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">',
-              '<div ref={cartScrollRef} className="relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">',
-              'cart scroll container',
-          )
-          text = replace_once(
-              text,
-              '<div key={`${item.product.id}-${item.isBulk ? "bulk" : item.weight != null ? `w-${index}` : "unit"}-${index}`} className="rounded-2xl border bg-white p-3 shadow-sm">',
-              '<div data-pos-cart-item={index} key={`${item.product.id}-${item.isBulk ? "bulk" : item.weight != null ? `w-${index}` : "unit"}-${index}`} className="rounded-2xl border bg-white p-3 shadow-sm">',
-              'cart row marker',
-          )
-          text = replace_once(
-              text,
-              'lg:block lg:h-[calc(100dvh-14rem)] lg:min-h-[440px] lg:overflow-hidden',
-              'lg:block lg:h-[calc(100dvh-7rem)] lg:min-h-[440px] lg:overflow-hidden',
-              'desktop cart height',
-          )
+          text = replace_once(text, '<div className="max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">', '<div ref={cartScrollRef} className="relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:min-h-0 lg:flex-1">', 'cart scroll container')
+          text = replace_once(text, '<div key={`${item.product.id}-${item.isBulk ? "bulk" : item.weight != null ? `w-${index}` : "unit"}-${index}`} className="rounded-2xl border bg-white p-3 shadow-sm">', '<div data-pos-cart-item={index} key={`${item.product.id}-${item.isBulk ? "bulk" : item.weight != null ? `w-${index}` : "unit"}-${index}`} className="rounded-2xl border bg-white p-3 shadow-sm">', 'cart row marker')
+          text = replace_once(text, 'lg:block lg:h-[calc(100dvh-14rem)] lg:min-h-[440px] lg:overflow-hidden', 'lg:block lg:h-[calc(100dvh-7rem)] lg:min-h-[440px] lg:overflow-hidden', 'desktop cart height')
 
           path.write_text(text)
           PY
