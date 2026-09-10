@@ -1,0 +1,37 @@
+name: Apply flexible POS cart viewport once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/apply-pos-fill-cart-space-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fill remaining desktop cart space
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/pages/POSPro.tsx')
+          text = p.read_text()
+          old = 'relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:h-[15rem] lg:max-h-[15rem] lg:flex-none lg:space-y-1.5'
+          new = 'relative max-h-[46vh] space-y-2 overflow-y-auto overscroll-contain pr-1 lg:min-h-0 lg:max-h-none lg:flex-1 lg:space-y-1.5'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one cart viewport match, got {text.count(old)}')
+          p.write_text(text.replace(old, new, 1))
+          PY
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/pages/POSPro.tsx
+          git commit -m "fix(pos): fill cart viewport to checkout footer"
+          git pull --rebase origin main
+          git push origin HEAD:main
