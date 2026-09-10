@@ -222,6 +222,7 @@ export async function getPosInvoiceSale(saleId: string): Promise<Sale> {
     digital_wallet_amount: num(invoice.digital_wallet_amount),
     net_profit_after_payment_fee: num(invoice.net_profit_after_payment_fee),
     payment_reference: invoice.payment_reference,
+    payment_breakdown: Array.isArray(invoice.payment_breakdown) ? invoice.payment_breakdown : [],
     invoice_returns: Array.isArray(payload.returns) ? payload.returns : [],
   } as Sale;
 }
