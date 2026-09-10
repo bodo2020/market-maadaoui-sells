@@ -4,10 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { siteConfig } from "@/config/site";
 import type { Sale } from "@/types";
 import { useBranchStore } from "@/stores/branchStore";
 import { bluetoothPrinterService, type PrinterConnectionStatus } from "@/services/bluetoothPrinterService";
+import { buildCustomerInvoiceText } from "@/services/invoiceTextPrintService";
 
 function autoPrintKey(branchId: string) {
   return `pos:auto-print:${branchId}`;
@@ -19,16 +19,6 @@ function readAutoPrint(branchId: string) {
   } catch {
     return false;
   }
-}
-
-function invoiceStoreInfo() {
-  return {
-    name: siteConfig.name,
-    address: siteConfig.address || "",
-    phone: siteConfig.phone || "",
-    footer: siteConfig.invoice?.footer || "شكراً لزيارتكم!",
-    currency: siteConfig.currency || "ج.م",
-  };
 }
 
 export default function PosPrinterRuntime() {
@@ -53,7 +43,7 @@ export default function PosPrinterRuntime() {
   }, [currentBranchId]);
 
   const printSale = async (sale: Sale) => {
-    const text = bluetoothPrinterService.generateInvoiceText(sale, invoiceStoreInfo());
+    const text = buildCustomerInvoiceText(sale);
     const ok = await bluetoothPrinterService.printText(text);
     refreshStatus();
     return ok;
