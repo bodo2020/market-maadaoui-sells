@@ -20,6 +20,7 @@ export type ModernPOSPaymentSelection = {
   paymentMethodId?: string;
   paymentReference?: string | null;
   splits?: ModernPOSPaymentSplit[];
+  employeeId?: string | null;
 };
 
 type PendingModernSale = {
@@ -32,7 +33,7 @@ type PendingModernSale = {
 type RpcResult = { data: unknown; error: { message?: string; code?: string } | null };
 
 function key(userId: string, branchId: string, checkoutId: string) {
-  return `pos-sale-v3-request:${userId}:${branchId}:${checkoutId}`;
+  return `pos-sale-v4-request:${userId}:${branchId}:${checkoutId}`;
 }
 
 function friendly(message?: string) {
@@ -58,6 +59,12 @@ function friendly(message?: string) {
   if (value.includes("REQUEST_CONFLICT")) return "فيه محاولة بيع سابقة مختلفة لنفس السلة. راجع الفاتورة السابقة قبل إعادة المحاولة.";
   if (value.includes("BRANCH_ACCESS_DENIED")) return "ليس لديك صلاحية تنفيذ بيع على الفرع الحالي.";
   if (value.includes("INVALID_PAYMENT_SPLIT")) return "مجموع أجزاء الدفع لازم يساوي المبلغ المطلوب قبل الرسوم بالضبط.";
+  if (value.includes("EMPLOYEE_REQUIRED_FOR_CREDIT")) return "اسكن بطاقة الموظف قبل اختيار الآجل.";
+  if (value.includes("EMPLOYEE_CREDIT_MUST_BE_FULL_PAYMENT")) return "الآجل للموظف في النسخة الحالية لازم يغطي الفاتورة كاملة، ومينفعش يتخلط مع وسيلة دفع أخرى.";
+  if (value.includes("EMPLOYEE_NOT_FOUND")) return "بطاقة الموظف غير معروفة أو الحساب غير نشط.";
+  if (value.includes("EMPLOYEE_BRANCH_MISMATCH")) return "الموظف غير مرتبط بالفرع الحالي.";
+  if (value.includes("EMPLOYEE_CREDIT_INACTIVE") || value.includes("EMPLOYEE_WALLET_NOT_ACTIVE")) return "حساب الآجل للموظف موقوف حاليًا.";
+  if (value.includes("CREDIT_LIMIT_EXCEEDED")) return "المبلغ يتجاوز الآجل المتاح للموظف.";
   return null;
 }
 
@@ -98,6 +105,7 @@ export async function submitModernPosSale(
   const voucher = readPOSLoyaltyVoucher(branchId, checkoutId);
   if (voucher && !customer) throw new Error("امسح بطاقة العميل أولًا قبل استخدام كوبون الخصم.");
   if (voucher?.customer_id && customer?.customer_id && voucher.customer_id !== customer.customer_id) throw new Error("كوبون الخصم لا يخص العميل المرتبط بالفاتورة.");
+  if (selection.employeeId && customer) throw new Error("لا يمكن ربط الموظف والعميل بنفس الفاتورة. اختار هوية واحدة فقط.");
 
   const voucherAmount = voucher
     ? Math.max(0, Math.min(Number(voucher.remaining_value_egp || 0), Number(sale.total || 0)))
@@ -111,11 +119,7 @@ export async function submitModernPosSale(
   })).filter(part => part.base_amount > 0);
 
   if (!splits.length && baseDue > 0 && selection.paymentMethodId) {
-    splits = [{
-      payment_method_id: selection.paymentMethodId,
-      base_amount: baseDue,
-      reference: selection.paymentReference?.trim() || null,
-    }];
+    splits = [{ payment_method_id: selection.paymentMethodId, base_amount: baseDue, reference: selection.paymentReference?.trim() || null }];
   }
   if (baseDue > 0 && !splits.length) throw new Error("اختر وسيلة دفع واحدة على الأقل قبل تأكيد البيع.");
 
@@ -129,6 +133,7 @@ export async function submitModernPosSale(
     total: sale.total,
     profit: sale.profit ?? 0,
     payment_splits: splits,
+    employee_id: selection.employeeId || null,
     customer_id: customer?.customer_id || null,
     customer_barcode: customer?.barcode_token || null,
     customer_name: customer?.name || null,
@@ -151,15 +156,11 @@ export async function submitModernPosSale(
   }
 
   if (pending.fingerprint !== fingerprint) {
-    pending = {
-      requestId: pending.confirmed ? crypto.randomUUID() : (pending.requestId || crypto.randomUUID()),
-      fingerprint,
-      payload,
-    };
+    pending = { requestId: pending.confirmed ? crypto.randomUUID() : (pending.requestId || crypto.randomUUID()), fingerprint, payload };
   }
   try { localStorage.setItem(storageKey, JSON.stringify(pending)); } catch { /* noop */ }
 
-  const call = async () => await (supabase.rpc as any)("create_pos_sale_v3", {
+  const call = async () => await (supabase.rpc as any)("create_pos_sale_v4", {
     p_request_id: pending.requestId,
     p_branch_id: branchId,
     p_sale: pending.payload,
