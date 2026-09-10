@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Check, Gift, PackageCheck, RefreshCw, ScanLine, Ticket, X } from "lucide-react";
+import { AlertTriangle, Check, Gift, PackageCheck, Plus, RefreshCw, ScanLine, SplitSquareHorizontal, Ticket, Trash2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBranchStore } from "@/stores/branchStore";
 import { useToast } from "@/hooks/use-toast";
 import { preflightPosCart } from "@/services/supabase/posPreflightService";
-import { clearConfirmedModernPosSale, submitModernPosSale } from "@/services/supabase/posCheckoutV2Service";
+import { clearConfirmedModernPosSale, submitModernPosSale, type ModernPOSPaymentSplit } from "@/services/supabase/posCheckoutV2Service";
 import { calculatePOSPaymentFee, fetchPOSPaymentMethods, type POSPaymentMethod } from "@/services/supabase/posPaymentMethodService";
 import {
   isCustomerLoyaltyBarcode,
@@ -33,6 +33,7 @@ import {
 } from "@/components/POS/POSCustomerLoyaltyBridge";
 
 type ScanTarget = "customer" | "voucher" | null;
+type SplitDraft = { methodId: string; amount: string; reference: string };
 
 type Props = {
   open: boolean;
@@ -49,6 +50,18 @@ function money(value: number) {
   return `${Number(value || 0).toFixed(2)} ${siteConfig.currency}`;
 }
 
+function distributeEvenly(methodIds: string[], total: number): SplitDraft[] {
+  if (!methodIds.length || total <= 0) return [];
+  const cents = Math.round(total * 100);
+  const each = Math.floor(cents / methodIds.length);
+  let used = 0;
+  return methodIds.map((methodId, index) => {
+    const part = index === methodIds.length - 1 ? cents - used : each;
+    used += part;
+    return { methodId, amount: (part / 100).toFixed(2), reference: "" };
+  });
+}
+
 export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId, items, total, onRepriced, onSaleCommitted, onStartNewSale }: Props) {
   const { user } = useAuth();
   const { currentBranchId } = useBranchStore();
@@ -59,6 +72,8 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   const [methodId, setMethodId] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
   const [cashTendered, setCashTendered] = useState("");
+  const [mixedMode, setMixedMode] = useState(false);
+  const [splitDrafts, setSplitDrafts] = useState<SplitDraft[]>([]);
   const [scanTarget, setScanTarget] = useState<ScanTarget>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -73,9 +88,25 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   const voucherAmount = voucher ? Math.max(0, Math.min(Number(voucher.remaining_value_egp || 0), Number(total || 0))) : 0;
   const baseDue = Math.max(0, Number((Number(total || 0) - voucherAmount).toFixed(2)));
   const paymentPreview = useMemo(() => calculatePOSPaymentFee(selectedMethod, baseDue), [selectedMethod, baseDue]);
-  const amountToCollect = paymentPreview.amountCharged;
-  const isCash = selectedMethod?.method_type === "cash";
-  const change = isCash ? Math.max(0, Number(cashTendered || 0) - amountToCollect) : 0;
+
+  const splitRows = useMemo(() => splitDrafts.map(draft => {
+    const method = activeMethods.find(row => row.id === draft.methodId) || null;
+    const baseAmount = Math.max(0, Number(draft.amount || 0));
+    const preview = calculatePOSPaymentFee(method, baseAmount);
+    return { ...draft, method, baseAmount, preview };
+  }), [splitDrafts, activeMethods]);
+
+  const splitBaseTotal = useMemo(() => Number(splitRows.reduce((sum, row) => sum + row.baseAmount, 0).toFixed(2)), [splitRows]);
+  const splitRemaining = Number((baseDue - splitBaseTotal).toFixed(2));
+  const splitCustomerFee = useMemo(() => Number(splitRows.reduce((sum, row) => sum + row.preview.customerFee, 0).toFixed(2)), [splitRows]);
+  const splitMerchantFee = useMemo(() => Number(splitRows.reduce((sum, row) => sum + row.preview.merchantFee, 0).toFixed(2)), [splitRows]);
+  const splitAmountToCollect = useMemo(() => Number(splitRows.reduce((sum, row) => sum + row.preview.amountCharged, 0).toFixed(2)), [splitRows]);
+  const splitCashDue = useMemo(() => Number(splitRows.filter(row => row.method?.method_type === "cash").reduce((sum, row) => sum + row.preview.amountCharged, 0).toFixed(2)), [splitRows]);
+
+  const amountToCollect = mixedMode ? splitAmountToCollect : paymentPreview.amountCharged;
+  const isCash = !mixedMode && selectedMethod?.method_type === "cash";
+  const activeCashDue = mixedMode ? splitCashDue : (isCash ? amountToCollect : 0);
+  const change = activeCashDue > 0 ? Math.max(0, Number(cashTendered || 0) - activeCashDue) : 0;
   const expectedPoints = customer ? Math.floor(baseDue) : 0;
 
   const syncContexts = useCallback(() => {
@@ -130,6 +161,8 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
     setSale(null);
     setError(null);
     setPaymentReference("");
+    setMixedMode(false);
+    setSplitDrafts([]);
     setScanTarget(null);
     syncContexts();
     void loadMethods();
@@ -142,9 +175,14 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   }, [open]);
 
   useEffect(() => {
-    if (!open || !selectedMethod) return;
-    if (selectedMethod.method_type === "cash") setCashTendered(paymentPreview.amountCharged.toFixed(2));
-  }, [open, selectedMethod?.id, paymentPreview.amountCharged]);
+    if (!open) return;
+    if (!mixedMode && selectedMethod?.method_type === "cash") setCashTendered(paymentPreview.amountCharged.toFixed(2));
+  }, [open, mixedMode, selectedMethod?.id, selectedMethod?.method_type, paymentPreview.amountCharged]);
+
+  useEffect(() => {
+    if (!mixedMode || splitCashDue <= 0) return;
+    setCashTendered(current => !current || Number(current) < splitCashDue ? splitCashDue.toFixed(2) : current);
+  }, [mixedMode, splitCashDue]);
 
   const handleBarcode = useCallback(async (raw: string) => {
     const barcode = raw.trim();
@@ -214,16 +252,70 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
     };
   }, [open, scanTarget, handleBarcode]);
 
-  const paymentValid = useMemo(() => {
+  const enableMixedMode = () => {
+    if (activeMethods.length < 2 || baseDue <= 0) return;
+    const firstId = selectedMethod?.id || activeMethods[0].id;
+    const second = activeMethods.find(row => row.id !== firstId);
+    if (!second) return;
+    setSplitDrafts(distributeEvenly([firstId, second.id], baseDue));
+    setCashTendered("");
+    setMixedMode(true);
+    setError(null);
+  };
+
+  const disableMixedMode = () => {
+    setMixedMode(false);
+    setSplitDrafts([]);
+    setCashTendered(selectedMethod?.method_type === "cash" ? paymentPreview.amountCharged.toFixed(2) : "");
+    setError(null);
+  };
+
+  const addSplitMethod = (methodIdToAdd: string) => {
+    if (splitDrafts.some(row => row.methodId === methodIdToAdd)) return;
+    const ids = [...splitDrafts.map(row => row.methodId), methodIdToAdd];
+    setSplitDrafts(distributeEvenly(ids, baseDue));
+  };
+
+  const removeSplitMethod = (methodIdToRemove: string) => {
+    const ids = splitDrafts.filter(row => row.methodId !== methodIdToRemove).map(row => row.methodId);
+    if (ids.length < 2) {
+      disableMixedMode();
+      if (ids[0]) setMethodId(ids[0]);
+      return;
+    }
+    setSplitDrafts(distributeEvenly(ids, baseDue));
+  };
+
+  const updateSplit = (methodIdToUpdate: string, patch: Partial<SplitDraft>) => {
+    setSplitDrafts(current => current.map(row => row.methodId === methodIdToUpdate ? { ...row, ...patch } : row));
+  };
+
+  const fillSplitRemainder = (methodIdToUpdate: string) => {
+    const other = splitDrafts.filter(row => row.methodId !== methodIdToUpdate).reduce((sum, row) => sum + Math.max(0, Number(row.amount || 0)), 0);
+    updateSplit(methodIdToUpdate, { amount: Math.max(0, Number((baseDue - other).toFixed(2))).toFixed(2) });
+  };
+
+  const mixedPaymentValid = useMemo(() => {
+    if (baseDue <= 0) return true;
+    if (!mixedMode || splitRows.length < 2 || Math.abs(splitRemaining) > 0.009) return false;
+    if (splitRows.some(row => !row.method || row.baseAmount <= 0 || (row.method.require_reference && !row.reference.trim()))) return false;
+    if (splitCashDue > 0 && Number(cashTendered || 0) < splitCashDue) return false;
+    return true;
+  }, [baseDue, mixedMode, splitRows, splitRemaining, splitCashDue, cashTendered]);
+
+  const singlePaymentValid = useMemo(() => {
+    if (baseDue <= 0) return true;
     if (!selectedMethod) return false;
     if (selectedMethod.require_reference && !paymentReference.trim()) return false;
-    if (amountToCollect <= 0) return true;
-    if (selectedMethod.method_type === "cash") return Number(cashTendered || 0) >= amountToCollect;
+    if (selectedMethod.method_type === "cash") return Number(cashTendered || 0) >= paymentPreview.amountCharged;
     return true;
-  }, [selectedMethod, paymentReference, cashTendered, amountToCollect]);
+  }, [baseDue, selectedMethod, paymentReference, cashTendered, paymentPreview.amountCharged]);
+
+  const paymentValid = mixedMode ? mixedPaymentValid : singlePaymentValid;
 
   const completeSale = async () => {
-    if (!currentBranchId || !user?.id || !selectedMethod || !paymentValid || processing || !items.length) return;
+    if (!currentBranchId || !user?.id || !paymentValid || processing || !items.length) return;
+    if (baseDue > 0 && !mixedMode && !selectedMethod) return;
     setProcessing(true);
     setError(null);
     try {
@@ -244,7 +336,7 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
         discount: checked.discount,
         total: checked.total,
         profit,
-        payment_method: selectedMethod.method_type === "cash" ? "cash" : "card",
+        payment_method: mixedMode ? "mixed" : selectedMethod?.method_type === "cash" ? "cash" : "card",
         cash_amount: 0,
         card_amount: 0,
         customer_name: customer?.name || undefined,
@@ -253,8 +345,13 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
         cashier_name: user.name,
         branch_id: currentBranchId,
       } as Omit<Sale, "id" | "created_at" | "updated_at">;
-      const confirmed = await submitModernPosSale(payload, checkoutId, {
-        paymentMethodId: selectedMethod.id,
+
+      const splits: ModernPOSPaymentSplit[] | undefined = mixedMode
+        ? splitRows.map(row => ({ paymentMethodId: row.methodId, baseAmount: row.baseAmount, reference: row.reference.trim() || null }))
+        : undefined;
+
+      const confirmed = await submitModernPosSale(payload, checkoutId, mixedMode ? { splits } : {
+        paymentMethodId: selectedMethod?.id,
         paymentReference: paymentReference.trim() || null,
       });
       setSale(confirmed as Sale);
@@ -276,13 +373,15 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
     setCustomer(null);
     setVoucher(null);
     setPaymentReference("");
+    setMixedMode(false);
+    setSplitDrafts([]);
     onStartNewSale();
   };
 
   return (
     <>
       <Dialog open={open} onOpenChange={next => { if (!processing) onOpenChange(next); }}>
-        <DialogContent dir="rtl" className="max-h-[94vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent dir="rtl" className="max-h-[94vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>{sale ? "تمت عملية البيع" : "إتمام البيع"}</DialogTitle>
           </DialogHeader>
@@ -294,7 +393,10 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
                 <div className="text-xl font-black">تم تسجيل الفاتورة</div>
                 <div className="mt-1 text-sm">{sale.invoice_number}</div>
                 <div className="mt-3 text-2xl font-black">{money(Number((sale as any).amount_charged ?? sale.amount_due ?? sale.total))}</div>
-                <div className="mt-1 text-xs text-emerald-800">{(sale as any).payment_method_name || selectedMethod?.name || "وسيلة الدفع"}</div>
+                <div className="mt-1 text-xs text-emerald-800">{(sale as any).payment_method_name || (mixedMode ? "دفع مختلط" : selectedMethod?.name) || "وسيلة الدفع"}</div>
+                {Array.isArray((sale as any).payment_breakdown) && (sale as any).payment_breakdown.length > 1 && (
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">{(sale as any).payment_breakdown.map((part: any, index: number) => <Badge key={`${part.payment_method_id}-${index}`} variant="outline" className="bg-white">{part.name} · {money(Number(part.charged_amount || 0))}</Badge>)}</div>
+                )}
                 {Number(sale.loyalty_points_earned || 0) > 0 && <div className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-sm font-bold">+ {Number(sale.loyalty_points_earned || 0).toLocaleString("ar-EG")} نقطة للعميل</div>}
               </div>
               <Button variant="outline" className="h-12 w-full" onClick={() => setInvoiceOpen(true)}><PackageCheck className="ml-2 h-4 w-4" />عرض وطباعة الفاتورة</Button>
@@ -336,25 +438,61 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
               </section>
 
               <section className="rounded-3xl border p-4">
-                <div className="mb-3"><div className="text-xs font-bold text-[#005931]">3 · وسيلة الدفع</div><div className="font-black">اختر طريقة التحصيل</div></div>
-                {loadingMethods ? <div className="flex justify-center py-5"><RefreshCw className="h-5 w-5 animate-spin text-[#005931]" /></div> : activeMethods.length === 0 ? <Alert variant="destructive"><AlertDescription>لا توجد وسيلة دفع مفعلة للفرع. فعّل واحدة من صفحة وسائل الدفع.</AlertDescription></Alert> : (
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{activeMethods.map(method => { const active = method.id === methodId; return <button key={method.id} type="button" onClick={() => { setMethodId(method.id); setPaymentReference(""); }} className={`flex min-h-[104px] flex-col items-center justify-center rounded-2xl border p-3 text-center transition ${active ? "border-[#005931] bg-emerald-50 text-[#005931] ring-1 ring-[#005931]/20" : "bg-white hover:bg-slate-50"}`}><PaymentMethodBrand method={method} compact className="border-0 shadow-none" /><div className="mt-2 text-sm font-black">{method.name}</div>{method.fee_type !== "none" && method.fee_value > 0 && <div className="mt-1 text-[10px]">رسوم {method.fee_type === "percent" ? `${method.fee_value}%` : money(method.fee_value)}</div>}</button>; })}</div>
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div><div className="text-xs font-bold text-[#005931]">3 · وسيلة الدفع</div><div className="font-black">{mixedMode ? "قسّم الفاتورة على أكثر من وسيلة" : "اختر طريقة التحصيل"}</div></div>
+                  {baseDue > 0 && activeMethods.length >= 2 && (
+                    <div className="flex rounded-xl border bg-slate-50 p-1">
+                      <Button type="button" size="sm" variant={!mixedMode ? "default" : "ghost"} className={!mixedMode ? "bg-[#005931]" : ""} onClick={disableMixedMode}>وسيلة واحدة</Button>
+                      <Button type="button" size="sm" variant={mixedMode ? "default" : "ghost"} className={mixedMode ? "bg-[#005931]" : ""} onClick={enableMixedMode}><SplitSquareHorizontal className="ml-1.5 h-4 w-4" />دفع مختلط</Button>
+                    </div>
+                  )}
+                </div>
+
+                {loadingMethods ? <div className="flex justify-center py-5"><RefreshCw className="h-5 w-5 animate-spin text-[#005931]" /></div> : activeMethods.length === 0 ? <Alert variant="destructive"><AlertDescription>لا توجد وسيلة دفع مفعلة للفرع. فعّل واحدة من صفحة وسائل الدفع.</AlertDescription></Alert> : mixedMode ? (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">{activeMethods.filter(method => !splitDrafts.some(row => row.methodId === method.id)).map(method => <Button key={method.id} type="button" variant="outline" size="sm" onClick={() => addSplitMethod(method.id)}><Plus className="ml-1 h-3.5 w-3.5" />{method.name}</Button>)}</div>
+
+                    <div className="space-y-3">{splitRows.map(row => row.method && (
+                      <div key={row.methodId} className="rounded-2xl border bg-white p-3 sm:p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="min-w-0 flex-1"><PaymentMethodBrand method={row.method} compact className="border-0 p-0 shadow-none" /><div className="mt-1 text-sm font-black">{row.method.name}</div></div>
+                          <Button type="button" variant="ghost" size="icon" className="text-red-600" onClick={() => removeSplitMethod(row.methodId)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+                          <div><Label>جزء الفاتورة على الوسيلة</Label><Input inputMode="decimal" className="mt-1 h-12 text-lg font-black" value={row.amount} onChange={e => updateSplit(row.methodId, { amount: e.target.value })} /></div>
+                          <div className="flex items-end"><Button type="button" variant="outline" className="h-12" onClick={() => fillSplitRemainder(row.methodId)}>ضع المتبقي</Button></div>
+                        </div>
+                        {row.method.require_reference && <div className="mt-3"><Label>مرجع {row.method.name}</Label><Input className="mt-1" value={row.reference} onChange={e => updateSplit(row.methodId, { reference: e.target.value })} placeholder="رقم العملية / الإيصال" dir="ltr" /></div>}
+                        {row.preview.fee > 0 && <div className="mt-3 flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-950"><span>عمولة على الجزء {money(row.preview.fee)} · {row.method.fee_bearer === "customer" ? "على العميل" : "على المنشأة"}</span><strong>تحصيل {money(row.preview.amountCharged)}</strong></div>}
+                      </div>
+                    ))}</div>
+
+                    <div className={`rounded-2xl p-4 ${Math.abs(splitRemaining) <= 0.009 ? "bg-emerald-50 text-emerald-950" : splitRemaining > 0 ? "bg-amber-50 text-amber-950" : "bg-red-50 text-red-900"}`}>
+                      <div className="grid grid-cols-3 gap-3 text-center"><div><div className="text-[10px] opacity-70">أصل المطلوب</div><div className="font-black">{money(baseDue)}</div></div><div><div className="text-[10px] opacity-70">تم توزيعه</div><div className="font-black">{money(splitBaseTotal)}</div></div><div><div className="text-[10px] opacity-70">المتبقي</div><div className="font-black">{money(splitRemaining)}</div></div></div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{activeMethods.map(method => { const active = method.id === methodId; return <button key={method.id} type="button" onClick={() => { setMethodId(method.id); setPaymentReference(""); }} className={`flex min-h-[104px] flex-col items-center justify-center rounded-2xl border p-3 text-center transition ${active ? "border-[#005931] bg-emerald-50 text-[#005931] ring-1 ring-[#005931]/20" : "bg-white hover:bg-slate-50"}`}><PaymentMethodBrand method={method} compact className="border-0 shadow-none" /><div className="mt-2 text-sm font-black">{method.name}</div>{method.fee_type !== "none" && method.fee_value > 0 && <div className="mt-1 text-[10px]">رسوم {method.fee_type === "percent" ? `${method.fee_value}%` : money(method.fee_value)}</div>}</button>; })}</div>
+                    {selectedMethod?.require_reference && <div className="mt-3 space-y-2"><Label>الرقم المرجعي للعملية</Label><Input value={paymentReference} onChange={e => setPaymentReference(e.target.value)} placeholder="رقم العملية / الإيصال" dir="ltr" /></div>}
+                    {selectedMethod && paymentPreview.fee > 0 && <div className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-950"><div className="flex justify-between"><span>رسوم {selectedMethod.name}</span><strong>{money(paymentPreview.fee)}</strong></div><div className="mt-1 text-xs">{selectedMethod.fee_bearer === "customer" ? "تُضاف على المبلغ المطلوب من العميل." : "تتحملها المنشأة وتُخصم من صافي الربح."}</div></div>}
+                  </>
                 )}
-                {selectedMethod?.require_reference && <div className="mt-3 space-y-2"><Label>الرقم المرجعي للعملية</Label><Input value={paymentReference} onChange={e => setPaymentReference(e.target.value)} placeholder="رقم العملية / الإيصال" dir="ltr" /></div>}
-                {selectedMethod && paymentPreview.fee > 0 && <div className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-950"><div className="flex justify-between"><span>رسوم {selectedMethod.name}</span><strong>{money(paymentPreview.fee)}</strong></div><div className="mt-1 text-xs">{selectedMethod.fee_bearer === "customer" ? "تُضاف على المبلغ المطلوب من العميل." : "تتحملها المنشأة وتُخصم من صافي الربح."}</div></div>}
-                {selectedMethod?.method_type === "cash" && amountToCollect > 0 && <div className="mt-3 space-y-2"><Label>المبلغ المستلم</Label><Input inputMode="decimal" value={cashTendered} onChange={e => setCashTendered(e.target.value)} className="h-12 text-xl font-black" /><div className="rounded-2xl bg-emerald-50 p-3 text-center"><div className="text-xs text-emerald-800">الباقي للعميل</div><div className="text-2xl font-black text-[#005931]">{money(change)}</div></div></div>}
+
+                {activeCashDue > 0 && <div className="mt-4 space-y-2 rounded-2xl border bg-slate-50 p-3"><Label>{mixedMode ? `المبلغ النقدي المستلم · المطلوب كاش ${money(activeCashDue)}` : "المبلغ المستلم"}</Label><Input inputMode="decimal" value={cashTendered} onChange={e => setCashTendered(e.target.value)} className="h-12 bg-white text-xl font-black" /><div className="rounded-xl bg-emerald-50 p-3 text-center"><div className="text-xs text-emerald-800">الباقي للعميل</div><div className="text-2xl font-black text-[#005931]">{money(change)}</div></div></div>}
               </section>
 
               <div className="rounded-3xl bg-slate-50 p-4">
                 <div className="flex items-center justify-between text-sm"><span>إجمالي المنتجات</span><strong>{money(total)}</strong></div>
                 {voucherAmount > 0 && <div className="mt-2 flex items-center justify-between text-sm text-emerald-700"><span>كوبون خصم</span><strong>- {money(voucherAmount)}</strong></div>}
-                {paymentPreview.customerFee > 0 && <div className="mt-2 flex items-center justify-between text-sm text-amber-700"><span>رسوم وسيلة الدفع</span><strong>+ {money(paymentPreview.customerFee)}</strong></div>}
+                {(mixedMode ? splitCustomerFee : paymentPreview.customerFee) > 0 && <div className="mt-2 flex items-center justify-between text-sm text-amber-700"><span>رسوم وسائل الدفع على العميل</span><strong>+ {money(mixedMode ? splitCustomerFee : paymentPreview.customerFee)}</strong></div>}
+                {mixedMode && splitMerchantFee > 0 && <div className="mt-2 text-[11px] text-muted-foreground">عمولات تتحملها المنشأة: {money(splitMerchantFee)} — لا تُضاف على العميل.</div>}
                 <div className="mt-3 flex items-center justify-between border-t pt-3"><span className="font-black">المطلوب تحصيله</span><strong className="text-2xl text-[#005931]">{money(amountToCollect)}</strong></div>
-                <div className="mt-2 flex flex-wrap gap-2"><Badge variant={customer ? "default" : "secondary"} className={customer ? "bg-[#005931]" : ""}>{customer ? `عميل مرتبط · +${expectedPoints} نقطة متوقعة` : "بدون عميل · 0 نقطة"}</Badge>{voucher && <Badge variant="outline">كوبون خصم مطبق</Badge>}</div>
+                <div className="mt-2 flex flex-wrap gap-2"><Badge variant={customer ? "default" : "secondary"} className={customer ? "bg-[#005931]" : ""}>{customer ? `عميل مرتبط · +${expectedPoints} نقطة متوقعة` : "بدون عميل · 0 نقطة"}</Badge>{voucher && <Badge variant="outline">كوبون خصم مطبق</Badge>}{mixedMode && <Badge variant="outline">{splitRows.length} وسائل دفع</Badge>}</div>
               </div>
 
-              <Button className="h-14 w-full bg-[#005931] text-base hover:bg-[#004a29]" disabled={!paymentValid || processing || !activeMethods.length} onClick={() => void completeSale()}>{processing ? <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> : <Check className="ml-2 h-5 w-5" />}{processing ? "جاري تسجيل البيع..." : `تأكيد البيع · ${money(amountToCollect)}`}</Button>
-              <div className="text-center text-[11px] text-muted-foreground">العميل اختياري · كوبون الخصم لا يعمل بدون عميل · الرسوم يعيد السيرفر حسابها وقت الحفظ</div>
+              <Button className="h-14 w-full bg-[#005931] text-base hover:bg-[#004a29]" disabled={!paymentValid || processing || (baseDue > 0 && !activeMethods.length)} onClick={() => void completeSale()}>{processing ? <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> : <Check className="ml-2 h-5 w-5" />}{processing ? "جاري تسجيل البيع..." : `تأكيد البيع · ${money(amountToCollect)}`}</Button>
+              <div className="text-center text-[11px] text-muted-foreground">في الدفع المختلط يتم توزيع أصل الفاتورة أولًا، ثم تحسب عمولة كل وسيلة على الجزء الخاص بها فقط.</div>
             </div>
           )}
         </DialogContent>
