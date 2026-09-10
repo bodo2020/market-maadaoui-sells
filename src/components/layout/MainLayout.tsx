@@ -2,6 +2,7 @@ import BrandLoader from '@/components/ui/BrandLoader';
 import { ReactNode, useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
 import NavbarV2 from "./NavbarV2";
+import ITDeviceRuntime from "@/components/it/ITDeviceRuntime";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { useNotificationStore } from "@/stores/notificationStore";
@@ -48,6 +49,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <TooltipProvider>
       <div className="fixed inset-0 flex min-h-screen flex-col overflow-hidden bg-slate-50 md:flex-row">
+        <ITDeviceRuntime />
         <Sidebar
           isMobile={isMobile}
           showMobileSidebar={showMobileSidebar}
