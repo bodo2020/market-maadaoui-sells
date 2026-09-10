@@ -31,6 +31,7 @@ import CustomerMyTasksDock from "@/components/customers/CustomerMyTasksDock";
 import HrTaskExecutionDock from "@/components/hr/HrTaskExecutionDock";
 import FinanceTreasuryCenterV2 from "@/components/finance/FinanceTreasuryCenterV2";
 import TreasuryDisbursementDock from "@/components/finance/TreasuryDisbursementDock";
+import FinanceTransferTaskDockV2 from "@/components/finance/FinanceTransferTaskDockV2";
 import AttendanceApprovedLeaveBanner from "@/components/hr/AttendanceApprovedLeaveBanner";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import Categories from "@/pages/Categories";
@@ -46,6 +47,7 @@ import Purchases from "@/pages/Purchases";
 import Invoices from "@/pages/Invoices";
 import Finance from "@/pages/Finance";
 import FinanceControlCenterV2 from "@/pages/FinanceControlCenterV2";
+import FinanceTransfersV2 from "@/pages/FinanceTransfersV2";
 import PaymentMethods from "@/pages/PaymentMethods";
 import ExpenseManagement from "@/pages/ExpenseManagement";
 import Settings from "@/pages/Settings";
@@ -94,7 +96,7 @@ const CashierPOS = () => (
 );
 const CustomersWorkspace = () => (<><CustomersAdvanced /><CustomerMyTasksDock /><CustomerTeamWorkloadDock /><CustomerOperationsCenterDock /><CustomerOpportunityDock /></>);
 const Customer360Workspace = () => (<><Customer360Profile /><CustomerMyTasksDock /><CustomerFollowupPerformanceDock /><CustomerInsightsDock /><CustomerManagementDock /></>);
-const OperationsTasksWorkspace = () => (<><OperationsTasksPage /><HrTaskExecutionDock /><TreasuryDisbursementDock /></>);
+const OperationsTasksWorkspace = () => (<><OperationsTasksPage /><FinanceTransferTaskDockV2 /><HrTaskExecutionDock /><TreasuryDisbursementDock /></>);
 const AttendanceWorkspace = () => (<><AttendancePage /><AttendanceApprovedLeaveBanner /></>);
 const FinanceWorkspace = () => (<><Finance /><FinanceTreasuryCenterV2 /></>);
 const ReportsRedirect = () => <Navigate to="/reports" replace />;
@@ -159,6 +161,7 @@ export default function AppRoutes() {
       <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
       <Route path="/finance" element={<ProtectedRoute><FinanceWorkspace /></ProtectedRoute>} />
       <Route path="/finance/control-center" element={<ProtectedRoute><FinanceControlCenterV2 /></ProtectedRoute>} />
+      <Route path="/finance/transfers" element={<ProtectedRoute><FinanceTransfersV2 /></ProtectedRoute>} />
       <Route path="/payment-methods" element={<ProtectedRoute><PaymentMethods /></ProtectedRoute>} />
       <Route path="/expenses" element={<ProtectedRoute><ExpenseManagement /></ProtectedRoute>} />
       <Route path="/expenses-salaries" element={<ProtectedRoute><ExpensesAndSalaries /></ProtectedRoute>} />
