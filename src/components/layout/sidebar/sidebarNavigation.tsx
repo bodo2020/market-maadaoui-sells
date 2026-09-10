@@ -52,6 +52,7 @@ export const financeNavigation: NavigationGroup = {
   title: "الماليات",
   items: [
     { label: "مركز الماليات", href: "/finance/control-center", icon: Vault },
+    { label: "تحويلات الخزن والعهد", href: "/finance/transfers", icon: ArrowLeftRight },
     { label: "التقارير المالية والخزن", href: "/finance", icon: DollarSign },
     { label: "تتبع النقدية", href: "/cash-tracking", icon: Wallet, adminOnly: true },
     { label: "وسائل الدفع", href: "/payment-methods", icon: WalletCards },
