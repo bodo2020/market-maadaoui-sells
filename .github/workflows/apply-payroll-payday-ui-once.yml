@@ -1,0 +1,40 @@
+name: Apply payroll payday UI once
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-payroll-payday-ui-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch payroll page
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/pages/HrPayrollPage.tsx')
+          text = path.read_text()
+          import_old = 'import MainLayout from "@/components/layout/MainLayout";'
+          import_new = 'import MainLayout from "@/components/layout/MainLayout";\nimport PayrollPayDayCard from "@/components/hr/PayrollPayDayCard";'
+          if import_old not in text:
+              raise SystemExit('MainLayout import not found')
+          text = text.replace(import_old, import_new, 1)
+          anchor = '        {query.isError ?'
+          insertion = '        {currentBranchId && data && <PayrollPayDayCard branchId={currentBranchId} value={data.policy?.pay_day_of_month} onSaved={refresh} />}\n\n'
+          if anchor not in text:
+              raise SystemExit('query error anchor not found')
+          text = text.replace(anchor, insertion + anchor, 1)
+          path.write_text(text)
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name "Elmadawy Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/pages/HrPayrollPage.tsx
+          git commit -m "feat(hr): expose payroll pay day setting" || exit 0
+          git push
