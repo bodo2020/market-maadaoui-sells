@@ -43,6 +43,7 @@ export const customersNavigation: NavigationGroup = {
     { label: "سلات العملاء", href: "/customer-carts", icon: ShoppingCart },
     { label: "أماكن التوصيل العامة", href: "/delivery-locations", icon: MapPin },
     { label: "أماكن التوصيل للفروع", href: "/branch-delivery-zones", icon: Building2 },
+    { label: "إدارة الصفحة الرئيسية", href: "/home-builder", icon: LayoutDashboard, adminOnly: true },
     { label: "الإعلانات", href: "/banners", icon: Image },
   ],
 };
