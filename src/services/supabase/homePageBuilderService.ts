@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type HomeSectionType = 'hero_banners' | 'categories' | 'featured_products' | 'product_collection';
+export type HomeSectionType = 'hero_banners' | 'categories' | 'featured_products' | 'product_collection' | 'smart_recommendations';
+export type HomeAudienceSegment = 'all' | 'guest' | 'new' | 'returning' | 'active' | 'loyal' | 'inactive';
 
 export interface HomePageRecord {
   id: string;
@@ -14,6 +15,7 @@ export interface HomePageRecord {
 
 export interface HomeSectionRecord {
   id: string;
+  section_key: string;
   home_page_id: string;
   section_type: HomeSectionType;
   title?: string | null;
@@ -25,6 +27,7 @@ export interface HomeSectionRecord {
   starts_at?: string | null;
   ends_at?: string | null;
   branch_ids: string[];
+  audience_segments: HomeAudienceSegment[];
 }
 
 export interface HomeBuilderCollection { id: string; title: string; active: boolean | null; }
@@ -36,6 +39,13 @@ export interface HomeBuilderState {
   sections: HomeSectionRecord[];
   collections: HomeBuilderCollection[];
   branches: HomeBuilderBranch[];
+}
+
+export interface HomeSectionAnalytics {
+  section_key: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
 }
 
 const db = supabase as any;
@@ -64,10 +74,24 @@ export const fetchHomeBuilderState = async (): Promise<HomeBuilderState> => {
   return {
     draft: draftResult.data,
     published: publishedResult.data || null,
-    sections: sectionsResult.data || [],
+    sections: (sectionsResult.data || []).map((section: HomeSectionRecord) => ({
+      ...section,
+      audience_segments: section.audience_segments?.length ? section.audience_segments : ['all'],
+    })),
     collections: collectionsResult.data || [],
     branches: branchesResult.data || [],
   };
+};
+
+export const fetchHomeAnalytics = async (days = 30): Promise<HomeSectionAnalytics[]> => {
+  const { data, error } = await db.rpc('get_home_section_analytics', { p_days: Math.max(1, Math.min(days, 365)) });
+  if (error) throw error;
+  return (data || []).map((row: any) => ({
+    section_key: String(row.section_key),
+    impressions: Number(row.impressions || 0),
+    clicks: Number(row.clicks || 0),
+    ctr: Number(row.ctr || 0),
+  }));
 };
 
 export const createHomeSection = async (pageId: string, values: Partial<HomeSectionRecord>) => {
@@ -83,13 +107,19 @@ export const createHomeSection = async (pageId: string, values: Partial<HomeSect
     starts_at: values.starts_at || null,
     ends_at: values.ends_at || null,
     branch_ids: values.branch_ids || [],
+    audience_segments: values.audience_segments?.length ? values.audience_segments : ['all'],
   }).select('*').single();
   if (error) throw error;
   return data as HomeSectionRecord;
 };
 
 export const updateHomeSection = async (id: string, patch: Partial<HomeSectionRecord>) => {
-  const { data, error } = await db.from('home_sections').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id).select('*').single();
+  const normalizedPatch = {
+    ...patch,
+    ...(patch.audience_segments ? { audience_segments: patch.audience_segments.length ? patch.audience_segments : ['all'] } : {}),
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await db.from('home_sections').update(normalizedPatch).eq('id', id).select('*').single();
   if (error) throw error;
   return data as HomeSectionRecord;
 };
