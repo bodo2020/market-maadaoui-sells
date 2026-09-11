@@ -76,6 +76,7 @@ import OrganizationStructurePage from "@/pages/OrganizationStructurePage";
 import CashTracking from "@/pages/CashTracking";
 import Banners from "@/pages/Banners";
 import AddBanner from "@/pages/AddBanner";
+import HomePageBuilder from "@/pages/HomePageBuilder";
 import Barcode from "@/pages/Barcode";
 import DeliveryLocationsPage from "@/pages/DeliveryLocationsPage";
 import DeliveryLocations from "@/pages/DeliveryLocations";
@@ -185,6 +186,7 @@ export default function AppRoutes() {
       <Route path="/employees/:employeeId/devices" element={<ProtectedRoute><EmployeeDevicesPage /></ProtectedRoute>} />
       <Route path="/organization" element={<ProtectedRoute><OrganizationStructurePage /></ProtectedRoute>} />
       <Route path="/cash-tracking" element={<ProtectedRoute><CashTracking /></ProtectedRoute>} />
+      <Route path="/home-builder" element={<ProtectedRoute><HomePageBuilder /></ProtectedRoute>} />
       <Route path="/banners" element={<ProtectedRoute><Banners /></ProtectedRoute>} />
       <Route path="/banners/add" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
       <Route path="/banners/edit" element={<ProtectedRoute><AddBanner /></ProtectedRoute>} />
