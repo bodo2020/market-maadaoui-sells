@@ -1,8 +1,5 @@
-import OrderNotifications from '@/components/orders/OrderNotifications';
 import ApprovalCenterNotifications from "@/components/approvals/ApprovalCenterNotifications";
-import CustomerTaskNotifications from "@/components/customers/CustomerTaskNotifications";
 import OperationsTaskNotifications from "@/components/tasks/OperationsTaskNotifications";
-import InventoryTransferSmartAlertNotifications from "@/components/inventory/InventoryTransferSmartAlertNotifications";
 import { BrowserRouter as Router } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -21,10 +18,7 @@ function App() {
       <Router>
         <AuthProvider>
           <TooltipProvider>
-            <OrderNotifications />
-            <CustomerTaskNotifications />
             <OperationsTaskNotifications />
-            <InventoryTransferSmartAlertNotifications />
             <ApprovalCenterNotifications />
             <AppRoutes />
             <SonnerToaster position="top-center" richColors />
