@@ -12,6 +12,9 @@ export type AttendanceSnapshot = {
     require_trusted_device: boolean;
     allow_outside_exception: boolean;
     require_location_for_field: boolean;
+    outside_require_live_photo: boolean;
+    outside_require_phone_verification: boolean;
+    verification_photo_retention_minutes: number;
   };
   schedule: null | {
     shift_template_id: string;
@@ -52,6 +55,8 @@ export type AttendanceSnapshot = {
     distance_m: number | null;
     reason: string;
     status: string;
+    phone_verified_at?: string | null;
+    has_verification_photo?: boolean;
   };
   recent_sessions: Array<{
     id: string;
@@ -88,6 +93,11 @@ export type AttendanceActionResult = {
   exception_id?: string;
   task_id?: string;
   schedule?: AttendanceSnapshot["schedule"];
+  requires_live_photo?: boolean;
+  requires_phone_verification?: boolean;
+  verification_method?: string;
+  photo_cleanup_required?: boolean;
+  verification_photo_path?: string | null;
 };
 
 export type AttendanceException = {
@@ -110,6 +120,12 @@ export type AttendanceException = {
   review_note: string | null;
   operations_task_id: string | null;
   attendance_session_id: string | null;
+  verification_photo_path?: string | null;
+  verification_photo_sha256?: string | null;
+  verification_photo_captured_at?: string | null;
+  phone_verified_at?: string | null;
+  phone_verification_method?: string | null;
+  verification_photo_deleted_at?: string | null;
 };
 
 const rpc = supabase.rpc.bind(supabase) as unknown as (
@@ -130,9 +146,11 @@ export async function checkInAttendance(params: {
   longitude?: number | null;
   accuracyM?: number | null;
   exceptionReason?: string | null;
+  verificationPhotoPath?: string | null;
+  verificationPhotoSha256?: string | null;
 }): Promise<AttendanceActionResult> {
   const device = getLocalTrustedStaffDevice();
-  const { data, error } = await rpc("staff_attendance_check_in_v1", {
+  const { data, error } = await rpc("staff_attendance_check_in_v2", {
     p_branch_id: params.branchId,
     p_device_id: device?.device_id || null,
     p_device_token: device?.device_token || null,
@@ -141,6 +159,8 @@ export async function checkInAttendance(params: {
     p_longitude: params.longitude ?? null,
     p_accuracy_m: params.accuracyM ?? null,
     p_exception_reason: params.exceptionReason || null,
+    p_verification_photo_path: params.verificationPhotoPath || null,
+    p_verification_photo_sha256: params.verificationPhotoSha256 || null,
   });
   if (error) throw new Error(error.message || "تعذر تسجيل الحضور");
   return data as AttendanceActionResult;
@@ -165,6 +185,49 @@ export async function checkOutAttendance(params: {
   return data as AttendanceActionResult;
 }
 
+export async function verifyAttendancePhoneByPin(pin: string): Promise<{ ok: boolean; verified_at?: string; error?: string; remaining_attempts?: number; locked_until?: string }> {
+  const { data, error } = await rpc("verify_my_staff_app_pin_v1", { p_pin: pin });
+  if (error) throw new Error(error.message || "تعذر التحقق من الهاتف");
+  return (data || { ok: false, error: "PHONE_VERIFICATION_FAILED" }) as { ok: boolean; verified_at?: string; error?: string; remaining_attempts?: number; locked_until?: string };
+}
+
+async function sha256Hex(blob: Blob) {
+  const buffer = await blob.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function uploadAttendanceVerificationPhoto(params: { branchId: string; employeeId: string; blob: Blob }) {
+  const ext = params.blob.type === "image/png" ? "png" : params.blob.type === "image/webp" ? "webp" : "jpg";
+  const id = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const path = `${params.branchId}/${params.employeeId}/${id}.${ext}`;
+  const sha256 = await sha256Hex(params.blob);
+  const { error } = await supabase.storage.from("hr_attendance_verification").upload(path, params.blob, {
+    contentType: params.blob.type || "image/jpeg",
+    cacheControl: "0",
+    upsert: false,
+  });
+  if (error) throw new Error(error.message || "تعذر رفع صورة التحقق");
+  return { path, sha256 };
+}
+
+export async function getAttendanceVerificationPhotoUrl(path: string, expiresIn = 300) {
+  const { data, error } = await supabase.storage.from("hr_attendance_verification").createSignedUrl(path, expiresIn);
+  if (error || !data?.signedUrl) throw new Error(error?.message || "تعذر فتح صورة التحقق");
+  return data.signedUrl;
+}
+
+export async function removeAttendanceVerificationPhoto(path: string) {
+  const { error } = await supabase.storage.from("hr_attendance_verification").remove([path]);
+  if (error) throw new Error(error.message || "تعذر حذف صورة التحقق");
+}
+
+export async function markAttendanceVerificationPhotoDeleted(exceptionId: string) {
+  const { data, error } = await rpc("mark_attendance_verification_photo_deleted_v1", { p_exception_id: exceptionId });
+  if (error) throw new Error(error.message || "تعذر توثيق حذف صورة التحقق");
+  return data as { ok: boolean; exception_id: string; photo_deleted_at: string };
+}
+
 export async function getAttendanceException(exceptionId: string): Promise<AttendanceException | null> {
   const { data, error } = await rpc("get_attendance_exception_v1", { p_exception_id: exceptionId });
   if (error) throw new Error(error.message || "تعذر تحميل طلب الاستثناء");
@@ -178,7 +241,20 @@ export async function decideAttendanceException(exceptionId: string, decision: "
     p_note: note || null,
   });
   if (error) throw new Error(error.message || "تعذر تسجيل قرار الحضور");
-  return data as { ok: boolean; code: string; exception_id: string; decision: string; attendance_session_id?: string | null };
+  return data as { ok: boolean; code: string; exception_id: string; decision: string; attendance_session_id?: string | null; verification_photo_path?: string | null; photo_cleanup_required?: boolean };
+}
+
+export async function decideAttendanceExceptionAndCleanupPhoto(exceptionId: string, decision: "approved" | "rejected", note?: string) {
+  const result = await decideAttendanceException(exceptionId, decision, note);
+  if (!result.ok || !result.photo_cleanup_required || !result.verification_photo_path) return { ...result, photo_cleanup_ok: true };
+  try {
+    await removeAttendanceVerificationPhoto(result.verification_photo_path);
+    await markAttendanceVerificationPhotoDeleted(exceptionId);
+    return { ...result, photo_cleanup_ok: true };
+  } catch (error) {
+    console.warn("Attendance verification photo cleanup failed", error);
+    return { ...result, photo_cleanup_ok: false };
+  }
 }
 
 export function getBrowserLocation(): Promise<{ latitude: number; longitude: number; accuracyM: number }> {
