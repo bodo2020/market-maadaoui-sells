@@ -4,6 +4,8 @@ import HrAccessRoute from "@/components/hr/HrAccessRoute";
 import HrLogin from "@/pages/HrLogin";
 import HrDashboardPage from "@/pages/HrDashboardPage";
 import HrTeamWorkspacePage from "@/pages/HrTeamWorkspacePage";
+import HrAttendanceControlPage from "@/pages/HrAttendanceControlPage";
+import HrEmployeeSnapshotPage from "@/pages/HrEmployeeSnapshotPage";
 import EmployeeManagement from "@/pages/EmployeeManagement";
 import Employee360Page from "@/pages/Employee360Page";
 import EmployeeDevicesPage from "@/pages/EmployeeDevicesPage";
@@ -56,6 +58,8 @@ export default function AppRoutes() {
       <Route path="/account" element={protect(<StaffAccountPage />)} />
 
       <Route path="/team" element={protectHr("team", <HrTeamWorkspacePage />)} />
+      <Route path="/team/employees/:employeeId" element={protectHr("team", <HrEmployeeSnapshotPage />)} />
+      <Route path="/attendance/control" element={protectHr("team", <HrAttendanceControlPage />)} />
       <Route path="/approvals" element={protectHr("approvals", <ApprovalsCenterPage />)} />
       <Route path="/employees" element={protectHr("people", <EmployeeManagement />)} />
       <Route path="/employees/:employeeId" element={protectHr("people", <Employee360Page />)} />
