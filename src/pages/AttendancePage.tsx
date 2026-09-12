@@ -18,10 +18,12 @@ import {
   Smartphone,
 } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
+import LiveAttendancePhoto from "@/components/hr/LiveAttendancePhoto";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +35,9 @@ import {
   checkOutAttendance,
   getBrowserLocation,
   getMyAttendance,
+  removeAttendanceVerificationPhoto,
+  uploadAttendanceVerificationPhoto,
+  verifyAttendancePhoneByPin,
 } from "@/services/attendanceService";
 import { getLocalTrustedStaffDevice } from "@/services/staffDeviceService";
 
@@ -81,6 +86,9 @@ export default function AttendancePage() {
   const [outsideResult, setOutsideResult] = useState<AttendanceActionResult | null>(null);
   const [outsideLocation, setOutsideLocation] = useState<{ latitude: number; longitude: number; accuracyM: number } | null>(null);
   const [exceptionReason, setExceptionReason] = useState("");
+  const [verificationPhoto, setVerificationPhoto] = useState<Blob | null>(null);
+  const [phonePin, setPhonePin] = useState("");
+  const [verificationBusy, setVerificationBusy] = useState(false);
 
   const attendanceQuery = useQuery({
     queryKey: ["my-attendance-v1", currentBranchId],
@@ -94,6 +102,14 @@ export default function AttendancePage() {
   const effectiveMode = modes.includes(mode) ? mode : modes[0] || "onsite";
   const activeSession = data?.active_session;
 
+  const resetOutsideFlow = () => {
+    setOutsideResult(null);
+    setOutsideLocation(null);
+    setExceptionReason("");
+    setVerificationPhoto(null);
+    setPhonePin("");
+  };
+
   const getLocationForMode = async (attendanceMode: AttendanceMode) => {
     const needsLocation = attendanceMode === "onsite" || (attendanceMode === "field" && data?.policy?.require_location_for_field);
     if (!needsLocation) return null;
@@ -101,7 +117,17 @@ export default function AttendancePage() {
   };
 
   const checkInMutation = useMutation({
-    mutationFn: async ({ reason, knownLocation }: { reason?: string; knownLocation?: typeof outsideLocation }) => {
+    mutationFn: async ({
+      reason,
+      knownLocation,
+      verificationPhotoPath,
+      verificationPhotoSha256,
+    }: {
+      reason?: string;
+      knownLocation?: typeof outsideLocation;
+      verificationPhotoPath?: string | null;
+      verificationPhotoSha256?: string | null;
+    }) => {
       if (!data) throw new Error("بيانات الحضور غير جاهزة");
       const location = knownLocation || await getLocationForMode(effectiveMode);
       const result = await checkInAttendance({
@@ -111,15 +137,22 @@ export default function AttendancePage() {
         longitude: location?.longitude ?? null,
         accuracyM: location?.accuracyM ?? null,
         exceptionReason: reason || null,
+        verificationPhotoPath: verificationPhotoPath || null,
+        verificationPhotoSha256: verificationPhotoSha256 || null,
       });
       return { result, location };
     },
     onSuccess: async ({ result, location }) => {
       if (result.ok) {
-        toast.success(result.exception_id ? "تم إرسال طلب الاستثناء للمراجعة" : "تم تسجيل الحضور بنجاح");
-        setOutsideResult(null);
-        setOutsideLocation(null);
-        setExceptionReason("");
+        toast.success("تم تسجيل الحضور بنجاح");
+        resetOutsideFlow();
+        await attendanceQuery.refetch();
+        return;
+      }
+
+      if (result.code === "EXCEPTION_REQUESTED") {
+        toast.success("تم إرسال طلب الحضور للمدير بعد التحقق من الصورة والهاتف.");
+        resetOutsideFlow();
         await attendanceQuery.refetch();
         return;
       }
@@ -132,10 +165,14 @@ export default function AttendancePage() {
 
       const messages: Record<string, string> = {
         LOCATION_REQUIRED: "يلزم تشغيل GPS لتسجيل الحضور.",
-        LOCATION_ACCURACY_TOO_LOW: "دقة الموقع غير كافية. اقترب من مكان مفتوح وحاول مرة أخرى.",
+        LOCATION_ACCURACY_LOW: "دقة الموقع غير كافية. انتظر GPS أدق وحاول مرة أخرى.",
         OUTSIDE_GEOFENCE: "أنت خارج نطاق الحضور المسموح للفرع.",
         TRUSTED_DEVICE_REQUIRED: "يلزم تفعيل هذا الجهاز كجهاز موثوق أولًا.",
         ACTIVE_SESSION_EXISTS: "لديك حضور مفتوح بالفعل.",
+        PHONE_VERIFICATION_REQUIRED: "يلزم تأكيد الهاتف قبل إرسال طلب الحضور.",
+        LIVE_PHOTO_REQUIRED: "يلزم التقاط صورة تحقق مباشرة.",
+        LIVE_PHOTO_NOT_FOUND: "تعذر التحقق من صورة الحضور المرفوعة.",
+        PENDING_EXCEPTION_EXISTS: "لديك طلب حضور خارج النطاق قيد المراجعة بالفعل.",
       };
       toast.error(messages[result.code] || "تعذر تسجيل الحضور. راجع البيانات وحاول مرة أخرى.");
     },
@@ -164,13 +201,64 @@ export default function AttendancePage() {
     onError: error => toast.error(error instanceof Error ? error.message : "تعذر تسجيل الانصراف"),
   });
 
-  const submitException = () => {
-    if (!outsideLocation || !outsideResult) return;
+  const submitException = async () => {
+    if (!data || !outsideLocation || !outsideResult || verificationBusy) return;
     if (exceptionReason.trim().length < 5) {
       toast.error("اكتب سببًا واضحًا لطلب الحضور خارج النطاق.");
       return;
     }
-    checkInMutation.mutate({ reason: exceptionReason.trim(), knownLocation: outsideLocation });
+    if (data.policy.outside_require_live_photo && !verificationPhoto) {
+      toast.error("التقط صورة تحقق مباشرة قبل إرسال الطلب.");
+      return;
+    }
+    if (data.policy.outside_require_phone_verification && !/^\d{4,6}$/.test(phonePin)) {
+      toast.error("اكتب PIN تطبيق HR المكون من 4 إلى 6 أرقام لتأكيد الهاتف.");
+      return;
+    }
+
+    let uploadedPath: string | null = null;
+    setVerificationBusy(true);
+    try {
+      if (data.policy.outside_require_phone_verification) {
+        const verification = await verifyAttendancePhoneByPin(phonePin);
+        if (!verification.ok) {
+          const message = verification.error === "APP_PIN_NOT_CONFIGURED"
+            ? "PIN تطبيق HR غير مفعّل لهذا الحساب. فعّله أولًا من الحساب."
+            : verification.error === "APP_PIN_LOCKED"
+              ? "تم إيقاف محاولات PIN مؤقتًا بسبب محاولات خاطئة متكررة."
+              : `PIN غير صحيح${typeof verification.remaining_attempts === "number" ? ` · المتبقي ${verification.remaining_attempts}` : ""}`;
+          throw new Error(message);
+        }
+      }
+
+      let uploaded: { path: string; sha256: string } | null = null;
+      if (data.policy.outside_require_live_photo && verificationPhoto) {
+        uploaded = await uploadAttendanceVerificationPhoto({
+          branchId: data.branch_id,
+          employeeId: data.employee.user_id,
+          blob: verificationPhoto,
+        });
+        uploadedPath = uploaded.path;
+      }
+
+      const response = await checkInMutation.mutateAsync({
+        reason: exceptionReason.trim(),
+        knownLocation: outsideLocation,
+        verificationPhotoPath: uploaded?.path || null,
+        verificationPhotoSha256: uploaded?.sha256 || null,
+      });
+
+      if (response.result.code !== "EXCEPTION_REQUESTED" && uploadedPath) {
+        try { await removeAttendanceVerificationPhoto(uploadedPath); } catch { /* cleanup is best effort */ }
+      }
+    } catch (error) {
+      if (uploadedPath) {
+        try { await removeAttendanceVerificationPhoto(uploadedPath); } catch { /* cleanup is best effort */ }
+      }
+      toast.error(error instanceof Error ? error.message : "تعذر إرسال طلب الحضور");
+    } finally {
+      setVerificationBusy(false);
+    }
   };
 
   if (attendanceQuery.isLoading) {
@@ -223,7 +311,7 @@ export default function AttendancePage() {
         {data.pending_exception && (
           <Card className="border-amber-200 bg-amber-50/70">
             <CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
-              <div><div className="flex items-center gap-2 font-black text-amber-900"><AlertTriangle className="h-5 w-5" />طلب حضور خارج النطاق قيد المراجعة</div><p className="mt-1 text-sm text-amber-800">أُرسل {formatDateTime(data.pending_exception.requested_at)}{data.pending_exception.distance_m != null ? ` · المسافة ${Math.round(data.pending_exception.distance_m).toLocaleString("ar-EG")} م` : ""}</p><p className="mt-1 text-xs text-amber-700">{data.pending_exception.reason}</p></div>
+              <div><div className="flex items-center gap-2 font-black text-amber-900"><AlertTriangle className="h-5 w-5" />طلب حضور خارج النطاق قيد المراجعة</div><p className="mt-1 text-sm text-amber-800">أُرسل {formatDateTime(data.pending_exception.requested_at)}{data.pending_exception.distance_m != null ? ` · المسافة ${Math.round(data.pending_exception.distance_m).toLocaleString("ar-EG")} م` : ""}</p><p className="mt-1 text-xs text-amber-700">{data.pending_exception.reason}</p><div className="mt-2 flex flex-wrap gap-1.5">{data.pending_exception.has_verification_photo && <Badge variant="outline" className="bg-white">صورة Live مرفقة</Badge>}{data.pending_exception.phone_verified_at && <Badge variant="outline" className="bg-white">الهاتف متحقق</Badge>}</div></div>
               <Badge variant="outline" className="w-fit border-amber-300 bg-white text-amber-800">بانتظار المدير</Badge>
             </CardContent>
           </Card>
@@ -270,15 +358,20 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      <Dialog open={Boolean(outsideResult)} onOpenChange={open => { if (!open && !checkInMutation.isPending) { setOutsideResult(null); setOutsideLocation(null); setExceptionReason(""); } }}>
-        <DialogContent dir="rtl" className="max-w-lg">
+      <Dialog open={Boolean(outsideResult)} onOpenChange={open => { if (!open && !checkInMutation.isPending && !verificationBusy) resetOutsideFlow(); }}>
+        <DialogContent dir="rtl" className="max-h-[calc(100dvh-var(--safe-top)-var(--safe-bottom)-2rem)] max-w-lg overflow-y-auto">
           <DialogHeader><DialogTitle>أنت خارج نطاق الفرع</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900"><div className="flex items-center gap-2 font-black"><MapPin className="h-5 w-5" />طلب استثناء حضور</div><p className="mt-2 text-sm">المسافة التقريبية من الفرع: <b>{Math.round(Number(outsideResult?.distance_m || 0)).toLocaleString("ar-EG")} متر</b>، والنطاق المسموح {Math.round(Number(outsideResult?.radius_m || data.policy.geofence_radius_m)).toLocaleString("ar-EG")} متر.</p></div>
-            <div className="space-y-2"><Label>سبب الحضور من خارج النطاق</Label><Textarea autoFocus rows={4} value={exceptionReason} onChange={event => setExceptionReason(event.target.value)} placeholder="مثال: تكليف ميداني من المدير / استلام طلب خارج الفرع..." /></div>
-            <p className="text-xs leading-5 text-muted-foreground">لن يتم اعتبارك حاضرًا تلقائيًا. سيتم إرسال الطلب إلى مركز الموافقات، وإذا اعتمده المسؤول تُحسب بداية الحضور من وقت المحاولة الأصلية.</p>
+
+            {data.policy.outside_require_live_photo && <LiveAttendancePhoto value={verificationPhoto} onChange={setVerificationPhoto} />}
+
+            {data.policy.outside_require_phone_verification && <div className="space-y-2"><Label htmlFor="attendance-phone-pin">تأكيد الهاتف</Label><div className="rounded-2xl border bg-slate-50 p-3 text-xs leading-5 text-slate-600">أدخل PIN تطبيق HR على الجهاز الموثوق. يتم التحقق منه في السيرفر ويظل صالحًا لهذه المحاولة لفترة قصيرة فقط.</div><Input id="attendance-phone-pin" inputMode="numeric" type="password" maxLength={6} value={phonePin} onChange={event => setPhonePin(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="••••" className="h-12 rounded-xl text-center text-xl tracking-[0.35em]" /></div>}
+
+            <div className="space-y-2"><Label>سبب الحضور من خارج النطاق</Label><Textarea rows={4} value={exceptionReason} onChange={event => setExceptionReason(event.target.value)} placeholder="مثال: تكليف ميداني من المدير / وجودي عند مدخل المخزن الخلفي..." /></div>
+            <p className="text-xs leading-5 text-muted-foreground">لن يتم اعتبارك حاضرًا تلقائيًا. سيتم إرسال الصورة وحالة تحقق الهاتف والموقع والسبب للمدير، وإذا اعتمد الطلب تُحسب بداية الحضور من وقت المحاولة الأصلية.</p>
           </div>
-          <DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" disabled={checkInMutation.isPending} onClick={() => { setOutsideResult(null); setOutsideLocation(null); setExceptionReason(""); }}>إلغاء</Button><Button disabled={checkInMutation.isPending} onClick={submitException}>{checkInMutation.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="ml-2 h-4 w-4" />}إرسال للموافقة</Button></DialogFooter>
+          <DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" disabled={checkInMutation.isPending || verificationBusy} onClick={resetOutsideFlow}>إلغاء</Button><Button disabled={checkInMutation.isPending || verificationBusy} onClick={() => void submitException()}>{checkInMutation.isPending || verificationBusy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="ml-2 h-4 w-4" />}إرسال للموافقة</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </MainLayout>
