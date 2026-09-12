@@ -24,6 +24,13 @@ export default function NativeBackButtonGuard() {
     let removed = false;
     let listenerHandle: { remove?: () => Promise<void> | void } | null = null;
 
+    const dismissKeyboard = () => {
+      const active = document.activeElement as HTMLElement | null;
+      if (!active || !["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName)) return false;
+      active.blur();
+      return true;
+    };
+
     const closeOpenOverlay = () => {
       const openDialog = document.querySelector('[role="dialog"][data-state="open"]');
       const openSheet = document.querySelector('[data-state="open"][data-radix-dialog-content]');
@@ -34,6 +41,7 @@ export default function NativeBackButtonGuard() {
 
     Promise.resolve(
       appPlugin.addListener("backButton", ({ canGoBack }: { canGoBack?: boolean }) => {
+        if (dismissKeyboard()) return;
         if (closeOpenOverlay()) return;
 
         const currentPath = pathRef.current;
