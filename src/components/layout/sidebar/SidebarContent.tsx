@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Bell, CalendarDays, CheckCircle2, ChevronDown, Clock3, FileText, Home, Network, Search, ShieldCheck, UserRound, UsersRound, WalletCards } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { SidebarItem } from "./SidebarItem";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { useAuth } from "@/contexts/AuthContext";
+import { getHrAccess } from "@/lib/hrAccess";
 
 interface SidebarContentProps {
   collapsed: boolean;
@@ -14,53 +16,58 @@ interface SidebarContentProps {
 type Item = { label: string; href: string; icon: any };
 type Group = { title: string; items: Item[] };
 
-const groups: Group[] = [
-  {
-    title: "الرئيسية",
-    items: [
-      { label: "لوحة HR", href: "/", icon: Home },
-      { label: "ملفي الوظيفي", href: "/my-hr", icon: UserRound },
-    ],
-  },
-  {
-    title: "الموظفون والتنظيم",
-    items: [
-      { label: "إدارة الموظفين", href: "/employees", icon: UsersRound },
-      { label: "الهيكل التنظيمي", href: "/organization", icon: Network },
-    ],
-  },
-  {
-    title: "الوقت والعمل",
-    items: [
-      { label: "الحضور والانصراف", href: "/attendance", icon: Clock3 },
-      { label: "جدولة الشيفتات", href: "/hr/shifts", icon: CalendarDays },
-      { label: "الإجازات", href: "/hr/leave-calendar", icon: FileText },
-    ],
-  },
-  {
-    title: "الرواتب والتشغيل",
-    items: [
-      { label: "الرواتب", href: "/hr/payroll", icon: WalletCards },
-      { label: "المهام", href: "/tasks", icon: CheckCircle2 },
-      { label: "الموافقات", href: "/approvals", icon: ShieldCheck },
-    ],
-  },
-  {
-    title: "الحساب والتواصل",
-    items: [
-      { label: "الإشعارات", href: "/notifications", icon: Bell },
-      { label: "حسابي", href: "/account", icon: UserRound },
-    ],
-  },
-];
-
 export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
   const location = useLocation();
   const currentPath = location.pathname;
+  const { user } = useAuth();
+  const access = getHrAccess(user);
   const { operationsTaskAlerts, operationsTaskOverdue, approvalAlerts } = useNotificationStore();
   const [search, setSearch] = useState("");
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const query = search.trim().toLocaleLowerCase("ar");
+
+  const groups = useMemo<Group[]>(() => {
+    const items: Group[] = [
+      {
+        title: "مساحتي",
+        items: [
+          { label: "الرئيسية", href: "/", icon: Home },
+          { label: "ملفي الوظيفي", href: "/my-hr", icon: UserRound },
+          { label: "الحضور والانصراف", href: "/attendance", icon: Clock3 },
+        ],
+      },
+    ];
+
+    if (access.canViewTeam) {
+      items.push({
+        title: "فريقي",
+        items: [
+          { label: "مساحة الفريق", href: "/team", icon: UsersRound },
+          ...(access.canApprove ? [{ label: "الموافقات", href: "/approvals", icon: ShieldCheck }] : []),
+        ],
+      });
+    }
+
+    const workforce: Item[] = [];
+    if (access.canManagePeople) workforce.push({ label: "إدارة الموظفين", href: "/employees", icon: UsersRound });
+    if (access.canManageOrganization) workforce.push({ label: "الهيكل التنظيمي", href: "/organization", icon: Network });
+    if (access.canManageShifts) workforce.push({ label: "جدولة الشيفتات", href: "/hr/shifts", icon: CalendarDays });
+    if (access.canManageLeave) workforce.push({ label: "الإجازات", href: "/hr/leave-calendar", icon: FileText });
+    if (access.canManagePayroll) workforce.push({ label: "الرواتب", href: "/hr/payroll", icon: WalletCards });
+    if (workforce.length) items.push({ title: "إدارة الموارد البشرية", items: workforce });
+
+    items.push({
+      title: "التشغيل والتواصل",
+      items: [
+        { label: "المهام", href: "/tasks", icon: CheckCircle2 },
+        ...(!access.canViewTeam && access.canApprove ? [{ label: "الموافقات", href: "/approvals", icon: ShieldCheck }] : []),
+        { label: "الإشعارات", href: "/notifications", icon: Bell },
+        { label: "حسابي", href: "/account", icon: UserRound },
+      ],
+    });
+
+    return items;
+  }, [access.canApprove, access.canManageLeave, access.canManageOrganization, access.canManagePayroll, access.canManagePeople, access.canManageShifts, access.canViewTeam]);
 
   const isActive = (item: Item) => currentPath === item.href || (item.href !== "/" && currentPath.startsWith(`${item.href}/`));
   const toggleSection = (title: string) => setOpenSections((current) => ({ ...current, [title]: !(current[title] ?? true) }));
@@ -104,7 +111,11 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
     <div className="flex min-h-0 flex-1 flex-col">
       {!collapsed && (
         <div className="px-3 pb-2 pt-3">
-          <div className="relative">
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
+            <div className="text-[10px] font-black uppercase tracking-wide text-emerald-700">مساحة العمل الحالية</div>
+            <div className="mt-0.5 truncate text-xs font-black text-emerald-950">{access.roleLabel}</div>
+          </div>
+          <div className="relative mt-2">
             <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث داخل HR..." className="h-10 rounded-xl border-slate-200 bg-slate-50/80 pr-10 text-sm font-medium shadow-none placeholder:text-slate-400 focus-visible:border-emerald-300 focus-visible:ring-[#005931]/15" aria-label="بحث في قائمة الموارد البشرية" />
           </div>

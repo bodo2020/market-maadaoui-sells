@@ -32,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Install Capacitor toolchain
-        run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/assets
+        run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/assets @capacitor/status-bar@7 @capacitor/keyboard@7
 
       - name: Build HR web app
         run: npm run build
@@ -74,7 +74,6 @@ jobs:
           draw = ImageDraw.Draw(image)
           draw.rounded_rectangle((86, 86, 938, 938), radius=190, fill='#ffffff')
           draw.rounded_rectangle((150, 150, 874, 874), radius=150, fill='#005931')
-          # HR badge, rendered with standard latin font; Arabic app name remains in Android label.
           try:
               font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 260)
               small = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 72)

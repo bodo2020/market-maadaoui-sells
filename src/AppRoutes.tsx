@@ -1,7 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "@/components/Auth/ProtectedRoute";
+import HrAccessRoute from "@/components/hr/HrAccessRoute";
 import HrLogin from "@/pages/HrLogin";
 import HrDashboardPage from "@/pages/HrDashboardPage";
+import HrTeamWorkspacePage from "@/pages/HrTeamWorkspacePage";
 import EmployeeManagement from "@/pages/EmployeeManagement";
 import Employee360Page from "@/pages/Employee360Page";
 import EmployeeDevicesPage from "@/pages/EmployeeDevicesPage";
@@ -34,29 +36,39 @@ const HrTasksWorkspace = () => (
   </>
 );
 
+const protect = (element: React.ReactNode) => <ProtectedRoute>{element}</ProtectedRoute>;
+const protectHr = (capability: Parameters<typeof HrAccessRoute>[0]["capability"], element: React.ReactNode) => (
+  <ProtectedRoute><HrAccessRoute capability={capability}>{element}</HrAccessRoute></ProtectedRoute>
+);
+
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<HrLogin />} />
       <Route path="/staff-device/activate" element={<StaffDeviceActivationPage />} />
 
-      <Route path="/" element={<ProtectedRoute><HrDashboardPage /></ProtectedRoute>} />
-      <Route path="/dashboard" element={<ProtectedRoute><HrDashboardPage /></ProtectedRoute>} />
-      <Route path="/my-hr" element={<ProtectedRoute><MyHRPortalPage /></ProtectedRoute>} />
-      <Route path="/employees" element={<ProtectedRoute><EmployeeManagement /></ProtectedRoute>} />
-      <Route path="/employees/:employeeId" element={<ProtectedRoute><Employee360Page /></ProtectedRoute>} />
-      <Route path="/employees/:employeeId/devices" element={<ProtectedRoute><EmployeeDevicesPage /></ProtectedRoute>} />
-      <Route path="/organization" element={<ProtectedRoute><OrganizationStructurePage /></ProtectedRoute>} />
-      <Route path="/attendance" element={<ProtectedRoute><AttendanceWorkspace /></ProtectedRoute>} />
-      <Route path="/hr/shifts" element={<ProtectedRoute><HrShiftSchedulingPage /></ProtectedRoute>} />
-      <Route path="/hr/leave-calendar" element={<ProtectedRoute><HrLeaveCalendarPage /></ProtectedRoute>} />
-      <Route path="/hr/payroll" element={<ProtectedRoute><HrPayrollPage /></ProtectedRoute>} />
-      <Route path="/tasks" element={<ProtectedRoute><HrTasksWorkspace /></ProtectedRoute>} />
-      <Route path="/approvals" element={<ProtectedRoute><ApprovalsCenterPage /></ProtectedRoute>} />
-      <Route path="/notifications" element={<ProtectedRoute><NotificationsCenterV2 /></ProtectedRoute>} />
-      <Route path="/account" element={<ProtectedRoute><StaffAccountPage /></ProtectedRoute>} />
+      <Route path="/" element={protect(<HrDashboardPage />)} />
+      <Route path="/dashboard" element={protect(<HrDashboardPage />)} />
+      <Route path="/my-hr" element={protect(<MyHRPortalPage />)} />
+      <Route path="/attendance" element={protect(<AttendanceWorkspace />)} />
+      <Route path="/tasks" element={protect(<HrTasksWorkspace />)} />
+      <Route path="/notifications" element={protect(<NotificationsCenterV2 />)} />
+      <Route path="/account" element={protect(<StaffAccountPage />)} />
+
+      <Route path="/team" element={protectHr("team", <HrTeamWorkspacePage />)} />
+      <Route path="/approvals" element={protectHr("approvals", <ApprovalsCenterPage />)} />
+      <Route path="/employees" element={protectHr("people", <EmployeeManagement />)} />
+      <Route path="/employees/:employeeId" element={protectHr("people", <Employee360Page />)} />
+      <Route path="/employees/:employeeId/devices" element={protectHr("people", <EmployeeDevicesPage />)} />
+      <Route path="/organization" element={protectHr("organization", <OrganizationStructurePage />)} />
+      <Route path="/hr/shifts" element={protectHr("shifts_manage", <HrShiftSchedulingPage />)} />
+      <Route path="/hr/leave-calendar" element={protectHr("leave_manage", <HrLeaveCalendarPage />)} />
+      <Route path="/hr/payroll" element={protectHr("payroll", <HrPayrollPage />)} />
 
       <Route path="/pos" element={<Navigate to="/" replace />} />
+      <Route path="/products/*" element={<Navigate to="/" replace />} />
+      <Route path="/inventory/*" element={<Navigate to="/" replace />} />
+      <Route path="/finance/*" element={<Navigate to="/" replace />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
