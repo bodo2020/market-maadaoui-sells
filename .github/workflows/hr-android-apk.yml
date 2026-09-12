@@ -32,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Install Capacitor toolchain
-        run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/assets @capacitor/status-bar@7 @capacitor/keyboard@7
+        run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/assets @capacitor/status-bar@7 @capacitor/keyboard@7 @capacitor/app@7
 
       - name: Build HR web app
         run: npm run build
@@ -40,7 +40,7 @@ jobs:
       - name: Create Android project
         run: npx cap add android
 
-      - name: Prepare Android permissions and HR icon
+      - name: Prepare Android permissions, autofill and HR icon
         run: |
           python -m pip install --quiet pillow
           python <<'PY'
@@ -66,6 +66,10 @@ jobs:
                   node.set(f'{{{android_ns}}}name', permission)
                   root.insert(0, node)
           tree.write(manifest, encoding='utf-8', xml_declaration=True)
+
+          main_activity = Path('android/app/src/main/java/com/elmadawy/hr/MainActivity.java')
+          main_activity.parent.mkdir(parents=True, exist_ok=True)
+          main_activity.write_text('''package com.elmadawy.hr;\n\nimport android.os.Build;\nimport android.os.Bundle;\nimport android.view.View;\nimport android.webkit.WebView;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n  @Override\n  protected void onCreate(Bundle savedInstanceState) {\n    super.onCreate(savedInstanceState);\n    WebView webView = getBridge() != null ? getBridge().getWebView() : null;\n    if (webView != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {\n      webView.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_YES);\n    }\n  }\n}\n''', encoding='utf-8')
 
           assets = Path('assets')
           assets.mkdir(exist_ok=True)
