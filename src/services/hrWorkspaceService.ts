@@ -54,6 +54,10 @@ export type HrAttendanceExceptionItem = {
   reason: string;
   status: string;
   operations_task_id?: string | null;
+  verification_photo_path?: string | null;
+  verification_photo_sha256?: string | null;
+  phone_verified_at?: string | null;
+  phone_verification_method?: string | null;
 };
 
 export type HrAttendanceControl = HrWorkspaceDashboard & {
