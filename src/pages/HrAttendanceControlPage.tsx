@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { AlertTriangle, CalendarDays, CheckCircle2, Clock3, Filter, Loader2, ShieldAlert, UserRoundCheck, UsersRound } from "lucide-react";
+import { AlertTriangle, CalendarDays, Camera, CheckCircle2, Clock3, Filter, Loader2, ShieldAlert, Smartphone, UserRoundCheck, UsersRound } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
+import AttendanceExceptionReviewDialog from "@/components/hr/AttendanceExceptionReviewDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useBranchStore } from "@/stores/branchStore";
-import { getHrAttendanceControl, HrWorkspaceEmployee } from "@/services/hrWorkspaceService";
+import { getHrAttendanceControl, HrAttendanceExceptionItem, HrWorkspaceEmployee } from "@/services/hrWorkspaceService";
 
 const today = () => new Date().toISOString().slice(0, 10);
 type FilterKey = "all" | "attention" | "present" | "late" | "absent" | "leave";
@@ -27,6 +28,7 @@ export default function HrAttendanceControlPage() {
   const { currentBranchId, currentBranchName } = useBranchStore();
   const [date, setDate] = useState(today());
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [reviewItem, setReviewItem] = useState<HrAttendanceExceptionItem | null>(null);
 
   const query = useQuery({
     queryKey: ["hr-attendance-control", currentBranchId, date],
@@ -84,9 +86,10 @@ export default function HrAttendanceControlPage() {
             </CardContent>
           </Card>
 
-          {(query.data?.pending_exception_items?.length || 0) > 0 && <Card className="rounded-2xl border-amber-200"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-5 w-5 text-amber-600" />استثناءات حضور معلقة</CardTitle></CardHeader><CardContent className="space-y-2">{query.data!.pending_exception_items.slice(0, 8).map(item => <div key={item.id} className="rounded-2xl bg-amber-50 p-4"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-black text-amber-950">{item.employee_name}</div><div className="mt-1 text-xs text-amber-800">{item.reason}</div></div>{item.operations_task_id ? <Link to="/approvals" className="text-xs font-black text-[#005931]">فتح الموافقات</Link> : <Badge variant="outline">قيد المراجعة</Badge>}</div></div>)}</CardContent></Card>}
+          {(query.data?.pending_exception_items?.length || 0) > 0 && <Card className="rounded-2xl border-amber-200"><CardHeader><CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-5 w-5 text-amber-600" />استثناءات حضور معلقة</CardTitle></CardHeader><CardContent className="space-y-3">{query.data!.pending_exception_items.slice(0, 12).map(item => <div key={item.id} className="rounded-2xl border border-amber-100 bg-amber-50 p-4"><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div className="min-w-0"><div className="font-black text-amber-950">{item.employee_name}</div><div className="mt-1 text-xs text-amber-800">{item.reason}</div><div className="mt-2 flex flex-wrap gap-1.5">{item.verification_photo_path && <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-800"><Camera className="ml-1 h-3 w-3" />صورة Live</Badge>}{item.phone_verified_at && <Badge variant="outline" className="border-emerald-200 bg-white text-emerald-800"><Smartphone className="ml-1 h-3 w-3" />الهاتف متحقق</Badge>}<Badge variant="outline" className="bg-white">{Math.round(Number(item.distance_m || 0)).toLocaleString("ar-EG")} م خارج النطاق</Badge></div></div><Button size="sm" className="shrink-0 bg-[#005931] hover:bg-[#004526]" onClick={() => setReviewItem(item)}>مراجعة الطلب</Button></div></div>)}</CardContent></Card>}
         </>}
       </div>
+      <AttendanceExceptionReviewDialog item={reviewItem} open={Boolean(reviewItem)} onOpenChange={open => !open && setReviewItem(null)} onDone={() => query.refetch()} />
     </MainLayout>
   );
 }
