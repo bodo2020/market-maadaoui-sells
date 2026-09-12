@@ -78,14 +78,19 @@ public class MainActivity extends BridgeActivity {
   private class HrNativeBridge {
     @JavascriptInterface
     public void savePassword(String username, String password) {
-      if (!isTrustedHrPage() || username == null || username.trim().isEmpty() || password == null || password.isEmpty()) return;
-      runOnUiThread(() -> savePasswordWithCredentialManager(username.trim(), password));
+      if (username == null || username.trim().isEmpty() || password == null || password.isEmpty()) return;
+      runOnUiThread(() -> {
+        if (!isTrustedHrPage()) return;
+        savePasswordWithCredentialManager(username.trim(), password);
+      });
     }
 
     @JavascriptInterface
     public void captureAttendancePhoto() {
-      if (!isTrustedHrPage()) return;
-      runOnUiThread(MainActivity.this::ensureCameraPermissionAndOpen);
+      runOnUiThread(() -> {
+        if (!isTrustedHrPage()) return;
+        ensureCameraPermissionAndOpen();
+      });
     }
   }
 
