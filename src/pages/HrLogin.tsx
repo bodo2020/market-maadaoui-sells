@@ -8,6 +8,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+async function offerPasswordManagerSave(username: string, password: string) {
+  try {
+    const PasswordCredentialCtor = (window as any).PasswordCredential;
+    const credentialStore = (navigator as any).credentials;
+    if (!PasswordCredentialCtor || !credentialStore?.store) return;
+    const credential = new PasswordCredentialCtor({
+      id: username,
+      name: username,
+      password,
+    });
+    await credentialStore.store(credential);
+  } catch {
+    // Android/Google Password Manager may handle saving via Autofill instead.
+  }
+}
+
 export default function HrLogin() {
   const { login, logout, selectBranch, isAuthenticated, branchSelectionRequired, branchOptions, isLoading } = useAuth();
   const [username, setUsername] = useState("");
@@ -26,9 +42,11 @@ export default function HrLogin() {
       setError("اكتب اسم المستخدم وكلمة المرور.");
       return;
     }
+    const normalizedUsername = username.trim();
     try {
       setSubmitting(true);
-      await login(username.trim(), password);
+      await login(normalizedUsername, password);
+      await offerPasswordManagerSave(normalizedUsername, password);
     } catch (e: any) {
       setError(e?.message || "تعذر تسجيل الدخول");
     } finally {
@@ -125,13 +143,42 @@ export default function HrLogin() {
         <CardDescription>سجّل بحساب الموظف ونفس الصلاحيات المعتمدة داخل منظومة المعداوي.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={submit} className="space-y-4">
+        <form id="hr-login-form" onSubmit={submit} autoComplete="on" className="space-y-4">
           {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
-          <div className="space-y-2"><Label htmlFor="hr-username">اسم المستخدم</Label><Input id="hr-username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" className="h-12 rounded-xl" placeholder="اسم المستخدم" /></div>
+          <div className="space-y-2">
+            <Label htmlFor="hr-username">اسم المستخدم</Label>
+            <Input
+              id="hr-username"
+              name="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="text"
+              enterKeyHint="next"
+              className="h-12 rounded-xl"
+              placeholder="اسم المستخدم"
+            />
+          </div>
           <div className="space-y-2">
             <Label htmlFor="hr-password">كلمة المرور</Label>
             <div className="relative">
-              <Input id="hr-password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className="h-12 rounded-xl pl-12" placeholder="كلمة المرور" />
+              <Input
+                id="hr-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="done"
+                className="h-12 rounded-xl pl-12"
+                placeholder="كلمة المرور"
+              />
               <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="إظهار أو إخفاء كلمة المرور">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
             </div>
           </div>
