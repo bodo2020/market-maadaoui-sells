@@ -43,6 +43,7 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
         title: "فريقي",
         items: [
           { label: "مساحة الفريق", href: "/team", icon: UsersRound },
+          { label: "مراقبة الحضور", href: "/attendance/control", icon: Clock3 },
           ...(access.canApprove ? [{ label: "الموافقات", href: "/approvals", icon: ShieldCheck }] : []),
         ],
       });
