@@ -1,0 +1,125 @@
+name: HR Android APK
+
+on:
+  push:
+    branches: [hr-standalone]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-hr-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Install Capacitor toolchain
+        run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/assets
+
+      - name: Build HR web app
+        run: npm run build
+
+      - name: Create Android project
+        run: npx cap add android
+
+      - name: Prepare Android permissions and HR icon
+        run: |
+          python -m pip install --quiet pillow
+          python <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          from PIL import Image, ImageDraw, ImageFont
+
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          tree = ET.parse(manifest)
+          root = tree.getroot()
+          android_ns = 'http://schemas.android.com/apk/res/android'
+          ET.register_namespace('android', android_ns)
+          wanted = [
+              'android.permission.CAMERA',
+              'android.permission.ACCESS_FINE_LOCATION',
+              'android.permission.ACCESS_COARSE_LOCATION',
+              'android.permission.POST_NOTIFICATIONS',
+          ]
+          existing = {node.attrib.get(f'{{{android_ns}}}name') for node in root.findall('uses-permission')}
+          for permission in wanted:
+              if permission not in existing:
+                  node = ET.Element('uses-permission')
+                  node.set(f'{{{android_ns}}}name', permission)
+                  root.insert(0, node)
+          tree.write(manifest, encoding='utf-8', xml_declaration=True)
+
+          assets = Path('assets')
+          assets.mkdir(exist_ok=True)
+          size = 1024
+          image = Image.new('RGBA', (size, size), '#005931')
+          draw = ImageDraw.Draw(image)
+          draw.rounded_rectangle((86, 86, 938, 938), radius=190, fill='#ffffff')
+          draw.rounded_rectangle((150, 150, 874, 874), radius=150, fill='#005931')
+          # HR badge, rendered with standard latin font; Arabic app name remains in Android label.
+          try:
+              font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 260)
+              small = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 72)
+          except Exception:
+              font = ImageFont.load_default()
+              small = font
+          bbox = draw.textbbox((0,0), 'HR', font=font)
+          x = (size - (bbox[2]-bbox[0]))/2
+          y = 390 - (bbox[3]-bbox[1])/2
+          draw.text((x, y), 'HR', font=font, fill='white')
+          label = 'ELMADAWY'
+          bbox2 = draw.textbbox((0,0), label, font=small)
+          x2 = (size - (bbox2[2]-bbox2[0]))/2
+          draw.text((x2, 700), label, font=small, fill='#b7f7d1')
+          image.save(assets/'icon-only.png')
+          image.save(assets/'icon-foreground.png')
+          Image.new('RGBA', (size, size), '#005931').save(assets/'icon-background.png')
+          PY
+          npx capacitor-assets generate --android
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Set native version
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          p = Path('android/app/build.gradle')
+          text = p.read_text()
+          text = text.replace('versionCode 1', 'versionCode ${{ github.run_number }}')
+          text = text.replace('versionName "1.0"', 'versionName "1.0.${{ github.run_number }}"')
+          p.write_text(text)
+          PY
+
+      - name: Build debug APK
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+
+      - name: Name APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk elmadawy-hr-v1.0.${{ github.run_number }}.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: elmadawy-hr-v1.0.${{ github.run_number }}
+          path: elmadawy-hr-v1.0.${{ github.run_number }}.apk
+          if-no-files-found: error
+          retention-days: 14
