@@ -10,17 +10,19 @@ import { Label } from "@/components/ui/label";
 
 async function offerPasswordManagerSave(username: string, password: string) {
   try {
+    const nativeBridge = (window as any).HrNative;
+    if (nativeBridge && typeof nativeBridge.savePassword === "function") {
+      nativeBridge.savePassword(username, password);
+      return;
+    }
+
     const PasswordCredentialCtor = (window as any).PasswordCredential;
     const credentialStore = (navigator as any).credentials;
     if (!PasswordCredentialCtor || !credentialStore?.store) return;
-    const credential = new PasswordCredentialCtor({
-      id: username,
-      name: username,
-      password,
-    });
+    const credential = new PasswordCredentialCtor({ id: username, name: username, password });
     await credentialStore.store(credential);
   } catch {
-    // Android/Google Password Manager may handle saving via Autofill instead.
+    // Native Credential Manager / browser autofill owns its own UI and cancellation flow.
   }
 }
 
@@ -71,14 +73,10 @@ export default function HrLogin() {
       <section className="relative hidden overflow-hidden bg-[#005931] p-10 text-white lg:flex lg:flex-col lg:justify-between">
         <div className="absolute inset-0 opacity-25 [background-image:radial-gradient(circle_at_15%_15%,white_0,transparent_30%),radial-gradient(circle_at_85%_85%,#4ade80_0,transparent_26%)]" />
         <div className="relative z-10">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/12 ring-1 ring-white/20">
-            <BriefcaseBusiness className="h-8 w-8" />
-          </div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/12 ring-1 ring-white/20"><BriefcaseBusiness className="h-8 w-8" /></div>
           <p className="mt-8 text-sm font-bold text-emerald-100">ELMADAWY HR</p>
           <h1 className="mt-2 text-4xl font-black">المعداوي HR</h1>
-          <p className="mt-4 max-w-2xl text-lg leading-8 text-emerald-50">
-            إدارة الموظفين، الحضور، الشيفتات، الإجازات، الرواتب، المهام والموافقات في تطبيق مستقل وآمن.
-          </p>
+          <p className="mt-4 max-w-2xl text-lg leading-8 text-emerald-50">إدارة الموظفين، الحضور، الشيفتات، الإجازات، الرواتب، المهام والموافقات في تطبيق مستقل وآمن.</p>
         </div>
         <div className="relative z-10 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><UserRound className="h-5 w-5" /><div className="mt-2 font-bold">Employee 360</div></div>
@@ -113,13 +111,7 @@ export default function HrLogin() {
           {branchOptions.map((branch) => {
             const selecting = selectingBranchId === branch.branch_id;
             return (
-              <button
-                key={branch.branch_id}
-                type="button"
-                disabled={Boolean(selectingBranchId)}
-                onClick={() => void chooseBranch(branch.branch_id)}
-                className="flex w-full items-center gap-3 rounded-2xl border bg-white p-4 text-right transition hover:border-[#005931]/40 hover:bg-emerald-50/40 disabled:opacity-60"
-              >
+              <button key={branch.branch_id} type="button" disabled={Boolean(selectingBranchId)} onClick={() => void chooseBranch(branch.branch_id)} className="flex w-full items-center gap-3 rounded-2xl border bg-white p-4 text-right transition hover:border-[#005931]/40 hover:bg-emerald-50/40 disabled:opacity-60">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-[#005931]"><Building2 className="h-5 w-5" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2"><span className="truncate font-black">{branch.branch_name}</span>{branch.is_primary && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">أساسي</span>}</div>
@@ -147,38 +139,12 @@ export default function HrLogin() {
           {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
           <div className="space-y-2">
             <Label htmlFor="hr-username">اسم المستخدم</Label>
-            <Input
-              id="hr-username"
-              name="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              inputMode="text"
-              enterKeyHint="next"
-              className="h-12 rounded-xl"
-              placeholder="اسم المستخدم"
-            />
+            <Input id="hr-username" name="username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="text" enterKeyHint="next" className="h-12 rounded-xl" placeholder="اسم المستخدم" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="hr-password">كلمة المرور</Label>
             <div className="relative">
-              <Input
-                id="hr-password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                enterKeyHint="done"
-                className="h-12 rounded-xl pl-12"
-                placeholder="كلمة المرور"
-              />
+              <Input id="hr-password" name="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="done" className="h-12 rounded-xl pl-12" placeholder="كلمة المرور" />
               <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="إظهار أو إخفاء كلمة المرور">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
             </div>
           </div>
