@@ -155,7 +155,7 @@ export async function getHrScopedEmployeeProfile(employeeId: string, branchId: s
 }
 
 export async function getHrEmployeePerformanceDetail(employeeId: string, branchId: string, from: string, to: string): Promise<HrEmployeePerformanceDetail> {
-  const { data, error } = await supabase.rpc("get_hr_employee_performance_detail_v1", {
+  const { data, error } = await supabase.rpc("get_hr_employee_performance_detail_v2", {
     p_employee_id: employeeId,
     p_branch_id: branchId,
     p_from: from,
