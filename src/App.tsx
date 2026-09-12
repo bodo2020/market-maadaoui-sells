@@ -1,6 +1,5 @@
 import ApprovalCenterNotifications from "@/components/approvals/ApprovalCenterNotifications";
 import OperationsTaskNotifications from "@/components/tasks/OperationsTaskNotifications";
-import NativeBackButtonGuard from "@/components/native/NativeBackButtonGuard";
 import { BrowserRouter as Router } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -19,7 +18,6 @@ function App() {
       <Router>
         <AuthProvider>
           <TooltipProvider>
-            <NativeBackButtonGuard />
             <OperationsTaskNotifications />
             <ApprovalCenterNotifications />
             <AppRoutes />
