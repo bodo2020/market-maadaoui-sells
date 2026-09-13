@@ -30,14 +30,17 @@ export default function App() {
 }
 
 function BusinessAccessGate() {
-  const { loading, error, reload } = useBusiness();
+  const { loading, error, reload, selectedBranch } = useBusiness();
   if (loading) return <div className="full-loader"><span className="brand__mark">م</span><p>جاري تحميل الفروع والصلاحيات…</p></div>;
   if (error) return <div className="auth-page"><section className="auth-card setup-card"><h1>تعذر فتح تطبيق الأعمال</h1><p>{error}</p><button className="primary-button" onClick={() => void reload()}>إعادة المحاولة</button></section></div>;
 
+  const canViewReports = selectedBranch?.permissions.includes('reports.view') === true;
+  const canViewFinance = selectedBranch?.permissions.some((permission) => permission === 'finance.view' || permission === 'finance.manage') === true;
+
   return <AppShell><Routes>
-    <Route path="/" element={<Dashboard/>}/>
-    <Route path="/reports" element={<Reports/>}/>
-    <Route path="/finance" element={<Finance/>}/>
+    <Route path="/" element={canViewReports ? <Dashboard/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports" element={canViewReports ? <Reports/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/finance" element={canViewFinance ? <Finance/> : <Navigate to="/" replace/>}/>
     <Route path="/notifications" element={<Notifications/>}/>
     <Route path="/more" element={<More/>}/>
     <Route path="*" element={<Navigate to="/" replace/>}/>
