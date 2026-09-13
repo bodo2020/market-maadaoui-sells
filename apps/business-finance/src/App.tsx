@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import type { Session } from '@supabase/supabase-js';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppShell from './components/AppShell';
@@ -21,6 +23,15 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setLoading(false); });
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
     return () => subscription.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const listener = CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      if (canGoBack && window.history.length > 1) window.history.back();
+      else void CapacitorApp.exitApp();
+    });
+    return () => { void listener.then((handle) => handle.remove()); };
   }, []);
 
   if (!hasSupabaseConfig) return <SetupRequired />;

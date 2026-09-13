@@ -1,4 +1,4 @@
-import { ArrowUpLeft, Boxes, Building2, CircleDollarSign, ClipboardList, PackageSearch, RotateCcw, ShoppingCart, Truck, Users } from 'lucide-react';
+import { ArrowLeftRight, ArrowUpLeft, Boxes, Building2, CircleDollarSign, ClipboardList, Lightbulb, PackageSearch, Receipt, RotateCcw, ShoppingCart, Truck, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ReportKey } from '../services/reportingDetails';
 
@@ -12,6 +12,10 @@ export const reports: Array<{ key: ReportKey; title: string; desc: string; icon:
   { key: 'cashiers', title: 'الكاشير والورديات', desc: 'الأداء، Cash Variance والتسليم حسب وسيلة الدفع.', icon: Users },
   { key: 'branches', title: 'الفروع', desc: 'مقارنة الفروع المتاحة في المبيعات والربحية والمصروفات.', icon: Building2 },
   { key: 'online', title: 'الأونلاين والتوصيل', desc: 'Orders، الإلغاء، التحصيل وأداء التنفيذ والتوصيل.', icon: Truck },
+  { key: 'customers', title: 'العملاء والولاء', desc: 'الجدد والعائدون، قيمة العميل، التغطية والولاء.', icon: Users },
+  { key: 'costs', title: 'التكاليف والموردون', desc: 'المصروفات، المشتريات، الرواتب والتزامات الموردين.', icon: Receipt },
+  { key: 'transfers', title: 'تحويلات المخزون', desc: 'الصادر والوارد، فروق الاستلام والمهام المتأخرة.', icon: ArrowLeftRight },
+  { key: 'insights', title: 'الإشارات الذكية', desc: 'مشكلات وفرص مرتبة حسب الأولوية من القواعد الفعلية.', icon: Lightbulb },
 ];
 
 export default function Reports() {

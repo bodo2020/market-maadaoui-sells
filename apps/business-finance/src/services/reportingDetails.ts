@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { explainRpcError, resolvePeriod, type BusinessFilters, type StaffBranch } from './businessFinance';
 
-export const reportKeys = ['sales', 'profitability', 'products', 'inventory', 'payments', 'returns', 'cashiers', 'branches', 'online'] as const;
+export const reportKeys = ['sales', 'profitability', 'products', 'inventory', 'payments', 'returns', 'cashiers', 'branches', 'online', 'customers', 'costs', 'insights', 'transfers'] as const;
 export type ReportKey = typeof reportKeys[number];
 export type ReportDocument = Record<string, unknown>;
 
@@ -40,7 +40,12 @@ export async function fetchDetailedReport(key: ReportKey, filters: BusinessFilte
   if (key === 'returns') return rpc('get_reporting_returns_v2', base);
   if (key === 'cashiers') return rpc('get_reporting_shifts_v2', { ...base, p_limit: 100 });
   if (key === 'online') return rpc('get_reporting_online_v2', { ...base, p_limit: 100 });
+  if (key === 'customers') return rpc('get_reporting_customers_v2', { ...base, p_limit: 100 });
+  if (key === 'costs') return rpc('get_reporting_costs_v2', { ...base, p_limit: 100 });
+  if (key === 'insights') return rpc('get_reporting_insights_v2', base);
+  if (key === 'transfers') return rpc('get_reporting_inventory_transfers_v2', base);
 
+  // The branch comparison intentionally reuses the same secured overview RPC for every accessible branch.
   const range = resolvePeriod(filters);
   const allowedBranches = branches.filter((branch) => branch.permissions.includes('reports.view'));
   const rows = await Promise.all(allowedBranches.map(async (branch) => {

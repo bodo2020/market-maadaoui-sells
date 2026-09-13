@@ -16,7 +16,7 @@ const titles: Record<string, string> = { '/': 'نظرة عامة', '/reports': '
 export default function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { branches, identity, selectedBranch, selectBranch } = useBusiness();
-  const title = titles[location.pathname] ?? 'المعداوي للأعمال';
+  const title = location.pathname.startsWith('/reports/') ? 'تفاصيل التقرير' : titles[location.pathname] ?? 'المعداوي للأعمال';
   const visibleNav = nav.filter((item) => {
     if (item.to === '/' || item.to === '/reports') return selectedBranch?.permissions.includes('reports.view');
     if (item.to === '/finance') return selectedBranch?.permissions.some((permission) => permission === 'finance.view' || permission === 'finance.manage');

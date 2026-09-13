@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, BarChart3, Boxes, CircleDollarSign, FileText, PackageSearch, RefreshCcw, RotateCcw, ShoppingCart, Truck, Users, WalletCards } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, BarChart3, Boxes, CircleDollarSign, FileText, Lightbulb, PackageSearch, Receipt, RefreshCcw, RotateCcw, ShoppingCart, Truck, Users, WalletCards } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import { money, number } from '../components/MetricCard';
@@ -23,6 +23,10 @@ const icons: Record<ReportKey, LucideIcon> = {
   cashiers: Users,
   branches: BarChart3,
   online: Truck,
+  customers: Users,
+  costs: Receipt,
+  insights: Lightbulb,
+  transfers: ArrowLeftRight,
 };
 
 export default function ReportDetail() {
@@ -95,7 +99,11 @@ function present(key: ReportKey, data: ReportDocument): Presentation {
   if (key === 'returns') return returnsPresentation(data, summary);
   if (key === 'cashiers') return cashiersPresentation(data, summary);
   if (key === 'branches') return branchesPresentation(data);
-  return onlinePresentation(data, summary);
+  if (key === 'online') return onlinePresentation(data, summary);
+  if (key === 'customers') return customersPresentation(data, summary);
+  if (key === 'costs') return costsPresentation(data, summary);
+  if (key === 'transfers') return transfersPresentation(data, summary);
+  return insightsPresentation(data, summary);
 }
 
 function salesPresentation(data: ReportDocument, summary: Record<string, unknown>): Presentation {
@@ -196,10 +204,51 @@ function onlinePresentation(data: ReportDocument, summary: Record<string, unknow
   };
 }
 
+function customersPresentation(data: ReportDocument, summary: Record<string, unknown>): Presentation {
+  return {
+    metrics: [metric('عملاء اشتروا', number(n(summary.realized_customers_in_period))), metric('عملاء جدد', number(n(summary.new_realized_customers))), metric('عملاء عائدون', number(n(summary.returning_realized_customers))), metric('تغطية هوية المبيعات', percent(summary.overall_identity_coverage_percent))],
+    tables: [
+      table('Customer Value', 'العملاء', ['العميل', 'الهاتف', 'المرحلة', 'فواتير POS', 'طلبات أونلاين', 'قيمة الفترة', 'القيمة التاريخية', 'نقاط الولاء'], rows(data.customers).map((row) => [s(row.customer_name), s(row.phone), customerStage(row.customer_stage), number(n(row.pos_invoices)), number(n(row.online_orders)), money(n(row.period_realized_value)), money(n(row.lifetime_realized_value)), number(n(row.points_balance))]), 'لا توجد حركة عملاء معروفة داخل الفترة.'),
+      table('مصدر الهوية', 'تغطية ربط العميل', ['القناة', 'الإجمالي', 'مرتبط بعميل', 'بدون هوية', 'نسبة التغطية'], [['POS', number(n(summary.pos_transactions)), number(n(summary.pos_linked_transactions)), number(n(summary.pos_anonymous_transactions)), percent(summary.pos_identity_coverage_percent)], ['أونلاين', number(n(summary.online_orders)), number(n(summary.online_linked_orders)), number(n(summary.online_anonymous_orders)), percent(summary.online_identity_coverage_percent)]], 'لا توجد بيانات تغطية.'),
+    ],
+  };
+}
+
+function costsPresentation(data: ReportDocument, summary: Record<string, unknown>): Presentation {
+  const canCosts = Boolean(asRecord(data.permissions).can_view_costs);
+  return {
+    metrics: [metric('المصروفات المعتمدة', canCosts ? money(nullable(summary.active_expense_amount)) : 'محجوب'), metric('المشتريات', canCosts ? money(nullable(summary.purchase_total)) : 'محجوب'), metric('رواتب مدفوعة', canCosts ? money(nullable(summary.salary_paid_amount)) : 'محجوب'), metric('التزامات الموردين', canCosts ? money(nullable(summary.lifetime_supplier_outstanding)) : 'محجوب')],
+    note: !canCosts ? 'قيم التكلفة والموردين محجوبة حسب صلاحيات الحساب.' : undefined,
+    tables: [
+      table('Expenses', 'أنواع المصروفات', ['النوع', 'العمليات', 'القيمة'], rows(data.expense_types).map((row) => [s(row.type, 'غير مصنف'), number(n(row.records)), canCosts ? money(nullable(row.amount)) : 'محجوب']), 'لا توجد مصروفات مسجلة في الفترة.'),
+      table('Suppliers', 'الموردون', ['المورد', 'مشتريات الفترة', 'إجمالي الفترة', 'المدفوع', 'المستحق التاريخي', 'آخر شراء'], rows(data.suppliers).map((row) => [s(row.supplier_name), number(n(row.period_purchase_count)), canCosts ? money(nullable(row.period_purchase_total)) : 'محجوب', canCosts ? money(nullable(row.period_paid_total)) : 'محجوب', canCosts ? money(nullable(row.lifetime_outstanding)) : 'محجوب', date(row.last_purchase_at)]), 'لا توجد حركة موردين داخل الفترة.'),
+    ],
+  };
+}
+
+function transfersPresentation(data: ReportDocument, summary: Record<string, unknown>): Presentation {
+  const canProfit = Boolean(asRecord(data.permissions).can_view_profit);
+  return {
+    metrics: [metric('صادر قيد النقل', number(n(summary.in_transit_outgoing))), metric('وارد قيد النقل', number(n(summary.in_transit_incoming))), metric('استلامات بفروق', number(n(summary.received_with_variance_in_period))), metric('نسبة الفروق', percent(summary.variance_rate_percent))],
+    note: n(summary.overdue_transfer_tasks) > 0 ? `يوجد ${number(n(summary.overdue_transfer_tasks))} مهمة تحويل متأخرة تحتاج إجراء.` : undefined,
+    tables: [table('Inventory Transfers', 'آخر التحويلات', ['التحويل', 'الاتجاه', 'من', 'إلى', 'الحالة', 'الأصناف', 'المشحون', 'المستلم', 'الفرق', 'التكلفة'], rows(data.recent_transfers).map((row) => [s(row.transfer_number), row.direction === 'incoming' ? 'وارد' : 'صادر', s(row.from_branch_name), s(row.to_branch_name), status(row.status), number(n(row.items_count)), number(n(row.shipped_measure)), number(n(row.received_measure)), number(n(row.variance_measure)), canProfit ? money(nullable(row.cost_value)) : 'محجوب']), 'لا توجد تحويلات مخزون داخل الفترة.')],
+  };
+}
+
+function insightsPresentation(data: ReportDocument, summary: Record<string, unknown>): Presentation {
+  return {
+    metrics: [metric('إجمالي الإشارات', number(n(summary.total))), metric('عاجل', number(n(summary.critical))), metric('تحذيرات', number(n(summary.warning))), metric('فرص', number(n(summary.opportunity)))],
+    note: asRecord(data.data_quality).generative_ai_used === false ? 'الإشارات مبنية على قواعد وبيانات فعلية، ولا تستخدم ذكاءً توليديًا لتخمين النتائج.' : undefined,
+    tables: [table('Smart Insights', 'الإشارات حسب الأولوية', ['الإشارة', 'النوع', 'المؤشر', 'القيمة', 'الإجراء'], rows(data.insights).map((row) => [s(row.title), insightSeverity(row.severity), s(row.metric_label), `${number(n(row.metric_value))} ${s(row.metric_unit, '')}`.trim(), s(row.action)]), 'لا توجد إشارات تشغيلية للفترة المحددة.')],
+  };
+}
+
 function metric(label: string, value: string, hint?: string): Metric { return { label, value, hint }; }
 function table(eyebrow: string, title: string, columns: string[], body: string[][], empty: string): Table { return { eyebrow, title, columns, rows: body, empty }; }
 function channel(value: unknown) { return value === 'online' ? 'أونلاين' : value === 'pos' ? 'POS' : s(value); }
 function returnType(value: unknown) { return value === 'full' ? 'كامل' : value === 'partial' ? 'جزئي' : s(value); }
+function customerStage(value: unknown) { const labels: Record<string, string> = { prospect: 'محتمل', new: 'جديد', returning: 'عائد', engaged: 'نشط' }; return labels[String(value || '')] || s(value); }
+function insightSeverity(value: unknown) { const labels: Record<string, string> = { critical: 'عاجل', warning: 'تحذير', opportunity: 'فرصة', info: 'معلومة' }; return labels[String(value || '')] || s(value); }
 function status(value: unknown) {
   const labels: Record<string, string> = { open: 'مفتوحة', closed: 'مغلقة', approved: 'معتمد', rejected: 'مرفوض', pending: 'معلق', delivered: 'تم التسليم', cancelled: 'ملغي', processing: 'قيد التنفيذ', paid: 'مدفوع', failed: 'فشل', refunded: 'مردود' };
   return labels[String(value || '')] || s(value);
