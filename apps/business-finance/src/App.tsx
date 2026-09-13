@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import AppShell from './components/AppShell';
+import { BusinessProvider, useBusiness } from './context/BusinessContext';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
 import Dashboard from './pages/Dashboard';
 import Finance from './pages/Finance';
@@ -24,6 +25,14 @@ export default function App() {
   if (!hasSupabaseConfig) return <SetupRequired />;
   if (loading) return <div className="full-loader"><span className="brand__mark">م</span><p>جاري تجهيز المعداوي للأعمال…</p></div>;
   if (!session) return <Routes><Route path="*" element={<Login/>}/></Routes>;
+
+  return <BusinessProvider><BusinessAccessGate /></BusinessProvider>;
+}
+
+function BusinessAccessGate() {
+  const { loading, error, reload } = useBusiness();
+  if (loading) return <div className="full-loader"><span className="brand__mark">م</span><p>جاري تحميل الفروع والصلاحيات…</p></div>;
+  if (error) return <div className="auth-page"><section className="auth-card setup-card"><h1>تعذر فتح تطبيق الأعمال</h1><p>{error}</p><button className="primary-button" onClick={() => void reload()}>إعادة المحاولة</button></section></div>;
 
   return <AppShell><Routes>
     <Route path="/" element={<Dashboard/>}/>

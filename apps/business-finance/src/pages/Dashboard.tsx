@@ -1,20 +1,107 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Banknote, FileText, PackageCheck, ReceiptText, RefreshCcw, ShoppingBasket, TrendingUp, WalletCards } from 'lucide-react';
 import MetricCard, { money, number } from '../components/MetricCard';
-import { fetchOverview, ReportingEngineUnavailableError, type BusinessFilters, type OverviewData, type PeriodKey } from '../services/businessFinance';
+import { useBusiness } from '../context/BusinessContext';
+import { fetchOverview, type BusinessFilters, type OverviewData, type PeriodKey } from '../services/businessFinance';
 
-const periods: Array<{ key: PeriodKey; label: string }> = [{ key: 'today', label: 'اليوم' },{ key: 'yesterday', label: 'أمس' },{ key: 'week', label: 'الأسبوع' },{ key: 'month', label: 'الشهر' }];
+const periods: Array<{ key: PeriodKey; label: string }> = [
+  { key: 'today', label: 'اليوم' },
+  { key: 'yesterday', label: 'أمس' },
+  { key: 'week', label: 'الأسبوع' },
+  { key: 'month', label: 'الشهر' },
+];
+
 export default function Dashboard() {
-  const [period, setPeriod] = useState<PeriodKey>('today'); const [data, setData] = useState<OverviewData | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
-  const filters = useMemo<BusinessFilters>(() => ({ period }), [period]);
-  async function load() { setLoading(true); setError(null); try { setData(await fetchOverview(filters)); } catch (err) { setData(null); setError(err instanceof ReportingEngineUnavailableError ? 'واجهة التطبيق جاهزة، لكن RPC محرك التقارير الجديد لم يتم نشره على قاعدة البيانات بعد. لن نعرض أرقامًا قديمة أو تقديرية مكانه.' : err instanceof Error ? err.message : 'تعذر تحميل بيانات التقارير.'); } finally { setLoading(false); } }
-  useEffect(() => { void load(); }, [period]);
+  const { selectedBranch } = useBusiness();
+  const [period, setPeriod] = useState<PeriodKey>('today');
+  const [data, setData] = useState<OverviewData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const filters = useMemo<BusinessFilters | null>(
+    () => selectedBranch ? { period, branchId: selectedBranch.branch_id } : null,
+    [period, selectedBranch],
+  );
+
+  async function load() {
+    if (!filters) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setData(await fetchOverview(filters));
+    } catch (cause) {
+      setData(null);
+      setError(cause instanceof Error ? cause.message : 'تعذر تحميل بيانات التقارير.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(); }, [filters]);
+
   return <div className="stack-lg">
-    <section className="hero-panel"><div><span className="eyebrow">مركز متابعة الأعمال</span><h2>كل أرقام المعداوي في مكان واحد</h2><p>المبيعات، الربحية، التحصيل والسيولة — بنفس التعريفات المالية على مستوى النظام.</p></div><div className="period-switcher">{periods.map(item => <button key={item.key} className={period === item.key ? 'active' : ''} onClick={() => setPeriod(item.key)}>{item.label}</button>)}</div></section>
-    {error && <section className="engine-banner"><div><strong>محرك البيانات غير متصل بعد</strong><p>{error}</p></div><button className="secondary-button" onClick={() => void load()}><RefreshCcw size={17}/> إعادة المحاولة</button></section>}
-    <section className="metrics-grid"><MetricCard title="صافي المبيعات" value={loading ? '…' : money(data?.netSales.value)} change={data?.netSales.changePercent} icon={TrendingUp}/><MetricCard title="إجمالي الربح" value={loading ? '…' : money(data?.grossProfit.value)} change={data?.grossProfit.changePercent} icon={Banknote} emphasis="success"/><MetricCard title="صافي الربح" value={loading ? '…' : money(data?.netProfit.value)} change={data?.netProfit.changePercent} icon={WalletCards} emphasis="success"/><MetricCard title="عدد الفواتير" value={loading ? '…' : number(data?.invoices.value)} change={data?.invoices.changePercent} icon={FileText}/></section>
-    <section className="split-grid"><article className="section-card"><div className="section-heading"><div><span className="eyebrow">اتجاه المبيعات</span><h3>حركة الفترة</h3></div><TrendingUp size={20}/></div><div className="timeline-chart">{data?.timeline?.length ? data.timeline.map((point,index) => { const max=Math.max(...data.timeline.map(p=>p.amount),1); return <div className="chart-column" key={`${point.label}-${index}`}><div className="chart-bar" style={{height:`${Math.max(8,(point.amount/max)*100)}%`}} title={money(point.amount)}/><span>{point.label}</span></div>; }) : <EmptyData text="سيظهر اتجاه المبيعات فور اتصال Reporting Engine."/>}</div></article><article className="section-card"><div className="section-heading"><div><span className="eyebrow">قنوات البيع</span><h3>POS مقابل Online</h3></div><ShoppingBasket size={20}/></div><div className="rows-list">{data?.channels?.length ? data.channels.map(c => <div className="data-row" key={c.key}><span>{c.label}</span><strong>{money(c.amount)}</strong></div>) : <EmptyData text="لا توجد بيانات قنوات متاحة."/>}</div></article></section>
-    <section className="split-grid"><article className="section-card"><div className="section-heading"><div><span className="eyebrow">التحصيل</span><h3>وسائل الدفع</h3></div><ReceiptText size={20}/></div><div className="rows-list">{data?.payments?.length ? data.payments.map(p => <div className="data-row data-row--two-line" key={p.key}><div><span>{p.label}</span>{p.fee != null && <small>رسوم {money(p.fee)}</small>}</div><strong>{money(p.amount)}</strong></div>) : <EmptyData text="ستظهر Cash / Card / Vodafone Cash / InstaPay من الـPayment Ledger الجديد."/>}</div></article><article className="section-card quick-stats"><div className="section-heading"><div><span className="eyebrow">مؤشرات سريعة</span><h3>جودة المبيعات</h3></div><PackageCheck size={20}/></div><div className="quick-stat"><span>متوسط الفاتورة</span><strong>{loading?'…':money(data?.averageBasket)}</strong></div><div className="quick-stat"><span>الوحدات المباعة</span><strong>{loading?'…':number(data?.unitsSold)}</strong></div><div className="quick-stat"><span>المرتجعات</span><strong>{loading?'…':money(data?.returns)}</strong></div><div className="quick-stat"><span>المصروفات</span><strong>{loading?'…':money(data?.expenses)}</strong></div></article></section>
+    <section className="hero-panel">
+      <div>
+        <span className="eyebrow">مركز متابعة الأعمال</span>
+        <h2>{selectedBranch?.branch_name || 'كل أرقام المعداوي'} في مكان واحد</h2>
+        <p>بيانات فعلية من Invoice V2 ودفاتر الدفع والخزن، مع تطبيق صلاحيات الفرع على الخادم.</p>
+      </div>
+      <PeriodSwitcher period={period} onChange={setPeriod} />
+    </section>
+
+    {error && <section className="engine-banner">
+      <div><strong>تعذر تحميل بيانات الفرع</strong><p>{error}</p></div>
+      <button className="secondary-button" onClick={() => void load()}><RefreshCcw size={17}/> إعادة المحاولة</button>
+    </section>}
+
+    <section className="metrics-grid">
+      <MetricCard title="صافي المبيعات" value={loading ? '…' : money(data?.netSales.value)} change={data?.netSales.changePercent} icon={TrendingUp}/>
+      <MetricCard title="إجمالي ربح POS" value={loading ? '…' : money(data?.grossProfit.value)} change={data?.grossProfit.changePercent} icon={Banknote} emphasis="success"/>
+      <MetricCard title="النتيجة التشغيلية المعروفة" value={loading ? '…' : money(data?.netProfit.value)} change={data?.netProfit.changePercent} icon={WalletCards} emphasis="success" hint="تستبعد ربح الأونلاين غير المكتمل"/>
+      <MetricCard title="عدد الفواتير والطلبات" value={loading ? '…' : number(data?.invoices.value)} change={data?.invoices.changePercent} icon={FileText}/>
+    </section>
+
+    {data && !data.profit.onlineProfitComplete && <p className="data-scope-note">الربحية الحالية محسوبة من فواتير POS المكتملة؛ مبيعات الأونلاين ظاهرة في الإيراد، لكن تكلفة وربح الأونلاين لم يكتمل ربطهما بعد.</p>}
+
+    <section className="split-grid">
+      <article className="section-card">
+        <div className="section-heading"><div><span className="eyebrow">اتجاه المبيعات</span><h3>حركة الفترة</h3></div><TrendingUp size={20}/></div>
+        <div className="timeline-chart">{data?.timeline?.length ? data.timeline.map((point, index) => {
+          const max = Math.max(...data.timeline.map((item) => item.amount), 1);
+          return <div className="chart-column" key={`${point.label}-${index}`}>
+            <div className="chart-bar" style={{ height: `${Math.max(8, (Math.max(point.amount, 0) / max) * 100)}%` }} title={money(point.amount)}/>
+            <span>{point.label}</span>
+          </div>;
+        }) : <EmptyData text="لا توجد مبيعات مسجلة داخل الفترة."/>}</div>
+      </article>
+      <article className="section-card">
+        <div className="section-heading"><div><span className="eyebrow">قنوات البيع</span><h3>POS مقابل Online</h3></div><ShoppingBasket size={20}/></div>
+        <div className="rows-list">{data?.channels?.map((channel) => <div className="data-row" key={channel.key}><span>{channel.label}</span><strong>{money(channel.amount)}</strong></div>)}</div>
+      </article>
+    </section>
+
+    <section className="split-grid">
+      <article className="section-card">
+        <div className="section-heading"><div><span className="eyebrow">التحصيل</span><h3>وسائل الدفع</h3></div><ReceiptText size={20}/></div>
+        <div className="rows-list">{data?.payments?.length ? data.payments.map((payment) => <div className="data-row data-row--two-line" key={payment.key}>
+          <div><span>{payment.label}</span>{payment.fee !== 0 && <small>رسوم {money(payment.fee)}</small>}</div>
+          <strong>{money(payment.amount)}</strong>
+        </div>) : <EmptyData text="لا توجد تحصيلات في الفترة المحددة."/>}</div>
+      </article>
+      <article className="section-card quick-stats">
+        <div className="section-heading"><div><span className="eyebrow">مؤشرات سريعة</span><h3>جودة المبيعات</h3></div><PackageCheck size={20}/></div>
+        <div className="quick-stat"><span>متوسط الفاتورة</span><strong>{loading ? '…' : money(data?.averageBasket)}</strong></div>
+        <div className="quick-stat"><span>الوحدات المباعة</span><strong>{loading ? '…' : number(data?.unitsSold)}</strong></div>
+        <div className="quick-stat"><span>المرتجعات</span><strong>{loading ? '…' : money(data?.returns)}</strong></div>
+        <div className="quick-stat"><span>المصروفات</span><strong>{loading ? '…' : money(data?.expenses)}</strong></div>
+      </article>
+    </section>
   </div>;
 }
-function EmptyData({ text }: { text: string }) { return <div className="empty-data"><span>—</span><p>{text}</p></div>; }
+
+export function PeriodSwitcher({ period, onChange }: { period: PeriodKey; onChange: (period: PeriodKey) => void }) {
+  return <div className="period-switcher">{periods.map((item) => <button type="button" key={item.key} className={period === item.key ? 'active' : ''} onClick={() => onChange(item.key)}>{item.label}</button>)}</div>;
+}
+
+function EmptyData({ text }: { text: string }) {
+  return <div className="empty-data"><span>—</span><p>{text}</p></div>;
+}
