@@ -1,0 +1,20 @@
+export const design = {
+  colors: {
+    primary: '#0B5D3B',
+    primaryDark: '#07472E',
+    primaryLight: '#E8F3EE',
+    secondary: '#E0A21A',
+    secondaryLight: '#FFF6DD',
+    background: '#F6F8F7',
+    surface: '#FFFFFF',
+    text: '#17231D',
+    textSecondary: '#66756D',
+    divider: '#E4EAE7',
+    error: '#C62828',
+    success: '#188750',
+    warning: '#F29900',
+  },
+  radius: { sm: 10, md: 16, lg: 22, xl: 28 },
+  pagePadding: 20,
+  sectionGap: 24,
+} as const;
