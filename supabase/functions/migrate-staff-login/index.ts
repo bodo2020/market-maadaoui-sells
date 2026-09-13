@@ -26,13 +26,6 @@ async function sha256(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function safeEqual(a: string, b: string) {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
 function toBase64Url(value: string): string {
   const bytes = new TextEncoder().encode(value);
   let binary = "";
@@ -108,7 +101,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: user, error: userError } = await supabase
       .from("users")
-      .select("id,name,username,password,phone,active,created_at,system_role_id")
+      .select("id,name,username,phone,active,created_at,system_role_id")
       .eq("username", username)
       .maybeSingle();
 
@@ -117,23 +110,11 @@ Deno.serve(async (req: Request) => {
       return genericFailure();
     }
 
-    const storedPassword = String(user.password ?? "");
-    const alreadyMigrated = storedPassword.startsWith("__migrated__:");
-
-    // The normal Supabase password sign-in is attempted before this migration
-    // endpoint. If this row is already migrated, reaching here means that sign-in
-    // failed. Return the same generic failure as an unknown user and count it,
-    // rather than exposing whether a staff username exists or is already migrated.
-    if (alreadyMigrated) {
-      await logAttempt(identifierHash, ipHash, false);
-      return genericFailure();
-    }
-
-    // Verify the legacy password before returning any branch/account-specific
-    // response. This prevents username/branch enumeration through the migration API.
-    const suppliedHash = await sha256(password);
-    const storedHash = await sha256(storedPassword);
-    if (!safeEqual(suppliedHash, storedHash)) {
+    const { data: legacyPasswordOk, error: verifyError } = await supabase.rpc(
+      "verify_legacy_staff_password_v1",
+      { p_user_id: user.id, p_password: password },
+    );
+    if (verifyError || legacyPasswordOk !== true) {
       await logAttempt(identifierHash, ipHash, false);
       return genericFailure();
     }
