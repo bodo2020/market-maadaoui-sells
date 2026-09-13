@@ -1,58 +1,25 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Cache-Control": "no-store",
+};
 
-serve(async (req) => {
-  try {
-    // Create a Supabase client with the Auth context of the logged in user
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    )
-
-    const { data: { user } } = await supabaseClient.auth.getUser()
-    
-    // Only allow admins to create buckets
-    if (!user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { headers: { 'Content-Type': 'application/json' }, status: 401 }
-      )
-    }
-
-    // Get the bucket name from the request
-    const { bucketName } = await req.json()
-    
-    if (!bucketName) {
-      return new Response(
-        JSON.stringify({ error: 'Bucket name is required' }),
-        { headers: { 'Content-Type': 'application/json' }, status: 400 }
-      )
-    }
-
-    // Create the bucket if it doesn't exist
-    const { data, error } = await supabaseClient.rpc('create_bucket_if_not_exists', {
-      bucket_name: bucketName
-    })
-
-    if (error) {
-      throw error
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, message: `Bucket ${bucketName} has been created or already exists` }),
-      { headers: { 'Content-Type': 'application/json' }, status: 200 }
-    )
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { headers: { 'Content-Type': 'application/json' }, status: 500 }
-    )
+Deno.serve((req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
-})
+
+  return new Response(
+    JSON.stringify({
+      error: "endpoint_retired",
+      message: "Storage policies are managed by database migrations; runtime policy creation is disabled in production.",
+    }),
+    {
+      status: 410,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+});
