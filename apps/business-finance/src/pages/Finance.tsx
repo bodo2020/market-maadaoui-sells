@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowUpLeft, Banknote, Building2, CreditCard, Landmark, RefreshCcw, WalletCards } from 'lucide-react';
 import { money, number } from '../components/MetricCard';
+import PeriodSwitcher from '../components/PeriodSwitcher';
 import { useBusiness } from '../context/BusinessContext';
-import { PeriodSwitcher } from './Dashboard';
 import {
   fetchFinanceWorkspace,
   fetchOverview,

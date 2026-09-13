@@ -198,7 +198,7 @@ function isMissingFunction(message: string) {
   return value.includes('function') && (value.includes('does not exist') || value.includes('could not find'));
 }
 
-function explainRpcError(message?: string) {
+export function explainRpcError(message?: string) {
   const value = message || '';
   if (isMissingFunction(value)) return new ReportingEngineUnavailableError();
   if (value.includes('AUTH_REQUIRED')) return new Error('انتهت جلسة تسجيل الدخول. سجل الدخول مرة أخرى.');
