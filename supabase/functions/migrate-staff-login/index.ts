@@ -22,8 +22,7 @@ function json(body: unknown, status = 200) {
 }
 
 async function sha256(value: string): Promise<string> {
-  const data = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", data);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
@@ -60,6 +59,8 @@ async function clearLegacyPassword(userId: string) {
   if (error) console.error("Auth account ready but legacy password could not be cleared", error.message);
 }
 
+const genericFailure = (message = "اسم المستخدم أو كلمة المرور غير صحيح") => json({ error: message }, 401);
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -77,7 +78,7 @@ Deno.serve(async (req: Request) => {
     const branchCode = typeof body?.branchCode === "string" ? body.branchCode.trim() : "";
 
     if (!username || !password || username.length > 100 || password.length > 256 || branchCode.length > 100) {
-      return json({ error: "بيانات الدخول غير صحيحة" }, 401);
+      return genericFailure("بيانات الدخول غير صحيحة");
     }
 
     const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "";
@@ -85,23 +86,65 @@ Deno.serve(async (req: Request) => {
     const ipHash = forwarded ? await sha256(forwarded) : null;
     const cutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
-    const { count: identifierFailures } = await supabase.from("staff_login_attempts").select("id", { count: "exact", head: true }).eq("identifier_hash", identifierHash).eq("success", false).gte("created_at", cutoff);
-    if ((identifierFailures || 0) >= 5) return json({ error: "محاولات كثيرة. حاول مرة أخرى بعد 15 دقيقة" }, 429);
+    const { count: identifierFailures } = await supabase
+      .from("staff_login_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("identifier_hash", identifierHash)
+      .eq("success", false)
+      .gte("created_at", cutoff);
+    if ((identifierFailures || 0) >= 5) {
+      return json({ error: "محاولات كثيرة. حاول مرة أخرى بعد 15 دقيقة" }, 429);
+    }
 
     if (ipHash) {
-      const { count: ipFailures } = await supabase.from("staff_login_attempts").select("id", { count: "exact", head: true }).eq("ip_hash", ipHash).eq("success", false).gte("created_at", cutoff);
+      const { count: ipFailures } = await supabase
+        .from("staff_login_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("ip_hash", ipHash)
+        .eq("success", false)
+        .gte("created_at", cutoff);
       if ((ipFailures || 0) >= 20) return json({ error: "محاولات كثيرة. حاول مرة أخرى لاحقاً" }, 429);
     }
 
-    const { data: user, error: userError } = await supabase.from("users").select("id,name,username,password,phone,active,created_at,system_role_id").eq("username", username).maybeSingle();
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id,name,username,password,phone,active,created_at,system_role_id")
+      .eq("username", username)
+      .maybeSingle();
+
     if (userError || !user || user.active === false) {
       await logAttempt(identifierHash, ipHash, false);
-      return json({ error: "اسم المستخدم أو كلمة المرور غير صحيح" }, 401);
+      return genericFailure();
+    }
+
+    const storedPassword = String(user.password ?? "");
+    const alreadyMigrated = storedPassword.startsWith("__migrated__:");
+
+    // The normal Supabase password sign-in is attempted before this migration
+    // endpoint. If this row is already migrated, reaching here means that sign-in
+    // failed. Return the same generic failure as an unknown user and count it,
+    // rather than exposing whether a staff username exists or is already migrated.
+    if (alreadyMigrated) {
+      await logAttempt(identifierHash, ipHash, false);
+      return genericFailure();
+    }
+
+    // Verify the legacy password before returning any branch/account-specific
+    // response. This prevents username/branch enumeration through the migration API.
+    const suppliedHash = await sha256(password);
+    const storedHash = await sha256(storedPassword);
+    if (!safeEqual(suppliedHash, storedHash)) {
+      await logAttempt(identifierHash, ipHash, false);
+      return genericFailure();
     }
 
     let isSuperAdmin = false;
     if (user.system_role_id) {
-      const { data: systemRole } = await supabase.from("staff_roles").select("code,scope,active").eq("id", user.system_role_id).maybeSingle();
+      const { data: systemRole } = await supabase
+        .from("staff_roles")
+        .select("code,scope,active")
+        .eq("id", user.system_role_id)
+        .maybeSingle();
       isSuperAdmin = !!systemRole && systemRole.active !== false && systemRole.scope === "system" && systemRole.code === "super_admin";
     }
 
@@ -109,44 +152,45 @@ Deno.serve(async (req: Request) => {
       const { data: branch } = await supabase.from("branches").select("id,active").eq("code", branchCode).maybeSingle();
       if (!branch || branch.active === false) {
         await logAttempt(identifierHash, ipHash, false);
-        return json({ error: "اسم المستخدم أو كلمة المرور أو كود الماركت غير صحيح" }, 401);
+        return genericFailure("اسم المستخدم أو كلمة المرور أو كود الماركت غير صحيح");
       }
       if (!isSuperAdmin) {
-        const { data: assignment } = await supabase.from("user_branch_roles").select("id").eq("user_id", user.id).eq("branch_id", branch.id).eq("active", true).maybeSingle();
+        const { data: assignment } = await supabase
+          .from("user_branch_roles")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("branch_id", branch.id)
+          .eq("active", true)
+          .maybeSingle();
         if (!assignment) {
           await logAttempt(identifierHash, ipHash, false);
-          return json({ error: "اسم المستخدم أو كلمة المرور أو كود الماركت غير صحيح" }, 401);
+          return genericFailure("اسم المستخدم أو كلمة المرور أو كود الماركت غير صحيح");
         }
       }
     } else if (!isSuperAdmin) {
-      const { data: assignments } = await supabase.from("user_branch_roles").select("branch_id").eq("user_id", user.id).eq("active", true).limit(20);
+      const { data: assignments } = await supabase
+        .from("user_branch_roles")
+        .select("branch_id")
+        .eq("user_id", user.id)
+        .eq("active", true)
+        .limit(20);
       const ids = (assignments || []).map((row) => row.branch_id).filter(Boolean);
       if (!ids.length) {
         await logAttempt(identifierHash, ipHash, false);
         return json({ error: "لا يوجد فرع نشط متاح لهذا الحساب" }, 403);
       }
-      const { count: activeBranches } = await supabase.from("branches").select("id", { count: "exact", head: true }).in("id", ids).eq("active", true);
+      const { count: activeBranches } = await supabase
+        .from("branches")
+        .select("id", { count: "exact", head: true })
+        .in("id", ids)
+        .eq("active", true);
       if (!activeBranches) {
         await logAttempt(identifierHash, ipHash, false);
         return json({ error: "لا يوجد فرع نشط متاح لهذا الحساب" }, 403);
       }
     }
 
-    const storedPassword = String(user.password ?? "");
-    const alreadyMigrated = storedPassword.startsWith("__migrated__:");
     const { data: existingAuth } = await supabase.auth.admin.getUserById(user.id);
-
-    if (existingAuth?.user && alreadyMigrated) {
-      return json({ code: "already_migrated" }, 409);
-    }
-
-    const suppliedHash = await sha256(password);
-    const storedHash = await sha256(storedPassword);
-    if (!safeEqual(suppliedHash, storedHash)) {
-      await logAttempt(identifierHash, ipHash, false);
-      return json({ error: "اسم المستخدم أو كلمة المرور غير صحيح" }, 401);
-    }
-
     if (existingAuth?.user) {
       const { error: updateAuthError } = await supabase.auth.admin.updateUserById(user.id, {
         email: staffAuthEmail(user.username),
