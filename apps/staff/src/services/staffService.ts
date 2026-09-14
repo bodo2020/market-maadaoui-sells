@@ -10,6 +10,12 @@ const unwrap = <T>(value: { data: unknown; error: { message?: string } | null })
   return value.data as T;
 };
 
+const withTimeout = <T>(promise: PromiseLike<T>, timeoutMs: number, code: string): Promise<T> =>
+  Promise.race([
+    Promise.resolve(promise),
+    new Promise<T>((_, reject) => window.setTimeout(() => reject(new Error(code)), timeoutMs)),
+  ]);
+
 export type StaffIdentity = {
   user_id: string;
   name: string;
@@ -402,7 +408,7 @@ export async function attendanceCheckIn(
   accuracy: number,
   options: AttendanceCheckInOptions = {},
 ) {
-  return unwrap<Record<string, unknown>>(await rpc("staff_attendance_check_in_v2", {
+  return unwrap<Record<string, unknown>>(await withTimeout(rpc("staff_attendance_check_in_v2", {
     p_branch_id: branchId,
     p_device_id: deviceId,
     p_device_token: token,
@@ -413,7 +419,7 @@ export async function attendanceCheckIn(
     p_exception_reason: options.exceptionReason ?? null,
     p_verification_photo_path: options.verificationPhotoPath ?? null,
     p_verification_photo_sha256: options.verificationPhotoSha256 ?? null,
-  }));
+  }), 20_000, "ATTENDANCE_REQUEST_TIMEOUT"));
 }
 
 export async function uploadAttendanceVerificationSelfie(
@@ -424,16 +430,36 @@ export async function uploadAttendanceVerificationSelfie(
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) throw new Error("AUTH_REQUIRED");
   const path = `${branchId}/${userData.user.id}/${crypto.randomUUID()}-${sha256.slice(0, 12)}.jpg`;
-  const { error } = await supabase.storage
-    .from("hr_attendance_verification")
-    .upload(path, image, { contentType: "image/jpeg", cacheControl: "0", upsert: false });
+  const { error } = await withTimeout(
+    supabase.storage
+      .from("hr_attendance_verification")
+      .upload(path, image, { contentType: "image/jpeg", cacheControl: "0", upsert: false }),
+    25_000,
+    "PHOTO_UPLOAD_TIMEOUT",
+  );
   if (error) throw new Error(error.message || "PHOTO_UPLOAD_FAILED");
   return path;
 }
 
 export async function removeUnsubmittedAttendanceSelfie(path: string) {
-  const { error } = await supabase.storage.from("hr_attendance_verification").remove([path]);
+  const { error } = await withTimeout(
+    supabase.storage.from("hr_attendance_verification").remove([path]),
+    12_000,
+    "PHOTO_DELETE_TIMEOUT",
+  );
   if (error) throw new Error(error.message || "PHOTO_DELETE_FAILED");
+}
+
+export async function cleanupAttendanceVerificationOrphans(branchId: string) {
+  const { data, error } = await withTimeout(
+    supabase.functions.invoke("attendance-exception-decision-v2", {
+      body: { action: "cleanup_orphans", branch_id: branchId },
+    }),
+    15_000,
+    "PHOTO_CLEANUP_TIMEOUT",
+  );
+  if (error || !data?.ok) throw new Error(data?.code || error?.message || "PHOTO_CLEANUP_FAILED");
+  return Number(data.cleaned || 0);
 }
 
 export async function attendanceCheckOut(
