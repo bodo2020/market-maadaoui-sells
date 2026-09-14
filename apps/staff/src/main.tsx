@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import NativeBarcodeFab from "./components/NativeBarcodeFab";
+import SelfDeviceApproval from "./components/SelfDeviceApproval";
 import { installStaffAuthEnhancements } from "./authEnhancer";
 import { installNativeAppBridge } from "./nativeAppBridge";
 import "./styles.css";
@@ -16,5 +17,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
     <NativeBarcodeFab />
+    <SelfDeviceApproval />
   </React.StrictMode>,
 );
