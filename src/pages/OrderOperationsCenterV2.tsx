@@ -1,13 +1,18 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Clock3, PackageCheck, RefreshCw, Route, TimerReset, Truck, UserCheck } from "lucide-react";
+import { Clock3, PackageCheck, RefreshCw, Route, Settings2, TimerReset, Truck, UserCheck } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useBranchStore } from "@/stores/branchStore";
-import { assignRecommendedDelivery, fetchFulfillmentWorkspace } from "@/services/supabase/orderFulfillmentV1Service";
+import {
+  assignRecommendedDelivery,
+  fetchFulfillmentWorkspace,
+  fetchPickerAssignmentPolicy,
+  setPickerAssignmentPolicy,
+} from "@/services/supabase/orderFulfillmentV1Service";
 import { toast } from "sonner";
 
 const stateLabel: Record<string, string> = {
@@ -33,12 +38,29 @@ export default function OrderOperationsCenterV2() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { currentBranchId, currentBranchName } = useBranchStore();
+  const [policyMode, setPolicyMode] = useState<"shadow" | "assisted">("shadow");
+  const [offerTtl, setOfferTtl] = useState(90);
+  const [savingPolicy, setSavingPolicy] = useState(false);
+
   const query = useQuery({
     queryKey: ["order-fulfillment-v1", currentBranchId],
     enabled: Boolean(currentBranchId),
     queryFn: () => fetchFulfillmentWorkspace(currentBranchId!),
     refetchInterval: 20_000,
   });
+
+  const policyQuery = useQuery({
+    queryKey: ["picker-assignment-policy-v1", currentBranchId],
+    enabled: Boolean(currentBranchId),
+    queryFn: () => fetchPickerAssignmentPolicy(currentBranchId!),
+    refetchInterval: 30_000,
+  });
+
+  useEffect(() => {
+    if (!policyQuery.data) return;
+    setPolicyMode(policyQuery.data.mode);
+    setOfferTtl(Number(policyQuery.data.offer_ttl_seconds || 90));
+  }, [policyQuery.data?.mode, policyQuery.data?.offer_ttl_seconds]);
 
   const orders = query.data?.orders || [];
   const summary = query.data?.summary;
@@ -56,6 +78,23 @@ export default function OrderOperationsCenterV2() {
     }
   };
 
+  const saveAssignmentPolicy = async () => {
+    if (!currentBranchId || !policyQuery.data?.can_manage) return;
+    try {
+      setSavingPolicy(true);
+      await setPickerAssignmentPolicy(currentBranchId, policyMode, offerTtl);
+      toast.success(policyMode === "assisted" ? `تم تشغيل التوزيع المساعد بمهلة ${offerTtl} ثانية` : "تم الرجوع لوضع Shadow بدون توزيع فعلي");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["picker-assignment-policy-v1", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["order-fulfillment-v1", currentBranchId] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر حفظ سياسة توزيع المهام");
+    } finally {
+      setSavingPolicy(false);
+    }
+  };
+
   return (
     <MainLayout>
       <div dir="rtl" className="mx-auto max-w-7xl space-y-5 py-5">
@@ -70,6 +109,34 @@ export default function OrderOperationsCenterV2() {
             <Button variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}><RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
           </div>
         </header>
+
+        {!policyQuery.isLoading && policyQuery.data && <Card className={`overflow-hidden border-2 ${policyQuery.data.mode === "assisted" ? "border-emerald-300 bg-emerald-50/40" : "border-slate-200 bg-white"}`}>
+          <CardContent className="p-4 md:p-5">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#005931] text-white"><Settings2 className="h-5 w-5" /></div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2"><h2 className="font-black text-slate-950">توزيع مهام التجهيز الذكي</h2><span className={`rounded-full px-3 py-1 text-xs font-black ${policyQuery.data.mode === "assisted" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"}`}>{policyQuery.data.mode === "assisted" ? "ASSISTED شغال" : "SHADOW مراقبة فقط"}</span></div>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">Shadow يحسب أفضل موظف ويسجل القرار بدون إرسال المهمة. Assisted يعرض الطلب تلقائيًا للموظف الأنسب لمدة محددة، ولو ما قبلهوش ينتقل لموظف آخر.</p>
+                </div>
+              </div>
+
+              {policyQuery.data.can_manage ? <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex rounded-xl border bg-white p-1">
+                  <button type="button" onClick={() => setPolicyMode("shadow")} className={`rounded-lg px-3 py-2 text-xs font-black transition ${policyMode === "shadow" ? "bg-slate-900 text-white" : "text-slate-600"}`}>Shadow</button>
+                  <button type="button" onClick={() => setPolicyMode("assisted")} className={`rounded-lg px-3 py-2 text-xs font-black transition ${policyMode === "assisted" ? "bg-[#005931] text-white" : "text-slate-600"}`}>Assisted</button>
+                </div>
+                <select aria-label="مدة عرض المهمة" value={offerTtl} onChange={(event) => setOfferTtl(Number(event.target.value))} className="h-10 rounded-xl border bg-white px-3 text-sm font-bold outline-none">
+                  <option value={60}>60 ثانية</option>
+                  <option value={90}>90 ثانية</option>
+                  <option value={120}>120 ثانية</option>
+                  <option value={180}>180 ثانية</option>
+                </select>
+                <Button onClick={() => void saveAssignmentPolicy()} disabled={savingPolicy || (policyMode === policyQuery.data.mode && offerTtl === policyQuery.data.offer_ttl_seconds)} className="bg-[#005931] hover:bg-[#004526]">{savingPolicy ? "جاري الحفظ…" : "حفظ السياسة"}</Button>
+              </div> : <div className="rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600">تغيير السياسة متاح لمدير الطلبات فقط</div>}
+            </div>
+          </CardContent>
+        </Card>}
 
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-6">
           {[
