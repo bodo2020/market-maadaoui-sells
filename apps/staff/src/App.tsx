@@ -39,6 +39,7 @@ import {
   RefreshCw,
   Scale,
   ScanLine,
+  ShieldCheck,
   Smartphone,
   UserRound,
   UsersRound,
