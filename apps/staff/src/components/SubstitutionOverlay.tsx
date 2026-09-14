@@ -24,6 +24,15 @@ function money(value: number) {
   return `${n > 0 ? "+" : ""}${n.toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
 }
 
+function financialStateLabel(state?: string | null) {
+  if (state === "settled" || state === "applied_to_order_total") return "فرق السعر محسوب في إجمالي الطلب";
+  if (state === "pending_collection") return "اعتماد البديل تم · فرق السعر بانتظار التحصيل";
+  if (state === "pending_refund") return "اعتماد البديل تم · فرق السعر بانتظار الرد للعميل";
+  if (state === "not_required") return "لا توجد تسوية مالية مطلوبة";
+  if (state === "waived") return "تم إعفاء فرق السعر";
+  return "جاري تحديث التسوية المالية";
+}
+
 function StatusBlock({ item, onChanged }: { item: PickingItem; onChanged: () => Promise<void> }) {
   const sub = item.substitution;
   const [busy, setBusy] = useState(false);
@@ -37,7 +46,7 @@ function StatusBlock({ item, onChanged }: { item: PickingItem; onChanged: () => 
     );
   }
   if (sub.status === "approved") {
-    return <div className="sub-status approved"><CheckCircle2 /><div><strong>تم اعتماد البديل</strong><small>{sub.replacement_product_name} · {qty(sub.quantity, item.is_weight_based)} · فرق {money(sub.price_delta_total)}</small></div></div>;
+    return <div className="sub-status approved"><CheckCircle2 /><div><strong>تم اعتماد البديل</strong><small>{sub.replacement_product_name} · {qty(sub.quantity, item.is_weight_based)} · فرق {money(sub.price_delta_total)}</small><small>{financialStateLabel(sub.financial_state)}</small></div></div>;
   }
   if (sub.status === "rejected") {
     return <div className="sub-status rejected"><AlertTriangle /><div><strong>تم رفض الاقتراح السابق</strong><small>{sub.resolution_note || sub.replacement_product_name}</small></div></div>;
