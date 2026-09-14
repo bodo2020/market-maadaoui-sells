@@ -39,6 +39,12 @@ jobs:
         working-directory: apps/staff
         run: npx cap add android
 
+      - name: Configure scanner Android SDK
+        working-directory: apps/staff
+        run: |
+          sed -i -E 's/minSdkVersion = [0-9]+/minSdkVersion = 26/' android/variables.gradle
+          grep -n "minSdkVersion" android/variables.gradle
+
       - name: Sync Android project
         working-directory: apps/staff
         run: npx cap sync android
