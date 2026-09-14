@@ -13,12 +13,25 @@ export function installStaffAuthEnhancements() {
   const auth = supabase.auth;
   const originalSignIn = auth.signInWithPassword.bind(auth);
 
-  auth.signInWithPassword = ((credentials: Parameters<typeof originalSignIn>[0]) => {
-    if ("email" in credentials && typeof credentials.email === "string" && credentials.email.endsWith("@example.com")) {
-      const username = credentials.email.slice(0, -"@example.com".length);
-      return originalSignIn({ ...credentials, email: toStaffAuthEmail(username) });
+  auth.signInWithPassword = (async (credentials: Parameters<typeof originalSignIn>[0]) => {
+    if (!("email" in credentials) || typeof credentials.email !== "string" || !credentials.email.endsWith("@example.com")) {
+      return originalSignIn(credentials);
     }
-    return originalSignIn(credentials);
+
+    const username = credentials.email.slice(0, -"@example.com".length).trim().toLowerCase();
+    const staffEmail = toStaffAuthEmail(username);
+    const direct = await originalSignIn({ ...credentials, email: staffEmail });
+    if (!direct.error) return direct;
+
+    const password = "password" in credentials && typeof credentials.password === "string" ? credentials.password : "";
+    if (!password) return direct;
+
+    const { data: migration, error: migrationError } = await supabase.functions.invoke("migrate-staff-login", {
+      body: { username, password },
+    });
+
+    if (migrationError || migration?.error || migration?.migrated !== true) return direct;
+    return originalSignIn({ ...credentials, email: staffEmail });
   }) as typeof auth.signInWithPassword;
 
   const style = document.createElement("style");
