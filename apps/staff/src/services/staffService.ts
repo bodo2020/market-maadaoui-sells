@@ -387,6 +387,12 @@ export async function redeemStaffDevicePairing(
   }));
 }
 
+export type AttendanceCheckInOptions = {
+  exceptionReason?: string | null;
+  verificationPhotoPath?: string | null;
+  verificationPhotoSha256?: string | null;
+};
+
 export async function attendanceCheckIn(
   branchId: string,
   deviceId: string,
@@ -394,6 +400,7 @@ export async function attendanceCheckIn(
   latitude: number,
   longitude: number,
   accuracy: number,
+  options: AttendanceCheckInOptions = {},
 ) {
   return unwrap<Record<string, unknown>>(await rpc("staff_attendance_check_in_v2", {
     p_branch_id: branchId,
@@ -403,10 +410,30 @@ export async function attendanceCheckIn(
     p_latitude: latitude,
     p_longitude: longitude,
     p_accuracy_m: accuracy,
-    p_exception_reason: null,
-    p_verification_photo_path: null,
-    p_verification_photo_sha256: null,
+    p_exception_reason: options.exceptionReason ?? null,
+    p_verification_photo_path: options.verificationPhotoPath ?? null,
+    p_verification_photo_sha256: options.verificationPhotoSha256 ?? null,
   }));
+}
+
+export async function uploadAttendanceVerificationSelfie(
+  branchId: string,
+  image: Blob,
+  sha256: string,
+) {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) throw new Error("AUTH_REQUIRED");
+  const path = `${branchId}/${userData.user.id}/${crypto.randomUUID()}-${sha256.slice(0, 12)}.jpg`;
+  const { error } = await supabase.storage
+    .from("hr_attendance_verification")
+    .upload(path, image, { contentType: "image/jpeg", cacheControl: "0", upsert: false });
+  if (error) throw new Error(error.message || "PHOTO_UPLOAD_FAILED");
+  return path;
+}
+
+export async function removeUnsubmittedAttendanceSelfie(path: string) {
+  const { error } = await supabase.storage.from("hr_attendance_verification").remove([path]);
+  if (error) throw new Error(error.message || "PHOTO_DELETE_FAILED");
 }
 
 export async function attendanceCheckOut(
