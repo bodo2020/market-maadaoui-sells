@@ -91,22 +91,45 @@ export default function AttendanceExceptionDecisionDialog({ task, onClose, onDon
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-900">{detail.reason}</p>
             </div>
 
+            {detail.verification_photo_signed_url ? (
+              <div className="space-y-2 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3">
+                <div className="text-sm font-black text-emerald-950">صورة التحقق المباشرة</div>
+                <img
+                  src={detail.verification_photo_signed_url}
+                  alt="صورة تحقق الموظف"
+                  className="max-h-80 w-full rounded-xl bg-slate-100 object-contain"
+                  referrerPolicy="no-referrer"
+                />
+                <p className="text-xs leading-5 text-emerald-900">
+                  رابط العرض مؤقت. عند الاعتماد أو الرفض تُحذف الصورة نهائيًا قبل إتمام القرار،
+                  ولا يحتفظ النظام بمسارها أو بصمتها.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                صورة التحقق غير متاحة؛ لا تتخذ القرار قبل إعادة تحميل التفاصيل.
+              </div>
+            )}
+
             {detail.latitude != null && detail.longitude != null && (
               <div className="rounded-2xl border bg-slate-50 p-3 text-xs text-muted-foreground">إحداثيات محاولة الحضور: {Number(detail.latitude).toFixed(6)}, {Number(detail.longitude).toFixed(6)}</div>
             )}
 
             <div className="space-y-2"><Label>ملاحظة المراجع</Label><Textarea rows={4} value={note} onChange={event => setNote(event.target.value)} placeholder="اكتب سبب الاعتماد أو الرفض وما تم التحقق منه..." /></div>
 
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-900">عند الاعتماد، النظام ينشئ جلسة الحضور من وقت محاولة الموظف الأصلية. عند الرفض لا تُنشأ جلسة حضور.</div>
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-900">
+              عند الاعتماد، النظام ينشئ جلسة الحضور من وقت محاولة الموظف الأصلية. عند الرفض لا تُنشأ جلسة حضور.
+              في الحالتين لن يظهر نجاح القرار إلا بعد حذف صورة التحقق من التخزين والتأكد من اختفائها.
+            </div>
           </div>
         )}
 
         <DialogFooter className="gap-2 sm:justify-start">
           <Button variant="outline" disabled={decisionMutation.isPending} onClick={onClose}>إغلاق</Button>
-          <Button variant="destructive" disabled={decisionMutation.isPending || !detail} onClick={() => decisionMutation.mutate("rejected")}>
+          <Button variant="destructive" disabled={decisionMutation.isPending || !detail || !detail.verification_photo_signed_url} onClick={() => decisionMutation.mutate("rejected")}>
             {decisionMutation.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ShieldX className="ml-2 h-4 w-4" />}رفض الطلب
           </Button>
-          <Button disabled={decisionMutation.isPending || !detail} className="bg-[#005931] hover:bg-[#004426]" onClick={() => decisionMutation.mutate("approved")}>
+          <Button disabled={decisionMutation.isPending || !detail || !detail.verification_photo_signed_url} className="bg-[#005931] hover:bg-[#004426]" onClick={() => decisionMutation.mutate("approved")}>
             {decisionMutation.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}اعتماد الحضور
           </Button>
         </DialogFooter>
