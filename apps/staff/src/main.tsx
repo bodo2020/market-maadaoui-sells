@@ -15,6 +15,7 @@ import "./staff-v05.css";
 import "./substitutions.css";
 import "./staging.css";
 import "./assignment-offer.css";
+import "./attendance-validation.css";
 
 installStaffAuthEnhancements();
 void installNativeAppBridge();
