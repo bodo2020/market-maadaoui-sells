@@ -97,6 +97,42 @@ export type PickerAssignmentShadow = {
   orders: PickerShadowOrder[];
 };
 
+export type BatchPickingShadowOrder = {
+  order_id: string;
+  display_id: string;
+  customer_name: string;
+  items_total: number;
+  predicted_ready_at: string | null;
+  eta_risk: string;
+};
+
+export type BatchPickingShadowRecommendation = {
+  id: string;
+  batch_code: string;
+  order_ids: string[];
+  order_count: number;
+  total_lines: number;
+  score: number;
+  reason: "shared_shelf_route" | "shared_categories" | "close_sla_window";
+  recommended_user_id: string | null;
+  recommended_user_name: string | null;
+  orders: BatchPickingShadowOrder[];
+};
+
+export type BatchPickingShadow = {
+  mode: "shadow";
+  branch_id: string;
+  generated_at: string;
+  summary: {
+    eligible_orders: number;
+    recommended_batches: number;
+    covered_orders: number;
+    single_orders: number;
+    coverage_rate: number | null;
+  };
+  batches: BatchPickingShadowRecommendation[];
+};
+
 export type PickingSubstitution = {
   id: string;
   status: "pending" | "approved" | "rejected" | "cancelled";
@@ -416,6 +452,12 @@ export async function getFulfillmentWorkspace(branchId: string) {
 
 export async function getPickerAssignmentShadow(branchId: string) {
   return unwrap<PickerAssignmentShadow>(await rpc("get_my_picker_assignment_shadow_v1", {
+    p_branch_id: branchId,
+  }));
+}
+
+export async function getBatchPickingShadow(branchId: string) {
+  return unwrap<BatchPickingShadow>(await rpc("get_batch_picking_shadow_v1", {
     p_branch_id: branchId,
   }));
 }
