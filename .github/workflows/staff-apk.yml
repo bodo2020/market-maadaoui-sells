@@ -39,12 +39,22 @@ jobs:
         working-directory: apps/staff
         run: npx cap add android
 
-      - name: Configure Android SDK and location permissions
+      - name: Configure Android SDK
         working-directory: apps/staff
         run: |
           sed -i -E 's/minSdkVersion = [0-9]+/minSdkVersion = 26/' android/variables.gradle
+          grep -n "minSdkVersion" android/variables.gradle
+
+      - name: Sync Android project
+        working-directory: apps/staff
+        run: npx cap sync android
+
+      - name: Add and verify Android location permissions
+        working-directory: apps/staff
+        run: |
           python - <<'PY'
           from pathlib import Path
+          import xml.etree.ElementTree as ET
 
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           text = manifest.read_text(encoding="utf-8")
@@ -54,24 +64,28 @@ jobs:
           ]
           missing = [line for line in permissions if line not in text]
           if missing:
-              root_end = text.find(">")
-              if root_end < 0:
-                  raise SystemExit("AndroidManifest.xml root element not found")
-              text = text[: root_end + 1] + "\n" + "\n".join(missing) + text[root_end + 1 :]
+              marker = "    <application"
+              pos = text.find(marker)
+              if pos < 0:
+                  marker = "<application"
+                  pos = text.find(marker)
+              if pos < 0:
+                  raise SystemExit("AndroidManifest.xml application element not found")
+              text = text[:pos] + "\n".join(missing) + "\n\n" + text[pos:]
               manifest.write_text(text, encoding="utf-8")
+
+          ET.parse(manifest)
+          parsed = manifest.read_text(encoding="utf-8")
+          required = [
+              "android.permission.ACCESS_FINE_LOCATION",
+              "android.permission.ACCESS_COARSE_LOCATION",
+          ]
+          for permission in required:
+              if permission not in parsed:
+                  raise SystemExit(f"Missing Android permission: {permission}")
+          print("AndroidManifest.xml is valid and location permissions are present")
           PY
-          grep -n "minSdkVersion" android/variables.gradle
           grep -n "ACCESS_.*LOCATION" android/app/src/main/AndroidManifest.xml
-
-      - name: Sync Android project
-        working-directory: apps/staff
-        run: npx cap sync android
-
-      - name: Verify Android location permissions
-        working-directory: apps/staff
-        run: |
-          grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
-          grep -q 'android.permission.ACCESS_COARSE_LOCATION' android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK
         working-directory: apps/staff/android
