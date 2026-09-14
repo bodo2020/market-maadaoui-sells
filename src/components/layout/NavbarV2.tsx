@@ -10,7 +10,7 @@ import { fetchNotificationCenterV2 } from "@/services/supabase/notificationCente
 
 const pageTitles: Array<[string, string]> = [
   ["/pos", "نقطة البيع"], ["/reports", "التقارير والتحليلات"], ["/tasks", "مركز المهام"], ["/approvals", "مركز الموافقات"],
-  ["/notifications", "مركز الإشعارات"], ["/online-orders", "الطلبات الإلكترونية"], ["/invoices", "الفواتير"], ["/products", "المنتجات"],
+  ["/notifications", "مركز الإشعارات"], ["/online-orders/operations", "تشغيل وتجهيز الطلبات"], ["/online-orders", "الطلبات الإلكترونية"], ["/invoices", "الفواتير"], ["/products", "المنتجات"],
   ["/inventory", "إدارة المخزون"], ["/customers", "العملاء"], ["/finance", "المالية"], ["/payment-methods", "وسائل الدفع"],
   ["/cash-tracking", "تتبع النقدية"], ["/employees", "إدارة الموظفين"], ["/organization", "الهيكل التنظيمي"], ["/attendance", "الحضور والانصراف"],
   ["/my-hr", "بوابة الموظف"], ["/hr/payroll", "مسير الرواتب"], ["/hr/shifts", "جدولة الورديات"], ["/hr/leave-calendar", "تقويم الإجازات"],
@@ -67,9 +67,9 @@ export default function NavbarV2({ onMenuClick, isMobile = false }: { onMenuClic
         </div>
         <div className="flex items-center gap-1.5 md:gap-2">
           {branchOptions.length > 1 ? <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="outline" className="h-11 max-w-[180px] gap-2 rounded-2xl px-3"><Store className="h-4 w-4 shrink-0" /><span className="hidden truncate sm:inline">{currentBranchName || "اختر الفرع"}</span><ChevronDown className="h-4 w-4 shrink-0" /></Button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button variant="outline" className="h-11 max-w-[165px] gap-1.5 rounded-2xl px-2.5 sm:px-3"><Store className="h-4 w-4 shrink-0" /><span className="max-w-[86px] truncate text-xs sm:max-w-[135px] sm:text-sm">{currentBranchName || "اختر الفرع"}</span><ChevronDown className="h-4 w-4 shrink-0" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64"><DropdownMenuLabel>فروع العمل</DropdownMenuLabel><DropdownMenuSeparator />{branchOptions.map(branch => <DropdownMenuItem key={branch.branch_id} onClick={() => void changeBranch(branch.branch_id)} className="gap-2"><Store className="h-4 w-4" /><div className="min-w-0 flex-1"><div className="truncate font-bold">{branch.branch_name}</div><div className="text-[11px] text-muted-foreground">{branch.role_name_ar}</div></div>{branch.branch_id === currentBranchId && <Check className="mr-auto h-4 w-4 text-[#005931]" />}</DropdownMenuItem>)}</DropdownMenuContent>
-          </DropdownMenu> : currentBranchName ? <div className="hidden h-11 items-center gap-2 rounded-2xl border px-3 text-sm text-slate-600 md:flex"><Store className="h-4 w-4" /><span className="max-w-[150px] truncate">{currentBranchName}</span></div> : null}
+          </DropdownMenu> : currentBranchName ? <div className="flex h-11 max-w-[150px] items-center gap-1.5 rounded-2xl border px-2.5 text-xs text-slate-600 md:px-3 md:text-sm"><Store className="h-4 w-4 shrink-0" /><span className="truncate">{currentBranchName}</span></div> : null}
 
           <Button variant="outline" size="icon" className="relative h-11 w-11 rounded-2xl" onClick={() => navigate("/notifications")} aria-label="الإشعارات"><Bell className="h-5 w-5" />{unread > 0 && <span className="absolute -left-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white">{unread > 99 ? "99+" : unread}</span>}</Button>
           {actionRequired > 0 && <Button variant="outline" className="hidden h-11 rounded-2xl border-amber-200 bg-amber-50 px-3 text-amber-800 lg:flex" onClick={() => navigate("/tasks")}><BriefcaseBusiness className="ml-2 h-4 w-4" />{actionRequired.toLocaleString("ar-EG")} إجراء</Button>}
