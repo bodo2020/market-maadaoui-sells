@@ -1,0 +1,60 @@
+name: Staff APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/staff/**"
+      - ".github/workflows/staff-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install staff dependencies
+        working-directory: apps/staff
+        run: npm install --no-audit --no-fund
+
+      - name: Build staff web app
+        working-directory: apps/staff
+        run: npm run build
+
+      - name: Generate Android project
+        working-directory: apps/staff
+        run: npx cap add android
+
+      - name: Sync Android project
+        working-directory: apps/staff
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: apps/staff/android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: cp apps/staff/android/app/build/outputs/apk/debug/app-debug.apk elmadawy-staff-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elmadawy-staff-apk
+          path: elmadawy-staff-debug.apk
+          if-no-files-found: error
+          retention-days: 14
