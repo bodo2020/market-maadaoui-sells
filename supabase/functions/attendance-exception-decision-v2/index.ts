@@ -29,15 +29,11 @@ Deno.serve(async (req: Request) => {
     return json({ ok: false, code: "SERVER_CONFIGURATION_ERROR" }, 500);
   }
 
-  let payload: { exception_id?: string; decision?: string; note?: string };
+  let payload: { action?: string; branch_id?: string; exception_id?: string; decision?: string; note?: string };
   try {
     payload = await req.json();
   } catch {
     return json({ ok: false, code: "INVALID_JSON" }, 400);
-  }
-
-  if (!payload.exception_id || !["approved", "rejected"].includes(String(payload.decision))) {
-    return json({ ok: false, code: "INVALID_REQUEST" }, 400);
   }
 
   const userClient = createClient(supabaseUrl, anonKey, {
@@ -47,6 +43,29 @@ Deno.serve(async (req: Request) => {
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  if (payload.action === "cleanup_orphans") {
+    if (!payload.branch_id) return json({ ok: false, code: "BRANCH_REQUIRED" }, 400);
+    const { data: orphanResult, error: orphanError } = await userClient.rpc(
+      "list_my_attendance_verification_orphans_v1",
+      { p_branch_id: payload.branch_id },
+    );
+    if (orphanError) return json({ ok: false, code: orphanError.message || "CLEANUP_LOOKUP_FAILED" }, 403);
+    const paths = Array.isArray(orphanResult?.paths)
+      ? orphanResult.paths.filter((value: unknown): value is string => typeof value === "string")
+      : [];
+    if (paths.length) {
+      const { error: cleanupError } = await adminClient.storage
+        .from("hr_attendance_verification")
+        .remove(paths);
+      if (cleanupError) return json({ ok: false, code: "ORPHAN_CLEANUP_FAILED", retryable: true }, 503);
+    }
+    return json({ ok: true, cleaned: paths.length });
+  }
+
+  if (!payload.exception_id || !["approved", "rejected"].includes(String(payload.decision))) {
+    return json({ ok: false, code: "INVALID_REQUEST" }, 400);
+  }
 
   const { data: prepared, error: prepareError } = await userClient.rpc(
     "prepare_attendance_exception_decision_v2",
