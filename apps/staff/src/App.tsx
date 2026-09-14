@@ -17,6 +17,7 @@ import {
   useParams,
 } from "react-router-dom";
 import { Geolocation } from "@capacitor/geolocation";
+import { Camera, CameraDirection, CameraResultType, CameraSource } from "@capacitor/camera";
 import {
   AlertTriangle,
   ArrowRight,
@@ -651,6 +652,51 @@ async function currentPosition() {
   return { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
 }
 
+async function captureAttendanceSelfie() {
+  const photo = await Camera.getPhoto({
+    source: CameraSource.Camera,
+    direction: CameraDirection.Front,
+    resultType: CameraResultType.Uri,
+    quality: 85,
+    width: 1080,
+    height: 1440,
+    allowEditing: false,
+    saveToGallery: false,
+    promptLabelHeader: "صورة تحقق الحضور",
+    promptLabelPhoto: "التقاط صورة",
+    promptLabelCancel: "إلغاء",
+  });
+  if (!photo.webPath) throw new Error("PHOTO_CAPTURE_FAILED");
+
+  const original = await fetch(photo.webPath).then((response) => response.blob());
+  const bitmap = await createImageBitmap(original);
+  const maxSide = 1080;
+  const ratio = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
+  canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
+  const context = canvas.getContext("2d");
+  if (!context) {
+    bitmap.close();
+    throw new Error("PHOTO_PROCESSING_FAILED");
+  }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => value ? resolve(value) : reject(new Error("PHOTO_PROCESSING_FAILED")), "image/jpeg", 0.82);
+  });
+  const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+  const sha256 = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return { blob, sha256 };
+}
+
+type OutsideAttendanceAttempt = {
+  location: { latitude: number; longitude: number; accuracy: number };
+  distanceM: number;
+  radiusM: number;
+};
+
 function AttendancePage({ branch }: { branch: StaffBranch }) {
   const [data,setData] = useState<staff.AttendancePayload|null>(null);
   const [busy,setBusy]=useState(true);
@@ -659,6 +705,22 @@ function AttendancePage({ branch }: { branch: StaffBranch }) {
   const [pairToken,setPairToken]=useState("");
   const [pairCode,setPairCode]=useState("");
   const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
+  const [outside,setOutside]=useState<OutsideAttendanceAttempt|null>(null);
+  const [exceptionReason,setExceptionReason]=useState("");
+  const [selfie,setSelfie]=useState<{blob:Blob;sha256:string;preview:string}|null>(null);
+
+  const clearOutside = useCallback(() => {
+    setOutside(null);
+    setExceptionReason("");
+    setSelfie((current) => {
+      if (current?.preview) URL.revokeObjectURL(current.preview);
+      return null;
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (selfie?.preview) URL.revokeObjectURL(selfie.preview);
+  }, [selfie?.preview]);
 
   const load = useCallback(async()=>{
     setBusy(true);
@@ -700,6 +762,14 @@ function AttendancePage({ branch }: { branch: StaffBranch }) {
         ?await staff.attendanceCheckIn(branch.branch_id,device.id,device.token,location.latitude,location.longitude,location.accuracy)
         :await staff.attendanceCheckOut(String(data?.active_session?.id),device.id,device.token,location.latitude,location.longitude,location.accuracy);
       const ok=result.ok===true;
+      if(kind==="in" && !ok && String(result.code)==="OUTSIDE_GEOFENCE" && result.exception_allowed===true){
+        setOutside({
+          location,
+          distanceM:Number(result.distance_m||0),
+          radiusM:Number(result.radius_m||data?.policy?.geofence_radius_m||0),
+        });
+        return;
+      }
       if(!ok)throw new Error(String(result.code||"REQUEST_FAILED"));
       setMessage({type:"ok",text:kind==="in"?"تم تسجيل الحضور بنجاح":"تم تسجيل الانصراف بنجاح"});
       await load();
@@ -707,9 +777,84 @@ function AttendancePage({ branch }: { branch: StaffBranch }) {
     finally{setActing(false);}
   };
 
+  const takeSelfie=async()=>{
+    setActing(true);setMessage(null);
+    try{
+      const captured=await captureAttendanceSelfie();
+      setSelfie((current)=>{
+        if(current?.preview)URL.revokeObjectURL(current.preview);
+        return {...captured,preview:URL.createObjectURL(captured.blob)};
+      });
+    }catch(caught){
+      const code=caught instanceof Error?caught.message:"";
+      setMessage({type:"error",text:code.includes("permission")?"اسمح للتطبيق باستخدام الكاميرا لالتقاط صورة التحقق.":"تعذر التقاط الصورة. حاول مرة أخرى في إضاءة واضحة."});
+    }finally{setActing(false);}
+  };
+
+  const submitOutside=async()=>{
+    if(!outside||exceptionReason.trim().length<5){
+      setMessage({type:"error",text:"اكتب سببًا واضحًا لا يقل عن 5 أحرف."});return;
+    }
+    if(!selfie){
+      setMessage({type:"error",text:"التقط صورة مباشرة قبل إرسال الطلب."});return;
+    }
+    const device=readStoredDevice();
+    if(!device){setMessage({type:"error",text:"اربط الجهاز أولًا"});return;}
+    setActing(true);setMessage(null);
+    let uploadedPath:string|null=null;
+    try{
+      uploadedPath=await staff.uploadAttendanceVerificationSelfie(branch.branch_id,selfie.blob,selfie.sha256);
+      const result=await staff.attendanceCheckIn(
+        branch.branch_id,device.id,device.token,
+        outside.location.latitude,outside.location.longitude,outside.location.accuracy,
+        {
+          exceptionReason:exceptionReason.trim(),
+          verificationPhotoPath:uploadedPath,
+          verificationPhotoSha256:selfie.sha256,
+        },
+      );
+      if(String(result.code)!=="EXCEPTION_REQUESTED"){
+        await staff.removeUnsubmittedAttendanceSelfie(uploadedPath).catch(()=>undefined);
+        throw new Error(String(result.code||"REQUEST_FAILED"));
+      }
+      clearOutside();
+      setMessage({type:"ok",text:"تم إرسال طلب الحضور وصورة التحقق للمسؤول. ستُحذف الصورة نهائيًا فور اتخاذ القرار."});
+      await load();
+    }catch(caught){
+      if(uploadedPath)await staff.removeUnsubmittedAttendanceSelfie(uploadedPath).catch(()=>undefined);
+      setMessage({type:"error",text:attendanceError(caught instanceof Error?caught.message:"")});
+    }finally{setActing(false);}
+  };
+
   if(busy&&!data)return <Loading/>;
   const active=data?.active_session;
-  return <><PageTitle title="الحضور" subtitle="تسجيل آمن بالجهاز والموقع"/>{message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}<section className="attendance-card attendance-live"><div className="attendance-status-icon"><Clock3/></div><h2>{active?"أنت داخل الوردية":"جاهز لتسجيل الحضور"}</h2>{active?<><p>دخول: {new Date(active.check_in_at).toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit"})}</p>{Number(active.late_minutes||0)>0&&<span className="warning-pill">تأخير {active.late_minutes} دقيقة</span>}</>:<p>النظام سيتأكد من الجهاز وموقعك بالنسبة للفرع.</p>}<div className={`device-state ${deviceState}`}><Smartphone/><span>{deviceState==="trusted"?"الجهاز معتمد":deviceState==="pending"?"في انتظار اعتماد الجهاز":deviceState==="rejected"?"الجهاز مرفوض":"الجهاز غير مربوط"}</span></div>{deviceState==="trusted"&&(active?<button className="logout attendance-action" disabled={acting} onClick={()=>void attendanceAction("out")}><LogOut/>تسجيل الانصراف</button>:<button className="primary attendance-action" disabled={acting} onClick={()=>void attendanceAction("in")}><LogIn/>تسجيل الحضور</button>)}</section>{deviceState==="none"&&<section className="pairing-card"><div className="row"><div><strong>ربط هذا الهاتف</strong><p>استخدم بيانات الربط التي يصدرها مسؤول الفرع.</p></div><Smartphone/></div><label>رمز الربط<input value={pairCode} onChange={(e)=>setPairCode(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" placeholder="6 أرقام"/></label><label>مفتاح الربط<input value={pairToken} onChange={(e)=>setPairToken(e.target.value)} dir="ltr" placeholder="Pairing token"/></label><button className="primary" disabled={acting||pairCode.length!==6||pairToken.length<32} onClick={()=>void pair()}>{acting?<Loader2 className="spin"/>:<Smartphone/>}ربط الجهاز</button></section>}<section className="attendance-history"><h2>آخر الحضور</h2>{(data?.recent_sessions||[]).slice(0,5).map((row:any)=><div className="history-row" key={String(row.id)}><div><strong>{new Date(String(row.check_in_at)).toLocaleDateString("ar-EG")}</strong><small>{new Date(String(row.check_in_at)).toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit"})}{row.check_out_at?` ← ${new Date(String(row.check_out_at)).toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit"})}`:""}</small></div><span>{row.status==="active"?"مفتوحة":row.worked_minutes?`${row.worked_minutes} د`:"—"}</span></div>)}{!(data?.recent_sessions||[]).length&&<p className="muted">لا يوجد سجل حضور سابق.</p>}</section></>;
+  const hasPending=Boolean(data?.pending_exception);
+  return <><PageTitle title="الحضور" subtitle="تسجيل آمن بالجهاز والموقع"/>
+    {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
+    {hasPending&&<div className="attendance-pending"><AlertTriangle/><div><strong>طلب الحضور خارج النطاق قيد المراجعة</strong><p>سيصلك إشعار بعد قرار المسؤول، وستُحذف صورة التحقق نهائيًا بعد القرار.</p></div></div>}
+    <section className="attendance-card attendance-live"><div className="attendance-status-icon"><Clock3/></div><h2>{active?"أنت داخل الوردية":"جاهز لتسجيل الحضور"}</h2>{active?<><p>دخول: {new Date(active.check_in_at).toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit"})}</p>{Number(active.late_minutes||0)>0&&<span className="warning-pill">تأخير {active.late_minutes} دقيقة</span>}</>:<p>النظام سيتأكد من الجهاز وموقعك بالنسبة للفرع.</p>}<div className={`device-state ${deviceState}`}><Smartphone/><span>{deviceState==="trusted"?"الجهاز معتمد":deviceState==="pending"?"في انتظار اعتماد الجهاز":deviceState==="rejected"?"الجهاز مرفوض":"الجهاز غير مربوط"}</span></div>{deviceState==="trusted"&&(active?<button className="logout attendance-action" disabled={acting} onClick={()=>void attendanceAction("out")}><LogOut/>تسجيل الانصراف</button>:<button className="primary attendance-action" disabled={acting||hasPending} onClick={()=>void attendanceAction("in")}><LogIn/>{hasPending?"طلب قيد المراجعة":"تسجيل الحضور"}</button>)}</section>
+    {deviceState==="none"&&<section className="pairing-card"><div className="row"><div><strong>ربط هذا الهاتف</strong><p>استخدم بيانات الربط التي يصدرها مسؤول الفرع.</p></div><Smartphone/></div><label>رمز الربط<input value={pairCode} onChange={(e)=>setPairCode(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" placeholder="6 أرقام"/></label><label>مفتاح الربط<input value={pairToken} onChange={(e)=>setPairToken(e.target.value)} dir="ltr" placeholder="Pairing token"/></label><button className="primary" disabled={acting||pairCode.length!==6||pairToken.length<32} onClick={()=>void pair()}>{acting?<Loader2 className="spin"/>:<Smartphone/>}ربط الجهاز</button></section>}
+    <section className="attendance-history"><h2>آخر الحضور</h2>{(data?.recent_sessions||[]).slice(0,5).map((row:any)=><div className="history-row" key={String(row.id)}><div><strong>{new Date(String(row.check_in_at)).toLocaleDateString("ar-EG")}</strong><small>{new Date(String(row.check_in_at)).toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit"})}{row.check_out_at?` ← ${new Date(String(row.check_out_at)).toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit"})}`:""}</small></div><span>{row.status==="active"?"مفتوحة":row.worked_minutes?`${row.worked_minutes} د`:"—"}</span></div>)}{!(data?.recent_sessions||[]).length&&<p className="muted">لا يوجد سجل حضور سابق.</p>}</section>
+
+    {outside&&<div className="attendance-exception-overlay" role="dialog" aria-modal="true">
+      <section className="attendance-exception-sheet">
+        <div className="exception-sheet-head"><div><small>استثناء حضور</small><h2>أنت خارج نطاق الفرع</h2></div><MapPin/></div>
+        <div className="exception-distance"><strong>{Math.round(outside.distanceM).toLocaleString("ar-EG")} متر</strong><span>المسافة عن الفرع · النطاق {Math.round(outside.radiusM).toLocaleString("ar-EG")} متر</span></div>
+        <label>سبب تسجيل الحضور من خارج النطاق
+          <textarea rows={3} value={exceptionReason} onChange={(e)=>setExceptionReason(e.target.value)} placeholder="مثال: تكليف خارجي من مدير الفرع"/>
+        </label>
+        <div className="selfie-capture">
+          {selfie?<img src={selfie.preview} alt="معاينة صورة التحقق"/>:<div className="selfie-placeholder"><Smartphone/><span>الصورة تُلتقط الآن بالكاميرا فقط</span></div>}
+          <button className="secondary" disabled={acting} onClick={()=>void takeSelfie()}>{selfie?"إعادة التقاط الصورة":"فتح الكاميرا الأمامية"}</button>
+        </div>
+        <p className="privacy-note"><ShieldCheck/>تُستخدم الصورة للمراجعة فقط، وتُحذف نهائيًا من التخزين بمجرد موافقة المسؤول أو رفضه.</p>
+        <div className="exception-actions">
+          <button className="secondary" disabled={acting} onClick={clearOutside}>إلغاء</button>
+          <button className="primary" disabled={acting||!selfie||exceptionReason.trim().length<5} onClick={()=>void submitOutside()}>{acting?<Loader2 className="spin"/>:<Check/>}إرسال للموافقة</button>
+        </div>
+      </section>
+    </div>}
+  </>;
 }
 
 function severityLabel(value: string) {
