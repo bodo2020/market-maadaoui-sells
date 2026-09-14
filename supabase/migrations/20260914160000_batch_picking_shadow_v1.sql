@@ -64,7 +64,7 @@ as $function$
     from eligible e
     left join lateral jsonb_array_elements(case when jsonb_typeof(e.items)='array' then e.items else '[]'::jsonb end) item on true
   )
-  select r.order_id,min(r.created_at),min(r.predicted_ready_at),min(r.eta_risk),min(r.recommended_user_id),
+  select r.order_id,r.created_at,r.predicted_ready_at,r.eta_risk,r.recommended_user_id,
          count(r.item)::integer,
          coalesce(sum(coalesce(nullif(r.item->>'stock_quantity','')::numeric,nullif(r.item->>'quantity','')::numeric,1)),0),
          coalesce(array_agg(distinct r.product_id) filter(where r.product_id is not null),'{}'::uuid[]),
@@ -76,7 +76,7 @@ as $function$
          coalesce(bool_or(coalesce((r.item->>'is_bulk')::boolean,false)),false)
   from item_rows r
   left join public.products p on p.id=r.product_id
-  group by r.order_id;
+  group by r.order_id,r.created_at,r.predicted_ready_at,r.eta_risk,r.recommended_user_id;
 $function$;
 
 create or replace function private.refresh_branch_batch_picking_shadow_v1(p_branch_id uuid)
@@ -162,12 +162,20 @@ begin
     where p.order_id=any(v_ids);
 
     select case
-      when min(p.shelf_coverage)>=0.60 and cardinality(array(
-        select unnest(min(p.shelf_locations)) intersect select unnest(max(p.shelf_locations))
-      ))>0 then 'shared_shelf_route'
-      when cardinality(array(
-        select unnest(min(p.category_ids)) intersect select unnest(max(p.category_ids))
-      ))>0 then 'shared_categories'
+      when min(p.shelf_coverage)>=0.60 and exists(
+        select 1
+        from private.order_batch_profiles_v1(p_branch_id) a
+        join private.order_batch_profiles_v1(p_branch_id) c on a.order_id<c.order_id
+        where a.order_id=any(v_ids) and c.order_id=any(v_ids)
+          and a.shelf_locations && c.shelf_locations
+      ) then 'shared_shelf_route'
+      when exists(
+        select 1
+        from private.order_batch_profiles_v1(p_branch_id) a
+        join private.order_batch_profiles_v1(p_branch_id) c on a.order_id<c.order_id
+        where a.order_id=any(v_ids) and c.order_id=any(v_ids)
+          and a.category_ids && c.category_ids
+      ) then 'shared_categories'
       else 'close_sla_window'
     end
     into v_reason
