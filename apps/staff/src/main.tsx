@@ -12,6 +12,7 @@ import "./picking.css";
 import "./native-safe-area.css";
 import "./staff-v05.css";
 import "./substitutions.css";
+import "./staging.css";
 
 installStaffAuthEnhancements();
 void installNativeAppBridge();
