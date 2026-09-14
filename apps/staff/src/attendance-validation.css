@@ -1,0 +1,26 @@
+/* Keep outside-geofence validation feedback visible above the full-screen sheet. */
+body:has(.attendance-exception-overlay) .content > .error-box {
+  position: fixed;
+  top: max(calc(env(safe-area-inset-top, 0px) + 12px), 20px);
+  right: 16px;
+  left: 16px;
+  z-index: 1300;
+  width: min(calc(100% - 32px), 520px);
+  margin: 0 auto;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 14px;
+  background: #fff1f2;
+  color: #b42318;
+  box-shadow: 0 12px 32px rgba(180, 35, 24, .2);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.7;
+  text-align: right;
+  animation: attendance-validation-in .18s ease-out;
+}
+
+@keyframes attendance-validation-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
