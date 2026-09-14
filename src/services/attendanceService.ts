@@ -136,7 +136,7 @@ export async function checkInAttendance(params: {
   exceptionReason?: string | null;
 }): Promise<AttendanceActionResult> {
   const device = getLocalTrustedStaffDevice();
-  const { data, error } = await rpc("staff_attendance_check_in_v1", {
+  const { data, error } = await rpc("staff_attendance_check_in_v2", {
     p_branch_id: params.branchId,
     p_device_id: device?.device_id || null,
     p_device_token: device?.device_token || null,
@@ -145,6 +145,8 @@ export async function checkInAttendance(params: {
     p_longitude: params.longitude ?? null,
     p_accuracy_m: params.accuracyM ?? null,
     p_exception_reason: params.exceptionReason || null,
+    p_verification_photo_path: null,
+    p_verification_photo_sha256: null,
   });
   if (error) throw new Error(error.message || "تعذر تسجيل الحضور");
   return data as AttendanceActionResult;
