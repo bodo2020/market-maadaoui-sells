@@ -49,7 +49,7 @@ jobs:
         working-directory: apps/staff
         run: npx cap sync android
 
-      - name: Add and verify Android location permissions
+      - name: Add and verify Android camera and location permissions
         working-directory: apps/staff
         run: |
           python - <<'PY'
@@ -61,6 +61,7 @@ jobs:
           permissions = [
               '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
               '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
+              '    <uses-permission android:name="android.permission.CAMERA" />',
           ]
           missing = [line for line in permissions if line not in text]
           if missing:
@@ -79,13 +80,14 @@ jobs:
           required = [
               "android.permission.ACCESS_FINE_LOCATION",
               "android.permission.ACCESS_COARSE_LOCATION",
+              "android.permission.CAMERA",
           ]
           for permission in required:
               if permission not in parsed:
                   raise SystemExit(f"Missing Android permission: {permission}")
-          print("AndroidManifest.xml is valid and location permissions are present")
+          print("AndroidManifest.xml is valid and camera/location permissions are present")
           PY
-          grep -n "ACCESS_.*LOCATION" android/app/src/main/AndroidManifest.xml
+          grep -n -E "ACCESS_.*LOCATION|android.permission.CAMERA" android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK
         working-directory: apps/staff/android
