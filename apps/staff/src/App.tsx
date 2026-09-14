@@ -643,6 +643,9 @@ function attendanceError(code: string) {
     ACTIVE_SESSION_EXISTS:"عندك وردية مفتوحة بالفعل.",
     BRANCH_LOCATION_NOT_CONFIGURED:"موقع الفرع غير مضبوط في الإدارة.",
     EMPLOYEE_PROFILE_INACTIVE:"ملف الموظف غير نشط.",
+    ATTENDANCE_REQUEST_TIMEOUT:"الاتصال استغرق وقتًا أطول من اللازم. تحقق من الإنترنت وحاول مرة أخرى.",
+    PHOTO_UPLOAD_TIMEOUT:"رفع الصورة استغرق وقتًا أطول من اللازم. تحقق من الإنترنت وحاول مرة أخرى.",
+    PHOTO_CLEANUP_TIMEOUT:"تعذر تنظيف صورة محاولة سابقة الآن، وسيعيد التطبيق المحاولة تلقائيًا.",
   };
   return map[code] || code || "تعذر تنفيذ الإجراء";
 }
@@ -737,6 +740,9 @@ function AttendancePage({ branch }: { branch: StaffBranch }) {
     finally{setBusy(false);}
   },[branch.branch_id]);
   useEffect(()=>{void load();},[load]);
+  useEffect(()=>{
+    void staff.cleanupAttendanceVerificationOrphans(branch.branch_id).catch(()=>undefined);
+  },[branch.branch_id]);
 
   const pair=async()=>{
     if(!pairToken.trim()||pairCode.trim().length!==6)return;
@@ -819,7 +825,7 @@ function AttendancePage({ branch }: { branch: StaffBranch }) {
         throw new Error(String(result.code||"REQUEST_FAILED"));
       }
       clearOutside();
-      setMessage({type:"ok",text:"تم إرسال طلب الحضور وصورة التحقق للمسؤول. ستُحذف الصورة نهائيًا فور اتخاذ القرار."});
+      setMessage({type:"ok",text:"تم إرسال الطلب إلى تطبيق HR. ستُحذف صورة التحقق نهائيًا فور اتخاذ القرار."});
       await load();
     }catch(caught){
       if(uploadedPath)await staff.removeUnsubmittedAttendanceSelfie(uploadedPath).catch(()=>undefined);
