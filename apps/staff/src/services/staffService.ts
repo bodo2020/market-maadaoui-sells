@@ -64,6 +64,24 @@ export type FulfillmentOrder = {
   eta_risk: string;
 };
 
+export type PickingSubstitution = {
+  id: string;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  replacement_product_id: string;
+  replacement_variant_id: string | null;
+  replacement_product_name: string;
+  replacement_barcode: string | null;
+  replacement_image_url: string | null;
+  quantity: number;
+  original_unit_price: number;
+  replacement_unit_price: number;
+  price_delta_total: number;
+  financial_state: "pending" | "not_required" | "settled" | "waived";
+  proposed_at: string;
+  resolved_at: string | null;
+  resolution_note: string | null;
+};
+
 export type PickingItem = {
   id: string;
   line_no: number;
@@ -83,6 +101,7 @@ export type PickingItem = {
   status: "pending" | "picking" | "picked" | "shortage" | "substituted";
   last_scanned_at: string | null;
   note: string | null;
+  substitution?: PickingSubstitution | null;
 };
 
 export type PickingSession = {
@@ -93,8 +112,57 @@ export type PickingSession = {
   items_picked: number;
   shortage_count: number;
   substitution_count: number;
+  pending_substitution_count: number;
   resolved_count: number;
   items: PickingItem[];
+};
+
+export type SubstitutionCandidate = {
+  product_id: string;
+  variant_id: string | null;
+  name: string;
+  barcode: string | null;
+  image_url: string | null;
+  unit_price: number;
+  original_unit_price: number;
+  price_delta_per_unit: number;
+  available_quantity: number;
+  stock_units_per_order_unit: number;
+  is_bulk: boolean;
+  is_weight_based: boolean;
+  unit_of_measure: string | null;
+};
+
+export type SubstitutionCandidateResponse = {
+  item_id: string;
+  original_product_name: string;
+  original_unit_price: number;
+  items: SubstitutionCandidate[];
+};
+
+export type SubstitutionApproval = {
+  id: string;
+  task_id: string | null;
+  order_id: string;
+  tracking_number: string | null;
+  item_id: string;
+  original_product_name: string;
+  replacement_product_name: string;
+  replacement_product_id: string;
+  replacement_variant_id: string | null;
+  replacement_barcode: string | null;
+  replacement_image_url: string | null;
+  quantity: number;
+  original_unit_price: number;
+  replacement_unit_price: number;
+  price_delta_total: number;
+  financial_state: string;
+  status: string;
+  proposed_by: string;
+  proposed_by_name: string | null;
+  proposed_at: string;
+  due_at: string | null;
+  task_status: string | null;
 };
 
 export type NotificationItem = {
@@ -304,6 +372,52 @@ export async function markPickingShortage(itemId: string, quantity: number, note
     p_shortage_quantity: quantity,
     p_note: note ?? null,
   }));
+}
+
+export async function searchSubstitutionCandidates(itemId: string, query = "", limit = 20) {
+  return unwrap<SubstitutionCandidateResponse>(await rpc("search_order_fulfillment_substitution_candidates_v1", {
+    p_item_id: itemId,
+    p_query: query,
+    p_limit: limit,
+  }));
+}
+
+export async function proposeSubstitution(
+  itemId: string,
+  candidate: Pick<SubstitutionCandidate, "product_id" | "variant_id">,
+  quantity: number,
+  note = "اقتراح بديل من تطبيق الموظفين",
+) {
+  return unwrap<{ ok: boolean; substitution: PickingSubstitution }>(await rpc("propose_order_fulfillment_substitution_v1", {
+    p_item_id: itemId,
+    p_replacement_product_id: candidate.product_id,
+    p_replacement_variant_id: candidate.variant_id,
+    p_quantity: quantity,
+    p_note: note,
+  }));
+}
+
+export async function cancelSubstitution(substitutionId: string) {
+  return unwrap<{ ok: boolean; id: string; status: string }>(await rpc("cancel_order_fulfillment_substitution_v1", {
+    p_substitution_id: substitutionId,
+  }));
+}
+
+export async function listSubstitutionApprovals(branchId: string, limit = 50) {
+  return unwrap<{ branch_id: string; count: number; items: SubstitutionApproval[] }>(await rpc("list_order_substitution_approvals_v1", {
+    p_branch_id: branchId,
+    p_limit: limit,
+  }));
+}
+
+export async function decideSubstitution(substitutionId: string, decision: "approve" | "reject", note: string) {
+  return unwrap<{ ok: boolean; id: string; status: string; price_delta_total?: number; financial_state?: string }>(
+    await rpc("decide_order_fulfillment_substitution_v1", {
+      p_substitution_id: substitutionId,
+      p_decision: decision,
+      p_note: note,
+    }),
+  );
 }
 
 export async function updatePicking(
