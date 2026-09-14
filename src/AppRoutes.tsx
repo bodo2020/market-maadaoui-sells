@@ -21,6 +21,7 @@ import PosRuntimeGuard from "@/components/POS/PosRuntimeGuard";
 import PosWorkspaceRecoveryGate from "@/components/POS/PosWorkspaceRecoveryGate";
 import PosRecentSales from "@/components/POS/PosRecentSales";
 import POSCustomerLoyaltyBridge from "@/components/POS/POSCustomerLoyaltyBridge";
+import DeliveryCashHandoverDock from "@/components/POS/DeliveryCashHandoverDock";
 import CustomerManagementDock from "@/components/customers/CustomerManagementDock";
 import CustomerInsightsDock from "@/components/customers/CustomerInsightsDock";
 import CustomerOpportunityDock from "@/components/customers/CustomerOpportunityDock";
@@ -97,7 +98,7 @@ import ProductDetails from "@/pages/ProductDetails";
 import InventoryImport from "@/pages/InventoryImport";
 
 const CashierPOS = () => (
-  <PosShiftGatePro><PosRuntimeGuard><PosWorkspaceRecoveryGate><><POSPro /><POSCustomerLoyaltyBridge /><PosRecentSales /></></PosWorkspaceRecoveryGate></PosRuntimeGuard></PosShiftGatePro>
+  <PosShiftGatePro><PosRuntimeGuard><PosWorkspaceRecoveryGate><><POSPro /><POSCustomerLoyaltyBridge /><PosRecentSales /><DeliveryCashHandoverDock /></></PosWorkspaceRecoveryGate></PosRuntimeGuard></PosShiftGatePro>
 );
 const CustomersWorkspace = () => (<><CustomersAdvanced /><CustomerMyTasksDock /><CustomerTeamWorkloadDock /><CustomerOperationsCenterDock /><CustomerOpportunityDock /></>);
 const Customer360Workspace = () => (<><Customer360Profile /><CustomerMyTasksDock /><CustomerFollowupPerformanceDock /><CustomerInsightsDock /><CustomerManagementDock /></>);
