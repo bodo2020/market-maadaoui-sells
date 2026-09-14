@@ -39,15 +39,39 @@ jobs:
         working-directory: apps/staff
         run: npx cap add android
 
-      - name: Configure scanner Android SDK
+      - name: Configure Android SDK and location permissions
         working-directory: apps/staff
         run: |
           sed -i -E 's/minSdkVersion = [0-9]+/minSdkVersion = 26/' android/variables.gradle
+          python - <<'PY'
+          from pathlib import Path
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text(encoding="utf-8")
+          permissions = [
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
+          ]
+          missing = [line for line in permissions if line not in text]
+          if missing:
+              root_end = text.find(">")
+              if root_end < 0:
+                  raise SystemExit("AndroidManifest.xml root element not found")
+              text = text[: root_end + 1] + "\n" + "\n".join(missing) + text[root_end + 1 :]
+              manifest.write_text(text, encoding="utf-8")
+          PY
           grep -n "minSdkVersion" android/variables.gradle
+          grep -n "ACCESS_.*LOCATION" android/app/src/main/AndroidManifest.xml
 
       - name: Sync Android project
         working-directory: apps/staff
         run: npx cap sync android
+
+      - name: Verify Android location permissions
+        working-directory: apps/staff
+        run: |
+          grep -q 'android.permission.ACCESS_FINE_LOCATION' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.ACCESS_COARSE_LOCATION' android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK
         working-directory: apps/staff/android
