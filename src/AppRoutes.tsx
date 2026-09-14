@@ -138,6 +138,7 @@ export default function AppRoutes() {
       <Route path="/hr/leave-calendar" element={<ProtectedRoute><HrLeaveCalendarPage /></ProtectedRoute>} />
       <Route path="/hr/payroll" element={<ProtectedRoute><HrPayrollPage /></ProtectedRoute>} />
       <Route path="/hr/shifts" element={<ProtectedRoute><HrShiftSchedulingPage /></ProtectedRoute>} />
+      <Route path="/hr/attendance-approvals" element={<ProtectedRoute><ApprovalsCenterPage /></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><OperationsTasksWorkspace /></ProtectedRoute>} />
       <Route path="/approvals" element={<ProtectedRoute><ApprovalsCenterPage /></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><NotificationsCenterV2 /></ProtectedRoute>} />
