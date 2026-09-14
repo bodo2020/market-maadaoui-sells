@@ -110,6 +110,10 @@ export type AttendanceException = {
   review_note: string | null;
   operations_task_id: string | null;
   attendance_session_id: string | null;
+  verification_photo_path: string | null;
+  verification_photo_captured_at: string | null;
+  verification_photo_deleted_at: string | null;
+  verification_photo_signed_url?: string | null;
 };
 
 const rpc = supabase.rpc.bind(supabase) as unknown as (
@@ -168,17 +172,46 @@ export async function checkOutAttendance(params: {
 export async function getAttendanceException(exceptionId: string): Promise<AttendanceException | null> {
   const { data, error } = await rpc("get_attendance_exception_v1", { p_exception_id: exceptionId });
   if (error) throw new Error(error.message || "تعذر تحميل طلب الاستثناء");
-  return (data || null) as AttendanceException | null;
+  const detail = (data || null) as AttendanceException | null;
+  if (!detail?.verification_photo_path || detail.status !== "pending") return detail;
+
+  const { data: signed, error: signedError } = await supabase.storage
+    .from("hr_attendance_verification")
+    .createSignedUrl(detail.verification_photo_path, 60);
+  if (signedError) throw new Error("تعذر فتح صورة التحقق المؤقتة");
+  return { ...detail, verification_photo_signed_url: signed.signedUrl };
 }
 
 export async function decideAttendanceException(exceptionId: string, decision: "approved" | "rejected", note?: string) {
-  const { data, error } = await rpc("decide_attendance_exception_v1", {
-    p_exception_id: exceptionId,
-    p_decision: decision,
-    p_note: note || null,
+  const { data, error } = await supabase.functions.invoke("attendance-exception-decision-v2", {
+    body: {
+      exception_id: exceptionId,
+      decision,
+      note: note || null,
+    },
   });
-  if (error) throw new Error(error.message || "تعذر تسجيل قرار الحضور");
-  return data as { ok: boolean; code: string; exception_id: string; decision: string; attendance_session_id?: string | null };
+  if (error) throw new Error(error.message || "تعذر حذف صورة التحقق وإتمام القرار");
+  const result = data as {
+    ok: boolean;
+    code: string;
+    exception_id: string;
+    decision: string;
+    attendance_session_id?: string | null;
+    photo_deleted?: boolean;
+    retryable?: boolean;
+  };
+  if (!result?.ok) {
+    const messages: Record<string, string> = {
+      PHOTO_DELETE_FAILED: "تعذر حذف الصورة نهائيًا؛ لم يُعتمد القرار ويمكن إعادة المحاولة.",
+      PHOTO_STILL_EXISTS: "الصورة ما زالت موجودة؛ لم يُعتمد القرار ويمكن إعادة المحاولة.",
+      DECISION_IN_PROGRESS: "مراجع آخر يتخذ القرار حاليًا.",
+      SELF_APPROVAL_DENIED: "لا يمكن للموظف اعتماد طلبه الشخصي.",
+      EMPLOYEE_ALREADY_ACTIVE: "الموظف لديه حضور مفتوح بالفعل.",
+    };
+    throw new Error(messages[result?.code] || "تعذر إتمام القرار بأمان");
+  }
+  if (!result.photo_deleted) throw new Error("لم يؤكد النظام حذف الصورة؛ لم يتم اعتماد القرار.");
+  return result;
 }
 
 export function getBrowserLocation(): Promise<{ latitude: number; longitude: number; accuracyM: number }> {
