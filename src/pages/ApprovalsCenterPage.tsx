@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -85,6 +85,8 @@ const rejectionReasonLabels: Record<InventoryAdjustmentRejectionReason, string> 
 
 export default function ApprovalsCenterPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const hrAttendanceOnly = location.pathname === "/hr/attendance-approvals";
   const { currentBranchId, currentBranchName } = useBranchStore();
   const [scope, setScope] = useState<ApprovalScope>("pending");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -111,7 +113,10 @@ export default function ApprovalsCenterPage() {
   });
 
   const summary = query.data?.summary;
-  const items = useMemo(() => query.data?.items || [], [query.data?.items]);
+  const items = useMemo(
+    () => (query.data?.items || []).filter(item => !hrAttendanceOnly || item.source_kind === "attendance_exception"),
+    [query.data?.items, hrAttendanceOnly],
+  );
 
   const openApproval = async (item: ApprovalItem) => {
     setBusyId(item.id);
@@ -230,10 +235,10 @@ export default function ApprovalsCenterPage() {
     <div dir="rtl" className="mx-auto max-w-[1500px] space-y-5 py-5">
       <section className="rounded-3xl border bg-white p-5 shadow-sm md:p-7">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div><div className="flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-[#005931]" /><h1 className="text-2xl font-black">مركز الموافقات</h1></div><p className="mt-2 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · المخزون والطلبات والمالية والحضور والموارد البشرية في Inbox واحد.</p></div>
+          <div><div className="flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-[#005931]" /><h1 className="text-2xl font-black">{hrAttendanceOnly ? "موافقات الحضور — HR" : "مركز الموافقات"}</h1></div><p className="mt-2 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · {hrAttendanceOnly ? "طلبات الحضور خارج النطاق تصل هنا مباشرة لمسؤول الموارد البشرية." : "المخزون والطلبات والمالية والحضور والموارد البشرية في Inbox واحد."}</p></div>
           <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">{cards.map(card => <div key={card.label} className="rounded-2xl border bg-slate-50/70 p-3"><card.icon className="h-4 w-4 text-[#005931]" /><div className="mt-2 text-2xl font-black">{card.value.toLocaleString("ar-EG")}</div><div className="text-xs text-muted-foreground">{card.label}</div></div>)}</div>
+        {!hrAttendanceOnly && <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">{cards.map(card => <div key={card.label} className="rounded-2xl border bg-slate-50/70 p-3"><card.icon className="h-4 w-4 text-[#005931]" /><div className="mt-2 text-2xl font-black">{card.value.toLocaleString("ar-EG")}</div><div className="text-xs text-muted-foreground">{card.label}</div></div>)}</div>}
         <Tabs value={scope} onValueChange={value => setScope(value as ApprovalScope)} dir="rtl" className="mt-5"><TabsList className="h-auto flex-wrap justify-start gap-1 rounded-2xl bg-slate-100 p-1.5"><TabsTrigger value="pending">معلقة</TabsTrigger><TabsTrigger value="mine">عندي</TabsTrigger><TabsTrigger value="overdue">متأخرة</TabsTrigger><TabsTrigger value="completed">مكتملة</TabsTrigger><TabsTrigger value="all">الكل</TabsTrigger></TabsList></Tabs>
       </section>
 
