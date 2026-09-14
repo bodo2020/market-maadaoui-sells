@@ -25,3 +25,10 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run build
+      - name: Upload Staff web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: elmadawy-staff-web
+          path: apps/staff/dist
+          if-no-files-found: error
+          retention-days: 14
