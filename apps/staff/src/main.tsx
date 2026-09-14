@@ -5,6 +5,7 @@ import NativeBarcodeFab from "./components/NativeBarcodeFab";
 import SelfDeviceApproval from "./components/SelfDeviceApproval";
 import SubstitutionOverlay from "./components/SubstitutionOverlay";
 import SubstitutionApprovalsOverlay from "./components/SubstitutionApprovalsOverlay";
+import AssistedAssignmentOffer from "./components/AssistedAssignmentOffer";
 import { installStaffAuthEnhancements } from "./authEnhancer";
 import { installNativeAppBridge } from "./nativeAppBridge";
 import "./styles.css";
@@ -13,6 +14,7 @@ import "./native-safe-area.css";
 import "./staff-v05.css";
 import "./substitutions.css";
 import "./staging.css";
+import "./assignment-offer.css";
 
 installStaffAuthEnhancements();
 void installNativeAppBridge();
@@ -24,5 +26,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <SelfDeviceApproval />
     <SubstitutionOverlay />
     <SubstitutionApprovalsOverlay />
+    <AssistedAssignmentOffer />
   </React.StrictMode>,
 );
