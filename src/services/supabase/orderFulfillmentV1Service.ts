@@ -46,3 +46,24 @@ export const assignRecommendedDelivery = async (orderId: string, force = false) 
   const { data, error } = await rpc("assign_recommended_delivery_v1", { p_order_id: orderId, p_force: force });
   return unwrap<any>(data, error);
 };
+
+export type PickerAssignmentPolicy = {
+  branch_id: string;
+  mode: "shadow" | "assisted";
+  offer_ttl_seconds: number;
+  can_manage: boolean;
+};
+
+export const fetchPickerAssignmentPolicy = async (branchId: string) => {
+  const { data, error } = await rpc("get_picker_assignment_policy_v1", { p_branch_id: branchId });
+  return unwrap<PickerAssignmentPolicy>(data, error);
+};
+
+export const setPickerAssignmentPolicy = async (branchId: string, mode: "shadow" | "assisted", offerTtlSeconds = 90) => {
+  const { data, error } = await rpc("set_picker_assignment_policy_v1", {
+    p_branch_id: branchId,
+    p_mode: mode,
+    p_offer_ttl_seconds: offerTtlSeconds,
+  });
+  return unwrap<{ ok: boolean; branch_id: string; mode: "shadow" | "assisted"; offer_ttl_seconds: number }>(data, error);
+};
