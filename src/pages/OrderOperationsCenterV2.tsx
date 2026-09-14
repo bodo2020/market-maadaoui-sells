@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Clock3, PackageCheck, RefreshCw, Route, Settings2, TimerReset, Truck, UserCheck } from "lucide-react";
+import { Clock3, Layers3, PackageCheck, RefreshCw, Route, Settings2, TimerReset, Truck, UserCheck } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { useBranchStore } from "@/stores/branchStore";
 import {
   assignRecommendedDelivery,
+  fetchBatchPickingShadow,
   fetchFulfillmentWorkspace,
   fetchPickerAssignmentPolicy,
   setPickerAssignmentPolicy,
@@ -28,6 +29,11 @@ const stateLabel: Record<string, string> = {
 };
 
 const riskLabel: Record<string, string> = { on_track: "في الموعد", at_risk: "معرض للتأخير", late: "متأخر" };
+const batchReasonLabel: Record<string, string> = {
+  shared_shelf_route: "مسار رفوف مشترك",
+  shared_categories: "أقسام متقاربة",
+  close_sla_window: "مواعيد تجهيز متقاربة",
+};
 
 function timeLabel(value?: string | null) {
   if (!value) return "—";
@@ -47,6 +53,13 @@ export default function OrderOperationsCenterV2() {
     enabled: Boolean(currentBranchId),
     queryFn: () => fetchFulfillmentWorkspace(currentBranchId!),
     refetchInterval: 20_000,
+  });
+
+  const batchShadowQuery = useQuery({
+    queryKey: ["batch-picking-shadow-v1", currentBranchId],
+    enabled: Boolean(currentBranchId),
+    queryFn: () => fetchBatchPickingShadow(currentBranchId!),
+    refetchInterval: 30_000,
   });
 
   const policyQuery = useQuery({
@@ -137,6 +150,41 @@ export default function OrderOperationsCenterV2() {
             </div>
           </CardContent>
         </Card>}
+
+        <Card className="overflow-hidden border-violet-200 bg-gradient-to-br from-violet-50/70 via-white to-white shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-700 text-white"><Layers3 className="h-5 w-5" /></div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2"><CardTitle>Batch Picking Shadow</CardTitle><span className="rounded-full bg-violet-100 px-3 py-1 text-[11px] font-black text-violet-800">اقتراح فقط · لا يغيّر الطلبات</span></div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">يجمع الطلبات المتوافقة في جولة مقترحة حسب الـSLA والأقسام والرفوف، مع حد أقصى 4 طلبات و40 صنفًا.</p>
+                </div>
+              </div>
+              <Button variant="outline" onClick={() => void batchShadowQuery.refetch()} disabled={batchShadowQuery.isFetching}><RefreshCw className={`h-4 w-4 ${batchShadowQuery.isFetching ? "animate-spin" : ""}`} />إعادة التحليل</Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {batchShadowQuery.isLoading ? <div className="rounded-2xl bg-white/80 p-5 text-center text-sm text-slate-500">جاري تحليل فرص التجميع…</div> : batchShadowQuery.error ? <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">تعذر تحميل تحليل Batch Picking.</div> : <>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+                {[
+                  ["مؤهل للتجميع", batchShadowQuery.data?.summary.eligible_orders || 0],
+                  ["Batches مقترحة", batchShadowQuery.data?.summary.recommended_batches || 0],
+                  ["طلبات مغطاة", batchShadowQuery.data?.summary.covered_orders || 0],
+                  ["تبقى Single", batchShadowQuery.data?.summary.single_orders || 0],
+                  ["نسبة التغطية", batchShadowQuery.data?.summary.coverage_rate == null ? "—" : `${batchShadowQuery.data.summary.coverage_rate}%`],
+                ].map(([label, value]) => <div key={label} className="rounded-2xl border border-violet-100 bg-white p-3 text-center"><p className="text-[11px] text-slate-500">{label}</p><p className="mt-1 text-xl font-black text-violet-900">{value}</p></div>)}
+              </div>
+              {(batchShadowQuery.data?.batches || []).length === 0 ? <div className="rounded-2xl border border-dashed border-violet-200 bg-white/70 p-5 text-center text-sm text-slate-500">لا توجد حاليًا طلبات مؤكدة ومتوافقة تستحق التجميع. الطلبات الكبيرة أو المتباعدة زمنيًا ستظل Single تلقائيًا.</div> : <div className="grid gap-3 lg:grid-cols-2">
+                {batchShadowQuery.data!.batches.map((batch) => <div key={batch.id} className="rounded-2xl border border-violet-100 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3"><div><strong className="text-violet-950">{batch.batch_code}</strong><p className="mt-1 text-xs text-slate-500">{batchReasonLabel[batch.reason] || batch.reason} · Score {Number(batch.score).toFixed(1)}</p></div><span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-800">{batch.order_count} طلبات · {batch.total_lines} صنف</span></div>
+                  <div className="mt-3 space-y-2">{batch.orders.map((order) => <button key={order.order_id} type="button" onClick={() => navigate(`/online-orders/${order.order_id}`)} className="flex w-full items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-right transition hover:bg-violet-50"><div><p className="text-sm font-black">{order.display_id}</p><p className="text-[11px] text-slate-500">{order.customer_name} · {order.items_total} صنف</p></div><span className={`text-xs font-black ${order.eta_risk === "late" ? "text-red-600" : order.eta_risk === "at_risk" ? "text-amber-700" : "text-emerald-700"}`}>{riskLabel[order.eta_risk] || "—"} · {timeLabel(order.predicted_ready_at)}</span></button>)}</div>
+                  <div className="mt-3 flex items-center justify-between border-t pt-3 text-xs"><span className="text-slate-500">المجهز المقترح</span><strong>{batch.recommended_user_name || "يُحدد وقت التوزيع"}</strong></div>
+                </div>)}
+              </div>}
+            </>}
+          </CardContent>
+        </Card>
 
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-6">
           {[
