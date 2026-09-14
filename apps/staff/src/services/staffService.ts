@@ -97,6 +97,55 @@ export type PickingSession = {
   items: PickingItem[];
 };
 
+export type NotificationItem = {
+  id: string;
+  event_key: string;
+  category: string;
+  severity: "critical" | "high" | "normal" | "info";
+  title: string;
+  body: string | null;
+  action_url: string | null;
+  action_label: string | null;
+  requires_action: boolean;
+  status: string;
+  read_at: string | null;
+  created_at: string;
+  metadata: Record<string, unknown>;
+};
+
+export type NotificationCenter = {
+  version: number;
+  branch_id: string | null;
+  filter: string;
+  summary: {
+    total: number;
+    unread: number;
+    critical: number;
+    action_required: number;
+    today: number;
+  };
+  items: NotificationItem[];
+};
+
+export type AttendancePayload = {
+  active_session?: {
+    id: string;
+    check_in_at: string;
+    late_minutes?: number;
+    attendance_mode?: string;
+    branch_name?: string;
+  } | null;
+  policy?: {
+    geofence_radius_m: number;
+    max_location_accuracy_m: number;
+    require_trusted_device: boolean;
+    allow_outside_exception: boolean;
+  };
+  schedule?: Record<string, unknown> | null;
+  recent_sessions?: Array<Record<string, unknown>>;
+  pending_exception?: Record<string, unknown> | null;
+};
+
 export async function getStaffIdentity() {
   return unwrap<StaffIdentity | null>(await rpc("get_my_staff_identity"));
 }
@@ -126,7 +175,94 @@ export async function completeTask(id: string, note = "تم التنفيذ من 
 }
 
 export async function getAttendance(branchId: string) {
-  return unwrap<any>(await rpc("get_my_attendance_v1", { p_branch_id: branchId }));
+  return unwrap<AttendancePayload>(await rpc("get_my_attendance_v1", { p_branch_id: branchId }));
+}
+
+export async function validateStaffDevice(deviceId: string, token: string) {
+  return unwrap<{ trusted: boolean; code?: string; approval_status?: string; device_id?: string }>(
+    await rpc("validate_my_staff_device_v1", { p_device_id: deviceId, p_device_token: token }),
+  );
+}
+
+export async function redeemStaffDevicePairing(
+  pairingToken: string,
+  pairingCode: string,
+  deviceKey: string,
+  deviceName: string,
+  platform = "android",
+) {
+  return unwrap<{
+    ok: boolean;
+    code: string;
+    approval_status: string;
+    device_id: string;
+    device_token: string;
+  }>(await rpc("redeem_staff_device_pairing_v1", {
+    p_pairing_token: pairingToken,
+    p_pairing_code: pairingCode,
+    p_device_key: deviceKey,
+    p_device_name: deviceName,
+    p_platform: platform,
+    p_device_type: "personal",
+    p_metadata: { app: "elmadawy_staff" },
+  }));
+}
+
+export async function attendanceCheckIn(
+  branchId: string,
+  deviceId: string,
+  token: string,
+  latitude: number,
+  longitude: number,
+  accuracy: number,
+) {
+  return unwrap<Record<string, unknown>>(await rpc("staff_attendance_check_in_v2", {
+    p_branch_id: branchId,
+    p_device_id: deviceId,
+    p_device_token: token,
+    p_attendance_mode: "onsite",
+    p_latitude: latitude,
+    p_longitude: longitude,
+    p_accuracy_m: accuracy,
+    p_exception_reason: null,
+    p_verification_photo_path: null,
+    p_verification_photo_sha256: null,
+  }));
+}
+
+export async function attendanceCheckOut(
+  sessionId: string,
+  deviceId: string,
+  token: string,
+  latitude: number,
+  longitude: number,
+  accuracy: number,
+) {
+  return unwrap<Record<string, unknown>>(await rpc("staff_attendance_check_out_v1", {
+    p_session_id: sessionId,
+    p_device_id: deviceId,
+    p_device_token: token,
+    p_latitude: latitude,
+    p_longitude: longitude,
+    p_accuracy_m: accuracy,
+  }));
+}
+
+export async function getNotifications(branchId: string, filter = "all") {
+  return unwrap<NotificationCenter>(await rpc("get_my_notification_center_v2", {
+    p_branch_id: branchId,
+    p_filter: filter,
+    p_category: null,
+    p_limit: 100,
+  }));
+}
+
+export async function markNotificationRead(id: string) {
+  return unwrap<boolean>(await rpc("mark_notification_read_v2", { p_notification_id: id }));
+}
+
+export async function markAllNotificationsRead(branchId: string) {
+  return unwrap<number>(await rpc("mark_all_notifications_read_v2", { p_branch_id: branchId }));
 }
 
 export async function getFulfillmentWorkspace(branchId: string) {
@@ -170,7 +306,6 @@ export async function markPickingShortage(itemId: string, quantity: number, note
   }));
 }
 
-// Legacy aggregate helper remains available for compatibility with older screens.
 export async function updatePicking(
   orderId: string,
   picked: number,
