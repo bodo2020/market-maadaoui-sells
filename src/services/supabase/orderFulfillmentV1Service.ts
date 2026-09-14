@@ -67,3 +67,51 @@ export const setPickerAssignmentPolicy = async (branchId: string, mode: "shadow"
   });
   return unwrap<{ ok: boolean; branch_id: string; mode: "shadow" | "assisted"; offer_ttl_seconds: number }>(data, error);
 };
+
+export type BatchPickingShadowOrder = {
+  order_id: string;
+  display_id: string;
+  customer_name: string;
+  items_total: number;
+  predicted_ready_at?: string | null;
+  eta_risk: "on_track" | "at_risk" | "late";
+};
+
+export type BatchPickingShadowRecommendation = {
+  id: string;
+  batch_code: string;
+  order_ids: string[];
+  order_count: number;
+  total_lines: number;
+  score: number;
+  reason: "shared_shelf_route" | "shared_categories" | "close_sla_window";
+  recommended_user_id?: string | null;
+  recommended_user_name?: string | null;
+  generated_at: string;
+  orders: BatchPickingShadowOrder[];
+};
+
+export type BatchPickingShadowPayload = {
+  mode: "shadow";
+  branch_id: string;
+  generated_at: string;
+  limits: {
+    max_orders: number;
+    max_lines: number;
+    max_ready_gap_minutes: number;
+    minimum_pair_score: number;
+  };
+  summary: {
+    eligible_orders: number;
+    recommended_batches: number;
+    covered_orders: number;
+    single_orders: number;
+    coverage_rate?: number | null;
+  };
+  batches: BatchPickingShadowRecommendation[];
+};
+
+export const fetchBatchPickingShadow = async (branchId: string) => {
+  const { data, error } = await rpc("get_batch_picking_shadow_v1", { p_branch_id: branchId });
+  return unwrap<BatchPickingShadowPayload>(data, error);
+};
