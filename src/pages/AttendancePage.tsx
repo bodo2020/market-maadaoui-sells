@@ -134,6 +134,8 @@ export default function AttendancePage() {
         LOCATION_REQUIRED: "يلزم تشغيل GPS لتسجيل الحضور.",
         LOCATION_ACCURACY_TOO_LOW: "دقة الموقع غير كافية. اقترب من مكان مفتوح وحاول مرة أخرى.",
         OUTSIDE_GEOFENCE: "أنت خارج نطاق الحضور المسموح للفرع.",
+        LIVE_PHOTO_REQUIRED: "طلب الاستثناء يحتاج صورة مباشرة؛ افتح تطبيق المعداوي Staff على الهاتف لإرساله.",
+        PHONE_VERIFICATION_REQUIRED: "أعد التحقق من تسجيل الدخول في تطبيق Staff ثم حاول مرة أخرى.",
         TRUSTED_DEVICE_REQUIRED: "يلزم تفعيل هذا الجهاز كجهاز موثوق أولًا.",
         ACTIVE_SESSION_EXISTS: "لديك حضور مفتوح بالفعل.",
       };
@@ -170,7 +172,7 @@ export default function AttendancePage() {
       toast.error("اكتب سببًا واضحًا لطلب الحضور خارج النطاق.");
       return;
     }
-    checkInMutation.mutate({ reason: exceptionReason.trim(), knownLocation: outsideLocation });
+    toast.error("لحماية الموظف، طلب الحضور خارج النطاق يُرسل من تطبيق المعداوي Staff بصورة مباشرة فقط.");
   };
 
   if (attendanceQuery.isLoading) {
