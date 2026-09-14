@@ -12,3 +12,29 @@
 .batch-shadow-preview p{margin:7px 0;color:#6b7280;font-size:12px}
 .batch-order-chips{display:flex;flex-wrap:wrap;gap:6px}
 .batch-order-chips span{background:#ede9fe;color:#5b21b6;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:900}
+
+
+/* Outside-geofence attendance exception */
+.attendance-pending{display:flex;gap:12px;align-items:flex-start;padding:14px;margin-bottom:14px;border:1px solid #f4cf72;border-radius:18px;background:#fff8e6;color:#7c4a03}
+.attendance-pending svg{width:22px;flex:0 0 auto}
+.attendance-pending strong{display:block}
+.attendance-pending p{margin:5px 0 0;font-size:12px;line-height:1.6}
+.attendance-exception-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-end;justify-content:center;padding:16px;background:rgba(8,24,16,.66);backdrop-filter:blur(5px)}
+.attendance-exception-sheet{width:min(100%,520px);max-height:92dvh;overflow:auto;padding:20px;border-radius:26px 26px 18px 18px;background:#fff;box-shadow:0 22px 70px rgba(0,0,0,.28)}
+.exception-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.exception-sheet-head small{color:#a05a00;font-weight:800}
+.exception-sheet-head h2{margin:3px 0 0;font-size:22px}
+.exception-sheet-head svg{width:34px;height:34px;padding:7px;border-radius:12px;background:#fff2cc;color:#a05a00}
+.exception-distance{display:flex;flex-direction:column;gap:2px;margin:16px 0;padding:14px;border:1px solid #f4cf72;border-radius:16px;background:#fff8e6}
+.exception-distance strong{font-size:22px;color:#7c4a03}
+.exception-distance span{font-size:12px;color:#8c641f}
+.attendance-exception-sheet label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:800}
+.attendance-exception-sheet textarea{width:100%;resize:vertical;padding:12px;border:1px solid #d8dedb;border-radius:14px;font:inherit;line-height:1.6}
+.selfie-capture{display:grid;gap:10px;margin-top:14px}
+.selfie-capture img,.selfie-placeholder{width:100%;height:230px;border-radius:18px;background:#eef3f0;object-fit:contain}
+.selfie-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:1px dashed #96b3a4;color:#527061}
+.selfie-placeholder svg{width:38px;height:38px}
+.privacy-note{display:flex;gap:8px;align-items:flex-start;margin:14px 0;padding:11px;border-radius:14px;background:#eaf7f0;color:#174b31;font-size:12px;line-height:1.7}
+.privacy-note svg{width:19px;flex:0 0 auto}
+.exception-actions{display:grid;grid-template-columns:1fr 1.6fr;gap:10px}
+@media (min-width:700px){.attendance-exception-overlay{align-items:center}.attendance-exception-sheet{border-radius:26px}}
