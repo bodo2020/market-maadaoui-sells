@@ -21,7 +21,7 @@ function App() {
             <OperationsTaskNotifications />
             <ApprovalCenterNotifications />
             <AppRoutes />
-            <SonnerToaster position="top-center" richColors />
+            <SonnerToaster position="top-center" richColors offset="calc(var(--safe-area-top) + 12px)" />
             <Toaster />
           </TooltipProvider>
         </AuthProvider>
