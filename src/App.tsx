@@ -3,6 +3,7 @@ import ApprovalCenterNotifications from "@/components/approvals/ApprovalCenterNo
 import CustomerTaskNotifications from "@/components/customers/CustomerTaskNotifications";
 import OperationsTaskNotifications from "@/components/tasks/OperationsTaskNotifications";
 import InventoryTransferSmartAlertNotifications from "@/components/inventory/InventoryTransferSmartAlertNotifications";
+import POSOnlineOrdersRouteDock from "@/components/POS/POSOnlineOrdersRouteDock";
 import { BrowserRouter as Router } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -26,6 +27,7 @@ function App() {
             <OperationsTaskNotifications />
             <InventoryTransferSmartAlertNotifications />
             <ApprovalCenterNotifications />
+            <POSOnlineOrdersRouteDock />
             <AppRoutes />
             <SonnerToaster position="top-center" richColors />
             <Toaster />
