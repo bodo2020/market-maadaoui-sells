@@ -55,6 +55,31 @@ export type OrderSubstitutionFinancialAdjustment = {
   replacement_product_name: string;
 };
 
+export type OrderShortageFinancialAdjustment = {
+  id: string;
+  item_id: string;
+  order_id: string;
+  branch_id: string;
+  direction: "refund";
+  signed_amount: number;
+  amount: number;
+  payment_method: string | null;
+  payment_status: string | null;
+  order_total_before: number;
+  target_order_total: number;
+  order_total_after: number;
+  settlement_state: string;
+  operations_task_id: string | null;
+  provider_reference: string | null;
+  note: string | null;
+  settled_by: string | null;
+  settled_at: string | null;
+  created_at: string;
+  product_name: string;
+  shortage_quantity: number;
+  original_unit_price: number;
+};
+
 function mapError(message?: string) {
   const value = message || "";
   if (value.includes("SUBSTITUTION_APPROVAL_DENIED")) return new Error("ليس لديك صلاحية اعتماد بدائل الطلبات في هذا الفرع.");
@@ -65,6 +90,11 @@ function mapError(message?: string) {
   if (value.includes("SUBSTITUTION_PROVIDER_REFERENCE_REQUIRED")) return new Error("اكتب مرجع عملية التحصيل أو الرد من مزود الدفع.");
   if (value.includes("SUBSTITUTION_FINANCE_NOTE_REQUIRED")) return new Error("اكتب ملاحظة التسوية المالية.");
   if (value.includes("SUBSTITUTION_FINANCE_NOT_PENDING")) return new Error("هذه التسوية لم تعد معلقة.");
+  if (value.includes("SHORTAGE_FINANCE_ACCESS_DENIED")) return new Error("ليس لديك صلاحية رد قيمة النواقص لهذا الطلب.");
+  if (value.includes("SHORTAGE_PROVIDER_REFERENCE_REQUIRED")) return new Error("اكتب مرجع عملية الرد من مزود الدفع.");
+  if (value.includes("SHORTAGE_FINANCE_NOTE_REQUIRED")) return new Error("اكتب ملاحظة توضح عملية رد قيمة النقص.");
+  if (value.includes("SHORTAGE_FINANCE_NOT_PENDING")) return new Error("تسوية هذا النقص لم تعد معلقة.");
+  if (value.includes("SHORTAGE_FINANCIAL_ADJUSTMENT_NOT_FOUND")) return new Error("لم يتم العثور على تسوية النقص المطلوبة.");
   return new Error(message || "تعذر تنفيذ العملية.");
 }
 
@@ -100,6 +130,32 @@ export async function fetchOrderSubstitutionFinancialAdjustment(adjustmentId: st
 
 export async function settleOrderSubstitutionFinancialAdjustment(adjustmentId: string, providerReference: string, note: string) {
   const { data, error } = await rpc("settle_order_substitution_financial_adjustment_v1", {
+    p_adjustment_id: adjustmentId,
+    p_provider_reference: providerReference,
+    p_note: note,
+  });
+  if (error) throw mapError(error.message);
+  return data as {
+    ok: boolean;
+    id: string;
+    settlement_state: string;
+    signed_amount: number;
+    order_total_after: number;
+    payment_ledger_id: string;
+    provider_reference: string;
+  };
+}
+
+export async function fetchOrderShortageFinancialAdjustment(adjustmentId: string) {
+  const { data, error } = await rpc("get_order_shortage_financial_adjustment_v1", {
+    p_adjustment_id: adjustmentId,
+  });
+  if (error) throw mapError(error.message);
+  return data as OrderShortageFinancialAdjustment;
+}
+
+export async function settleOrderShortageFinancialAdjustment(adjustmentId: string, providerReference: string, note: string) {
+  const { data, error } = await rpc("settle_order_shortage_financial_adjustment_v1", {
     p_adjustment_id: adjustmentId,
     p_provider_reference: providerReference,
     p_note: note,
