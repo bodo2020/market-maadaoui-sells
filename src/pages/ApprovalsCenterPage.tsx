@@ -19,12 +19,12 @@ import {
 import MainLayout from "@/components/layout/MainLayout";
 import AttendanceExceptionDecisionDialog from "@/components/attendance/AttendanceExceptionDecisionDialog";
 import HrRequestDecisionDialog from "@/components/hr/HrRequestDecisionDialog";
+import OrderFinancialAdjustmentDialog from "@/components/orders/OrderFinancialAdjustmentDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,10 +42,7 @@ import {
 import {
   decideOrderSubstitution,
   fetchOrderSubstitutionApproval,
-  fetchOrderSubstitutionFinancialAdjustment,
-  settleOrderSubstitutionFinancialAdjustment,
   type OrderSubstitutionApprovalDetail,
-  type OrderSubstitutionFinancialAdjustment,
 } from "@/services/supabase/orderSubstitutionApprovalService";
 
 const formatDateTime = (value?: string | null) => value
@@ -54,12 +51,16 @@ const formatDateTime = (value?: string | null) => value
 const formatQty = (value?: number | null) => Number(value || 0).toLocaleString("ar-EG", { maximumFractionDigits: 3 });
 const formatMoney = (value?: number | null) => `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
 
+const financialSourceKinds = ["order_substitution_financial_adjustment", "order_shortage_financial_adjustment"];
+const specializedKinds = ["attendance_exception", "hr_request", "order_substitution", ...financialSourceKinds];
+
 const sourceMeta = (sourceKind: string) => {
   if (sourceKind === "inventory_adjustment") return { label: "اعتماد فرق مخزون", icon: Warehouse, className: "border-cyan-200 bg-cyan-50 text-cyan-800" };
   if (sourceKind === "attendance_exception") return { label: "استثناء حضور", icon: MapPinCheck, className: "border-emerald-200 bg-emerald-50 text-emerald-800" };
   if (sourceKind === "hr_request") return { label: "طلب موارد بشرية", icon: UserRoundCheck, className: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800" };
   if (sourceKind === "order_substitution") return { label: "اعتماد بديل طلب", icon: ClipboardCheck, className: "border-teal-200 bg-teal-50 text-teal-800" };
   if (sourceKind === "order_substitution_financial_adjustment") return { label: "تسوية فرق بديل", icon: WalletCards, className: "border-orange-200 bg-orange-50 text-orange-800" };
+  if (sourceKind === "order_shortage_financial_adjustment") return { label: "رد قيمة نقص طلب", icon: WalletCards, className: "border-rose-200 bg-rose-50 text-rose-800" };
   if (sourceKind === "shift_reconciliation") return { label: "فرق وردية", icon: WalletCards, className: "border-violet-200 bg-violet-50 text-violet-800" };
   if (sourceKind === "cash_handoff") return { label: "فرق عهدة نقدية", icon: WalletCards, className: "border-amber-200 bg-amber-50 text-amber-800" };
   if (sourceKind === "inventory_transfer_variance") return { label: "فرق تحويل مخزون", icon: ClipboardCheck, className: "border-blue-200 bg-blue-50 text-blue-800" };
@@ -94,15 +95,12 @@ export default function ApprovalsCenterPage() {
   const [substitutionTask, setSubstitutionTask] = useState<ApprovalItem | null>(null);
   const [substitutionDetail, setSubstitutionDetail] = useState<OrderSubstitutionApprovalDetail | null>(null);
   const [financeTask, setFinanceTask] = useState<ApprovalItem | null>(null);
-  const [financeDetail, setFinanceDetail] = useState<OrderSubstitutionFinancialAdjustment | null>(null);
   const [inventoryDetail, setInventoryDetail] = useState<InventoryAuditTaskDetail | null>(null);
   const [adjustmentReason, setAdjustmentReason] = useState<InventoryAdjustmentReason>("unknown");
   const [rejectionReason, setRejectionReason] = useState<InventoryAdjustmentRejectionReason>("insufficient_evidence");
   const [note, setNote] = useState("");
   const [generalNote, setGeneralNote] = useState("");
   const [substitutionNote, setSubstitutionNote] = useState("");
-  const [financeNote, setFinanceNote] = useState("");
-  const [providerReference, setProviderReference] = useState("");
 
   const query = useQuery({
     queryKey: ["approval-center-v1", currentBranchId, scope],
@@ -119,7 +117,7 @@ export default function ApprovalsCenterPage() {
     setBusyId(item.id);
     try {
       if (item.status === "open" && item.can_claim) await claimOperationsTask(item.id);
-      try { await startOperationsTask(item.id); } catch { /* specialized decision RPCs are idempotent */ }
+      try { await startOperationsTask(item.id); } catch { /* specialized RPC owns the final transition */ }
 
       if (item.source_kind === "inventory_adjustment") {
         const detail = await fetchInventoryAuditTaskV2(item.id);
@@ -138,12 +136,8 @@ export default function ApprovalsCenterPage() {
         setSubstitutionTask(item);
         setSubstitutionDetail(detail);
         setSubstitutionNote("");
-      } else if (item.source_kind === "order_substitution_financial_adjustment") {
-        const detail = await fetchOrderSubstitutionFinancialAdjustment(item.source_id);
+      } else if (financialSourceKinds.includes(item.source_kind)) {
         setFinanceTask(item);
-        setFinanceDetail(detail);
-        setFinanceNote("");
-        setProviderReference("");
       } else {
         setGeneralTask(item);
         setGeneralNote("");
@@ -160,11 +154,10 @@ export default function ApprovalsCenterPage() {
   const closeInventory = () => { setInventoryTask(null); setInventoryDetail(null); setNote(""); };
   const closeGeneral = () => { setGeneralTask(null); setGeneralNote(""); };
   const closeSubstitution = () => { setSubstitutionTask(null); setSubstitutionDetail(null); setSubstitutionNote(""); };
-  const closeFinance = () => { setFinanceTask(null); setFinanceDetail(null); setFinanceNote(""); setProviderReference(""); };
 
   const submitGeneralDecision = async () => {
     if (!generalTask || busyId) return;
-    if (["attendance_exception", "hr_request", "order_substitution", "order_substitution_financial_adjustment"].includes(generalTask.source_kind)) return toast.error("هذه الموافقة لها مسار قرار متخصص.");
+    if (specializedKinds.includes(generalTask.source_kind)) return toast.error("هذه الموافقة لها مسار قرار متخصص.");
     if (generalNote.trim().length < 3) return toast.error("اكتب نتيجة المراجعة قبل الإغلاق.");
     setBusyId(generalTask.id);
     try {
@@ -191,22 +184,6 @@ export default function ApprovalsCenterPage() {
       await query.refetch();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر تسجيل قرار البديل.");
-      await query.refetch();
-    } finally { setBusyId(null); }
-  };
-
-  const settleSubstitutionFinance = async () => {
-    if (!financeTask || !financeDetail || busyId) return;
-    if (providerReference.trim().length < 3) return toast.error("اكتب مرجع عملية التحصيل أو الرد من مزود الدفع.");
-    if (financeNote.trim().length < 3) return toast.error("اكتب ملاحظة توضح العملية التي تمت.");
-    setBusyId(financeTask.id);
-    try {
-      const result = await settleOrderSubstitutionFinancialAdjustment(financeDetail.id, providerReference, financeNote);
-      toast.success(`${financeDetail.direction === "refund" ? "تم تسجيل رد" : "تم تسجيل تحصيل"} ${formatMoney(Math.abs(result.signed_amount))} وتحديث إجمالي الطلب.`);
-      closeFinance();
-      await query.refetch();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "تعذر تسوية فرق البديل.");
       await query.refetch();
     } finally { setBusyId(null); }
   };
@@ -249,40 +226,38 @@ export default function ApprovalsCenterPage() {
     { label: "مكتملة اليوم", value: summary?.completed_today || 0, icon: CheckCircle2 },
   ];
 
-  return (
-    <MainLayout>
-      <div dir="rtl" className="mx-auto max-w-[1500px] space-y-5 py-5">
-        <section className="rounded-3xl border bg-white p-5 shadow-sm md:p-7">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div><div className="flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-[#005931]" /><h1 className="text-2xl font-black">مركز الموافقات</h1></div><p className="mt-2 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · المخزون والطلبات والمالية والحضور والموارد البشرية في Inbox واحد.</p></div>
-            <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">{cards.map(card => <div key={card.label} className="rounded-2xl border bg-slate-50/70 p-3"><card.icon className="h-4 w-4 text-[#005931]" /><div className="mt-2 text-2xl font-black">{card.value.toLocaleString("ar-EG")}</div><div className="text-xs text-muted-foreground">{card.label}</div></div>)}</div>
-          <Tabs value={scope} onValueChange={value => setScope(value as ApprovalScope)} dir="rtl" className="mt-5"><TabsList className="h-auto flex-wrap justify-start gap-1 rounded-2xl bg-slate-100 p-1.5"><TabsTrigger value="pending">معلقة</TabsTrigger><TabsTrigger value="mine">عندي</TabsTrigger><TabsTrigger value="overdue">متأخرة</TabsTrigger><TabsTrigger value="completed">مكتملة</TabsTrigger><TabsTrigger value="all">الكل</TabsTrigger></TabsList></Tabs>
-        </section>
+  return <MainLayout>
+    <div dir="rtl" className="mx-auto max-w-[1500px] space-y-5 py-5">
+      <section className="rounded-3xl border bg-white p-5 shadow-sm md:p-7">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div><div className="flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-[#005931]" /><h1 className="text-2xl font-black">مركز الموافقات</h1></div><p className="mt-2 text-sm text-muted-foreground">{currentBranchName || "الفرع الحالي"} · المخزون والطلبات والمالية والحضور والموارد البشرية في Inbox واحد.</p></div>
+          <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">{cards.map(card => <div key={card.label} className="rounded-2xl border bg-slate-50/70 p-3"><card.icon className="h-4 w-4 text-[#005931]" /><div className="mt-2 text-2xl font-black">{card.value.toLocaleString("ar-EG")}</div><div className="text-xs text-muted-foreground">{card.label}</div></div>)}</div>
+        <Tabs value={scope} onValueChange={value => setScope(value as ApprovalScope)} dir="rtl" className="mt-5"><TabsList className="h-auto flex-wrap justify-start gap-1 rounded-2xl bg-slate-100 p-1.5"><TabsTrigger value="pending">معلقة</TabsTrigger><TabsTrigger value="mine">عندي</TabsTrigger><TabsTrigger value="overdue">متأخرة</TabsTrigger><TabsTrigger value="completed">مكتملة</TabsTrigger><TabsTrigger value="all">الكل</TabsTrigger></TabsList></Tabs>
+      </section>
 
-        {query.isLoading ? <div className="flex min-h-[320px] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#005931]" /></div> : query.isError ? <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-red-800">{query.error instanceof Error ? query.error.message : "تعذر تحميل الموافقات."}</div> : items.length === 0 ? <div className="rounded-3xl border border-dashed bg-white p-12 text-center"><ShieldCheck className="mx-auto h-10 w-10 text-emerald-700" /><h2 className="mt-3 text-lg font-black">لا توجد موافقات في هذا القسم</h2><p className="mt-1 text-sm text-muted-foreground">أي قرار جديد ضمن صلاحياتك سيظهر هنا تلقائيًا.</p></div> : <div className="space-y-3">{items.map(item => {
+      {query.isLoading ? <div className="flex min-h-[320px] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-[#005931]" /></div>
+        : query.isError ? <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-red-800">{query.error instanceof Error ? query.error.message : "تعذر تحميل الموافقات."}</div>
+        : items.length === 0 ? <div className="rounded-3xl border border-dashed bg-white p-12 text-center"><ShieldCheck className="mx-auto h-10 w-10 text-emerald-700" /><h2 className="mt-3 text-lg font-black">لا توجد موافقات في هذا القسم</h2><p className="mt-1 text-sm text-muted-foreground">أي قرار جديد ضمن صلاحياتك سيظهر هنا تلقائيًا.</p></div>
+        : <div className="space-y-3">{items.map(item => {
           const meta = sourceMeta(item.source_kind); const Icon = meta.icon; const active = ["open", "claimed", "in_progress", "failed"].includes(item.status);
           return <Card key={item.id} className={item.is_overdue && active ? "border-red-200 shadow-[0_8px_30px_rgba(220,38,38,.07)]" : ""}><CardContent className="p-4 md:p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={meta.className}><Icon className="ml-1 h-3.5 w-3.5" />{meta.label}</Badge>{item.priority === "urgent" && <Badge variant="destructive">حرجة</Badge>}{item.priority === "high" && <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">أولوية عالية</Badge>}{item.is_overdue && active && <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">متأخرة</Badge>}{item.is_mine && active && <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">مسندة لي</Badge>}{item.status === "completed" && <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">مكتملة</Badge>}</div><h3 className="mt-3 text-lg font-black text-slate-950">{item.title}</h3>{item.description && <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>}<div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"><span>أُنشئت: {formatDateTime(item.created_at)}</span>{item.due_at && <span>SLA: {formatDateTime(item.due_at)}</span>}{item.claimed_by_name && <span>المراجع: {item.claimed_by_name}</span>}{item.completed_by_name && <span>أغلقها: {item.completed_by_name}</span>}</div>{item.resolution_note && <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">القرار: {item.resolution_note}</div>}</div><div className="flex shrink-0 flex-wrap gap-2">{active && <Button disabled={busyId === item.id} onClick={() => openApproval(item)}>{busyId === item.id ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="ml-2 h-4 w-4" />}{item.is_mine ? "فتح القرار" : "استلام ومراجعة"}</Button>}{!active && item.action_url && <Button variant="outline" onClick={() => navigate(item.action_url!)}><ArrowLeft className="ml-2 h-4 w-4" />فتح المصدر</Button>}</div></div></CardContent></Card>;
         })}</div>}
-      </div>
+    </div>
 
-      <Dialog open={Boolean(inventoryTask)} onOpenChange={open => !open && closeInventory()}>
-        <DialogContent dir="rtl" className="max-w-2xl"><DialogHeader><DialogTitle>قرار اعتماد فرق المخزون</DialogTitle></DialogHeader>{!inventoryDetail ? <div className="flex min-h-40 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" /></div> : <div className="space-y-4"><div className="rounded-2xl border bg-slate-50 p-4"><h3 className="font-black">{inventoryDetail.product_name}</h3><p className="mt-1 text-sm text-muted-foreground">باركود: {inventoryDetail.barcode || "غير مسجل"} · الرف: {inventoryDetail.shelf_location || "غير محدد"}</p></div><div className="grid gap-2 sm:grid-cols-3"><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">رصيد النظام</div><div className="mt-1 text-xl font-black">{formatQty(inventoryDetail.current_system_quantity)}</div></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">الرصيد الفعلي المتوقع</div><div className="mt-1 text-xl font-black">{formatQty(inventoryDetail.projected_physical_quantity)}</div></div><div className="rounded-xl bg-cyan-50 p-3"><div className="text-xs text-muted-foreground">التسوية المقترحة</div><div className="mt-1 text-xl font-black text-cyan-900">{Number(inventoryDetail.current_adjustment_delta || 0) > 0 ? "+" : ""}{formatQty(inventoryDetail.current_adjustment_delta)}</div></div></div>{Math.abs(Number(inventoryDetail.movement_ledger_gap || 0)) > 0.001 && <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-800">Movement Ledger غير مطابق بفارق {formatQty(inventoryDetail.movement_ledger_gap)}. الاعتماد متوقف تلقائيًا.</div>}<div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>سبب الاعتماد</Label><Select value={adjustmentReason} onValueChange={value => setAdjustmentReason(value as InventoryAdjustmentReason)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(adjustmentReasonLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>سبب الرفض</Label><Select value={rejectionReason} onValueChange={value => setRejectionReason(value as InventoryAdjustmentRejectionReason)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(rejectionReasonLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div></div><div className="space-y-2"><Label>ملاحظة القرار</Label><Textarea value={note} onChange={event => setNote(event.target.value)} placeholder="اشرح ما راجعته وسبب القرار..." /></div></div>}<DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={closeInventory}>إغلاق</Button><Button variant="destructive" onClick={rejectInventory} disabled={Boolean(busyId)}>رفض وإعادة الجرد</Button><Button onClick={approveInventory} disabled={Boolean(busyId) || Math.abs(Number(inventoryDetail?.movement_ledger_gap || 0)) > 0.001}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}اعتماد التسوية</Button></DialogFooter></DialogContent>
-      </Dialog>
+    <Dialog open={Boolean(inventoryTask)} onOpenChange={open => !open && closeInventory()}>
+      <DialogContent dir="rtl" className="max-w-2xl"><DialogHeader><DialogTitle>قرار اعتماد فرق المخزون</DialogTitle></DialogHeader>{!inventoryDetail ? <div className="flex min-h-40 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" /></div> : <div className="space-y-4"><div className="rounded-2xl border bg-slate-50 p-4"><h3 className="font-black">{inventoryDetail.product_name}</h3><p className="mt-1 text-sm text-muted-foreground">باركود: {inventoryDetail.barcode || "غير مسجل"} · الرف: {inventoryDetail.shelf_location || "غير محدد"}</p></div><div className="grid gap-2 sm:grid-cols-3"><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">رصيد النظام</div><div className="mt-1 text-xl font-black">{formatQty(inventoryDetail.current_system_quantity)}</div></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">الرصيد الفعلي المتوقع</div><div className="mt-1 text-xl font-black">{formatQty(inventoryDetail.projected_physical_quantity)}</div></div><div className="rounded-xl bg-cyan-50 p-3"><div className="text-xs text-muted-foreground">التسوية المقترحة</div><div className="mt-1 text-xl font-black text-cyan-900">{Number(inventoryDetail.current_adjustment_delta || 0) > 0 ? "+" : ""}{formatQty(inventoryDetail.current_adjustment_delta)}</div></div></div>{Math.abs(Number(inventoryDetail.movement_ledger_gap || 0)) > 0.001 && <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-800">Movement Ledger غير مطابق بفارق {formatQty(inventoryDetail.movement_ledger_gap)}. الاعتماد متوقف تلقائيًا.</div>}<div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>سبب الاعتماد</Label><Select value={adjustmentReason} onValueChange={value => setAdjustmentReason(value as InventoryAdjustmentReason)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(adjustmentReasonLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>سبب الرفض</Label><Select value={rejectionReason} onValueChange={value => setRejectionReason(value as InventoryAdjustmentRejectionReason)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(rejectionReasonLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div></div><div className="space-y-2"><Label>ملاحظة القرار</Label><Textarea value={note} onChange={event => setNote(event.target.value)} placeholder="اشرح ما راجعته وسبب القرار..." /></div></div>}<DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={closeInventory}>إغلاق</Button><Button variant="destructive" onClick={rejectInventory} disabled={Boolean(busyId)}>رفض وإعادة الجرد</Button><Button onClick={approveInventory} disabled={Boolean(busyId) || Math.abs(Number(inventoryDetail?.movement_ledger_gap || 0)) > 0.001}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}اعتماد التسوية</Button></DialogFooter></DialogContent>
+    </Dialog>
 
-      <Dialog open={Boolean(substitutionTask)} onOpenChange={open => !open && closeSubstitution()}>
-        <DialogContent dir="rtl" className="max-w-xl"><DialogHeader><DialogTitle>اعتماد بديل في الطلب</DialogTitle></DialogHeader>{!substitutionDetail ? <div className="flex min-h-40 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" /></div> : <div className="space-y-4"><div className="rounded-2xl border bg-slate-50 p-4"><div className="text-xs text-muted-foreground">المنتج المطلوب</div><div className="mt-1 font-black">{substitutionDetail.original_product_name}</div><div className="my-3 border-t" /><div className="text-xs text-muted-foreground">البديل المقترح</div><div className="mt-1 font-black text-[#005931]">{substitutionDetail.replacement_product_name}</div></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">الكمية</div><div className="mt-1 font-black">{formatQty(substitutionDetail.quantity)}</div></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">السعر الأصلي</div><div className="mt-1 font-black">{formatMoney(substitutionDetail.original_unit_price)}</div></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">سعر البديل</div><div className="mt-1 font-black">{formatMoney(substitutionDetail.replacement_unit_price)}</div></div><div className={`rounded-xl p-3 ${substitutionDetail.price_delta_total > 0 ? "bg-amber-50" : substitutionDetail.price_delta_total < 0 ? "bg-emerald-50" : "bg-slate-50"}`}><div className="text-xs text-muted-foreground">فرق السعر</div><div className="mt-1 font-black">{substitutionDetail.price_delta_total > 0 ? "+" : ""}{formatMoney(substitutionDetail.price_delta_total)}</div></div></div><div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm leading-6 text-blue-900">عند الاعتماد يعاد فحص مخزون البديل أولًا. فرق السعر يُطبّق تلقائيًا إذا لم يتم التحصيل بعد، أو يتحول لمهمة مالية إذا كانت الدفعة الأصلية مسجلة.</div><div className="space-y-2"><Label>ملاحظة القرار</Label><Textarea value={substitutionNote} onChange={event => setSubstitutionNote(event.target.value)} placeholder="سبب قبول أو رفض البديل..." /></div></div>}<DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={closeSubstitution}>إغلاق</Button><Button variant="destructive" onClick={() => void submitSubstitutionDecision("reject")} disabled={Boolean(busyId)}>رفض البديل</Button><Button onClick={() => void submitSubstitutionDecision("approve")} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}اعتماد البديل</Button></DialogFooter></DialogContent>
-      </Dialog>
+    <Dialog open={Boolean(substitutionTask)} onOpenChange={open => !open && closeSubstitution()}>
+      <DialogContent dir="rtl" className="max-w-xl"><DialogHeader><DialogTitle>اعتماد بديل في الطلب</DialogTitle></DialogHeader>{!substitutionDetail ? <div className="flex min-h-40 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" /></div> : <div className="space-y-4"><div className="rounded-2xl border bg-slate-50 p-4"><div className="text-xs text-muted-foreground">المنتج المطلوب</div><div className="mt-1 font-black">{substitutionDetail.original_product_name}</div><div className="my-3 border-t" /><div className="text-xs text-muted-foreground">البديل المقترح</div><div className="mt-1 font-black text-[#005931]">{substitutionDetail.replacement_product_name}</div></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4"><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">الكمية</div><div className="mt-1 font-black">{formatQty(substitutionDetail.quantity)}</div></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">السعر الأصلي</div><div className="mt-1 font-black">{formatMoney(substitutionDetail.original_unit_price)}</div></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">سعر البديل</div><div className="mt-1 font-black">{formatMoney(substitutionDetail.replacement_unit_price)}</div></div><div className={`rounded-xl p-3 ${substitutionDetail.price_delta_total > 0 ? "bg-amber-50" : substitutionDetail.price_delta_total < 0 ? "bg-emerald-50" : "bg-slate-50"}`}><div className="text-xs text-muted-foreground">فرق السعر</div><div className="mt-1 font-black">{substitutionDetail.price_delta_total > 0 ? "+" : ""}{formatMoney(substitutionDetail.price_delta_total)}</div></div></div><div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm leading-6 text-blue-900">عند الاعتماد يعاد فحص مخزون البديل أولًا. فرق السعر يُطبّق تلقائيًا إذا لم يتم التحصيل بعد، أو يتحول لمهمة مالية إذا كانت الدفعة الأصلية مسجلة.</div><div className="space-y-2"><Label>ملاحظة القرار</Label><Textarea value={substitutionNote} onChange={event => setSubstitutionNote(event.target.value)} placeholder="سبب قبول أو رفض البديل..." /></div></div>}<DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={closeSubstitution}>إغلاق</Button><Button variant="destructive" onClick={() => void submitSubstitutionDecision("reject")} disabled={Boolean(busyId)}>رفض البديل</Button><Button onClick={() => void submitSubstitutionDecision("approve")} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}اعتماد البديل</Button></DialogFooter></DialogContent>
+    </Dialog>
 
-      <Dialog open={Boolean(financeTask)} onOpenChange={open => !open && closeFinance()}>
-        <DialogContent dir="rtl" className="max-w-xl"><DialogHeader><DialogTitle>{financeDetail?.direction === "refund" ? "تأكيد رد فرق البديل" : "تأكيد تحصيل فرق البديل"}</DialogTitle></DialogHeader>{!financeDetail ? <div className="flex min-h-40 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin" /></div> : <div className="space-y-4"><div className="rounded-2xl border bg-slate-50 p-4"><div className="font-black">{financeDetail.original_product_name} ← {financeDetail.replacement_product_name}</div><p className="mt-1 text-sm text-muted-foreground">وسيلة الدفع: {financeDetail.payment_method || "غير محددة"} · حالة الدفعة الأصلية: {financeDetail.payment_status || "—"}</p></div><div className="grid gap-2 sm:grid-cols-3"><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">فرق التسوية</div><div className={`mt-1 text-xl font-black ${financeDetail.direction === "refund" ? "text-emerald-700" : "text-amber-700"}`}>{financeDetail.direction === "refund" ? "رد " : "تحصيل "}{formatMoney(financeDetail.amount)}</div></div><div className="rounded-xl bg-slate-50 p-3"><div className="text-xs text-muted-foreground">الإجمالي الحالي</div><div className="mt-1 text-xl font-black">{formatMoney(financeDetail.order_total_before)}</div></div><div className="rounded-xl bg-[#005931]/5 p-3"><div className="text-xs text-muted-foreground">الإجمالي بعد التسوية</div><div className="mt-1 text-xl font-black text-[#005931]">{formatMoney(financeDetail.target_order_total)}</div></div></div><div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-medium leading-6 text-amber-900">نفّذ التحصيل أو الرد فعليًا في مزود الدفع أولًا، ثم أدخل مرجع العملية هنا. الضغط على التأكيد يسجل حركة مالية حقيقية في Payment Ledger ويحدّث إجمالي الطلب.</div><div className="space-y-2"><Label>مرجع عملية مزود الدفع</Label><Input value={providerReference} onChange={event => setProviderReference(event.target.value)} placeholder="مثال: رقم تحويل المحفظة / مرجع بوابة الدفع" /></div><div className="space-y-2"><Label>ملاحظة التسوية</Label><Textarea value={financeNote} onChange={event => setFinanceNote(event.target.value)} placeholder="كيف تم التحصيل أو الرد وما الذي تمت مراجعته..." /></div></div>}<DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={closeFinance}>إلغاء</Button><Button onClick={() => void settleSubstitutionFinance()} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <WalletCards className="ml-2 h-4 w-4" />}{financeDetail?.direction === "refund" ? "تأكيد الرد وتسجيله" : "تأكيد التحصيل وتسجيله"}</Button></DialogFooter></DialogContent>
-      </Dialog>
+    <OrderFinancialAdjustmentDialog task={financeTask} onClose={() => setFinanceTask(null)} onDone={() => query.refetch()} />
+    <AttendanceExceptionDecisionDialog task={attendanceTask} onClose={() => setAttendanceTask(null)} onDone={() => void query.refetch()} />
+    <HrRequestDecisionDialog task={hrTask} onClose={() => setHrTask(null)} onDone={() => void query.refetch()} />
 
-      <AttendanceExceptionDecisionDialog task={attendanceTask} onClose={() => setAttendanceTask(null)} onDone={() => void query.refetch()} />
-      <HrRequestDecisionDialog task={hrTask} onClose={() => setHrTask(null)} onDone={() => void query.refetch()} />
-
-      <Dialog open={Boolean(generalTask)} onOpenChange={open => !open && closeGeneral()}><DialogContent dir="rtl" className="max-w-lg"><DialogHeader><DialogTitle>تسجيل قرار المراجعة</DialogTitle></DialogHeader>{generalTask && <div className="space-y-4"><div className="rounded-2xl border bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={sourceMeta(generalTask.source_kind).className}>{sourceMeta(generalTask.source_kind).label}</Badge>{generalTask.is_overdue && <Badge variant="destructive">متأخرة</Badge>}</div><h3 className="mt-3 font-black">{generalTask.title}</h3>{generalTask.description && <p className="mt-1 text-sm leading-6 text-muted-foreground">{generalTask.description}</p>}</div><div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">هذا النوع لا يغيّر مخزونًا أو حركة مالية من مركز الموافقات؛ يتم فقط توثيق نتيجة المراجعة وإغلاق المهمة بنفس مسار النظام الحالي.</div><div className="space-y-2"><Label>نتيجة المراجعة</Label><Textarea autoFocus value={generalNote} onChange={event => setGeneralNote(event.target.value)} placeholder="اكتب ما تم التحقق منه والقرار النهائي..." /></div></div>}<DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={closeGeneral}>إلغاء</Button><Button onClick={submitGeneralDecision} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}تسجيل القرار وإغلاق</Button></DialogFooter></DialogContent></Dialog>
-    </MainLayout>
-  );
+    <Dialog open={Boolean(generalTask)} onOpenChange={open => !open && closeGeneral()}><DialogContent dir="rtl" className="max-w-lg"><DialogHeader><DialogTitle>تسجيل قرار المراجعة</DialogTitle></DialogHeader>{generalTask && <div className="space-y-4"><div className="rounded-2xl border bg-slate-50 p-4"><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={sourceMeta(generalTask.source_kind).className}>{sourceMeta(generalTask.source_kind).label}</Badge>{generalTask.is_overdue && <Badge variant="destructive">متأخرة</Badge>}</div><h3 className="mt-3 font-black">{generalTask.title}</h3>{generalTask.description && <p className="mt-1 text-sm leading-6 text-muted-foreground">{generalTask.description}</p>}</div><div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">هذا النوع لا يغيّر مخزونًا أو حركة مالية من مركز الموافقات؛ يتم فقط توثيق نتيجة المراجعة وإغلاق المهمة بنفس مسار النظام الحالي.</div><div className="space-y-2"><Label>نتيجة المراجعة</Label><Textarea autoFocus value={generalNote} onChange={event => setGeneralNote(event.target.value)} placeholder="اكتب ما تم التحقق منه والقرار النهائي..." /></div></div>}<DialogFooter className="gap-2 sm:justify-start"><Button variant="outline" onClick={closeGeneral}>إلغاء</Button><Button onClick={submitGeneralDecision} disabled={Boolean(busyId)}>{busyId ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}تسجيل القرار وإغلاق</Button></DialogFooter></DialogContent></Dialog>
+  </MainLayout>;
 }
