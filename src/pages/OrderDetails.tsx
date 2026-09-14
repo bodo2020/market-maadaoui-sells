@@ -1,6 +1,6 @@
 import OrderLocationMap from '@/components/orders/OrderLocationMap';
 import BrandLoader from '@/components/ui/BrandLoader';
-import OnlineOrderInvoiceDialog from '@/components/orders/OnlineOrderInvoiceDialog';
+import OnlineOrderFinalReceiptDialog from '@/components/orders/OnlineOrderFinalReceiptDialog';
 import OrderFulfillmentPanel from '@/components/orders/OrderFulfillmentPanel';
 import { changeOnlineOrderStatus } from '@/services/supabase/orderOperationsService';
 import "@/components/orders/orders-workspace.css";
@@ -27,7 +27,7 @@ import { ar } from "date-fns/locale";
 export default function OrderDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [invoiceOpen,setInvoiceOpen] = useState(false);
+  const [receiptOpen,setReceiptOpen] = useState(false);
   const [confirmAction,setConfirmAction] = useState<'confirm' | 'cancel' | null>(null);
   const snapshot = useQuery({queryKey:['order-delivery-snapshot',id],enabled:!!id,queryFn:() => getCheckoutSnapshot(id!)});
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
@@ -95,7 +95,7 @@ export default function OrderDetails() {
   const operationalFlow = ['confirmed','preparing','ready','shipped'].includes(order.status);
 
   return <div className="pos-orders pos-order-detail">
-    <header className="pos-orders-heading"><div className="flex items-start gap-3"><Button variant="outline" size="icon" aria-label="رجوع للطلبات" onClick={() => navigate('/online-orders')}><ArrowRight size={20} /></Button><div><p className="text-sm">تفاصيل الطلب</p><h1 className="pos-detail-number" dir="ltr">#{order.tracking_number || order.id.slice(0,8)}</h1><time dateTime={order.created_at}>{format(new Date(order.created_at),'dd MMM yyyy · HH:mm',{locale:ar})}</time></div></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => navigate('/online-orders/operations')}><Workflow size={18} />مركز التشغيل</Button><Button variant="outline" onClick={() => setInvoiceOpen(true)}><Printer size={18} />طباعة</Button></div></header>
+    <header className="pos-orders-heading"><div className="flex items-start gap-3"><Button variant="outline" size="icon" aria-label="رجوع للطلبات" onClick={() => navigate('/online-orders')}><ArrowRight size={20} /></Button><div><p className="text-sm">تفاصيل الطلب</p><h1 className="pos-detail-number" dir="ltr">#{order.tracking_number || order.id.slice(0,8)}</h1><time dateTime={order.created_at}>{format(new Date(order.created_at),'dd MMM yyyy · HH:mm',{locale:ar})}</time></div></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => navigate('/online-orders/operations')}><Workflow size={18} />مركز التشغيل</Button><Button variant="outline" onClick={() => setReceiptOpen(true)}><Printer size={18} />إيصال الطلب</Button></div></header>
     <div className="pos-detail-overview"><div><span>العميل</span><strong>{order.customer_name || 'غير مسجل'}</strong></div><div><span>الأصناف</span><strong>{order.items.length} أصناف</strong></div><div><span>قيمة الطلب</span><strong>{order.total.toFixed(2)} ج.م</strong></div><div><span>الدفع</span><PaymentStatusBadge status={order.payment_status} editable={false} /></div></div>
     <div className="pos-detail-layout">
       <div className="pos-detail-content">
@@ -113,7 +113,7 @@ export default function OrderDetails() {
       </aside>
     </div>
     <AlertDialog open={!!confirmAction} onOpenChange={open => {if(!open && !isProcessing)setConfirmAction(null);}}><AlertDialogContent dir="rtl"><AlertDialogHeader><AlertDialogTitle>{confirmAction === 'cancel' ? 'إلغاء الطلب؟' : 'تأكيد الطلب'}</AlertDialogTitle><AlertDialogDescription>{confirmAction === 'cancel' ? 'لو الطلب مدفوع، راجع رد المبلغ بشكل منفصل. لو فيه تجهيز أو تعيين مندوب سيتم إيقاف مسار الطلب.' : 'بعد التأكيد هيتفتح مسار التجهيز ويتحسب وقت الجاهزية المتوقع للمندوب.'}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isProcessing}>رجوع</AlertDialogCancel><AlertDialogAction disabled={isProcessing} onClick={async event => {event.preventDefault();if(confirmAction === 'cancel') await handleCancelOrder();else await handleConfirmOrder();setConfirmAction(null);}}>{isProcessing ? 'جاري الحفظ…' : 'تأكيد'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-    <OnlineOrderInvoiceDialog isOpen={invoiceOpen} onClose={()=>setInvoiceOpen(false)} order={order} />
+    <OnlineOrderFinalReceiptDialog isOpen={receiptOpen} onClose={()=>setReceiptOpen(false)} order={order} />
     <PaymentConfirmationDialog open={paymentConfirmOpen} onOpenChange={setPaymentConfirmOpen} orderId={order.id} onConfirm={fetchOrder} />
   </div>;
 }
