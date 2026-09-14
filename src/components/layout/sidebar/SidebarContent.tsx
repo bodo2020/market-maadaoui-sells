@@ -43,6 +43,8 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
   const isSuperAdmin = user?.role === UserRole.SUPER_ADMIN;
   const isCashier = user?.role === UserRole.CASHIER;
   const isDelivery = user?.role === UserRole.DELIVERY;
+  const staffRoleCode = typeof window !== "undefined" ? localStorage.getItem("currentStaffRoleCode") : null;
+  const isOrderPicker = staffRoleCode === "order_picker";
   const query = search.trim().toLocaleLowerCase("ar");
 
   const navigationGroups: NavigationGroup[] = [
@@ -59,6 +61,18 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
     if (item.adminOnly && !isAdmin && !isSuperAdmin) return false;
     if (item.cashierOnly && !isCashier) return false;
     if (item.deliveryOnly && !isDelivery) return false;
+
+    if (isOrderPicker) {
+      const allowedPickerRoutes = [
+        "/online-orders/operations",
+        "/tasks",
+        "/notifications",
+        "/my-hr",
+        "/attendance",
+        "/account",
+      ];
+      return allowedPickerRoutes.includes(item.href);
+    }
 
     if (isCashier && !isSuperAdmin) {
       const allowedCashierRoutes = [
