@@ -67,6 +67,7 @@ export const hrNavigation: NavigationGroup = {
   items: [
     { label: "بوابة الموظف", href: "/my-hr", icon: UserRound },
     { label: "الحضور والانصراف", href: "/attendance", icon: Clock3 },
+    { label: "موافقات الحضور", href: "/hr/attendance-approvals", icon: ShieldCheck, adminOnly: true },
     { label: "إدارة الموظفين", href: "/employees", icon: UserCheck, adminOnly: true },
     { label: "جدولة الورديات", href: "/hr/shifts", icon: Clock3, adminOnly: true },
     { label: "تقويم الإجازات", href: "/hr/leave-calendar", icon: CalendarCheck2, adminOnly: true },
