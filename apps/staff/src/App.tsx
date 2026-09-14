@@ -28,6 +28,7 @@ import {
   ClipboardList,
   Clock3,
   Home,
+  Layers3,
   Loader2,
   LogIn,
   LogOut,
@@ -44,6 +45,7 @@ import {
 import { supabase } from "./lib/supabase";
 import * as staff from "./services/staffService";
 import type {
+  BatchPickingShadow,
   FulfillmentOrder,
   NotificationCenter,
   NotificationItem,
@@ -279,6 +281,7 @@ function OperationsPage({ branch, identity }: { branch: StaffBranch; identity: S
   const canPrepare = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
   const [data, setData] = useState<{ summary: Record<string, number>; orders: FulfillmentOrder[] } | null>(null);
   const [shadow, setShadow] = useState<PickerAssignmentShadow | null>(null);
+  const [batchShadow, setBatchShadow] = useState<BatchPickingShadow | null>(null);
   const [busy, setBusy] = useState(true);
   const [acting, setActing] = useState("");
   const [error, setError] = useState("");
@@ -289,8 +292,17 @@ function OperationsPage({ branch, identity }: { branch: StaffBranch; identity: S
     try {
       const workspace = await staff.getFulfillmentWorkspace(branch.branch_id);
       setData(workspace);
-      try { setShadow(await staff.getPickerAssignmentShadow(branch.branch_id)); }
-      catch { setShadow(null); }
+      try {
+        const [assignment, batching] = await Promise.all([
+          staff.getPickerAssignmentShadow(branch.branch_id),
+          staff.getBatchPickingShadow(branch.branch_id),
+        ]);
+        setShadow(assignment);
+        setBatchShadow(batching);
+      } catch {
+        setShadow(null);
+        setBatchShadow(null);
+      }
       setError("");
     } catch {
       setError("تعذر تحديث تشغيل الطلبات");
@@ -340,6 +352,17 @@ function OperationsPage({ branch, identity }: { branch: StaffBranch; identity: S
           <p>{shadow.next_for_me.items_total} سطر · {shadow.next_for_me.eta_risk === "late" ? "متأخر" : shadow.next_for_me.eta_risk === "at_risk" ? "معرض للتأخير" : "ضمن الوقت"}</p>
           <div className="smart-assignment-meta"><span>Score: {Number(shadow.next_for_me.score || 0).toFixed(1)}</span>{shadow.summary.match_rate_7d !== null && <span>تطابق 7 أيام: {shadow.summary.match_rate_7d}%</span>}</div>
           <button className="primary" disabled={acting === shadow.next_for_me.order_id} onClick={() => void claimSuggested()}>{acting === shadow.next_for_me.order_id ? <Loader2 className="spin" /> : <Play />}استلام الطلب المقترح</button>
+        </section>}
+
+        {batchShadow && <section className="batch-shadow-card">
+          <div className="smart-assignment-head"><span className="smart-badge batch">Batch Shadow</span><small>تحليل جولات فقط — التنفيذ ما زال Order منفرد</small></div>
+          <div className="row"><div><small>فرص التجميع الحالية</small><h2>{batchShadow.summary.recommended_batches} جولة · {batchShadow.summary.covered_orders} طلب مغطى</h2></div><Layers3 /></div>
+          <div className="batch-shadow-stats"><span>مؤهل: {batchShadow.summary.eligible_orders}</span><span>Single: {batchShadow.summary.single_orders}</span><span>التغطية: {batchShadow.summary.coverage_rate == null ? "—" : `${batchShadow.summary.coverage_rate}%`}</span></div>
+          {batchShadow.batches.filter((batch) => !batch.recommended_user_id || batch.recommended_user_id === identity.user_id).slice(0,1).map((batch) => <div className="batch-shadow-preview" key={batch.id}>
+            <div className="row"><strong>{batch.batch_code}</strong><span>{batch.order_count} طلبات · {batch.total_lines} صنف</span></div>
+            <p>{batch.reason === "shared_shelf_route" ? "مسار رفوف مشترك" : batch.reason === "shared_categories" ? "أقسام متقاربة" : "مواعيد تجهيز متقاربة"} · Score {Number(batch.score).toFixed(1)}</p>
+            <div className="batch-order-chips">{batch.orders.map((order) => <span key={order.order_id}>{order.display_id}</span>)}</div>
+          </div>)}
         </section>}
 
         <div className="stats"><div><strong>{data?.summary.queued || 0}</strong><span>في الطابور</span></div><div><strong>{data?.summary.picking || 0}</strong><span>تجهيز</span></div><div><strong>{data?.summary.ready || 0}</strong><span>جاهز</span></div></div>
