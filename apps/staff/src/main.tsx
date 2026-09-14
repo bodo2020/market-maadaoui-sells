@@ -7,6 +7,7 @@ import { installNativeAppBridge } from "./nativeAppBridge";
 import "./styles.css";
 import "./picking.css";
 import "./native-safe-area.css";
+import "./staff-v05.css";
 
 installStaffAuthEnhancements();
 void installNativeAppBridge();
