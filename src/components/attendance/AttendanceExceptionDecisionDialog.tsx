@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Loader2, MapPin, ShieldX, Smartphone } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, Loader2, MapPin, ShieldX, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { getAttendanceException, decideAttendanceException } from "@/services/attendanceService";
+import {
+  decideAttendanceExceptionAndCleanupPhoto,
+  getAttendanceException,
+  getAttendanceVerificationPhotoUrl,
+} from "@/services/attendanceService";
 import type { ApprovalItem } from "@/services/supabase/approvalCenterV1Service";
 
 const formatDateTime = (value?: string | null) => {
@@ -35,6 +39,8 @@ type Props = {
 
 export default function AttendanceExceptionDecisionDialog({ task, onClose, onDone }: Props) {
   const [note, setNote] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
 
   useEffect(() => {
     if (task) setNote("");
@@ -46,25 +52,61 @@ export default function AttendanceExceptionDecisionDialog({ task, onClose, onDon
     queryFn: () => getAttendanceException(task!.source_id),
   });
 
+  const detail = detailQuery.data;
+
+  useEffect(() => {
+    setPhotoUrl(null);
+    if (!task || !detail?.verification_photo_path) {
+      setPhotoLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPhotoLoading(true);
+    getAttendanceVerificationPhotoUrl(detail.verification_photo_path, 300)
+      .then(url => {
+        if (!cancelled) setPhotoUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("تعذر فتح صورة التحقق. حدّث الطلب وحاول مرة أخرى.");
+      })
+      .finally(() => {
+        if (!cancelled) setPhotoLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [task?.id, detail?.verification_photo_path]);
+
   const decisionMutation = useMutation({
     mutationFn: async (decision: "approved" | "rejected") => {
       if (!task?.source_id) throw new Error("معرّف طلب الاستثناء غير متاح");
       if (note.trim().length < 3) throw new Error("اكتب ملاحظة قصيرة توضح سبب القرار");
-      return decideAttendanceException(task.source_id, decision, note.trim());
+      if (decision === "approved" && (!detail?.phone_verified_at || !detail?.verification_photo_path)) {
+        throw new Error("لا يمكن اعتماد الحضور بدون تحقق الهاتف وصورة التحقق المباشر");
+      }
+      return decideAttendanceExceptionAndCleanupPhoto(task.source_id, decision, note.trim());
     },
     onSuccess: async result => {
-      toast.success(result.decision === "approved" ? "تم اعتماد استثناء الحضور وفتح جلسة الموظف." : "تم رفض استثناء الحضور.");
+      if (result.photo_cleanup_ok === false) {
+        toast.warning("تم تسجيل القرار، لكن تعذر حذف صورة التحقق الآن. سيعاد تنظيفها لاحقًا.");
+      } else {
+        toast.success(result.decision === "approved" ? "تم اعتماد استثناء الحضور وفتح جلسة الموظف." : "تم رفض استثناء الحضور.");
+      }
       await onDone();
       onClose();
     },
     onError: error => toast.error(error instanceof Error ? error.message : "تعذر تسجيل قرار الحضور"),
   });
 
-  const detail = detailQuery.data;
-
   return (
     <Dialog open={Boolean(task)} onOpenChange={open => !open && !decisionMutation.isPending && onClose()}>
-      <DialogContent dir="rtl" className="max-w-xl">
+      <DialogContent
+        dir="rtl"
+        className="max-w-xl overflow-y-auto sm:rounded-2xl"
+        style={{ maxHeight: "calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom) - 1rem)" }}
+      >
         <DialogHeader><DialogTitle>مراجعة استثناء الحضور</DialogTitle></DialogHeader>
 
         {detailQuery.isLoading ? (
@@ -78,6 +120,14 @@ export default function AttendanceExceptionDecisionDialog({ task, onClose, onDon
                 <div><div className="text-lg font-black">{detail.employee_name}</div><div className="mt-1 text-sm text-muted-foreground">{detail.branch_name} · {attendanceModeLabel(detail.attendance_mode)}</div></div>
                 <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">خارج النطاق</Badge>
               </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Badge variant="outline" className={detail.phone_verified_at ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}>
+                  <Smartphone className="ml-1 h-3.5 w-3.5" />{detail.phone_verified_at ? "الهاتف متحقق" : "الهاتف غير متحقق"}
+                </Badge>
+                <Badge variant="outline" className={detail.verification_photo_path ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700"}>
+                  <Camera className="ml-1 h-3.5 w-3.5" />{detail.verification_photo_path ? "صورة Live مرفقة" : "لا توجد صورة"}
+                </Badge>
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
@@ -88,7 +138,20 @@ export default function AttendanceExceptionDecisionDialog({ task, onClose, onDon
 
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <div className="flex items-center gap-2 font-black text-amber-900"><AlertTriangle className="h-5 w-5" />سبب الموظف</div>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-900">{detail.reason}</p>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-900">{detail.reason || "لم يكتب الموظف سببًا."}</p>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border bg-slate-950">
+              <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3 text-sm font-black text-white"><Camera className="h-4 w-4" />صورة التحقق المباشر</div>
+              <div className="aspect-[4/3]">
+                {photoLoading ? (
+                  <div className="grid h-full place-items-center text-white"><Loader2 className="h-7 w-7 animate-spin" /></div>
+                ) : photoUrl ? (
+                  <img src={photoUrl} alt="صورة تحقق حضور الموظف" className="h-full w-full object-contain" />
+                ) : (
+                  <div className="grid h-full place-items-center p-6 text-center text-sm text-slate-300"><div><Camera className="mx-auto mb-2 h-8 w-8" /><span>صورة التحقق غير متاحة</span></div></div>
+                )}
+              </div>
             </div>
 
             {detail.latitude != null && detail.longitude != null && (
@@ -106,7 +169,7 @@ export default function AttendanceExceptionDecisionDialog({ task, onClose, onDon
           <Button variant="destructive" disabled={decisionMutation.isPending || !detail} onClick={() => decisionMutation.mutate("rejected")}>
             {decisionMutation.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <ShieldX className="ml-2 h-4 w-4" />}رفض الطلب
           </Button>
-          <Button disabled={decisionMutation.isPending || !detail} className="bg-[#005931] hover:bg-[#004426]" onClick={() => decisionMutation.mutate("approved")}>
+          <Button disabled={decisionMutation.isPending || !detail || !detail.phone_verified_at || !detail.verification_photo_path} className="bg-[#005931] hover:bg-[#004426]" onClick={() => decisionMutation.mutate("approved")}>
             {decisionMutation.isPending ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="ml-2 h-4 w-4" />}اعتماد الحضور
           </Button>
         </DialogFooter>
