@@ -64,6 +64,39 @@ export type FulfillmentOrder = {
   eta_risk: string;
 };
 
+export type PickerShadowOrder = {
+  order_id: string;
+  display_id: string;
+  created_at?: string;
+  customer_name: string;
+  items_total: number;
+  predicted_ready_at: string | null;
+  eta_risk: string;
+  score?: number | null;
+  recommended_user_id?: string | null;
+  recommended_name?: string | null;
+  recommended_score?: number | null;
+  reason: string;
+  is_recommended_to_me?: boolean;
+  generation_count?: number;
+};
+
+export type PickerAssignmentShadow = {
+  mode: "shadow";
+  branch_id: string;
+  generated_at: string;
+  summary: {
+    queued_unassigned: number;
+    recommended_to_me: number;
+    without_candidate: number;
+    resolved_7d: number;
+    matched_7d: number;
+    match_rate_7d: number | null;
+  };
+  next_for_me: PickerShadowOrder | null;
+  orders: PickerShadowOrder[];
+};
+
 export type PickingSubstitution = {
   id: string;
   status: "pending" | "approved" | "rejected" | "cancelled";
@@ -76,7 +109,7 @@ export type PickingSubstitution = {
   original_unit_price: number;
   replacement_unit_price: number;
   price_delta_total: number;
-  financial_state: "pending" | "not_required" | "settled" | "waived";
+  financial_state: "pending" | "not_required" | "settled" | "waived" | "applied_to_order_total" | "pending_collection" | "pending_refund";
   proposed_at: string;
   resolved_at: string | null;
   resolution_note: string | null;
@@ -115,6 +148,48 @@ export type PickingSession = {
   pending_substitution_count: number;
   resolved_count: number;
   items: PickingItem[];
+};
+
+export type StagingZone = "ambient" | "chilled" | "frozen";
+
+export type StagingBag = {
+  id: string;
+  bag_no: number;
+  bag_code: string;
+  zone: StagingZone;
+  status: "created" | "staged" | "handed_over";
+  location_id: string | null;
+  location_code: string | null;
+  location_label: string | null;
+  packed_at: string | null;
+  staged_at: string | null;
+  handed_over_at: string | null;
+};
+
+export type StagingLocation = {
+  id: string;
+  code: string;
+  label: string;
+  zone: StagingZone;
+  capacity_bags: number;
+  occupied_bags: number;
+  available_bags: number;
+};
+
+export type StagingSession = {
+  order_id: string;
+  branch_id: string;
+  fulfillment_state: string;
+  picker_user_id: string | null;
+  summary: {
+    total_bags: number;
+    created_bags: number;
+    staged_bags: number;
+    handed_over_bags: number;
+    ready_to_finalize: boolean;
+  };
+  bags: StagingBag[];
+  locations: StagingLocation[];
 };
 
 export type SubstitutionCandidate = {
@@ -339,6 +414,12 @@ export async function getFulfillmentWorkspace(branchId: string) {
   );
 }
 
+export async function getPickerAssignmentShadow(branchId: string) {
+  return unwrap<PickerAssignmentShadow>(await rpc("get_my_picker_assignment_shadow_v1", {
+    p_branch_id: branchId,
+  }));
+}
+
 export async function claimFulfillment(orderId: string) {
   return unwrap(await rpc("claim_order_fulfillment_v1", { p_order_id: orderId }));
 }
@@ -441,6 +522,41 @@ export async function startPacking(orderId: string, bags = 0) {
   return unwrap(await rpc("start_order_packing_v1", {
     p_order_id: orderId,
     p_bags_count: bags,
+  }));
+}
+
+export async function getStagingSession(orderId: string) {
+  return unwrap<StagingSession>(await rpc("get_my_order_staging_session_v1", {
+    p_order_id: orderId,
+  }));
+}
+
+export async function prepareStagingBags(orderId: string, zones: StagingZone[]) {
+  return unwrap<StagingSession>(await rpc("prepare_order_staging_bags_v1", {
+    p_order_id: orderId,
+    p_bags: zones.map((zone) => ({ zone })),
+  }));
+}
+
+export async function stageBag(orderId: string, bagCode: string, locationCode: string) {
+  return unwrap<StagingSession>(await rpc("stage_order_bag_v1", {
+    p_order_id: orderId,
+    p_bag_code: bagCode,
+    p_location_code: locationCode,
+  }));
+}
+
+export async function unstageBag(orderId: string, bagCode: string) {
+  return unwrap<StagingSession>(await rpc("unstage_order_bag_v1", {
+    p_order_id: orderId,
+    p_bag_code: bagCode,
+  }));
+}
+
+export async function finalizeStaging(orderId: string, note = "تم تسكين كل الأكياس من تطبيق الموظفين") {
+  return unwrap<StagingSession & { ok: boolean; state: string }>(await rpc("finalize_order_staging_v1", {
+    p_order_id: orderId,
+    p_note: note,
   }));
 }
 
