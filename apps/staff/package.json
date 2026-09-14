@@ -1,7 +1,7 @@
 {
   "name": "elmadawy-staff",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
+    "@capacitor/barcode-scanner": "^3.1.2",
     "@capacitor/core": "^7.4.3",
     "@supabase/supabase-js": "^2.57.4",
     "lucide-react": "^0.544.0",
