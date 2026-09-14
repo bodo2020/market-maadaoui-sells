@@ -10,6 +10,7 @@ export const mainNavigation: NavigationGroup = {
   items: [
     { label: "نقطة البيع", href: "/pos", icon: ShoppingCart },
     { label: "الطلبات الإلكترونية", href: "/online-orders", icon: ShoppingBag },
+    { label: "تشغيل وتجهيز الطلبات", href: "/online-orders/operations", icon: Truck },
     { label: "الفواتير", href: "/invoices", icon: Receipt },
     { label: "المهام", href: "/tasks", icon: ClipboardList },
     { label: "مركز الموافقات", href: "/approvals", icon: ShieldCheck },
