@@ -1,0 +1,12 @@
+{
+  "appId": "com.elmadawy.growth",
+  "appName": "Elmadawy Growth",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
