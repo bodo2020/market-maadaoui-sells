@@ -6,6 +6,7 @@ import PeriodSwitcher from '../components/PeriodSwitcher';
 import { DonutChart, RankedBarChart, TrendAreaChart, WaterfallChart } from '../components/ReportVisuals';
 import { useBusiness } from '../context/BusinessContext';
 import { fetchOverview, type BusinessFilters, type OverviewData, type PeriodKey } from '../services/businessFinance';
+import { getReportingMetric, metricLabel } from '../services/reportingMetrics';
 
 export default function Dashboard() {
   const { selectedBranch } = useBusiness();
@@ -34,14 +35,15 @@ export default function Dashboard() {
 
   useEffect(() => { void load(); }, [filters]);
 
+  const knownResultMetric = getReportingMetric('known_operating_result');
   const profitBridge = data ? [
-    { label: 'إجمالي المبيعات', value: data.profit.grossSales },
+    { label: metricLabel('gross_sales', true), value: data.profit.grossSales },
     { label: 'الخصومات', value: -data.profit.discounts },
-    { label: 'المرتجعات', value: -data.profit.returns },
-    { label: 'COGS', value: -(data.profit.cogs ?? 0) },
-    { label: 'رسوم الدفع', value: -data.profit.paymentFees },
-    { label: 'المصروفات', value: -data.profit.expenses },
-    { label: 'النتيجة التشغيلية', value: data.profit.operatingResult ?? 0 },
+    { label: metricLabel('returns', true), value: -data.profit.returns },
+    { label: metricLabel('pos_net_cogs', true), value: -(data.profit.cogs ?? 0) },
+    { label: metricLabel('merchant_payment_fees', true), value: -data.profit.paymentFees },
+    { label: metricLabel('expenses', true), value: -data.profit.expenses },
+    { label: metricLabel('known_operating_result', true), value: data.profit.operatingResult ?? 0 },
   ] : [];
 
   return <div className="stack-lg">
@@ -49,7 +51,7 @@ export default function Dashboard() {
       <div>
         <span className="eyebrow">Business Command Center · Reporting V2</span>
         <h2>{selectedBranch?.branch_name || 'كل أرقام المعداوي'} في مكان واحد</h2>
-        <p>مركز متابعة بصري مبني على Invoice V2 ودفاتر الدفع والخزن، بدون نسب نمو ثابتة أو أرقام تجميلية.</p>
+        <p>مركز متابعة بصري مبني على Invoice V2 ودفاتر الدفع والخزن، مع قاموس مؤشرات موحد وبدون نسب نمو ثابتة أو أرقام تجميلية.</p>
       </div>
       <PeriodSwitcher period={period} onChange={setPeriod} />
     </section>
@@ -60,19 +62,19 @@ export default function Dashboard() {
     </section>}
 
     <section className="metrics-grid">
-      <MetricCard title="صافي المبيعات" value={loading ? '…' : money(data?.netSales.value)} change={data?.netSales.changePercent} icon={TrendingUp}/>
-      <MetricCard title="إجمالي ربح POS" value={loading ? '…' : money(data?.grossProfit.value)} change={data?.grossProfit.changePercent} icon={Banknote} emphasis="success"/>
-      <MetricCard title="النتيجة التشغيلية المعروفة" value={loading ? '…' : money(data?.netProfit.value)} change={data?.netProfit.changePercent} icon={WalletCards} emphasis="success" hint="تستبعد ربح الأونلاين غير المكتمل"/>
-      <MetricCard title="عدد الفواتير والطلبات" value={loading ? '…' : number(data?.invoices.value)} change={data?.invoices.changePercent} icon={FileText}/>
+      <MetricCard title={metricLabel('net_sales')} value={loading ? '…' : money(data?.netSales.value)} change={data?.netSales.changePercent} icon={TrendingUp}/>
+      <MetricCard title={metricLabel('pos_gross_profit')} value={loading ? '…' : money(data?.grossProfit.value)} change={data?.grossProfit.changePercent} icon={Banknote} emphasis="success"/>
+      <MetricCard title={knownResultMetric.label} value={loading ? '…' : money(data?.netProfit.value)} change={data?.netProfit.changePercent} icon={WalletCards} emphasis="success" hint={knownResultMetric.caveat}/>
+      <MetricCard title={metricLabel('transactions')} value={loading ? '…' : number(data?.invoices.value)} change={data?.invoices.changePercent} icon={FileText}/>
     </section>
 
-    {data && !data.profit.onlineProfitComplete && <p className="data-scope-note">الربحية الحالية محسوبة من فواتير POS المكتملة؛ مبيعات الأونلاين ظاهرة في الإيراد، لكن تكلفة وربح الأونلاين لم يكتمل ربطهما بعد.</p>}
+    {data && !data.profit.onlineProfitComplete && <p className="data-scope-note">{getReportingMetric('pos_gross_profit').caveat} مبيعات الأونلاين تظهر داخل صافي الإيراد، لكن لا يتم تخمين ربحها.</p>}
 
     {data && <section className="report-visual-grid">
       <TrendAreaChart
         eyebrow="Sales Trend"
-        title="اتجاه صافي المبيعات"
-        valueLabel="صافي المبيعات"
+        title={`اتجاه ${metricLabel('net_sales')}`}
+        valueLabel={metricLabel('net_sales')}
         points={data.timeline.map((point) => ({ label: point.label, value: point.amount }))}
       />
       <DonutChart
@@ -94,20 +96,19 @@ export default function Dashboard() {
     <section className="split-grid">
       <article className="section-card quick-stats">
         <div className="section-heading"><div><span className="eyebrow">مؤشرات سريعة</span><h3>جودة المبيعات</h3></div><PackageCheck size={20}/></div>
-        <div className="quick-stat"><span>متوسط الفاتورة</span><strong>{loading ? '…' : money(data?.averageBasket)}</strong></div>
-        <div className="quick-stat"><span>الوحدات المباعة</span><strong>{loading ? '…' : number(data?.unitsSold)}</strong></div>
-        <div className="quick-stat"><span>المرتجعات</span><strong>{loading ? '…' : money(data?.returns)}</strong></div>
-        <div className="quick-stat"><span>المصروفات</span><strong>{loading ? '…' : money(data?.expenses)}</strong></div>
+        <div className="quick-stat"><span>{metricLabel('average_ticket', true)}</span><strong>{loading ? '…' : money(data?.averageBasket)}</strong></div>
+        <div className="quick-stat"><span>{metricLabel('items_sold', true)}</span><strong>{loading ? '…' : number(data?.unitsSold)}</strong></div>
+        <div className="quick-stat"><span>{metricLabel('returns', true)}</span><strong>{loading ? '…' : money(data?.returns)}</strong></div>
+        <div className="quick-stat"><span>{metricLabel('expenses', true)}</span><strong>{loading ? '…' : money(data?.expenses)}</strong></div>
       </article>
 
-      <article className="section-card quick-stats">
-        <div className="section-heading"><div><span className="eyebrow">وسائل الدفع</span><h3>صافي حركة التحصيل</h3></div><WalletCards size={20}/></div>
-        {data?.payments?.length ? <RankedBarChart eyebrow="Net Collection" title="ترتيب وسائل الدفع" items={data.payments.map((payment) => ({ label: payment.label, value: payment.amount }))}/> : <EmptyData text="لا توجد تحصيلات في الفترة المحددة."/>}
-      </article>
+      {data?.payments?.length
+        ? <RankedBarChart eyebrow="Net Collection" title={metricLabel('payment_net_movement')} items={data.payments.map((payment) => ({ label: payment.label, value: payment.amount }))}/>
+        : <article className="section-card quick-stats"><div className="section-heading"><div><span className="eyebrow">وسائل الدفع</span><h3>{metricLabel('payment_net_movement')}</h3></div><WalletCards size={20}/></div><EmptyData text="لا توجد تحصيلات في الفترة المحددة."/></article>}
     </section>
 
     <section className="section-card roadmap-card">
-      <div><span className="eyebrow">Deep Dive</span><h3>التقارير التفصيلية</h3><p>انتقل من النظرة التنفيذية إلى المبيعات، الربحية، المنتجات، المخزون، وسائل الدفع، المرتجعات، الكاشير، العملاء والفروع.</p></div>
+      <div><span className="eyebrow">Deep Dive</span><h3>التقارير التفصيلية</h3><p>انتقل من النظرة التنفيذية إلى المبيعات، الربحية، المنتجات، المخزون، وسائل الدفع، المرتجعات، الكاشير، العملاء والفروع. قاموس المؤشرات داخل مركز التقارير يوضح مصدر وصيغة كل رقم أساسي.</p></div>
       <Link className="primary-button" to="/reports">فتح مركز التقارير</Link>
     </section>
   </div>;
