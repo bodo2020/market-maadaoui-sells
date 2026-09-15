@@ -84,24 +84,12 @@ export async function postEmployeeDebt(branchId: string, employeeId: string, del
   });
 }
 
-export async function searchCustomers(branchId: string, search: string) {
-  return rpc<ReportDocument>('get_customer_management_catalog', {
+export async function searchDebtParties(branchId: string, partyType: 'customer' | 'employee' | 'supplier', search: string) {
+  return rpc<ReportDocument>('search_business_debt_parties_v1', {
     p_branch_id: branchId,
+    p_party_type: partyType,
     p_search: search || null,
-    p_segment: null,
-    p_limit: 30,
-    p_offset: 0,
-  });
-}
-
-export async function searchEmployees(branchId: string, search: string) {
-  return rpc<ReportDocument>('get_hr_employee_directory_v2', {
-    p_branch_id: branchId,
-    p_search: search || null,
-    p_department_id: null,
-    p_status: null,
-    p_limit: 60,
-    p_offset: 0,
+    p_limit: 50,
   });
 }
 
