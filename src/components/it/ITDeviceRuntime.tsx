@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useBranchStore } from "@/stores/branchStore";
 import { heartbeatITDevice } from "@/services/itDeviceService";
+import GrowthITSuperAdminPanel from "@/components/it/GrowthITSuperAdminPanel";
 
 const HEARTBEAT_MS = 45_000;
 
@@ -10,6 +12,7 @@ export default function ITDeviceRuntime() {
   const location = useLocation();
   const { currentBranchId } = useBranchStore();
   const endingRef = useRef(false);
+  const [adminHost, setAdminHost] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -55,5 +58,24 @@ export default function ITDeviceRuntime() {
     };
   }, [currentBranchId, location.pathname]);
 
-  return null;
+  useEffect(() => {
+    if (location.pathname !== "/it-center") {
+      setAdminHost(null);
+      return;
+    }
+
+    const main = document.querySelector("main");
+    if (!main) return;
+    const host = document.createElement("div");
+    host.dataset.growthItSuperAdmin = "true";
+    main.appendChild(host);
+    setAdminHost(host);
+
+    return () => {
+      setAdminHost(null);
+      host.remove();
+    };
+  }, [location.pathname]);
+
+  return adminHost ? createPortal(<GrowthITSuperAdminPanel />, adminHost) : null;
 }
