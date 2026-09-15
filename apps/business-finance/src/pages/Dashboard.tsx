@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Banknote, FileText, PackageCheck, RefreshCcw, TrendingUp, WalletCards } from 'lucide-react';
+import { Banknote, CalendarDays, FileText, PackageCheck, Printer, RefreshCcw, TrendingUp, WalletCards } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import MetricCard, { money, number } from '../components/MetricCard';
 import PeriodSwitcher from '../components/PeriodSwitcher';
@@ -7,20 +7,39 @@ import { DonutChart, RankedBarChart, TrendAreaChart, WaterfallChart } from '../c
 import { useBusiness } from '../context/BusinessContext';
 import { fetchOverview, type BusinessFilters, type OverviewData, type PeriodKey } from '../services/businessFinance';
 import { getReportingMetric, metricLabel } from '../services/reportingMetrics';
+import { makeCairoCustomRange } from '../services/salesReporting';
+import './sales-report.css';
 
 export default function Dashboard() {
   const { selectedBranch } = useBusiness();
+  const today = cairoToday();
   const [period, setPeriod] = useState<PeriodKey>('today');
+  const [customFrom, setCustomFrom] = useState(today);
+  const [customTo, setCustomTo] = useState(today);
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const customRange = useMemo(() => {
+    if (period !== 'custom') return null;
+    try { return makeCairoCustomRange(customFrom, customTo); } catch { return null; }
+  }, [period, customFrom, customTo]);
+
   const filters = useMemo<BusinessFilters | null>(
-    () => selectedBranch ? { period, branchId: selectedBranch.branch_id } : null,
-    [period, selectedBranch],
+    () => selectedBranch && (period !== 'custom' || customRange) ? {
+      period,
+      branchId: selectedBranch.branch_id,
+      from: customRange?.from,
+      to: customRange?.to,
+    } : null,
+    [period, selectedBranch, customRange],
   );
 
   async function load() {
-    if (!filters) return;
+    if (!filters) {
+      if (period === 'custom') setError('اختر نطاق تاريخ صحيح.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -53,8 +72,10 @@ export default function Dashboard() {
         <h2>{selectedBranch?.branch_name || 'كل أرقام المعداوي'} في مكان واحد</h2>
         <p>مركز متابعة بصري مبني على Invoice V2 ودفاتر الدفع والخزن، مع قاموس مؤشرات موحد وبدون نسب نمو ثابتة أو أرقام تجميلية.</p>
       </div>
-      <PeriodSwitcher period={period} onChange={setPeriod} />
+      <div className="sales-period-control"><PeriodSwitcher period={period} onChange={setPeriod}/><button type="button" className={period === 'custom' ? 'custom-period-button active' : 'custom-period-button'} onClick={() => setPeriod('custom')}><CalendarDays size={16}/> مخصص</button><button type="button" className="custom-period-button" onClick={() => window.print()}><Printer size={16}/> PDF</button></div>
     </section>
+
+    {period === 'custom' && <section className="section-card custom-date-panel"><div><span className="eyebrow">Executive Range</span><h3>فترة مخصصة</h3><p>المقارنة مع الفترة السابقة تُحسب تلقائيًا بنفس طول الفترة، وتاريخ النهاية يدخل كاملًا بتوقيت القاهرة.</p></div><div className="custom-date-inputs"><label><span>من</span><input type="date" value={customFrom} max={customTo} onChange={(event) => setCustomFrom(event.target.value)}/></label><label><span>إلى</span><input type="date" value={customTo} min={customFrom} onChange={(event) => setCustomTo(event.target.value)}/></label></div></section>}
 
     {error && <section className="engine-banner">
       <div><strong>تعذر تحميل بيانات الفرع</strong><p>{error}</p></div>
@@ -116,4 +137,10 @@ export default function Dashboard() {
 
 function EmptyData({ text }: { text: string }) {
   return <div className="empty-data"><span>—</span><p>{text}</p></div>;
+}
+
+function cairoToday() {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
