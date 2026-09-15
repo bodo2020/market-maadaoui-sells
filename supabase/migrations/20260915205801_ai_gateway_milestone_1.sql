@@ -3,10 +3,12 @@
 create table if not exists public.ai_runtime_settings (
   scope text primary key check (scope = 'global'),
   enabled boolean not null default false,
-  primary_provider text not null default 'gemini' check (primary_provider in ('gemini','groq')),
+  primary_provider text not null default 'gemini' check (primary_provider in ('gemini','groq','openrouter')),
   primary_model text not null default 'gemini-2.5-flash',
-  fallback_provider text check (fallback_provider in ('gemini','groq')),
+  fallback_provider text check (fallback_provider in ('gemini','groq','openrouter')),
   fallback_model text,
+  tertiary_provider text check (tertiary_provider in ('gemini','groq','openrouter')),
+  tertiary_model text,
   timeout_ms integer not null default 20000 check (timeout_ms between 5000 and 60000),
   max_output_tokens integer not null default 800 check (max_output_tokens between 128 and 4096),
   auto_reply_enabled boolean not null default false,
@@ -14,8 +16,12 @@ create table if not exists public.ai_runtime_settings (
   updated_by uuid references auth.users(id)
 );
 
-insert into public.ai_runtime_settings(scope,enabled,primary_provider,primary_model,fallback_provider,fallback_model,auto_reply_enabled)
-values ('global',false,'gemini','gemini-2.5-flash','groq','openai/gpt-oss-120b',false)
+insert into public.ai_runtime_settings(
+  scope,enabled,primary_provider,primary_model,fallback_provider,fallback_model,tertiary_provider,tertiary_model,auto_reply_enabled
+)
+values (
+  'global',false,'gemini','gemini-2.5-flash','groq','openai/gpt-oss-120b','openrouter','openrouter/auto',false
+)
 on conflict (scope) do nothing;
 
 create table if not exists public.ai_conversations (
