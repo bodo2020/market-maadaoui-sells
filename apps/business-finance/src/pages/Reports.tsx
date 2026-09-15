@@ -1,30 +1,36 @@
-import { ArrowLeftRight, ArrowUpLeft, BarChart3, Boxes, Building2, CircleDollarSign, ClipboardList, Gauge, Lightbulb, PackageSearch, Receipt, RotateCcw, ShoppingCart, Truck, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, ArrowUpLeft, BarChart3, Boxes, Building2, CircleDollarSign, ClipboardList, Clock3, Gauge, Lightbulb, PackageSearch, Receipt, RotateCcw, ShoppingCart, Truck, Users, UsersRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import '../components/reporting-metrics.css';
 import './reports-hub.css';
 import type { ReportKey } from '../services/reportingDetails';
 import { coreReportingMetricKeys, getReportingMetric } from '../services/reportingMetrics';
 
-export const reports: Array<{ key: ReportKey; title: string; desc: string; icon: typeof ShoppingCart }> = [
+type ExtendedReportKey = ReportKey | 'workforce-costs' | 'waste' | 'peak-hours';
+
+type ReportMeta = { key: ExtendedReportKey; title: string; desc: string; icon: typeof ShoppingCart };
+export const reports: ReportMeta[] = [
   { key: 'sales', title: 'المبيعات', desc: 'المبيعات، الفواتير، متوسط السلة وساعات الذروة.', icon: ShoppingCart },
   { key: 'profitability', title: 'الربحية', desc: 'Net Sales → COGS → Gross Profit → Operating Result.', icon: CircleDollarSign },
   { key: 'products', title: 'المنتجات والأقسام', desc: 'الأكثر مبيعًا وربحًا، الهامش ومساهمة الأقسام.', icon: PackageSearch },
   { key: 'inventory', title: 'المخزون', desc: 'قيمة المخزون، النواقص، النافد وصحة المخزون.', icon: Boxes },
+  { key: 'waste', title: 'التالف والهالك', desc: 'التلف والكسر المعتمد، الكمية وتكلفة الخسارة وأعلى المنتجات المتضررة.', icon: AlertTriangle },
   { key: 'payments', title: 'وسائل الدفع', desc: 'التحصيل، الرسوم، Refunds والتسويات لكل وسيلة.', icon: ClipboardList },
   { key: 'returns', title: 'المرتجعات', desc: 'Full / Partial، الأسباب وتأثير المرتجع على الربح.', icon: RotateCcw },
+  { key: 'workforce-costs', title: 'المرتبات والمصروفات', desc: 'Payroll V2، ساعات العمل، الإضافي والخصومات والمصروفات التشغيلية.', icon: UsersRound },
   { key: 'cashiers', title: 'الكاشير والورديات', desc: 'الأداء، Cash Variance والمبيعات لكل ساعة.', icon: Users },
+  { key: 'peak-hours', title: 'ساعات العمل والذروة', desc: 'مقارنة 24 ساعة بين حركة الفرع وطلبات الأونلاين مع Heatmap أسبوعي.', icon: Clock3 },
   { key: 'branches', title: 'الفروع', desc: 'مقارنة الفروع في المبيعات والربحية والمصروفات.', icon: Building2 },
   { key: 'online', title: 'الأونلاين والتوصيل', desc: 'Orders، الإلغاء، التحصيل وأداء التنفيذ والتوصيل.', icon: Truck },
   { key: 'customers', title: 'العملاء والولاء', desc: 'الجدد والعائدون، قيمة العميل وتغطية الهوية.', icon: Users },
-  { key: 'costs', title: 'التكاليف والموردون', desc: 'المصروفات، المشتريات، الرواتب والتزامات الموردين.', icon: Receipt },
+  { key: 'costs', title: 'التكاليف والموردون', desc: 'المصروفات، المشتريات والالتزامات والموردون.', icon: Receipt },
   { key: 'transfers', title: 'تحويلات المخزون', desc: 'الصادر والوارد، فروق الاستلام والمهام المتأخرة.', icon: ArrowLeftRight },
   { key: 'insights', title: 'الإشارات الذكية', desc: 'مشكلات وفرص مرتبة حسب الأولوية من القواعد الفعلية.', icon: Lightbulb },
 ];
 
-const groups: Array<{ title: string; eyebrow: string; desc: string; keys: ReportKey[] }> = [
-  { title: 'الأداء التجاري', eyebrow: 'Business Performance', desc: 'المبيعات والربحية والمنتجات والمخزون من نفس تعريفات الأرقام.', keys: ['sales', 'profitability', 'products', 'inventory'] },
-  { title: 'الرقابة المالية', eyebrow: 'Financial Control', desc: 'تحصيل الأموال، رسوم الدفع، المرتجعات، المصروفات والموردون.', keys: ['payments', 'returns', 'costs'] },
-  { title: 'تشغيل الفروع', eyebrow: 'Operations', desc: 'أداء الفريق والفروع والأونلاين وتحويلات المخزون.', keys: ['cashiers', 'branches', 'online', 'transfers'] },
+const groups: Array<{ title: string; eyebrow: string; desc: string; keys: ExtendedReportKey[] }> = [
+  { title: 'الأداء التجاري', eyebrow: 'Business Performance', desc: 'المبيعات والربحية والمنتجات والمخزون من نفس تعريفات الأرقام.', keys: ['sales', 'profitability', 'products', 'inventory', 'waste'] },
+  { title: 'الرقابة المالية والعمالة', eyebrow: 'Financial & People Cost', desc: 'التحصيل، المرتجعات، المرتبات والمصروفات والموردون من مصادر مالية موثوقة.', keys: ['payments', 'returns', 'workforce-costs', 'costs'] },
+  { title: 'تشغيل الفروع', eyebrow: 'Operations', desc: 'أداء الفريق والفروع والأونلاين وساعات الذروة وتحويلات المخزون.', keys: ['cashiers', 'peak-hours', 'branches', 'online', 'transfers'] },
   { title: 'العملاء والذكاء', eyebrow: 'Customers & Intelligence', desc: 'قيمة العميل، التغطية، والإشارات التي تحتاج تدخل الإدارة.', keys: ['customers', 'insights'] },
 ];
 
@@ -39,7 +45,7 @@ export default function Reports() {
 
     <section className="reports-capability-strip" aria-label="قدرات نظام التقارير">
       <span><BarChart3 size={16}/> رسوم وتحليلات متقدمة</span>
-      <span><ClipboardList size={16}/> Drill-down للبيانات</span>
+      <span><Clock3 size={16}/> ذروة POS وOnline</span>
       <span><CircleDollarSign size={16}/> أرقام مالية من الـLedgers</span>
       <span><Building2 size={16}/> صلاحيات وفروع</span>
     </section>
