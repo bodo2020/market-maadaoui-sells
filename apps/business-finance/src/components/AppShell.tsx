@@ -11,7 +11,15 @@ const nav = [
   { to: '/notifications', label: 'التنبيهات', icon: Bell },
   { to: '/more', label: 'المزيد', icon: MoreHorizontal },
 ];
-const titles: Record<string, string> = { '/': 'نظرة عامة', '/reports': 'التقارير والتحليلات', '/finance': 'النظام المالي', '/notifications': 'التنبيهات', '/more': 'المزيد' };
+const titles: Record<string, string> = {
+  '/': 'نظرة عامة',
+  '/reports': 'التقارير والتحليلات',
+  '/finance': 'النظام المالي',
+  '/finance/debts': 'المديونيات',
+  '/payroll': 'إدارة المرتبات',
+  '/notifications': 'التنبيهات',
+  '/more': 'المزيد',
+};
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
