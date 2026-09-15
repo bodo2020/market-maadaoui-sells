@@ -33,6 +33,10 @@ export async function fetchPeakHoursReport(filters: BusinessFilters) {
   return rpc('get_reporting_peak_hours_v1', rangePayload(filters));
 }
 
+export async function fetchStaffCoverageReport(filters: BusinessFilters) {
+  return rpc('get_reporting_staff_coverage_v1', rangePayload(filters));
+}
+
 export async function fetchWasteReport(filters: BusinessFilters) {
   return rpc('get_reporting_waste_v1', { ...rangePayload(filters), p_limit: 100 });
 }
@@ -75,11 +79,13 @@ export async function fetchWorkforceCostsReport(
 export type DecisionCenterBundle = {
   overview: OverviewData | null;
   peak: ReportDocument | null;
+  coverage: ReportDocument | null;
   waste: ReportDocument | null;
   payroll: ReportDocument | null;
   errors: {
     overview: string | null;
     peak: string | null;
+    coverage: string | null;
     waste: string | null;
     payroll: string | null;
   };
@@ -90,9 +96,10 @@ export async function fetchDecisionCenterReport(
   payrollMonth: number,
   payrollYear: number,
 ): Promise<DecisionCenterBundle> {
-  const [overviewResult, peakResult, wasteResult, payrollResult] = await Promise.allSettled([
+  const [overviewResult, peakResult, coverageResult, wasteResult, payrollResult] = await Promise.allSettled([
     fetchOverview(filters),
     fetchPeakHoursReport(filters),
+    fetchStaffCoverageReport(filters),
     fetchWasteReport(filters),
     rpc('get_hr_payroll_workspace_v2', {
       p_branch_id: filters.branchId,
@@ -104,11 +111,13 @@ export async function fetchDecisionCenterReport(
   return {
     overview: overviewResult.status === 'fulfilled' ? overviewResult.value : null,
     peak: peakResult.status === 'fulfilled' ? peakResult.value : null,
+    coverage: coverageResult.status === 'fulfilled' ? coverageResult.value : null,
     waste: wasteResult.status === 'fulfilled' ? wasteResult.value : null,
     payroll: payrollResult.status === 'fulfilled' ? payrollResult.value : null,
     errors: {
       overview: rejectedMessage(overviewResult),
       peak: rejectedMessage(peakResult),
+      coverage: rejectedMessage(coverageResult),
       waste: rejectedMessage(wasteResult),
       payroll: rejectedMessage(payrollResult),
     },
