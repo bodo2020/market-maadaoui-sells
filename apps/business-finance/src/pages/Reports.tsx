@@ -1,11 +1,12 @@
-import { AlertTriangle, ArrowLeftRight, ArrowUpLeft, BarChart3, Boxes, Building2, CircleDollarSign, ClipboardList, Clock3, Gauge, Lightbulb, PackageSearch, Receipt, RotateCcw, ShoppingCart, Truck, Users, UsersRound } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, ArrowUpLeft, BadgeDollarSign, BarChart3, Boxes, Building2, CircleDollarSign, ClipboardList, Clock3, Gauge, Lightbulb, PackageSearch, Receipt, RotateCcw, ShoppingCart, Truck, Users, UsersRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import '../components/reporting-metrics.css';
 import './reports-hub.css';
+import './reports-mobile.css';
 import type { ReportKey } from '../services/reportingDetails';
 import { coreReportingMetricKeys, getReportingMetric } from '../services/reportingMetrics';
 
-type ExtendedReportKey = ReportKey | 'workforce-costs' | 'waste' | 'peak-hours';
+type ExtendedReportKey = ReportKey | 'workforce-costs' | 'waste' | 'peak-hours' | 'debts';
 
 type ReportMeta = { key: ExtendedReportKey; title: string; desc: string; icon: typeof ShoppingCart };
 export const reports: ReportMeta[] = [
@@ -17,6 +18,7 @@ export const reports: ReportMeta[] = [
   { key: 'payments', title: 'وسائل الدفع', desc: 'التحصيل، الرسوم، Refunds والتسويات لكل وسيلة.', icon: ClipboardList },
   { key: 'returns', title: 'المرتجعات', desc: 'Full / Partial، الأسباب وتأثير المرتجع على الربح.', icon: RotateCcw },
   { key: 'workforce-costs', title: 'المرتبات والمصروفات', desc: 'Payroll V2، ساعات العمل، الإضافي والخصومات والمصروفات التشغيلية.', icon: UsersRound },
+  { key: 'debts', title: 'المديونيات', desc: 'مديونيات العملاء والموظفين ومستحقات الموردين مع فصل الرصيد الحالي عن حركة الفترة.', icon: BadgeDollarSign },
   { key: 'cashiers', title: 'الكاشير والورديات', desc: 'الأداء، Cash Variance والمبيعات لكل ساعة.', icon: Users },
   { key: 'peak-hours', title: 'ساعات العمل والذروة', desc: 'مقارنة 24 ساعة بين حركة الفرع وطلبات الأونلاين مع Heatmap أسبوعي.', icon: Clock3 },
   { key: 'branches', title: 'الفروع', desc: 'مقارنة الفروع في المبيعات والربحية والمصروفات.', icon: Building2 },
@@ -29,7 +31,7 @@ export const reports: ReportMeta[] = [
 
 const groups: Array<{ title: string; eyebrow: string; desc: string; keys: ExtendedReportKey[] }> = [
   { title: 'الأداء التجاري', eyebrow: 'Business Performance', desc: 'المبيعات والربحية والمنتجات والمخزون من نفس تعريفات الأرقام.', keys: ['sales', 'profitability', 'products', 'inventory', 'waste'] },
-  { title: 'الرقابة المالية والعمالة', eyebrow: 'Financial & People Cost', desc: 'التحصيل، المرتجعات، المرتبات والمصروفات والموردون من مصادر مالية موثوقة.', keys: ['payments', 'returns', 'workforce-costs', 'costs'] },
+  { title: 'الرقابة المالية والعمالة', eyebrow: 'Financial & People Cost', desc: 'التحصيل، المرتجعات، المرتبات، المديونيات والمصروفات والموردون من مصادر مالية موثوقة.', keys: ['payments', 'returns', 'workforce-costs', 'debts', 'costs'] },
   { title: 'تشغيل الفروع', eyebrow: 'Operations', desc: 'أداء الفريق والفروع والأونلاين وساعات الذروة وتحويلات المخزون.', keys: ['cashiers', 'peak-hours', 'branches', 'online', 'transfers'] },
   { title: 'العملاء والذكاء', eyebrow: 'Customers & Intelligence', desc: 'قيمة العميل، التغطية، والإشارات التي تحتاج تدخل الإدارة.', keys: ['customers', 'insights'] },
 ];
