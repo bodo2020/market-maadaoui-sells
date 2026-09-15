@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -49,6 +49,13 @@ type PeakWindow = {
   total: number;
 };
 
+type PressureHour = {
+  hour: number;
+  activity: number;
+  avgStaff: number;
+  activityPerStaff: number;
+};
+
 export default function DecisionCenter() {
   const { selectedBranch } = useBusiness();
   const now = cairoParts();
@@ -72,7 +79,10 @@ export default function DecisionCenter() {
     to: customRange?.to,
   } : null, [selectedBranch, period, customRange]);
 
-  const payrollContext = useMemo(() => inferPayrollContext(period, customFrom, now), [period, customFrom, now.year, now.month]);
+  const payrollContext = useMemo(
+    () => inferPayrollContext(period, customFrom, now),
+    [period, customFrom, now.year, now.month],
+  );
 
   async function load() {
     if (!filters) {
@@ -94,8 +104,9 @@ export default function DecisionCenter() {
   useEffect(() => { void load(); }, [filters, payrollContext.month, payrollContext.year]);
 
   const overview = data?.overview || null;
-  const peakSummary = record(data?.peak?.summary);
   const hourly = rows(data?.peak?.hourly);
+  const coverageSummary = record(data?.coverage?.summary);
+  const coverageHourly = rows(data?.coverage?.hourly);
   const wasteSummary = record(data?.waste?.summary);
   const wastePermissions = record(data?.waste?.permissions);
   const wasteProducts = rows(data?.waste?.products);
@@ -119,12 +130,11 @@ export default function DecisionCenter() {
 
   const posWindow = peakWindow(hourly, 'pos_transactions');
   const onlineWindow = peakWindow(hourly, 'online_orders');
+  const pressureHours = buildPressureHours(hourly, coverageHourly);
+  const highestPressure = pressureHours[0] || null;
   const insights = buildInsights({
-    netSales,
     salesChange: overview?.netSales.changePercent ?? null,
     operatingResult,
-    operatingChange: overview?.netProfit.changePercent ?? null,
-    expenses,
     expenseRatio,
     payrollNet,
     payrollRatio,
@@ -134,6 +144,8 @@ export default function DecisionCenter() {
     wasteProducts,
     posWindow,
     onlineWindow,
+    highestPressure,
+    hasCoverage: Boolean(data?.coverage),
   });
 
   const costSignals = [
@@ -155,8 +167,10 @@ export default function DecisionCenter() {
       ['المصروفات المسجلة', expenses ?? 'غير متاح'],
       [`صافي مرتبات ${monthLabel(payrollContext.month)} ${payrollContext.year}`, payrollNet ?? 'غير متاح'],
       ['تكلفة التالف', wasteLoss ?? 'غير متاح/محجوب'],
+      ['إجمالي ساعات التواجد', data.coverage ? num(coverageSummary.staff_hours) : 'غير متاح/محجوب'],
       ['ذروة الفرع', posWindow ? windowLabel(posWindow) : 'غير متاح'],
       ['ذروة الأونلاين', onlineWindow ? windowLabel(onlineWindow) : 'غير متاح'],
+      ['أعلى ضغط مقابل التغطية', highestPressure ? `${hourLabel(highestPressure.hour)} · ${number(highestPressure.activityPerStaff)} عملية/طلب لكل موظف` : 'غير متاح'],
       [],
       ['إشارات القرار'],
       ['الأولوية', 'العنوان', 'التفصيل'],
@@ -174,7 +188,7 @@ export default function DecisionCenter() {
         <div>
           <span className="eyebrow">Business Decision Center</span>
           <h2>مركز القرار التشغيلي</h2>
-          <p>صورة واحدة تربط الأداء المالي، تكلفة العمالة، المصروفات، التالف، وساعات الضغط بدون خلط مصادر أو مضاعفة التكاليف.</p>
+          <p>صورة واحدة تربط الأداء المالي، تكلفة العمالة، المصروفات، التالف، ضغط القنوات وتغطية الموظفين بدون خلط مصادر أو مضاعفة التكاليف.</p>
         </div>
       </div>
       <div className="sales-period-control">
@@ -215,8 +229,14 @@ export default function DecisionCenter() {
       </>}
     </section>
 
+    {data?.coverage && <section className="decision-kpi-grid">
+      <DecisionKpi label="ساعات التواجد المسجلة" value={`${number(num(coverageSummary.staff_hours))} س`} hint={`${number(num(coverageSummary.employees))} موظف في سجلات الفترة`}/>
+      <DecisionKpi label="جلسات حضور مكتملة" value={number(num(coverageSummary.closed_sessions))} hint="دخول وخروج موثق"/>
+      <DecisionKpi label="أعلى ضغط مقابل التغطية" value={highestPressure ? hourLabel(highestPressure.hour) : '—'} hint={highestPressure ? `${number(highestPressure.activityPerStaff)} عملية/طلب لكل موظف متواجد في المتوسط` : 'لا توجد بيانات مشتركة كافية'}/>
+    </section>}
+
     <section className="decision-insights-section">
-      <div className="section-heading"><div><span className="eyebrow">Actionable Signals</span><h3>إشارات تساعدك تاخد قرار</h3><p className="muted">الإشارات محسوبة بقواعد واضحة من بيانات الفترة، وليست توقعات غير موثقة.</p></div><Lightbulb size={20}/></div>
+      <div className="section-heading"><div><span className="eyebrow">Actionable Signals</span><h3>إشارات تساعدك تاخد قرار</h3><p className="muted">الإشارات محسوبة بقواعد واضحة من بيانات الفترة؛ وعند توفر الحضور يتم قياس الضغط نسبةً للتغطية الفعلية.</p></div><Lightbulb size={20}/></div>
       <div className="decision-insight-grid">
         {loading ? [1,2,3].map((item) => <article className="decision-insight-card" key={item}><div className="skeleton wide"/><div className="skeleton"/></article>) : insights.length ? insights.map((insight, index) => <InsightCard insight={insight} key={`${insight.title}-${index}`}/>) : <div className="empty-data"><span>—</span><p>لا توجد حركة كافية لإنتاج إشارات تشغيلية في الفترة الحالية.</p></div>}
       </div>
@@ -231,6 +251,21 @@ export default function DecisionCenter() {
         secondaryLabel="طلبات الأونلاين"
         formatValue={(value) => number(value)}
       />
+      {data.coverage && <TrendAreaChart
+        eyebrow="Staff Coverage"
+        title="تغطية الموظفين حسب الساعة"
+        points={coverageHourly.map((row) => ({ label: hourLabel(row.hour), value: num(row.avg_staff), secondary: num(row.max_staff) }))}
+        valueLabel="متوسط التواجد"
+        secondaryLabel="أقصى تواجد"
+        formatValue={(value) => number(value)}
+      />}
+      {data.coverage && <TrendAreaChart
+        eyebrow="Demand / Coverage"
+        title="ضغط النشاط لكل موظف متواجد"
+        points={[...pressureHours].sort((a, b) => a.hour - b.hour).map((row) => ({ label: hourLabel(row.hour), value: row.activityPerStaff }))}
+        valueLabel="عملية/طلب لكل موظف"
+        formatValue={(value) => number(value)}
+      />}
       <DonutChart
         eyebrow="Sales Channels"
         title="توزيع صافي المبيعات حسب القناة"
@@ -245,10 +280,10 @@ export default function DecisionCenter() {
       />
     </section>}
 
-    <p className="data-scope-note">مؤشرات المرتبات والمصروفات والتالف معروضة منفصلة عمدًا؛ لا يتم جمعها تلقائيًا لأن بعض البنود قد تتقاطع محاسبيًا داخل النتيجة التشغيلية.</p>
+    <p className="data-scope-note">مؤشرات المرتبات والمصروفات والتالف معروضة منفصلة عمدًا؛ لا يتم جمعها تلقائيًا لأن بعض البنود قد تتقاطع محاسبيًا داخل النتيجة التشغيلية. «النشاط لكل موظف» إشارة ضغط جماعية وليست تقييم إنتاجية فردي.</p>
 
     <section className="decision-quick-links">
-      <DecisionLink to="/reports/peak-hours" icon={<Clock3 size={19}/>} title="تفاصيل ساعات الذروة" text={posWindow || onlineWindow ? `${posWindow ? `الفرع ${windowLabel(posWindow)}` : ''}${posWindow && onlineWindow ? ' · ' : ''}${onlineWindow ? `الأونلاين ${windowLabel(onlineWindow)}` : ''}` : 'افتح تحليل 24 ساعة والـHeatmap الأسبوعي.'}/>
+      <DecisionLink to="/reports/peak-hours" icon={<Clock3 size={19}/>} title="تفاصيل ساعات الذروة" text={highestPressure ? `أعلى ضغط مقابل التغطية ${hourLabel(highestPressure.hour)} · ${number(highestPressure.activityPerStaff)} عملية/طلب لكل موظف.` : posWindow || onlineWindow ? `${posWindow ? `الفرع ${windowLabel(posWindow)}` : ''}${posWindow && onlineWindow ? ' · ' : ''}${onlineWindow ? `الأونلاين ${windowLabel(onlineWindow)}` : ''}` : 'افتح تحليل 24 ساعة والـHeatmap الأسبوعي.'}/>
       <DecisionLink to="/reports/workforce-costs" icon={<UsersRound size={19}/>} title="المرتبات والمصروفات" text={`دورة ${monthLabel(payrollContext.month)} ${payrollContext.year} وتفاصيل ساعات العمل والخصومات.`}/>
       <DecisionLink to="/reports/waste" icon={<AlertTriangle size={19}/>} title="التالف والهالك" text={`${number(num(wasteSummary.events))} حركة تلف/كسر معتمدة في الفترة.`}/>
       <DecisionLink to="/reports/profitability" icon={<Receipt size={19}/>} title="تفاصيل الربحية" text="راجع جسر الربح والنتيجة التشغيلية ومصادر التكلفة الموثقة."/>
@@ -267,16 +302,13 @@ function InsightCard({ insight }: { insight: Insight }) {
   </article>;
 }
 
-function DecisionLink({ to, icon, title, text: description }: { to: string; icon: React.ReactNode; title: string; text: string }) {
+function DecisionLink({ to, icon, title, text: description }: { to: string; icon: ReactNode; title: string; text: string }) {
   return <Link to={to} className="decision-quick-link"><span>{icon}</span><div><strong>{title}</strong><small>{description}</small></div><ArrowUpLeft size={17}/></Link>;
 }
 
 function buildInsights(input: {
-  netSales: number | null;
   salesChange: number | null;
   operatingResult: number | null;
-  operatingChange: number | null;
-  expenses: number | null;
   expenseRatio: number | null;
   payrollNet: number | null;
   payrollRatio: number | null;
@@ -286,29 +318,47 @@ function buildInsights(input: {
   wasteProducts: Record<string, unknown>[];
   posWindow: PeakWindow | null;
   onlineWindow: PeakWindow | null;
+  highestPressure: PressureHour | null;
+  hasCoverage: boolean;
 }): Insight[] {
   const insights: Insight[] = [];
 
   if (input.posWindow) insights.push({
     level: 'opportunity',
-    title: `عزّز تغطية الفرع ${windowLabel(input.posWindow)}`,
-    body: 'هذه النافذة تضم الساعات التي وصل نشاط POS فيها إلى 80% أو أكثر من أعلى ساعة في الفترة. تستحق مراجعة توزيع الكاشير والتجهيز خلالها.',
+    title: `راجع تغطية الفرع ${windowLabel(input.posWindow)}`,
+    body: 'هذه النافذة تضم الساعات التي وصل نشاط POS فيها إلى 80% أو أكثر من أعلى ساعة في الفترة. استخدمها لمراجعة توزيع الكاشير والتجهيز.',
     to: '/reports/peak-hours',
     action: 'تحليل الذروة',
   });
 
   if (input.onlineWindow) insights.push({
     level: 'opportunity',
-    title: `جهّز فريق الأونلاين ${windowLabel(input.onlineWindow)}`,
+    title: `راجع تجهيز الأونلاين ${windowLabel(input.onlineWindow)}`,
     body: 'هذه نافذة الضغط الأعلى لطلبات الأونلاين، ومناسبة لمراجعة عدد الـPickers والتجهيز والتسليم قبل زيادة الحمل.',
     to: '/reports/peak-hours',
     action: 'تفاصيل الأونلاين',
   });
 
+  if (input.highestPressure) insights.unshift({
+    level: 'attention',
+    title: `أعلى ضغط مقابل التغطية عند ${hourLabel(input.highestPressure.hour)}`,
+    body: `سجلت الساعة ${number(input.highestPressure.activityPerStaff)} عملية/طلب لكل موظف متواجد في المتوسط (${number(input.highestPressure.avgStaff)} موظف مقابل ${number(input.highestPressure.activity)} عملية/طلب). راجع توزيع الأدوار في هذه الساعة قبل زيادة العدد تلقائيًا.`,
+    to: '/reports/peak-hours',
+    action: 'مقارنة الضغط بالتغطية',
+  });
+
+  if (!input.hasCoverage) insights.push({
+    level: 'info',
+    title: 'تحليل التغطية يحتاج صلاحية الحضور',
+    body: 'ضغط الفرع والأونلاين محسوب، لكن مقارنة الضغط بعدد الموظفين لن تظهر بدون صلاحية عرض الحضور أو تقارير HR.',
+    to: '/reports/peak-hours',
+    action: 'عرض تقرير الذروة',
+  });
+
   if (input.posWindow && input.onlineWindow && windowsOverlap(input.posWindow, input.onlineWindow)) insights.unshift({
     level: 'attention',
     title: 'ذروة الفرع والأونلاين متداخلة',
-    body: 'فترة الضغط الأعلى للقناتين تتقاطع. الأفضل مراجعة توزيع الأدوار بين خدمة الفرع وتجهيز الأونلاين حتى لا يسحب مسار موارد المسار الآخر.',
+    body: 'فترة الضغط الأعلى للقناتين تتقاطع. راجع توزيع الأدوار بين خدمة الفرع وتجهيز الأونلاين حتى لا يسحب مسار موارد المسار الآخر.',
     to: '/reports/peak-hours',
     action: 'افتح خريطة الضغط',
   });
@@ -332,7 +382,7 @@ function buildInsights(input: {
   if (input.expenseRatio != null) insights.push({
     level: 'info',
     title: 'نسبة المصروفات إلى المبيعات',
-    body: `المصروفات المسجلة في الفترة تعادل ${number(input.expenseRatio)}% من صافي المبيعات. الرقم معروض كنسبة متابعة بدون تصنيف تلقائي مرتفع/منخفض لعدم افتراض هدف إداري غير محدد.`,
+    body: `المصروفات المسجلة في الفترة تعادل ${number(input.expenseRatio)}% من صافي المبيعات. الرقم معروض كنسبة متابعة بدون افتراض هدف إداري غير محدد.`,
     to: '/reports/workforce-costs',
     action: 'تفاصيل المصروفات',
   });
@@ -364,7 +414,22 @@ function buildInsights(input: {
     });
   }
 
-  return insights.slice(0, 7);
+  return insights.slice(0, 8);
+}
+
+function buildPressureHours(hourly: Record<string, unknown>[], coverageHourly: Record<string, unknown>[]): PressureHour[] {
+  return hourly.map((row) => {
+    const hour = num(row.hour);
+    const coverage = coverageHourly.find((item) => num(item.hour) === hour);
+    const avgStaff = coverage ? num(coverage.avg_staff) : 0;
+    const activity = num(row.combined_activity);
+    return {
+      hour,
+      activity,
+      avgStaff,
+      activityPerStaff: avgStaff > 0 ? activity / avgStaff : 0,
+    };
+  }).filter((row) => row.avgStaff > 0 && row.activity > 0).sort((a, b) => b.activityPerStaff - a.activityPerStaff);
 }
 
 function peakWindow(hourly: Record<string, unknown>[], key: string): PeakWindow | null {
@@ -410,11 +475,8 @@ function inferPayrollContext(period: PeriodKey, customFrom: string, now: { year:
   return now;
 }
 
-function DecisionSourceName() { return null; }
-void DecisionSourceName;
-
 function sourceLabel(key: string) {
-  const labels: Record<string, string> = { overview: 'الأداء المالي', peak: 'ساعات الذروة', waste: 'التالف', payroll: 'المرتبات' };
+  const labels: Record<string, string> = { overview: 'الأداء المالي', peak: 'ساعات الذروة', coverage: 'تغطية الموظفين', waste: 'التالف', payroll: 'المرتبات' };
   return labels[key] || key;
 }
 function levelLabel(level: InsightLevel) { return level === 'attention' ? 'يحتاج انتباه' : level === 'opportunity' ? 'فرصة تشغيلية' : 'معلومة قرار'; }
