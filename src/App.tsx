@@ -4,6 +4,7 @@ import CustomerTaskNotifications from "@/components/customers/CustomerTaskNotifi
 import OperationsTaskNotifications from "@/components/tasks/OperationsTaskNotifications";
 import InventoryTransferSmartAlertNotifications from "@/components/inventory/InventoryTransferSmartAlertNotifications";
 import POSOnlineOrdersRouteDock from "@/components/POS/POSOnlineOrdersRouteDock";
+import GooglePasswordAutofill from "@/components/Auth/GooglePasswordAutofill";
 import { BrowserRouter as Router } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -20,6 +21,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
+        <GooglePasswordAutofill />
         <AuthProvider>
           <TooltipProvider>
             <OrderNotifications />
