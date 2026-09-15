@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ChevronLeft, ChevronRight, Download, Filter, Printer, RefreshCcw, Search, ShoppingCart } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Download, Filter, Printer, RefreshCcw, Search, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { money, number } from '../components/MetricCard';
 import PeriodSwitcher from '../components/PeriodSwitcher';
 import { ReportVisuals } from '../components/ReportVisuals';
 import { useBusiness } from '../context/BusinessContext';
 import { type PeriodKey } from '../services/businessFinance';
-import { fetchAdvancedSalesReport, type SalesChannel } from '../services/salesReporting';
+import { fetchAdvancedSalesReport, fetchAllAdvancedSalesRows, makeCairoCustomRange, type SalesChannel } from '../services/salesReporting';
 import type { ReportDocument } from '../services/reportingDetails';
 import './sales-report.css';
 
@@ -14,7 +14,10 @@ type Option = { value: string; label: string };
 
 export default function SalesReport() {
   const { selectedBranch } = useBusiness();
+  const today = cairoToday();
   const [period, setPeriod] = useState<PeriodKey>('today');
+  const [customFrom, setCustomFrom] = useState(today);
+  const [customTo, setCustomTo] = useState(today);
   const [channel, setChannel] = useState<SalesChannel>('all');
   const [cashierId, setCashierId] = useState('');
   const [paymentCode, setPaymentCode] = useState('');
@@ -25,22 +28,33 @@ export default function SalesReport() {
   const [cashierOptions, setCashierOptions] = useState<Option[]>([]);
   const [paymentOptions, setPaymentOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const limit = 50;
 
-  const filters = useMemo(() => selectedBranch ? {
+  const customRange = useMemo(() => {
+    if (period !== 'custom') return null;
+    try { return makeCairoCustomRange(customFrom, customTo); } catch { return null; }
+  }, [period, customFrom, customTo]);
+
+  const filters = useMemo(() => selectedBranch && (period !== 'custom' || customRange) ? {
     branchId: selectedBranch.branch_id,
     period,
+    from: customRange?.from,
+    to: customRange?.to,
     channel,
     cashierId: cashierId || null,
     paymentCode: paymentCode || null,
     search,
     limit,
     offset,
-  } : null, [selectedBranch, period, channel, cashierId, paymentCode, search, offset]);
+  } : null, [selectedBranch, period, customRange, channel, cashierId, paymentCode, search, offset]);
 
   async function load() {
-    if (!filters) return;
+    if (!filters) {
+      if (period === 'custom') setError('اختر نطاق تاريخ صحيح.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -66,7 +80,7 @@ export default function SalesReport() {
 
   useEffect(() => {
     setOffset(0);
-  }, [period, channel, cashierId, paymentCode, search, selectedBranch?.branch_id]);
+  }, [period, customFrom, customTo, channel, cashierId, paymentCode, search, selectedBranch?.branch_id]);
 
   const summary = record(data?.summary);
   const pagination = record(data?.pagination);
@@ -81,12 +95,15 @@ export default function SalesReport() {
     if (next === 'online') setCashierId('');
   }
 
-  function submitSearch(event: React.FormEvent) {
+  function submitSearch(event: FormEvent) {
     event.preventDefault();
     setSearch(searchDraft.trim());
   }
 
   function clearFilters() {
+    setPeriod('today');
+    setCustomFrom(today);
+    setCustomTo(today);
     setChannel('all');
     setCashierId('');
     setPaymentCode('');
@@ -95,31 +112,40 @@ export default function SalesReport() {
     setOffset(0);
   }
 
-  function exportCsv() {
-    if (!transactionRows.length) return;
-    const headers = ['المرجع', 'القناة', 'الكاشير/العميل', 'وسيلة الدفع', 'الإجمالي', 'الخصومات', 'المرتجعات', 'الصافي', 'عدد الأصناف', 'التاريخ'];
-    const csvRows = transactionRows.map((row) => [
-      text(row.document_number),
-      channelLabel(row.channel),
-      text(row.cashier_name ?? row.customer_name),
-      text(row.payment_name),
-      decimal(row.gross_amount),
-      decimal(numeric(row.product_discount) + numeric(row.loyalty_discount)),
-      decimal(row.refunds),
-      decimal(row.net_sale),
-      numeric(row.item_count),
-      text(row.occurred_at),
-    ]);
-    const csv = [headers, ...csvRows].map((row) => row.map(csvCell).join(',')).join('\n');
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `elmadawy-sales-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
+  async function exportCsv() {
+    if (!filters || total <= 0 || exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const exportRows = await fetchAllAdvancedSalesRows({ ...filters, offset: 0 });
+      const headers = ['المرجع', 'القناة', 'الكاشير/العميل', 'وسيلة الدفع', 'الإجمالي', 'الخصومات', 'المرتجعات', 'الصافي', 'عدد الأصناف', 'التاريخ'];
+      const csvRows = exportRows.map((row) => [
+        text(row.document_number),
+        channelLabel(row.channel),
+        text(row.cashier_name ?? row.customer_name),
+        text(row.payment_name),
+        decimal(row.gross_amount),
+        decimal(numeric(row.product_discount) + numeric(row.loyalty_discount)),
+        decimal(row.refunds),
+        decimal(row.net_sale),
+        numeric(row.item_count),
+        text(row.occurred_at),
+      ]);
+      const csv = [headers, ...csvRows].map((row) => row.map(csvCell).join(',')).join('\n');
+      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `elmadawy-sales-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'تعذر تصدير التقرير.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   return <div className="stack-lg sales-report-page">
@@ -129,15 +155,20 @@ export default function SalesReport() {
         <span className="report-card__icon"><ShoppingCart size={22}/></span>
         <div><span className="eyebrow">Reporting V2 · Sales Deep Dive</span><h2>تقرير المبيعات المتقدم</h2><p>تحليل POS والأونلاين والكاشير ووسائل الدفع من نفس محرك التقارير.</p></div>
       </div>
-      <PeriodSwitcher period={period} onChange={setPeriod}/>
+      <div className="sales-period-control"><PeriodSwitcher period={period} onChange={setPeriod}/><button type="button" className={period === 'custom' ? 'custom-period-button active' : 'custom-period-button'} onClick={() => setPeriod('custom')}><CalendarDays size={16}/> مخصص</button></div>
     </section>
+
+    {period === 'custom' && <section className="section-card custom-date-panel">
+      <div><span className="eyebrow">Custom Range</span><h3>فترة مخصصة</h3><p>يتم احتساب الأيام بتوقيت القاهرة ويشمل تاريخ النهاية كاملًا.</p></div>
+      <div className="custom-date-inputs"><label><span>من</span><input type="date" value={customFrom} max={customTo} onChange={(event) => setCustomFrom(event.target.value)}/></label><label><span>إلى</span><input type="date" value={customTo} min={customFrom} onChange={(event) => setCustomTo(event.target.value)}/></label></div>
+    </section>}
 
     <section className="section-card sales-report-toolbar">
       <div className="section-heading">
         <div><span className="eyebrow">Global Filters</span><h3><Filter size={18}/> تصفية التقرير</h3></div>
         <div className="report-actions">
           <button className="secondary-button" type="button" onClick={() => window.print()}><Printer size={16}/> طباعة / PDF</button>
-          <button className="secondary-button" type="button" disabled={!transactionRows.length} onClick={exportCsv}><Download size={16}/> CSV</button>
+          <button className="secondary-button" type="button" disabled={total <= 0 || exporting} onClick={() => void exportCsv()}><Download size={16}/> {exporting ? 'جاري التصدير…' : `CSV (${number(total)})`}</button>
         </div>
       </div>
 
@@ -153,7 +184,7 @@ export default function SalesReport() {
         </select></label>
         <form className="sales-search" onSubmit={submitSearch}><label><span>بحث</span><div><Search size={16}/><input value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="فاتورة، عميل، هاتف، كاشير…"/><button type="submit">بحث</button></div></label></form>
       </div>
-      <div className="filter-summary"><span>{selectedBranch?.branch_name}</span><span>{channel === 'all' ? 'كل القنوات' : channel === 'pos' ? 'POS' : 'Online'}</span>{search && <span>بحث: {search}</span>}<button type="button" onClick={clearFilters}>مسح الفلاتر</button></div>
+      <div className="filter-summary"><span>{selectedBranch?.branch_name}</span><span>{periodLabel(period, customFrom, customTo)}</span><span>{channel === 'all' ? 'كل القنوات' : channel === 'pos' ? 'POS' : 'Online'}</span>{search && <span>بحث: {search}</span>}<button type="button" onClick={clearFilters}>مسح الفلاتر</button></div>
     </section>
 
     {error && <section className="engine-banner"><div><strong>تعذر تحميل تقرير المبيعات</strong><p>{error}</p></div><button className="secondary-button" onClick={() => void load()}><RefreshCcw size={17}/> إعادة المحاولة</button></section>}
@@ -221,4 +252,16 @@ function mergeOptions(current: Option[], incoming: Option[]) {
 function csvCell(value: unknown) {
   const string = String(value ?? '');
   return `"${string.replace(/"/g, '""')}"`;
+}
+
+function cairoToday() {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function periodLabel(period: PeriodKey, from: string, to: string) {
+  if (period === 'custom') return `${from} ← ${to}`;
+  const labels: Record<PeriodKey, string> = { today: 'اليوم', yesterday: 'أمس', week: 'الأسبوع', month: 'الشهر', custom: 'مخصص' };
+  return labels[period];
 }
