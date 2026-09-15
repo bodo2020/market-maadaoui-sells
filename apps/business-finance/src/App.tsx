@@ -14,8 +14,11 @@ import ManagementReport from './pages/ManagementReport';
 import More from './pages/More';
 import Notifications from './pages/Notifications';
 import OperationsReport from './pages/OperationsReport';
+import PeakHoursReport from './pages/PeakHoursReport';
 import Reports from './pages/Reports';
 import SalesReport from './pages/SalesReport';
+import WasteReport from './pages/WasteReport';
+import WorkforceCostsReport from './pages/WorkforceCostsReport';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -68,6 +71,9 @@ function BusinessAccessGate() {
     <Route path="/reports/costs" element={canViewReports ? <ManagementReport kind="costs"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/transfers" element={canViewReports ? <ManagementReport kind="transfers"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/insights" element={canViewReports ? <ManagementReport kind="insights"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/workforce-costs" element={canViewReports ? <WorkforceCostsReport/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/waste" element={canViewReports ? <WasteReport/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/peak-hours" element={canViewReports ? <PeakHoursReport/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/*" element={<Navigate to="/reports" replace/>}/>
     <Route path="/finance" element={canViewFinance ? <Finance/> : <Navigate to="/" replace/>}/>
     <Route path="/notifications" element={<Notifications/>}/>
