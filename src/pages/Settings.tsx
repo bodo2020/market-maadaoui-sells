@@ -1,6 +1,6 @@
 import MainLayout from "@/components/layout/MainLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Store, Users, PackageOpen, CreditCard, Truck, Receipt, FileText, Settings as SettingsIcon, MonitorSmartphone, KeyRound, Banknote, Clock3, Activity } from "lucide-react";
+import { Store, Users, PackageOpen, CreditCard, Truck, Receipt, FileText, Settings as SettingsIcon, MonitorSmartphone, KeyRound, Banknote, Clock3, Activity, Bot } from "lucide-react";
 import StoreSettings from "@/components/settings/StoreSettings";
 import UsersManagement from "@/components/settings/UsersManagement";
 import ExpenseSettings from "@/components/settings/ExpenseSettings";
@@ -11,6 +11,7 @@ import PosStaffAccessSettings from "@/components/settings/PosStaffAccessSettings
 import PosShiftManagement from "@/components/settings/PosShiftManagement";
 import PosHealthSettings from "@/components/settings/PosHealthSettings";
 import OnlineMoneySettings from "@/components/settings/OnlineMoneySettings";
+import AiAutomationSettings from "@/components/settings/AiAutomationSettings";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/types";
 import { currentStaffHasPermission } from "@/services/supabase/staffAuthService";
@@ -38,6 +39,7 @@ export default function Settings() {
     ...(canManagePosShifts ? [{ id: "pos-shifts", label: "ورديات POS", icon: <Clock3 className="ml-2 h-4 w-4" />, component: <PosShiftManagement /> }] : []),
     ...(canViewPosHealth ? [{ id: "pos-health", label: "صحة POS", icon: <Activity className="ml-2 h-4 w-4" />, component: <PosHealthSettings /> }] : []),
     ...(canViewOnlineMoney ? [{ id: "online-money", label: "تسويات الأونلاين", icon: <Banknote className="ml-2 h-4 w-4" />, component: <OnlineMoneySettings /> }] : []),
+    ...(user?.role === UserRole.SUPER_ADMIN ? [{ id: "ai", label: "AI والأتمتة", icon: <Bot className="ml-2 h-4 w-4" />, component: <AiAutomationSettings /> }] : []),
     { id: "products", label: "المنتجات", icon: <PackageOpen className="ml-2 h-4 w-4" />, component: <div className="text-center py-12 text-muted-foreground">إعدادات المنتجات ستكون متاحة قريباً</div> },
     { id: "payment", label: "الدفع", icon: <CreditCard className="ml-2 h-4 w-4" />, component: <PaymentSettings /> },
     { id: "shipping", label: "الشحن", icon: <Truck className="ml-2 h-4 w-4" />, component: <div className="text-center py-12 text-muted-foreground">إعدادات الشحن ستكون متاحة قريباً</div> },

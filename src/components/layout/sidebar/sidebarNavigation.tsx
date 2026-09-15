@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, ShoppingBag, Receipt, Package, Grid3X3, Building2, Warehouse, ClipboardList, Truck, Users,
   UserCheck, UserRound, Wallet, WalletCards, MapPin, FolderOpen, Tag, DollarSign, FileText, RefreshCw, Settings, QrCode,
-  Calendar, CalendarCheck2, FileSpreadsheet, ArrowLeftRight, BellRing, ShieldCheck, Network, Clock3, Banknote, KeyRound, Vault, Landmark,
+  Calendar, CalendarCheck2, FileSpreadsheet, ArrowLeftRight, BellRing, ShieldCheck, Network, Clock3, Banknote, KeyRound, Vault, Landmark, Bot,
 } from "lucide-react";
 import { NavigationGroup } from "./types";
 
@@ -80,6 +80,7 @@ export const reportsNavigation: NavigationGroup = {
   title: "التقارير والتحليلات",
   items: [
     { label: "مركز التقارير", href: "/reports", icon: LayoutDashboard },
+    { label: "مختبر Elmadawy AI", href: "/ai-sandbox", icon: Bot, adminOnly: true },
   ],
 };
 
