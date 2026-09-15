@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowUpLeft, BadgeDollarSign, Banknote, Building2, CreditCard, Landmark, RefreshCcw, UsersRound, WalletCards } from 'lucide-react';
+import { ArrowDownRight, ArrowUpLeft, BadgeDollarSign, Banknote, Building2, CreditCard, Landmark, ReceiptText, RefreshCcw, UsersRound, WalletCards } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { money, number } from '../components/MetricCard';
 import PeriodSwitcher from '../components/PeriodSwitcher';
@@ -76,6 +76,7 @@ export default function Finance() {
     <section className="section-card">
       <div className="section-heading"><div><span className="eyebrow">Finance Actions</span><h3>إدارة الالتزامات والمدفوعات</h3></div></div>
       <div className="more-list">
+        <Link className="more-item" to="/finance/expenses"><span className="more-item__icon"><ReceiptText size={20}/></span><div><strong>المصروفات والصرف</strong><small>طلب واعتماد وصرف المصروفات من الخزنة أو البنك مع دفعات جزئية وأثر مالي قابل للمراجعة.</small></div><ArrowUpLeft size={17}/></Link>
         <Link className="more-item" to="/payroll"><span className="more-item__icon"><UsersRound size={20}/></span><div><strong>المرتبات</strong><small>راجع الحضور والخصومات والحوافز ثم اعتمد وادفع المسير من خزنة أو بنك.</small></div><ArrowUpLeft size={17}/></Link>
         <Link className="more-item" to="/finance/debts"><span className="more-item__icon"><BadgeDollarSign size={20}/></span><div><strong>المديونيات</strong><small>مديونيات العملاء والموظفين ومستحقات الموردين في شاشة موحدة.</small></div><ArrowUpLeft size={17}/></Link>
       </div>
