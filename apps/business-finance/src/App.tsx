@@ -10,8 +10,12 @@ import Dashboard from './pages/Dashboard';
 import DecisionCenter from './pages/DecisionCenter';
 import DebtsPage from './pages/DebtsPage';
 import DebtsReport from './pages/DebtsReport';
+import EmployeeAdvancesPage from './pages/EmployeeAdvancesPage';
+import ExpenseBudgetsPage from './pages/ExpenseBudgetsPage';
 import ExpenseCategoriesPage from './pages/ExpenseCategoriesPage';
+import ExpenseInsightsPage from './pages/ExpenseInsightsPage';
 import ExpensesPage from './pages/ExpensesPage';
+import RecurringExpensesPage from './pages/RecurringExpensesPage';
 import Finance from './pages/Finance';
 import FinancialReport from './pages/FinancialReport';
 import Login from './pages/Login';
@@ -60,7 +64,7 @@ function BusinessAccessGate() {
 
   const canViewReports = selectedBranch?.permissions.includes('reports.view') === true;
   const canViewFinance = selectedBranch?.permissions.some((permission) => permission === 'finance.view' || permission === 'finance.manage') === true;
-  const canViewExpenses = selectedBranch?.permissions.some((permission) => ['expense.view','expense.request','expense.approve','expense.pay','finance.view','finance.manage'].includes(permission)) === true;
+  const canViewExpenses = selectedBranch?.permissions.some((permission) => ['expense.view','expense.request','expense.approve','expense.pay','expense.manage_budgets','expense.manage_recurring','expense.manage_advances','finance.view','finance.manage'].includes(permission)) === true;
   const canManageExpensePolicies = selectedBranch?.permissions.some((permission) => permission === 'expense.manage_categories' || permission === 'finance.manage') === true;
   const canViewPayroll = selectedBranch?.permissions.some((permission) => ['finance.view','finance.manage','hr.view','hr.payroll.view','hr.payroll.manage','hr.manage_employees','hr.admin'].includes(permission)) === true;
 
@@ -90,6 +94,10 @@ function BusinessAccessGate() {
     <Route path="/finance/debts" element={canViewFinance ? <DebtsPage/> : <Navigate to="/finance" replace/>}/>
     <Route path="/finance/expenses" element={canViewExpenses ? <ExpensesPage/> : <Navigate to="/finance" replace/>}/>
     <Route path="/finance/expenses/categories" element={canManageExpensePolicies ? <ExpenseCategoriesPage/> : <Navigate to="/finance/expenses" replace/>}/>
+    <Route path="/finance/expenses/budgets" element={canViewExpenses ? <ExpenseBudgetsPage/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/finance/expenses/recurring" element={canViewExpenses ? <RecurringExpensesPage/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/finance/expenses/advances" element={canViewExpenses ? <EmployeeAdvancesPage/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/finance/expenses/insights" element={canViewExpenses ? <ExpenseInsightsPage/> : <Navigate to="/finance" replace/>}/>
     <Route path="/payroll" element={canViewPayroll ? <PayrollDesk/> : <Navigate to="/finance" replace/>}/>
     <Route path="/notifications" element={<Notifications/>}/>
     <Route path="/more" element={<More/>}/>
