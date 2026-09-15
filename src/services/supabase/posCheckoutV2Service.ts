@@ -33,7 +33,7 @@ type PendingModernSale = {
 type RpcResult = { data: unknown; error: { message?: string; code?: string } | null };
 
 function key(userId: string, branchId: string, checkoutId: string) {
-  return `pos-sale-v4-request:${userId}:${branchId}:${checkoutId}`;
+  return `pos-sale-v5-request:${userId}:${branchId}:${checkoutId}`;
 }
 
 function friendly(message?: string) {
@@ -59,6 +59,12 @@ function friendly(message?: string) {
   if (value.includes("REQUEST_CONFLICT")) return "فيه محاولة بيع سابقة مختلفة لنفس السلة. راجع الفاتورة السابقة قبل إعادة المحاولة.";
   if (value.includes("BRANCH_ACCESS_DENIED")) return "ليس لديك صلاحية تنفيذ بيع على الفرع الحالي.";
   if (value.includes("INVALID_PAYMENT_SPLIT")) return "مجموع أجزاء الدفع لازم يساوي المبلغ المطلوب قبل الرسوم بالضبط.";
+  if (value.includes("CUSTOMER_REQUIRED_FOR_CREDIT")) return "امسح باركود العميل المعتمد قبل اختيار آجل العميل.";
+  if (value.includes("CUSTOMER_ONLINE_ACCOUNT_REQUIRED")) return "الآجل متاح فقط لعميل مسجل أونلاين ومربوط بحسابه.";
+  if (value.includes("CUSTOMER_CREDIT_INACTIVE")) return "الآجل غير مفعّل لهذا العميل في الفرع الحالي.";
+  if (value.includes("CUSTOMER_CREDIT_LIMIT_EXCEEDED")) return "المبلغ يتجاوز الآجل المتاح للعميل.";
+  if (value.includes("CUSTOMER_CREDIT_MUST_BE_FULL_PAYMENT")) return "آجل العميل لازم يغطي المبلغ المتبقي كاملًا، ولا يمكن خلطه مع وسيلة دفع أخرى حاليًا.";
+  if (value.includes("BUYER_IDENTITY_CONFLICT")) return "لا يمكن ربط عميل وموظف بنفس الفاتورة عند استخدام الآجل.";
   if (value.includes("EMPLOYEE_REQUIRED_FOR_CREDIT")) return "اسكن بطاقة الموظف قبل اختيار الآجل.";
   if (value.includes("EMPLOYEE_CREDIT_MUST_BE_FULL_PAYMENT")) return "الآجل للموظف في النسخة الحالية لازم يغطي الفاتورة كاملة، ومينفعش يتخلط مع وسيلة دفع أخرى.";
   if (value.includes("EMPLOYEE_NOT_FOUND")) return "بطاقة الموظف غير معروفة أو الحساب غير نشط.";
@@ -160,7 +166,7 @@ export async function submitModernPosSale(
   }
   try { localStorage.setItem(storageKey, JSON.stringify(pending)); } catch { /* noop */ }
 
-  const call = async () => await (supabase.rpc as any)("create_pos_sale_v4", {
+  const call = async () => await (supabase.rpc as any)("create_pos_sale_v5", {
     p_request_id: pending.requestId,
     p_branch_id: branchId,
     p_sale: pending.payload,
