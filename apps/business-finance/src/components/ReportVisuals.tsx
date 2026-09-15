@@ -188,12 +188,18 @@ export function ReportVisuals({ reportKey, data }: { reportKey: ReportKey; data:
   const summary = asRecord(data.summary);
 
   if (reportKey === 'sales') {
+    const hourly = records(data.hourly).map((row) => ({ label: hourLabel(row.hour), value: num(row.net_sales) }));
+    const paymentMethods = records(data.payment_methods).map((row) => ({ label: text(row.name, 'وسيلة دفع'), value: num(row.sales) }));
     const cashiers = records(data.cashiers).map((row) => ({ label: text(row.cashier_name, 'كاشير'), value: num(row.net_sales) }));
-    return <VisualGrid><RankedBarChart eyebrow="Sales Ranking" title="ترتيب الكاشير حسب صافي المبيعات" items={cashiers}/></VisualGrid>;
+    return <VisualGrid>
+      <TrendAreaChart eyebrow="Peak Hours" title="المبيعات حسب الساعة" points={hourly} valueLabel="صافي المبيعات"/>
+      <DonutChart eyebrow="Payment Mix" title="توزيع المبيعات حسب وسيلة الدفع" segments={paymentMethods}/>
+      <RankedBarChart eyebrow="Sales Ranking" title="ترتيب الكاشير حسب صافي المبيعات" items={cashiers}/>
+    </VisualGrid>;
   }
 
   if (reportKey === 'profitability') {
-    const daily = records(data.daily).map((row) => ({ label: text(row.date), value: num(row.net_sales), secondary: num(row.gross_profit) }));
+    const daily = records(data.daily).map((row) => ({ label: dateLabel(row.date), value: num(row.net_sales), secondary: num(row.gross_profit) }));
     const waterfall = records(data.waterfall).map((row) => ({ label: text(row.label ?? row.key), value: num(row.value) }));
     return <VisualGrid>
       <TrendAreaChart eyebrow="Profit Trend" title="اتجاه المبيعات والربح" points={daily} valueLabel="صافي المبيعات" secondaryLabel="إجمالي الربح"/>
@@ -212,19 +218,25 @@ export function ReportVisuals({ reportKey, data }: { reportKey: ReportKey; data:
 
   if (reportKey === 'inventory') {
     const categories = records(data.categories).map((row) => ({ label: text(row.category_name), value: num(row.purchase_value) }));
+    const total = num(summary.inventory_rows);
+    const low = num(summary.low_stock_rows);
+    const out = num(summary.out_of_stock_rows);
+    const healthy = Math.max(0, total - low - out);
     return <VisualGrid>
       <RankedBarChart eyebrow="Inventory Value" title="قيمة المخزون حسب القسم" items={categories}/>
       <DonutChart eyebrow="Stock Health" title="حالة توافر المخزون" centerLabel="الأصناف" formatValue={(value) => number(value)} segments={[
-        { label: 'متاح', value: Math.max(0, num(summary.total_rows) - num(summary.low_stock_rows) - num(summary.out_of_stock_rows)) },
-        { label: 'منخفض', value: num(summary.low_stock_rows) },
-        { label: 'نافد', value: num(summary.out_of_stock_rows) },
+        { label: 'طبيعي', value: healthy },
+        { label: 'منخفض', value: low },
+        { label: 'نافد', value: out },
       ]}/>
     </VisualGrid>;
   }
 
   if (reportKey === 'payments') {
     const methods = records(data.methods);
+    const daily = records(data.daily).map((row) => ({ label: dateLabel(row.date), value: num(row.gross_collected), secondary: num(row.net_movement) }));
     return <VisualGrid>
+      <TrendAreaChart eyebrow="Collection Trend" title="اتجاه التحصيل وصافي الحركة" points={daily} valueLabel="إجمالي التحصيل" secondaryLabel="صافي الحركة"/>
       <DonutChart eyebrow="Collection Mix" title="توزيع التحصيل حسب وسيلة الدفع" segments={methods.map((row) => ({ label: text(row.name), value: num(row.gross_collected) }))}/>
       <RankedBarChart eyebrow="Payment Fees" title="تكلفة رسوم وسائل الدفع" items={methods.map((row) => ({ label: text(row.name), value: num(row.merchant_fees) }))}/>
     </VisualGrid>;
@@ -239,18 +251,26 @@ export function ReportVisuals({ reportKey, data }: { reportKey: ReportKey; data:
   }
 
   if (reportKey === 'cashiers') {
-    const cashiers = records(data.cashiers).map((row) => ({ label: text(row.cashier_name), value: num(row.net_sales) }));
-    return <VisualGrid><RankedBarChart eyebrow="Cashier Performance" title="مقارنة صافي مبيعات الكاشير" items={cashiers}/></VisualGrid>;
+    const cashiers = records(data.cashiers);
+    return <VisualGrid>
+      <RankedBarChart eyebrow="Cashier Sales" title="مقارنة صافي مبيعات الكاشير" items={cashiers.map((row) => ({ label: text(row.cashier_name), value: num(row.net_sales) }))}/>
+      <RankedBarChart eyebrow="Sales Per Hour" title="الإنتاجية حسب ساعة العمل" items={cashiers.map((row) => ({ label: text(row.cashier_name), value: num(row.sales_per_hour) }))}/>
+    </VisualGrid>;
   }
 
   if (reportKey === 'branches') {
-    const branches = records(data.branches).map((row) => ({ label: text(row.branch_name), value: num(asRecord(row.current).net_sales) }));
-    return <VisualGrid><RankedBarChart eyebrow="Branch Ranking" title="ترتيب الفروع حسب صافي المبيعات" items={branches}/></VisualGrid>;
+    const branches = records(data.branches);
+    return <VisualGrid>
+      <RankedBarChart eyebrow="Branch Ranking" title="ترتيب الفروع حسب صافي المبيعات" items={branches.map((row) => ({ label: text(row.branch_name), value: num(asRecord(row.current).net_sales) }))}/>
+      <RankedBarChart eyebrow="Operating Result" title="النتيجة التشغيلية المعروفة حسب الفرع" items={branches.map((row) => ({ label: text(row.branch_name), value: num(asRecord(row.current).known_operating_result) }))}/>
+    </VisualGrid>;
   }
 
   if (reportKey === 'online') {
     const statuses = records(data.statuses);
+    const daily = records(data.daily).map((row) => ({ label: dateLabel(row.day), value: num(row.order_value) }));
     return <VisualGrid>
+      <TrendAreaChart eyebrow="Online Trend" title="اتجاه قيمة الطلبات اليومية" points={daily} valueLabel="قيمة الطلبات"/>
       <DonutChart eyebrow="Order Mix" title="توزيع الطلبات حسب الحالة" centerLabel="الطلبات" formatValue={(value) => number(value)} segments={statuses.map((row) => ({ label: statusLabel(row.status), value: num(row.orders) }))}/>
       <RankedBarChart eyebrow="Order Value" title="قيمة الطلبات حسب الحالة" items={statuses.map((row) => ({ label: statusLabel(row.status), value: num(row.order_value) }))}/>
     </VisualGrid>;
@@ -262,6 +282,10 @@ export function ReportVisuals({ reportKey, data }: { reportKey: ReportKey; data:
       <DonutChart eyebrow="Customer Mix" title="عملاء جدد مقابل عائدين" centerLabel="العملاء" formatValue={(value) => number(value)} segments={[
         { label: 'جدد', value: num(summary.new_realized_customers) },
         { label: 'عائدون', value: num(summary.returning_realized_customers) },
+      ]}/>
+      <DonutChart eyebrow="Identity Coverage" title="تغطية ربط المبيعات بهوية العميل" centerLabel="العمليات" formatValue={(value) => number(value)} segments={[
+        { label: 'مرتبط بعميل', value: num(summary.pos_linked_transactions) + num(summary.online_linked_orders) },
+        { label: 'بدون هوية', value: num(summary.pos_anonymous_transactions) + num(summary.online_anonymous_orders) },
       ]}/>
       <RankedBarChart eyebrow="Customer Value" title="أعلى العملاء قيمة خلال الفترة" items={customers}/>
     </VisualGrid>;
@@ -337,9 +361,22 @@ function shortLabel(value: string, max = 11) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
+function hourLabel(value: unknown) {
+  const hour = Number(value);
+  return Number.isFinite(hour) ? `${String(hour).padStart(2, '0')}:00` : text(value);
+}
+
+function dateLabel(value: unknown) {
+  if (!value) return '—';
+  const raw = String(value);
+  const date = new Date(raw.includes('T') ? raw : `${raw}T12:00:00Z`);
+  if (Number.isNaN(date.getTime())) return raw;
+  return new Intl.DateTimeFormat('ar-EG', { day: 'numeric', month: 'short' }).format(date);
+}
+
 function statusLabel(value: unknown) {
   const labels: Record<string, string> = {
-    open: 'مفتوح', pending: 'معلق', processing: 'قيد التنفيذ', ready: 'جاهز', out_for_delivery: 'خرج للتوصيل', delivered: 'تم التسليم', cancelled: 'ملغي', failed: 'فشل', refunded: 'مردود', paid: 'مدفوع',
+    open: 'مفتوح', waiting: 'في الانتظار', pending: 'معلق', processing: 'قيد التنفيذ', preparing: 'قيد التجهيز', ready: 'جاهز', out_for_delivery: 'خرج للتوصيل', delivered: 'تم التسليم', cancelled: 'ملغي', failed: 'فشل', refunded: 'مردود', paid: 'مدفوع',
   };
   return labels[String(value || '')] || text(value);
 }
