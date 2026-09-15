@@ -6,6 +6,76 @@
   align-items: flex-start;
 }
 
+.sales-period-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.custom-period-button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #dfe5e1;
+  border-radius: 11px;
+  background: #fff;
+  color: #667085;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.custom-period-button.active {
+  border-color: rgba(0, 89, 49, .2);
+  background: rgba(0, 89, 49, .08);
+  color: #005931;
+  font-weight: 700;
+}
+
+.custom-date-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.custom-date-panel h3 {
+  margin: 3px 0;
+}
+
+.custom-date-panel p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+}
+
+.custom-date-inputs {
+  display: flex;
+  gap: 10px;
+}
+
+.custom-date-inputs label {
+  display: grid;
+  gap: 6px;
+  color: #667085;
+  font-size: 11px;
+}
+
+.custom-date-inputs input {
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid #dfe5e1;
+  border-radius: 11px;
+  background: #fff;
+  color: #1d2939;
+  font: inherit;
+}
+
 .sales-report-toolbar {
   display: grid;
   gap: 18px;
@@ -189,8 +259,25 @@
 }
 
 @media (max-width: 620px) {
-  .sales-report-head {
+  .sales-report-head,
+  .custom-date-panel {
     gap: 14px;
+  }
+
+  .custom-date-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .custom-date-inputs,
+  .custom-date-inputs label,
+  .custom-date-inputs input {
+    width: 100%;
+  }
+
+  .sales-period-control {
+    justify-content: flex-start;
+    width: 100%;
   }
 
   .sales-filter-grid {
@@ -230,6 +317,8 @@
   .bottom-nav,
   .sales-report-toolbar,
   .period-switcher,
+  .custom-period-button,
+  .custom-date-panel,
   .back-button,
   .sales-pagination {
     display: none !important;
