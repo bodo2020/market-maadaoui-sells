@@ -115,6 +115,8 @@ export type PosReturnPreview = {
   employee_points_earned?: number;
   returned_employee_credit?: number;
   remaining_employee_credit?: number;
+  paid_base_amount?: number;
+  partial_credit_sale?: boolean;
   lines: PosReturnPreviewLine[];
 };
 
@@ -176,7 +178,7 @@ const rpc = supabase.rpc.bind(supabase) as unknown as (
 ) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
 
 function pendingKey(userId: string, branchId: string, saleId: string) {
-  return `pos-return-v5-request:${userId}:${branchId}:${saleId}`;
+  return `pos-return-v6-request:${userId}:${branchId}:${saleId}`;
 }
 
 function sleep(ms: number) {
@@ -193,6 +195,7 @@ function friendlyReturnError(message?: string) {
     const [, product, available] = value.split("|");
     return `${product || "المنتج"}: الكمية المتاحة للإرجاع حاليًا ${available || "0"}.`;
   }
+  if (value.includes("PARTIAL_CREDIT_RETURN_REQUIRES_FINANCE")) return "الفاتورة مدفوعة جزء وآجل جزء. المرتجع عليها متوقف من الكاشير مؤقتًا لحماية المديونية من التعويض المزدوج؛ نفّذ تسوية مالية من الإدارة.";
   if (value.includes("POS_SALE_NOT_FOUND")) return "الفاتورة غير متاحة كفاتورة POS قابلة للإرجاع.";
   if (value.includes("REFUND_PERMISSION_DENIED")) return "ليس لديك صلاحية تنفيذ مرتجع على هذا الفرع.";
   if (value.includes("POS_SHIFT_REQUIRED")) return "لازم تكون وردية الكاشير مفتوحة على نفس الجهاز لتنفيذ المرتجع.";
@@ -220,7 +223,7 @@ function deterministic(error?: { code?: string; message?: string } | null) {
 }
 
 export async function getPosSaleReturnPreview(saleId: string): Promise<PosReturnPreview> {
-  const { data, error } = await rpc("get_pos_sale_return_preview_v5", { p_sale_id: saleId });
+  const { data, error } = await rpc("get_pos_sale_return_preview_v6", { p_sale_id: saleId });
   if (error) throw new Error(friendlyReturnError(error.message) || error.message || "تعذر تحميل بيانات المرتجع");
   if (!data || typeof data !== "object") throw new Error("لم تصل بيانات الفاتورة للمرتجع.");
   return data as PosReturnPreview;
@@ -251,6 +254,10 @@ export async function submitPosQuickReturn(
 
   const device = getLocalPosDevice(preview.branch_id);
   if (!device) throw new Error("هذا المتصفح غير مسجل كجهاز POS للفرع الحالي.");
+
+  if (preview.partial_credit_sale) {
+    throw new Error("الفاتورة مدفوعة جزء وآجل جزء. المرتجع عليها متوقف من الكاشير مؤقتًا لحماية المديونية من التعويض المزدوج؛ نفّذ تسوية مالية من الإدارة.");
+  }
 
   const cleanReason = reason.trim();
   if (cleanReason.length < 3) throw new Error("اكتب سبب المرتجع بوضوح.");
@@ -289,10 +296,10 @@ export async function submitPosQuickReturn(
     p_reason: cleanReason,
   };
 
-  let result = await rpc("create_pos_sale_return_v5", args);
+  let result = await rpc("create_pos_sale_return_v6", args);
   if (result.error && !deterministic(result.error) && (typeof navigator === "undefined" || navigator.onLine)) {
     await sleep(350);
-    result = await rpc("create_pos_sale_return_v5", args);
+    result = await rpc("create_pos_sale_return_v6", args);
   }
 
   if (result.error) {
