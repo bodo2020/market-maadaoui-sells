@@ -7,6 +7,7 @@ import AppShell from './components/AppShell';
 import { BusinessProvider, useBusiness } from './context/BusinessContext';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
 import Dashboard from './pages/Dashboard';
+import DecisionCenter from './pages/DecisionCenter';
 import Finance from './pages/Finance';
 import FinancialReport from './pages/FinancialReport';
 import Login from './pages/Login';
@@ -58,6 +59,7 @@ function BusinessAccessGate() {
   return <AppShell><Routes>
     <Route path="/" element={canViewReports ? <Dashboard/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports" element={canViewReports ? <Reports/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/decision-center" element={canViewReports ? <DecisionCenter/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/sales" element={canViewReports ? <SalesReport/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/profitability" element={canViewReports ? <FinancialReport kind="profitability"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/payments" element={canViewReports ? <FinancialReport kind="payments"/> : <Navigate to="/finance" replace/>}/>
