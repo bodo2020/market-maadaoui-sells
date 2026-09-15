@@ -8,6 +8,8 @@ import { BusinessProvider, useBusiness } from './context/BusinessContext';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
 import Dashboard from './pages/Dashboard';
 import DecisionCenter from './pages/DecisionCenter';
+import DebtsPage from './pages/DebtsPage';
+import DebtsReport from './pages/DebtsReport';
 import Finance from './pages/Finance';
 import FinancialReport from './pages/FinancialReport';
 import Login from './pages/Login';
@@ -15,6 +17,7 @@ import ManagementReport from './pages/ManagementReport';
 import More from './pages/More';
 import Notifications from './pages/Notifications';
 import OperationsReport from './pages/OperationsReport';
+import PayrollDesk from './pages/PayrollDesk';
 import PeakHoursReport from './pages/PeakHoursReport';
 import Reports from './pages/Reports';
 import SalesReport from './pages/SalesReport';
@@ -55,6 +58,7 @@ function BusinessAccessGate() {
 
   const canViewReports = selectedBranch?.permissions.includes('reports.view') === true;
   const canViewFinance = selectedBranch?.permissions.some((permission) => permission === 'finance.view' || permission === 'finance.manage') === true;
+  const canViewPayroll = selectedBranch?.permissions.some((permission) => ['finance.view','finance.manage','hr.view','hr.payroll.view','hr.payroll.manage','hr.manage_employees','hr.admin'].includes(permission)) === true;
 
   return <AppShell><Routes>
     <Route path="/" element={canViewReports ? <Dashboard/> : <Navigate to="/finance" replace/>}/>
@@ -76,8 +80,11 @@ function BusinessAccessGate() {
     <Route path="/reports/workforce-costs" element={canViewReports ? <WorkforceCostsReport/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/waste" element={canViewReports ? <WasteReport/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/peak-hours" element={canViewReports ? <PeakHoursReport/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/debts" element={canViewReports ? <DebtsReport/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/*" element={<Navigate to="/reports" replace/>}/>
     <Route path="/finance" element={canViewFinance ? <Finance/> : <Navigate to="/" replace/>}/>
+    <Route path="/finance/debts" element={canViewFinance ? <DebtsPage/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/payroll" element={canViewPayroll ? <PayrollDesk/> : <Navigate to="/finance" replace/>}/>
     <Route path="/notifications" element={<Notifications/>}/>
     <Route path="/more" element={<More/>}/>
     <Route path="*" element={<Navigate to="/" replace/>}/>
