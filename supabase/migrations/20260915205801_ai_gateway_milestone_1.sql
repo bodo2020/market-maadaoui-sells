@@ -97,17 +97,16 @@ drop policy if exists ai_usage_logs_owner_read on public.ai_usage_logs;
 create policy ai_usage_logs_owner_read on public.ai_usage_logs for select to authenticated using (user_id=auth.uid() and public.has_branch_access(auth.uid(),branch_id));
 
 create or replace function public.ai_assert_access_v1(p_branch_id uuid)
-returns boolean language sql stable security definer set search_path='' as $$
+returns boolean language sql stable security invoker set search_path='' as $$
   select auth.uid() is not null and public.has_branch_access(auth.uid(),p_branch_id) and (
-    private.staff_is_super_admin(auth.uid())
-    or public.staff_has_permission('reports.view',p_branch_id)
+    public.staff_has_permission('reports.view',p_branch_id)
     or public.staff_has_permission('products.view',p_branch_id)
     or public.staff_has_permission('inventory.view',p_branch_id)
     or public.staff_has_permission('online_orders.view',p_branch_id)
   );
 $$;
 
-create or replace function public.ai_catalog_search_v1(p_branch_id uuid,p_query text default null,p_only_offers boolean default false,p_limit integer default 8)
+create or replace function private.ai_catalog_search_impl_v1(p_branch_id uuid,p_query text default null,p_only_offers boolean default false,p_limit integer default 8)
 returns setof jsonb language plpgsql stable security definer set search_path='' as $$
 declare v_inventory_branch uuid; v_pricing_branch uuid;
 begin
@@ -131,17 +130,17 @@ begin
   limit greatest(1,least(coalesce(p_limit,8),30));
 end $$;
 
-create or replace function public.ai_get_order_status_v1(p_branch_id uuid,p_order_ref text)
+create or replace function private.ai_get_order_status_impl_v1(p_branch_id uuid,p_order_ref text)
 returns jsonb language plpgsql stable security definer set search_path='' as $$
 declare v_order public.online_orders%rowtype;
 begin
-  if not public.ai_assert_access_v1(p_branch_id) or not (private.staff_is_super_admin(auth.uid()) or public.staff_has_permission('online_orders.view',p_branch_id) or public.staff_has_permission('online_orders.manage',p_branch_id)) then raise exception using errcode='42501',message='ORDER_ACCESS_DENIED'; end if;
+  if not public.ai_assert_access_v1(p_branch_id) or not (public.staff_has_permission('online_orders.view',p_branch_id) or public.staff_has_permission('online_orders.manage',p_branch_id)) then raise exception using errcode='42501',message='ORDER_ACCESS_DENIED'; end if;
   select * into v_order from public.online_orders where branch_id=p_branch_id and (id::text=btrim(p_order_ref) or tracking_number=btrim(p_order_ref)) limit 1;
   if v_order.id is null then return jsonb_build_object('found',false); end if;
   return jsonb_build_object('found',true,'id',v_order.id,'tracking_number',v_order.tracking_number,'status',v_order.status,'payment_status',v_order.payment_status,'total',v_order.total,'created_at',v_order.created_at,'updated_at',v_order.updated_at);
 end $$;
 
-create or replace function public.ai_get_branch_info_v1(p_branch_id uuid)
+create or replace function private.ai_get_branch_info_impl_v1(p_branch_id uuid)
 returns jsonb language plpgsql stable security definer set search_path='' as $$
 declare v_result jsonb;
 begin
@@ -149,6 +148,21 @@ begin
   select jsonb_build_object('id',id,'name',name,'code',code,'active',active) into v_result from public.branches where id=p_branch_id;
   return coalesce(v_result,jsonb_build_object('found',false));
 end $$;
+
+create or replace function public.ai_catalog_search_v1(p_branch_id uuid,p_query text default null,p_only_offers boolean default false,p_limit integer default 8)
+returns setof jsonb language sql stable security definer set search_path='' as $$
+  select * from private.ai_catalog_search_impl_v1(p_branch_id,p_query,p_only_offers,p_limit);
+$$;
+
+create or replace function public.ai_get_order_status_v1(p_branch_id uuid,p_order_ref text)
+returns jsonb language sql stable security definer set search_path='' as $$
+  select private.ai_get_order_status_impl_v1(p_branch_id,p_order_ref);
+$$;
+
+create or replace function public.ai_get_branch_info_v1(p_branch_id uuid)
+returns jsonb language sql stable security definer set search_path='' as $$
+  select private.ai_get_branch_info_impl_v1(p_branch_id);
+$$;
 
 revoke all on function public.ai_assert_access_v1(uuid) from public,anon;
 revoke all on function public.ai_catalog_search_v1(uuid,text,boolean,integer) from public,anon;
@@ -158,6 +172,10 @@ grant execute on function public.ai_assert_access_v1(uuid) to authenticated;
 grant execute on function public.ai_catalog_search_v1(uuid,text,boolean,integer) to authenticated;
 grant execute on function public.ai_get_order_status_v1(uuid,text) to authenticated;
 grant execute on function public.ai_get_branch_info_v1(uuid) to authenticated;
+
+revoke all on function private.ai_catalog_search_impl_v1(uuid,text,boolean,integer) from public,anon,authenticated;
+revoke all on function private.ai_get_order_status_impl_v1(uuid,text) from public,anon,authenticated;
+revoke all on function private.ai_get_branch_info_impl_v1(uuid) from public,anon,authenticated;
 
 revoke all on table public.ai_runtime_settings,public.ai_conversations,public.ai_messages,public.ai_tool_calls,public.ai_usage_logs from anon;
 grant select,update on public.ai_runtime_settings to authenticated;
