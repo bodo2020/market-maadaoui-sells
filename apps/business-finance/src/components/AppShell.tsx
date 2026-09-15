@@ -18,6 +18,10 @@ const titles: Record<string, string> = {
   '/finance/debts': 'المديونيات',
   '/finance/expenses': 'إدارة المصروفات',
   '/finance/expenses/categories': 'سياسات بنود المصروفات',
+  '/finance/expenses/budgets': 'موازنة المصروفات',
+  '/finance/expenses/recurring': 'المصروفات الدورية',
+  '/finance/expenses/advances': 'العهد والسلف',
+  '/finance/expenses/insights': 'المراجعة الذكية للمصروفات',
   '/payroll': 'إدارة المرتبات',
   '/notifications': 'التنبيهات',
   '/more': 'المزيد',
@@ -29,7 +33,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const title = location.pathname.startsWith('/reports/') ? 'تفاصيل التقرير' : titles[location.pathname] ?? 'المعداوي للأعمال';
   const visibleNav = nav.filter((item) => {
     if (item.to === '/' || item.to === '/reports') return selectedBranch?.permissions.includes('reports.view');
-    if (item.to === '/finance') return selectedBranch?.permissions.some((permission) => ['finance.view','finance.manage','expense.view','expense.request','expense.approve','expense.pay'].includes(permission));
+    if (item.to === '/finance') return selectedBranch?.permissions.some((permission) => ['finance.view','finance.manage','expense.view','expense.request','expense.approve','expense.pay','expense.manage_budgets','expense.manage_recurring','expense.manage_advances'].includes(permission));
     return true;
   });
   return <div className="app-shell">
