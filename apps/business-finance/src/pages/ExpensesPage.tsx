@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Banknote, CheckCircle2, CircleDollarSign, Clock3, FileText, Plus, ReceiptText, RefreshCcw, RotateCcw, ShieldCheck, WalletCards, X, XCircle } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { Banknote, CheckCircle2, CircleDollarSign, Clock3, FileText, Plus, ReceiptText, RefreshCcw, RotateCcw, Settings2, ShieldCheck, WalletCards, X, XCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { money } from '../components/MetricCard';
 import { useBusiness } from '../context/BusinessContext';
 import {
@@ -102,7 +103,10 @@ export default function ExpensesPage() {
         <h2>مركز المصروفات والصرف</h2>
         <p>كل مصروف له مستند واعتماد مستقل، ثم دفعات فعلية من الخزنة أو البنك. التسجيل المحاسبي وخروج السيولة لم يعودا خطوة واحدة.</p>
       </div>
-      {workspace?.permissions.can_request && <button className="primary-button expense-primary-action" onClick={() => setCreateOpen(true)}><Plus size={18}/> طلب مصروف</button>}
+      <div className="expense-policy-actions">
+        {workspace?.permissions.can_manage_categories && <Link className="secondary-button" to="/finance/expenses/categories"><Settings2 size={17}/> سياسات البنود</Link>}
+        {workspace?.permissions.can_request && <button className="primary-button expense-primary-action" onClick={() => setCreateOpen(true)}><Plus size={18}/> طلب مصروف</button>}
+      </div>
     </section>
 
     {error && <section className="engine-banner expense-error"><div><strong>تعذر إتمام العملية</strong><p>{error}</p></div><button className="secondary-button" onClick={() => void load()}><RefreshCcw size={17}/> إعادة المحاولة</button></section>}
@@ -251,7 +255,7 @@ function PaymentDialog({ document, sources, onClose, onSaved, onError }: { docum
   </Dialog>;
 }
 
-function Dialog({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: React.ReactNode }) {
+function Dialog({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: ReactNode }) {
   return <div className="expense-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="expense-dialog" role="dialog" aria-modal="true"><header><div><h3>{title}</h3><p>{subtitle}</p></div><button className="icon-button" onClick={onClose} aria-label="إغلاق"><X size={18}/></button></header>{children}</section></div>;
 }
 
