@@ -1,0 +1,252 @@
+.sales-report-page {
+  min-width: 0;
+}
+
+.sales-report-head {
+  align-items: flex-start;
+}
+
+.sales-report-toolbar {
+  display: grid;
+  gap: 18px;
+}
+
+.sales-report-toolbar .section-heading h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sales-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, .8fr)) minmax(260px, 1.4fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.sales-filter,
+.sales-search label {
+  display: grid;
+  gap: 7px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.sales-filter select,
+.sales-search input {
+  width: 100%;
+  min-height: 43px;
+  border: 1px solid #dfe5e1;
+  border-radius: 12px;
+  background: #fff;
+  color: #1d2939;
+  font: inherit;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.sales-filter select {
+  padding: 0 12px;
+}
+
+.sales-filter select:focus,
+.sales-search input:focus {
+  border-color: rgba(0, 89, 49, .45);
+  box-shadow: 0 0 0 3px rgba(0, 89, 49, .08);
+}
+
+.sales-filter select:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.sales-search label > div {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 43px;
+  padding-inline-start: 12px;
+  border: 1px solid #dfe5e1;
+  border-radius: 12px;
+  background: #fff;
+  color: #7b8794;
+}
+
+.sales-search input {
+  min-height: 39px;
+  padding: 0;
+  border: 0;
+  box-shadow: none !important;
+}
+
+.sales-search button {
+  align-self: stretch;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 15px;
+  background: #005931;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.filter-summary span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 29px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(0, 89, 49, .06);
+  color: #36564a;
+  font-size: 11px;
+}
+
+.filter-summary button {
+  margin-inline-start: auto;
+  border: 0;
+  background: transparent;
+  color: #8b5e50;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.table-total {
+  color: #005931;
+  font-size: 13px;
+}
+
+.channel-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.channel-badge--pos {
+  background: rgba(0, 89, 49, .08);
+  color: #005931;
+}
+
+.channel-badge--online {
+  background: rgba(48, 88, 166, .08);
+  color: #3058a6;
+}
+
+.sales-loading {
+  display: grid;
+  gap: 12px;
+  padding: 18px 0;
+}
+
+.sales-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(15, 23, 42, .06);
+  color: #667085;
+  font-size: 12px;
+}
+
+.sales-pagination > div {
+  display: flex;
+  gap: 8px;
+}
+
+.sales-pagination .secondary-button {
+  min-width: 92px;
+}
+
+@media (max-width: 980px) {
+  .sales-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sales-search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .sales-report-head {
+    gap: 14px;
+  }
+
+  .sales-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-search {
+    grid-column: auto;
+  }
+
+  .report-actions {
+    width: 100%;
+  }
+
+  .report-actions .secondary-button {
+    flex: 1;
+  }
+
+  .filter-summary button {
+    margin-inline-start: 0;
+  }
+
+  .sales-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sales-pagination > div,
+  .sales-pagination .secondary-button {
+    width: 100%;
+  }
+}
+
+@media print {
+  .desktop-sidebar,
+  .topbar,
+  .bottom-nav,
+  .sales-report-toolbar,
+  .period-switcher,
+  .back-button,
+  .sales-pagination {
+    display: none !important;
+  }
+
+  .app-content,
+  .page-content {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .section-card,
+  .finance-summary,
+  .report-chart-card {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+}
