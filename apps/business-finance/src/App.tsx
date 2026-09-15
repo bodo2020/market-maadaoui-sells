@@ -13,6 +13,7 @@ import More from './pages/More';
 import Notifications from './pages/Notifications';
 import Reports from './pages/Reports';
 import ReportDetail from './pages/ReportDetail';
+import SalesReport from './pages/SalesReport';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -52,6 +53,7 @@ function BusinessAccessGate() {
   return <AppShell><Routes>
     <Route path="/" element={canViewReports ? <Dashboard/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports" element={canViewReports ? <Reports/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/sales" element={canViewReports ? <SalesReport/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/:reportKey" element={canViewReports ? <ReportDetail/> : <Navigate to="/finance" replace/>}/>
     <Route path="/finance" element={canViewFinance ? <Finance/> : <Navigate to="/" replace/>}/>
     <Route path="/notifications" element={<Notifications/>}/>
