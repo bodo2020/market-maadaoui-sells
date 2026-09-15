@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type AiProvider = "gemini" | "groq";
+export type AiProvider = "gemini" | "groq" | "openrouter";
 
 export type AiToolCall = {
   name: string;
@@ -15,6 +15,7 @@ export type AiGatewayResponse = {
   provider: AiProvider;
   model: string;
   fallback_used: boolean;
+  provider_attempt?: number;
   tool_calls: AiToolCall[];
   usage?: { input_tokens?: number; output_tokens?: number };
 };
@@ -25,6 +26,8 @@ export type AiRuntimeSettings = {
   primary_model: string;
   fallback_provider: AiProvider | null;
   fallback_model: string | null;
+  tertiary_provider: AiProvider | null;
+  tertiary_model: string | null;
   timeout_ms: number;
   max_output_tokens: number;
   auto_reply_enabled: boolean;
@@ -74,7 +77,7 @@ export async function fetchAiRuntimeSettings(): Promise<AiRuntimeSettings> {
   const client = supabase as any;
   const { data, error } = await client
     .from("ai_runtime_settings")
-    .select("enabled,primary_provider,primary_model,fallback_provider,fallback_model,timeout_ms,max_output_tokens,auto_reply_enabled")
+    .select("enabled,primary_provider,primary_model,fallback_provider,fallback_model,tertiary_provider,tertiary_model,timeout_ms,max_output_tokens,auto_reply_enabled")
     .eq("scope", "global")
     .single();
   if (error) throw new Error(error.message || "تعذر تحميل إعدادات الذكاء الاصطناعي.");
