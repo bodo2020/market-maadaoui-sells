@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Banknote, FileText, PackageCheck, ReceiptText, RefreshCcw, ShoppingBasket, TrendingUp, WalletCards } from 'lucide-react';
+import { Banknote, FileText, PackageCheck, RefreshCcw, TrendingUp, WalletCards } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import MetricCard, { money, number } from '../components/MetricCard';
 import PeriodSwitcher from '../components/PeriodSwitcher';
+import { DonutChart, RankedBarChart, TrendAreaChart, WaterfallChart } from '../components/ReportVisuals';
 import { useBusiness } from '../context/BusinessContext';
 import { fetchOverview, type BusinessFilters, type OverviewData, type PeriodKey } from '../services/businessFinance';
 
@@ -32,12 +34,22 @@ export default function Dashboard() {
 
   useEffect(() => { void load(); }, [filters]);
 
+  const profitBridge = data ? [
+    { label: 'إجمالي المبيعات', value: data.profit.grossSales },
+    { label: 'الخصومات', value: -data.profit.discounts },
+    { label: 'المرتجعات', value: -data.profit.returns },
+    { label: 'COGS', value: -(data.profit.cogs ?? 0) },
+    { label: 'رسوم الدفع', value: -data.profit.paymentFees },
+    { label: 'المصروفات', value: -data.profit.expenses },
+    { label: 'النتيجة التشغيلية', value: data.profit.operatingResult ?? 0 },
+  ] : [];
+
   return <div className="stack-lg">
     <section className="hero-panel">
       <div>
-        <span className="eyebrow">مركز متابعة الأعمال</span>
+        <span className="eyebrow">Business Command Center · Reporting V2</span>
         <h2>{selectedBranch?.branch_name || 'كل أرقام المعداوي'} في مكان واحد</h2>
-        <p>بيانات فعلية من Invoice V2 ودفاتر الدفع والخزن، مع تطبيق صلاحيات الفرع على الخادم.</p>
+        <p>مركز متابعة بصري مبني على Invoice V2 ودفاتر الدفع والخزن، بدون نسب نمو ثابتة أو أرقام تجميلية.</p>
       </div>
       <PeriodSwitcher period={period} onChange={setPeriod} />
     </section>
@@ -56,31 +68,30 @@ export default function Dashboard() {
 
     {data && !data.profit.onlineProfitComplete && <p className="data-scope-note">الربحية الحالية محسوبة من فواتير POS المكتملة؛ مبيعات الأونلاين ظاهرة في الإيراد، لكن تكلفة وربح الأونلاين لم يكتمل ربطهما بعد.</p>}
 
-    <section className="split-grid">
-      <article className="section-card">
-        <div className="section-heading"><div><span className="eyebrow">اتجاه المبيعات</span><h3>حركة الفترة</h3></div><TrendingUp size={20}/></div>
-        <div className="timeline-chart">{data?.timeline?.length ? data.timeline.map((point, index) => {
-          const max = Math.max(...data.timeline.map((item) => item.amount), 1);
-          return <div className="chart-column" key={`${point.label}-${index}`}>
-            <div className="chart-bar" style={{ height: `${Math.max(8, (Math.max(point.amount, 0) / max) * 100)}%` }} title={money(point.amount)}/>
-            <span>{point.label}</span>
-          </div>;
-        }) : <EmptyData text="لا توجد مبيعات مسجلة داخل الفترة."/>}</div>
-      </article>
-      <article className="section-card">
-        <div className="section-heading"><div><span className="eyebrow">قنوات البيع</span><h3>POS مقابل Online</h3></div><ShoppingBasket size={20}/></div>
-        <div className="rows-list">{data?.channels?.map((channel) => <div className="data-row" key={channel.key}><span>{channel.label}</span><strong>{money(channel.amount)}</strong></div>)}</div>
-      </article>
-    </section>
+    {data && <section className="report-visual-grid">
+      <TrendAreaChart
+        eyebrow="Sales Trend"
+        title="اتجاه صافي المبيعات"
+        valueLabel="صافي المبيعات"
+        points={data.timeline.map((point) => ({ label: point.label, value: point.amount }))}
+      />
+      <DonutChart
+        eyebrow="Channel Mix"
+        title="POS مقابل Online"
+        segments={data.channels.map((channel) => ({ label: channel.label, value: Math.max(0, channel.amount) }))}
+      />
+    </section>}
+
+    {data && <section className="report-visual-grid">
+      <DonutChart
+        eyebrow="Payment Mix"
+        title="توزيع التحصيل حسب وسيلة الدفع"
+        segments={data.payments.map((payment) => ({ label: payment.label, value: Math.max(0, payment.amount) }))}
+      />
+      <WaterfallChart eyebrow="Profit Bridge" title="جسر تكوين الربح" points={profitBridge}/>
+    </section>}
 
     <section className="split-grid">
-      <article className="section-card">
-        <div className="section-heading"><div><span className="eyebrow">التحصيل</span><h3>وسائل الدفع</h3></div><ReceiptText size={20}/></div>
-        <div className="rows-list">{data?.payments?.length ? data.payments.map((payment) => <div className="data-row data-row--two-line" key={payment.key}>
-          <div><span>{payment.label}</span>{payment.fee !== 0 && <small>رسوم {money(payment.fee)}</small>}</div>
-          <strong>{money(payment.amount)}</strong>
-        </div>) : <EmptyData text="لا توجد تحصيلات في الفترة المحددة."/>}</div>
-      </article>
       <article className="section-card quick-stats">
         <div className="section-heading"><div><span className="eyebrow">مؤشرات سريعة</span><h3>جودة المبيعات</h3></div><PackageCheck size={20}/></div>
         <div className="quick-stat"><span>متوسط الفاتورة</span><strong>{loading ? '…' : money(data?.averageBasket)}</strong></div>
@@ -88,6 +99,16 @@ export default function Dashboard() {
         <div className="quick-stat"><span>المرتجعات</span><strong>{loading ? '…' : money(data?.returns)}</strong></div>
         <div className="quick-stat"><span>المصروفات</span><strong>{loading ? '…' : money(data?.expenses)}</strong></div>
       </article>
+
+      <article className="section-card quick-stats">
+        <div className="section-heading"><div><span className="eyebrow">وسائل الدفع</span><h3>صافي حركة التحصيل</h3></div><WalletCards size={20}/></div>
+        {data?.payments?.length ? <RankedBarChart eyebrow="Net Collection" title="ترتيب وسائل الدفع" items={data.payments.map((payment) => ({ label: payment.label, value: payment.amount }))}/> : <EmptyData text="لا توجد تحصيلات في الفترة المحددة."/>}
+      </article>
+    </section>
+
+    <section className="section-card roadmap-card">
+      <div><span className="eyebrow">Deep Dive</span><h3>التقارير التفصيلية</h3><p>انتقل من النظرة التنفيذية إلى المبيعات، الربحية، المنتجات، المخزون، وسائل الدفع، المرتجعات، الكاشير، العملاء والفروع.</p></div>
+      <Link className="primary-button" to="/reports">فتح مركز التقارير</Link>
     </section>
   </div>;
 }
