@@ -8,6 +8,7 @@ import { BusinessProvider, useBusiness } from './context/BusinessContext';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
 import Dashboard from './pages/Dashboard';
 import Finance from './pages/Finance';
+import FinancialReport from './pages/FinancialReport';
 import Login from './pages/Login';
 import More from './pages/More';
 import Notifications from './pages/Notifications';
@@ -54,6 +55,8 @@ function BusinessAccessGate() {
     <Route path="/" element={canViewReports ? <Dashboard/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports" element={canViewReports ? <Reports/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/sales" element={canViewReports ? <SalesReport/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/profitability" element={canViewReports ? <FinancialReport kind="profitability"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/payments" element={canViewReports ? <FinancialReport kind="payments"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/:reportKey" element={canViewReports ? <ReportDetail/> : <Navigate to="/finance" replace/>}/>
     <Route path="/finance" element={canViewFinance ? <Finance/> : <Navigate to="/" replace/>}/>
     <Route path="/notifications" element={<Notifications/>}/>
