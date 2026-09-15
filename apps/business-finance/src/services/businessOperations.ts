@@ -72,6 +72,16 @@ export async function postCustomerDebt(branchId: string, customerId: string, ent
   });
 }
 
+export async function configureCustomerCredit(branchId: string, customerId: string, enabled: boolean, creditLimit: number | null, note: string) {
+  return rpc<ReportDocument>('configure_customer_credit_v1', {
+    p_branch_id: branchId,
+    p_customer_id: customerId,
+    p_enabled: enabled,
+    p_credit_limit: creditLimit,
+    p_note: note || null,
+  });
+}
+
 export async function postEmployeeDebt(branchId: string, employeeId: string, delta: number, description: string) {
   return rpc('post_employee_wallet_adjustment_v1', {
     p_employee_id: employeeId,
