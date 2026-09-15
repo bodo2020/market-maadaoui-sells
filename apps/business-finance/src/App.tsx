@@ -15,7 +15,6 @@ import More from './pages/More';
 import Notifications from './pages/Notifications';
 import OperationsReport from './pages/OperationsReport';
 import Reports from './pages/Reports';
-import ReportDetail from './pages/ReportDetail';
 import SalesReport from './pages/SalesReport';
 
 export default function App() {
@@ -69,7 +68,7 @@ function BusinessAccessGate() {
     <Route path="/reports/costs" element={canViewReports ? <ManagementReport kind="costs"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/transfers" element={canViewReports ? <ManagementReport kind="transfers"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/insights" element={canViewReports ? <ManagementReport kind="insights"/> : <Navigate to="/finance" replace/>}/>
-    <Route path="/reports/:reportKey" element={canViewReports ? <ReportDetail/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/*" element={<Navigate to="/reports" replace/>}/>
     <Route path="/finance" element={canViewFinance ? <Finance/> : <Navigate to="/" replace/>}/>
     <Route path="/notifications" element={<Notifications/>}/>
     <Route path="/more" element={<More/>}/>
