@@ -16,6 +16,7 @@ const titles: Record<string, string> = {
   '/reports': 'التقارير والتحليلات',
   '/finance': 'النظام المالي',
   '/finance/debts': 'المديونيات',
+  '/finance/expenses': 'إدارة المصروفات',
   '/payroll': 'إدارة المرتبات',
   '/notifications': 'التنبيهات',
   '/more': 'المزيد',
@@ -27,7 +28,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const title = location.pathname.startsWith('/reports/') ? 'تفاصيل التقرير' : titles[location.pathname] ?? 'المعداوي للأعمال';
   const visibleNav = nav.filter((item) => {
     if (item.to === '/' || item.to === '/reports') return selectedBranch?.permissions.includes('reports.view');
-    if (item.to === '/finance') return selectedBranch?.permissions.some((permission) => permission === 'finance.view' || permission === 'finance.manage');
+    if (item.to === '/finance') return selectedBranch?.permissions.some((permission) => ['finance.view','finance.manage','expense.view','expense.request','expense.approve','expense.pay'].includes(permission));
     return true;
   });
   return <div className="app-shell">
