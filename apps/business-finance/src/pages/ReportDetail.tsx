@@ -4,6 +4,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import { money, number } from '../components/MetricCard';
 import PeriodSwitcher from '../components/PeriodSwitcher';
+import { ReportVisuals } from '../components/ReportVisuals';
 import { useBusiness } from '../context/BusinessContext';
 import { type BusinessFilters, type PeriodKey } from '../services/businessFinance';
 import { fetchDetailedReport, isReportKey, type ReportDocument, type ReportKey } from '../services/reportingDetails';
@@ -73,6 +74,8 @@ export default function ReportDetail() {
       : presentation?.metrics.map((metric) => <article className="finance-summary" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong>{metric.hint && <small className="muted">{metric.hint}</small>}</article>)}</section>
 
     {presentation?.note && <p className="data-scope-note">{presentation.note}</p>}
+
+    {data && <ReportVisuals reportKey={validKey} data={data}/>} 
 
     {presentation?.tables.map((reportTable) => <section className="section-card report-table-card" key={`${reportTable.eyebrow}-${reportTable.title}`}>
       <div className="section-heading"><div><span className="eyebrow">{reportTable.eyebrow}</span><h3>{reportTable.title}</h3></div><FileText size={20}/></div>
