@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import Finance from './pages/Finance';
 import FinancialReport from './pages/FinancialReport';
 import Login from './pages/Login';
+import ManagementReport from './pages/ManagementReport';
 import More from './pages/More';
 import Notifications from './pages/Notifications';
 import OperationsReport from './pages/OperationsReport';
@@ -61,6 +62,13 @@ function BusinessAccessGate() {
     <Route path="/reports/products" element={canViewReports ? <OperationsReport kind="products"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/inventory" element={canViewReports ? <OperationsReport kind="inventory"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/returns" element={canViewReports ? <OperationsReport kind="returns"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/cashiers" element={canViewReports ? <ManagementReport kind="cashiers"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/branches" element={canViewReports ? <ManagementReport kind="branches"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/online" element={canViewReports ? <ManagementReport kind="online"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/customers" element={canViewReports ? <ManagementReport kind="customers"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/costs" element={canViewReports ? <ManagementReport kind="costs"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/transfers" element={canViewReports ? <ManagementReport kind="transfers"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/insights" element={canViewReports ? <ManagementReport kind="insights"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/:reportKey" element={canViewReports ? <ReportDetail/> : <Navigate to="/finance" replace/>}/>
     <Route path="/finance" element={canViewFinance ? <Finance/> : <Navigate to="/" replace/>}/>
     <Route path="/notifications" element={<Notifications/>}/>
