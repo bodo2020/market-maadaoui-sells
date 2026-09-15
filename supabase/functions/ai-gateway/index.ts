@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
-type ProviderName = "gemini" | "groq";
+type ProviderName = "gemini" | "groq" | "openrouter";
 type ToolRequest = { name: string; args: Record<string, unknown>; callId?: string };
 type ProviderResult = {
   text: string;
@@ -98,8 +98,34 @@ async function callGroq(model: string, messages: unknown[], timeoutMs: number, m
   };
 }
 
+async function callOpenRouter(model: string, messages: unknown[], timeoutMs: number, maxTokens: number): Promise<ProviderResult> {
+  const key = Deno.env.get("OPENROUTER_API_KEY");
+  if (!key) throw new Error("OPENROUTER_NOT_CONFIGURED");
+  const response = await withTimeout("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+      "X-Title": "Elmadawy Market AI Gateway",
+    },
+    body: JSON.stringify({ model, messages: [{ role: "system", content: systemPrompt }, ...messages], tools: toolDeclarations.map((tool) => ({ type: "function", function: tool })), tool_choice: "auto", temperature: 0.2, max_tokens: maxTokens }),
+  }, timeoutMs);
+  if (!response.ok) throw new Error(`OPENROUTER_${response.status}`);
+  const payload = await response.json();
+  const assistant = payload?.choices?.[0]?.message || {};
+  return {
+    text: assistant.content || "",
+    toolCalls: (assistant.tool_calls || []).map((call: any) => ({ name: call.function.name, args: JSON.parse(call.function.arguments || "{}"), callId: call.id })),
+    rawAssistant: assistant,
+    inputTokens: payload?.usage?.prompt_tokens,
+    outputTokens: payload?.usage?.completion_tokens,
+  };
+}
+
 async function callProvider(provider: ProviderName, model: string, messages: unknown[], timeoutMs: number, maxTokens: number) {
-  return provider === "gemini" ? callGemini(model, messages, timeoutMs, maxTokens) : callGroq(model, messages, timeoutMs, maxTokens);
+  if (provider === "gemini") return callGemini(model, messages, timeoutMs, maxTokens);
+  if (provider === "groq") return callGroq(model, messages, timeoutMs, maxTokens);
+  return callOpenRouter(model, messages, timeoutMs, maxTokens);
 }
 
 async function executeTool(userClient: any, branchId: string, request: ToolRequest, permissions: Set<string>, isSuperAdmin: boolean) {
@@ -203,9 +229,15 @@ Deno.serve(async (req: Request) => {
   }
   await admin.from("ai_messages").insert({ conversation_id: conversationId, role: "user", content: message, created_by: authData.user.id });
 
-  const providers = [{ provider: settings.primary_provider as ProviderName, model: settings.primary_model as string }, ...(settings.fallback_provider && settings.fallback_model ? [{ provider: settings.fallback_provider as ProviderName, model: settings.fallback_model as string }] : [])];
+  const providers = [
+    { provider: settings.primary_provider as ProviderName, model: settings.primary_model as string },
+    ...(settings.fallback_provider && settings.fallback_model ? [{ provider: settings.fallback_provider as ProviderName, model: settings.fallback_model as string }] : []),
+    ...(settings.tertiary_provider && settings.tertiary_model ? [{ provider: settings.tertiary_provider as ProviderName, model: settings.tertiary_model as string }] : []),
+  ].filter((item, index, all) => all.findIndex((candidate) => candidate.provider === item.provider && candidate.model === item.model) === index);
+
   const started = Date.now();
   let selected = providers[0];
+  let selectedAttempt = 1;
   let fallbackUsed = false;
   let final: ProviderResult | null = null;
   let finalMessages: any[] = [];
@@ -214,6 +246,7 @@ Deno.serve(async (req: Request) => {
 
   for (let providerIndex = 0; providerIndex < providers.length && !final; providerIndex += 1) {
     selected = providers[providerIndex];
+    selectedAttempt = providerIndex + 1;
     fallbackUsed = providerIndex > 0;
     const messages: any[] = selected.provider === "gemini" ? [{ role: "user", parts: [{ text: message }] }] : [{ role: "user", content: message }];
     try {
@@ -236,13 +269,13 @@ Deno.serve(async (req: Request) => {
   }
 
   if (!final) {
-    await admin.from("ai_usage_logs").insert({ conversation_id: conversationId, user_id: authData.user.id, branch_id: branchId, provider: selected.provider, model: selected.model, fallback_used: fallbackUsed, status: "error", latency_ms: Date.now() - started, error_code: providerError.slice(0, 120) });
-    return json({ error: "مزودا الذكاء الاصطناعي غير متاحين حاليًا. حاول مرة أخرى بعد قليل." }, 503);
+    await admin.from("ai_usage_logs").insert({ conversation_id: conversationId, user_id: authData.user.id, branch_id: branchId, provider: selected.provider, model: selected.model, fallback_used: fallbackUsed, status: "error", latency_ms: Date.now() - started, error_code: providerError.slice(0, 120), metadata: { provider_attempt: selectedAttempt, channel } });
+    return json({ error: "مزودو الذكاء الاصطناعي غير متاحين حاليًا. حاول مرة أخرى بعد قليل." }, 503);
   }
 
   const reply = final.text || "لم أتمكن من تكوين إجابة واضحة من البيانات المتاحة.";
   const { data: savedMessage } = await admin.from("ai_messages").insert({ conversation_id: conversationId, role: "assistant", content: reply, provider: selected.provider, model: selected.model, created_by: authData.user.id }).select("id").single();
-  await admin.from("ai_usage_logs").insert({ conversation_id: conversationId, user_id: authData.user.id, branch_id: branchId, provider: selected.provider, model: selected.model, fallback_used: fallbackUsed, status: "success", latency_ms: Date.now() - started, input_tokens: final.inputTokens || null, output_tokens: final.outputTokens || null, metadata: { rounds: finalMessages.length, channel } });
+  await admin.from("ai_usage_logs").insert({ conversation_id: conversationId, user_id: authData.user.id, branch_id: branchId, provider: selected.provider, model: selected.model, fallback_used: fallbackUsed, status: "success", latency_ms: Date.now() - started, input_tokens: final.inputTokens || null, output_tokens: final.outputTokens || null, metadata: { rounds: finalMessages.length, channel, provider_attempt: selectedAttempt } });
 
-  return json({ conversation_id: conversationId, message_id: savedMessage?.id || crypto.randomUUID(), reply, provider: selected.provider, model: selected.model, fallback_used: fallbackUsed, tool_calls: toolAudit, usage: { input_tokens: final.inputTokens, output_tokens: final.outputTokens } });
+  return json({ conversation_id: conversationId, message_id: savedMessage?.id || crypto.randomUUID(), reply, provider: selected.provider, model: selected.model, fallback_used: fallbackUsed, provider_attempt: selectedAttempt, tool_calls: toolAudit, usage: { input_tokens: final.inputTokens, output_tokens: final.outputTokens } });
 });
