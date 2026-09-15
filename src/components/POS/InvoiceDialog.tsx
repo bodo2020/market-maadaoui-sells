@@ -69,15 +69,39 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
       0,
       Number(extra.amount_charged ?? extra.amount_due ?? (Number(sale.total || 0) - loyalty + customerFee)),
     );
+    const customerCredit = Number(extra.customer_credit_amount || 0);
+    const employeeCredit = Number(extra.employee_credit_amount || 0);
+    const creditAmount = Math.max(0, customerCredit + employeeCredit);
+    const receivableBefore = Number(extra.receivable_balance_before || 0);
+    const receivableAfter = Number(extra.receivable_balance_after || 0);
+    const creditLimit = Number(extra.receivable_credit_limit || 0);
+    const creditAvailableAfter = Number(extra.receivable_credit_available_after || 0);
+    const pointsEarned = Number(extra.loyalty_points_earned || 0);
     const paymentName = String(
       extra.payment_method_name ||
         (sale.payment_method === "cash" ? "نقدي" : sale.payment_method === "card" ? "بطاقة بنكية" : "دفع مختلط"),
     );
     const returns = Array.isArray(extra.invoice_returns) ? extra.invoice_returns : [];
     const paymentBreakdown = Array.isArray(extra.payment_breakdown)
-      ? extra.payment_breakdown.filter((part: any) => Number(part?.charged_amount ?? part?.base_amount ?? 0) > 0)
+      ? extra.payment_breakdown.filter((part: any) => Number(part?.base_amount ?? part?.charged_amount ?? 0) > 0)
       : [];
-    return { extra, loyalty, customerFee, amountPaid, paymentName, returns, paymentBreakdown };
+    return {
+      extra,
+      loyalty,
+      customerFee,
+      amountPaid,
+      customerCredit,
+      employeeCredit,
+      creditAmount,
+      receivableBefore,
+      receivableAfter,
+      creditLimit,
+      creditAvailableAfter,
+      pointsEarned,
+      paymentName,
+      returns,
+      paymentBreakdown,
+    };
   }, [sale]);
 
   if (!sale || !meta) return null;
@@ -99,12 +123,30 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
   };
 
   const handleDesignedPrint = () => {
-    const opened = printSaleInvoice(sale, preferences, {
+    const printableBreakdown = meta.paymentBreakdown.map((part: any) => {
+      const isCredit = part?.code === "customer_credit" || part?.code === "employee_credit" || part?.method_type === "customer_credit" || part?.method_type === "employee_credit";
+      if (!isCredit) return part;
+      return {
+        ...part,
+        name: `${String(part?.name || "آجل")} (غير محصل)`,
+        charged_amount: Number(part?.base_amount || 0),
+      };
+    });
+    const creditPrintNote = meta.creditAmount > 0
+      ? `حالة الفاتورة: مدفوعة جزئيًا / آجل\nالرصيد السابق: ${money(meta.receivableBefore)}\nالمسجل آجل: ${money(meta.creditAmount)}\nالرصيد بعد الفاتورة: ${money(meta.receivableAfter)}${meta.customerCredit > 0 ? "\nالجزء الآجل لا يحتسب نقاط حتى بعد السداد." : ""}`
+      : "";
+    const paymentInstructions = [invoiceSettings.paymentInstructions, creditPrintNote].filter(Boolean).join("\n");
+    const printableSale = {
+      ...(sale as Sale & Record<string, any>),
+      payment_method_name: meta.creditAmount > 0 ? `${meta.paymentName} · آجل ${money(meta.creditAmount)}` : meta.paymentName,
+      payment_breakdown: printableBreakdown,
+    } as Sale;
+    const opened = printSaleInvoice(printableSale, preferences, {
       footer: invoiceSettings.footer,
       website: invoiceSettings.website,
       showVat: invoiceSettings.showVat,
       notes: invoiceSettings.notes,
-      paymentInstructions: invoiceSettings.paymentInstructions,
+      paymentInstructions,
       logoChoice: invoiceSettings.logoChoice,
       customLogoUrl: invoiceSettings.customLogoUrl,
     });
@@ -215,7 +257,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
               <section className="border-b border-dashed border-black py-2 text-center">
                 <p className="text-[8px] font-bold">فاتورة مبيعات</p>
                 <p className={`${is58 ? "text-xs" : "text-sm"} mt-0.5 break-all font-black`}>#{sale.invoice_number}</p>
-                <span className="mt-1 inline-block border border-black px-2 py-0.5 text-[8px] font-black">مدفوعة</span>
+                <span className="mt-1 inline-block border border-black px-2 py-0.5 text-[8px] font-black">{meta.creditAmount > 0 ? "مدفوعة جزئيًا / آجل" : "مدفوعة"}</span>
               </section>
 
               <section className={`grid border-b border-dashed border-black py-2 ${is58 ? "grid-cols-2" : "grid-cols-4"} gap-x-3 gap-y-1.5`}>
@@ -289,19 +331,27 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
                 <div className={`mt-2 flex justify-between gap-3 border-y-4 border-double border-black py-2 font-black ${is58 ? "text-[11px]" : "text-sm"}`}>
                   <span>المدفوع فعليًا</span><strong>{money(meta.amountPaid)}</strong>
                 </div>
+                {meta.creditAmount > 0 && <div className="flex justify-between gap-3 font-black"><span>المسجل آجل</span><strong>{money(meta.creditAmount)}</strong></div>}
+                {meta.creditAmount > 0 && <div className="flex justify-between gap-3"><span>الرصيد السابق</span><strong>{money(meta.receivableBefore)}</strong></div>}
+                {meta.creditAmount > 0 && <div className="flex justify-between gap-3"><span>الرصيد بعد الفاتورة</span><strong>{money(meta.receivableAfter)}</strong></div>}
+                {meta.creditAmount > 0 && meta.creditLimit > 0 && <div className="flex justify-between gap-3"><span>حد الآجل</span><strong>{money(meta.creditLimit)}</strong></div>}
+                {meta.creditAmount > 0 && meta.creditLimit > 0 && <div className="flex justify-between gap-3"><span>المتاح بعد الفاتورة</span><strong>{money(meta.creditAvailableAfter)}</strong></div>}
+                {sale.customer_name && <div className="flex justify-between gap-3"><span>النقاط المكتسبة</span><strong>{meta.pointsEarned.toLocaleString("ar-EG")} نقطة</strong></div>}
+                {meta.customerCredit > 0 && <p className="pt-1 text-[7px] font-bold">الجزء الآجل لا يحتسب نقاط حتى بعد السداد.</p>}
               </section>
 
               <section className="mt-2 space-y-1 border-b border-dashed border-black pb-2 text-[8px]">
                 <div className="flex justify-between gap-3"><span>طريقة الدفع</span><strong>{meta.paymentName}</strong></div>
-                {meta.paymentBreakdown.length > 1 ? (
+                {meta.paymentBreakdown.length > 0 ? (
                   <div className="mt-1 space-y-1 border-t border-dashed border-black pt-1.5">
                     {meta.paymentBreakdown.map((part: any, index: number) => {
-                      const charged = Number(part?.charged_amount ?? part?.base_amount ?? 0);
+                      const isCredit = part?.code === "customer_credit" || part?.code === "employee_credit" || part?.method_type === "customer_credit" || part?.method_type === "employee_credit";
+                      const displayAmount = isCredit ? Number(part?.base_amount || 0) : Number(part?.charged_amount ?? part?.base_amount ?? 0);
                       const partCustomerFee = Number(part?.customer_fee_amount || 0);
                       const partName = String(part?.name || part?.code || "وسيلة دفع");
                       return (
                         <div key={`${part?.payment_method_id || part?.code || "payment"}-${index}`} className="space-y-0.5">
-                          <div className="flex justify-between gap-3 font-bold"><span>{partName}</span><strong>{money(charged)}</strong></div>
+                          <div className="flex justify-between gap-3 font-bold"><span>{partName}{isCredit ? " (غير محصل)" : ""}</span><strong>{money(displayAmount)}</strong></div>
                           {part?.reference && <div className="flex justify-between gap-3 pr-2 text-[7px]"><span>المرجع</span><strong dir="ltr" className="break-all text-left">{String(part.reference)}</strong></div>}
                           {partCustomerFee > 0 && <div className="flex justify-between gap-3 pr-2 text-[7px]"><span>رسوم على العميل</span><strong>+ {money(partCustomerFee)}</strong></div>}
                         </div>
