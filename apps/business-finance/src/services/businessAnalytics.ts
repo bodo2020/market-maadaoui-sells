@@ -1,5 +1,11 @@
 import { supabase } from '../lib/supabase';
-import { explainRpcError, resolvePeriod, type BusinessFilters } from './businessFinance';
+import {
+  explainRpcError,
+  fetchOverview,
+  resolvePeriod,
+  type BusinessFilters,
+  type OverviewData,
+} from './businessFinance';
 import type { ReportDocument } from './reportingDetails';
 
 function client() {
@@ -64,4 +70,52 @@ export async function fetchWorkforceCostsReport(
       ? (payrollResult.reason instanceof Error ? payrollResult.reason.message : 'لا يمكن عرض تفاصيل المرتبات بهذا الحساب.')
       : null,
   };
+}
+
+export type DecisionCenterBundle = {
+  overview: OverviewData | null;
+  peak: ReportDocument | null;
+  waste: ReportDocument | null;
+  payroll: ReportDocument | null;
+  errors: {
+    overview: string | null;
+    peak: string | null;
+    waste: string | null;
+    payroll: string | null;
+  };
+};
+
+export async function fetchDecisionCenterReport(
+  filters: BusinessFilters,
+  payrollMonth: number,
+  payrollYear: number,
+): Promise<DecisionCenterBundle> {
+  const [overviewResult, peakResult, wasteResult, payrollResult] = await Promise.allSettled([
+    fetchOverview(filters),
+    fetchPeakHoursReport(filters),
+    fetchWasteReport(filters),
+    rpc('get_hr_payroll_workspace_v2', {
+      p_branch_id: filters.branchId,
+      p_month: payrollMonth,
+      p_year: payrollYear,
+    }),
+  ]);
+
+  return {
+    overview: overviewResult.status === 'fulfilled' ? overviewResult.value : null,
+    peak: peakResult.status === 'fulfilled' ? peakResult.value : null,
+    waste: wasteResult.status === 'fulfilled' ? wasteResult.value : null,
+    payroll: payrollResult.status === 'fulfilled' ? payrollResult.value : null,
+    errors: {
+      overview: rejectedMessage(overviewResult),
+      peak: rejectedMessage(peakResult),
+      waste: rejectedMessage(wasteResult),
+      payroll: rejectedMessage(payrollResult),
+    },
+  };
+}
+
+function rejectedMessage(result: PromiseSettledResult<unknown>): string | null {
+  if (result.status === 'fulfilled') return null;
+  return result.reason instanceof Error ? result.reason.message : 'تعذر تحميل هذا الجزء من التحليل.';
 }
