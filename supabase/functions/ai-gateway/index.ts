@@ -102,7 +102,7 @@ async function callProvider(provider: ProviderName, model: string, messages: unk
   return provider === "gemini" ? callGemini(model, messages, timeoutMs, maxTokens) : callGroq(model, messages, timeoutMs, maxTokens);
 }
 
-async function executeTool(userClient: any, branchId: string, request: ToolRequest) {
+async function executeTool(userClient: any, branchId: string, request: ToolRequest, permissions: Set<string>, isSuperAdmin: boolean) {
   const started = Date.now();
   const rpc = async (name: string, args: Record<string, unknown>) => {
     const { data, error } = await userClient.rpc(name, args);
@@ -111,14 +111,36 @@ async function executeTool(userClient: any, branchId: string, request: ToolReque
   };
   try {
     let result: unknown;
+    const safeCatalog = (rows: unknown) => (Array.isArray(rows) ? rows : []).map((row: any) => ({
+      id: row?.id,
+      record_type: row?.record_type,
+      name: row?.name,
+      barcode: row?.barcode,
+      price: row?.price,
+      offer_price: row?.offer_price,
+      is_offer: row?.is_offer,
+      quantity: row?.quantity,
+      unit_of_measure: row?.unit_of_measure,
+      stock_status: row?.stock_status,
+    }));
     if (request.name === "search_products") {
-      result = await rpc("ai_catalog_search_v1", { p_branch_id: branchId, p_query: safeText(request.args.query, 120), p_only_offers: false, p_limit: Math.min(20, Math.max(1, Number(request.args.limit || 8))) });
+      if (!isSuperAdmin && !permissions.has("inventory.manage") && !permissions.has("products.manage")) throw new Error("TOOL_PERMISSION_DENIED");
+      result = safeCatalog(await rpc("get_product_management_catalog", { p_branch_id: branchId, p_search: safeText(request.args.query, 120), p_company_id: null, p_category_id: null, p_limit: Math.min(20, Math.max(1, Number(request.args.limit || 8))), p_offset: 0 }));
     } else if (request.name === "get_active_offers") {
-      result = await rpc("ai_catalog_search_v1", { p_branch_id: branchId, p_query: null, p_only_offers: true, p_limit: Math.min(30, Math.max(1, Number(request.args.limit || 10))) });
+      if (!isSuperAdmin && !permissions.has("inventory.manage") && !permissions.has("products.manage")) throw new Error("TOOL_PERMISSION_DENIED");
+      const rows = await rpc("get_product_management_catalog", { p_branch_id: branchId, p_search: null, p_company_id: null, p_category_id: null, p_limit: 200, p_offset: 0 });
+      result = safeCatalog(rows).filter((row: any) => row?.is_offer).slice(0, Math.min(30, Math.max(1, Number(request.args.limit || 10))));
     } else if (request.name === "get_order_status") {
-      result = await rpc("ai_get_order_status_v1", { p_branch_id: branchId, p_order_ref: safeText(request.args.order_ref, 120) });
+      if (!isSuperAdmin && !permissions.has("online_orders.view") && !permissions.has("online_orders.manage")) throw new Error("TOOL_PERMISSION_DENIED");
+      const orderRef = safeText(request.args.order_ref, 120);
+      if (!/^[a-zA-Z0-9-]{1,120}$/.test(orderRef)) throw new Error("INVALID_ORDER_REFERENCE");
+      const { data, error } = await userClient.from("online_orders").select("id,tracking_number,status,payment_status,total,created_at,updated_at").eq("branch_id", branchId).or(`id.eq.${orderRef},tracking_number.eq.${orderRef}`).limit(1).maybeSingle();
+      if (error) throw new Error(error.message || "TOOL_FAILED");
+      result = data ? { found: true, ...data } : { found: false };
     } else if (request.name === "get_branch_info") {
-      result = await rpc("ai_get_branch_info_v1", { p_branch_id: branchId });
+      const { data, error } = await userClient.from("branches").select("id,name,code,active").eq("id", branchId).maybeSingle();
+      if (error) throw new Error(error.message || "TOOL_FAILED");
+      result = data || { found: false };
     } else {
       throw new Error("TOOL_NOT_ALLOWED");
     }
@@ -155,8 +177,15 @@ Deno.serve(async (req: Request) => {
   const channel = safeText(body?.channel, 40) || "admin_sandbox";
   if (!message || !/^[0-9a-f-]{36}$/i.test(branchId)) return json({ error: "الرسالة أو الفرع غير صالح." }, 400);
 
-  const { data: access, error: accessError } = await userClient.rpc("ai_assert_access_v1", { p_branch_id: branchId });
-  if (accessError || access !== true) return json({ error: "ليس لديك صلاحية استخدام مساعد AI في هذا الفرع." }, 403);
+  const [{ data: identity, error: identityError }, { data: branchContexts, error: branchesError }] = await Promise.all([
+    userClient.rpc("get_my_staff_identity"),
+    userClient.rpc("get_my_staff_branches"),
+  ]);
+  const branchContext = Array.isArray(branchContexts) ? branchContexts.find((item: any) => item?.branch_id === branchId) : null;
+  const permissions = new Set<string>(Array.isArray(branchContext?.permissions) ? branchContext.permissions : []);
+  const isSuperAdmin = identity?.user_id === authData.user.id && identity?.is_super_admin === true;
+  const canUseAi = isSuperAdmin || ["reports.view", "products.manage", "inventory.manage", "online_orders.view"].some((permission) => permissions.has(permission));
+  if (identityError || branchesError || identity?.user_id !== authData.user.id || !branchContext || !canUseAi) return json({ error: "ليس لديك صلاحية استخدام مساعد AI في هذا الفرع." }, 403);
 
   const { data: settings } = await admin.from("ai_runtime_settings").select("*").eq("scope", "global").single();
   if (!settings?.enabled) return json({ error: "بوابة AI متوقفة من الإعدادات حاليًا." }, 503);
@@ -193,7 +222,7 @@ Deno.serve(async (req: Request) => {
         if (!answer.toolCalls.length) { final = answer; finalMessages = messages; break; }
         const calls = [];
         for (const request of answer.toolCalls.slice(0, 5)) {
-          const output = await executeTool(userClient, branchId, request);
+          const output = await executeTool(userClient, branchId, request, permissions, isSuperAdmin);
           toolAudit.push({ name: request.name, status: output.ok ? "success" : "error", duration_ms: output.duration_ms });
           calls.push({ request, output });
           await admin.from("ai_tool_calls").insert({ conversation_id: conversationId, user_id: authData.user.id, branch_id: branchId, tool_name: request.name, risk_level: "read", arguments: request.args, result_summary: output.ok ? output.result : { error: output.error }, status: output.ok ? "success" : "error", duration_ms: output.duration_ms });
