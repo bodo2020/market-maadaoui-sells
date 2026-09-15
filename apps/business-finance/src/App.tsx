@@ -29,6 +29,7 @@ import Reports from './pages/Reports';
 import SalesReport from './pages/SalesReport';
 import WasteReport from './pages/WasteReport';
 import WorkforceCostsReport from './pages/WorkforceCostsReport';
+import './pages/expenseControlV3.css';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
