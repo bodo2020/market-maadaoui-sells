@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import DecisionCenter from './pages/DecisionCenter';
 import DebtsPage from './pages/DebtsPage';
 import DebtsReport from './pages/DebtsReport';
+import ExpensesPage from './pages/ExpensesPage';
 import Finance from './pages/Finance';
 import FinancialReport from './pages/FinancialReport';
 import Login from './pages/Login';
@@ -58,6 +59,7 @@ function BusinessAccessGate() {
 
   const canViewReports = selectedBranch?.permissions.includes('reports.view') === true;
   const canViewFinance = selectedBranch?.permissions.some((permission) => permission === 'finance.view' || permission === 'finance.manage') === true;
+  const canViewExpenses = selectedBranch?.permissions.some((permission) => ['expense.view','expense.request','expense.approve','expense.pay','finance.view','finance.manage'].includes(permission)) === true;
   const canViewPayroll = selectedBranch?.permissions.some((permission) => ['finance.view','finance.manage','hr.view','hr.payroll.view','hr.payroll.manage','hr.manage_employees','hr.admin'].includes(permission)) === true;
 
   return <AppShell><Routes>
@@ -82,8 +84,9 @@ function BusinessAccessGate() {
     <Route path="/reports/peak-hours" element={canViewReports ? <PeakHoursReport/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/debts" element={canViewReports ? <DebtsReport/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/*" element={<Navigate to="/reports" replace/>}/>
-    <Route path="/finance" element={canViewFinance ? <Finance/> : <Navigate to="/" replace/>}/>
+    <Route path="/finance" element={canViewFinance ? <Finance/> : canViewExpenses ? <Navigate to="/finance/expenses" replace/> : <Navigate to="/" replace/>}/>
     <Route path="/finance/debts" element={canViewFinance ? <DebtsPage/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/finance/expenses" element={canViewExpenses ? <ExpensesPage/> : <Navigate to="/finance" replace/>}/>
     <Route path="/payroll" element={canViewPayroll ? <PayrollDesk/> : <Navigate to="/finance" replace/>}/>
     <Route path="/notifications" element={<Notifications/>}/>
     <Route path="/more" element={<More/>}/>
