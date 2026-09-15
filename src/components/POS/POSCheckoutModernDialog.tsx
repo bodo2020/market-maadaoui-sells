@@ -104,17 +104,45 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const scanTargetRef = useRef<ScanTarget>(null);
 
-  const visibleMethods = useMemo(
-    () => methods
-      .filter(row => row.active && (row.code !== "employee_credit" || Boolean(employee)))
-      .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "ar")),
-    [methods, employee],
+  const customerCreditMethod = useMemo<POSPaymentMethod | null>(() => {
+    if (!currentBranchId || !customer?.credit_active || !customer.credit_payment_method_id) return null;
+    return {
+      id: customer.credit_payment_method_id,
+      branch_id: currentBranchId,
+      code: "customer_credit",
+      name: "آجل عميل",
+      method_type: "other",
+      active: true,
+      sort_order: 960,
+      fee_type: "none",
+      fee_value: 0,
+      fee_bearer: "business",
+      require_reference: false,
+      settlement_account_id: null,
+      metadata: { internal_only: true, customer_credit: true },
+    };
+  }, [currentBranchId, customer]);
+
+  const allMethods = useMemo(
+    () => customerCreditMethod ? [...methods, customerCreditMethod] : methods,
+    [methods, customerCreditMethod],
   );
-  const mixedEligibleMethods = useMemo(() => visibleMethods.filter(row => row.code !== "employee_credit"), [visibleMethods]);
+
+  const visibleMethods = useMemo(
+    () => allMethods
+      .filter(row => row.active
+        && (row.code !== "employee_credit" || Boolean(employee))
+        && (row.code !== "customer_credit" || Boolean(customer?.credit_active)))
+      .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "ar")),
+    [allMethods, employee, customer?.credit_active],
+  );
+  const mixedEligibleMethods = useMemo(() => visibleMethods.filter(row => row.code !== "employee_credit" && row.code !== "customer_credit"), [visibleMethods]);
   const selectedMethod = useMemo(() => visibleMethods.find(row => row.id === methodId) || null, [visibleMethods, methodId]);
   const voucherAmount = voucher ? Math.max(0, Math.min(Number(voucher.remaining_value_egp || 0), Number(total || 0))) : 0;
   const baseDue = Math.max(0, Number((Number(total || 0) - voucherAmount).toFixed(2)));
   const isEmployeeCredit = !mixedMode && selectedMethod?.code === "employee_credit";
+  const isCustomerCredit = !mixedMode && selectedMethod?.code === "customer_credit";
+  const isCredit = isEmployeeCredit || isCustomerCredit;
   const paymentPreview = useMemo(() => calculatePOSPaymentFee(selectedMethod, baseDue), [selectedMethod, baseDue]);
 
   const splitRows = useMemo(() => splitDrafts.map(draft => {
@@ -131,7 +159,7 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   const splitAmountToCollect = useMemo(() => Number(splitRows.reduce((sum, row) => sum + row.preview.amountCharged, 0).toFixed(2)), [splitRows]);
   const splitCashDue = useMemo(() => Number(splitRows.filter(row => row.method?.method_type === "cash").reduce((sum, row) => sum + row.preview.amountCharged, 0).toFixed(2)), [splitRows]);
 
-  const amountToCollect = isEmployeeCredit ? 0 : mixedMode ? splitAmountToCollect : paymentPreview.amountCharged;
+  const amountToCollect = isCredit ? 0 : mixedMode ? splitAmountToCollect : paymentPreview.amountCharged;
   const isCash = !mixedMode && selectedMethod?.method_type === "cash";
   const activeCashDue = mixedMode ? splitCashDue : (isCash ? amountToCollect : 0);
   const change = activeCashDue > 0 ? Math.max(0, Number(cashTendered || 0) - activeCashDue) : 0;
@@ -174,7 +202,7 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
     setLoadingMethods(true);
     try {
       const rows = await fetchPOSPaymentMethods(currentBranchId);
-      const normalActive = rows.filter(row => row.active && row.code !== "employee_credit");
+      const normalActive = rows.filter(row => row.active && row.code !== "employee_credit" && row.code !== "customer_credit");
       setMethods(rows);
       const cash = normalActive.find(row => row.method_type === "cash");
       const fallback = cash || normalActive[0];
@@ -200,12 +228,13 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   }, [open, syncContexts, loadMethods]);
 
   useEffect(() => {
-    if (!employee && selectedMethod?.code === "employee_credit") {
-      const cash = methods.find(row => row.active && row.code !== "employee_credit" && row.method_type === "cash");
-      const fallback = cash || methods.find(row => row.active && row.code !== "employee_credit");
-      setMethodId(fallback?.id || "");
-    }
-  }, [employee, selectedMethod?.code, methods]);
+    if (!methodId || visibleMethods.some(row => row.id === methodId)) return;
+    const normal = methods.filter(row => row.active && row.code !== "employee_credit" && row.code !== "customer_credit");
+    const cash = normal.find(row => row.method_type === "cash");
+    setMethodId((cash || normal[0])?.id || "");
+    setMixedMode(false);
+    setSplitDrafts([]);
+  }, [methodId, visibleMethods, methods]);
 
   useEffect(() => {
     if (!open) return;
@@ -216,8 +245,8 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   useEffect(() => {
     if (!open) return;
     if (!mixedMode && selectedMethod?.method_type === "cash") setCashTendered(paymentPreview.amountCharged.toFixed(2));
-    if (isEmployeeCredit) setCashTendered("");
-  }, [open, mixedMode, selectedMethod?.id, selectedMethod?.method_type, paymentPreview.amountCharged, isEmployeeCredit]);
+    if (isCredit) setCashTendered("");
+  }, [open, mixedMode, selectedMethod?.id, selectedMethod?.method_type, paymentPreview.amountCharged, isCredit]);
 
   useEffect(() => {
     if (!mixedMode || splitCashDue <= 0) return;
@@ -236,7 +265,12 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
           if (!linked) throw new Error("باركود الزبون غير معروف.");
           setEmployee(null);
           storeCustomer(linked);
-          toast({ title: `تم ربط ${linked.name || "الزبون"}`, description: `${Number(linked.points_balance || 0).toLocaleString("ar-EG")} نقطة متاحة` });
+          toast({
+            title: `تم ربط ${linked.name || "الزبون"}`,
+            description: linked.credit_active
+              ? `آجل متاح ${money(linked.credit_available)} · ${Number(linked.points_balance || 0).toLocaleString("ar-EG")} نقطة`
+              : `${Number(linked.points_balance || 0).toLocaleString("ar-EG")} نقطة متاحة`,
+          });
         } else if (isEmployeePurchaseBarcode(barcode)) {
           const linked = await lookupEmployeePurchaseCard(barcode, currentBranchId);
           if (!linked) throw new Error("باركود الموظف غير معروف أو الحساب غير نشط.");
@@ -306,8 +340,8 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   }, [open, scanTarget, handleBarcode]);
 
   const enableMixedMode = () => {
-    if (mixedEligibleMethods.length < 2 || baseDue <= 0 || isEmployeeCredit) return;
-    const firstId = selectedMethod && selectedMethod.code !== "employee_credit" ? selectedMethod.id : mixedEligibleMethods[0].id;
+    if (mixedEligibleMethods.length < 2 || baseDue <= 0 || isCredit) return;
+    const firstId = selectedMethod && selectedMethod.code !== "employee_credit" && selectedMethod.code !== "customer_credit" ? selectedMethod.id : mixedEligibleMethods[0].id;
     const second = mixedEligibleMethods.find(row => row.id !== firstId);
     if (!second) return;
     setSplitDrafts(distributeEvenly([firstId, second.id], baseDue));
@@ -360,10 +394,11 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
     if (baseDue <= 0) return true;
     if (!selectedMethod) return false;
     if (isEmployeeCredit) return Boolean(employee?.credit_active) && baseDue <= Number(employee?.credit_available || 0) + 0.009;
+    if (isCustomerCredit) return Boolean(customer?.credit_active) && baseDue <= Number(customer?.credit_available || 0) + 0.009;
     if (selectedMethod.require_reference && !paymentReference.trim()) return false;
     if (selectedMethod.method_type === "cash") return Number(cashTendered || 0) >= paymentPreview.amountCharged;
     return true;
-  }, [baseDue, selectedMethod, isEmployeeCredit, employee, paymentReference, cashTendered, paymentPreview.amountCharged]);
+  }, [baseDue, selectedMethod, isEmployeeCredit, employee, isCustomerCredit, customer, paymentReference, cashTendered, paymentPreview.amountCharged]);
 
   const paymentValid = mixedMode ? mixedPaymentValid : singlePaymentValid;
 
@@ -390,7 +425,7 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
         discount: checked.discount,
         total: checked.total,
         profit,
-        payment_method: isEmployeeCredit ? "mixed" : mixedMode ? "mixed" : selectedMethod?.method_type === "cash" ? "cash" : "card",
+        payment_method: isCredit ? "mixed" : mixedMode ? "mixed" : selectedMethod?.method_type === "cash" ? "cash" : "card",
         cash_amount: 0,
         card_amount: 0,
         customer_name: customer?.name || undefined,
@@ -419,11 +454,14 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
       setVoucher(null);
       onSaleCommitted?.(confirmed as Sale);
       const employeeCredit = Number((confirmed as any).employee_credit_amount || 0);
+      const customerCredit = Number((confirmed as any).customer_credit_amount || 0);
       toast({
-        title: employeeCredit > 0 ? "تم تسجيل البيع الآجل" : "تم البيع بنجاح",
-        description: employeeCredit > 0
-          ? `فاتورة ${(confirmed as Sale).invoice_number} · آجل ${money(employeeCredit)}`
-          : `فاتورة ${(confirmed as Sale).invoice_number}`,
+        title: customerCredit > 0 ? "تم تسجيل البيع الآجل للعميل" : employeeCredit > 0 ? "تم تسجيل البيع الآجل" : "تم البيع بنجاح",
+        description: customerCredit > 0
+          ? `فاتورة ${(confirmed as Sale).invoice_number} · آجل عميل ${money(customerCredit)}`
+          : employeeCredit > 0
+            ? `فاتورة ${(confirmed as Sale).invoice_number} · آجل ${money(employeeCredit)}`
+            : `فاتورة ${(confirmed as Sale).invoice_number}`,
       });
     } catch (err: any) {
       setError(err?.message || "تعذر إتمام البيع.");
@@ -446,6 +484,7 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   };
 
   const saleEmployeeCredit = Number((sale as any)?.employee_credit_amount || 0);
+  const saleCustomerCredit = Number((sale as any)?.customer_credit_amount || 0);
   const saleEmployeePoints = Number((sale as any)?.employee_points_earned || 0);
 
   return (
@@ -460,10 +499,10 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
             <div className="space-y-5 py-2">
               <div className="rounded-3xl bg-emerald-50 p-6 text-center text-emerald-950">
                 <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-white"><Check className="h-7 w-7 text-[#005931]" /></div>
-                <div className="text-xl font-black">{saleEmployeeCredit > 0 ? "تم تسجيل الفاتورة على حساب الموظف" : "تم تسجيل الفاتورة"}</div>
+                <div className="text-xl font-black">{saleCustomerCredit > 0 ? "تم تسجيل الفاتورة على حساب العميل" : saleEmployeeCredit > 0 ? "تم تسجيل الفاتورة على حساب الموظف" : "تم تسجيل الفاتورة"}</div>
                 <div className="mt-1 text-sm">{sale.invoice_number}</div>
-                <div className="mt-3 text-2xl font-black">{money(saleEmployeeCredit > 0 ? saleEmployeeCredit : Number((sale as any).amount_charged ?? sale.amount_due ?? sale.total))}</div>
-                <div className="mt-1 text-xs text-emerald-800">{saleEmployeeCredit > 0 ? "آجل موظف · المحصل فعليًا 0.00" : (sale as any).payment_method_name || (mixedMode ? "دفع مختلط" : selectedMethod?.name) || "وسيلة الدفع"}</div>
+                <div className="mt-3 text-2xl font-black">{money(saleCustomerCredit > 0 ? saleCustomerCredit : saleEmployeeCredit > 0 ? saleEmployeeCredit : Number((sale as any).amount_charged ?? sale.amount_due ?? sale.total))}</div>
+                <div className="mt-1 text-xs text-emerald-800">{saleCustomerCredit > 0 ? "آجل عميل · المحصل فعليًا 0.00" : saleEmployeeCredit > 0 ? "آجل موظف · المحصل فعليًا 0.00" : (sale as any).payment_method_name || (mixedMode ? "دفع مختلط" : selectedMethod?.name) || "وسيلة الدفع"}</div>
                 {Array.isArray((sale as any).payment_breakdown) && (sale as any).payment_breakdown.length > 1 && (
                   <div className="mt-3 flex flex-wrap justify-center gap-2">{(sale as any).payment_breakdown.map((part: any, index: number) => <Badge key={`${part.payment_method_id}-${index}`} variant="outline" className="bg-white">{part.name} · {money(Number(part.charged_amount || 0))}</Badge>)}</div>
                 )}
@@ -501,16 +540,25 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
                     <div className="mt-3 text-xs text-amber-900">الدفع العادي يكسب <strong>5 نقاط لكل جنيه</strong>. البيع الآجل لا يكسب نقاط.</div>
                   </div>
                 ) : customer ? (
-                  <div className="rounded-2xl bg-emerald-50 p-4">
+                  <div className={`rounded-2xl p-4 ${customer.credit_active ? "border border-amber-200 bg-amber-50" : "bg-emerald-50"}`}>
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1"><div className="font-black">{customer.name || "عميل المعداوي"}</div><div className="mt-1 text-xs text-muted-foreground">{customer.membership_number || customer.phone || "عميل مرتبط"}</div></div>
                       <Button variant="ghost" size="icon" onClick={() => storeCustomer(null)} aria-label="إزالة العميل"><X className="h-4 w-4" /></Button>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-center"><div className="rounded-xl bg-white p-2"><div className="text-[10px] text-muted-foreground">الرصيد</div><div className="font-black text-[#005931]">{Number(customer.points_balance || 0).toLocaleString("ar-EG")} نقطة</div></div><div className="rounded-xl bg-white p-2"><div className="text-[10px] text-muted-foreground">متوقع من الفاتورة</div><div className="font-black text-[#005931]">+ {expectedCustomerPoints.toLocaleString("ar-EG")} نقطة</div></div></div>
+                    {customer.credit_active ? (
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                        <div className="rounded-xl bg-white p-2"><div className="text-[10px] text-muted-foreground">النقاط</div><div className="font-black text-[#005931]">{Number(customer.points_balance || 0).toLocaleString("ar-EG")}</div></div>
+                        <div className="rounded-xl bg-white p-2"><div className="text-[10px] text-muted-foreground">الآجل المتاح</div><div className="font-black text-amber-900">{money(customer.credit_available)}</div></div>
+                        <div className="rounded-xl bg-white p-2"><div className="text-[10px] text-muted-foreground">المديونية</div><div className="font-black">{money(customer.receivable_balance)}</div></div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-center"><div className="rounded-xl bg-white p-2"><div className="text-[10px] text-muted-foreground">الرصيد</div><div className="font-black text-[#005931]">{Number(customer.points_balance || 0).toLocaleString("ar-EG")} نقطة</div></div><div className="rounded-xl bg-white p-2"><div className="text-[10px] text-muted-foreground">متوقع من الفاتورة</div><div className="font-black text-[#005931]">+ {expectedCustomerPoints.toLocaleString("ar-EG")} نقطة</div></div></div>
+                    )}
+                    <div className={`mt-3 text-xs ${customer.credit_active ? "text-amber-900" : "text-emerald-800"}`}>{customer.credit_active ? `آجل معتمد لهذا الفرع · الحد ${money(customer.credit_limit)}` : customer.online_registered ? "حساب أونلاين مرتبط · الآجل غير مفعّل" : "الآجل غير متاح لهذا العميل"}</div>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">ممكن تكمل بدون هوية. اربط عميل للولاء أو موظف لتفعيل نقاط الموظفين وخيار الآجل.</div>
+                    <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">ممكن تكمل بدون هوية. اربط عميل للولاء أو موظف لتفعيل المزايا وخيارات الآجل المصرح بها.</div>
                     <div className="grid grid-cols-2 gap-2">
                       <Button variant={scanTarget === "buyer" ? "default" : "outline"} className={scanTarget === "buyer" ? "bg-[#005931]" : ""} onClick={() => beginScan("buyer")}><ScanLine className="ml-2 h-4 w-4" />زبون / موظف</Button>
                       <Button variant="outline" onClick={() => beginScan("buyer", true)}>كاميرا الهوية</Button>
@@ -531,8 +579,8 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
 
               <section className="rounded-3xl border p-4">
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div><div className="text-xs font-bold text-[#005931]">3 · وسيلة الدفع</div><div className="font-black">{mixedMode ? "قسّم الفاتورة على أكثر من وسيلة" : isEmployeeCredit ? "تسجيل الفاتورة آجل على الموظف" : "اختر طريقة التحصيل"}</div></div>
-                  {baseDue > 0 && mixedEligibleMethods.length >= 2 && !isEmployeeCredit && (
+                  <div><div className="text-xs font-bold text-[#005931]">3 · وسيلة الدفع</div><div className="font-black">{mixedMode ? "قسّم الفاتورة على أكثر من وسيلة" : isCustomerCredit ? "تسجيل الفاتورة آجل على العميل" : isEmployeeCredit ? "تسجيل الفاتورة آجل على الموظف" : "اختر طريقة التحصيل"}</div></div>
+                  {baseDue > 0 && mixedEligibleMethods.length >= 2 && !isCredit && (
                     <div className="flex rounded-xl border bg-slate-50 p-1">
                       <Button type="button" size="sm" variant={!mixedMode ? "default" : "ghost"} className={!mixedMode ? "bg-[#005931]" : ""} onClick={disableMixedMode}>وسيلة واحدة</Button>
                       <Button type="button" size="sm" variant={mixedMode ? "default" : "ghost"} className={mixedMode ? "bg-[#005931]" : ""} onClick={enableMixedMode}><SplitSquareHorizontal className="ml-1.5 h-4 w-4" />دفع مختلط</Button>
@@ -557,16 +605,18 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
                   <>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{visibleMethods.map(method => {
                       const active = method.id === methodId;
-                      const credit = method.code === "employee_credit";
+                      const credit = method.code === "employee_credit" || method.code === "customer_credit";
+                      const customerCredit = method.code === "customer_credit";
                       return <button key={method.id} type="button" onClick={() => { setMethodId(method.id); setPaymentReference(""); setMixedMode(false); setSplitDrafts([]); }} className={`flex min-h-[104px] flex-col items-center justify-center rounded-2xl border p-3 text-center transition ${active ? credit ? "border-amber-500 bg-amber-50 text-amber-900 ring-1 ring-amber-400/30" : "border-[#005931] bg-emerald-50 text-[#005931] ring-1 ring-[#005931]/20" : "bg-white hover:bg-slate-50"}`}>
                         {credit ? <CreditCard className="h-6 w-6" /> : <PaymentMethodBrand method={method} compact className="border-0 shadow-none" />}
                         <div className="mt-2 text-sm font-black">{method.name}</div>
-                        {credit ? <div className="mt-1 text-[10px]">لا يدخل تحصيل الوردية</div> : method.fee_type !== "none" && method.fee_value > 0 ? <div className="mt-1 text-[10px]">رسوم {method.fee_type === "percent" ? `${method.fee_value}%` : money(method.fee_value)}</div> : null}
+                        {credit ? <div className="mt-1 text-[10px]">{customerCredit ? "يظهر للعميل المعتمد فقط" : "لا يدخل تحصيل الوردية"}</div> : method.fee_type !== "none" && method.fee_value > 0 ? <div className="mt-1 text-[10px]">رسوم {method.fee_type === "percent" ? `${method.fee_value}%` : money(method.fee_value)}</div> : null}
                       </button>;
                     })}</div>
                     {isEmployeeCredit && employee && <div className={`mt-3 rounded-2xl border p-4 ${baseDue <= employee.credit_available + 0.009 ? "border-amber-200 bg-amber-50 text-amber-950" : "border-red-200 bg-red-50 text-red-900"}`}><div className="flex items-center justify-between gap-3"><span>سيُضاف على حساب {employee.name}</span><strong>{money(baseDue)}</strong></div><div className="mt-2 flex items-center justify-between text-xs"><span>المتاح قبل العملية</span><strong>{money(employee.credit_available)}</strong></div><div className="mt-2 text-xs font-bold">المحصل فعليًا: 0.00 · النقاط: 0</div>{baseDue > employee.credit_available + 0.009 && <div className="mt-2 text-xs font-black">المبلغ أكبر من حد الآجل المتاح.</div>}</div>}
-                    {selectedMethod?.require_reference && !isEmployeeCredit && <div className="mt-3 space-y-2"><Label>الرقم المرجعي للعملية</Label><Input value={paymentReference} onChange={e => setPaymentReference(e.target.value)} placeholder="رقم العملية / الإيصال" dir="ltr" /></div>}
-                    {selectedMethod && paymentPreview.fee > 0 && !isEmployeeCredit && <div className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-950"><div className="flex justify-between"><span>رسوم {selectedMethod.name}</span><strong>{money(paymentPreview.fee)}</strong></div><div className="mt-1 text-xs">{selectedMethod.fee_bearer === "customer" ? "تُضاف على المبلغ المطلوب من العميل." : "تتحملها المنشأة وتُخصم من صافي الربح."}</div></div>}
+                    {isCustomerCredit && customer && <div className={`mt-3 rounded-2xl border p-4 ${baseDue <= customer.credit_available + 0.009 ? "border-amber-200 bg-amber-50 text-amber-950" : "border-red-200 bg-red-50 text-red-900"}`}><div className="flex items-center justify-between gap-3"><span>سيُضاف على حساب {customer.name || "العميل"}</span><strong>{money(baseDue)}</strong></div><div className="mt-2 flex items-center justify-between text-xs"><span>المديونية الحالية</span><strong>{money(customer.receivable_balance)}</strong></div><div className="mt-2 flex items-center justify-between text-xs"><span>المتاح قبل العملية</span><strong>{money(customer.credit_available)}</strong></div><div className="mt-2 text-xs font-bold">المحصل فعليًا: 0.00 · تُسجل الفاتورة في مديونية العميل.</div>{baseDue > customer.credit_available + 0.009 && <div className="mt-2 text-xs font-black">المبلغ أكبر من حد الآجل المتاح.</div>}</div>}
+                    {selectedMethod?.require_reference && !isCredit && <div className="mt-3 space-y-2"><Label>الرقم المرجعي للعملية</Label><Input value={paymentReference} onChange={e => setPaymentReference(e.target.value)} placeholder="رقم العملية / الإيصال" dir="ltr" /></div>}
+                    {selectedMethod && paymentPreview.fee > 0 && !isCredit && <div className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-950"><div className="flex justify-between"><span>رسوم {selectedMethod.name}</span><strong>{money(paymentPreview.fee)}</strong></div><div className="mt-1 text-xs">{selectedMethod.fee_bearer === "customer" ? "تُضاف على المبلغ المطلوب من العميل." : "تتحملها المنشأة وتُخصم من صافي الربح."}</div></div>}
                   </>
                 )}
 
@@ -576,11 +626,11 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
               <div className="rounded-3xl bg-slate-50 p-4">
                 <div className="flex items-center justify-between text-sm"><span>إجمالي المنتجات</span><strong>{money(total)}</strong></div>
                 {voucherAmount > 0 && <div className="mt-2 flex items-center justify-between text-sm text-emerald-700"><span>كوبون خصم</span><strong>- {money(voucherAmount)}</strong></div>}
-                {!isEmployeeCredit && (mixedMode ? splitCustomerFee : paymentPreview.customerFee) > 0 && <div className="mt-2 flex items-center justify-between text-sm text-amber-700"><span>رسوم وسائل الدفع على العميل</span><strong>+ {money(mixedMode ? splitCustomerFee : paymentPreview.customerFee)}</strong></div>}
+                {!isCredit && (mixedMode ? splitCustomerFee : paymentPreview.customerFee) > 0 && <div className="mt-2 flex items-center justify-between text-sm text-amber-700"><span>رسوم وسائل الدفع على العميل</span><strong>+ {money(mixedMode ? splitCustomerFee : paymentPreview.customerFee)}</strong></div>}
                 {mixedMode && splitMerchantFee > 0 && <div className="mt-2 text-[11px] text-muted-foreground">عمولات تتحملها المنشأة: {money(splitMerchantFee)} — لا تُضاف على العميل.</div>}
-                <div className="mt-3 flex items-center justify-between border-t pt-3"><span className="font-black">{isEmployeeCredit ? "المسجل آجل" : "المطلوب تحصيله"}</span><strong className={`text-2xl ${isEmployeeCredit ? "text-amber-800" : "text-[#005931]"}`}>{money(isEmployeeCredit ? baseDue : amountToCollect)}</strong></div>
+                <div className="mt-3 flex items-center justify-between border-t pt-3"><span className="font-black">{isCredit ? "المسجل آجل" : "المطلوب تحصيله"}</span><strong className={`text-2xl ${isCredit ? "text-amber-800" : "text-[#005931]"}`}>{money(isCredit ? baseDue : amountToCollect)}</strong></div>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {customer && <Badge className="bg-[#005931]">عميل مرتبط · +{expectedCustomerPoints} نقطة متوقعة</Badge>}
+                  {customer && <Badge className={isCustomerCredit ? "bg-amber-700" : "bg-[#005931]"}>{isCustomerCredit ? `عميل · آجل معتمد · متاح ${money(customer.credit_available)}` : `عميل مرتبط · +${expectedCustomerPoints} نقطة متوقعة`}</Badge>}
                   {employee && <Badge className={isEmployeeCredit ? "bg-amber-700" : "bg-[#005931]"}>{isEmployeeCredit ? "موظف · آجل · 0 نقطة" : `موظف · +${expectedEmployeePoints} نقطة متوقعة`}</Badge>}
                   {!customer && !employee && <Badge variant="secondary">بدون هوية · 0 نقطة</Badge>}
                   {voucher && <Badge variant="outline">كوبون خصم مطبق</Badge>}
@@ -588,8 +638,8 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
                 </div>
               </div>
 
-              <Button className={`h-14 w-full text-base ${isEmployeeCredit ? "bg-amber-700 hover:bg-amber-800" : "bg-[#005931] hover:bg-[#004a29]"}`} disabled={!paymentValid || processing || (baseDue > 0 && !visibleMethods.length)} onClick={() => void completeSale()}>{processing ? <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> : isEmployeeCredit ? <CreditCard className="ml-2 h-5 w-5" /> : <Check className="ml-2 h-5 w-5" />}{processing ? "جاري تسجيل البيع..." : isEmployeeCredit ? `تسجيل آجل · ${money(baseDue)}` : `تأكيد البيع · ${money(amountToCollect)}`}</Button>
-              <div className="text-center text-[11px] text-muted-foreground">{isEmployeeCredit ? "الآجل لا يدخل في نقدية أو محافظ الوردية، ويُسجل مباشرة في حساب الموظف." : employee ? <><Coins className="ml-1 inline h-3 w-3" />الموظف يحصل على 5 نقاط لكل جنيه مدفوع فعليًا.</> : "في الدفع المختلط يتم توزيع أصل الفاتورة أولًا، ثم تحسب عمولة كل وسيلة على الجزء الخاص بها فقط."}</div>
+              <Button className={`h-14 w-full text-base ${isCredit ? "bg-amber-700 hover:bg-amber-800" : "bg-[#005931] hover:bg-[#004a29]"}`} disabled={!paymentValid || processing || (baseDue > 0 && !visibleMethods.length)} onClick={() => void completeSale()}>{processing ? <RefreshCw className="ml-2 h-5 w-5 animate-spin" /> : isCredit ? <CreditCard className="ml-2 h-5 w-5" /> : <Check className="ml-2 h-5 w-5" />}{processing ? "جاري تسجيل البيع..." : isCredit ? `تسجيل آجل · ${money(baseDue)}` : `تأكيد البيع · ${money(amountToCollect)}`}</Button>
+              <div className="text-center text-[11px] text-muted-foreground">{isCustomerCredit ? "آجل العميل لا يدخل في نقدية أو محافظ الوردية، ويُسجل مباشرة في مديونية العميل مع مراجعة الحد مرة أخرى على السيرفر." : isEmployeeCredit ? "الآجل لا يدخل في نقدية أو محافظ الوردية، ويُسجل مباشرة في حساب الموظف." : employee ? <><Coins className="ml-1 inline h-3 w-3" />الموظف يحصل على 5 نقاط لكل جنيه مدفوع فعليًا.</> : "في الدفع المختلط يتم توزيع أصل الفاتورة أولًا، ثم تحسب عمولة كل وسيلة على الجزء الخاص بها فقط."}</div>
             </div>
           )}
         </DialogContent>
