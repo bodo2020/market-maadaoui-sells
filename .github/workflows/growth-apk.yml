@@ -1,0 +1,94 @@
+name: Growth APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.*"
+      - "capacitor.config.json"
+      - ".github/workflows/growth-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install web dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Capacitor for Android build
+        run: npm install --no-save --no-package-lock --no-audit --no-fund @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+
+      - name: Build Growth web app
+        run: npm run build
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Configure Android min SDK and WebView autofill
+        run: |
+          sed -i -E 's/minSdkVersion = [0-9]+/minSdkVersion = 26/' android/variables.gradle
+          python - <<'PY'
+          from pathlib import Path
+
+          activity = Path("android/app/src/main/java/com/elmadawy/growth/MainActivity.java")
+          if not activity.exists():
+              raise SystemExit(f"MainActivity not found: {activity}")
+
+          activity.write_text('''package com.elmadawy.growth;\n\nimport android.os.Bundle;\nimport android.view.View;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n    @Override\n    protected void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        if (getBridge() != null && getBridge().getWebView() != null) {\n            getBridge().getWebView().setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_YES);\n        }\n    }\n}\n''', encoding="utf-8")
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text(encoding="utf-8")
+          if 'android:usesCleartextTraffic="false"' not in text:
+              text = text.replace('<application', '<application android:usesCleartextTraffic="false"', 1)
+              manifest.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Sync Android project
+        run: npx cap sync android
+
+      - name: Verify password autofill metadata in built web bundle
+        run: |
+          grep -R "current-password" dist >/dev/null
+          grep -R "username" dist >/dev/null
+          grep -n "IMPORTANT_FOR_AUTOFILL_YES" android/app/src/main/java/com/elmadawy/growth/MainActivity.java
+          grep -n "usesCleartextTraffic=\"false\"" android/app/src/main/AndroidManifest.xml
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare APK artifact
+        run: |
+          VERSION="1.0.${{ github.run_number }}"
+          mkdir -p artifact
+          cp android/app/build/outputs/apk/debug/app-debug.apk "artifact/elmadawy-growth-v${VERSION}.apk"
+          echo "apk_name=elmadawy-growth-v${VERSION}" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.apk_name }}
+          path: artifact/*.apk
+          if-no-files-found: error
+          retention-days: 14
