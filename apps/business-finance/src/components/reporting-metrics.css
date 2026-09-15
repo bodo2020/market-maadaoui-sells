@@ -1,0 +1,119 @@
+.metric-dictionary {
+  display: grid;
+  gap: 14px;
+}
+
+.metric-dictionary__head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.metric-dictionary__head h3 {
+  margin: 5px 0 0;
+}
+
+.metric-dictionary__head p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.metric-definition-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-definition-card {
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.metric-definition-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+}
+
+.metric-definition-card__top strong {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.metric-definition-card__key {
+  direction: ltr;
+  color: var(--primary);
+  background: var(--primary-light);
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.metric-definition-card > p {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.8;
+  margin: 0;
+}
+
+.metric-definition-card__formula {
+  direction: ltr;
+  text-align: left;
+  background: #f7faf8;
+  border: 1px solid #e7eeea;
+  border-radius: 11px;
+  padding: 9px 10px;
+  color: #365347;
+  font-size: 10px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.metric-definition-card__source,
+.metric-definition-card__caveat {
+  display: flex;
+  gap: 6px;
+  align-items: start;
+  color: #7b8781;
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.metric-definition-card__source b,
+.metric-definition-card__caveat b {
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.metric-definition-card__source code {
+  direction: ltr;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.metric-definition-card__caveat {
+  padding-top: 8px;
+  border-top: 1px solid var(--divider);
+  color: #8a6c27;
+}
+
+@media (max-width: 1100px) {
+  .metric-definition-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  .metric-dictionary__head { display: grid; }
+  .metric-definition-grid { grid-template-columns: 1fr; }
+}

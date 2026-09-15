@@ -1,0 +1,210 @@
+.decision-center-page {
+  padding-bottom: 1.5rem;
+}
+
+.decision-center-head {
+  position: relative;
+  overflow: hidden;
+}
+
+.decision-center-head::after {
+  content: '';
+  position: absolute;
+  inset: auto -5rem -6rem auto;
+  width: 15rem;
+  height: 15rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(22, 131, 90, .14), rgba(22, 131, 90, 0) 70%);
+  pointer-events: none;
+}
+
+.decision-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: .85rem;
+}
+
+.decision-kpi {
+  min-height: 8.2rem;
+}
+
+.decision-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  margin-top: .35rem;
+  font-weight: 700;
+}
+
+.decision-trend.is-up {
+  color: #087443;
+}
+
+.decision-trend.is-down {
+  color: #b74b3b;
+}
+
+.decision-source-warnings {
+  display: grid;
+  gap: .55rem;
+}
+
+.decision-source-warnings > div {
+  display: flex;
+  align-items: flex-start;
+  gap: .55rem;
+  padding: .7rem .85rem;
+  border: 1px solid rgba(191, 117, 34, .2);
+  border-radius: 14px;
+  background: rgba(255, 248, 235, .72);
+  color: #7a4f20;
+  font-size: .86rem;
+}
+
+.decision-insights-section {
+  display: grid;
+  gap: .9rem;
+}
+
+.decision-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .85rem;
+}
+
+.decision-insight-card {
+  min-height: 12rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--border, #e6e8e7);
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(24, 55, 43, .045);
+}
+
+.decision-insight-card.is-attention {
+  border-color: rgba(183, 75, 59, .22);
+  background: linear-gradient(150deg, #fff, rgba(255, 242, 239, .78));
+}
+
+.decision-insight-card.is-opportunity {
+  border-color: rgba(0, 89, 49, .18);
+  background: linear-gradient(150deg, #fff, rgba(236, 249, 242, .82));
+}
+
+.decision-insight-card.is-info {
+  border-color: rgba(78, 103, 128, .17);
+  background: linear-gradient(150deg, #fff, rgba(243, 247, 250, .82));
+}
+
+.decision-insight-card h4 {
+  margin: .55rem 0 .45rem;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.decision-insight-card p {
+  margin: 0;
+  color: var(--muted, #68736e);
+  font-size: .87rem;
+  line-height: 1.75;
+}
+
+.decision-insight-card > a {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  width: fit-content;
+  color: #005931;
+  font-size: .83rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.decision-insight-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: .27rem .55rem;
+  border-radius: 999px;
+  background: rgba(0, 89, 49, .08);
+  color: #005931;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.is-attention .decision-insight-badge {
+  background: rgba(183, 75, 59, .09);
+  color: #a33d30;
+}
+
+.decision-quick-links {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.decision-quick-link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .7rem;
+  padding: .85rem;
+  border: 1px solid var(--border, #e6e8e7);
+  border-radius: 16px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.decision-quick-link:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 89, 49, .25);
+  box-shadow: 0 10px 24px rgba(24, 55, 43, .06);
+}
+
+.decision-quick-link > span {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 89, 49, .08);
+  color: #005931;
+}
+
+.decision-quick-link div {
+  min-width: 0;
+  display: grid;
+  gap: .2rem;
+}
+
+.decision-quick-link strong {
+  font-size: .88rem;
+}
+
+.decision-quick-link small {
+  color: var(--muted, #68736e);
+  line-height: 1.45;
+}
+
+@media (max-width: 1180px) {
+  .decision-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .decision-quick-links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .decision-kpi-grid,
+  .decision-insight-grid,
+  .decision-quick-links { grid-template-columns: 1fr; }
+  .decision-kpi { min-height: auto; }
+  .decision-insight-card { min-height: auto; }
+}
+
+@media print {
+  .decision-insight-card,
+  .decision-quick-link { box-shadow: none; break-inside: avoid; }
+}
