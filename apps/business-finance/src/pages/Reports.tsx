@@ -39,15 +39,15 @@ export default function Reports() {
 
   return <div className="stack-lg reports-hub">
     <section className="reports-command-hero">
-      <div><span className="eyebrow">Reporting V2</span><h2>التقارير والتحليلات</h2><p>كل تقرير مبني على نفس محرك البيانات والصلاحيات، مع رسوم تفاعلية، فترة مخصصة، تصدير CSV وطباعة/PDF بدون أرقام تجميلية.</p></div>
-      <Link to="/" className="reports-command-hero__action"><Gauge size={20}/><span><small>Executive View</small><strong>فتح مركز القيادة</strong></span><ArrowUpLeft size={18}/></Link>
+      <div><span className="eyebrow">Reporting V2</span><h2>التقارير والتحليلات</h2><p>كل تقرير مبني على نفس محرك البيانات والصلاحيات، مع رسوم تفاعلية، فترة مخصصة، تصدير CSV وطباعة/PDF بدون أرقام تجميلية. مركز القرار يربط المبيعات والربح والعمالة والمصروفات والتالف والذروة في شاشة واحدة.</p></div>
+      <Link to="/reports/decision-center" className="reports-command-hero__action"><Gauge size={20}/><span><small>Decision Center</small><strong>فتح مركز القرار</strong></span><ArrowUpLeft size={18}/></Link>
     </section>
 
     <section className="reports-capability-strip" aria-label="قدرات نظام التقارير">
       <span><BarChart3 size={16}/> رسوم وتحليلات متقدمة</span>
       <span><Clock3 size={16}/> ذروة POS وOnline</span>
       <span><CircleDollarSign size={16}/> أرقام مالية من الـLedgers</span>
-      <span><Building2 size={16}/> صلاحيات وفروع</span>
+      <span><Lightbulb size={16}/> إشارات قرار قابلة للتتبع</span>
     </section>
 
     {groups.map((group) => <section className="reports-domain" key={group.title}>
