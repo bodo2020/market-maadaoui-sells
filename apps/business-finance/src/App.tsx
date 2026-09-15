@@ -12,6 +12,7 @@ import FinancialReport from './pages/FinancialReport';
 import Login from './pages/Login';
 import More from './pages/More';
 import Notifications from './pages/Notifications';
+import OperationsReport from './pages/OperationsReport';
 import Reports from './pages/Reports';
 import ReportDetail from './pages/ReportDetail';
 import SalesReport from './pages/SalesReport';
@@ -57,6 +58,9 @@ function BusinessAccessGate() {
     <Route path="/reports/sales" element={canViewReports ? <SalesReport/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/profitability" element={canViewReports ? <FinancialReport kind="profitability"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/payments" element={canViewReports ? <FinancialReport kind="payments"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/products" element={canViewReports ? <OperationsReport kind="products"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/inventory" element={canViewReports ? <OperationsReport kind="inventory"/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/reports/returns" element={canViewReports ? <OperationsReport kind="returns"/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/:reportKey" element={canViewReports ? <ReportDetail/> : <Navigate to="/finance" replace/>}/>
     <Route path="/finance" element={canViewFinance ? <Finance/> : <Navigate to="/" replace/>}/>
     <Route path="/notifications" element={<Notifications/>}/>
