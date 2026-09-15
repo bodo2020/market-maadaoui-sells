@@ -1,6 +1,8 @@
 import { ArrowLeftRight, ArrowUpLeft, Boxes, Building2, CircleDollarSign, ClipboardList, Lightbulb, PackageSearch, Receipt, RotateCcw, ShoppingCart, Truck, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import '../components/reporting-metrics.css';
 import type { ReportKey } from '../services/reportingDetails';
+import { coreReportingMetricKeys, getReportingMetric } from '../services/reportingMetrics';
 
 export const reports: Array<{ key: ReportKey; title: string; desc: string; icon: typeof ShoppingCart }> = [
   { key: 'sales', title: 'المبيعات', desc: 'المبيعات، الفواتير، متوسط السلة وساعات الذروة.', icon: ShoppingCart },
@@ -19,11 +21,29 @@ export const reports: Array<{ key: ReportKey; title: string; desc: string; icon:
 ];
 
 export default function Reports() {
+  const coreMetrics = coreReportingMetricKeys.map(getReportingMetric);
+
   return <div className="stack-lg">
     <section className="page-intro"><span className="eyebrow">Reporting V2</span><h2>التقارير والتحليلات</h2><p>تقارير فعلية من نفس محرك البيانات، مع تطبيق صلاحيات الفرع على الخادم وإظهار حدود اكتمال كل رقم.</p></section>
+
     <section className="report-grid">{reports.map(({ key, title, desc, icon: Icon }) => <Link className="report-card" to={`/reports/${key}`} key={key}>
       <span className="report-card__icon"><Icon size={22}/></span><div><strong>{title}</strong><p>{desc}</p></div><ArrowUpLeft className="report-card__arrow" size={18}/>
     </Link>)}</section>
+
+    <section className="metric-dictionary">
+      <div className="metric-dictionary__head">
+        <div><span className="eyebrow">Metric Dictionary</span><h3>قاموس المؤشرات الموحد</h3></div>
+        <p>كل مؤشر أساسي له تعريف وصيغة ومصدر واحد. أي شاشة تستخدم المؤشر تعتمد على نفس التعريف بدل اختلاف الحساب بين الـDashboard والتقارير.</p>
+      </div>
+      <div className="metric-definition-grid">{coreMetrics.map((metric) => <article className="metric-definition-card" key={metric.key}>
+        <div className="metric-definition-card__top"><strong>{metric.label}</strong><span className="metric-definition-card__key">{metric.key}</span></div>
+        <p>{metric.definition}</p>
+        <div className="metric-definition-card__formula">{metric.formula}</div>
+        <div className="metric-definition-card__source"><b>المصدر</b><code>{metric.source}</code></div>
+        {metric.caveat && <div className="metric-definition-card__caveat"><b>ملاحظة</b><span>{metric.caveat}</span></div>}
+      </article>)}</div>
+    </section>
+
     <section className="section-card roadmap-card"><div><span className="eyebrow">قاعدة مهمة</span><h3>لا توجد أرقام تجميلية</h3><p>أي مقياس لا يملك مصدرًا مكتملًا يظهر كغير متاح، ولا يتم استبداله بحسابات قديمة أو نسب ثابتة.</p></div></section>
   </div>;
 }
