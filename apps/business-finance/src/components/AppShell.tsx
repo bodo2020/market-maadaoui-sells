@@ -17,6 +17,7 @@ const titles: Record<string, string> = {
   '/finance': 'النظام المالي',
   '/finance/debts': 'المديونيات',
   '/finance/expenses': 'إدارة المصروفات',
+  '/finance/expenses/categories': 'سياسات بنود المصروفات',
   '/payroll': 'إدارة المرتبات',
   '/notifications': 'التنبيهات',
   '/more': 'المزيد',
