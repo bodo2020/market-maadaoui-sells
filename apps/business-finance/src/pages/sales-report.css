@@ -93,6 +93,23 @@
   gap: 8px;
 }
 
+.financial-report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.financial-report-actions > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.financial-report-actions strong {
+  color: #1d2939;
+  font-size: 13px;
+}
+
 .sales-filter-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(150px, .8fr)) minmax(260px, 1.4fr);
@@ -260,11 +277,13 @@
 
 @media (max-width: 620px) {
   .sales-report-head,
-  .custom-date-panel {
+  .custom-date-panel,
+  .financial-report-actions {
     gap: 14px;
   }
 
-  .custom-date-panel {
+  .custom-date-panel,
+  .financial-report-actions {
     align-items: stretch;
     flex-direction: column;
   }
@@ -316,6 +335,7 @@
   .topbar,
   .bottom-nav,
   .sales-report-toolbar,
+  .financial-report-actions,
   .period-switcher,
   .custom-period-button,
   .custom-date-panel,
