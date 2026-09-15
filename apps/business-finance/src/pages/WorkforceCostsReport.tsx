@@ -82,7 +82,7 @@ export default function WorkforceCostsReport() {
     </section>
 
     <section className="section-card payroll-period-panel">
-      <div><span className="eyebrow">Payroll Cycle</span><h3>دورة المرتبات</h3><p>المرتبات شهرية، بينما فلتر الفترة بالأعلى يتحكم في المصروفات والمبيعات المستخدمة للمقارنة. نسبة العمالة للمبيعات لا تظهر إلا عندما تتطابق الفترتان.</p></div>
+      <div><span className="eyebrow">Payroll Cycle</span><h3>دورة المرتبات</h3><p>المرتبات شهرية، بينما فلتر الفترة بالأعلى يتحكم في المصروفات والمبيعات المستخدمة للمقارنة. نسبة العمالة للمبيعات لا تظهر إلا عندما تتطابق الفترتان بالكامل.</p></div>
       <div className="payroll-period-fields"><label><span>الشهر</span><select value={payrollMonth} onChange={(event) => setPayrollMonth(Number(event.target.value))}>{months.map((label, index) => <option key={label} value={index + 1}>{label}</option>)}</select></label><label><span>السنة</span><input type="number" min="2020" max="2200" value={payrollYear} onChange={(event) => setPayrollYear(Number(event.target.value))}/></label></div>
     </section>
 
@@ -97,7 +97,7 @@ export default function WorkforceCostsReport() {
       <Summary label="صافي دورة المرتبات" value={payrollNet == null ? '—' : money(payrollNet)} hint={Object.keys(run).length ? `الحالة: ${payrollStatus(run.status)}` : 'لم تُنشأ دورة لهذا الشهر'}/>
       <Summary label="المصروفات التشغيلية" value={canViewCosts ? money(expenseAmount) : 'محجوب'} hint={canViewCosts && expenseRatio != null ? `${number(expenseRatio)}% من صافي المبيعات` : undefined}/>
       <Summary label="إجمالي الخصومات" value={payrollNet == null ? '—' : money(nullable(run.total_deductions))} hint="خصومات دورة Payroll V2"/>
-      <Summary label="تكلفة العمالة / المبيعات" value={payrollRatio == null ? '—' : `${number(payrollRatio)}%`} hint={!payrollComparisonMatches ? 'اختر نفس شهر دورة المرتب في فترة المبيعات للمقارنة العادلة' : netSales == null ? 'صافي المبيعات غير متاح للمقارنة' : `صافي المبيعات ${money(netSales)}`}/>
+      <Summary label="تكلفة العمالة / المبيعات" value={payrollRatio == null ? '—' : `${number(payrollRatio)}%`} hint={!payrollComparisonMatches ? 'استخدم فترة مخصصة تغطي شهر دورة المرتب بالكامل؛ زر الشهر الحالي لا يُقارن قبل اكتمال الشهر' : netSales == null ? 'صافي المبيعات غير متاح للمقارنة' : `صافي المبيعات ${money(netSales)}`}/>
     </>}</section>
 
     {payrollItems.length > 0 && <section className="report-visual-grid">
@@ -133,10 +133,10 @@ function csvCell(value: unknown): string { const valueText = String(value ?? '')
 function download(filename: string, content: string) { const blob = new Blob([content], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = filename; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); }
 function cairoParts() { const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone:'Africa/Cairo', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(new Date()).map((part) => [part.type, part.value])); return { year:Number(parts.year), month:Number(parts.month), day:Number(parts.day) }; }
 function isComparablePayrollSalesPeriod(period: PeriodKey, customFrom: string, customTo: string, payrollMonth: number, payrollYear: number, now: { year: number; month: number; day: number }) {
-  if (period === 'month') return payrollMonth === now.month && payrollYear === now.year;
+  const lastDay = new Date(Date.UTC(payrollYear, payrollMonth, 0)).getUTCDate();
+  if (period === 'month') return payrollMonth === now.month && payrollYear === now.year && now.day === lastDay;
   if (period !== 'custom') return false;
   const first = `${payrollYear}-${String(payrollMonth).padStart(2, '0')}-01`;
-  const lastDay = new Date(Date.UTC(payrollYear, payrollMonth, 0)).getUTCDate();
   const last = `${payrollYear}-${String(payrollMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   return customFrom === first && customTo === last;
 }
