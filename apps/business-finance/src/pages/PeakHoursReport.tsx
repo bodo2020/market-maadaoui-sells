@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { ArrowRight, CalendarDays, Clock3, Download, Printer, RefreshCcw, UsersRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { number, money } from '../components/MetricCard';
@@ -11,6 +11,12 @@ import { makeCairoCustomRange } from '../services/salesReporting';
 import type { ReportDocument } from '../services/reportingDetails';
 import './sales-report.css';
 import './business-analytics.css';
+
+type WorkloadStaffRow = Record<string, unknown> & {
+  avg_staff: number;
+  max_staff: number;
+  activity_per_staff: number | null;
+};
 
 const weekdayLabels: Record<number, string> = { 1: 'الاثنين', 2: 'الثلاثاء', 3: 'الأربعاء', 4: 'الخميس', 5: 'الجمعة', 6: 'السبت', 7: 'الأحد' };
 
@@ -74,7 +80,7 @@ export default function PeakHoursReport() {
   const peakOnline = record(summary.peak_online);
   const peakCombined = record(summary.peak_combined);
   const maxHeat = Math.max(1, ...heatmap.map((row) => num(row.combined_activity)));
-  const workloadWithStaff = hourly.map((row) => {
+  const workloadWithStaff: WorkloadStaffRow[] = hourly.map((row): WorkloadStaffRow => {
     const hour = num(row.hour);
     const staffing = coverageHourly.find((item) => num(item.hour) === hour) || {};
     const avgStaff = num(staffing.avg_staff);
@@ -144,7 +150,7 @@ export default function PeakHoursReport() {
           return [<div className="peak-heatmap__day" key={`d-${dow}`}>{weekdayLabels[dow]}</div>, ...Array.from({ length: 24 }, (_, hour) => {
             const row = dayRows.find((item) => num(item.hour) === hour) || {};
             const value = num(row.combined_activity);
-            return <div className="peak-heatmap__cell" key={`${dow}-${hour}`} style={{ '--heat': Math.max(.06, value / maxHeat) } as React.CSSProperties} title={`${weekdayLabels[dow]} ${hourLabel(hour)} · فرع ${number(num(row.pos_transactions))} · أونلاين ${number(num(row.online_orders))}`}><span>{value ? number(value) : ''}</span></div>;
+            return <div className="peak-heatmap__cell" key={`${dow}-${hour}`} style={{ '--heat': Math.max(.06, value / maxHeat) } as CSSProperties} title={`${weekdayLabels[dow]} ${hourLabel(hour)} · فرع ${number(num(row.pos_transactions))} · أونلاين ${number(num(row.online_orders))}`}><span>{value ? number(value) : ''}</span></div>;
           })];
         })}
       </div></div> : <Empty text="لا توجد حركة كافية لبناء خريطة الذروة في الفترة المحددة."/>}
