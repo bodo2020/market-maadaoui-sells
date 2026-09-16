@@ -3,6 +3,7 @@ import ProtectedRoute from "@/components/Auth/ProtectedRoute";
 import HrAccessRoute from "@/components/hr/HrAccessRoute";
 import HrLogin from "@/pages/HrLogin";
 import HrDashboardPage from "@/pages/HrDashboardPage";
+import HrAiPage from "@/pages/HrAiPage";
 import HrTeamWorkspacePage from "@/pages/HrTeamWorkspacePage";
 import HrAttendanceControlPage from "@/pages/HrAttendanceControlPage";
 import HrEmployeeSnapshotPage from "@/pages/HrEmployeeSnapshotPage";
@@ -57,6 +58,7 @@ export default function AppRoutes() {
       <Route path="/notifications" element={protect(<NotificationsCenterV2 />)} />
       <Route path="/account" element={protect(<StaffAccountPage />)} />
 
+      <Route path="/ai" element={protectHr("team", <HrAiPage />)} />
       <Route path="/team" element={protectHr("team", <HrTeamWorkspacePage />)} />
       <Route path="/team/employees/:employeeId" element={protectHr("team", <HrEmployeeSnapshotPage />)} />
       <Route path="/attendance/control" element={protectHr("team", <HrAttendanceControlPage />)} />
