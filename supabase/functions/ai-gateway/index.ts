@@ -9,6 +9,8 @@ type ProviderResult = {
   rawAssistant?: unknown;
   inputTokens?: number;
   outputTokens?: number;
+  thoughtsTokens?: number;
+  finishReason?: string;
 };
 type StoredMessage = { role: "user" | "assistant"; content: string };
 
@@ -26,36 +28,16 @@ const corsHeaders = {
 };
 
 const reportSections = [
-  "overview",
-  "sales",
-  "profitability",
-  "payments",
-  "returns",
-  "inventory",
-  "products",
-  "shifts",
-  "online",
-  "customers",
-  "costs",
-  "insights",
-  "debts",
-  "peak_hours",
-  "waste",
-  "staff_coverage",
-  "inventory_transfers",
+  "overview", "sales", "profitability", "payments", "returns", "inventory", "products", "shifts",
+  "online", "customers", "costs", "insights", "debts", "peak_hours", "waste", "staff_coverage", "inventory_transfers",
 ] as const;
-
 type ReportSection = typeof reportSections[number];
 
 const toolDeclarations = [
   {
     name: "search_products",
     description: "ابحث عن منتجات حقيقية في الفرع بالاسم أو الباركود. استخدمها دائمًا قبل ذكر سعر أو مخزون منتج محدد.",
-    parameters: {
-      type: "object",
-      properties: { query: { type: "string" }, limit: { type: "integer" } },
-      required: ["query"],
-    },
+    parameters: { type: "object", properties: { query: { type: "string" }, limit: { type: "integer" } }, required: ["query"] },
   },
   {
     name: "get_active_offers",
@@ -67,11 +49,7 @@ const toolDeclarations = [
     description: "اقرأ حالة طلب حقيقي باستخدام UUID أو رقم التتبع.",
     parameters: { type: "object", properties: { order_ref: { type: "string" } }, required: ["order_ref"] },
   },
-  {
-    name: "get_branch_info",
-    description: "اقرأ بيانات فرع العمل الحالي.",
-    parameters: { type: "object", properties: {} },
-  },
+  { name: "get_branch_info", description: "اقرأ بيانات فرع العمل الحالي.", parameters: { type: "object", properties: {} } },
   {
     name: "get_management_report",
     description: "اقرأ تقريرًا إداريًا موثوقًا من Reporting V2. استخدمه لأي سؤال عن المبيعات أو الأرباح أو وسائل الدفع أو المرتجعات أو المخزون أو المنتجات أو الورديات والكاشير أو الأونلاين أو العملاء أو المصروفات والموردين أو الديون أو ساعات الذروة أو الهالك أو تغطية الموظفين أو تحويلات المخزون أو التنبيهات الذكية. لا تستنتج أرقامًا تشغيلية من الذاكرة؛ اطلب التقرير أولًا.",
@@ -98,49 +76,37 @@ const systemPrompt = `أنت مساعد الإدارة الخاص بالمعدا
 - لا تعرض purchase_price الخام أو أسرار أو بيانات شخصية مثل الهاتف والبريد والعنوان، حتى لو ظهرت في مصدر البيانات.
 - الربح والتكاليف لا تُعرض إلا إذا رجعت من الـTool حسب صلاحيات المستخدم؛ لا تحاول تجاوز الصلاحيات.
 - لا تدّعي تنفيذ تعديل. هذه النسخة قراءة فقط، وأي Action مالي أو مخزني أو تسعيري يحتاج موافقة بشرية.
+- لو التقرير كبير، أكمل الإجابة للنهاية بخلاصة مرتبة ومكتملة بدل بدء قائمة طويلة ثم قطعها. ركّز على أهم النتائج والإجراءات.
 - لو الأداة فشلت أو البيانات غير كافية، قل ذلك بوضوح من غير اختلاق إجابة.`;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" } });
 }
-
-function safeText(value: unknown, max = 500) {
-  return typeof value === "string" ? value.trim().slice(0, max) : "";
-}
-
+function safeText(value: unknown, max = 500) { return typeof value === "string" ? value.trim().slice(0, max) : ""; }
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
 }
-
 function parseToolArguments(value: unknown) {
   if (typeof value !== "string") return {};
-  try { return JSON.parse(value) as Record<string, unknown>; }
-  catch { return {}; }
+  try { return JSON.parse(value) as Record<string, unknown>; } catch { return {}; }
 }
-
 async function withTimeout(url: string, init: RequestInit, timeoutMs: number) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try { return await fetch(url, { ...init, signal: controller.signal }); }
-  finally { clearTimeout(timer); }
+  try { return await fetch(url, { ...init, signal: controller.signal }); } finally { clearTimeout(timer); }
 }
-
-async function sleep(ms: number) {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
+async function sleep(ms: number) { await new Promise((resolve) => setTimeout(resolve, ms)); }
 
 async function getProviderKey(name: "GEMINI_API_KEY" | "GROQ_API_KEY" | "OPENROUTER_API_KEY") {
   const cached = providerSecretCache.get(name);
   if (cached) return cached;
-
   const { data, error } = await admin.rpc("get_ai_provider_secret", { p_name: name });
   const vaultValue = typeof data === "string" ? data.trim() : "";
   if (!error && vaultValue) {
     providerSecretCache.set(name, vaultValue);
     return vaultValue;
   }
-
   const envValue = Deno.env.get(name)?.trim();
   if (envValue) {
     providerSecretCache.set(name, envValue);
@@ -153,7 +119,6 @@ function sanitizeForAi(value: unknown, depth = 0): unknown {
   if (depth > 7) return "[truncated]";
   if (Array.isArray(value)) return value.slice(0, 60).map((item) => sanitizeForAi(item, depth + 1));
   if (!value || typeof value !== "object") return value;
-
   const blocked = /(purchase_price|unit_cost|cost_price|customer_phone|phone|email|address|receipt_url|provider_reference|tax_number|commercial_registration|payout_destination)/i;
   const output: Record<string, unknown> = {};
   for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
@@ -174,7 +139,6 @@ function resolveReportRange(args: Record<string, unknown>) {
       return { from: from.toISOString(), to: to.toISOString(), requested_days: null };
     }
   }
-
   const days = Math.round(clampNumber(args.days, 1, 90, 7));
   const to = new Date();
   const from = new Date(to.getTime() - days * 86400000);
@@ -182,15 +146,9 @@ function resolveReportRange(args: Record<string, unknown>) {
 }
 
 function toGeminiHistory(messages: StoredMessage[]) {
-  return messages.map((message) => ({
-    role: message.role === "assistant" ? "model" : "user",
-    parts: [{ text: message.content }],
-  }));
+  return messages.map((message) => ({ role: message.role === "assistant" ? "model" : "user", parts: [{ text: message.content }] }));
 }
-
-function toOpenAiHistory(messages: StoredMessage[]) {
-  return messages.map((message) => ({ role: message.role, content: message.content }));
-}
+function toOpenAiHistory(messages: StoredMessage[]) { return messages.map((message) => ({ role: message.role, content: message.content })); }
 
 async function callGemini(model: string, messages: unknown[], timeoutMs: number, maxTokens: number): Promise<ProviderResult> {
   const key = await getProviderKey("GEMINI_API_KEY");
@@ -198,6 +156,11 @@ async function callGemini(model: string, messages: unknown[], timeoutMs: number,
   const transient = new Set([429, 500, 502, 503, 504]);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    const isGemini3 = /^gemini-3(?:\.|-)/i.test(model);
+    const generationConfig = isGemini3
+      ? { maxOutputTokens: maxTokens, thinkingConfig: { thinkingLevel: "LOW" } }
+      : { maxOutputTokens: maxTokens, temperature: 0.15 };
+
     const response = await withTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -205,19 +168,34 @@ async function callGemini(model: string, messages: unknown[], timeoutMs: number,
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: messages,
         tools: [{ functionDeclarations: toolDeclarations }],
-        generationConfig: { temperature: 0.15, maxOutputTokens: maxTokens },
+        generationConfig,
       }),
     }, timeoutMs);
 
     if (response.ok) {
       const payload = await response.json();
-      const parts = payload?.candidates?.[0]?.content?.parts || [];
+      const candidate = payload?.candidates?.[0] || {};
+      const parts = candidate?.content?.parts || [];
+      const finishReason = safeText(candidate?.finishReason, 80) || undefined;
+      const thoughtsTokens = Number(payload?.usageMetadata?.thoughtsTokenCount || 0) || undefined;
+      const outputTokens = Number(payload?.usageMetadata?.candidatesTokenCount || 0) || undefined;
+
+      if (finishReason === "MAX_TOKENS") {
+        throw new Error(`GEMINI_MAX_TOKENS_output_${outputTokens || 0}_thoughts_${thoughtsTokens || 0}`);
+      }
+
       return {
         text: parts.map((part: any) => part.text || "").join("\n").trim(),
-        toolCalls: parts.filter((part: any) => part.functionCall).map((part: any) => ({ name: part.functionCall.name, args: part.functionCall.args || {} })),
-        rawAssistant: payload?.candidates?.[0]?.content,
+        toolCalls: parts.filter((part: any) => part.functionCall).map((part: any) => ({
+          name: part.functionCall.name,
+          args: part.functionCall.args || {},
+          callId: part.functionCall.id || undefined,
+        })),
+        rawAssistant: candidate?.content,
         inputTokens: payload?.usageMetadata?.promptTokenCount,
-        outputTokens: payload?.usageMetadata?.candidatesTokenCount,
+        outputTokens,
+        thoughtsTokens,
+        finishReason,
       };
     }
 
@@ -253,6 +231,7 @@ async function callGroq(model: string, messages: unknown[], timeoutMs: number, m
     rawAssistant: assistant,
     inputTokens: payload?.usage?.prompt_tokens,
     outputTokens: payload?.usage?.completion_tokens,
+    finishReason: payload?.choices?.[0]?.finish_reason || undefined,
   };
 }
 
@@ -273,6 +252,7 @@ async function callOpenRouter(model: string, messages: unknown[], timeoutMs: num
     rawAssistant: assistant,
     inputTokens: payload?.usage?.prompt_tokens,
     outputTokens: payload?.usage?.completion_tokens,
+    finishReason: payload?.choices?.[0]?.finish_reason || undefined,
   };
 }
 
@@ -288,7 +268,6 @@ async function executeManagementReport(userClient: any, branchId: string, reques
   const range = resolveReportRange(request.args);
   const limit = Math.round(clampNumber(request.args.limit, 10, 50, 25));
   const common = { p_branch_id: branchId, p_from: range.from, p_to: range.to };
-
   const rpcMap: Record<ReportSection, { name: string; args: Record<string, unknown> }> = {
     overview: { name: "get_reporting_overview_v2", args: common },
     sales: { name: "get_reporting_sales_v2", args: { ...common, p_channel: "all", p_cashier_id: null, p_payment_code: null, p_search: null, p_limit: limit, p_offset: 0 } },
@@ -308,7 +287,6 @@ async function executeManagementReport(userClient: any, branchId: string, reques
     staff_coverage: { name: "get_reporting_staff_coverage_v1", args: common },
     inventory_transfers: { name: "get_reporting_inventory_transfers_v2", args: common },
   };
-
   const selected = rpcMap[section];
   const { data, error } = await userClient.rpc(selected.name, selected.args);
   if (error) throw new Error(error.message || "REPORT_TOOL_FAILED");
@@ -322,20 +300,11 @@ async function executeTool(userClient: any, branchId: string, request: ToolReque
     if (error) throw new Error(error.message || "TOOL_FAILED");
     return data;
   };
-
   try {
     let result: unknown;
     const safeCatalog = (rows: unknown) => (Array.isArray(rows) ? rows : []).map((row: any) => ({
-      id: row?.id,
-      record_type: row?.record_type,
-      name: row?.name,
-      barcode: row?.barcode,
-      price: row?.price,
-      offer_price: row?.offer_price,
-      is_offer: row?.is_offer,
-      quantity: row?.quantity,
-      unit_of_measure: row?.unit_of_measure,
-      stock_status: row?.stock_status,
+      id: row?.id, record_type: row?.record_type, name: row?.name, barcode: row?.barcode, price: row?.price,
+      offer_price: row?.offer_price, is_offer: row?.is_offer, quantity: row?.quantity, unit_of_measure: row?.unit_of_measure, stock_status: row?.stock_status,
     }));
 
     if (request.name === "search_products") {
@@ -350,9 +319,7 @@ async function executeTool(userClient: any, branchId: string, request: ToolReque
       const orderRef = safeText(request.args.order_ref, 120);
       if (!/^[a-zA-Z0-9-]{1,120}$/.test(orderRef)) throw new Error("INVALID_ORDER_REFERENCE");
       const baseQuery = userClient.from("online_orders").select("id,tracking_number,status,payment_status,total,created_at,updated_at").eq("branch_id", branchId);
-      const query = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderRef)
-        ? baseQuery.eq("id", orderRef)
-        : baseQuery.eq("tracking_number", orderRef);
+      const query = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderRef) ? baseQuery.eq("id", orderRef) : baseQuery.eq("tracking_number", orderRef);
       const { data, error } = await query.limit(1).maybeSingle();
       if (error) throw new Error(error.message || "TOOL_FAILED");
       result = data ? { found: true, ...data } : { found: false };
@@ -366,7 +333,6 @@ async function executeTool(userClient: any, branchId: string, request: ToolReque
     } else {
       throw new Error("TOOL_NOT_ALLOWED");
     }
-
     return { ok: true, result, duration_ms: Date.now() - started };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "TOOL_FAILED", duration_ms: Date.now() - started };
@@ -376,7 +342,16 @@ async function executeTool(userClient: any, branchId: string, request: ToolReque
 function appendToolRound(provider: ProviderName, messages: any[], assistant: ProviderResult, calls: Array<{ request: ToolRequest; output: unknown }>) {
   if (provider === "gemini") {
     messages.push(assistant.rawAssistant || { role: "model", parts: [] });
-    messages.push({ role: "user", parts: calls.map(({ request, output }) => ({ functionResponse: { name: request.name, response: output } })) });
+    messages.push({
+      role: "user",
+      parts: calls.map(({ request, output }) => ({
+        functionResponse: {
+          name: request.name,
+          ...(request.callId ? { id: request.callId } : {}),
+          response: output,
+        },
+      })),
+    });
   } else {
     messages.push(assistant.rawAssistant || { role: "assistant", content: assistant.text });
     for (const { request, output } of calls) messages.push({ role: "tool", tool_call_id: request.callId || crypto.randomUUID(), content: JSON.stringify(output) });
@@ -451,7 +426,13 @@ Deno.serve(async (req: Request) => {
 
     try {
       for (let round = 0; round < 5; round += 1) {
-        const answer = await callProvider(selected.provider, selected.model, messages, Math.min(60000, Math.max(5000, Number(settings.timeout_ms || 45000))), Math.min(4096, Math.max(128, Number(settings.max_output_tokens || 1000))));
+        const answer = await callProvider(
+          selected.provider,
+          selected.model,
+          messages,
+          Math.min(60000, Math.max(5000, Number(settings.timeout_ms || 60000))),
+          Math.min(8192, Math.max(512, Number(settings.max_output_tokens || 4096))),
+        );
         if (!answer.toolCalls.length) { final = answer; finalMessages = messages; break; }
 
         const calls = [];
@@ -466,7 +447,18 @@ Deno.serve(async (req: Request) => {
       if (!final) throw new Error("TOOL_LOOP_LIMIT");
     } catch (error) {
       providerError = error instanceof Error ? error.message : "PROVIDER_FAILED";
-      await admin.from("ai_usage_logs").insert({ conversation_id: conversationId, user_id: authData.user.id, branch_id: branchId, provider: selected.provider, model: selected.model, fallback_used: providerIndex > 0, status: "error", latency_ms: Date.now() - providerStarted, error_code: providerError.slice(0, 120), metadata: { provider_attempt: selectedAttempt, channel, stage: "provider_attempt", milestone: "reporting_v2" } });
+      await admin.from("ai_usage_logs").insert({
+        conversation_id: conversationId,
+        user_id: authData.user.id,
+        branch_id: branchId,
+        provider: selected.provider,
+        model: selected.model,
+        fallback_used: providerIndex > 0,
+        status: "error",
+        latency_ms: Date.now() - providerStarted,
+        error_code: providerError.slice(0, 120),
+        metadata: { provider_attempt: selectedAttempt, channel, stage: "provider_attempt", milestone: "reporting_v2", response_complete: false },
+      });
     }
   }
 
@@ -474,7 +466,38 @@ Deno.serve(async (req: Request) => {
 
   const reply = final.text || "لم أتمكن من تكوين إجابة واضحة من البيانات المتاحة.";
   const { data: savedMessage } = await admin.from("ai_messages").insert({ conversation_id: conversationId, role: "assistant", content: reply, provider: selected.provider, model: selected.model, created_by: authData.user.id }).select("id").single();
-  await admin.from("ai_usage_logs").insert({ conversation_id: conversationId, user_id: authData.user.id, branch_id: branchId, provider: selected.provider, model: selected.model, fallback_used: fallbackUsed, status: "success", latency_ms: Date.now() - started, input_tokens: final.inputTokens || null, output_tokens: final.outputTokens || null, metadata: { rounds: finalMessages.length, channel, provider_attempt: selectedAttempt, milestone: "reporting_v2" } });
+  await admin.from("ai_usage_logs").insert({
+    conversation_id: conversationId,
+    user_id: authData.user.id,
+    branch_id: branchId,
+    provider: selected.provider,
+    model: selected.model,
+    fallback_used: fallbackUsed,
+    status: "success",
+    latency_ms: Date.now() - started,
+    input_tokens: final.inputTokens || null,
+    output_tokens: final.outputTokens || null,
+    metadata: {
+      rounds: finalMessages.length,
+      channel,
+      provider_attempt: selectedAttempt,
+      milestone: "reporting_v2",
+      finish_reason: final.finishReason || null,
+      thoughts_tokens: final.thoughtsTokens || null,
+      response_complete: final.finishReason !== "MAX_TOKENS",
+    },
+  });
 
-  return json({ conversation_id: conversationId, message_id: savedMessage?.id || crypto.randomUUID(), reply, provider: selected.provider, model: selected.model, fallback_used: fallbackUsed, provider_attempt: selectedAttempt, tool_calls: toolAudit, usage: { input_tokens: final.inputTokens, output_tokens: final.outputTokens } });
+  return json({
+    conversation_id: conversationId,
+    message_id: savedMessage?.id || crypto.randomUUID(),
+    reply,
+    provider: selected.provider,
+    model: selected.model,
+    fallback_used: fallbackUsed,
+    provider_attempt: selectedAttempt,
+    tool_calls: toolAudit,
+    usage: { input_tokens: final.inputTokens, output_tokens: final.outputTokens, thoughts_tokens: final.thoughtsTokens },
+    finish_reason: final.finishReason || null,
+  });
 });
