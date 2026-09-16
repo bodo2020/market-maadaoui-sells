@@ -1,6 +1,11 @@
 name: Business Finance APK
 
 on:
+  push:
+    branches: [feature/business-finance-app]
+    paths:
+      - 'apps/business-finance/**'
+      - '.github/workflows/business-finance-apk.yml'
   pull_request:
     branches: [main]
     paths:
@@ -50,12 +55,12 @@ jobs:
         run: cd android && ./gradlew assembleDebug --no-daemon
 
       - name: Prepare artifact
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk Elmadawy-Business-v1.0.0.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Elmadawy-Business-v1.0.1.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Elmadawy-Business-v1.0.0-APK
-          path: apps/business-finance/Elmadawy-Business-v1.0.0.apk
+          name: Elmadawy-Business-v1.0.1-APK
+          path: apps/business-finance/Elmadawy-Business-v1.0.1.apk
           if-no-files-found: error
           retention-days: 30
