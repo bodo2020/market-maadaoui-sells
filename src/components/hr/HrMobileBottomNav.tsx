@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { BellRing, CheckSquare2, ClipboardCheck, Clock3, Home, UserRound, UsersRound } from "lucide-react";
+import { BellRing, CheckSquare2, ClipboardCheck, Clock3, Home, Sparkles, UserRound, UsersRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { getHrAccess } from "@/lib/hrAccess";
@@ -20,17 +20,17 @@ export default function HrMobileBottomNav() {
   const managerItems = [
     { href: "/", label: "الرئيسية", icon: Home },
     { href: "/team", label: "فريقي", icon: UsersRound },
+    { href: "/ai", label: "HR AI", icon: Sparkles },
     { href: "/approvals", label: "الموافقات", icon: ClipboardCheck },
     { href: "/tasks", label: "المهام", icon: CheckSquare2 },
-    { href: "/account", label: "حسابي", icon: UserRound },
   ];
 
   const hrItems = [
     { href: "/", label: "الرئيسية", icon: Home },
     { href: "/employees", label: "الموظفون", icon: UsersRound },
+    { href: "/ai", label: "HR AI", icon: Sparkles },
     { href: "/attendance", label: "الحضور", icon: Clock3 },
     { href: "/approvals", label: "الموافقات", icon: BellRing },
-    { href: "/account", label: "حسابي", icon: UserRound },
   ];
 
   const items = access.canManagePeople ? hrItems : access.canViewTeam ? managerItems : employeeItems;
