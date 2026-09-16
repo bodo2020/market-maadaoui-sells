@@ -15,6 +15,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+const providerSecretCache = new Map<string, string>();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -53,8 +54,23 @@ async function withTimeout(url: string, init: RequestInit, timeoutMs: number) {
   finally { clearTimeout(timer); }
 }
 
+async function getProviderKey(name: "GEMINI_API_KEY" | "GROQ_API_KEY" | "OPENROUTER_API_KEY") {
+  const envValue = Deno.env.get(name)?.trim();
+  if (envValue) return envValue;
+
+  const cached = providerSecretCache.get(name);
+  if (cached) return cached;
+
+  const { data, error } = await admin.rpc("get_ai_provider_secret", { p_name: name });
+  const vaultValue = typeof data === "string" ? data.trim() : "";
+  if (error || !vaultValue) return null;
+
+  providerSecretCache.set(name, vaultValue);
+  return vaultValue;
+}
+
 async function callGemini(model: string, messages: unknown[], timeoutMs: number, maxTokens: number): Promise<ProviderResult> {
-  const key = Deno.env.get("GEMINI_API_KEY");
+  const key = await getProviderKey("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_NOT_CONFIGURED");
   const response = await withTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
     method: "POST",
@@ -79,7 +95,7 @@ async function callGemini(model: string, messages: unknown[], timeoutMs: number,
 }
 
 async function callGroq(model: string, messages: unknown[], timeoutMs: number, maxTokens: number): Promise<ProviderResult> {
-  const key = Deno.env.get("GROQ_API_KEY");
+  const key = await getProviderKey("GROQ_API_KEY");
   if (!key) throw new Error("GROQ_NOT_CONFIGURED");
   const response = await withTimeout("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -99,7 +115,7 @@ async function callGroq(model: string, messages: unknown[], timeoutMs: number, m
 }
 
 async function callOpenRouter(model: string, messages: unknown[], timeoutMs: number, maxTokens: number): Promise<ProviderResult> {
-  const key = Deno.env.get("OPENROUTER_API_KEY");
+  const key = await getProviderKey("OPENROUTER_API_KEY");
   if (!key) throw new Error("OPENROUTER_NOT_CONFIGURED");
   const response = await withTimeout("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
