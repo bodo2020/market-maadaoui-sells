@@ -7,19 +7,13 @@ org_id = "844173"
 [api]
 # Port to use for the API URL.
 port = 54321
-# Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
-# endpoints. public and storage are always included.
+# Schemas to expose in your API. Tables, views and stored procedures in this schema get API endpoints.
 schemas = ["public", "storage"]
-# Extra schemas to add to the search_path of every request. public is always included.
 extra_search_path = ["public", "extensions"]
-# Maximum rows returns from a view, table, or stored procedures. Limits payload size for accidental
-# or malicious requests.
 max_rows = 1000
 
 [db]
-# Port to use for the database URL.
 port = 54322
-# The database major version to use has to match production.
 major_version = 15
 
 [studio]
@@ -62,6 +56,9 @@ port = 54321
 verify_jwt = true
 
 [functions.ai-action-engine]
+verify_jwt = true
+
+[functions.ai-workspace-gateway]
 verify_jwt = true
 
 [functions.notify-new-order]
