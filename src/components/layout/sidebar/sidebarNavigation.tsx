@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, ShoppingBag, Receipt, Package, Grid3X3, Building2, Warehouse, ClipboardList, Truck, Users,
   UserCheck, UserRound, Wallet, WalletCards, MapPin, FolderOpen, Tag, DollarSign, FileText, RefreshCw, Settings, QrCode,
-  Calendar, CalendarCheck2, FileSpreadsheet, ArrowLeftRight, BellRing, ShieldCheck, Network, Clock3, Banknote, KeyRound, Vault, Landmark, Bot,
+  Calendar, CalendarCheck2, FileSpreadsheet, ArrowLeftRight, BellRing, ShieldCheck, Network, Clock3, Banknote, KeyRound, Vault, Landmark, Bot, Store,
 } from "lucide-react";
 import { NavigationGroup } from "./types";
 
@@ -44,6 +44,13 @@ export const customersNavigation: NavigationGroup = {
     { label: "سلات العملاء", href: "/customer-carts", icon: ShoppingCart },
     { label: "أماكن التوصيل العامة", href: "/delivery-locations", icon: MapPin },
     { label: "أماكن التوصيل للفروع", href: "/branch-delivery-zones", icon: Building2 },
+  ],
+};
+
+export const marketplaceNavigation: NavigationGroup = {
+  title: "Marketplace",
+  items: [
+    { label: "إدارة المتاجر الشريكة", href: "/marketplace", icon: Store, adminOnly: true },
   ],
 };
 
