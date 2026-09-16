@@ -3,8 +3,10 @@ import {
   BarChart3,
   Bot,
   Boxes,
+  CalendarCheck2,
   CheckCircle2,
   ClipboardList,
+  Clock3,
   ExternalLink,
   Loader2,
   PackageSearch,
@@ -14,10 +16,11 @@ import {
   ShieldCheck,
   Sparkles,
   TriangleAlert,
+  UserCheck,
   WalletCards,
   XCircle,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,13 +46,21 @@ type ChatMessage = {
   actionLoading?: boolean;
 };
 
-const suggestions = [
+const adminSuggestions = [
   "حلل أداء الفرع آخر 7 أيام: المبيعات والربح وأهم التغيرات",
   "هات أهم AI Insights والتنبيهات اللي محتاجة تدخل دلوقتي",
   "إيه الأصناف النافدة والمنخفضة والمخزون اللي مفيهوش حركة؟",
   "حلل وسائل الدفع والعمولات والمرتجعات آخر 7 أيام",
   "مين أعلى الكاشير في المبيعات وهل في فروق ورديات؟",
   "عندنا لبن جهينة؟ وقولي السعر والمخزون",
+];
+
+const hrSuggestions = [
+  "حلل الحضور النهارده وقولي الحالات اللي محتاجة مراجعة",
+  "راجع تغطية الورديات الحالية وحدد أي نقص محتاج تدخل",
+  "هات ملخص الإجازات القادمة وتأثيرها على تغطية الفرع",
+  "راجع ملخص مسير الرواتب للشهر وحدد أي مؤشرات غير طبيعية بدون كشف رواتب أفراد",
+  "إيه أهم متابعات HR اللي محتاجة تتحول لمهام دلوقتي؟",
 ];
 
 const priorityLabel: Record<AiActionProposal["priority"], string> = {
@@ -60,6 +71,9 @@ const priorityLabel: Record<AiActionProposal["priority"], string> = {
 
 export default function AiSandbox() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isHr = new URLSearchParams(location.search).get("workspace") === "hr";
+  const suggestions = isHr ? hrSuggestions : adminSuggestions;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -161,11 +175,15 @@ export default function AiSandbox() {
             <img src="/elmadawy-logo.png" alt="المعداوي" className="h-14 w-14 rounded-2xl object-cover shadow-sm" />
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-black text-slate-950 md:text-3xl">Elmadawy AI للإدارة</h1>
-                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Reporting V2</Badge>
-                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Action Engine M3</Badge>
+                <h1 className="text-2xl font-black text-slate-950 md:text-3xl">{isHr ? "Elmadawy HR AI" : "Elmadawy AI للإدارة"}</h1>
+                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{isHr ? "HR Workspace" : "Reporting V2"}</Badge>
+                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">{isHr ? "Action Engine M4" : "Action Engine M3"}</Badge>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">يحلل بيانات الفرع ثم يحول التحليل - بعد تأكيدك - إلى Task أو Approval داخل النظام.</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isHr
+                  ? "يحلل الحضور والورديات والإجازات وملخصات الرواتب بصلاحيات HR، ثم يحول النتائج بعد تأكيدك إلى Task أو Approval."
+                  : "يحلل بيانات الفرع ثم يحول التحليل - بعد تأكيدك - إلى Task أو Approval داخل النظام."}
+              </p>
             </div>
           </div>
           <Button variant="outline" onClick={reset}><RefreshCw className="ml-2 h-4 w-4" />محادثة جديدة</Button>
@@ -174,15 +192,22 @@ export default function AiSandbox() {
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_330px]">
           <Card className="overflow-hidden border-emerald-950/10 shadow-sm">
             <CardHeader className="border-b bg-gradient-to-l from-[#005931] to-emerald-800 text-white">
-              <CardTitle className="flex items-center gap-2 text-lg"><Sparkles className="h-5 w-5 text-lime-300" />مساعد الإدارة والتحليلات والإجراءات</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Sparkles className="h-5 w-5 text-lime-300" />
+                {isHr ? "مساعد الموارد البشرية والتحليلات والإجراءات" : "مساعد الإدارة والتحليلات والإجراءات"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="h-[60vh] min-h-[460px] space-y-4 overflow-y-auto bg-slate-50/70 p-4 md:p-6">
                 {!messages.length && (
                   <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center text-center">
                     <div className="mb-4 grid h-16 w-16 place-items-center rounded-3xl bg-emerald-100 text-[#005931]"><Bot className="h-8 w-8" /></div>
-                    <h2 className="text-xl font-black">اسأل عن الفرع كأنك بتكلم محلل أعمال</h2>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">بعد أي تحليل تقدر تطلب من Action Engine تحويل النتيجة إلى اقتراح مهمة أو مراجعة موافقة، بدون تنفيذ تلقائي.</p>
+                    <h2 className="text-xl font-black">{isHr ? "اسأل عن HR كأن معاك محلل موارد بشرية" : "اسأل عن الفرع كأنك بتكلم محلل أعمال"}</h2>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {isHr
+                        ? "الـAI يقرأ بيانات HR المسموح بها فقط. لا يعتمد إجازة، ولا يعدل راتب، ولا يتخذ قرار توظيف أو فصل أو جزاء تلقائيًا."
+                        : "بعد أي تحليل تقدر تطلب من Action Engine تحويل النتيجة إلى اقتراح مهمة أو مراجعة موافقة، بدون تنفيذ تلقائي."}
+                    </p>
                     <div className="mt-5 flex flex-wrap justify-center gap-2">
                       {suggestions.map((suggestion) => (
                         <button key={suggestion} onClick={() => void send(undefined, suggestion)} className="rounded-full border bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50">{suggestion}</button>
@@ -270,11 +295,24 @@ export default function AiSandbox() {
                   </div>
                 ))}
 
-                {loading && <div className="flex justify-end"><div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border bg-white px-4 py-3 text-sm text-slate-500"><RefreshCw className="h-4 w-4 animate-spin text-[#005931]" />براجع Reporting V2 وبيانات الفرع...</div></div>}
+                {loading && (
+                  <div className="flex justify-end">
+                    <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border bg-white px-4 py-3 text-sm text-slate-500">
+                      <RefreshCw className="h-4 w-4 animate-spin text-[#005931]" />
+                      {isHr ? "براجع بيانات HR المسموح بها للفرع..." : "براجع Reporting V2 وبيانات الفرع..."}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <form onSubmit={(event) => void send(event)} className="flex gap-2 border-t bg-white p-3 md:p-4">
-                <Input value={input} onChange={(event) => setInput(event.target.value)} placeholder="مثال: ليه صافي الربح نزل آخر 7 أيام؟" className="h-12 rounded-xl" disabled={loading} />
+                <Input
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  placeholder={isHr ? "مثال: هل في نقص في تغطية ورديات بكرة؟" : "مثال: ليه صافي الربح نزل آخر 7 أيام؟"}
+                  className="h-12 rounded-xl"
+                  disabled={loading}
+                />
                 <Button type="submit" className="h-12 bg-[#005931] px-5 hover:bg-emerald-800" disabled={loading || !input.trim()}><Send className="ml-2 h-4 w-4" />إرسال</Button>
               </form>
             </CardContent>
@@ -285,29 +323,53 @@ export default function AiSandbox() {
               <CardHeader><CardTitle className="text-base">حالة الجلسة</CardTitle></CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="flex items-center justify-between"><span className="text-muted-foreground">المحادثة</span><span className="font-mono text-xs">{conversationId ? conversationId.slice(0, 8) : "جديدة"}</span></div>
+                <div className="flex items-center justify-between"><span className="text-muted-foreground">المساحة</span><span className="font-bold">{isHr ? "HR" : "Admin"}</span></div>
                 <div className="flex items-center justify-between"><span className="text-muted-foreground">المزود</span><span className="font-bold">{lastMeta?.provider || "—"}</span></div>
                 <div className="flex items-center justify-between"><span className="text-muted-foreground">Fallback</span><span>{lastMeta?.fallback_used ? "تم استخدامه" : "لا"}</span></div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base">Action Engine M3</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">{isHr ? "HR Action Engine M4" : "Action Engine M3"}</CardTitle></CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-[#005931]" />تحليل من Reporting V2</div>
-                <div className="flex items-center gap-2"><TriangleAlert className="h-4 w-4 text-[#005931]" />تحديد مشكلة وإجراء مناسب</div>
-                <div className="flex items-center gap-2"><ClipboardList className="h-4 w-4 text-[#005931]" />Task Center للمراجعات التشغيلية</div>
-                <div className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-amber-700" />Approval Center للمالية والمشتريات</div>
-                <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#005931]" />صلاحيات + Audit + منع التكرار</div>
-                <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">قاعدة التنفيذ: Read → Analyze → Recommend → Human Confirm → Task/Approval. الـAI لا يعدل مخزونًا أو سعرًا أو أموالًا مباشرة.</p>
+                {isHr ? (
+                  <>
+                    <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-[#005931]" />الحضور وتغطية الورديات</div>
+                    <div className="flex items-center gap-2"><CalendarCheck2 className="h-4 w-4 text-[#005931]" />الإجازات والغيابات المخططة</div>
+                    <div className="flex items-center gap-2"><UserCheck className="h-4 w-4 text-[#005931]" />متابعات الموظفين حسب الصلاحية</div>
+                    <div className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-amber-700" />الإجازات والرواتب الحساسة تذهب للموافقة</div>
+                    <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#005931]" />إخفاء PII + صلاحيات الفرع + Audit</div>
+                    <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">الـAI لا يقرر تعيينًا أو فصلًا أو جزاءً، ولا يعتمد إجازة أو يعدل راتبًا. أي إجراء حساس يظل قرارًا بشريًا.</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-[#005931]" />تحليل من Reporting V2</div>
+                    <div className="flex items-center gap-2"><TriangleAlert className="h-4 w-4 text-[#005931]" />تحديد مشكلة وإجراء مناسب</div>
+                    <div className="flex items-center gap-2"><ClipboardList className="h-4 w-4 text-[#005931]" />Task Center للمراجعات التشغيلية</div>
+                    <div className="flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-amber-700" />Approval Center للمالية والمشتريات</div>
+                    <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-[#005931]" />صلاحيات + Audit + منع التكرار</div>
+                    <p className="rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-900">قاعدة التنفيذ: Read → Analyze → Recommend → Human Confirm → Task/Approval. الـAI لا يعدل مخزونًا أو سعرًا أو أموالًا مباشرة.</p>
+                  </>
+                )}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-base">ما زال متاحًا</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">{isHr ? "مصادر HR المتاحة" : "ما زال متاحًا"}</CardTitle></CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center gap-2"><WalletCards className="h-4 w-4 text-[#005931]" />المدفوعات والمصروفات والديون</div>
-                <div className="flex items-center gap-2"><Boxes className="h-4 w-4 text-[#005931]" />المخزون والتحويلات والحركة</div>
-                <div className="flex items-center gap-2"><PackageSearch className="h-4 w-4 text-[#005931]" />المنتجات والعروض والطلبات</div>
+                {isHr ? (
+                  <>
+                    <div className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-[#005931]" />لوحة الحضور</div>
+                    <div className="flex items-center gap-2"><CalendarCheck2 className="h-4 w-4 text-[#005931]" />الورديات وتقويم الإجازات</div>
+                    <div className="flex items-center gap-2"><WalletCards className="h-4 w-4 text-[#005931]" />ملخصات الرواتب بدون كشف رواتب أفراد</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2"><WalletCards className="h-4 w-4 text-[#005931]" />المدفوعات والمصروفات والديون</div>
+                    <div className="flex items-center gap-2"><Boxes className="h-4 w-4 text-[#005931]" />المخزون والتحويلات والحركة</div>
+                    <div className="flex items-center gap-2"><PackageSearch className="h-4 w-4 text-[#005931]" />المنتجات والعروض والطلبات</div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
