@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BarChart3, Bell, Building2, CircleDollarSign, LayoutDashboard, MoreHorizontal, Search } from 'lucide-react';
+import { BarChart3, Bell, Building2, CircleDollarSign, LayoutDashboard, MoreHorizontal, Search, Sparkles } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
 import Brand from './Brand';
@@ -7,6 +7,7 @@ import Brand from './Brand';
 const nav = [
   { to: '/', label: 'الرئيسية', icon: LayoutDashboard },
   { to: '/reports', label: 'التقارير', icon: BarChart3 },
+  { to: '/ai', label: 'AI', icon: Sparkles },
   { to: '/finance', label: 'المالية', icon: CircleDollarSign },
   { to: '/notifications', label: 'التنبيهات', icon: Bell },
   { to: '/more', label: 'المزيد', icon: MoreHorizontal },
@@ -14,6 +15,7 @@ const nav = [
 const titles: Record<string, string> = {
   '/': 'نظرة عامة',
   '/reports': 'التقارير والتحليلات',
+  '/ai': 'مساعد الأعمال الذكي',
   '/finance': 'النظام المالي',
   '/finance/debts': 'المديونيات',
   '/finance/expenses': 'إدارة المصروفات',
@@ -32,7 +34,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const { branches, identity, selectedBranch, selectBranch } = useBusiness();
   const title = location.pathname.startsWith('/reports/') ? 'تفاصيل التقرير' : titles[location.pathname] ?? 'المعداوي للأعمال';
   const visibleNav = nav.filter((item) => {
-    if (item.to === '/' || item.to === '/reports') return selectedBranch?.permissions.includes('reports.view');
+    if (item.to === '/' || item.to === '/reports' || item.to === '/ai') return selectedBranch?.permissions.includes('reports.view');
     if (item.to === '/finance') return selectedBranch?.permissions.some((permission) => ['finance.view','finance.manage','expense.view','expense.request','expense.approve','expense.pay','expense.manage_budgets','expense.manage_recurring','expense.manage_advances'].includes(permission));
     return true;
   });
