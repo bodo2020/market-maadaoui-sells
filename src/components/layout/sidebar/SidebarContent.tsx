@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Bell, CalendarDays, CheckCircle2, ChevronDown, Clock3, FileText, Home, Network, Search, ShieldCheck, UserRound, UsersRound, WalletCards } from "lucide-react";
+import { Bell, CalendarDays, CheckCircle2, ChevronDown, Clock3, FileText, Home, Network, Search, ShieldCheck, Sparkles, UserRound, UsersRound, WalletCards } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { SidebarItem } from "./SidebarItem";
@@ -39,6 +39,12 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
     ];
 
     if (access.canViewTeam) {
+      items.push({
+        title: "الذكاء والتحليل",
+        items: [
+          { label: "مساعد HR الذكي", href: "/ai", icon: Sparkles },
+        ],
+      });
       items.push({
         title: "فريقي",
         items: [
