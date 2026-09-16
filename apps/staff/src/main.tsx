@@ -6,6 +6,7 @@ import SelfDeviceApproval from "./components/SelfDeviceApproval";
 import SubstitutionOverlay from "./components/SubstitutionOverlay";
 import SubstitutionApprovalsOverlay from "./components/SubstitutionApprovalsOverlay";
 import AssistedAssignmentOffer from "./components/AssistedAssignmentOffer";
+import HrAiOverlay from "./HrAiOverlay";
 import { installStaffAuthEnhancements } from "./authEnhancer";
 import { installNativeAppBridge } from "./nativeAppBridge";
 import "./styles.css";
@@ -28,5 +29,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <SubstitutionOverlay />
     <SubstitutionApprovalsOverlay />
     <AssistedAssignmentOffer />
+    <HrAiOverlay />
   </React.StrictMode>,
 );
