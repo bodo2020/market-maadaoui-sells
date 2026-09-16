@@ -96,6 +96,7 @@ import CustomerCartsPage from "@/pages/CustomerCartsPage";
 import SubcategoryDetails from "@/pages/SubcategoryDetails";
 import ProductDetails from "@/pages/ProductDetails";
 import InventoryImport from "@/pages/InventoryImport";
+import AiSandbox from "@/pages/AiSandbox";
 
 const CashierPOS = () => (
   <PosShiftGatePro><PosRuntimeGuard><PosWorkspaceRecoveryGate><><POSPro /><POSCustomerLoyaltyBridge /><PosRecentSales /><DeliveryCashHandoverDock /></></PosWorkspaceRecoveryGate></PosRuntimeGuard></PosShiftGatePro>
@@ -131,6 +132,7 @@ export default function AppRoutes() {
       <Route path="/reports/export" element={<ProtectedRoute><ReportsExportV2 /></ProtectedRoute>} />
       <Route path="/analytics" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
       <Route path="/ai-insights" element={<ProtectedRoute><ReportsInsightsV2 /></ProtectedRoute>} />
+      <Route path="/ai-sandbox" element={<ProtectedRoute><AiSandbox /></ProtectedRoute>} />
       <Route path="/sales-dashboard" element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
       <Route path="/pos" element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
       <Route path="/account" element={<ProtectedRoute><StaffAccountPage /></ProtectedRoute>} />
