@@ -6,6 +6,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import AppShell from './components/AppShell';
 import { BusinessProvider, useBusiness } from './context/BusinessContext';
 import { hasSupabaseConfig, supabase } from './lib/supabase';
+import AiAssistant from './pages/AiAssistant';
 import Dashboard from './pages/Dashboard';
 import DecisionCenter from './pages/DecisionCenter';
 import DebtsPage from './pages/DebtsPage';
@@ -71,6 +72,7 @@ function BusinessAccessGate() {
 
   return <AppShell><Routes>
     <Route path="/" element={canViewReports ? <Dashboard/> : <Navigate to="/finance" replace/>}/>
+    <Route path="/ai" element={canViewReports ? <AiAssistant/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports" element={canViewReports ? <Reports/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/decision-center" element={canViewReports ? <DecisionCenter/> : <Navigate to="/finance" replace/>}/>
     <Route path="/reports/sales" element={canViewReports ? <SalesReport/> : <Navigate to="/finance" replace/>}/>
