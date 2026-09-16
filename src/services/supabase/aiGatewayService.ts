@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type AiProvider = "gemini" | "groq" | "openrouter";
+export type AiWorkspace = "hr" | "growth" | "business";
 
 export type AiToolCall = {
   name: string;
@@ -18,6 +19,7 @@ export type AiGatewayResponse = {
   provider_attempt?: number;
   tool_calls: AiToolCall[];
   usage?: { input_tokens?: number; output_tokens?: number };
+  workspace?: AiWorkspace;
 };
 
 export type AiActionProposal = {
@@ -70,6 +72,12 @@ function currentBranchId() {
   return branchId;
 }
 
+function currentWorkspace(): AiWorkspace | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("workspace");
+  return value === "hr" || value === "growth" || value === "business" ? value : null;
+}
+
 async function functionError(error: unknown) {
   try {
     const candidate = error as { context?: { json?: () => Promise<{ error?: string; message?: string }> } };
@@ -87,8 +95,15 @@ export async function askElmadawyAi(message: string, conversationId?: string | n
   const clean = message.trim();
   if (!clean) throw new Error("اكتب سؤالك أولاً.");
 
-  const { data, error } = await supabase.functions.invoke("ai-gateway", {
-    body: {
+  const workspace = currentWorkspace();
+  const { data, error } = await supabase.functions.invoke(workspace ? "ai-workspace-gateway" : "ai-gateway", {
+    body: workspace ? {
+      mode: "chat",
+      workspace,
+      message: clean,
+      conversation_id: conversationId || null,
+      branch_id: currentBranchId(),
+    } : {
       message: clean,
       conversation_id: conversationId || null,
       branch_id: currentBranchId(),
@@ -103,8 +118,15 @@ export async function askElmadawyAi(message: string, conversationId?: string | n
 }
 
 export async function proposeAiAction(conversationId: string, messageId: string): Promise<AiActionSuggestionResponse> {
-  const { data, error } = await supabase.functions.invoke("ai-action-engine", {
-    body: {
+  const workspace = currentWorkspace();
+  const { data, error } = await supabase.functions.invoke(workspace ? "ai-workspace-gateway" : "ai-action-engine", {
+    body: workspace ? {
+      mode: "propose_action",
+      workspace,
+      conversation_id: conversationId,
+      message_id: messageId,
+      branch_id: currentBranchId(),
+    } : {
       conversation_id: conversationId,
       message_id: messageId,
       branch_id: currentBranchId(),
@@ -116,7 +138,7 @@ export async function proposeAiAction(conversationId: string, messageId: string)
 }
 
 export async function confirmAiActionProposal(proposalId: string): Promise<AiActionDispatchResult> {
-  // RPC exists in the additive Milestone 3 migration before generated types are refreshed.
+  // RPC exists in the additive Milestone 3/4 migrations before generated types are refreshed.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   const { data, error } = await client.rpc("confirm_ai_action_proposal_v1", { p_proposal_id: proposalId });
@@ -136,7 +158,6 @@ export async function rejectAiActionProposal(proposalId: string, note?: string):
 }
 
 export async function fetchAiRuntimeSettings(): Promise<AiRuntimeSettings> {
-  // The generated Database type is updated after the additive migration is applied.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   const { data, error } = await client
@@ -149,7 +170,6 @@ export async function fetchAiRuntimeSettings(): Promise<AiRuntimeSettings> {
 }
 
 export async function saveAiRuntimeSettings(settings: AiRuntimeSettings) {
-  // The generated Database type is updated after the additive migration is applied.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client = supabase as any;
   const { error } = await client.from("ai_runtime_settings").update({
