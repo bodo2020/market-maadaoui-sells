@@ -109,6 +109,7 @@ export type CreateMarketplacePartnerInput = {
 export type MerchantDetailBranch = MarketplaceBranch & {
   phone?: string | null;
   email?: string | null;
+  marketplace_customer_enabled?: boolean;
   latitude?: number | null;
   longitude?: number | null;
   delivery_radius_km: number;
@@ -130,6 +131,7 @@ export type MerchantListing = {
   image_url?: string | null;
   merchant_sku?: string | null;
   status: "draft" | "active" | "paused" | "rejected" | "archived";
+  marketplace_customer_enabled?: boolean;
   preparation_minutes?: number | null;
   sale_price?: number | null;
   purchase_price?: number | null;
@@ -159,6 +161,19 @@ export type MerchantReadiness = {
   };
 };
 
+export type CustomerPublishReadiness = {
+  merchant_id: string;
+  ready_for_customer_publish: boolean;
+  missing: string[];
+  base_readiness?: MerchantReadiness;
+  checks: {
+    branch_count?: number;
+    branches_with_coordinates?: number;
+    publishable_listings?: number;
+    [key: string]: unknown;
+  };
+};
+
 export type MarketplaceMerchantDetail = {
   merchant: {
     id: string;
@@ -180,6 +195,7 @@ export type MarketplaceMerchantDetail = {
   commission_rules: MarketplaceCommissionRule[];
   settlements: MarketplaceSettlement[];
   readiness: MerchantReadiness;
+  customer_publish_readiness: CustomerPublishReadiness;
   generated_at: string;
 };
 
@@ -206,7 +222,9 @@ function marketplaceError(message?: string) {
   if (value.includes("AUTH_REQUIRED")) return new Error("انتهت جلسة تسجيل الدخول. سجل الدخول مرة أخرى.");
   if (value.includes("MARKETPLACE_ACCESS_DENIED")) return new Error("ليس لديك صلاحية إدارة الـ Marketplace لهذه الشركة.");
   if (value.includes("MARKETPLACE_TENANT_NOT_FOUND")) return new Error("لا توجد شركة متاحة لإدارة الـ Marketplace.");
+  if (value.includes("MARKETPLACE_CUSTOMER_NOT_READY")) return new Error("لا يمكن نشر المتجر للعملاء قبل استكمال متطلبات النشر الظاهرة في الصفحة.");
   if (value.includes("MARKETPLACE_NOT_READY")) return new Error("لا يمكن اعتماد المتجر قبل استكمال كل متطلبات التجهيز.");
+  if (value.includes("merchant_not_publishable")) return new Error("المتجر غير قابل للنشر للعملاء بالحالة الحالية.");
   if (value.includes("tenant_not_found_or_inactive")) return new Error("الشركة غير موجودة أو غير نشطة.");
   if (value.includes("merchant_and_branch_name_required")) return new Error("اسم المتجر واسم الفرع مطلوبان.");
   if (value.includes("commission_rule_name_required")) return new Error("اسم قاعدة العمولة مطلوب.");
@@ -356,5 +374,29 @@ export async function approveMarketplaceMerchant(merchantId: string) {
     branches_active: false;
     delivery_enabled: false;
     readiness: MerchantReadiness;
+  };
+}
+
+export async function publishMarketplaceMerchant(merchantId: string) {
+  const { data, error } = await rpc("publish_marketplace_merchant_v1", {
+    p_merchant_id: merchantId,
+  });
+  if (error) throw marketplaceError(error.message);
+  return data as {
+    merchant_id: string;
+    customer_published: true;
+    published_listings: number;
+    readiness: CustomerPublishReadiness;
+  };
+}
+
+export async function unpublishMarketplaceMerchant(merchantId: string) {
+  const { data, error } = await rpc("unpublish_marketplace_merchant_v1", {
+    p_merchant_id: merchantId,
+  });
+  if (error) throw marketplaceError(error.message);
+  return data as {
+    merchant_id: string;
+    customer_published: false;
   };
 }
