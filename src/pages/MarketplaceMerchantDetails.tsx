@@ -5,6 +5,8 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  EyeOff,
+  Globe2,
   MapPinned,
   PackagePlus,
   Percent,
@@ -27,9 +29,11 @@ import {
   fetchMarketplaceMerchantDetail,
   MarketplaceProductMasterItem,
   MerchantDetailBranch,
+  publishMarketplaceMerchant,
   saveMarketplaceCommissionRule,
   saveMarketplaceListing,
   searchMarketplaceProductMaster,
+  unpublishMarketplaceMerchant,
   updateMarketplaceBranchProfile,
 } from "@/services/supabase/marketplaceAdminService";
 
@@ -45,6 +49,9 @@ const checkLabels: Record<string, string> = {
   commission_rule: "قاعدة عمولة فعالة",
   listing: "منتج واحد على الأقل",
   listing_pricing_inventory: "سعر ومخزون صالحان لكل Listing",
+  marketplace_approval: "اعتماد المتجر داخليًا",
+  branch_coordinates: "إحداثيات صحيحة لكل فرع",
+  in_stock_listing: "Listing واحدة على الأقل بسعر ومخزون متاح",
 };
 
 function BranchSetupCard({ merchantId, branch }: { merchantId: string; branch: MerchantDetailBranch }) {
@@ -103,7 +110,12 @@ function BranchSetupCard({ merchantId, branch }: { merchantId: string; branch: M
             <p className="mt-1 text-xs text-slate-400">{branch.code}</p>
           </div>
           <div className="flex gap-2">
-            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">{branch.active ? "نشط تشغيليًا" : "غير منشور"}</Badge>
+            <Badge
+              variant="outline"
+              className={branch.marketplace_customer_enabled ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}
+            >
+              {branch.marketplace_customer_enabled ? "منشور في Marketplace" : branch.active ? "نشط داخليًا" : "غير منشور"}
+            </Badge>
             <Badge variant="outline">{branch.active_delivery_zone_count} منطقة توصيل نشطة</Badge>
           </div>
         </div>
@@ -155,6 +167,7 @@ export default function MarketplaceMerchantDetails() {
   const data = detailQuery.data;
   const merchant = data?.merchant;
   const readiness = data?.readiness;
+  const customerReadiness = data?.customer_publish_readiness;
   const branches = data?.branches || [];
 
   useEffect(() => {
@@ -208,13 +221,35 @@ export default function MarketplaceMerchantDetails() {
   const approvalMutation = useMutation({
     mutationFn: () => approveMarketplaceMerchant(merchantId),
     onSuccess: async () => {
-      toast.success("تم اعتماد المتجر داخليًا", { description: "لم يتم نشره للعميل، والفروع والتوصيل ما زالت مغلقة." });
+      toast.success("تم اعتماد المتجر داخليًا", { description: "الاعتماد لا ينشر المتجر للعملاء تلقائيًا." });
       await refresh();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "تعذر اعتماد المتجر"),
   });
 
+  const publishMutation = useMutation({
+    mutationFn: () => publishMarketplaceMerchant(merchantId),
+    onSuccess: async (result) => {
+      toast.success("تم نشر المتجر للعملاء", { description: `تم نشر ${Number(result.published_listings || 0).toLocaleString("ar-EG")} Listing مؤهلة.` });
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "تعذر نشر المتجر للعملاء"),
+  });
+
+  const unpublishMutation = useMutation({
+    mutationFn: () => unpublishMarketplaceMerchant(merchantId),
+    onSuccess: async () => {
+      toast.success("تم إيقاف نشر المتجر", { description: "اختفى المتجر ومنتجاته من تطبيق العميل فورًا." });
+      await refresh();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "تعذر إيقاف نشر المتجر"),
+  });
+
   const missingLabels = useMemo(() => (readiness?.missing || []).map((key) => checkLabels[key] || key), [readiness?.missing]);
+  const customerMissingLabels = useMemo(
+    () => (customerReadiness?.missing || []).map((key) => checkLabels[key] || key),
+    [customerReadiness?.missing],
+  );
 
   const selectProduct = (product: MarketplaceProductMasterItem) => {
     setSelectedProduct(product);
@@ -247,7 +282,9 @@ export default function MarketplaceMerchantDetails() {
               <h1 className="text-2xl font-black text-slate-950">{merchant?.name || "تفاصيل المتجر"}</h1>
               {merchant && <Badge variant="outline">{merchant.merchant_type === "partner" ? "متجر شريك" : merchant.merchant_type === "franchise" ? "فرنشايز" : "مملوك"}</Badge>}
               {merchant?.marketplace_approved_at && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">معتمد داخليًا</Badge>}
-              {!merchant?.customer_published_at && <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">غير منشور للعملاء</Badge>}
+              {merchant?.customer_published_at
+                ? <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100"><Globe2 className="ml-1 h-3.5 w-3.5" />منشور للعملاء</Badge>
+                : <Badge className="bg-amber-100 text-amber-900 hover:bg-amber-100">غير منشور للعملاء</Badge>}
             </div>
             {merchant && <p className="mt-1 text-xs text-slate-400">{merchant.code}</p>}
           </div>
@@ -265,7 +302,7 @@ export default function MarketplaceMerchantDetails() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#005931]" /><h2 className="text-lg font-black">جاهزية الاعتماد</h2></div>
-                      <p className="mt-2 text-sm text-slate-600">الاعتماد داخلي فقط في هذه المرحلة. النشر للعملاء سيظل مغلقًا حتى Phase 9.</p>
+                      <p className="mt-2 text-sm text-slate-600">الاعتماد داخلي ومستقل عن النشر للعملاء. بعده يمر المتجر على Customer Publishing Gate منفصل.</p>
                     </div>
                     <Badge className={readiness.ready_for_approval ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" : "bg-amber-100 text-amber-900 hover:bg-amber-100"}>{readiness.ready_for_approval ? "جاهز" : `${readiness.missing.length} متطلبات ناقصة`}</Badge>
                   </div>
@@ -275,18 +312,57 @@ export default function MarketplaceMerchantDetails() {
                       return <div key={key} className={`flex items-center gap-2 rounded-xl border p-3 text-sm font-bold ${missing ? "border-amber-200 bg-white text-amber-900" : "border-emerald-200 bg-white text-emerald-800"}`}>{missing ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}{checkLabels[key]}</div>;
                     })}
                   </div>
-                  {missingLabels.length > 0 && <p className="mt-4 text-xs text-slate-500">المتبقي: {missingLabels.join("، ")}</p>}
+                  {missingLabels.length > 0 && <p className="mt-4 text-xs text-slate-500">المتبقي للاعتماد: {missingLabels.join("، ")}</p>}
                 </CardContent>
               </Card>
 
-              <Card className="border-slate-200">
+              <Card className={merchant.customer_published_at ? "border-blue-200 bg-blue-50/30" : "border-slate-200"}>
                 <CardContent className="p-5">
-                  <div className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-600" /><h2 className="font-black">حد الأمان</h2></div>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">حتى بعد الاعتماد سيظل الفرع غير نشط، التوصيل غير مفعل، والـListings في Draft. لا يوجد Customer Publishing RPC في النظام حتى الآن.</p>
-                  {merchant.merchant_type !== "owned" && (
-                    <Button className="mt-5 w-full bg-[#005931] hover:bg-[#004426]" disabled={!readiness.ready_for_approval || approvalMutation.isPending || Boolean(merchant.marketplace_approved_at)} onClick={() => approvalMutation.mutate()}>
-                      {merchant.marketplace_approved_at ? "تم الاعتماد داخليًا" : approvalMutation.isPending ? "جاري الاعتماد..." : "اعتماد المتجر داخليًا"}
+                  <div className="flex items-center gap-2">
+                    {merchant.customer_published_at ? <Globe2 className="h-5 w-5 text-blue-700" /> : <AlertTriangle className="h-5 w-5 text-amber-600" />}
+                    <h2 className="font-black">Customer Publishing Gate</h2>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">الاعتماد لا يفتح المتجر تلقائيًا. النشر يتم فقط بعد اكتمال بيانات التواصل، مناطق التوصيل، العمولة، الإحداثيات، وسعر ومخزون Listing مؤهلة.</p>
+
+                  {merchant.merchant_type !== "owned" && !merchant.marketplace_approved_at && (
+                    <Button className="mt-5 w-full bg-[#005931] hover:bg-[#004426]" disabled={!readiness.ready_for_approval || approvalMutation.isPending} onClick={() => approvalMutation.mutate()}>
+                      {approvalMutation.isPending ? "جاري الاعتماد..." : "اعتماد المتجر داخليًا"}
                     </Button>
+                  )}
+
+                  {merchant.merchant_type !== "owned" && merchant.marketplace_approved_at && customerReadiness && (
+                    <div className="mt-5 space-y-3 border-t pt-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <strong className="text-sm">جاهزية النشر للعميل</strong>
+                        <Badge className={customerReadiness.ready_for_customer_publish ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" : "bg-amber-100 text-amber-900 hover:bg-amber-100"}>
+                          {customerReadiness.ready_for_customer_publish ? "جاهز للنشر" : `${customerReadiness.missing.length} متطلبات ناقصة`}
+                        </Badge>
+                      </div>
+                      {customerMissingLabels.length > 0 && <p className="text-xs leading-5 text-slate-500">المتبقي: {customerMissingLabels.join("، ")}</p>}
+
+                      {merchant.customer_published_at ? (
+                        <Button
+                          variant="outline"
+                          className="w-full border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                          disabled={unpublishMutation.isPending}
+                          onClick={() => {
+                            if (window.confirm("إيقاف نشر المتجر سيخفيه ومنتجاته فورًا من تطبيق العميل. هل تريد المتابعة؟")) unpublishMutation.mutate();
+                          }}
+                        >
+                          <EyeOff className="ml-2 h-4 w-4" />
+                          {unpublishMutation.isPending ? "جاري إيقاف النشر..." : "إيقاف النشر للعملاء"}
+                        </Button>
+                      ) : (
+                        <Button
+                          className="w-full bg-blue-700 hover:bg-blue-800"
+                          disabled={!customerReadiness.ready_for_customer_publish || publishMutation.isPending}
+                          onClick={() => publishMutation.mutate()}
+                        >
+                          <Globe2 className="ml-2 h-4 w-4" />
+                          {publishMutation.isPending ? "جاري النشر..." : "نشر المتجر للعملاء"}
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -334,14 +410,14 @@ export default function MarketplaceMerchantDetails() {
                   </CardContent>
                 </Card>
 
-                <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white"><table className="min-w-[900px] w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-3 text-right">المنتج</th><th className="p-3 text-right">الفرع</th><th className="p-3 text-right">سعر البيع</th><th className="p-3 text-right">المخزون</th><th className="p-3 text-right">التجهيز</th><th className="p-3 text-right">الحالة</th></tr></thead><tbody>{data.listings.length ? data.listings.map((listing) => <tr key={listing.id} className="border-t"><td className="p-3"><div className="font-bold">{listing.product_name}</div><div className="text-xs text-slate-400">{listing.barcode || listing.merchant_sku || "—"}</div></td><td className="p-3">{listing.branch_name}</td><td className="p-3 font-black">{money(listing.sale_price)}</td><td className="p-3">{Number(listing.quantity || 0).toLocaleString("ar-EG")}</td><td className="p-3">{listing.preparation_minutes ? `${listing.preparation_minutes} د` : "—"}</td><td className="p-3"><Badge variant="outline">{listing.status}</Badge></td></tr>) : <tr><td colSpan={6} className="p-8 text-center text-slate-500">لا توجد Listings لهذا المتجر حتى الآن.</td></tr>}</tbody></table></div>
+                <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white"><table className="min-w-[900px] w-full text-sm"><thead className="bg-slate-50 text-slate-500"><tr><th className="p-3 text-right">المنتج</th><th className="p-3 text-right">الفرع</th><th className="p-3 text-right">سعر البيع</th><th className="p-3 text-right">المخزون</th><th className="p-3 text-right">التجهيز</th><th className="p-3 text-right">الحالة</th></tr></thead><tbody>{data.listings.length ? data.listings.map((listing) => <tr key={listing.id} className="border-t"><td className="p-3"><div className="font-bold">{listing.product_name}</div><div className="text-xs text-slate-400">{listing.barcode || listing.merchant_sku || "—"}</div></td><td className="p-3">{listing.branch_name}</td><td className="p-3 font-black">{money(listing.sale_price)}</td><td className="p-3">{Number(listing.quantity || 0).toLocaleString("ar-EG")}</td><td className="p-3">{listing.preparation_minutes ? `${listing.preparation_minutes} د` : "—"}</td><td className="p-3"><Badge variant="outline" className={listing.marketplace_customer_enabled ? "border-emerald-200 bg-emerald-50 text-emerald-800" : ""}>{listing.marketplace_customer_enabled ? "منشور" : listing.status}</Badge></td></tr>) : <tr><td colSpan={6} className="p-8 text-center text-slate-500">لا توجد Listings لهذا المتجر حتى الآن.</td></tr>}</tbody></table></div>
               </TabsContent>
 
               <TabsContent value="delivery">
                 <Card className="border-slate-200">
                   <CardContent className="p-5">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><MapPinned className="h-5 w-5 text-[#005931]" /><h2 className="font-black">مناطق التوصيل</h2></div><p className="mt-2 text-sm text-slate-500">كل فرع شريك يحتاج منطقة توصيل نشطة قبل الاعتماد. نستخدم محرر المناطق الموجود بالفعل في النظام.</p></div><Button asChild className="bg-[#005931] hover:bg-[#004426]"><Link to="/branch-delivery-zones">فتح محرر مناطق التوصيل</Link></Button></div>
-                    <div className="mt-5 grid gap-3 md:grid-cols-2">{branches.map((branch) => <div key={branch.id} className="rounded-xl border p-4"><div className="font-black">{branch.name}</div><div className="mt-2 text-sm text-slate-500">Zones نشطة: {branch.active_delivery_zone_count}</div><div className="mt-2 text-xs text-slate-400">{branch.code}</div></div>)}</div>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><MapPinned className="h-5 w-5 text-[#005931]" /><h2 className="font-black">مناطق التوصيل</h2></div><p className="mt-2 text-sm text-slate-500">كل فرع شريك يحتاج منطقة توصيل نشطة وإحداثيات صحيحة قبل النشر للعملاء. نستخدم محرر المناطق الموجود بالفعل في النظام.</p></div><Button asChild className="bg-[#005931] hover:bg-[#004426]"><Link to="/branch-delivery-zones">فتح محرر مناطق التوصيل</Link></Button></div>
+                    <div className="mt-5 grid gap-3 md:grid-cols-2">{branches.map((branch) => <div key={branch.id} className="rounded-xl border p-4"><div className="font-black">{branch.name}</div><div className="mt-2 text-sm text-slate-500">Zones نشطة: {branch.active_delivery_zone_count}</div><div className="mt-1 text-sm text-slate-500">الإحداثيات: {branch.latitude != null && branch.longitude != null ? "مكتملة" : "ناقصة"}</div><div className="mt-2 text-xs text-slate-400">{branch.code}</div></div>)}</div>
                   </CardContent>
                 </Card>
               </TabsContent>
