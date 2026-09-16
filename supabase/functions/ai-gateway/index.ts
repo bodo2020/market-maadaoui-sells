@@ -72,9 +72,9 @@ async function getProviderKey(name: "GEMINI_API_KEY" | "GROQ_API_KEY" | "OPENROU
 async function callGemini(model: string, messages: unknown[], timeoutMs: number, maxTokens: number): Promise<ProviderResult> {
   const key = await getProviderKey("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_NOT_CONFIGURED");
-  const response = await withTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
+  const response = await withTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: messages,
@@ -82,7 +82,16 @@ async function callGemini(model: string, messages: unknown[], timeoutMs: number,
       generationConfig: { temperature: 0.2, maxOutputTokens: maxTokens },
     }),
   }, timeoutMs);
-  if (!response.ok) throw new Error(`GEMINI_${response.status}`);
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const payload = await response.json();
+      detail = safeText(payload?.error?.status || payload?.error?.message || "", 80).replace(/[^A-Za-z0-9_.:-]/g, "_");
+    } catch {
+      detail = "";
+    }
+    throw new Error(`GEMINI_${response.status}${detail ? `_${detail}` : ""}`);
+  }
   const payload = await response.json();
   const parts = payload?.candidates?.[0]?.content?.parts || [];
   return {
@@ -264,6 +273,7 @@ Deno.serve(async (req: Request) => {
     selected = providers[providerIndex];
     selectedAttempt = providerIndex + 1;
     fallbackUsed = providerIndex > 0;
+    const providerStarted = Date.now();
     const messages: any[] = selected.provider === "gemini" ? [{ role: "user", parts: [{ text: message }] }] : [{ role: "user", content: message }];
     try {
       for (let round = 0; round < 4; round += 1) {
@@ -281,11 +291,11 @@ Deno.serve(async (req: Request) => {
       if (!final) throw new Error("TOOL_LOOP_LIMIT");
     } catch (error) {
       providerError = error instanceof Error ? error.message : "PROVIDER_FAILED";
+      await admin.from("ai_usage_logs").insert({ conversation_id: conversationId, user_id: authData.user.id, branch_id: branchId, provider: selected.provider, model: selected.model, fallback_used: providerIndex > 0, status: "error", latency_ms: Date.now() - providerStarted, error_code: providerError.slice(0, 120), metadata: { provider_attempt: selectedAttempt, channel, stage: "provider_attempt" } });
     }
   }
 
   if (!final) {
-    await admin.from("ai_usage_logs").insert({ conversation_id: conversationId, user_id: authData.user.id, branch_id: branchId, provider: selected.provider, model: selected.model, fallback_used: fallbackUsed, status: "error", latency_ms: Date.now() - started, error_code: providerError.slice(0, 120), metadata: { provider_attempt: selectedAttempt, channel } });
     return json({ error: "مزودو الذكاء الاصطناعي غير متاحين حاليًا. حاول مرة أخرى بعد قليل." }, 503);
   }
 
