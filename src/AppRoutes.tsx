@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { UserRole } from "@/types";
 import Login from "@/pages/Login";
 import ReportsV2 from "@/pages/ReportsV2";
 import ReportsSalesV2 from "@/pages/ReportsSalesV2";
@@ -59,6 +60,7 @@ import OnlineOrders from "@/pages/OnlineOrders";
 import OrderDetails from "@/pages/OrderDetails";
 import OrderOperationsCenterV2 from "@/pages/OrderOperationsCenterV2";
 import Marketplace from "@/pages/Marketplace";
+import MarketplaceMerchantDetails from "@/pages/MarketplaceMerchantDetails";
 import CustomersAdvanced from "@/pages/CustomersAdvanced";
 import CustomerMyTasksPage from "@/pages/CustomerMyTasksPage";
 import OperationsTasksPage from "@/pages/OperationsTasksPage";
@@ -109,6 +111,7 @@ const AttendanceWorkspace = () => (<><AttendancePage /><AttendanceApprovedLeaveB
 const FinanceWorkspace = () => (<><Finance /><FinanceTreasuryCenterV2 /></>);
 const ReportsRedirect = () => <Navigate to="/reports" replace />;
 const InventoryAuditRedirect = () => <Navigate to="/daily-inventory" replace />;
+const marketplaceRoles = [UserRole.ADMIN, UserRole.SUPER_ADMIN];
 
 export default function AppRoutes() {
   return (
@@ -183,7 +186,8 @@ export default function AppRoutes() {
       <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
       <Route path="/online-orders/operations" element={<ProtectedRoute><OrderOperationsCenterV2 /></ProtectedRoute>} />
       <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
-      <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
+      <Route path="/marketplace" element={<ProtectedRoute allowedRoles={marketplaceRoles}><Marketplace /></ProtectedRoute>} />
+      <Route path="/marketplace/:merchantId" element={<ProtectedRoute allowedRoles={marketplaceRoles}><MarketplaceMerchantDetails /></ProtectedRoute>} />
       <Route path="/customers" element={<ProtectedRoute><CustomersWorkspace /></ProtectedRoute>} />
       <Route path="/customer-tasks" element={<ProtectedRoute><CustomerMyTasksPage /></ProtectedRoute>} />
       <Route path="/customers/:customerId" element={<ProtectedRoute><Customer360Workspace /></ProtectedRoute>} />
