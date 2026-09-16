@@ -58,6 +58,7 @@ import ITDeviceCenterV1 from "@/pages/ITDeviceCenterV1";
 import OnlineOrders from "@/pages/OnlineOrders";
 import OrderDetails from "@/pages/OrderDetails";
 import OrderOperationsCenterV2 from "@/pages/OrderOperationsCenterV2";
+import Marketplace from "@/pages/Marketplace";
 import CustomersAdvanced from "@/pages/CustomersAdvanced";
 import CustomerMyTasksPage from "@/pages/CustomerMyTasksPage";
 import OperationsTasksPage from "@/pages/OperationsTasksPage";
@@ -182,6 +183,7 @@ export default function AppRoutes() {
       <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
       <Route path="/online-orders/operations" element={<ProtectedRoute><OrderOperationsCenterV2 /></ProtectedRoute>} />
       <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
+      <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
       <Route path="/customers" element={<ProtectedRoute><CustomersWorkspace /></ProtectedRoute>} />
       <Route path="/customer-tasks" element={<ProtectedRoute><CustomerMyTasksPage /></ProtectedRoute>} />
       <Route path="/customers/:customerId" element={<ProtectedRoute><Customer360Workspace /></ProtectedRoute>} />
