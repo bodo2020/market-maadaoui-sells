@@ -66,6 +66,7 @@ export const hrNavigation: NavigationGroup = {
   title: "الموارد البشرية",
   items: [
     { label: "بوابة الموظف", href: "/my-hr", icon: UserRound },
+    { label: "Elmadawy HR AI", href: "/ai-sandbox?workspace=hr", icon: Bot, adminOnly: true },
     { label: "الحضور والانصراف", href: "/attendance", icon: Clock3 },
     { label: "موافقات الحضور", href: "/hr/attendance-approvals", icon: ShieldCheck, adminOnly: true },
     { label: "إدارة الموظفين", href: "/employees", icon: UserCheck, adminOnly: true },
