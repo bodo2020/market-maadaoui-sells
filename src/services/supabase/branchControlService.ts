@@ -26,6 +26,20 @@ export interface BranchChannelRuntime {
   updated_at?: string | null;
 }
 
+export interface BranchActiveResult {
+  branch_id: string;
+  tenant_id: string;
+  merchant_id: string;
+  merchant_type: MerchantType;
+  merchant_status: string;
+  active: boolean;
+  changed: boolean;
+  reason?: string | null;
+  agreement_status?: string | null;
+  agreement_starts_on?: string | null;
+  agreement_ends_on?: string | null;
+}
+
 export interface BranchGroupSummary {
   id: string;
   code: string;
@@ -125,9 +139,17 @@ export interface BranchControlDetail {
 function friendlyBranchControlError(message?: string) {
   const value = message || "تعذر تنفيذ العملية";
   const map: Record<string, string> = {
+    AUTHENTICATION_REQUIRED: "يجب تسجيل الدخول أولًا.",
     TENANT_ACCESS_REQUIRED: "ليس لديك صلاحية لعرض هيكل هذه الشركة.",
     BUSINESS_STRUCTURE_MANAGER_REQUIRED: "تحتاج صلاحية إدارة هيكل الفروع لتنفيذ العملية.",
     BRANCH_NOT_FOUND: "الفرع غير موجود.",
+    BRANCH_MERCHANT_NOT_FOUND: "المشغل المرتبط بالفرع غير موجود.",
+    BRANCH_MERCHANT_NOT_ACTIVE: "لا يمكن تشغيل الفرع لأن المشغل نفسه غير نشط.",
+    BRANCH_DISABLE_REASON_REQUIRED: "سبب إيقاف الفرع مطلوب.",
+    FRANCHISE_AGREEMENT_REQUIRED: "لا يمكن تشغيل فرع Franchise قبل إنشاء عقد حالي.",
+    FRANCHISE_AGREEMENT_NOT_ACTIVE: "لا يمكن تشغيل فرع Franchise قبل تفعيل العقد.",
+    FRANCHISE_AGREEMENT_NOT_STARTED: "لا يمكن تشغيل الفرع قبل تاريخ بداية عقد الـFranchise.",
+    FRANCHISE_AGREEMENT_EXPIRED: "لا يمكن تشغيل الفرع لأن عقد الـFranchise منتهي.",
     INVALID_BRANCH_CHANNEL: "قناة التشغيل غير صحيحة.",
     DISABLE_REASON_REQUIRED: "سبب الإيقاف مطلوب.",
     BRANCH_GROUP_NOT_FOUND: "مجموعة الفروع غير موجودة.",
@@ -135,7 +157,11 @@ function friendlyBranchControlError(message?: string) {
     GROUP_MERCHANT_TENANT_MISMATCH: "المشغل لا يتبع نفس الشركة.",
     GROUP_CODE_AND_NAME_REQUIRED: "كود واسم المجموعة مطلوبان.",
   };
-  return map[value] || value;
+
+  for (const [key, translated] of Object.entries(map)) {
+    if (value.includes(key)) return translated;
+  }
+  return value;
 }
 
 async function rpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
@@ -153,6 +179,18 @@ export function fetchBusinessStructure(tenantId?: string | null) {
 export function fetchBranchControlDetail(branchId: string) {
   return rpc<BranchControlDetail>("get_branch_control_detail_v1", {
     p_branch_id: branchId,
+  });
+}
+
+export function setBranchActive(input: {
+  branchId: string;
+  active: boolean;
+  reason?: string | null;
+}) {
+  return rpc<BranchActiveResult>("set_branch_active_v1", {
+    p_branch_id: input.branchId,
+    p_active: input.active,
+    p_reason: input.reason ?? null,
   });
 }
 
