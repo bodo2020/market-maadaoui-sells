@@ -14,6 +14,7 @@ import {
   financeNavigation,
   hrNavigation,
   reportsNavigation,
+  saasNavigation,
   adminNavigation,
 } from "./sidebarNavigation";
 import { NavigationGroup, SidebarItemData } from "./types";
@@ -56,10 +57,12 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
     financeNavigation,
     hrNavigation,
     reportsNavigation,
+    ...(isSuperAdmin ? [saasNavigation] : []),
     adminNavigation,
   ];
 
   const isItemVisible = (item: SidebarItemData) => {
+    if (item.superAdminOnly && !isSuperAdmin) return false;
     if (item.adminOnly && !isAdmin && !isSuperAdmin) return false;
     if (item.cashierOnly && !isCashier) return false;
     if (item.deliveryOnly && !isDelivery) return false;
