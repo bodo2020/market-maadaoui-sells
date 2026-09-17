@@ -5,6 +5,7 @@ import OperationsTaskNotifications from "@/components/tasks/OperationsTaskNotifi
 import InventoryTransferSmartAlertNotifications from "@/components/inventory/InventoryTransferSmartAlertNotifications";
 import POSOnlineOrdersRouteDock from "@/components/POS/POSOnlineOrdersRouteDock";
 import GooglePasswordAutofill from "@/components/Auth/GooglePasswordAutofill";
+import FranchiseAccountDock from "@/components/franchise/FranchiseAccountDock";
 import { BrowserRouter as Router, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -29,6 +30,7 @@ function StaffApplication() {
         <InventoryTransferSmartAlertNotifications />
         <ApprovalCenterNotifications />
         <POSOnlineOrdersRouteDock />
+        <FranchiseAccountDock />
         <AppRoutes />
       </AuthProvider>
     </>
@@ -37,7 +39,12 @@ function StaffApplication() {
 
 function RoutedApplication() {
   const { pathname } = useLocation();
-  const isFranchisePortal = pathname === "/franchise-login" || pathname === "/franchise-portal" || pathname.startsWith("/franchise-portal/");
+  const authCallback = typeof window !== "undefined" && (window.location.hash.includes("type=invite") || window.location.hash.includes("type=recovery"));
+  const isFranchisePortal = pathname === "/franchise-login"
+    || pathname === "/franchise-auth"
+    || pathname === "/franchise-portal"
+    || pathname.startsWith("/franchise-portal/")
+    || authCallback;
   return isFranchisePortal ? <FranchisePortalApp /> : <StaffApplication />;
 }
 
