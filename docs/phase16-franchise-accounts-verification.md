@@ -43,6 +43,7 @@ No real external mailbox was used by this database integration test.
 
 Production Edge Function: `franchise-account-admin`
 
+- status: `ACTIVE`, version `1`;
 - deployed with `verify_jwt=true`;
 - validates caller Supabase Auth JWT;
 - browser never receives the service-role key;
@@ -64,4 +65,11 @@ The function currently falls back to `https://elmaday-market.lovable.app` for th
 
 ## CI
 
-Pending on the Phase 16 head. The draft PR is temporarily retargeted to `main` only to trigger the repository workflows, then will be restored to `work/franchise-operator-portal-phase15` after verification.
+Verified on Phase 16 head `9f5a91f3c01de635e0b47377662fc246db5de053` before this documentation-only finalization commit:
+
+- GitHub Build #1352: **success**.
+- GitHub CI #531: **success**.
+- CI Typecheck step: **success**.
+- CI Build step: **success**.
+
+The draft PR was temporarily retargeted to `main` only to trigger repository workflows and is restored to `work/franchise-operator-portal-phase15` after verification. No merge is performed.
