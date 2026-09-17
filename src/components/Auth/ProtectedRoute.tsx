@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import StaffAppPinGate from "@/components/Auth/StaffAppPinGate";
+import TenantRuntimeGate from "@/components/Auth/TenantRuntimeGate";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/types";
 
@@ -24,7 +25,11 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     return <Navigate to="/" replace />;
   }
 
-  return <StaffAppPinGate>{children}</StaffAppPinGate>;
+  return (
+    <TenantRuntimeGate>
+      <StaffAppPinGate>{children}</StaffAppPinGate>
+    </TenantRuntimeGate>
+  );
 };
 
 export default ProtectedRoute;
