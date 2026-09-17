@@ -9,7 +9,10 @@ import {
   MapPin,
   MonitorCog,
   PackageCheck,
+  Power,
+  PowerOff,
   RefreshCw,
+  ShieldAlert,
   ShoppingCart,
   Smartphone,
   Store,
@@ -35,8 +38,10 @@ import {
   BranchChannelKey,
   BranchChannelRuntime,
   fetchBranchControlDetail,
+  setBranchActive,
   setBranchChannel,
 } from "@/services/supabase/branchControlService";
+import { fetchFranchiseDetail } from "@/services/supabase/franchiseService";
 
 const channelDefinitions: Array<{
   key: BranchChannelKey;
@@ -72,6 +77,24 @@ const merchantLabels: Record<string, string> = {
   partner: "Marketplace Partner",
 };
 
+const agreementLabels: Record<string, string> = {
+  draft: "مسودة",
+  review: "قيد المراجعة",
+  approved: "معتمد",
+  active: "نشط",
+  suspended: "موقوف",
+  expired: "منتهي",
+  terminated: "منهى",
+};
+
+function todayKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function HealthCard({ label, value, note, icon: Icon }: { label: string; value: number | string; note: string; icon: typeof Boxes }) {
   return (
     <Card className="border-slate-200 bg-white shadow-sm">
@@ -103,9 +126,18 @@ export default function BranchControlDetails() {
     refetchInterval: 30_000,
   });
 
+  const franchiseQuery = useQuery({
+    queryKey: ["franchise-detail", query.data?.merchant.id],
+    queryFn: () => fetchFranchiseDetail(query.data!.merchant.id),
+    enabled: query.data?.merchant.merchant_type === "franchise" && !!query.data?.merchant.id,
+    staleTime: 8_000,
+  });
+
   const [pendingDisable, setPendingDisable] = useState<{ key: BranchChannelKey; label: string } | null>(null);
   const [reason, setReason] = useState("");
   const [messageAr, setMessageAr] = useState("");
+  const [pendingBranchDisable, setPendingBranchDisable] = useState(false);
+  const [branchReason, setBranchReason] = useState("");
 
   const mutation = useMutation({
     mutationFn: (input: { key: BranchChannelKey; enabled: boolean; reason?: string | null; messageAr?: string | null }) => {
@@ -125,6 +157,24 @@ export default function BranchControlDetails() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "تعذر تحديث القناة"),
   });
 
+  const branchStateMutation = useMutation({
+    mutationFn: (input: { active: boolean; reason?: string | null }) => {
+      if (!branchId) throw new Error("الفرع غير محدد");
+      return setBranchActive({ branchId, active: input.active, reason: input.reason });
+    },
+    onSuccess: async (result) => {
+      toast.success(result.active ? "تم تشغيل الفرع" : "تم إيقاف الفرع");
+      setPendingBranchDisable(false);
+      setBranchReason("");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["branch-control-detail", branchId] }),
+        queryClient.invalidateQueries({ queryKey: ["business-structure"] }),
+        queryClient.invalidateQueries({ queryKey: ["franchise-detail", result.merchant_id] }),
+      ]);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "تعذر تحديث حالة الفرع"),
+  });
+
   const toggleChannel = (runtime: BranchChannelRuntime, label: string) => {
     const next = !runtime.configured_enabled;
     if (!next) {
@@ -139,6 +189,11 @@ export default function BranchControlDetails() {
   const confirmDisable = () => {
     if (!pendingDisable || !reason.trim()) return;
     mutation.mutate({ key: pendingDisable.key, enabled: false, reason: reason.trim(), messageAr: messageAr.trim() || reason.trim() });
+  };
+
+  const confirmBranchDisable = () => {
+    if (!branchReason.trim()) return;
+    branchStateMutation.mutate({ active: false, reason: branchReason.trim() });
   };
 
   const lastOrder = useMemo(() => {
@@ -156,6 +211,29 @@ export default function BranchControlDetails() {
   }
 
   const { branch, merchant, channels, groups, health } = query.data;
+  const activationBlockers: string[] = [];
+  const agreement = franchiseQuery.data?.current_agreement;
+  const currentDate = todayKey();
+
+  if (!branch.active) {
+    if (merchant.status !== "active") activationBlockers.push("المشغل نفسه غير نشط؛ يجب إعادة تفعيله أولًا.");
+
+    if (merchant.merchant_type === "franchise") {
+      if (franchiseQuery.isLoading) {
+        activationBlockers.push("جارٍ التحقق من عقد الـFranchise…");
+      } else if (franchiseQuery.isError) {
+        activationBlockers.push("تعذر التحقق من عقد الـFranchise؛ التفعيل محجوب احتياطيًا.");
+      } else if (!agreement) {
+        activationBlockers.push("لا يوجد عقد Franchise حالي لهذا المشغل.");
+      } else {
+        if (agreement.status !== "active") activationBlockers.push(`العقد الحالي حالته «${agreementLabels[agreement.status] || agreement.status}» وليس Active.`);
+        if (agreement.starts_on && agreement.starts_on > currentDate) activationBlockers.push(`العقد يبدأ في ${agreement.starts_on} ولم يدخل فترة السريان بعد.`);
+        if (agreement.ends_on && agreement.ends_on < currentDate) activationBlockers.push(`العقد انتهى في ${agreement.ends_on}.`);
+      }
+    }
+  }
+
+  const canActivate = !branch.active && activationBlockers.length === 0;
 
   return (
     <MainLayout>
@@ -166,6 +244,7 @@ export default function BranchControlDetails() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge className={merchant.merchant_type === "owned" ? "bg-emerald-100 text-emerald-800" : merchant.merchant_type === "franchise" ? "bg-blue-100 text-blue-800" : "bg-violet-100 text-violet-800"}>{merchantLabels[merchant.merchant_type] || merchant.merchant_type}</Badge>
               <Badge variant="outline" className={branch.active ? "border-emerald-200 text-emerald-700" : "border-red-200 text-red-700"}>{branch.active ? "الفرع نشط" : "الفرع متوقف"}</Badge>
+              {merchant.merchant_type === "franchise" && agreement && <Badge variant="outline">العقد: {agreementLabels[agreement.status] || agreement.status}</Badge>}
             </div>
             <h1 className="mt-3 text-3xl font-black text-slate-950">{branch.name}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-bold text-slate-500">
@@ -174,8 +253,29 @@ export default function BranchControlDetails() {
               <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{branch.address || "لا يوجد عنوان مسجل"}</span>
             </div>
           </div>
-          <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث الحالة</Button>
+          <div className="flex flex-wrap gap-2">
+            {branch.active ? (
+              <Button variant="destructive" onClick={() => { setBranchReason(""); setPendingBranchDisable(true); }} disabled={branchStateMutation.isPending}>
+                <PowerOff className="ml-2 h-4 w-4" />إيقاف الفرع
+              </Button>
+            ) : (
+              <Button className="bg-[#005931] hover:bg-[#004525]" onClick={() => branchStateMutation.mutate({ active: true })} disabled={!canActivate || branchStateMutation.isPending}>
+                <Power className="ml-2 h-4 w-4" />{branchStateMutation.isPending ? "جارٍ التشغيل…" : "تشغيل الفرع"}
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث الحالة</Button>
+          </div>
         </div>
+
+        {!branch.active && (
+          activationBlockers.length ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3"><ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div><p className="font-black text-amber-950">التفعيل محجوب حاليًا</p><p className="mt-1 text-xs text-amber-800">Branch 360 يمنع التشغيل قبل استيفاء شروط المشغل والعقد، والـServer يعيد التحقق عند التنفيذ.</p><div className="mt-3 space-y-1">{activationBlockers.map((item) => <p key={item} className="text-xs font-bold text-amber-900">• {item}</p>)}</div></div></div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900">الفرع جاهز للتشغيل. تفعيل الفرع لا يغير إعدادات القنوات؛ كل قناة ستعمل فقط حسب إعدادها وحالتها الفعلية.</div>
+          )
+        )}
 
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <HealthCard label="أصناف المخزون" value={Number(health.inventory_sku_count || 0).toLocaleString("ar-EG")} note="SKU مسجل على الفرع" icon={Boxes} />
@@ -187,7 +287,7 @@ export default function BranchControlDetails() {
         </section>
 
         <section className="space-y-3">
-          <div><p className="text-xs font-black text-[#005931]">CHANNEL CONTROL</p><h2 className="mt-1 text-xl font-black text-slate-950">قنوات تشغيل الفرع</h2><p className="mt-1 text-xs leading-5 text-slate-500">الحالة الفعلية تجمع إعداد الفرع مع حالة المشغل واشتراك SaaS والنشر في Marketplace.</p></div>
+          <div><p className="text-xs font-black text-[#005931]">CHANNEL CONTROL</p><h2 className="mt-1 text-xl font-black text-slate-950">قنوات تشغيل الفرع</h2><p className="mt-1 text-xs leading-5 text-slate-500">الحالة الفعلية تجمع إعداد الفرع مع حالة المشغل واشتراك SaaS والنشر في Marketplace. إيقاف الفرع يحجب القنوات بدون مسح إعداداتها.</p></div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {channelDefinitions.map((definition) => {
               const runtime = channels[definition.key];
@@ -214,6 +314,14 @@ export default function BranchControlDetails() {
           <Card className="border-slate-200"><CardContent className="p-5"><div className="flex items-center gap-2"><Store className="h-5 w-5 text-[#005931]" /><h2 className="font-black">المشغل والمجموعات</h2></div><div className="mt-4 rounded-2xl border border-slate-100 p-4"><p className="text-[11px] font-bold text-slate-400">Operator</p><p className="mt-1 font-black">{merchant.name}</p><p className="mt-1 text-xs text-slate-500">{merchant.code} • {merchantLabels[merchant.merchant_type] || merchant.merchant_type}</p></div><div className="mt-3 flex flex-wrap gap-2">{groups.length ? groups.map((group) => <Badge key={group.id} variant="outline">{group.name}</Badge>) : <span className="text-xs text-slate-400">الفرع غير مضاف لأي مجموعة حتى الآن.</span>}</div></CardContent></Card>
         </section>
       </div>
+
+      <Dialog open={pendingBranchDisable} onOpenChange={(open) => !open && setPendingBranchDisable(false)}>
+        <DialogContent dir="rtl" className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>إيقاف الفرع بالكامل</DialogTitle><DialogDescription>سيتم حجب التشغيل الفعلي لكل القنوات، لكن إعدادات القنوات نفسها ستظل محفوظة حتى يمكن استعادتها عند إعادة تشغيل الفرع.</DialogDescription></DialogHeader>
+          <div className="space-y-2 py-3"><Label>سبب إيقاف الفرع *</Label><Input value={branchReason} onChange={(event) => setBranchReason(event.target.value)} placeholder="مثال: صيانة شاملة / إيقاف تشغيلي مؤقت" /></div>
+          <DialogFooter className="gap-2"><Button variant="outline" onClick={() => setPendingBranchDisable(false)}>إلغاء</Button><Button variant="destructive" onClick={confirmBranchDisable} disabled={!branchReason.trim() || branchStateMutation.isPending}>{branchStateMutation.isPending ? "جارٍ الإيقاف…" : "تأكيد إيقاف الفرع"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!pendingDisable} onOpenChange={(open) => !open && setPendingDisable(null)}>
         <DialogContent dir="rtl" className="sm:max-w-lg">
