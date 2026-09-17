@@ -1,4 +1,3 @@
-
 import { LucideIcon } from "lucide-react";
 
 export interface SidebarItemData {
@@ -6,10 +5,11 @@ export interface SidebarItemData {
   label: string;
   href: string;
   badge?: number;
-  secondaryBadge?: number; // إضافة دعم للإشعارات الثانوية  
+  secondaryBadge?: number;
   adminOnly?: boolean;
-  cashierOnly?: boolean; // إضافة دعم للصفحات الخاصة بالكاشير
-  deliveryOnly?: boolean; // إضافة دعم للصفحات الخاصة بمندوبي التوصيل
+  superAdminOnly?: boolean;
+  cashierOnly?: boolean;
+  deliveryOnly?: boolean;
 }
 
 export interface SidebarGroupData {
