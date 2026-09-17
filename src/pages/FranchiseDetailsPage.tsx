@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -14,7 +14,6 @@ import {
   Plus,
   RefreshCw,
   ShieldCheck,
-  Store,
   XCircle,
 } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
@@ -31,11 +30,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { BranchChannelRuntime } from "@/services/supabase/branchControlService";
 import {
   createFranchiseBranch,
   fetchFranchiseDetail,
-  FranchiseAgreementAction,
-  FranchiseAgreementStatus,
+  type FranchiseAgreementAction,
+  type FranchiseAgreementStatus,
   transitionFranchiseAgreement,
 } from "@/services/supabase/franchiseService";
 import { toast } from "sonner";
@@ -86,7 +86,7 @@ function allowedActions(status: FranchiseAgreementStatus): FranchiseAgreementAct
   return [];
 }
 
-function Value({ label, value }: { label: string; value: React.ReactNode }) {
+function Value({ label, value }: { label: string; value: ReactNode }) {
   return <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3"><p className="text-[10px] font-black text-slate-400">{label}</p><div className="mt-1 text-sm font-black text-slate-800">{value ?? "—"}</div></div>;
 }
 
@@ -244,7 +244,7 @@ export default function FranchiseDetailsPage() {
               <button key={item.id} type="button" onClick={() => navigate(`/branches/${item.id}`)} className="w-full rounded-2xl border border-slate-100 bg-slate-50 p-4 text-right transition hover:border-emerald-200 hover:bg-emerald-50/40">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div><div className="flex flex-wrap items-center gap-2"><span className="font-black text-slate-900">{item.name}</span><Badge variant="outline" className={item.active ? "border-emerald-200 text-emerald-700" : "border-red-200 text-red-700"}>{item.active ? "نشط" : "متوقف"}</Badge><span className="text-[11px] font-bold text-slate-400">{item.code}</span></div><p className="mt-1 text-xs text-slate-500">{item.address || "لا يوجد عنوان"}</p></div>
-                  <div className="flex flex-wrap gap-1.5">{Object.entries(item.channels || {}).map(([key, runtime]) => <span key={key} className={`rounded-full border px-2 py-1 text-[10px] font-black ${runtime.effective_enabled ? "border-emerald-200 bg-emerald-50 text-emerald-700" : runtime.configured_enabled ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-white text-slate-400"}`}>{key}</span>)}</div>
+                  <div className="flex flex-wrap gap-1.5">{(Object.entries(item.channels || {}) as [string, BranchChannelRuntime][]).map(([key, runtime]) => <span key={key} className={`rounded-full border px-2 py-1 text-[10px] font-black ${runtime.effective_enabled ? "border-emerald-200 bg-emerald-50 text-emerald-700" : runtime.configured_enabled ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-white text-slate-400"}`}>{key}</span>)}</div>
                 </div>
               </button>
             ))}
