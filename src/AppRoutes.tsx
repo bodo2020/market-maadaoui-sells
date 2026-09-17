@@ -61,6 +61,8 @@ import OrderDetails from "@/pages/OrderDetails";
 import OrderOperationsCenterV2 from "@/pages/OrderOperationsCenterV2";
 import Marketplace from "@/pages/Marketplace";
 import MarketplaceMerchantDetails from "@/pages/MarketplaceMerchantDetails";
+import BranchControlCenter from "@/pages/BranchControlCenter";
+import BranchControlDetails from "@/pages/BranchControlDetails";
 import CustomersAdvanced from "@/pages/CustomersAdvanced";
 import CustomerMyTasksPage from "@/pages/CustomerMyTasksPage";
 import OperationsTasksPage from "@/pages/OperationsTasksPage";
@@ -186,6 +188,8 @@ export default function AppRoutes() {
       <Route path="/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
       <Route path="/online-orders/operations" element={<ProtectedRoute><OrderOperationsCenterV2 /></ProtectedRoute>} />
       <Route path="/online-orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
+      <Route path="/branches" element={<ProtectedRoute allowedRoles={marketplaceRoles}><BranchControlCenter /></ProtectedRoute>} />
+      <Route path="/branches/:branchId" element={<ProtectedRoute allowedRoles={marketplaceRoles}><BranchControlDetails /></ProtectedRoute>} />
       <Route path="/marketplace" element={<ProtectedRoute allowedRoles={marketplaceRoles}><Marketplace /></ProtectedRoute>} />
       <Route path="/marketplace/:merchantId" element={<ProtectedRoute allowedRoles={marketplaceRoles}><MarketplaceMerchantDetails /></ProtectedRoute>} />
       <Route path="/customers" element={<ProtectedRoute><CustomersWorkspace /></ProtectedRoute>} />
