@@ -48,9 +48,10 @@ export const customersNavigation: NavigationGroup = {
 };
 
 export const marketplaceNavigation: NavigationGroup = {
-  title: "Marketplace",
+  title: "الفروع والشبكة",
   items: [
-    { label: "إدارة المتاجر الشريكة", href: "/marketplace", icon: Store, adminOnly: true },
+    { label: "مركز الفروع", href: "/branches", icon: Building2, adminOnly: true },
+    { label: "Marketplace والشركاء", href: "/marketplace", icon: Store, adminOnly: true },
   ],
 };
 
