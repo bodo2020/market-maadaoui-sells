@@ -1,0 +1,54 @@
+name: SaaS Admin Standalone
+
+on:
+  pull_request:
+    paths:
+      - 'apps/saas-admin/**'
+      - '.github/workflows/saas-admin-pages.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/saas-admin/**'
+      - '.github/workflows/saas-admin-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: saas-admin-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsc --noEmit -p apps/saas-admin/tsconfig.json
+      - run: npx vite build apps/saas-admin --config apps/saas-admin/vite.config.ts
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/saas-admin/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
