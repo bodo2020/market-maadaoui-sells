@@ -14,7 +14,6 @@ import {
   financeNavigation,
   hrNavigation,
   reportsNavigation,
-  saasNavigation,
   adminNavigation,
 } from "./sidebarNavigation";
 import { NavigationGroup, SidebarItemData } from "./types";
@@ -57,7 +56,6 @@ export function SidebarContent({ collapsed, onNavigate }: SidebarContentProps) {
     financeNavigation,
     hrNavigation,
     reportsNavigation,
-    ...(isSuperAdmin ? [saasNavigation] : []),
     adminNavigation,
   ];
 
