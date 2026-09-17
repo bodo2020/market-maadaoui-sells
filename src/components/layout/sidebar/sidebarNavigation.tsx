@@ -91,6 +91,13 @@ export const reportsNavigation: NavigationGroup = {
   ],
 };
 
+export const saasNavigation: NavigationGroup = {
+  title: "SaaS Platform",
+  items: [
+    { label: "مركز تحكم SaaS", href: "/saas-control", icon: ShieldCheck, superAdminOnly: true },
+  ],
+};
+
 export const adminNavigation: NavigationGroup = {
   title: "الحساب والإعدادات",
   items: [
