@@ -67,6 +67,9 @@ verify_jwt = true
 [functions.ai-action-engine]
 verify_jwt = true
 
+[functions.franchise-account-admin]
+verify_jwt = true
+
 [functions.notify-new-order]
 verify_jwt = false
 
