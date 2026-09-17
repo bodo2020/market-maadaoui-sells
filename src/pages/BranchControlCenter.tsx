@@ -213,6 +213,7 @@ export default function BranchControlCenter() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => query.refetch()} disabled={query.isFetching}><RefreshCw className={`ml-2 h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
+            <Button variant="outline" onClick={() => navigate("/franchise/new")}><Building2 className="ml-2 h-4 w-4" />Franchise جديد</Button>
             <Button variant="outline" onClick={() => navigate("/marketplace")}><Store className="ml-2 h-4 w-4" />Marketplace</Button>
             <Button className="bg-[#005931] hover:bg-[#004a29]" onClick={() => setGroupOpen(true)}><Plus className="ml-2 h-4 w-4" />مجموعة فروع</Button>
           </div>
@@ -262,9 +263,16 @@ export default function BranchControlCenter() {
                           <h2 className="mt-3 text-xl font-black text-slate-950">{merchant.name}</h2>
                           <p className="mt-1 text-xs text-slate-500">{merchant.code} • {merchant.branch_count} فرع</p>
                         </div>
-                        <div className="flex flex-wrap gap-2 text-[11px] font-bold text-slate-500">
-                          {merchant.contact_name && <span className="rounded-full bg-slate-100 px-3 py-1.5">{merchant.contact_name}</span>}
-                          {merchant.phone && <span className="rounded-full bg-slate-100 px-3 py-1.5">{merchant.phone}</span>}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {merchant.merchant_type === "franchise" && (
+                            <Button size="sm" variant="outline" className="border-blue-200 text-blue-800 hover:bg-blue-50" onClick={() => navigate(`/franchise/${merchant.id}`)}>
+                              <Building2 className="ml-2 h-4 w-4" />إدارة Franchise
+                            </Button>
+                          )}
+                          <div className="flex flex-wrap gap-2 text-[11px] font-bold text-slate-500">
+                            {merchant.contact_name && <span className="rounded-full bg-slate-100 px-3 py-1.5">{merchant.contact_name}</span>}
+                            {merchant.phone && <span className="rounded-full bg-slate-100 px-3 py-1.5">{merchant.phone}</span>}
+                          </div>
                         </div>
                       </div>
                     </div>
