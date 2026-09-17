@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Building2, FileSignature, Network, Save, Store } from "lucide-react";
@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { fetchBusinessStructure } from "@/services/supabase/branchControlService";
-import { createFranchiseOperator } from "@/services/supabase/franchiseService";
+import { createFranchiseOperator, type CreateFranchiseInput } from "@/services/supabase/franchiseService";
 import { toast } from "sonner";
 
 const stepMeta = [
@@ -18,7 +18,7 @@ const stepMeta = [
   { id: 3, title: "أول فرع", icon: Store },
 ];
 
-const Field = ({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) => (
+const Field = ({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) => (
   <div className="space-y-2">
     <Label className="font-bold text-slate-700">{label}</Label>
     {children}
@@ -103,6 +103,11 @@ export default function FranchiseOnboardingPage() {
           ...agreement,
           agreement_code: agreement.agreement_code || undefined,
           ends_on: agreement.ends_on || undefined,
+          settlement_cycle: agreement.settlement_cycle as CreateFranchiseInput["agreement"]["settlement_cycle"],
+          pricing_policy: agreement.pricing_policy as CreateFranchiseInput["agreement"]["pricing_policy"],
+          catalog_policy: agreement.catalog_policy as CreateFranchiseInput["agreement"]["catalog_policy"],
+          supplier_policy: agreement.supplier_policy as CreateFranchiseInput["agreement"]["supplier_policy"],
+          promotion_policy: agreement.promotion_policy as CreateFranchiseInput["agreement"]["promotion_policy"],
           notes: agreement.notes || undefined,
         },
         branch: {
