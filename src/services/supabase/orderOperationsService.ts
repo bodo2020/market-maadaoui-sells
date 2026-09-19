@@ -172,6 +172,60 @@ export async function fetchOrderGroupDispatchBoard(branchId: string, limit = 20)
   return (data || { branch_id: branchId, items: [], generated_at: new Date().toISOString() }) as OrderGroupDispatchBoardPayload;
 }
 
+export type OrderGroupDispatchMode = 'shadow' | 'assisted' | 'auto';
+
+export type OrderGroupDispatchPolicy = {
+  branch_id: string;
+  mode: OrderGroupDispatchMode;
+  can_manage: boolean;
+  policy_actor_id?: string | null;
+  policy_actor_name?: string | null;
+  actor_valid: boolean;
+  updated_at?: string | null;
+};
+
+export async function fetchOrderGroupDispatchPolicy(branchId: string) {
+  const { data, error } = await (supabase.rpc as any)('get_order_group_dispatch_policy_v1', {
+    p_branch_id: branchId,
+  });
+  if (error) {
+    const messages: Record<string, string> = {
+      AUTH_REQUIRED: 'سجّل الدخول مرة أخرى.',
+      DISPATCH_VIEW_DENIED: 'الحساب الحالي لا يملك صلاحية عرض سياسة التوزيع.',
+    };
+    throw new Error(messages[error.message] || 'تعذر تحميل سياسة Smart Dispatch.');
+  }
+  return (data || {
+    branch_id: branchId,
+    mode: 'assisted',
+    can_manage: false,
+    actor_valid: true,
+  }) as OrderGroupDispatchPolicy;
+}
+
+export async function setOrderGroupDispatchPolicy(branchId: string, mode: OrderGroupDispatchMode) {
+  const { data, error } = await (supabase.rpc as any)('set_order_group_dispatch_policy_v1', {
+    p_branch_id: branchId,
+    p_mode: mode,
+  });
+  if (error) {
+    const messages: Record<string, string> = {
+      AUTH_REQUIRED: 'سجّل الدخول مرة أخرى.',
+      DISPATCH_MANAGE_DENIED: 'الحساب الحالي لا يملك صلاحية تغيير سياسة التوزيع.',
+      INVALID_DISPATCH_MODE: 'وضع Smart Dispatch غير صالح.',
+    };
+    throw new Error(messages[error.message] || 'تعذر حفظ سياسة Smart Dispatch.');
+  }
+  return data as {
+    ok: boolean;
+    branch_id: string;
+    mode: OrderGroupDispatchMode;
+    policy_actor_id: string;
+    actor_valid: boolean;
+    updated_at: string;
+  };
+}
+
 export async function assignRecommendedOrderGroupDelivery(groupId: string) {
   const { data, error } = await (supabase.rpc as any)('assign_recommended_order_group_delivery_v1', {
     p_group_id: groupId,
@@ -189,6 +243,7 @@ export async function assignRecommendedOrderGroupDelivery(groupId: string) {
       GROUP_READINESS_PREDICTION_INCOMPLETE: 'بيانات جاهزية بعض المتاجر غير مكتملة.',
       GROUP_DISPATCH_TOO_EARLY: 'لسه بدري على تحريك المندوب حسب جاهزية المتاجر.',
       GROUP_NO_ACTIVE_ORDERS: 'لا توجد طلبات نشطة داخل المجموعة.',
+      GROUP_DISPATCH_POLICY_SHADOW: 'Smart Dispatch مضبوط على Shadow؛ التعيين اليدوي من التوصية متوقف.',
     };
     throw new Error(messages[error.message] || 'تعذر تعيين المندوب المقترح للمجموعة.');
   }
@@ -199,6 +254,7 @@ export async function assignRecommendedOrderGroupDelivery(groupId: string) {
     route_id: string;
     delivery_user_id: string;
     recommendation?: OrderGroupDispatchRecommendation;
+    assignment_count?: number;
     assignment?: {
       assignment_count?: number;
     };
