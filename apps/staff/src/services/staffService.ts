@@ -182,6 +182,7 @@ export type PickingItem = {
 export type PickingSession = {
   order_id: string;
   fulfillment_state: string;
+  substitution_policy: "allow_substitutions" | "contact_me" | "remove_item" | "manager";
   picker_user_id: string | null;
   items_total: number;
   items_picked: number;
@@ -248,6 +249,10 @@ export type SubstitutionCandidate = {
   is_bulk: boolean;
   is_weight_based: boolean;
   unit_of_measure: string | null;
+  is_predefined?: boolean;
+  same_brand?: boolean;
+  match_reason?: "predefined" | "same_brand" | "same_category";
+  match_score?: number;
 };
 
 export type SubstitutionCandidateResponse = {
@@ -524,7 +529,7 @@ export async function startPicking(orderId: string) {
 }
 
 export async function getPickingSession(orderId: string) {
-  return unwrap<PickingSession>(await rpc("get_my_order_picking_session_v1", { p_order_id: orderId }));
+  return unwrap<PickingSession>(await rpc("get_my_order_picking_session_v2", { p_order_id: orderId }));
 }
 
 export async function scanPickingBarcode(orderId: string, barcode: string, quantity?: number | null) {
@@ -543,7 +548,7 @@ export async function confirmPickingItem(itemId: string, quantity?: number | nul
 }
 
 export async function markPickingShortage(itemId: string, quantity: number, note?: string | null) {
-  return unwrap<{ ok: boolean; line: PickingItem }>(await rpc("mark_order_fulfillment_shortage_v1", {
+  return unwrap<{ ok: boolean; line: PickingItem }>(await rpc("mark_order_fulfillment_shortage_v2", {
     p_item_id: itemId,
     p_shortage_quantity: quantity,
     p_note: note ?? null,
@@ -551,7 +556,7 @@ export async function markPickingShortage(itemId: string, quantity: number, note
 }
 
 export async function searchSubstitutionCandidates(itemId: string, query = "", limit = 20) {
-  return unwrap<SubstitutionCandidateResponse>(await rpc("search_order_fulfillment_substitution_candidates_v1", {
+  return unwrap<SubstitutionCandidateResponse>(await rpc("search_order_fulfillment_substitution_candidates_v2", {
     p_item_id: itemId,
     p_query: query,
     p_limit: limit,
@@ -564,7 +569,7 @@ export async function proposeSubstitution(
   quantity: number,
   note = "اقتراح بديل من تطبيق الموظفين",
 ) {
-  return unwrap<{ ok: boolean; substitution: PickingSubstitution }>(await rpc("propose_order_fulfillment_substitution_v1", {
+  return unwrap<{ ok: boolean; substitution: PickingSubstitution }>(await rpc("propose_order_fulfillment_substitution_v2", {
     p_item_id: itemId,
     p_replacement_product_id: candidate.product_id,
     p_replacement_variant_id: candidate.variant_id,
