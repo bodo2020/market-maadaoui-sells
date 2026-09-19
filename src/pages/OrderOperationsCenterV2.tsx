@@ -20,7 +20,9 @@ import {
   fetchOrderGroupDispatchBoard,
   fetchOrderGroupDispatchHealth,
   fetchOrderGroupDispatchPolicy,
+  fetchOrderGroupPickupIssueBoard,
   repriceOrderGroup,
+  resolveOrderGroupPickupIssue,
   setOrderGroupDispatchPolicy,
   type OrderGroupControlTowerItem,
   type OrderGroupDispatchMode,
@@ -81,6 +83,14 @@ const dispatchReasonLabel: Record<string, string> = {
   route_not_assignable: "المسار بدأ بالفعل",
   group_not_dispatchable: "المجموعة غير قابلة للتوزيع",
   no_active_orders: "لا توجد طلبات نشطة",
+};
+
+const pickupIssueLabel: Record<string, string> = {
+  store_closed: "المتجر مغلق",
+  order_not_ready: "الطلب غير جاهز",
+  order_mismatch: "الطلب أو الأكياس غير مطابقة",
+  pickup_access: "تعذر الوصول لنقطة الاستلام",
+  other: "مشكلة أخرى",
 };
 
 function timeLabel(value?: string | null) {
@@ -270,6 +280,7 @@ export default function OrderOperationsCenterV2() {
   const [assigningGroupId, setAssigningGroupId] = useState<string | null>(null);
   const [dispatchPolicyMode, setDispatchPolicyMode] = useState<OrderGroupDispatchMode>("assisted");
   const [savingDispatchPolicy, setSavingDispatchPolicy] = useState(false);
+  const [resolvingPickupIssueId, setResolvingPickupIssueId] = useState<string | null>(null);
 
   const query = useQuery({
     queryKey: ["order-fulfillment-v1", currentBranchId],
@@ -304,6 +315,13 @@ export default function OrderOperationsCenterV2() {
     enabled: Boolean(currentBranchId),
     queryFn: () => fetchOrderGroupDispatchHealth(currentBranchId!, 20),
     refetchInterval: 15_000,
+  });
+
+  const pickupIssueQuery = useQuery({
+    queryKey: ["order-group-pickup-issues-v1", currentBranchId],
+    enabled: Boolean(currentBranchId),
+    queryFn: () => fetchOrderGroupPickupIssueBoard(currentBranchId!, 50),
+    refetchInterval: 10_000,
   });
 
   const batchShadowQuery = useQuery({
@@ -344,6 +362,8 @@ export default function OrderOperationsCenterV2() {
   ).length;
   const dispatchHealthSummary = dispatchHealthQuery.data?.summary || {};
   const dispatchHealthIssues = dispatchHealthQuery.data?.issues || [];
+  const pickupIssueSummary = pickupIssueQuery.data?.summary || {};
+  const pickupIssues = pickupIssueQuery.data?.issues || [];
 
   const assignRecommended = async (order: any) => {
     const recommendation = order.dispatch_recommendation;
@@ -405,6 +425,26 @@ export default function OrderOperationsCenterV2() {
     }
   };
 
+  const resolvePickupIssue = async (issueId: string) => {
+    try {
+      setResolvingPickupIssueId(issueId);
+      await resolveOrderGroupPickupIssue(issueId);
+      toast.success("تم حل مشكلة نقطة الاستلام", {
+        description: "تم إغلاق المهمة وإعادة فتح الاستلام للمندوب على نفس الرحلة.",
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["order-group-pickup-issues-v1", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["order-group-control-tower-v1", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["order-group-dispatch-board-v1", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["order-fulfillment-v1", currentBranchId] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر حل مشكلة نقطة الاستلام");
+    } finally {
+      setResolvingPickupIssueId(null);
+    }
+  };
+
   const retryGroupReprice = async (groupId: string) => {
     try {
       setRepricingGroupId(groupId);
@@ -433,6 +473,7 @@ export default function OrderOperationsCenterV2() {
       dispatchQuery.refetch(),
       dispatchPolicyQuery.refetch(),
       dispatchHealthQuery.refetch(),
+      pickupIssueQuery.refetch(),
       batchShadowQuery.refetch(),
     ]);
   };
@@ -500,6 +541,109 @@ export default function OrderOperationsCenterV2() {
           </CardContent>
         </Card>}
 
+
+        <Card className="overflow-hidden border-amber-200 bg-gradient-to-br from-amber-50/70 via-white to-white shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-600 text-white">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CardTitle>مشاكل نقاط الاستلام · Multi-store</CardTitle>
+                    {(pickupIssueSummary.open || 0) > 0 ? (
+                      <span className="rounded-full bg-red-100 px-3 py-1 text-[11px] font-black text-red-800">
+                        {pickupIssueSummary.open} مفتوحة
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-800">مستقر</span>
+                    )}
+                  </div>
+                  <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
+                    المندوب يقدر يوقف نقطة الاستلام الحالية بدون إلغاء الرحلة. المشكلة تُفتح كـTask، والاستلام يظل مقفولًا حتى حلها من هنا.
+                  </p>
+                </div>
+              </div>
+              <Button variant="outline" onClick={() => void pickupIssueQuery.refetch()} disabled={pickupIssueQuery.isFetching}>
+                <RefreshCw className={`h-4 w-4 ${pickupIssueQuery.isFetching ? "animate-spin" : ""}`} />
+                تحديث المشاكل
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-2xl border border-amber-100 bg-white p-3 text-center">
+                <p className="text-[11px] text-slate-500">مفتوحة الآن</p>
+                <p className="mt-1 text-2xl font-black text-red-700">{pickupIssueSummary.open || 0}</p>
+              </div>
+              <div className="rounded-2xl border border-amber-100 bg-white p-3 text-center">
+                <p className="text-[11px] text-slate-500">تم حلها خلال 24 ساعة</p>
+                <p className="mt-1 text-2xl font-black text-emerald-700">{pickupIssueSummary.resolved_last_24h || 0}</p>
+              </div>
+            </div>
+
+            {pickupIssueQuery.isLoading ? (
+              <div className="rounded-2xl bg-white/80 p-5 text-center text-sm text-slate-500">جاري تحميل مشاكل نقاط الاستلام…</div>
+            ) : pickupIssueQuery.error ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {pickupIssueQuery.error instanceof Error ? pickupIssueQuery.error.message : "تعذر تحميل مشاكل نقاط الاستلام."}
+              </div>
+            ) : pickupIssues.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/50 p-5 text-center text-sm font-bold text-emerald-800">
+                لا توجد مشاكل Pickup مفتوحة أو محلولة حديثًا.
+              </div>
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {pickupIssues.map((issue) => {
+                  const open = issue.status === "open";
+                  return (
+                    <div key={issue.id} className={`rounded-2xl border p-4 ${open ? "border-red-200 bg-red-50/60" : "border-emerald-200 bg-emerald-50/50"}`}>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <strong className="text-sm text-slate-950">{issue.display_id}</strong>
+                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${open ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800"}`}>
+                              {open ? "مفتوحة" : "تم الحل"}
+                            </span>
+                            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-amber-800">
+                              Pickup #{issue.stop_order}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm font-black text-slate-900">
+                            {issue.branch_name || issue.merchant_name || "نقطة استلام"} · {pickupIssueLabel[issue.issue_type] || issue.issue_type}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-slate-600">{issue.note}</p>
+                          <p className="mt-2 text-[11px] text-slate-500">
+                            المندوب: {issue.driver_name || "—"} · البلاغ {timeLabel(issue.reported_at)}
+                            {issue.task_status ? ` · Task: ${issue.task_status}` : ""}
+                          </p>
+                          {!open && issue.resolution_note ? (
+                            <p className="mt-2 rounded-xl bg-white/80 p-2 text-[11px] text-emerald-800">الحل: {issue.resolution_note}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <Button variant="outline" className="flex-1" onClick={() => navigate(`/online-orders/${issue.order_id}`)}>
+                          فتح الطلب
+                        </Button>
+                        {open ? (
+                          <Button
+                            className="flex-1 bg-emerald-700 hover:bg-emerald-800"
+                            disabled={resolvingPickupIssueId === issue.id}
+                            onClick={() => void resolvePickupIssue(issue.id)}
+                          >
+                            {resolvingPickupIssueId === issue.id ? "جاري الحل…" : "تم حل المشكلة · افتح الاستلام"}
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="overflow-hidden border-sky-200 bg-gradient-to-br from-sky-50/80 via-white to-white shadow-sm">
           <CardHeader className="pb-3">
