@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Clock3, Layers3, PackageCheck, RefreshCw, Route, Settings2, TimerReset, Truck, UserCheck } from "lucide-react";
+import { AlertTriangle, Clock3, Layers3, PackageCheck, RefreshCw, Route, Settings2, Store, TimerReset, Truck, UserCheck } from "lucide-react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,10 @@ import {
   fetchPickerAssignmentPolicy,
   setPickerAssignmentPolicy,
 } from "@/services/supabase/orderFulfillmentV1Service";
+import {
+  fetchOrderGroupControlTower,
+  type OrderGroupControlTowerItem,
+} from "@/services/supabase/orderOperationsService";
 import { toast } from "sonner";
 
 const stateLabel: Record<string, string> = {
@@ -28,6 +32,29 @@ const stateLabel: Record<string, string> = {
   issue: "مشكلة تشغيلية",
 };
 
+const groupStatusLabel: Record<string, string> = {
+  pending: "بانتظار المتاجر",
+  confirmed: "تم قبول المتاجر",
+  preparing: "المتاجر بتحضّر",
+  ready: "كل نقاط الاستلام جاهزة",
+  shipped: "خرج للتوصيل",
+  on_the_way: "في الطريق للعميل",
+  delivered: "تم التسليم",
+  cancelled: "ملغي",
+  failed: "مشكلة في الرحلة",
+  return_to_branch: "راجع للفرع",
+};
+
+const orderStatusLabel: Record<string, string> = {
+  pending: "ينتظر القبول",
+  confirmed: "مقبول",
+  preparing: "جاري التجهيز",
+  ready: "جاهز",
+  shipped: "تم الاستلام",
+  delivered: "تم التسليم",
+  cancelled: "ملغي",
+};
+
 const riskLabel: Record<string, string> = { on_track: "في الموعد", at_risk: "معرض للتأخير", late: "متأخر" };
 const batchReasonLabel: Record<string, string> = {
   shared_shelf_route: "مسار رفوف مشترك",
@@ -38,6 +65,141 @@ const batchReasonLabel: Record<string, string> = {
 function timeLabel(value?: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("ar-EG", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+
+function groupRiskClass(risk?: string | null) {
+  if (risk === "late") return "border-red-200 bg-red-50 text-red-700";
+  if (risk === "at_risk") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
+}
+
+function groupStatusClass(status?: string | null) {
+  if (status === "ready") return "bg-emerald-600 text-white";
+  if (status === "preparing") return "bg-blue-100 text-blue-800";
+  if (status === "pending") return "bg-amber-100 text-amber-800";
+  if (status === "shipped" || status === "on_the_way") return "bg-violet-100 text-violet-800";
+  return "bg-slate-100 text-slate-700";
+}
+
+function MultiStoreGroupCard({ group, onOpenOrder }: { group: OrderGroupControlTowerItem; onOpenOrder: (id: string) => void }) {
+  const operations = group.operations || {};
+  const activeStores = Number(operations.stores_active ?? group.stores.length);
+  const readyStores = Number(operations.ready || 0) + Number(operations.shipped || 0) + Number(operations.delivered || 0);
+  const readiness = activeStores > 0 ? Math.min(100, Math.round((readyStores / activeStores) * 100)) : 0;
+  const risk = operations.sla_risk || "on_track";
+
+  return (
+    <Card className={`overflow-hidden border-2 shadow-sm ${risk === "late" ? "border-red-200" : risk === "at_risk" ? "border-amber-200" : operations.ready_for_dispatch ? "border-emerald-200" : "border-slate-200"}`}>
+      <CardHeader className="border-b bg-slate-50/70 pb-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="text-lg">{group.display_id}</CardTitle>
+              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${groupStatusClass(group.status)}`}>
+                {groupStatusLabel[group.status] || group.status}
+              </span>
+              {operations.partially_cancelled && (
+                <span className="rounded-full bg-red-100 px-3 py-1 text-[11px] font-black text-red-700">إلغاء جزئي</span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              {group.customer_name || "عميل"} · {group.stores_count} متاجر · {Number(group.total || 0).toFixed(2)} ج.م
+            </p>
+          </div>
+          <div className={`rounded-xl border px-3 py-2 text-xs font-black ${groupRiskClass(risk)}`}>
+            {riskLabel[risk] || risk}
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4 p-4">
+        <div>
+          <div className="mb-2 flex items-center justify-between text-xs">
+            <span className="font-bold text-slate-600">جاهزية نقاط الاستلام</span>
+            <strong>{readyStores}/{activeStores || 0}</strong>
+          </div>
+          <Progress value={readiness} className="h-2.5" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <div className="rounded-2xl bg-slate-50 p-3 text-center">
+            <p className="text-[11px] text-slate-500">جاهز</p>
+            <p className="mt-1 text-xl font-black text-emerald-700">{operations.ready || 0}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-3 text-center">
+            <p className="text-[11px] text-slate-500">بيتحضّر</p>
+            <p className="mt-1 text-xl font-black text-blue-700">{operations.preparing || 0}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-3 text-center">
+            <p className="text-[11px] text-slate-500">ينتظر القبول</p>
+            <p className="mt-1 text-xl font-black text-amber-700">{operations.pending || 0}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 p-3 text-center">
+            <p className="text-[11px] text-slate-500">ملغي</p>
+            <p className="mt-1 text-xl font-black text-red-700">{operations.cancelled || 0}</p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {group.stores.map((store) => (
+            <button
+              key={store.order_id}
+              type="button"
+              onClick={() => onOpenOrder(store.order_id)}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border bg-white p-3 text-right transition hover:border-[#005931]/30 hover:bg-emerald-50/30"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Store className="h-4 w-4 shrink-0 text-[#005931]" />
+                  <strong className="truncate text-sm">{store.branch_name || store.merchant_name}</strong>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600">
+                    {store.source_kind === "owned" ? "المعداوي" : "شريك"}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {orderStatusLabel[store.status] || store.status}
+                  {store.pickup_sequence ? ` · نقطة استلام #${store.pickup_sequence}` : ""}
+                  {store.predicted_ready_at ? ` · متوقع ${timeLabel(store.predicted_ready_at)}` : ""}
+                </p>
+              </div>
+              <span className={`shrink-0 text-xs font-black ${store.eta_risk === "late" ? "text-red-600" : store.eta_risk === "at_risk" ? "text-amber-700" : "text-emerald-700"}`}>
+                {riskLabel[store.eta_risk] || "—"}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {(operations.late_stores || operations.at_risk_stores) ? (
+          <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              {operations.late_stores ? `${operations.late_stores} متجر متأخر` : ""}
+              {operations.late_stores && operations.at_risk_stores ? " · " : ""}
+              {operations.at_risk_stores ? `${operations.at_risk_stores} معرض للتأخير` : ""}
+              {" · "}تم ربط الحالة تلقائيًا بمركز المهام عند وجود خطر SLA.
+            </p>
+          </div>
+        ) : null}
+
+        <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs text-slate-500">
+            {group.route ? (
+              <>
+                المسار: <strong className="text-slate-700">{group.route.status}</strong>
+                {group.route.assigned_driver_name ? <> · المندوب: <strong className="text-slate-700">{group.route.assigned_driver_name}</strong></> : " · بدون مندوب"}
+                {group.route.estimated_minutes ? ` · ${group.route.estimated_minutes} د` : ""}
+              </>
+            ) : "مسار التوصيل لم يُنشأ بعد"}
+          </div>
+          {group.lead_order_id && (
+            <Button variant="outline" onClick={() => onOpenOrder(group.lead_order_id!)}>
+              فتح الطلب الرئيسي
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function OrderOperationsCenterV2() {
@@ -53,6 +215,13 @@ export default function OrderOperationsCenterV2() {
     enabled: Boolean(currentBranchId),
     queryFn: () => fetchFulfillmentWorkspace(currentBranchId!),
     refetchInterval: 20_000,
+  });
+
+  const groupQuery = useQuery({
+    queryKey: ["order-group-control-tower-v1", currentBranchId],
+    enabled: Boolean(currentBranchId),
+    queryFn: () => fetchOrderGroupControlTower(currentBranchId!, 100),
+    refetchInterval: 15_000,
   });
 
   const batchShadowQuery = useQuery({
@@ -78,6 +247,8 @@ export default function OrderOperationsCenterV2() {
   const orders = query.data?.orders || [];
   const summary = query.data?.summary;
   const readyForDispatch = useMemo(() => orders.filter((order: any) => order.fulfillment_state === "ready" && !order.delivery_assigned), [orders]);
+  const groupSummary = groupQuery.data?.summary || {};
+  const activeGroups = groupQuery.data?.groups || [];
 
   const assignRecommended = async (order: any) => {
     const recommendation = order.dispatch_recommendation;
@@ -85,10 +256,21 @@ export default function OrderOperationsCenterV2() {
     try {
       await assignRecommendedDelivery(order.order_id, Boolean(recommendation.dispatch_now));
       toast.success(`تم تعيين ${recommendation.recommended_driver.name} للطلب ${order.display_id}`);
-      await queryClient.invalidateQueries({ queryKey: ["order-fulfillment-v1", currentBranchId] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["order-fulfillment-v1", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["order-group-control-tower-v1", currentBranchId] }),
+      ]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر تعيين المندوب");
     }
+  };
+
+  const refreshOperations = async () => {
+    await Promise.all([
+      query.refetch(),
+      groupQuery.refetch(),
+      batchShadowQuery.refetch(),
+    ]);
   };
 
   const saveAssignmentPolicy = async () => {
@@ -115,11 +297,14 @@ export default function OrderOperationsCenterV2() {
           <div>
             <p className="text-xs font-black text-[#005931]">ORDER OPERATIONS V2</p>
             <h1 className="mt-1 text-2xl font-black text-slate-950 md:text-3xl">مركز تشغيل وتجهيز وتوزيع الطلبات</h1>
-            <p className="mt-1 text-sm text-slate-500">{currentBranchName || "الفرع الحالي"} · التجهيز والتوصيل شغالين بالتوازي حسب الوقت المتوقع.</p>
+            <p className="mt-1 text-sm text-slate-500">{currentBranchName || "الفرع الحالي"} · الطلبات الفردية والمجمعة في Control Tower واحدة.</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate("/online-orders")}>الطلبات</Button>
-            <Button variant="outline" onClick={() => void query.refetch()} disabled={query.isFetching}><RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />تحديث</Button>
+            <Button variant="outline" onClick={() => void refreshOperations()} disabled={query.isFetching || groupQuery.isFetching}>
+              <RefreshCw className={`h-4 w-4 ${query.isFetching || groupQuery.isFetching ? "animate-spin" : ""}`} />
+              تحديث
+            </Button>
           </div>
         </header>
 
@@ -150,6 +335,68 @@ export default function OrderOperationsCenterV2() {
             </div>
           </CardContent>
         </Card>}
+
+        <Card className="overflow-hidden border-emerald-200 bg-gradient-to-br from-emerald-50/70 via-white to-white shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#005931] text-white"><Route className="h-5 w-5" /></div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CardTitle>Multi-store Control Tower</CardTitle>
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-800">GROUP AWARE</span>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">كل Sub-order يحتفظ بتشغيله المستقل، والمجموعة لا تصبح جاهزة للمندوب إلا بعد جاهزية كل نقاط الاستلام النشطة.</p>
+                </div>
+              </div>
+              <Button variant="outline" onClick={() => void groupQuery.refetch()} disabled={groupQuery.isFetching}>
+                <RefreshCw className={`h-4 w-4 ${groupQuery.isFetching ? "animate-spin" : ""}`} />
+                تحديث المجموعات
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+              {[
+                ["نشطة", groupSummary.active_groups || 0],
+                ["انتظار", groupSummary.pending || 0],
+                ["تجهيز", groupSummary.preparing || 0],
+                ["جاهزة", groupSummary.ready || 0],
+                ["في الطريق", groupSummary.on_route || 0],
+                ["At risk", groupSummary.at_risk || 0],
+                ["متأخرة", groupSummary.late || 0],
+                ["إلغاء جزئي", groupSummary.partially_cancelled || 0],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-emerald-100 bg-white p-3 text-center">
+                  <p className="text-[11px] text-slate-500">{label}</p>
+                  <p className="mt-1 text-xl font-black text-slate-900">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            {groupQuery.isLoading ? (
+              <div className="rounded-2xl bg-white/80 p-6 text-center text-sm text-slate-500">جاري تحميل الطلبات المجمعة…</div>
+            ) : groupQuery.error ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {groupQuery.error instanceof Error ? groupQuery.error.message : "تعذر تحميل Control Tower للطلبات المجمعة."}
+              </div>
+            ) : activeGroups.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-emerald-200 bg-white/70 p-6 text-center text-sm text-slate-500">
+                لا توجد طلبات Multi-store نشطة حاليًا. أول Order Group جديد سيظهر هنا تلقائيًا.
+              </div>
+            ) : (
+              <div className="grid gap-4 xl:grid-cols-2">
+                {activeGroups.map((group) => (
+                  <MultiStoreGroupCard
+                    key={group.group_id}
+                    group={group}
+                    onOpenOrder={(id) => navigate(`/online-orders/${id}`)}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="overflow-hidden border-violet-200 bg-gradient-to-br from-violet-50/70 via-white to-white shadow-sm">
           <CardHeader className="pb-3">
