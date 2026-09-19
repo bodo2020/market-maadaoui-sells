@@ -49,6 +49,10 @@ export interface InventoryControlSummaryV2 {
   no_movement_rows: number;
   coverage_risk_rows: number;
   on_hand_measure: number;
+  reserved_measure: number;
+  available_measure: number;
+  reserved_sku_rows: number;
+  fully_reserved_rows: number;
   purchase_value: number;
   retail_value: number;
   potential_margin_value: number;
@@ -65,6 +69,8 @@ export interface InventoryControlProductV2 {
   barcode: string | null;
   image_url: string | null;
   quantity: number;
+  reserved_quantity: number;
+  available_quantity: number;
   unit_of_measure: string;
   shelf_location: string | null;
   category_id: string | null;
@@ -165,7 +171,8 @@ function inventoryControlError(message?: string) {
   if (value.includes("INVENTORY_VIEW_DENIED")) return new Error("ليس لديك صلاحية عرض مركز المخزون.");
   if (value.includes("INVENTORY_MANAGE_DENIED")) return new Error("ليس لديك صلاحية تعديل المخزون.");
   if (value.includes("INVENTORY_ROW_MISSING")) return new Error("المنتج لا يملك رصيد مخزون في مصدر المخزون الحالي.");
-  if (value.includes("INSUFFICIENT_STOCK")) return new Error("التسوية ستجعل الرصيد أقل من صفر، لذلك لم يتم تنفيذها.");
+  if (value.includes("RESERVED_STOCK_PROTECTED")) return new Error("لا يمكن خفض الرصيد تحت الكمية المحجوزة لطلبات أونلاين نشطة.");
+  if (value.includes("INSUFFICIENT_STOCK")) return new Error("الكمية المتاحة للبيع غير كافية لإتمام العملية.");
   if (value.includes("INVALID_MIN_STOCK_LEVEL")) return new Error("أدخل حدًا أدنى صحيحًا للمخزون.");
   if (value.includes("INVALID_MAX_STOCK_LEVEL")) return new Error("الحد الأقصى يجب أن يكون صحيحًا وألا يقل عن الحد الأدنى.");
   if (value.includes("INVALID_INVENTORY_ADJUSTMENT_REASON")) return new Error("اختر سببًا صحيحًا للتسوية.");
@@ -204,6 +211,8 @@ function normalizeProduct(row: Record<string, unknown>): InventoryControlProduct
     barcode: row.barcode == null ? null : String(row.barcode),
     image_url: row.image_url == null ? null : String(row.image_url),
     quantity: numberValue(row.quantity),
+    reserved_quantity: numberValue(row.reserved_quantity),
+    available_quantity: numberValue(row.available_quantity ?? row.quantity),
     unit_of_measure: String(row.unit_of_measure || "قطعة"),
     shelf_location: row.shelf_location == null ? null : String(row.shelf_location),
     category_id: row.category_id == null ? null : String(row.category_id),
@@ -274,6 +283,10 @@ export async function fetchInventoryControlCenterV2(
       no_movement_rows: numberValue(summary.no_movement_rows),
       coverage_risk_rows: numberValue(summary.coverage_risk_rows),
       on_hand_measure: numberValue(summary.on_hand_measure),
+      reserved_measure: numberValue(summary.reserved_measure),
+      available_measure: numberValue(summary.available_measure ?? summary.on_hand_measure),
+      reserved_sku_rows: numberValue(summary.reserved_sku_rows),
+      fully_reserved_rows: numberValue(summary.fully_reserved_rows),
       purchase_value: numberValue(summary.purchase_value),
       retail_value: numberValue(summary.retail_value),
       potential_margin_value: numberValue(summary.potential_margin_value),
