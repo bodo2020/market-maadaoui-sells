@@ -15,8 +15,10 @@ import {
   PackageX,
   RefreshCw,
   ShieldAlert,
+  ServerCog,
   Smartphone,
   Sparkles,
+  Power,
   Truck,
   Users,
   WalletCards,
@@ -32,8 +34,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useBranchStore } from "@/stores/branchStore";
 import {
   fetchNotificationCenterV2,
+  fetchPushOperationalStatusV1,
   markAllNotificationsReadV2,
   markNotificationReadV2,
+  setPushWorkerEnabledV1,
   type NotificationCenterItemV2,
   type NotificationFilterV2,
   type NotificationSeverityV2,
@@ -100,6 +104,13 @@ function channelLabel(channel: string) {
   return "داخل النظام";
 }
 
+function pushIssueLabel(code: string) {
+  if (code === "FCM_NOT_CONFIGURED") return "FCM Service Account غير مضاف في Vault";
+  if (code === "FCM_CONFIG_INVALID") return "بيانات FCM الموجودة غير صالحة";
+  if (code === "PUSH_WORKER_DISABLED") return "Push Worker متوقف";
+  return code;
+}
+
 function StatCard({ title, value, helper, icon: Icon, tone }: { title: string; value: number; helper: string; icon: any; tone: "green" | "red" | "amber" | "slate" }) {
   const toneClass = tone === "red" ? "bg-red-50 text-red-700" : tone === "amber" ? "bg-amber-50 text-amber-700" : tone === "green" ? "bg-emerald-50 text-[#005931]" : "bg-slate-100 text-slate-700";
   return (
@@ -134,6 +145,25 @@ export default function NotificationsCenterV2() {
     retry: false,
   });
 
+  const pushStatusQuery = useQuery({
+    queryKey: ["push-operational-status-v1"],
+    queryFn: fetchPushOperationalStatusV1,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    staleTime: 10_000,
+    retry: false,
+  });
+
+  const pushWorkerMutation = useMutation({
+    mutationFn: (enabled: boolean) => setPushWorkerEnabledV1(enabled),
+    onSuccess: data => {
+      queryClient.setQueryData(["push-operational-status-v1"], data);
+      void queryClient.invalidateQueries({ queryKey: ["operations-tasks"] });
+      toast.success(data.worker_enabled ? "تم تشغيل Push Worker." : "تم إيقاف Push Worker.");
+    },
+    onError: error => toast.error(error instanceof Error ? error.message : "تعذر تحديث حالة Push Worker."),
+  });
+
   const markRead = useMutation({
     mutationFn: markNotificationReadV2,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notification-center-v2"] }),
@@ -151,6 +181,7 @@ export default function NotificationsCenterV2() {
 
   const items = query.data?.items || [];
   const summary = query.data?.summary || { total: 0, unread: 0, critical: 0, action_required: 0, today: 0 };
+  const pushStatus = pushStatusQuery.data;
 
   const sourceBreakdown = useMemo(() => {
     const active = items.filter(item => item.status === "active");
@@ -180,7 +211,7 @@ export default function NotificationsCenterV2() {
               <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded-full bg-white/10 px-3 py-1.5">{currentBranchName || "الفرع الحالي"}</span>
                 <span className="rounded-full bg-white/10 px-3 py-1.5"><Smartphone className="ml-1 inline h-3.5 w-3.5" /> In‑App جاهز</span>
-                <span className="rounded-full bg-white/10 px-3 py-1.5"><BellRing className="ml-1 inline h-3.5 w-3.5" /> Push جاهز معماريًا</span>
+                <span className={`rounded-full px-3 py-1.5 ${pushStatus?.ready ? "bg-emerald-300/20 text-emerald-50" : "bg-amber-300/20 text-amber-50"}`}><BellRing className="ml-1 inline h-3.5 w-3.5" /> {pushStatus?.ready ? "Push يعمل" : "Push يحتاج إعداد"}</span>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -201,6 +232,76 @@ export default function NotificationsCenterV2() {
           <StatCard title="يحتاج إجراء" value={summary.action_required} helper="مرتبط بخطوة تشغيلية" icon={CircleAlert} tone="amber" />
           <StatCard title="اليوم" value={summary.today} helper={`إجمالي ${summary.total.toLocaleString("ar-EG")}`} icon={Clock3} tone="slate" />
         </div>
+
+        {pushStatus && (
+          <Card className={`overflow-hidden shadow-sm ${pushStatus.ready ? "border-emerald-200" : "border-amber-200"}`}>
+            <CardContent className="p-4 md:p-5">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${pushStatus.ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                    <ServerCog className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-black text-slate-950">حالة Push Notifications</h2>
+                      <Badge variant="outline" className={pushStatus.ready ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800"}>
+                        {pushStatus.ready ? "جاهز ويعمل" : "متوقف بأمان"}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {pushStatus.ready
+                        ? "FCM صالح والـworker مفعّل. الأحداث المؤهلة تدخل Queue ويتم إرسالها للأجهزة المسجلة."
+                        : "In-App وRealtime مستمران، لكن النظام يمنع إنشاء Push Queue جديدة حتى يكتمل إعداد FCM وتشغيل الـworker."}
+                    </p>
+                    {!pushStatus.ready && pushStatus.issues.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {pushStatus.issues.map(issue => (
+                          <span key={issue} className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800">
+                            {pushIssueLabel(issue)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {!pushStatus.provider_configured && (
+                      <p className="mt-3 text-xs leading-6 text-slate-600">
+                        الإجراء المطلوب: أضف Secret باسم <code className="rounded bg-slate-100 px-1.5 py-0.5">fcm_service_account_json</code> في Supabase Vault، ثم فعّل الـworker من هنا.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4 xl:min-w-[460px]">
+                  <div className="rounded-xl bg-slate-50 p-3 text-center"><div className="text-lg font-black">{pushStatus.active_customer_devices.toLocaleString("ar-EG")}</div><div className="text-[10px] text-muted-foreground">أجهزة العملاء</div></div>
+                  <div className="rounded-xl bg-slate-50 p-3 text-center"><div className="text-lg font-black">{pushStatus.queue.pending.toLocaleString("ar-EG")}</div><div className="text-[10px] text-muted-foreground">Pending</div></div>
+                  <div className="rounded-xl bg-slate-50 p-3 text-center"><div className="text-lg font-black">{pushStatus.queue.failed.toLocaleString("ar-EG")}</div><div className="text-[10px] text-muted-foreground">Failed</div></div>
+                  <div className="rounded-xl bg-slate-50 p-3 text-center"><div className="text-lg font-black">{pushStatus.queue.suppressed.toLocaleString("ar-EG")}</div><div className="text-[10px] text-muted-foreground">Suppressed</div></div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
+                <Button variant="outline" className="rounded-xl" onClick={() => void pushStatusQuery.refetch()} disabled={pushStatusQuery.isFetching}>
+                  <RefreshCw className={`ml-2 h-4 w-4 ${pushStatusQuery.isFetching ? "animate-spin" : ""}`} /> تحديث حالة Push
+                </Button>
+                {pushStatus.health_task?.id && (
+                  <Button variant="outline" className="rounded-xl" onClick={() => navigate("/tasks?type=system")}>
+                    <ShieldAlert className="ml-2 h-4 w-4" /> فتح مهمة صحة النظام
+                  </Button>
+                )}
+                {pushStatus.can_configure && (
+                  <Button
+                    className="rounded-xl"
+                    variant={pushStatus.worker_enabled ? "destructive" : "default"}
+                    disabled={pushWorkerMutation.isPending || (!pushStatus.worker_enabled && !pushStatus.provider_valid)}
+                    onClick={() => pushWorkerMutation.mutate(!pushStatus.worker_enabled)}
+                  >
+                    <Power className="ml-2 h-4 w-4" />
+                    {pushStatus.worker_enabled ? "إيقاف Push Worker" : "تشغيل Push Worker"}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {(sourceBreakdown.inventory > 0 || sourceBreakdown.transfers > 0 || sourceBreakdown.tasks > 0) && (
           <div className="grid gap-3 md:grid-cols-3">
