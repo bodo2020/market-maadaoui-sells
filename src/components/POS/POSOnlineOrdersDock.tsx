@@ -51,6 +51,12 @@ function etaText(value: string | null) {
   return `خلال ${diff} د`;
 }
 
+function confidenceText(value: string) {
+  if (value === "high") return "ثقة عالية";
+  if (value === "medium") return "ثقة جيدة";
+  return "تقدير مبدئي";
+}
+
 function ageText(minutes: number) {
   if (minutes < 60) return `منذ ${Math.max(0, minutes)} د`;
   const hours = Math.floor(minutes / 60);
@@ -237,6 +243,9 @@ export default function POSOnlineOrdersDock() {
                             <Badge variant={isNew ? "default" : "secondary"}>{statusLabel[order.order_status] || order.order_status}</Badge>
                             {order.eta_risk === "late" && <Badge variant="destructive">متأخر</Badge>}
                             {order.eta_risk === "at_risk" && <Badge className="bg-amber-500">معرض للتأخير</Badge>}
+                            {order.eta_model_version === "eta-v2-intelligent" && (
+                              <Badge variant="outline">{confidenceText(order.eta_confidence)}</Badge>
+                            )}
                           </div>
                           <p className="mt-1 text-sm font-bold">{order.customer_name}</p>
                           <p className="mt-1 text-xs text-muted-foreground">{order.items_count} صنف · {money(order.total)} · {ageText(order.age_minutes)}</p>
@@ -256,6 +265,14 @@ export default function POSOnlineOrdersDock() {
                             {order.picker_name && <span>المجهز: {order.picker_name}</span>}
                             {order.shortage_count > 0 && <span className="font-bold text-amber-700">نواقص: {order.shortage_count}</span>}
                           </div>
+                        </div>
+                      )}
+
+                      {order.eta_model_version === "eta-v2-intelligent" && (
+                        <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-2 text-center text-[10px]">
+                          <div><span className="block text-muted-foreground">متبقي</span><strong>{Math.max(0, Number(order.eta_remaining_minutes || 0))} د</strong></div>
+                          <div><span className="block text-muted-foreground">التجهيز</span><strong>{Math.max(0, Number(order.eta_ready_remaining_minutes || 0))} د</strong></div>
+                          <div><span className="block text-muted-foreground">الطريق</span><strong>{Math.max(0, Number(order.eta_route_minutes || 0))} د</strong></div>
                         </div>
                       )}
 
