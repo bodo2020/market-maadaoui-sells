@@ -18,8 +18,11 @@ import {
   assignRecommendedOrderGroupDelivery,
   fetchOrderGroupControlTower,
   fetchOrderGroupDispatchBoard,
+  fetchOrderGroupDispatchPolicy,
   repriceOrderGroup,
+  setOrderGroupDispatchPolicy,
   type OrderGroupControlTowerItem,
+  type OrderGroupDispatchMode,
 } from "@/services/supabase/orderOperationsService";
 import { toast } from "sonner";
 
@@ -264,6 +267,8 @@ export default function OrderOperationsCenterV2() {
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [repricingGroupId, setRepricingGroupId] = useState<string | null>(null);
   const [assigningGroupId, setAssigningGroupId] = useState<string | null>(null);
+  const [dispatchPolicyMode, setDispatchPolicyMode] = useState<OrderGroupDispatchMode>("assisted");
+  const [savingDispatchPolicy, setSavingDispatchPolicy] = useState(false);
 
   const query = useQuery({
     queryKey: ["order-fulfillment-v1", currentBranchId],
@@ -286,6 +291,13 @@ export default function OrderOperationsCenterV2() {
     refetchInterval: 10_000,
   });
 
+  const dispatchPolicyQuery = useQuery({
+    queryKey: ["order-group-dispatch-policy-v1", currentBranchId],
+    enabled: Boolean(currentBranchId),
+    queryFn: () => fetchOrderGroupDispatchPolicy(currentBranchId!),
+    refetchInterval: 30_000,
+  });
+
   const batchShadowQuery = useQuery({
     queryKey: ["batch-picking-shadow-v1", currentBranchId],
     enabled: Boolean(currentBranchId),
@@ -305,6 +317,11 @@ export default function OrderOperationsCenterV2() {
     setPolicyMode(policyQuery.data.mode);
     setOfferTtl(Number(policyQuery.data.offer_ttl_seconds || 90));
   }, [policyQuery.data?.mode, policyQuery.data?.offer_ttl_seconds]);
+
+  useEffect(() => {
+    if (!dispatchPolicyQuery.data) return;
+    setDispatchPolicyMode(dispatchPolicyQuery.data.mode || "assisted");
+  }, [dispatchPolicyQuery.data?.mode]);
 
   const orders = query.data?.orders || [];
   const summary = query.data?.summary;
@@ -337,7 +354,7 @@ export default function OrderOperationsCenterV2() {
     try {
       setAssigningGroupId(groupId);
       const result = await assignRecommendedOrderGroupDelivery(groupId);
-      const assignmentCount = Number(result.assignment?.assignment_count || 0);
+      const assignmentCount = Number(result.assignment_count || result.assignment?.assignment_count || 0);
       toast.success(
         assignmentCount > 1
           ? `تم تعيين المندوب لكل ${assignmentCount} طلبات داخل المجموعة`
@@ -352,6 +369,28 @@ export default function OrderOperationsCenterV2() {
       toast.error(error instanceof Error ? error.message : "تعذر تعيين المندوب المقترح");
     } finally {
       setAssigningGroupId(null);
+    }
+  };
+
+  const saveDispatchPolicy = async () => {
+    if (!currentBranchId || !dispatchPolicyQuery.data?.can_manage) return;
+    try {
+      setSavingDispatchPolicy(true);
+      await setOrderGroupDispatchPolicy(currentBranchId, dispatchPolicyMode);
+      const modeLabel = dispatchPolicyMode === "shadow"
+        ? "Shadow: مراقبة فقط"
+        : dispatchPolicyMode === "auto"
+          ? "Auto: التعيين الآلي كل دقيقة عند وقت التحرك الآمن"
+          : "Assisted: المدير يعتمد التوصية";
+      toast.success(`تم حفظ Smart Dispatch · ${modeLabel}`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["order-group-dispatch-policy-v1", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["order-group-dispatch-board-v1", currentBranchId] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر حفظ سياسة Smart Dispatch");
+    } finally {
+      setSavingDispatchPolicy(false);
     }
   };
 
@@ -381,6 +420,7 @@ export default function OrderOperationsCenterV2() {
       query.refetch(),
       groupQuery.refetch(),
       dispatchQuery.refetch(),
+      dispatchPolicyQuery.refetch(),
       batchShadowQuery.refetch(),
     ]);
   };
@@ -459,11 +499,19 @@ export default function OrderOperationsCenterV2() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <CardTitle>Smart Dispatch · Multi-store</CardTitle>
-                    <span className="rounded-full bg-sky-100 px-3 py-1 text-[11px] font-black text-sky-800">ASSISTED PREDICTIVE</span>
+                    <span className={`rounded-full px-3 py-1 text-[11px] font-black ${
+                      dispatchPolicyQuery.data?.mode === "auto"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : dispatchPolicyQuery.data?.mode === "shadow"
+                          ? "bg-slate-100 text-slate-700"
+                          : "bg-sky-100 text-sky-800"
+                    }`}>
+                      {dispatchPolicyQuery.data?.mode === "auto" ? "AUTO" : dispatchPolicyQuery.data?.mode === "shadow" ? "SHADOW" : "ASSISTED"}
+                    </span>
                   </div>
                   <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
                     يختار أفضل مندوب من موقعه وحمله الحالي، ويحسب وقت التحرك من جاهزية آخر متجر وزمن الوصول لأول Pickup.
-                    التعيين لا يتم تلقائيًا في هذه المرحلة؛ المدير يعتمد التوصية عندما يحين وقت التحرك.
+                    Shadow يعرض القرار فقط، Assisted يحتاج اعتماد المدير، وAuto يراجع المجموعات كل دقيقة ويسند فقط عندما يحين وقت التحرك الآمن.
                   </p>
                 </div>
               </div>
@@ -474,6 +522,74 @@ export default function OrderOperationsCenterV2() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {dispatchPolicyQuery.data ? (
+              <div className={`rounded-2xl border p-4 ${
+                dispatchPolicyQuery.data.mode === "auto"
+                  ? "border-emerald-200 bg-emerald-50/60"
+                  : dispatchPolicyQuery.data.mode === "shadow"
+                    ? "border-slate-200 bg-slate-50"
+                    : "border-sky-200 bg-sky-50/60"
+              }`}>
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div>
+                    <p className="text-sm font-black text-slate-950">سياسة إسناد الرحلات المجمعة</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-600">
+                      {dispatchPolicyQuery.data.mode === "auto"
+                        ? "Auto شغال: الـWorker يفحص كل دقيقة، ولا يسند إلا لو التوصية تقول تحرك الآن، الـETA مكتملة، الـReprice منتهي، والمندوب عنده Location حديث."
+                        : dispatchPolicyQuery.data.mode === "shadow"
+                          ? "Shadow: النظام يحسب التوصيات ويعرضها فقط، بدون تعيين من التوصية."
+                          : "Assisted: النظام يحسب التوقيت والمندوب، والمدير يعتمد التعيين يدويًا عندما يحين وقت التحرك."}
+                    </p>
+                    {dispatchPolicyQuery.data.mode === "auto" && (
+                      <p className="mt-1 text-[11px] font-bold text-emerald-800">
+                        Policy Actor: {dispatchPolicyQuery.data.policy_actor_name || "المدير الذي فعّل Auto"}
+                        {dispatchPolicyQuery.data.actor_valid ? "" : " · الصلاحية غير صالحة وسيظل Auto متوقفًا"}
+                      </p>
+                    )}
+                  </div>
+
+                  {dispatchPolicyQuery.data.can_manage ? (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <div className="flex rounded-xl border bg-white p-1">
+                        {([
+                          ["shadow", "Shadow"],
+                          ["assisted", "Assisted"],
+                          ["auto", "Auto"],
+                        ] as const).map(([mode, label]) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setDispatchPolicyMode(mode)}
+                            className={`rounded-lg px-3 py-2 text-xs font-black transition ${
+                              dispatchPolicyMode === mode
+                                ? mode === "auto"
+                                  ? "bg-emerald-600 text-white"
+                                  : mode === "assisted"
+                                    ? "bg-sky-700 text-white"
+                                    : "bg-slate-900 text-white"
+                                : "text-slate-600"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => void saveDispatchPolicy()}
+                        disabled={savingDispatchPolicy || dispatchPolicyMode === dispatchPolicyQuery.data.mode}
+                        className="bg-sky-700 hover:bg-sky-800"
+                      >
+                        {savingDispatchPolicy ? "جاري الحفظ…" : "حفظ سياسة التوزيع"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-white px-3 py-2 text-xs text-slate-600">تغيير السياسة متاح لمدير الطلبات أو التوصيل فقط</div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-2xl border border-sky-100 bg-white p-3 text-center">
                 <p className="text-[11px] text-slate-500">يتحرك الآن</p>
@@ -503,7 +619,8 @@ export default function OrderOperationsCenterV2() {
               <div className="grid gap-3 lg:grid-cols-2">
                 {dispatchItems.map((item) => {
                   const assigned = item.reason === "already_assigned";
-                  const canAssignNow = Boolean(item.dispatch_now && item.recommended_driver && !assigned);
+                  const manualDispatchEnabled = (dispatchPolicyQuery.data?.mode || "assisted") !== "shadow";
+                  const canAssignNow = Boolean(item.dispatch_now && item.recommended_driver && !assigned && manualDispatchEnabled);
                   const waitingMinutes = Number(item.dispatch_in_minutes || 0);
                   return (
                     <div key={item.group_id} className="rounded-2xl border border-sky-100 bg-white p-4">
@@ -592,9 +709,11 @@ export default function OrderOperationsCenterV2() {
                               ? "جاري التعيين…"
                               : canAssignNow
                                 ? "تعيين المقترح"
-                                : item.reason === "wait_for_group_readiness"
-                                  ? `تحرك بعد ${waitingMinutes} د`
-                                  : "التعيين غير متاح الآن"}
+                                : !manualDispatchEnabled
+                                  ? "Shadow · مراقبة فقط"
+                                  : item.reason === "wait_for_group_readiness"
+                                    ? `تحرك بعد ${waitingMinutes} د`
+                                    : "التعيين غير متاح الآن"}
                           </Button>
                         ) : null}
                       </div>
