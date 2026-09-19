@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Scale,
   ScanLine,
+  ServerCog,
   UserRoundCheck,
   WalletCards,
 } from "lucide-react";
@@ -46,6 +47,7 @@ import {
   isOperationsReviewTask,
   isRefundTransferTask,
   isShiftReconciliationTask,
+  isSystemHealthTask,
   releaseOperationsTask,
   startOperationsTask,
   type OperationsTask,
@@ -63,7 +65,7 @@ import {
   type InventoryAuditTaskDetail,
 } from "@/services/supabase/inventoryAuditV2Service";
 
-type TaskTypeFilter = "all" | "refund" | "shift" | "cash_handoff" | "inventory";
+type TaskTypeFilter = "all" | "refund" | "shift" | "cash_handoff" | "inventory" | "system";
 
 const formatMoney = (value: number | null | undefined) =>
   `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siteConfig.currency}`;
@@ -104,6 +106,13 @@ const rejectionReasonLabels: Record<InventoryAdjustmentRejectionReason, string> 
 };
 
 function statusLabel(task: OperationsTask) {
+  if (isSystemHealthTask(task)) {
+    if (task.status === "completed") return "النظام سليم";
+    if (task.status === "open") return "تحتاج إعداد";
+    if (task.status === "claimed") return "قيد المراجعة";
+    if (task.status === "in_progress") return "جاري الإصلاح";
+    if (task.status === "failed") return "تحتاج تدخل";
+  }
   if (isInventoryTask(task)) {
     const returnedForRecount = task.metadata?.returned_from_approval === true;
     if (returnedForRecount && task.status === "claimed") return "مطلوب إعادة العد";
@@ -125,6 +134,7 @@ function statusLabel(task: OperationsTask) {
 }
 
 function sourceLabel(task: OperationsTask) {
+  if (isSystemHealthTask(task)) return "صحة النظام";
   if (isInventoryCountTask(task)) {
     if (task.metadata?.returned_from_approval === true) return "إعادة جرد";
     if (task.metadata?.session_kind === "full") return "جرد شامل";
@@ -145,10 +155,12 @@ function normalizeTypeFilter(value: string | null): TaskTypeFilter {
   if (value === "shift" || value === "shift_variance_review" || value === "shift_reconciliation") return "shift";
   if (value === "cash_handoff" || value === "cash_handoff_variance_review") return "cash_handoff";
   if (value === "inventory" || value?.startsWith("inventory_")) return "inventory";
+  if (value === "system" || value === "system_health" || value === "notification_push_health") return "system";
   return "all";
 }
 
 export default function OperationsTasksPage() {
+  const navigate = useNavigate();
   const { currentBranchId, currentBranchName } = useBranchStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const typeFilter = normalizeTypeFilter(searchParams.get("type"));
@@ -215,6 +227,7 @@ export default function OperationsTasksPage() {
     if (typeFilter === "shift") return rawData.filter(isShiftReconciliationTask);
     if (typeFilter === "cash_handoff") return rawData.filter(isCashHandoffVarianceTask);
     if (typeFilter === "inventory") return rawData.filter(isInventoryTask);
+    if (typeFilter === "system") return rawData.filter(isSystemHealthTask);
     return rawData;
   }, [rawData, typeFilter]);
 
@@ -227,6 +240,7 @@ export default function OperationsTasksPage() {
   const varianceActive = rawData.filter(task => isShiftReconciliationTask(task) && !["completed", "cancelled"].includes(task.status)).length;
   const cashHandoffActive = rawData.filter(task => isCashHandoffVarianceTask(task) && !["completed", "cancelled"].includes(task.status)).length;
   const inventoryActive = rawData.filter(task => isInventoryTask(task) && !["completed", "cancelled"].includes(task.status)).length;
+  const systemHealthActive = rawData.filter(task => isSystemHealthTask(task) && !["completed", "cancelled"].includes(task.status)).length;
   const dashboardSummary = dashboardQuery.data?.summary;
   const dashboardCards = dashboardSummary ? [
     { label: "مهامي", value: dashboardSummary.my_active, tone: "bg-blue-50 text-blue-900 border-blue-100" },
@@ -358,6 +372,7 @@ export default function OperationsTasksPage() {
     const inventory = isInventoryTask(task);
     const cashReview = isCashHandoffVarianceTask(task);
     const refund = isRefundTransferTask(task);
+    const systemHealth = isSystemHealthTask(task);
     const resolution = typeof task.metadata?.resolution_note === "string" ? task.metadata.resolution_note : null;
     const returnedForRecount = task.metadata?.returned_from_approval === true;
     const returnNote = typeof task.metadata?.return_note === "string" ? task.metadata.return_note : null;
@@ -366,13 +381,13 @@ export default function OperationsTasksPage() {
         <CardContent className="p-4 md:p-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline" className={statusClass[task.status] || ""}>{statusLabel(task)}</Badge>
-            <Badge variant="outline" className={inventory ? "border-cyan-200 bg-cyan-50 text-cyan-800" : review ? "border-violet-200 bg-violet-50 text-violet-800" : ""}>{sourceLabel(task)}</Badge>
+            <Badge variant="outline" className={systemHealth ? "border-amber-200 bg-amber-50 text-amber-800" : inventory ? "border-cyan-200 bg-cyan-50 text-cyan-800" : review ? "border-violet-200 bg-violet-50 text-violet-800" : ""}>{sourceLabel(task)}</Badge>
             {returnedForRecount && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800"><RotateCcw className="ml-1 h-3.5 w-3.5" />راجعة من المراجعة</Badge>}
             {task.is_overdue && task.status !== "completed" && <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700"><AlertTriangle className="ml-1 h-3.5 w-3.5" />متأخرة</Badge>}
           </div>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div><h3 className="text-lg font-black text-slate-950">{task.title}</h3><div className="mt-1 text-xs text-muted-foreground">{task.reference_number || task.invoice_number || "مهمة تشغيلية"} · {formatDateTime(task.created_at)}</div></div>
-            <div className="text-left">{inventory ? <div className="text-sm font-bold text-cyan-800">{isInventoryAdjustmentReviewTask(task) ? "مراجعة واعتماد" : "Blind Count"}</div> : <div className="text-2xl font-black text-[#005931]">{formatMoney(task.amount)}</div>}{task.due_at && <div className="mt-1 text-xs text-muted-foreground">SLA: {formatDateTime(task.due_at)}</div>}</div>
+            <div className="text-left">{systemHealth ? <div className="text-sm font-bold text-amber-800">System Health</div> : inventory ? <div className="text-sm font-bold text-cyan-800">{isInventoryAdjustmentReviewTask(task) ? "مراجعة واعتماد" : "Blind Count"}</div> : <div className="text-2xl font-black text-[#005931]">{formatMoney(task.amount)}</div>}{task.due_at && <div className="mt-1 text-xs text-muted-foreground">SLA: {formatDateTime(task.due_at)}</div>}</div>
           </div>
           {review && <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <div className="rounded-2xl bg-slate-50 p-3"><div className="text-[11px] text-muted-foreground">النوع</div><div className="mt-1 font-bold">{cashReview ? "استلام نقدية" : task.payment_method_name || task.method_code || "تسوية"}</div></div>
@@ -385,12 +400,13 @@ export default function OperationsTasksPage() {
           {returnedForRecount && returnNote && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>ملاحظة المراجع:</strong> {returnNote}</div>}
           {resolution && <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">نتيجة المراجعة: {resolution}</div>}
           <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-            {task.status === "open" && task.can_claim && !isInventoryAdjustmentReviewTask(task) && <Button disabled={busy} onClick={() => run(task.id, () => claimOperationsTask(task.id), "تم استلام المهمة.")}><UserRoundCheck className="ml-2 h-4 w-4" />استلام</Button>}
+            {task.status === "open" && task.can_claim && !isInventoryAdjustmentReviewTask(task) && !systemHealth && <Button disabled={busy} onClick={() => run(task.id, () => claimOperationsTask(task.id), "تم استلام المهمة.")}><UserRoundCheck className="ml-2 h-4 w-4" />استلام</Button>}
             {inventory && task.status !== "completed" && (task.is_mine || task.can_claim || isInventoryAdjustmentReviewTask(task)) && <Button disabled={busy} onClick={() => openInventory(task)} className="bg-cyan-700 hover:bg-cyan-800"><ClipboardCheck className="ml-2 h-4 w-4" />{isInventoryAdjustmentReviewTask(task) ? "مراجعة واعتماد" : returnedForRecount ? "فتح إعادة الجرد" : isInventoryRecountTask(task) ? "فتح إعادة العد" : "فتح الجرد"}</Button>}
-            {!inventory && task.is_mine && task.status === "claimed" && <Button variant="outline" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), review ? "بدأت المراجعة." : "بدأ تنفيذ المهمة.")}><Play className="ml-2 h-4 w-4" />بدء</Button>}
+            {!inventory && !systemHealth && task.is_mine && task.status === "claimed" && <Button variant="outline" disabled={busy} onClick={() => run(task.id, () => startOperationsTask(task.id), review ? "بدأت المراجعة." : "بدأ تنفيذ المهمة.")}><Play className="ml-2 h-4 w-4" />بدء</Button>}
             {!inventory && task.is_mine && ["claimed", "in_progress", "failed"].includes(task.status) && refund && <Button disabled={busy} onClick={() => { setCompleteRefundTask(task); setProviderReference(""); }}><CheckCircle2 className="ml-2 h-4 w-4" />تأكيد التحويل</Button>}
             {!inventory && task.is_mine && ["claimed", "in_progress", "failed"].includes(task.status) && review && <Button disabled={busy} onClick={() => { setCompleteReviewTask(task); setResolutionNote(""); }}><Scale className="ml-2 h-4 w-4" />إغلاق المراجعة</Button>}
-            {task.is_mine && ["claimed", "in_progress", "failed"].includes(task.status) && !isInventoryAdjustmentReviewTask(task) && <><Button variant="outline" disabled={busy} onClick={() => run(task.id, () => releaseOperationsTask(task.id, "إرجاع للمجموعة"), "تم إرجاع المهمة للمجموعة.")}><RotateCcw className="ml-2 h-4 w-4" />إرجاع</Button><Button variant="ghost" disabled={busy} onClick={() => { setFailTask(task); setFailureReason(""); }}><AlertTriangle className="ml-2 h-4 w-4" />تعذر التنفيذ</Button></>}
+            {task.is_mine && ["claimed", "in_progress", "failed"].includes(task.status) && !isInventoryAdjustmentReviewTask(task) && !systemHealth && <><Button variant="outline" disabled={busy} onClick={() => run(task.id, () => releaseOperationsTask(task.id, "إرجاع للمجموعة"), "تم إرجاع المهمة للمجموعة.")}><RotateCcw className="ml-2 h-4 w-4" />إرجاع</Button><Button variant="ghost" disabled={busy} onClick={() => { setFailTask(task); setFailureReason(""); }}><AlertTriangle className="ml-2 h-4 w-4" />تعذر التنفيذ</Button></>}
+            {systemHealth && task.status !== "completed" && <Button onClick={() => navigate("/notifications")} className="bg-amber-600 hover:bg-amber-700"><ServerCog className="ml-2 h-4 w-4" />فتح إعداد Push</Button>}
             <Button variant="ghost" onClick={() => setHistoryTask(task)}><History className="ml-2 h-4 w-4" />السجل</Button>
           </div>
         </CardContent>
@@ -416,6 +432,7 @@ export default function OperationsTasksPage() {
             <Button size="sm" variant={typeFilter === "refund" ? "default" : "outline"} onClick={() => changeTypeFilter("refund")}><WalletCards className="ml-1 h-4 w-4" />المرتجعات <Badge variant="secondary" className="mr-2">{refundActive}</Badge></Button>
             <Button size="sm" variant={typeFilter === "shift" ? "default" : "outline"} onClick={() => changeTypeFilter("shift")}><Scale className="ml-1 h-4 w-4" />فروق الورديات <Badge variant="secondary" className="mr-2">{varianceActive}</Badge></Button>
             <Button size="sm" variant={typeFilter === "cash_handoff" ? "default" : "outline"} onClick={() => changeTypeFilter("cash_handoff")}><Banknote className="ml-1 h-4 w-4" />استلام النقدية <Badge variant="secondary" className="mr-2">{cashHandoffActive}</Badge></Button>
+            <Button size="sm" variant={typeFilter === "system" ? "default" : "outline"} onClick={() => changeTypeFilter("system")}><ServerCog className="ml-1 h-4 w-4" />صحة النظام <Badge variant="secondary" className="mr-2">{systemHealthActive}</Badge></Button>
           </div>
         </section>
 
