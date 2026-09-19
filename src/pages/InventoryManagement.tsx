@@ -98,6 +98,9 @@ const movementSourceLabels: Record<string, string> = {
   manual_inventory_adjustment: "تسوية يدوية",
   inventory_audit_adjustment: "تسوية جرد معتمدة",
   inventory_quantity_update: "حركة مخزون",
+  online_order_reservation_commit: "تنفيذ حجز طلب أونلاين",
+  online_order_cancel_restock: "إرجاع مخزون طلب أونلاين ملغي",
+  pos_sale: "بيع POS",
 };
 
 const statusLabels: Record<InventoryControlStatus, string> = {
@@ -262,7 +265,11 @@ export default function InventoryManagement() {
       return toast.error("أدخل فرق كمية صحيحًا، مثل 3 أو -1 أو 0.5.");
     }
     if (adjustNote.trim().length < 3) return toast.error("اكتب ملاحظة واضحة تشرح سبب التسوية.");
-    if (adjustProduct.quantity + delta < 0) return toast.error("التسوية ستجعل الرصيد أقل من صفر.");
+    const nextQuantity = adjustProduct.quantity + delta;
+    if (nextQuantity < 0) return toast.error("التسوية ستجعل الرصيد أقل من صفر.");
+    if (nextQuantity < adjustProduct.reserved_quantity) {
+      return toast.error(`لا يمكن خفض الرصيد إلى ${formatQty(nextQuantity)}؛ يوجد ${formatQty(adjustProduct.reserved_quantity)} محجوز لطلبات أونلاين نشطة.`);
+    }
     setBusy(true);
     try {
       const result = await adjustInventoryStockV2(
@@ -355,7 +362,7 @@ export default function InventoryManagement() {
                 </div>
                 <h1 className="text-2xl font-bold md:text-3xl">مركز التحكم في المخزون</h1>
                 <p className="max-w-3xl text-sm leading-6 text-emerald-50/90">
-                  الرصيد، حدود المخزون، التنبيهات، حركة 30 يوم، الجرد وسجل التغييرات في مكان واحد. أي تسوية يدوية تمر الآن عبر سجل حركات قابل للمراجعة.
+                  الرصيد الفعلي، المحجوز لطلبات الأونلاين، المتاح للبيع، حدود المخزون، الجرد وسجل الحركات في مكان واحد. أي تسوية يدوية تمر عبر سجل قابل للمراجعة ولا يمكنها المساس بكميات محجوزة.
                 </p>
               </div>
 
@@ -439,6 +446,37 @@ export default function InventoryManagement() {
           })}
         </section>
 
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div><p className="text-xs font-semibold text-muted-foreground">الرصيد الفعلي On-hand</p><p className="mt-1 text-2xl font-black text-slate-950">{formatQty(summary?.on_hand_measure)}</p></div>
+              <div className="rounded-xl bg-slate-100 p-2.5 text-slate-700"><Warehouse className="h-5 w-5" /></div>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">الموجود فعليًا قبل خصم حجوزات الطلبات.</p>
+          </div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div><p className="text-xs font-semibold text-amber-800">محجوز للأونلاين</p><p className="mt-1 text-2xl font-black text-amber-950">{formatQty(summary?.reserved_measure)}</p></div>
+              <div className="rounded-xl bg-amber-100 p-2.5 text-amber-800"><ShieldCheck className="h-5 w-5" /></div>
+            </div>
+            <p className="mt-2 text-xs text-amber-800">{formatQty(summary?.reserved_sku_rows)} صنف عليه حجز نشط.</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div><p className="text-xs font-semibold text-emerald-800">متاح للبيع الآن</p><p className="mt-1 text-2xl font-black text-[#005931]">{formatQty(summary?.available_measure)}</p></div>
+              <div className="rounded-xl bg-emerald-100 p-2.5 text-[#005931]"><Boxes className="h-5 w-5" /></div>
+            </div>
+            <p className="mt-2 text-xs text-emerald-800">ده الحد اللي POS والعميل يقدروا يستهلكوه.</p>
+          </div>
+          <div className="rounded-2xl border border-orange-200 bg-orange-50/70 p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div><p className="text-xs font-semibold text-orange-800">محجوز بالكامل</p><p className="mt-1 text-2xl font-black text-orange-950">{formatQty(summary?.fully_reserved_rows)}</p></div>
+              <div className="rounded-xl bg-orange-100 p-2.5 text-orange-800"><Package className="h-5 w-5" /></div>
+            </div>
+            <p className="mt-2 text-xs text-orange-800">عنده رصيد فعلي لكن المتاح للبيع حاليًا صفر.</p>
+          </div>
+        </section>
+
         <section className="grid gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader className="pb-3">
@@ -501,7 +539,7 @@ export default function InventoryManagement() {
                       <TableHeader>
                         <TableRow className="bg-muted/40">
                           <TableHead className="text-right">المنتج</TableHead>
-                          <TableHead className="text-right">الرصيد</TableHead>
+                          <TableHead className="text-right">المخزون والحجز</TableHead>
                           <TableHead className="text-right">الحالة</TableHead>
                           <TableHead className="text-right">بيع 30 يوم</TableHead>
                           <TableHead className="text-right">القيمة</TableHead>
@@ -527,8 +565,12 @@ export default function InventoryManagement() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <p className="font-semibold">{formatQty(product.quantity)} <span className="text-xs font-normal text-muted-foreground">{product.unit_of_measure}</span></p>
-                              <p className="mt-1 text-xs text-muted-foreground">حد أدنى {formatQty(product.min_stock_level)}</p>
+                              <div className="space-y-1 text-xs">
+                                <p><span className="text-muted-foreground">فعلي</span> <strong className="mr-1 text-sm text-slate-950">{formatQty(product.quantity)}</strong> <span className="text-muted-foreground">{product.unit_of_measure}</span></p>
+                                <p><span className="text-muted-foreground">محجوز</span> <strong className={`mr-1 ${product.reserved_quantity > 0 ? "text-amber-700" : "text-slate-500"}`}>{formatQty(product.reserved_quantity)}</strong></p>
+                                <p><span className="text-muted-foreground">متاح</span> <strong className={`mr-1 ${product.available_quantity <= 0 && product.quantity > 0 ? "text-orange-700" : "text-emerald-700"}`}>{formatQty(product.available_quantity)}</strong></p>
+                                {product.quantity > 0 && product.available_quantity <= 0 ? <Badge variant="outline" className="border-orange-200 bg-orange-50 text-[10px] text-orange-800">محجوز بالكامل</Badge> : null}
+                              </div>
                             </TableCell>
                             <TableCell>{stockBadge(product)}</TableCell>
                             <TableCell>
@@ -570,7 +612,9 @@ export default function InventoryManagement() {
                             <p className="mt-1 text-xs text-muted-foreground">{product.barcode || "بدون باركود"} · {product.category_name}</p>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               {stockBadge(product)}
-                              <Badge variant="outline">{formatQty(product.quantity)} {product.unit_of_measure}</Badge>
+                              <Badge variant="outline">فعلي {formatQty(product.quantity)}</Badge>
+                              {product.reserved_quantity > 0 ? <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">محجوز {formatQty(product.reserved_quantity)}</Badge> : null}
+                              <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">متاح {formatQty(product.available_quantity)}</Badge>
                             </div>
                           </div>
                         </div>
@@ -688,7 +732,11 @@ export default function InventoryManagement() {
               <div><p className="font-medium">تفعيل تنبيه انخفاض المخزون</p><p className="mt-1 text-xs text-muted-foreground">يظهر في فلتر التنبيهات عندما يصل الرصيد للحد الأدنى أو أقل.</p></div>
               <Switch checked={alertEnabled} onCheckedChange={setAlertEnabled} />
             </div>
-            <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">الرصيد الحالي: <strong className="text-foreground">{formatQty(policyProduct?.quantity)} {policyProduct?.unit_of_measure}</strong></div>
+            <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/40 p-3 text-center text-xs">
+              <div><span className="text-muted-foreground">فعلي</span><strong className="mt-1 block text-foreground">{formatQty(policyProduct?.quantity)}</strong></div>
+              <div><span className="text-muted-foreground">محجوز</span><strong className="mt-1 block text-amber-700">{formatQty(policyProduct?.reserved_quantity)}</strong></div>
+              <div><span className="text-muted-foreground">متاح</span><strong className="mt-1 block text-emerald-700">{formatQty(policyProduct?.available_quantity)}</strong></div>
+            </div>
           </div>
           <DialogFooter className="gap-2 sm:justify-start">
             <Button onClick={savePolicy} disabled={busy}>{busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <BellRing className="ml-2 h-4 w-4" />} حفظ</Button>
@@ -722,11 +770,17 @@ export default function InventoryManagement() {
               </div>
             </div>
             <div className="space-y-2"><Label>ملاحظة إلزامية</Label><Textarea value={adjustNote} onChange={(event) => setAdjustNote(event.target.value)} placeholder="اكتب ما حدث ولماذا يتم تعديل الرصيد..." rows={3} /></div>
-            <div className="grid grid-cols-3 gap-2 rounded-xl bg-muted/40 p-3 text-center text-sm">
-              <div><p className="text-xs text-muted-foreground">الحالي</p><p className="mt-1 font-bold">{formatQty(adjustProduct?.quantity)}</p></div>
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-3 text-center text-sm sm:grid-cols-4">
+              <div><p className="text-xs text-muted-foreground">الفعلي الحالي</p><p className="mt-1 font-bold">{formatQty(adjustProduct?.quantity)}</p></div>
+              <div><p className="text-xs text-muted-foreground">المحجوز</p><p className="mt-1 font-bold text-amber-700">{formatQty(adjustProduct?.reserved_quantity)}</p></div>
               <div><p className="text-xs text-muted-foreground">التغيير</p><p className="mt-1 font-bold">{formatQty(Number(adjustDelta) || 0)}</p></div>
-              <div><p className="text-xs text-muted-foreground">بعد التسوية</p><p className="mt-1 font-bold">{formatQty(Number(adjustProduct?.quantity || 0) + (Number(adjustDelta) || 0))}</p></div>
+              <div><p className="text-xs text-muted-foreground">الفعلي بعد التسوية</p><p className="mt-1 font-bold">{formatQty(Number(adjustProduct?.quantity || 0) + (Number(adjustDelta) || 0))}</p></div>
             </div>
+            {adjustProduct && adjustProduct.reserved_quantity > 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
+                يوجد <strong>{formatQty(adjustProduct.reserved_quantity)} {adjustProduct.unit_of_measure}</strong> محجوز لطلبات أونلاين. أقل رصيد فعلي مسموح بعد التسوية هو نفس الكمية المحجوزة.
+              </div>
+            ) : null}
           </div>
           <DialogFooter className="gap-2 sm:justify-start">
             <Button onClick={submitAdjustment} disabled={busy}>{busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Scale className="ml-2 h-4 w-4" />} تنفيذ التسوية</Button>
@@ -739,7 +793,9 @@ export default function InventoryManagement() {
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5" /> سجل حركات المنتج</DialogTitle>
-            <DialogDescription>{movementProduct?.product_name} · الرصيد الحالي {formatQty(movementProduct?.quantity)} {movementProduct?.unit_of_measure}</DialogDescription>
+            <DialogDescription>
+              {movementProduct?.product_name} · فعلي {formatQty(movementProduct?.quantity)} · محجوز {formatQty(movementProduct?.reserved_quantity)} · متاح {formatQty(movementProduct?.available_quantity)} {movementProduct?.unit_of_measure}
+            </DialogDescription>
           </DialogHeader>
           {movementQuery.isLoading ? (
             <div className="flex min-h-52 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>
