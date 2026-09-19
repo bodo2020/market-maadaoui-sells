@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useBranchStore } from "@/stores/branchStore";
 import { fetchFinanceControlCenterV2 } from "@/services/supabase/financeControlCenterV2Service";
+import FinanceReconciliationPanelV1 from "@/components/finance/FinanceReconciliationPanelV1";
 
 const money = (value?: number | null) => `${Number(value || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
 const dt = (value?: string | null) => value ? new Date(value).toLocaleString("ar-EG") : "—";
@@ -119,6 +120,8 @@ export default function FinanceControlCenterV2() {
         {!branchId && <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-900">اختر الفرع أولًا لعرض مركز الماليات.</div>}
         {query.isError && <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">{query.error instanceof Error ? query.error.message : "تعذر تحميل مركز الماليات"}</div>}
         {query.isLoading && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-2xl bg-slate-100" />)}</div>}
+
+        {branchId && <FinanceReconciliationPanelV1 branchId={branchId} />}
 
         {data && summary && (
           <>
