@@ -1,0 +1,60 @@
+name: Connect APK
+
+on:
+  pull_request:
+    paths:
+      - 'apps/connect/**'
+      - '.github/workflows/connect-apk.yml'
+  push:
+    branches:
+      - 'work/elmadawy-connect-m1'
+    paths:
+      - 'apps/connect/**'
+      - '.github/workflows/connect-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build-connect:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/connect
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck and web build
+        run: npm run build
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Sync Android
+        run: npx cap sync android
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: elmadawy-connect-apk
+          path: apps/connect/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
