@@ -106,6 +106,105 @@ export async function fetchOrderGroupControlTower(branchId: string, limit = 100)
   return (data || { branch_id: branchId, summary: {}, groups: [], generated_at: new Date().toISOString() }) as OrderGroupControlTowerPayload;
 }
 
+
+export type OrderGroupDispatchDriver = {
+  id: string;
+  name: string;
+  availability: string;
+  active_orders: number;
+  distance_km: number | null;
+  travel_minutes: number;
+  score: number;
+  last_location_at: string | null;
+};
+
+export type OrderGroupDispatchRecommendation = {
+  group_id: string;
+  route_id?: string | null;
+  route_status?: string | null;
+  lead_order_id?: string | null;
+  active_store_count?: number;
+  ready_store_count?: number;
+  missing_eta_count?: number;
+  all_active_ready?: boolean;
+  prediction_complete?: boolean;
+  predicted_group_ready_at?: string | null;
+  dispatch_at?: string | null;
+  dispatch_in_minutes?: number | null;
+  dispatch_now?: boolean;
+  can_assign?: boolean;
+  dispatch_priority?: number;
+  reason?: string;
+  buffer_minutes?: number;
+  route_distance_km?: number | null;
+  route_estimated_minutes?: number | null;
+  reprice_status?: string | null;
+  first_pickup?: {
+    branch_id?: string | null;
+    branch_name?: string | null;
+  } | null;
+  recommended_driver?: OrderGroupDispatchDriver | null;
+  assigned_driver?: {
+    id: string;
+    name?: string | null;
+  } | null;
+  candidates?: OrderGroupDispatchDriver[];
+};
+
+export type OrderGroupDispatchBoardPayload = {
+  branch_id: string;
+  items: OrderGroupDispatchRecommendation[];
+  generated_at: string;
+};
+
+export async function fetchOrderGroupDispatchBoard(branchId: string, limit = 20) {
+  const { data, error } = await (supabase.rpc as any)('get_order_group_dispatch_board_v1', {
+    p_hub_branch_id: branchId,
+    p_limit: limit,
+  });
+  if (error) {
+    const messages: Record<string, string> = {
+      AUTH_REQUIRED: 'سجّل الدخول مرة أخرى.',
+      DISPATCH_VIEW_DENIED: 'الحساب الحالي لا يملك صلاحية عرض توصيات التوزيع.',
+    };
+    throw new Error(messages[error.message] || 'تعذر تحميل توصيات Smart Dispatch.');
+  }
+  return (data || { branch_id: branchId, items: [], generated_at: new Date().toISOString() }) as OrderGroupDispatchBoardPayload;
+}
+
+export async function assignRecommendedOrderGroupDelivery(groupId: string) {
+  const { data, error } = await (supabase.rpc as any)('assign_recommended_order_group_delivery_v1', {
+    p_group_id: groupId,
+    p_force: false,
+  });
+  if (error) {
+    const messages: Record<string, string> = {
+      AUTH_REQUIRED: 'سجّل الدخول مرة أخرى.',
+      ORDER_GROUP_NOT_FOUND: 'الطلب المجمّع غير موجود.',
+      DISPATCH_MANAGE_DENIED: 'الحساب الحالي لا يملك صلاحية تعيين المندوب.',
+      GROUP_ROUTE_NOT_FOUND: 'مسار التوصيل غير جاهز.',
+      GROUP_ROUTE_NOT_ASSIGNABLE: 'مسار التوصيل بدأ بالفعل أو لا يقبل تعيينًا جديدًا.',
+      GROUP_REPRICE_REQUIRED: 'لازم يكتمل تحديث السعر والمسار قبل تعيين المندوب.',
+      NO_AVAILABLE_DRIVER: 'لا يوجد مندوب متاح بموقع حديث حاليًا.',
+      GROUP_READINESS_PREDICTION_INCOMPLETE: 'بيانات جاهزية بعض المتاجر غير مكتملة.',
+      GROUP_DISPATCH_TOO_EARLY: 'لسه بدري على تحريك المندوب حسب جاهزية المتاجر.',
+      GROUP_NO_ACTIVE_ORDERS: 'لا توجد طلبات نشطة داخل المجموعة.',
+    };
+    throw new Error(messages[error.message] || 'تعذر تعيين المندوب المقترح للمجموعة.');
+  }
+  return data as {
+    ok: boolean;
+    idempotent: boolean;
+    group_id: string;
+    route_id: string;
+    delivery_user_id: string;
+    recommendation?: OrderGroupDispatchRecommendation;
+    assignment?: {
+      assignment_count?: number;
+    };
+  };
+}
+
 export async function repriceOrderGroup(groupId: string) {
   const { data, error } = await supabase.functions.invoke('order-group-reprice', {
     body: { group_id: groupId },
