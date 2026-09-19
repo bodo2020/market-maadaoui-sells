@@ -10,6 +10,7 @@ import { AssignDeliveryPersonDialog } from "./AssignDeliveryPersonDialog";
 import { OrderItemsList } from "./OrderItemsList";
 import { OrderSummaryActions } from "./OrderSummaryActions";
 import { CustomerInfoCards } from "./CustomerInfoCards";
+import { OrderDeliverySnapshot } from "./OrderDeliverySnapshot";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useBranchStore } from "@/stores/branchStore";
@@ -152,7 +153,17 @@ export function OrderDetailsDialog({
                 </div>
               </div>
             )}
-            <CustomerInfoCards customerName={renderCustomerNameWithVerification()} customerEmail={order.customer_email} customerPhone={order.customer_phone} shippingAddress={order.shipping_address} notes={order.notes} />
+            {snapshot.data?.checkout_version === 1 ? (
+              <OrderDeliverySnapshot orderId={order.id} />
+            ) : (
+              <CustomerInfoCards
+                customerName={renderCustomerNameWithVerification()}
+                customerEmail={order.customer_email}
+                customerPhone={order.customer_phone}
+                shippingAddress={order.shipping_address}
+                notes={order.notes}
+              />
+            )}
           </div>
         </div>
 
