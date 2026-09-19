@@ -221,7 +221,7 @@ function buildReceiptBody(sale: Sale, preferences: InvoicePrintPreferences, over
     <section class="invoice-identity">
       <div class="identity-label">فاتورة مبيعات</div>
       <div class="invoice-number">#${esc(sale.invoice_number)}</div>
-      <div class="paid-status">مدفوعة</div>
+      <div class="paid-status">${Number(extra.customer_credit_amount || 0) + Number(extra.employee_credit_amount || 0) > 0 ? "مدفوعة جزئيًا / آجل" : "مدفوعة"}</div>
     </section>
 
     <section class="meta-block">

@@ -1,0 +1,40 @@
+@media print {
+  @page { size: A4; margin: 10mm; }
+  html, body { background: #fff !important; }
+  .desktop-sidebar,
+  .bottom-nav,
+  .topbar,
+  .report-actions,
+  .financial-report-actions,
+  .custom-date-panel,
+  .period-switcher,
+  .custom-period-button,
+  button,
+  .back-button { display: none !important; }
+  .app-shell { display: block !important; }
+  .app-content,
+  .page-content,
+  .stack-lg,
+  .sales-report-page { width: 100% !important; max-width: none !important; min-width: 0 !important; padding: 0 !important; margin: 0 !important; }
+  .section-card,
+  .finance-summary,
+  .report-card,
+  .decision-insight-card { break-inside: avoid; box-shadow: none !important; }
+  .report-visual-grid,
+  .split-grid,
+  .finance-summary-grid,
+  .decision-kpi-grid { grid-template-columns: 1fr 1fr !important; }
+  .peak-heatmap-wrap,
+  .report-table-wrap { overflow: visible !important; }
+}
+
+.native-printing .desktop-sidebar,
+.native-printing .bottom-nav,
+.native-printing .topbar,
+.native-printing .report-actions,
+.native-printing .financial-report-actions,
+.native-printing .custom-date-panel,
+.native-printing .period-switcher,
+.native-printing .custom-period-button,
+.native-printing button,
+.native-printing .back-button { visibility: hidden !important; }
