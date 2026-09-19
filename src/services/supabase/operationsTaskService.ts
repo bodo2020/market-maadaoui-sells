@@ -181,6 +181,10 @@ export function isAttendanceExceptionTask(task: Pick<OperationsTask, "source_kin
   return task.source_kind === "attendance_exception";
 }
 
+export function isSystemHealthTask(task: Pick<OperationsTask, "task_type" | "source_kind">) {
+  return task.task_type === "notification_push_health" || task.source_kind === "system_health";
+}
+
 export async function fetchOperationsTasks(branchId: string, scope: OperationsTaskScope = "all", limit = 250): Promise<OperationsTask[]> {
   const { data, error } = await rpc("list_operations_tasks", { p_branch_id: branchId, p_scope: scope, p_limit: limit });
   if (error) throw operationsTaskError(error.message);
