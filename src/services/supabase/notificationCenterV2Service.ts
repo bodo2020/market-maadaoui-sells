@@ -184,3 +184,105 @@ export async function updateMyNotificationPreferencesV2(input: Partial<{
   if (error) throw error;
   return data as NotificationPreferencesV2;
 }
+
+
+export interface PushOperationalStatusV1 {
+  provider: string;
+  provider_configured: boolean;
+  provider_valid: boolean;
+  project_id: string | null;
+  worker_enabled: boolean;
+  ready: boolean;
+  issues: string[];
+  primary_branch_id: string | null;
+  active_devices: number;
+  active_customer_devices: number;
+  queue: {
+    pending: number;
+    retrying: number;
+    processing: number;
+    sent: number;
+    failed: number;
+    suppressed: number;
+  };
+  health_task: {
+    id: string | null;
+    status: string | null;
+  };
+  can_configure: boolean;
+  generated_at: string;
+}
+
+export async function fetchPushOperationalStatusV1(): Promise<PushOperationalStatusV1> {
+  const { data, error } = await (supabase as any).rpc("get_push_operational_status_v1");
+  if (error) throw error;
+  const raw: any = data || {};
+  return {
+    provider: textValue(raw.provider, "fcm-http-v1"),
+    provider_configured: Boolean(raw.provider_configured),
+    provider_valid: Boolean(raw.provider_valid),
+    project_id: typeof raw.project_id === "string" ? raw.project_id : null,
+    worker_enabled: Boolean(raw.worker_enabled),
+    ready: Boolean(raw.ready),
+    issues: Array.isArray(raw.issues) ? raw.issues.filter((value: unknown) => typeof value === "string") : [],
+    primary_branch_id: typeof raw.primary_branch_id === "string" ? raw.primary_branch_id : null,
+    active_devices: numberValue(raw.active_devices),
+    active_customer_devices: numberValue(raw.active_customer_devices),
+    queue: {
+      pending: numberValue(raw.queue?.pending),
+      retrying: numberValue(raw.queue?.retrying),
+      processing: numberValue(raw.queue?.processing),
+      sent: numberValue(raw.queue?.sent),
+      failed: numberValue(raw.queue?.failed),
+      suppressed: numberValue(raw.queue?.suppressed),
+    },
+    health_task: {
+      id: typeof raw.health_task?.id === "string" ? raw.health_task.id : null,
+      status: typeof raw.health_task?.status === "string" ? raw.health_task.status : null,
+    },
+    can_configure: Boolean(raw.can_configure),
+    generated_at: textValue(raw.generated_at),
+  };
+}
+
+export async function setPushWorkerEnabledV1(enabled: boolean): Promise<PushOperationalStatusV1> {
+  const { data, error } = await (supabase as any).rpc("set_push_worker_enabled_v1", {
+    p_enabled: enabled,
+  });
+  if (error) {
+    if (String(error.message || "").includes("PUSH_PROVIDER_NOT_CONFIGURED")) {
+      throw new Error("لا يمكن تشغيل Push قبل إضافة FCM Service Account صالح في Supabase Vault.");
+    }
+    if (String(error.message || "").includes("SUPER_ADMIN_REQUIRED")) {
+      throw new Error("تفعيل أو تعطيل Push متاح للـ Super Admin فقط.");
+    }
+    throw error;
+  }
+  const raw: any = data || {};
+  return {
+    provider: textValue(raw.provider, "fcm-http-v1"),
+    provider_configured: Boolean(raw.provider_configured),
+    provider_valid: Boolean(raw.provider_valid),
+    project_id: typeof raw.project_id === "string" ? raw.project_id : null,
+    worker_enabled: Boolean(raw.worker_enabled),
+    ready: Boolean(raw.ready),
+    issues: Array.isArray(raw.issues) ? raw.issues.filter((value: unknown) => typeof value === "string") : [],
+    primary_branch_id: typeof raw.primary_branch_id === "string" ? raw.primary_branch_id : null,
+    active_devices: numberValue(raw.active_devices),
+    active_customer_devices: numberValue(raw.active_customer_devices),
+    queue: {
+      pending: numberValue(raw.queue?.pending),
+      retrying: numberValue(raw.queue?.retrying),
+      processing: numberValue(raw.queue?.processing),
+      sent: numberValue(raw.queue?.sent),
+      failed: numberValue(raw.queue?.failed),
+      suppressed: numberValue(raw.queue?.suppressed),
+    },
+    health_task: {
+      id: typeof raw.health_task?.id === "string" ? raw.health_task.id : null,
+      status: typeof raw.health_task?.status === "string" ? raw.health_task.status : null,
+    },
+    can_configure: Boolean(raw.can_configure),
+    generated_at: textValue(raw.generated_at),
+  };
+}
