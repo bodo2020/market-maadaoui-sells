@@ -285,6 +285,87 @@ export async function fetchOrderGroupDispatchHealth(branchId: string, limit = 20
   }) as OrderGroupDispatchHealthPayload;
 }
 
+export type OrderGroupPickupIssue = {
+  id: string;
+  group_id: string;
+  display_id: string;
+  route_id: string;
+  stop_id: string;
+  stop_order: number;
+  order_id: string;
+  branch_id: string | null;
+  branch_name: string | null;
+  merchant_name: string | null;
+  driver_user_id: string;
+  driver_name: string | null;
+  issue_type: 'store_closed' | 'order_not_ready' | 'order_mismatch' | 'pickup_access' | 'other' | string;
+  note: string;
+  status: 'open' | 'resolved' | 'cancelled' | string;
+  task_id: string | null;
+  task_status: string | null;
+  task_priority: string | null;
+  reported_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  resolution_note: string | null;
+};
+
+export type OrderGroupPickupIssueBoardPayload = {
+  branch_id: string;
+  summary: {
+    open?: number;
+    resolved_last_24h?: number;
+  };
+  issues: OrderGroupPickupIssue[];
+  generated_at: string;
+};
+
+export async function fetchOrderGroupPickupIssueBoard(branchId: string, limit = 50) {
+  const { data, error } = await (supabase.rpc as any)('get_order_group_pickup_issue_board_v1', {
+    p_branch_id: branchId,
+    p_limit: limit,
+  });
+  if (error) {
+    const messages: Record<string, string> = {
+      AUTH_REQUIRED: 'سجّل الدخول مرة أخرى.',
+      PICKUP_ISSUE_VIEW_DENIED: 'الحساب الحالي لا يملك صلاحية عرض مشاكل نقاط الاستلام.',
+    };
+    throw new Error(messages[error.message] || 'تعذر تحميل مشاكل نقاط الاستلام.');
+  }
+  return (data || {
+    branch_id: branchId,
+    summary: {},
+    issues: [],
+    generated_at: new Date().toISOString(),
+  }) as OrderGroupPickupIssueBoardPayload;
+}
+
+export async function resolveOrderGroupPickupIssue(issueId: string, note?: string) {
+  const { data, error } = await (supabase.rpc as any)('resolve_order_group_pickup_issue_v1', {
+    p_issue_id: issueId,
+    p_note: note?.trim() || null,
+  });
+  if (error) {
+    const messages: Record<string, string> = {
+      AUTH_REQUIRED: 'سجّل الدخول مرة أخرى.',
+      PICKUP_ISSUE_NOT_FOUND: 'مشكلة نقطة الاستلام لم تعد موجودة.',
+      PICKUP_ISSUE_NOT_OPEN: 'المشكلة اتقفلت بالفعل.',
+      PICKUP_ISSUE_RESOLVE_DENIED: 'الحساب الحالي لا يملك صلاحية حل مشكلة نقطة الاستلام.',
+      PICKUP_ISSUE_RESOLUTION_NOTE_INVALID: 'ملاحظة الحل يجب أن تكون من 3 إلى 500 حرف.',
+    };
+    throw new Error(messages[error.message] || 'تعذر حل مشكلة نقطة الاستلام.');
+  }
+  return data as {
+    ok: boolean;
+    idempotent: boolean;
+    issue_id: string;
+    group_id?: string;
+    route_id?: string;
+    stop_id?: string;
+    status: 'resolved';
+  };
+}
+
 export async function assignRecommendedOrderGroupDelivery(groupId: string) {
   const { data, error } = await (supabase.rpc as any)('assign_recommended_order_group_delivery_v1', {
     p_group_id: groupId,
