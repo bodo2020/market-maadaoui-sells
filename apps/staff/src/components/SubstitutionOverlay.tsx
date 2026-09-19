@@ -24,6 +24,13 @@ function money(value: number) {
   return `${n > 0 ? "+" : ""}${n.toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ج.م`;
 }
 
+function policyLabel(policy?: PickingSession["substitution_policy"]) {
+  if (policy === "allow_substitutions") return "العميل يسمح ببديل مناسب إذا كان بنفس السعر أو أقل؛ الزيادة تحتاج موافقته.";
+  if (policy === "contact_me") return "العميل يريد الموافقة من التطبيق قبل أي استبدال.";
+  if (policy === "remove_item") return "العميل اختار حذف الصنف إذا لم يتوفر.";
+  return "الطلب قديم: موافقة المدير مطلوبة للبديل.";
+}
+
 function financialStateLabel(state?: string | null) {
   if (state === "settled" || state === "applied_to_order_total") return "فرق السعر محسوب في إجمالي الطلب";
   if (state === "pending_collection") return "اعتماد البديل تم · فرق السعر بانتظار التحصيل";
@@ -91,6 +98,7 @@ export default function SubstitutionOverlay() {
 
   const unresolved = useMemo(() => (session?.items || []).filter((item) => remaining(item) > 0), [session]);
   const pending = useMemo(() => unresolved.filter((item) => item.substitution?.status === "pending").length, [unresolved]);
+  const policy = session?.substitution_policy || "manager";
   const available = Boolean(orderId && session?.fulfillment_state === "picking" && unresolved.length);
   if (!available) return null;
 
@@ -115,6 +123,20 @@ export default function SubstitutionOverlay() {
     finally { setLoading(false); }
   };
 
+  const markAsShortage = async (item: PickingItem) => {
+    if (acting) return;
+    const left = remaining(item);
+    if (left <= 0) return;
+    if (!window.confirm(`تسجيل ${item.product_name} كصنف غير متوفر؟\nالكمية: ${qty(left, item.is_weight_based)}`)) return;
+    setActing(true); setError("");
+    try {
+      await staff.markPickingShortage(item.id, left, "حسب اختيار العميل: احذف الصنف إذا لم يتوفر");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "تعذر تسجيل النقص.");
+    } finally { setActing(false); }
+  };
+
   const propose = async (candidate: SubstitutionCandidate) => {
     if (!selected || acting) return;
     const left = remaining(selected);
@@ -127,7 +149,15 @@ export default function SubstitutionOverlay() {
       setSelected(null); setCandidates([]); setQuery("");
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "";
-      setError(message.includes("SUBSTITUTE_INSUFFICIENT_STOCK") ? "مخزون البديل لم يعد كافيًا. اختر بديلًا آخر." : message.includes("SUBSTITUTION_ALREADY_PENDING") ? "يوجد اقتراح بديل معلق بالفعل لهذا الصنف." : "تعذر إرسال اقتراح البديل.");
+      setError(
+        message.includes("SUBSTITUTE_INSUFFICIENT_STOCK")
+          ? "مخزون البديل لم يعد كافيًا. اختر بديلًا آخر."
+          : message.includes("SUBSTITUTION_ALREADY_PENDING")
+            ? "يوجد اقتراح بديل معلق بالفعل لهذا الصنف."
+            : message.includes("SUBSTITUTION_POLICY_REMOVE_ITEM")
+              ? "العميل اختار حذف الصنف عند عدم توفره؛ سجله كناقص بدل اقتراح بديل."
+              : "تعذر إرسال اقتراح البديل."
+      );
     } finally { setActing(false); }
   };
 
@@ -143,16 +173,25 @@ export default function SubstitutionOverlay() {
             <div className="sub-head-actions">{selected && <button onClick={() => { setSelected(null); setCandidates([]); setError(""); }}><ArrowRight /></button>}<button onClick={() => { setOpen(false); setSelected(null); }}><X /></button></div>
           </div>
 
-          {!selected ? <div className="sub-item-list">
+          {!selected ? <>
+            <div className="sub-policy-card">
+              <strong>اختيار العميل للبدائل</strong>
+              <small>{policyLabel(policy)}</small>
+            </div>
+            <div className="sub-item-list">
             {unresolved.map((item) => {
               const hasPending = item.substitution?.status === "pending";
               return <article className="sub-origin-card" key={item.id}>
                 <div className="sub-origin-main">{item.image_url ? <img src={item.image_url} alt="" /> : <div className="sub-img-placeholder"><PackageSearch /></div>}<div><strong>{item.product_name}</strong><small>المتبقي: {qty(remaining(item), item.is_weight_based)}</small>{item.barcode && <small>{item.barcode}</small>}</div></div>
                 <StatusBlock item={item} onChanged={load} />
-                {!hasPending && item.status !== "substituted" && <button className="sub-primary" onClick={() => void chooseItem(item)}><Search />اقتراح بديل</button>}
+                {!hasPending && item.status !== "substituted" && (
+                  policy === "remove_item"
+                    ? <button className="sub-primary" disabled={acting} onClick={() => void markAsShortage(item)}><AlertTriangle />تسجيل كناقص وحذف الصنف</button>
+                    : <button className="sub-primary" onClick={() => void chooseItem(item)}><Search />اقتراح بديل</button>
+                )}
               </article>;
             })}
-          </div> : <>
+          </div></> : <>
             <article className="sub-selected-origin"><span>بديل عن</span><strong>{selected.product_name}</strong><small>الكمية المطلوبة للبديل: {qty(remaining(selected), selected.is_weight_based)}</small></article>
             <form className="sub-search" onSubmit={(event) => void search(event)}><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="اسم المنتج أو الباركود" autoFocus /><button disabled={loading}>{loading ? <Loader2 className="spin" /> : <Search />}</button></form>
             {error && <div className="sub-error">{error}</div>}
@@ -161,7 +200,7 @@ export default function SubstitutionOverlay() {
                 const totalDelta = Number(candidate.price_delta_per_unit || 0) * remaining(selected);
                 return <article key={`${candidate.product_id}:${candidate.variant_id || "base"}`} className="sub-candidate">
                   {candidate.image_url ? <img src={candidate.image_url} alt="" /> : <div className="sub-img-placeholder"><PackageSearch /></div>}
-                  <div className="sub-candidate-body"><strong>{candidate.name}</strong><small>{candidate.barcode || "بدون باركود"}</small><div className="sub-price-row"><span>{Number(candidate.unit_price).toLocaleString("ar-EG")} ج.م</span><span className={totalDelta > 0 ? "up" : totalDelta < 0 ? "down" : "same"}>فرق {money(totalDelta)}</span></div><small>متاح: {qty(candidate.available_quantity, selected.is_weight_based)}</small></div>
+                  <div className="sub-candidate-body"><strong>{candidate.name}</strong>{candidate.is_predefined ? <small>محدد مسبقًا كبديل</small> : candidate.same_brand ? <small>من نفس العلامة</small> : null}<small>{candidate.barcode || "بدون باركود"}</small><div className="sub-price-row"><span>{Number(candidate.unit_price).toLocaleString("ar-EG")} ج.م</span><span className={totalDelta > 0 ? "up" : totalDelta < 0 ? "down" : "same"}>فرق {money(totalDelta)}</span></div><small>متاح: {qty(candidate.available_quantity, selected.is_weight_based)}</small></div>
                   <button disabled={acting || candidate.available_quantity + 0.0005 < remaining(selected)} onClick={() => void propose(candidate)}>{acting ? <Loader2 className="spin" /> : "اختيار"}</button>
                 </article>;
               })}
