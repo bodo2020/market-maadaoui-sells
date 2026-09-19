@@ -226,6 +226,65 @@ export async function setOrderGroupDispatchPolicy(branchId: string, mode: OrderG
   };
 }
 
+export type OrderGroupDispatchHealthIssue = {
+  group_id: string;
+  display_id: string;
+  status: 'retrying' | 'needs_attention' | 'recovered' | 'healthy' | string;
+  consecutive_failures: number;
+  last_error_code?: string | null;
+  last_error_message?: string | null;
+  last_attempt_at?: string | null;
+  last_success_at?: string | null;
+  next_retry_at?: string | null;
+  recovery_task_id?: string | null;
+  task_status?: string | null;
+  task_priority?: string | null;
+  lead_order_id?: string | null;
+};
+
+export type OrderGroupDispatchHealthPayload = {
+  branch_id: string;
+  policy: {
+    mode: OrderGroupDispatchMode;
+    actor_id?: string | null;
+    actor_valid: boolean;
+    auto_paused_reason?: string | null;
+    auto_paused_at?: string | null;
+    updated_at?: string | null;
+  };
+  summary: {
+    failing_groups?: number;
+    needs_attention?: number;
+    retrying?: number;
+    recovered_last_24h?: number;
+    open_tasks?: number;
+    last_failure_at?: string | null;
+  };
+  issues: OrderGroupDispatchHealthIssue[];
+  generated_at: string;
+};
+
+export async function fetchOrderGroupDispatchHealth(branchId: string, limit = 20) {
+  const { data, error } = await (supabase.rpc as any)('get_order_group_dispatch_health_v1', {
+    p_branch_id: branchId,
+    p_limit: limit,
+  });
+  if (error) {
+    const messages: Record<string, string> = {
+      AUTH_REQUIRED: 'سجّل الدخول مرة أخرى.',
+      DISPATCH_VIEW_DENIED: 'الحساب الحالي لا يملك صلاحية عرض صحة Smart Dispatch.',
+    };
+    throw new Error(messages[error.message] || 'تعذر تحميل حالة Smart Dispatch.');
+  }
+  return (data || {
+    branch_id: branchId,
+    policy: { mode: 'assisted', actor_valid: true },
+    summary: {},
+    issues: [],
+    generated_at: new Date().toISOString(),
+  }) as OrderGroupDispatchHealthPayload;
+}
+
 export async function assignRecommendedOrderGroupDelivery(groupId: string) {
   const { data, error } = await (supabase.rpc as any)('assign_recommended_order_group_delivery_v1', {
     p_group_id: groupId,
