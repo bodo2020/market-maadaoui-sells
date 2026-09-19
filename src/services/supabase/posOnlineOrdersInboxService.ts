@@ -22,6 +22,14 @@ export type PosInboxOrder = {
   predicted_ready_at: string | null;
   ready_at: string | null;
   eta_risk: string;
+  eta_confidence: string;
+  eta_model_version: string | null;
+  eta_live_at: string | null;
+  eta_live_window_start: string | null;
+  eta_live_window_end: string | null;
+  eta_remaining_minutes: number;
+  eta_ready_remaining_minutes: number;
+  eta_route_minutes: number;
   driver_name: string | null;
   delivery_state: string | null;
   arrived_branch_at: string | null;
