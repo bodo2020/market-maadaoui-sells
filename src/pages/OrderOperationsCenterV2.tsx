@@ -16,6 +16,7 @@ import {
 } from "@/services/supabase/orderFulfillmentV1Service";
 import {
   fetchOrderGroupControlTower,
+  repriceOrderGroup,
   type OrderGroupControlTowerItem,
 } from "@/services/supabase/orderOperationsService";
 import { toast } from "sonner";
@@ -81,7 +82,17 @@ function groupStatusClass(status?: string | null) {
   return "bg-slate-100 text-slate-700";
 }
 
-function MultiStoreGroupCard({ group, onOpenOrder }: { group: OrderGroupControlTowerItem; onOpenOrder: (id: string) => void }) {
+function MultiStoreGroupCard({
+  group,
+  onOpenOrder,
+  onReprice,
+  repricing,
+}: {
+  group: OrderGroupControlTowerItem;
+  onOpenOrder: (id: string) => void;
+  onReprice: (groupId: string) => void;
+  repricing: boolean;
+}) {
   const operations = group.operations || {};
   const activeStores = Number(operations.stores_active ?? group.stores.length);
   const readyStores = Number(operations.ready || 0) + Number(operations.shipped || 0) + Number(operations.delivered || 0);
@@ -169,6 +180,32 @@ function MultiStoreGroupCard({ group, onOpenOrder }: { group: OrderGroupControlT
           ))}
         </div>
 
+        {operations.dispatch_blocked_reason === "reprice_required" ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                <strong>التوصيل متوقف مؤقتًا:</strong>{" "}
+                {operations.reprice_status === "failed"
+                  ? "فشلت محاولة تحديث السعر والمسار بعد تعديل الطلب."
+                  : "جاري تثبيت السعر والمسار الجديد بعد تعديل أو إلغاء أحد المتاجر."}
+                {" "}لن يتم إسناد المندوب قبل نجاح إعادة التسعير.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={repricing}
+              onClick={() => onReprice(group.group_id)}
+              className="shrink-0 border-amber-300 bg-white"
+            >
+              <RefreshCw className={`h-4 w-4 ${repricing ? "animate-spin" : ""}`} />
+              {repricing ? "جاري إعادة الحساب…" : "إعادة حساب السعر والمسار"}
+            </Button>
+          </div>
+        ) : null}
+
         {(operations.late_stores || operations.at_risk_stores) ? (
           <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -209,6 +246,7 @@ export default function OrderOperationsCenterV2() {
   const [policyMode, setPolicyMode] = useState<"shadow" | "assisted">("shadow");
   const [offerTtl, setOfferTtl] = useState(90);
   const [savingPolicy, setSavingPolicy] = useState(false);
+  const [repricingGroupId, setRepricingGroupId] = useState<string | null>(null);
 
   const query = useQuery({
     queryKey: ["order-fulfillment-v1", currentBranchId],
@@ -262,6 +300,27 @@ export default function OrderOperationsCenterV2() {
       ]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر تعيين المندوب");
+    }
+  };
+
+  const retryGroupReprice = async (groupId: string) => {
+    try {
+      setRepricingGroupId(groupId);
+      const result = await repriceOrderGroup(groupId);
+      const newTotal = Number(result?.result?.new_total);
+      toast.success(
+        Number.isFinite(newTotal)
+          ? `تم تحديث السعر والمسار · الإجمالي الجديد ${newTotal.toFixed(2)} ج.م`
+          : "تم تحديث السعر والمسار بنجاح"
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["order-group-control-tower-v1", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["order-fulfillment-v1", currentBranchId] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر إعادة تسعير الطلب المجمّع");
+    } finally {
+      setRepricingGroupId(null);
     }
   };
 
@@ -391,6 +450,8 @@ export default function OrderOperationsCenterV2() {
                     key={group.group_id}
                     group={group}
                     onOpenOrder={(id) => navigate(`/online-orders/${id}`)}
+                    onReprice={(groupId) => void retryGroupReprice(groupId)}
+                    repricing={repricingGroupId === group.group_id}
                   />
                 ))}
               </div>
