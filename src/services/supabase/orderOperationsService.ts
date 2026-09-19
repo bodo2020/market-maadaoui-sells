@@ -53,6 +53,8 @@ export type OrderGroupControlTowerItem = {
     cancelled?: number;
     all_active_ready?: boolean;
     ready_for_dispatch?: boolean;
+    dispatch_blocked_reason?: string | null;
+    reprice_status?: string | null;
     partially_cancelled?: boolean;
     sla_risk?: 'on_track' | 'at_risk' | 'late' | string;
     late_stores?: number;
@@ -102,6 +104,31 @@ export async function fetchOrderGroupControlTower(branchId: string, limit = 100)
     throw new Error(messages[error.message] || 'تعذر تحميل الطلبات المجمعة.');
   }
   return (data || { branch_id: branchId, summary: {}, groups: [], generated_at: new Date().toISOString() }) as OrderGroupControlTowerPayload;
+}
+
+export async function repriceOrderGroup(groupId: string) {
+  const { data, error } = await supabase.functions.invoke('order-group-reprice', {
+    body: { group_id: groupId },
+  });
+  if (error || (data as { error?: string } | null)?.error) {
+    const code = (data as { error?: string } | null)?.error || error?.message || '';
+    const messages: Record<string, string> = {
+      AUTH_REQUIRED: 'سجّل الدخول مرة أخرى.',
+      ORDER_GROUP_REQUIRED: 'رقم الطلب المجمّع غير صالح.',
+      ORDER_GROUP_OPERATION_DENIED: 'الحساب الحالي لا يملك صلاحية إعادة تسعير الطلب.',
+      ORDER_GROUP_REPRICE_NOT_REQUIRED: 'الطلب لا يحتاج إعادة تسعير حاليًا.',
+      ROAD_QUOTE_REQUIRED: 'تعذر تثبيت مسار التوصيل الجديد.',
+      ROUTE_REPRICE_FAILED: 'تعذر حساب المسار الجديد. حاول مرة أخرى.',
+      ORDER_GROUP_REPRICE_FAILED: 'تعذرت إعادة تسعير الطلب المجمّع.',
+    };
+    throw new Error(messages[code] || 'تعذر تحديث سعر ومسار الطلب المجمّع.');
+  }
+  return data as {
+    ok: boolean;
+    group_id: string;
+    request_id: string;
+    result?: { new_total?: number; status?: string };
+  };
 }
 
 async function processOrder(args: Record<string, string | null>) {
