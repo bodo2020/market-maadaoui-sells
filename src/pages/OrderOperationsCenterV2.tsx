@@ -15,7 +15,9 @@ import {
   setPickerAssignmentPolicy,
 } from "@/services/supabase/orderFulfillmentV1Service";
 import {
+  assignRecommendedOrderGroupDelivery,
   fetchOrderGroupControlTower,
+  fetchOrderGroupDispatchBoard,
   repriceOrderGroup,
   type OrderGroupControlTowerItem,
 } from "@/services/supabase/orderOperationsService";
@@ -61,6 +63,20 @@ const batchReasonLabel: Record<string, string> = {
   shared_shelf_route: "مسار رفوف مشترك",
   shared_categories: "أقسام متقاربة",
   close_sla_window: "مواعيد تجهيز متقاربة",
+};
+
+const dispatchReasonLabel: Record<string, string> = {
+  group_ready_now: "كل المتاجر جاهزة · يتحرك الآن",
+  driver_should_move_now: "وقت تحرك المندوب الآن",
+  wait_for_group_readiness: "مجدول حسب جاهزية آخر متجر",
+  readiness_prediction_incomplete: "بيانات جاهزية ناقصة",
+  no_available_driver: "لا يوجد مندوب مناسب حاليًا",
+  reprice_required: "التوزيع موقوف لحين إعادة التسعير",
+  already_assigned: "تم تعيين مندوب للمجموعة",
+  group_route_missing: "مسار المجموعة غير جاهز",
+  route_not_assignable: "المسار بدأ بالفعل",
+  group_not_dispatchable: "المجموعة غير قابلة للتوزيع",
+  no_active_orders: "لا توجد طلبات نشطة",
 };
 
 function timeLabel(value?: string | null) {
@@ -247,6 +263,7 @@ export default function OrderOperationsCenterV2() {
   const [offerTtl, setOfferTtl] = useState(90);
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [repricingGroupId, setRepricingGroupId] = useState<string | null>(null);
+  const [assigningGroupId, setAssigningGroupId] = useState<string | null>(null);
 
   const query = useQuery({
     queryKey: ["order-fulfillment-v1", currentBranchId],
@@ -260,6 +277,13 @@ export default function OrderOperationsCenterV2() {
     enabled: Boolean(currentBranchId),
     queryFn: () => fetchOrderGroupControlTower(currentBranchId!, 100),
     refetchInterval: 15_000,
+  });
+
+  const dispatchQuery = useQuery({
+    queryKey: ["order-group-dispatch-board-v1", currentBranchId],
+    enabled: Boolean(currentBranchId),
+    queryFn: () => fetchOrderGroupDispatchBoard(currentBranchId!, 20),
+    refetchInterval: 10_000,
   });
 
   const batchShadowQuery = useQuery({
@@ -287,6 +311,12 @@ export default function OrderOperationsCenterV2() {
   const readyForDispatch = useMemo(() => orders.filter((order: any) => order.fulfillment_state === "ready" && !order.delivery_assigned), [orders]);
   const groupSummary = groupQuery.data?.summary || {};
   const activeGroups = groupQuery.data?.groups || [];
+  const dispatchItems = dispatchQuery.data?.items || [];
+  const dispatchMoveNow = dispatchItems.filter((item) => item.dispatch_now && item.recommended_driver).length;
+  const dispatchScheduled = dispatchItems.filter((item) => item.reason === "wait_for_group_readiness").length;
+  const dispatchBlocked = dispatchItems.filter((item) =>
+    ["reprice_required", "readiness_prediction_incomplete", "no_available_driver"].includes(item.reason || "")
+  ).length;
 
   const assignRecommended = async (order: any) => {
     const recommendation = order.dispatch_recommendation;
@@ -300,6 +330,28 @@ export default function OrderOperationsCenterV2() {
       ]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر تعيين المندوب");
+    }
+  };
+
+  const assignGroupDispatch = async (groupId: string) => {
+    try {
+      setAssigningGroupId(groupId);
+      const result = await assignRecommendedOrderGroupDelivery(groupId);
+      const assignmentCount = Number(result.assignment?.assignment_count || 0);
+      toast.success(
+        assignmentCount > 1
+          ? `تم تعيين المندوب لكل ${assignmentCount} طلبات داخل المجموعة`
+          : "تم تعيين المندوب المقترح للمجموعة"
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["order-group-dispatch-board-v1", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["order-group-control-tower-v1", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["order-fulfillment-v1", currentBranchId] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "تعذر تعيين المندوب المقترح");
+    } finally {
+      setAssigningGroupId(null);
     }
   };
 
@@ -328,6 +380,7 @@ export default function OrderOperationsCenterV2() {
     await Promise.all([
       query.refetch(),
       groupQuery.refetch(),
+      dispatchQuery.refetch(),
       batchShadowQuery.refetch(),
     ]);
   };
@@ -360,8 +413,8 @@ export default function OrderOperationsCenterV2() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate("/online-orders")}>الطلبات</Button>
-            <Button variant="outline" onClick={() => void refreshOperations()} disabled={query.isFetching || groupQuery.isFetching}>
-              <RefreshCw className={`h-4 w-4 ${query.isFetching || groupQuery.isFetching ? "animate-spin" : ""}`} />
+            <Button variant="outline" onClick={() => void refreshOperations()} disabled={query.isFetching || groupQuery.isFetching || dispatchQuery.isFetching}>
+              <RefreshCw className={`h-4 w-4 ${query.isFetching || groupQuery.isFetching || dispatchQuery.isFetching ? "animate-spin" : ""}`} />
               تحديث
             </Button>
           </div>
@@ -394,6 +447,164 @@ export default function OrderOperationsCenterV2() {
             </div>
           </CardContent>
         </Card>}
+
+
+        <Card className="overflow-hidden border-sky-200 bg-gradient-to-br from-sky-50/80 via-white to-white shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-sky-700 text-white">
+                  <Truck className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <CardTitle>Smart Dispatch · Multi-store</CardTitle>
+                    <span className="rounded-full bg-sky-100 px-3 py-1 text-[11px] font-black text-sky-800">ASSISTED PREDICTIVE</span>
+                  </div>
+                  <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">
+                    يختار أفضل مندوب من موقعه وحمله الحالي، ويحسب وقت التحرك من جاهزية آخر متجر وزمن الوصول لأول Pickup.
+                    التعيين لا يتم تلقائيًا في هذه المرحلة؛ المدير يعتمد التوصية عندما يحين وقت التحرك.
+                  </p>
+                </div>
+              </div>
+              <Button variant="outline" onClick={() => void dispatchQuery.refetch()} disabled={dispatchQuery.isFetching}>
+                <RefreshCw className={`h-4 w-4 ${dispatchQuery.isFetching ? "animate-spin" : ""}`} />
+                تحديث التوصيات
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-2xl border border-sky-100 bg-white p-3 text-center">
+                <p className="text-[11px] text-slate-500">يتحرك الآن</p>
+                <p className="mt-1 text-2xl font-black text-emerald-700">{dispatchMoveNow}</p>
+              </div>
+              <div className="rounded-2xl border border-sky-100 bg-white p-3 text-center">
+                <p className="text-[11px] text-slate-500">مجدول</p>
+                <p className="mt-1 text-2xl font-black text-sky-700">{dispatchScheduled}</p>
+              </div>
+              <div className="rounded-2xl border border-sky-100 bg-white p-3 text-center">
+                <p className="text-[11px] text-slate-500">يحتاج تدخل</p>
+                <p className="mt-1 text-2xl font-black text-amber-700">{dispatchBlocked}</p>
+              </div>
+            </div>
+
+            {dispatchQuery.isLoading ? (
+              <div className="rounded-2xl bg-white/80 p-6 text-center text-sm text-slate-500">جاري حساب أفضل توقيت ومندوب للمجموعات…</div>
+            ) : dispatchQuery.error ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {dispatchQuery.error instanceof Error ? dispatchQuery.error.message : "تعذر تحميل Smart Dispatch."}
+              </div>
+            ) : dispatchItems.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-sky-200 bg-white/70 p-6 text-center text-sm text-slate-500">
+                لا توجد مجموعات تحتاج قرار توزيع حاليًا.
+              </div>
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {dispatchItems.map((item) => {
+                  const assigned = item.reason === "already_assigned";
+                  const canAssignNow = Boolean(item.dispatch_now && item.recommended_driver && !assigned);
+                  const waitingMinutes = Number(item.dispatch_in_minutes || 0);
+                  return (
+                    <div key={item.group_id} className="rounded-2xl border border-sky-100 bg-white p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <strong className="text-sm text-slate-950">G-{item.group_id.replaceAll("-", "").slice(0, 8).toUpperCase()}</strong>
+                            <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
+                              item.dispatch_now && item.recommended_driver
+                                ? "bg-emerald-100 text-emerald-800"
+                                : item.reason === "reprice_required"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-sky-100 text-sky-800"
+                            }`}>
+                              {dispatchReasonLabel[item.reason || ""] || item.reason || "—"}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {item.active_store_count || 0} نقاط استلام
+                            {item.first_pickup?.branch_name ? ` · أول Pickup: ${item.first_pickup.branch_name}` : ""}
+                          </p>
+                        </div>
+                        <div className="text-left text-xs text-slate-500">
+                          {item.route_distance_km != null ? <p>{Number(item.route_distance_km).toFixed(1)} كم</p> : null}
+                          {item.route_estimated_minutes != null ? <p>{item.route_estimated_minutes} د للمسار</p> : null}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-[10px] text-slate-500">آخر متجر متوقع</p>
+                          <p className="mt-1 text-sm font-black">{timeLabel(item.predicted_group_ready_at)}</p>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-[10px] text-slate-500">موعد تحرك المندوب</p>
+                          <p className="mt-1 text-sm font-black">{timeLabel(item.dispatch_at)}</p>
+                        </div>
+                        <div className="col-span-2 rounded-xl bg-slate-50 p-3 sm:col-span-1">
+                          <p className="text-[10px] text-slate-500">الجاهزية</p>
+                          <p className="mt-1 text-sm font-black">{item.ready_store_count || 0}/{item.active_store_count || 0}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 rounded-xl border border-sky-100 bg-sky-50/60 p-3">
+                        {assigned ? (
+                          <div className="flex items-center gap-2 text-sm font-black text-sky-900">
+                            <UserCheck className="h-4 w-4" />
+                            المندوب: {item.assigned_driver?.name || "تم التعيين"}
+                          </div>
+                        ) : item.recommended_driver ? (
+                          <>
+                            <div className="flex items-center gap-2 text-sm font-black text-sky-900">
+                              <UserCheck className="h-4 w-4" />
+                              المقترح: {item.recommended_driver.name}
+                            </div>
+                            <p className="mt-1 text-[11px] text-slate-600">
+                              يبعد {item.recommended_driver.distance_km == null ? "—" : Number(item.recommended_driver.distance_km).toFixed(1)} كم
+                              {" · "}وصول لأول Pickup ≈ {item.recommended_driver.travel_minutes} د
+                              {" · "}حمل حالي {item.recommended_driver.active_orders} رحلة
+                            </p>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2 text-sm font-bold text-amber-800">
+                            <AlertTriangle className="h-4 w-4" />
+                            {item.reason === "readiness_prediction_incomplete"
+                              ? `ناقص ETA لـ ${item.missing_eta_count || 0} متجر`
+                              : "لا يوجد مندوب بموقع حديث ومتاح حاليًا"}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        {item.lead_order_id ? (
+                          <Button variant="outline" className="flex-1" onClick={() => navigate(`/online-orders/${item.lead_order_id}`)}>
+                            فتح الطلب الرئيسي
+                          </Button>
+                        ) : null}
+                        {!assigned && item.recommended_driver ? (
+                          <Button
+                            className="flex-1 bg-sky-700 hover:bg-sky-800"
+                            disabled={!canAssignNow || assigningGroupId === item.group_id}
+                            onClick={() => void assignGroupDispatch(item.group_id)}
+                          >
+                            <Truck className="h-4 w-4" />
+                            {assigningGroupId === item.group_id
+                              ? "جاري التعيين…"
+                              : canAssignNow
+                                ? "تعيين المقترح"
+                                : item.reason === "wait_for_group_readiness"
+                                  ? `تحرك بعد ${waitingMinutes} د`
+                                  : "التعيين غير متاح الآن"}
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="overflow-hidden border-emerald-200 bg-gradient-to-br from-emerald-50/70 via-white to-white shadow-sm">
           <CardHeader className="pb-3">
