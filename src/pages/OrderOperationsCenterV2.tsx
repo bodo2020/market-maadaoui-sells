@@ -18,6 +18,7 @@ import {
   assignRecommendedOrderGroupDelivery,
   fetchOrderGroupControlTower,
   fetchOrderGroupDispatchBoard,
+  fetchOrderGroupDispatchHealth,
   fetchOrderGroupDispatchPolicy,
   repriceOrderGroup,
   setOrderGroupDispatchPolicy,
@@ -298,6 +299,13 @@ export default function OrderOperationsCenterV2() {
     refetchInterval: 30_000,
   });
 
+  const dispatchHealthQuery = useQuery({
+    queryKey: ["order-group-dispatch-health-v1", currentBranchId],
+    enabled: Boolean(currentBranchId),
+    queryFn: () => fetchOrderGroupDispatchHealth(currentBranchId!, 20),
+    refetchInterval: 15_000,
+  });
+
   const batchShadowQuery = useQuery({
     queryKey: ["batch-picking-shadow-v1", currentBranchId],
     enabled: Boolean(currentBranchId),
@@ -334,6 +342,8 @@ export default function OrderOperationsCenterV2() {
   const dispatchBlocked = dispatchItems.filter((item) =>
     ["reprice_required", "readiness_prediction_incomplete", "no_available_driver"].includes(item.reason || "")
   ).length;
+  const dispatchHealthSummary = dispatchHealthQuery.data?.summary || {};
+  const dispatchHealthIssues = dispatchHealthQuery.data?.issues || [];
 
   const assignRecommended = async (order: any) => {
     const recommendation = order.dispatch_recommendation;
@@ -386,6 +396,7 @@ export default function OrderOperationsCenterV2() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["order-group-dispatch-policy-v1", currentBranchId] }),
         queryClient.invalidateQueries({ queryKey: ["order-group-dispatch-board-v1", currentBranchId] }),
+        queryClient.invalidateQueries({ queryKey: ["order-group-dispatch-health-v1", currentBranchId] }),
       ]);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "تعذر حفظ سياسة Smart Dispatch");
@@ -421,6 +432,7 @@ export default function OrderOperationsCenterV2() {
       groupQuery.refetch(),
       dispatchQuery.refetch(),
       dispatchPolicyQuery.refetch(),
+      dispatchHealthQuery.refetch(),
       batchShadowQuery.refetch(),
     ]);
   };
@@ -589,6 +601,130 @@ export default function OrderOperationsCenterV2() {
                 </div>
               </div>
             ) : null}
+
+
+            {dispatchHealthQuery.data?.policy?.auto_paused_reason ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+                  <div>
+                    <p className="font-black text-red-900">Auto Dispatch اتوقف تلقائيًا ورجع Assisted</p>
+                    <p className="mt-1 text-xs leading-5 text-red-800">
+                      السبب: حساب الـPolicy Actor لم يعد صالحًا أو فقد صلاحية إدارة الطلبات/التوصيل.
+                      راجع Task Center ثم فعّل Auto من جديد بحساب مدير صالح.
+                    </p>
+                    <p className="mt-1 text-[11px] text-red-700">
+                      وقت الإيقاف: {timeLabel(dispatchHealthQuery.data.policy.auto_paused_at)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-black text-slate-950">Dispatch Health & Recovery</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Auto failures تستخدم Retry backoff تلقائيًا، وبعد 3 محاولات فاشلة تُفتح مهمة في Task Center وتُغلق تلقائيًا عند التعافي.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => void dispatchHealthQuery.refetch()} disabled={dispatchHealthQuery.isFetching}>
+                  <RefreshCw className={`h-4 w-4 ${dispatchHealthQuery.isFetching ? "animate-spin" : ""}`} />
+                  تحديث الصحة
+                </Button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+                {[
+                  ["Retrying", dispatchHealthSummary.retrying || 0, "text-sky-700"],
+                  ["Needs attention", dispatchHealthSummary.needs_attention || 0, "text-red-700"],
+                  ["Open tasks", dispatchHealthSummary.open_tasks || 0, "text-amber-700"],
+                  ["Recovered 24h", dispatchHealthSummary.recovered_last_24h || 0, "text-emerald-700"],
+                ].map(([label, value, tone]) => (
+                  <div key={String(label)} className="rounded-xl bg-slate-50 p-3 text-center">
+                    <p className="text-[10px] text-slate-500">{label}</p>
+                    <p className={`mt-1 text-xl font-black ${tone}`}>{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {dispatchHealthQuery.error ? (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                  {dispatchHealthQuery.error instanceof Error ? dispatchHealthQuery.error.message : "تعذر تحميل صحة Smart Dispatch."}
+                </div>
+              ) : dispatchHealthIssues.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {dispatchHealthIssues.map((issue) => (
+                    <div
+                      key={issue.group_id}
+                      className={`rounded-xl border p-3 ${
+                        issue.status === "needs_attention"
+                          ? "border-red-200 bg-red-50/70"
+                          : issue.status === "retrying"
+                            ? "border-sky-200 bg-sky-50/70"
+                            : "border-emerald-200 bg-emerald-50/60"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <strong className="text-sm text-slate-950">{issue.display_id}</strong>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
+                              issue.status === "needs_attention"
+                                ? "bg-red-100 text-red-800"
+                                : issue.status === "retrying"
+                                  ? "bg-sky-100 text-sky-800"
+                                  : "bg-emerald-100 text-emerald-800"
+                            }`}>
+                              {issue.status === "needs_attention" ? "يحتاج تدخل" : issue.status === "retrying" ? "إعادة محاولة تلقائية" : "تعافى"}
+                            </span>
+                            {issue.task_priority ? (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800">
+                                Task {issue.task_priority}
+                              </span>
+                            ) : null}
+                          </div>
+                          {issue.consecutive_failures > 0 ? (
+                            <>
+                              <p className="mt-1 text-xs text-slate-600">
+                                {issue.consecutive_failures} فشل متتالي
+                                {issue.last_error_code ? ` · ${issue.last_error_code}` : ""}
+                              </p>
+                              {issue.last_error_message ? (
+                                <p className="mt-1 line-clamp-2 text-[11px] text-slate-500">{issue.last_error_message}</p>
+                              ) : null}
+                            </>
+                          ) : (
+                            <p className="mt-1 text-xs text-emerald-700">
+                              تم التعافي تلقائيًا {issue.last_success_at ? `· ${timeLabel(issue.last_success_at)}` : ""}
+                            </p>
+                          )}
+                        </div>
+                        <div className="shrink-0 text-left text-[11px] text-slate-500">
+                          {issue.next_retry_at ? <p>المحاولة الجاية {timeLabel(issue.next_retry_at)}</p> : null}
+                          {issue.last_attempt_at ? <p>آخر محاولة {timeLabel(issue.last_attempt_at)}</p> : null}
+                        </div>
+                      </div>
+                      {issue.lead_order_id ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => navigate(`/online-orders/${issue.lead_order_id}`)}
+                        >
+                          فتح الطلب
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-center text-xs font-bold text-emerald-800">
+                  لا توجد مشاكل Auto Dispatch مسجلة حاليًا.
+                </p>
+              )}
+            </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-2xl border border-sky-100 bg-white p-3 text-center">
