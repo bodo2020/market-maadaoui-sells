@@ -3,6 +3,7 @@ import ApprovalCenterNotifications from "@/components/approvals/ApprovalCenterNo
 import CustomerTaskNotifications from "@/components/customers/CustomerTaskNotifications";
 import OperationsTaskNotifications from "@/components/tasks/OperationsTaskNotifications";
 import InventoryTransferSmartAlertNotifications from "@/components/inventory/InventoryTransferSmartAlertNotifications";
+import StaffInAppNotificationHost from "@/components/notifications/StaffInAppNotificationHost";
 import POSOnlineOrdersRouteDock from "@/components/POS/POSOnlineOrdersRouteDock";
 import GooglePasswordAutofill from "@/components/Auth/GooglePasswordAutofill";
 import FranchiseAccountDock from "@/components/franchise/FranchiseAccountDock";
@@ -29,6 +30,7 @@ function StaffApplication() {
         <OperationsTaskNotifications />
         <InventoryTransferSmartAlertNotifications />
         <ApprovalCenterNotifications />
+        <StaffInAppNotificationHost />
         <POSOnlineOrdersRouteDock />
         <FranchiseAccountDock />
         <AppRoutes />

@@ -67,6 +67,20 @@ export default function StaffInAppNotificationHost() {
               void queryClient.invalidateQueries({ queryKey: ["notification-center-v2"] });
 
               const item = center.items.find(entry => entry.id === signal.notification_id);
+
+              if (item?.source_kind === "operations_task") {
+                void queryClient.invalidateQueries({ queryKey: ["operations-tasks"] });
+                void queryClient.invalidateQueries({ queryKey: ["operations-task-dashboard"] });
+              }
+
+              if (
+                item?.event_key === "task.system_health"
+                || item?.metadata?.health_key === "push_provider"
+                || item?.metadata?.source_kind === "system_health"
+              ) {
+                void queryClient.invalidateQueries({ queryKey: ["push-operational-status-v1"] });
+              }
+
               // Keep real-time in-app campaign toasts; navigation now lives in the main navbar only.
               if (item?.source_kind === "notification_campaign") {
                 toastCampaign(item, navigate);
