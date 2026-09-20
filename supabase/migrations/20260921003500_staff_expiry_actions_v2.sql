@@ -70,6 +70,135 @@ alter table public.supplier_return_items_v2 enable row level security;
 revoke all on table public.supplier_returns_v2 from public,anon,authenticated;
 revoke all on table public.supplier_return_items_v2 from public,anon,authenticated;
 
+create or replace function public.get_expiry_workspace_v2(
+  p_branch_id uuid,
+  p_days_ahead integer default 30,
+  p_limit integer default 250
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path=''
+as $function$
+declare
+  v_uid uuid:=auth.uid();
+  v_days integer:=least(greatest(coalesce(p_days_ahead,30),1),90);
+  v_limit integer:=least(greatest(coalesce(p_limit,250),1),500);
+  v_items jsonb;
+  v_summary jsonb;
+begin
+  if v_uid is null then raise exception using errcode='42501',message='AUTH_REQUIRED'; end if;
+
+  if not public.has_branch_access(v_uid,p_branch_id) then
+    raise exception using errcode='42501',message='EXPIRY_BRANCH_ACCESS_DENIED';
+  end if;
+
+  if not (
+    public.staff_has_permission('inventory.manage',p_branch_id)
+    or public.staff_has_permission('products.manage',p_branch_id)
+    or public.staff_has_permission('purchases.manage',p_branch_id)
+  ) then
+    raise exception using errcode='42501',message='EXPIRY_VIEW_DENIED';
+  end if;
+
+  with base as (
+    select
+      b.id batch_id,
+      b.product_id,
+      p.name product_name,
+      p.barcode,
+      case when p.image_urls is not null and cardinality(p.image_urls)>0 then p.image_urls[1] else null end image_url,
+      b.batch_number,
+      b.expiry_date,
+      b.quantity,
+      coalesce(b.shelf_location,p.shelf_location) shelf_location,
+      coalesce(nullif(b.purchase_price,0),nullif(pi.price,0),nullif(p.purchase_price,0),0)::numeric purchase_price,
+      coalesce(b.supplier_id,pu.supplier_id) supplier_id,
+      s.name supplier_name,
+      b.purchase_item_id,
+      b.notes,
+      (upper(coalesce(b.batch_number,'')) like 'REMAINING-%') legacy_remaining_batch
+    from public.product_batches b
+    join public.products p on p.id=b.product_id
+    left join public.purchase_items pi on pi.id=b.purchase_item_id
+    left join public.purchases pu on pu.id=pi.purchase_id
+    left join public.suppliers s on s.id=coalesce(b.supplier_id,pu.supplier_id)
+    where b.branch_id=p_branch_id
+      and b.quantity>0
+      and b.expiry_date<=current_date+v_days
+      and upper(coalesce(b.batch_number,'')) not like 'DAMAGED-%'
+  )
+  select jsonb_build_object(
+    'expired',count(*) filter(where expiry_date<current_date),
+    'today',count(*) filter(where expiry_date=current_date),
+    'within_3_days',count(*) filter(where expiry_date>current_date and expiry_date<=current_date+3),
+    'within_7_days',count(*) filter(where expiry_date>=current_date and expiry_date<=current_date+7),
+    'total_quantity',round(coalesce(sum(quantity),0),3),
+    'purchase_value_at_risk',round(coalesce(sum(quantity*purchase_price),0),2),
+    'supplier_return_ready',count(*) filter(where supplier_id is not null),
+    'legacy_remaining_rows',count(*) filter(where legacy_remaining_batch)
+  )
+  into v_summary
+  from base;
+
+  with base as (
+    select
+      b.id batch_id,
+      b.product_id,
+      p.name product_name,
+      p.barcode,
+      case when p.image_urls is not null and cardinality(p.image_urls)>0 then p.image_urls[1] else null end image_url,
+      b.batch_number,
+      b.expiry_date,
+      b.quantity,
+      coalesce(b.shelf_location,p.shelf_location) shelf_location,
+      coalesce(nullif(b.purchase_price,0),nullif(pi.price,0),nullif(p.purchase_price,0),0)::numeric purchase_price,
+      coalesce(b.supplier_id,pu.supplier_id) supplier_id,
+      s.name supplier_name,
+      b.notes,
+      (upper(coalesce(b.batch_number,'')) like 'REMAINING-%') legacy_remaining_batch
+    from public.product_batches b
+    join public.products p on p.id=b.product_id
+    left join public.purchase_items pi on pi.id=b.purchase_item_id
+    left join public.purchases pu on pu.id=pi.purchase_id
+    left join public.suppliers s on s.id=coalesce(b.supplier_id,pu.supplier_id)
+    where b.branch_id=p_branch_id
+      and b.quantity>0
+      and b.expiry_date<=current_date+v_days
+      and upper(coalesce(b.batch_number,'')) not like 'DAMAGED-%'
+    order by b.expiry_date asc,b.created_at asc,b.id
+    limit v_limit
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'batch_id',batch_id,
+    'product_id',product_id,
+    'product_name',product_name,
+    'barcode',barcode,
+    'image_url',image_url,
+    'batch_number',batch_number,
+    'expiry_date',expiry_date,
+    'quantity',round(quantity,3),
+    'shelf_location',shelf_location,
+    'purchase_price',round(purchase_price,2),
+    'supplier_id',supplier_id,
+    'supplier_name',supplier_name,
+    'can_supplier_return',supplier_id is not null,
+    'legacy_remaining_batch',legacy_remaining_batch,
+    'notes',notes
+  ) order by expiry_date,batch_number),'[]'::jsonb)
+  into v_items
+  from base;
+
+  return jsonb_build_object(
+    'branch_id',p_branch_id,
+    'days_ahead',v_days,
+    'summary',coalesce(v_summary,'{}'::jsonb),
+    'items',v_items
+  );
+end;
+$function$;
+
 create or replace function public.process_expiry_batch_action_v2(
   p_request_id uuid,
   p_branch_id uuid,
@@ -452,10 +581,12 @@ begin
 end;
 $function$;
 
+revoke all on function public.get_expiry_workspace_v2(uuid,integer,integer) from public,anon;
 revoke all on function public.process_expiry_batch_action_v2(uuid,uuid,uuid,numeric,text,text) from public,anon;
 revoke all on function public.get_supplier_returns_workspace_v2(uuid,text,integer) from public,anon;
 revoke all on function public.settle_supplier_return_v2(uuid,numeric,text,text) from public,anon;
 
+grant execute on function public.get_expiry_workspace_v2(uuid,integer,integer) to authenticated,service_role;
 grant execute on function public.process_expiry_batch_action_v2(uuid,uuid,uuid,numeric,text,text) to authenticated,service_role;
 grant execute on function public.get_supplier_returns_workspace_v2(uuid,text,integer) to authenticated,service_role;
 grant execute on function public.settle_supplier_return_v2(uuid,numeric,text,text) to authenticated,service_role;
