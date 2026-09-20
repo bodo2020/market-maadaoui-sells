@@ -264,8 +264,15 @@ function HomePage({ branch, identity }: { identity: StaffIdentity; branch: Staff
   const canPrepare = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
   const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
   const canApprove = branch.permissions.some((permission) =>
-    permission.includes("approve") || permission.includes("review") || permission === "finance.manage" || permission === "pos.manage_shifts" || permission === "inventory.manage"
+    permission.includes("approve")
+    || permission.includes("review")
+    || permission === "hr.approvals.view"
+    || permission === "finance.manage"
+    || permission === "pos.manage_shifts"
+    || permission === "inventory.manage"
+    || permission === "online_orders.manage"
   );
+  const canManager = identity.is_super_admin || branch.permissions.includes("hr.view") || branch.permissions.includes("branch.manage_staff");
   const canHandoffs = branch.permissions.includes("finance.manage") || branch.permissions.includes("finance.view") || branch.permissions.includes("pos.manage_shifts");
 
   return (
@@ -289,7 +296,7 @@ function HomePage({ branch, identity }: { identity: StaffIdentity; branch: Staff
           {canPrepare && <NavLink className="secondary" to="/operations"><PackageCheck />تجهيز الطلبات</NavLink>}
           {canInventory && <NavLink className="secondary" to="/inventory"><Layers3 />المخزون والجرد</NavLink>}
           {canApprove && <NavLink className="secondary" to="/approvals"><ShieldCheck />الموافقات</NavLink>}
-          {canApprove && <NavLink className="secondary" to="/manager"><UsersRound />فريقي اليوم</NavLink>}
+          {canManager && <NavLink className="secondary" to="/manager"><UsersRound />فريقي اليوم</NavLink>}
           {canHandoffs && <NavLink className="secondary" to="/handoffs"><Banknote />تسليمات الوردية</NavLink>}
           <NavLink className="secondary" to="/attendance"><Clock3 />الحضور والوردية</NavLink>
           <NavLink className="secondary" to="/account"><IdCard />خدمات الموظف</NavLink>
@@ -1346,6 +1353,8 @@ function approvalSourceLabel(value:string){
   if(value==="cash_handoff")return "فرق عهدة";
   if(value==="inventory_transfer_variance")return "فرق تحويل";
   if(value==="order_substitution")return "بديل طلب";
+  if(value==="order_substitution_financial_adjustment")return "تسوية فرق بديل";
+  if(value==="order_shortage_financial_adjustment")return "رد نقص طلب";
   return "موافقة تشغيلية";
 }
 
