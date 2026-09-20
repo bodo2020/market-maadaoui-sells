@@ -1433,6 +1433,26 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
       <label className="inventory-field">ملاحظة<textarea rows={2} value={transferNote} onChange={(e)=>setTransferNote(e.target.value)} placeholder="اختياري"/></label>
       <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void (selectedTransfer.can_dispatch?dispatchTransfer():receiveTransfer())}>{acting?<Loader2 className="spin"/>:<PackageCheck/>}{selectedTransfer.can_dispatch?"تأكيد خروج الشحنة":"تأكيد الاستلام"}</button>
     </section></div>}
+
+    {selectedExpiry&&<div className="inventory-modal-backdrop" onClick={closeExpiryAction}><section className="inventory-modal expiry-action-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>دفعة {selectedExpiry.batch_number}</small><h2>{expiryAction==="dispose"?"إهلاك دفعة":"إرجاع للمورد"}</h2></div><button className="icon-btn" onClick={closeExpiryAction}><XCircle/></button></div>
+      <div className="approval-person"><CalendarDays/><div><strong>{selectedExpiry.product_name}</strong><span>{selectedExpiry.supplier_name?"المورد: "+selectedExpiry.supplier_name:"لا يوجد مورد مرتبط"}</span></div></div>
+      <div className="inventory-review-grid"><div><span>المتاح بالدفعة</span><strong>{selectedExpiry.quantity}</strong></div><div><span>تكلفة الوحدة</span><strong>{Number(selectedExpiry.purchase_price).toLocaleString("ar-EG")} ج.م</strong></div><div><span>{expiryAction==="dispose"?"خسارة متوقعة":"Credit متوقع"}</span><strong>{(Number(expiryActionQuantity||0)*Number(selectedExpiry.purchase_price||0)).toLocaleString("ar-EG",{maximumFractionDigits:2})}</strong></div></div>
+      <label className="inventory-field">الكمية<input type="number" min="0.001" max={selectedExpiry.quantity} step="0.001" inputMode="decimal" value={expiryActionQuantity} onChange={(e)=>setExpiryActionQuantity(e.target.value)}/></label>
+      <label className="inventory-field">سبب الإجراء<textarea rows={3} value={expiryActionNote} onChange={(e)=>setExpiryActionNote(e.target.value)}/></label>
+      <div className="handoff-warning"><ShieldCheck/><span>{expiryAction==="dispose"?"التأكيد يخصم المخزون المتاح فقط، يسجل الحركة في Inventory Ledger، ويضيف مصروفًا محاسبيًا غير نقدي بالقيمة الفعلية.":"التأكيد يخرج الكمية من المخزون المتاح وينشئ إرجاع مورد Pending Credit؛ لا يتم تعديل رصيد المورد قبل وصول Credit Note."}</span></div>
+      <button className={expiryAction==="dispose"?"danger-action full-action":"primary full-action"} disabled={Boolean(acting)} onClick={()=>void submitExpiryAction()}>{acting?<Loader2 className="spin"/>:expiryAction==="dispose"?<XCircle/>:<Send/>}{expiryAction==="dispose"?"تأكيد الإهلاك":"تأكيد الإرجاع للمورد"}</button>
+    </section></div>}
+
+    {selectedSupplierReturn&&<div className="inventory-modal-backdrop" onClick={closeSupplierSettlement}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>{selectedSupplierReturn.supplier_name}</small><h2>تسوية إرجاع المورد</h2></div><button className="icon-btn" onClick={closeSupplierSettlement}><XCircle/></button></div>
+      <div className="inventory-review-grid"><div><span>Credit المتوقع</span><strong>{Number(selectedSupplierReturn.expected_credit_amount).toFixed(2)}</strong></div><div><span>Credit المعتمد</span><strong>{Number(supplierCreditAmount||0).toFixed(2)}</strong></div><div><span>الفرق</span><strong>{(Number(supplierCreditAmount||0)-Number(selectedSupplierReturn.expected_credit_amount||0)).toFixed(2)}</strong></div></div>
+      <label className="inventory-field">قيمة Credit الفعلية<input type="number" min="0" step="0.01" inputMode="decimal" value={supplierCreditAmount} onChange={(e)=>setSupplierCreditAmount(e.target.value)}/></label>
+      <label className="inventory-field">رقم Credit Note / المرجع<input value={supplierCreditNote} onChange={(e)=>setSupplierCreditNote(e.target.value)} placeholder="مثال: CN-2026-001"/></label>
+      <label className="inventory-field">ملاحظة اختيارية<textarea rows={3} value={supplierSettlementNote} onChange={(e)=>setSupplierSettlementNote(e.target.value)}/></label>
+      <div className="handoff-warning"><FileText/><span>هذه الخطوة تثبت اعتماد المورد للمبلغ فقط. لا تنشئ حركة نقدية تلقائيًا ولا تغيّر رصيد المورد بدون مستند محاسبي لاحق.</span></div>
+      <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void submitSupplierSettlement()}>{acting?<Loader2 className="spin"/>:<Check/>}تسجيل Credit Note وإغلاق الإرجاع</button>
+    </section></div>}
   </>;
 }
 
