@@ -1291,7 +1291,7 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
         {(transfer.can_dispatch||transfer.can_receive)&&<div className="actions"><button className="primary" onClick={()=>openTransfer(transfer)}>{transfer.can_dispatch?"تأكيد الشحن":"استلام التحويل"}</button></div>}
       </article>)}
       {!transfers?.transfers.length&&<Empty text="مفيش تحويلات مخزون تحتاج تنفيذ حاليًا"/>}
-    </div>:<div className="inventory-risk-workspace">
+    </div>:tab==="risks"?<div className="inventory-risk-workspace">
       <div className="chips risk-filter">{([["low_stock","منخفض"],["out_of_stock","نافد"],["coverage_risk","تغطية منخفضة"]] as Array<[staff.InventoryRiskStatus,string]>).map(([id,label])=><button key={id} className={riskStatus===id?"active":""} onClick={()=>setRiskStatus(id)}>{label}</button>)}</div>
       <div className="inventory-risk-summary"><span>منخفض <b>{risks?.summary.low_stock_rows||0}</b></span><span>نافد <b>{risks?.summary.out_of_stock_rows||0}</b></span><span>تغطية منخفضة <b>{risks?.summary.coverage_risk_rows||0}</b></span><span>جرد معلق <b>{risks?.summary.pending_audit_tasks||0}</b></span></div>
       <div className="stack">{(risks?.products||[]).map((product)=><article className="risk-product-card" key={product.product_id}>
