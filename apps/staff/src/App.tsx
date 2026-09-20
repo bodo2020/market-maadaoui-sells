@@ -1260,7 +1260,7 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
         <div className="actions"><button className="primary" disabled={acting===task.id} onClick={()=>void openTask(task)}>{acting===task.id?<Loader2 className="spin"/>:<Scale/>}فتح الجرد</button></div>
       </article>)}
       {!auditTasks.length&&<Empty text="مفيش مهام جرد نشطة حاليًا"/>}
-    </div>:<div className="stack">
+    </div>:tab==="transfers"?<div className="stack">
       {(transfers?.transfers||[]).map((transfer)=><article className={`task-card ${transfer.has_variance?"danger":""}`} key={transfer.id}>
         <div className="row"><strong>{transfer.transfer_number}</strong><span className="pill normal">{transfer.status==="requested"?"بانتظار الشحن":transfer.status==="dispatched"?"في الطريق":transfer.status==="received_with_variance"?"مستلم بفرق":"مستلم"}</span></div>
         <h3>{transfer.direction==="incoming"?`من ${transfer.from_branch_name}`:`إلى ${transfer.to_branch_name}`}</h3>
