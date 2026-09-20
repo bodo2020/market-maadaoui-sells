@@ -2,18 +2,9 @@
 -- Keeps the old staging tables for history/backward compatibility, but removes
 -- staging/bag creation as a mandatory operational stage for new orders.
 
--- Existing orders that were left in the legacy packing stage are returned to
--- the unified picking/preparing stage so the new UI can finish them normally.
-update private.order_fulfillment_state_v1 f
-set fulfillment_state = 'picking',
-    packing_started_at = null,
-    metadata = coalesce(f.metadata, '{}'::jsonb)
-      || jsonb_build_object('legacy_staging_deprecated_at', now()),
-    updated_at = now()
-from public.online_orders o
-where o.id = f.order_id
-  and f.fulfillment_state = 'packing'
-  and o.status::text = 'preparing';
+-- Existing packing/staging RPCs are intentionally left untouched for backwards
+-- compatibility with already-installed staff APKs. The new POS/staff clients call
+-- mark_order_ready_v1 directly and therefore do not require staging.
 
 create or replace function public.mark_order_ready_v1(
   p_order_id uuid,
@@ -208,65 +199,8 @@ revoke all on function public.mark_order_ready_v1(uuid,integer,text)
 grant execute on function public.mark_order_ready_v1(uuid,integer,text)
   to authenticated;
 
--- Compatibility shim for older staff APKs. "Start packing" now finishes
--- fulfillment directly; there is no separate packing/staging stage.
-create or replace function public.start_order_packing_v1(
-  p_order_id uuid,
-  p_bags_count integer default 0
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path=''
-as $function$
-begin
-  return public.mark_order_ready_v1(
-    p_order_id,
-    greatest(0, coalesce(p_bags_count, 0)),
-    'تم إنهاء التجهيز عبر مسار التوافق القديم'
-  );
-end;
-$function$;
-
-revoke all on function public.start_order_packing_v1(uuid,integer)
-  from public,anon;
-grant execute on function public.start_order_packing_v1(uuid,integer)
-  to authenticated;
-
--- Legacy staging finalize remains callable by old clients, but no longer blocks
--- readiness on bag/location records.
-create or replace function public.finalize_order_staging_v1(
-  p_order_id uuid,
-  p_note text default null
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path=''
-as $function$
-declare
-  v_total integer := 0;
-begin
-  select count(*) filter(where status <> 'cancelled')::integer
-  into v_total
-  from private.order_fulfillment_bags_v1
-  where order_id = p_order_id;
-
-  return public.mark_order_ready_v1(
-    p_order_id,
-    greatest(0, coalesce(v_total, 0)),
-    coalesce(
-      nullif(trim(coalesce(p_note,'')), ''),
-      'تم إنهاء التجهيز عبر مسار التسكين القديم'
-    )
-  );
-end;
-$function$;
-
-revoke all on function public.finalize_order_staging_v1(uuid,text)
-  from public,anon;
-grant execute on function public.finalize_order_staging_v1(uuid,text)
-  to authenticated;
+-- Legacy start_order_packing_v1/finalize_order_staging_v1 remain unchanged so
+-- already-installed staff APKs can finish their old workflow safely.
 
 -- POS order intake is now the primary parallel-dispatch entry point.
 create or replace function public.accept_pos_online_order_v1(p_order_id uuid)
