@@ -150,9 +150,25 @@ function buildPresentation(kind: ManagementReportKind, data: ReportDocument): Pr
   }
 
   if (kind === 'online') {
+    const quality = record(data.data_quality);
+    const profitAvailable = quality.profit_available !== false && summary.online_gross_profit != null;
+    const reconstructedLines = numeric(quality.reconstructed_legacy_lines);
     return {
-      metrics: [metric('الطلبات', number(numeric(summary.order_count))), metric('قيمة الطلبات المسلمة', money(numeric(summary.delivered_order_value))), metric('معدل التسليم', percent(summary.delivery_rate_percent)), metric('معدل الإلغاء', percent(summary.cancellation_rate_percent))],
-      note: record(data.data_quality).profit_available === false ? 'تكلفة وربح الأونلاين غير متاحين؛ التقرير لا يخمن ربحًا من قيمة الطلب.' : undefined,
+      metrics: [
+        metric('الطلبات', number(numeric(summary.order_count))),
+        metric('قيمة الطلبات المسلمة', money(numeric(summary.delivered_order_value))),
+        metric('صافي مبيعات الأونلاين', money(numeric(summary.online_net_sales))),
+        metric('تكلفة الأونلاين', profitAvailable ? moneyNullable(summary.online_cogs) : '—'),
+        metric('إجمالي ربح الأونلاين', profitAvailable ? moneyNullable(summary.online_gross_profit) : '—'),
+        metric('هامش ربح الأونلاين', profitAvailable ? percent(summary.online_margin_percent) : '—'),
+        metric('معدل التسليم', percent(summary.delivery_rate_percent)),
+        metric('معدل الإلغاء', percent(summary.cancellation_rate_percent)),
+      ],
+      note: !profitAvailable
+        ? 'يوجد بند أو أكثر بدون تكلفة موثقة؛ لذلك لا يعرض النظام رقم ربح تخميني.'
+        : reconstructedLines > 0
+          ? `${number(reconstructedLines)} بند تاريخي أُعيد بناؤه من سعر الشراء الموجود وقت التحديث؛ الطلبات الجديدة تحفظ تكلفة البيع كـ Snapshot عند تحقق الطلب.`
+          : undefined,
       tables: [
         table('Orders', 'آخر الطلبات', ['العميل', 'الحالة', 'الدفع', 'الوسيلة', 'القيمة', 'الشحن', 'العناصر', 'الوقت'], rows(data.orders).map((row) => [text(row.customer_name, 'عميل غير مسجل'), status(row.status), status(row.payment_status), text(row.payment_method), money(numeric(row.total)), money(numeric(row.shipping_cost)), number(numeric(row.item_count)), dateTime(row.created_at)]), 'لا توجد طلبات أونلاين في الفترة.'),
         table('Fulfillment', 'حالات الطلبات', ['الحالة', 'الطلبات', 'القيمة', 'الشحن'], rows(data.statuses).map((row) => [status(row.status), number(numeric(row.orders)), money(numeric(row.order_value)), money(numeric(row.shipping_charged))]), 'لا توجد حالات طلبات مسجلة.'),
