@@ -266,6 +266,7 @@ function HomePage({ branch, identity }: { identity: StaffIdentity; branch: Staff
   const canApprove = branch.permissions.some((permission) =>
     permission.includes("approve") || permission.includes("review") || permission === "finance.manage" || permission === "pos.manage_shifts" || permission === "inventory.manage"
   );
+  const canHandoffs = branch.permissions.includes("finance.manage") || branch.permissions.includes("finance.view") || branch.permissions.includes("pos.manage_shifts");
 
   return (
     <>
@@ -289,6 +290,7 @@ function HomePage({ branch, identity }: { identity: StaffIdentity; branch: Staff
           {canInventory && <NavLink className="secondary" to="/inventory"><Layers3 />المخزون والجرد</NavLink>}
           {canApprove && <NavLink className="secondary" to="/approvals"><ShieldCheck />الموافقات</NavLink>}
           {canApprove && <NavLink className="secondary" to="/manager"><UsersRound />فريقي اليوم</NavLink>}
+          {canHandoffs && <NavLink className="secondary" to="/handoffs"><Banknote />تسليمات الوردية</NavLink>}
           <NavLink className="secondary" to="/attendance"><Clock3 />الحضور والوردية</NavLink>
           <NavLink className="secondary" to="/account"><IdCard />خدمات الموظف</NavLink>
         </div>
@@ -1511,6 +1513,68 @@ function ManagerWorkspace({branch}:{branch:StaffBranch}){
   </>;
 }
 
+
+function CashHandoffPage({branch}:{branch:StaffBranch}){
+  const [data,setData]=useState<staff.CashHandoffWorkspace|null>(null);
+  const [busy,setBusy]=useState(true);
+  const [acting,setActing]=useState("");
+  const [selected,setSelected]=useState<staff.CashHandoff|null>(null);
+  const [received,setReceived]=useState("");
+  const [reason,setReason]=useState("");
+  const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
+
+  const load=useCallback(async(show=true)=>{
+    if(show)setBusy(true);
+    try{setData(await staff.getCashHandoffWorkspace(branch.branch_id));setMessage(null);}
+    catch(caught){setData(null);setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل تسليمات الوردية"});}
+    finally{if(show)setBusy(false);}
+  },[branch.branch_id]);
+
+  useEffect(()=>{void load();},[load]);
+
+  const open=(handoff:staff.CashHandoff)=>{
+    setSelected(handoff);
+    setReceived(Number(handoff.expected_amount||0).toFixed(2));
+    setReason("");
+  };
+
+  const submit=async()=>{
+    if(!selected||acting)return;
+    const amount=Number(received);
+    if(!Number.isFinite(amount)||amount<0){setMessage({type:"error",text:"اكتب المبلغ المستلم فعليًا"});return;}
+    const variance=Math.round((amount-Number(selected.expected_amount||0))*100)/100;
+    if(Math.abs(variance)>=0.01&&reason.trim().length<3){setMessage({type:"error",text:"فيه فرق في العهدة؛ اكتب سبب واضح"});return;}
+    setActing(selected.handoff_id);setMessage(null);
+    try{
+      await staff.receiveCashHandoff(selected.handoff_id,amount,reason);
+      setSelected(null);setMessage({type:"ok",text:"تم استلام العهدة وتوريدها للخزنة وتسجيل الحركة المالية"});await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر استلام العهدة"});}
+    finally{setActing("");}
+  };
+
+  const variance=selected?Math.round((Number(received||0)-Number(selected.expected_amount||0))*100)/100:0;
+  return <>
+    <PageTitle title="تسليمات الوردية" subtitle="استلام عهدة الكاشير بعد إغلاق POS وتوريدها للخزنة"/>
+    {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
+    {busy?<Loading/>:data&&<>
+      <div className="handoff-safe-card"><div><small>خزنة الفرع</small><strong>{data.safe?.name||"الخزنة"}</strong></div><div><small>الرصيد الحالي</small><strong>{Number(data.safe?.balance||0).toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})} ج.م</strong></div><button className="icon-btn" onClick={()=>void load()}><RefreshCw/></button></div>
+      <section className="manager-section"><div className="section-head"><div><h2>بانتظار الاستلام</h2><p>{data.pending.length} وردية مغلقة لم يتم توريد عهدتها بعد</p></div></div>
+        <div className="handoff-list">{data.pending.map((handoff)=><article className="handoff-card" key={handoff.handoff_id}><div className="row"><div><small>{handoff.device_name}</small><h3>{handoff.cashier_name}</h3></div><span className="pill high">معلق</span></div><div className="handoff-amount"><span>المطلوب استلامه</span><strong>{Number(handoff.expected_amount).toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})} ج.م</strong></div><small>أُغلقت {new Date(handoff.closed_at).toLocaleString("ar-EG")}</small>{data.permissions.can_manage&&<button className="primary full-action" onClick={()=>open(handoff)}><Banknote/>استلام العهدة</button>}</article>)}{!data.pending.length&&<div className="manager-all-clear"><CheckCircle2/><strong>كل تسليمات الورديات متوردة للخزنة</strong></div>}</div>
+      </section>
+      <section className="manager-section"><div className="section-head"><div><h2>آخر التسليمات</h2><p>سجل مختصر للاستلامات المؤكدة</p></div></div><div className="handoff-history">{data.recent.slice(0,10).map((item)=><div key={item.handoff_id}><div><strong>{item.cashier_name}</strong><span>{new Date(item.received_at).toLocaleString("ar-EG")} · {item.received_by_name||"المسؤول"}</span></div><div><strong>{Number(item.received_amount).toLocaleString("ar-EG",{minimumFractionDigits:2})} ج.م</strong>{Math.abs(Number(item.variance_amount||0))>=0.01&&<span className="danger-text">فرق {Number(item.variance_amount).toLocaleString("ar-EG",{minimumFractionDigits:2})}</span>}</div></div>)}{!data.recent.length&&<Empty text="لسه مفيش تسليمات مكتملة"/>}</div></section>
+    </>}
+
+    {selected&&<div className="inventory-modal-backdrop" onClick={()=>setSelected(null)}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>{selected.device_name}</small><h2>استلام عهدة {selected.cashier_name}</h2></div><button className="icon-btn" onClick={()=>setSelected(null)}><XCircle/></button></div>
+      <div className="inventory-review-grid"><div><span>المتوقع</span><strong>{Number(selected.expected_amount).toFixed(2)}</strong></div><div><span>المستلم</span><strong>{Number(received||0).toFixed(2)}</strong></div><div><span>الفرق</span><strong>{variance.toFixed(2)}</strong></div></div>
+      <label className="inventory-field">المبلغ المعدود فعليًا<input type="number" inputMode="decimal" min="0" step="0.01" value={received} onChange={(e)=>setReceived(e.target.value)}/></label>
+      {Math.abs(variance)>=0.01&&<label className="inventory-field">سبب الفرق<textarea rows={3} value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="اكتب سبب الزيادة أو العجز"/></label>}
+      <div className="handoff-warning"><ShieldCheck/><span>التأكيد ينشئ حركة مالية من درج الكاشير إلى خزنة الفرع، ولا يمكن اعتباره مجرد إغلاق شكلي.</span></div>
+      <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void submit()}>{acting?<Loader2 className="spin"/>:<Check/>}تأكيد الاستلام والتوريد</button>
+    </section></div>}
+  </>;
+}
+
 function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: StaffBranch }) {
   const navigate=useNavigate();
   const [data,setData]=useState<StaffSelfServiceSnapshot|null>(null);
@@ -1679,7 +1743,7 @@ function AuthenticatedApp({state}:{state:ReturnType<typeof useStaffSession>}) {
   if(state.loading)return <Loading/>;
   if(!state.identity||!state.branch)return <Navigate to="/login" replace/>;
   const props={identity:state.identity,branch:state.branch};
-  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/manager" element={<ManagerWorkspace branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
+  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/manager" element={<ManagerWorkspace branch={state.branch}/>}/><Route path="/handoffs" element={<CashHandoffPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
 }
 
 export default function App(){
