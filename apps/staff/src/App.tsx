@@ -18,6 +18,7 @@ import {
 } from "react-router-dom";
 import { Geolocation } from "@capacitor/geolocation";
 import { Camera, CameraDirection, CameraResultType, CameraSource } from "@capacitor/camera";
+import { Capacitor } from "@capacitor/core";
 import {
   AlertTriangle,
   ArrowRight,
@@ -45,6 +46,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
+import { googlePasswordManager } from "./googlePasswordManager";
 import * as staff from "./services/staffService";
 import type {
   BatchPickingShadow,
@@ -120,6 +122,13 @@ function Login() {
     if (authError) {
       setError("اسم المستخدم أو كلمة المرور غير صحيحة");
       return;
+    }
+    if (Capacitor.getPlatform() === "android") {
+      try {
+        await googlePasswordManager.savePassword({ username: value, password });
+      } catch (saveError) {
+        console.warn("Google Password Manager save was skipped", saveError);
+      }
     }
     navigate("/", { replace: true });
   };
@@ -465,7 +474,7 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
         setStaging(null);
       }
       setMessage(null);
-      if (nextSession.fulfillment_state === "picking") window.setTimeout(()=>scannerRef.current?.focus(),50);
+      if (nextSession.fulfillment_state === "picking" && !Capacitor.isNativePlatform()) window.setTimeout(()=>scannerRef.current?.focus(),50);
     } catch(caught) {
       setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});
     } finally {
@@ -502,7 +511,11 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
         setBarcode("");setWeight("");await load(false);setMessage({type:"ok",text:"الصنف متسجل بالفعل وتم تحديث الجلسة"});
       }else setMessage({type:"error",text:pickingError(message)});
     }
-    finally{scanLockRef.current=false;setActing(false);window.setTimeout(()=>scannerRef.current?.focus(),50);}
+    finally{
+      scanLockRef.current=false;setActing(false);
+      if(Capacitor.isNativePlatform())scannerRef.current?.blur();
+      else window.setTimeout(()=>scannerRef.current?.focus(),50);
+    }
   };
 
   const confirmManual=async(item:PickingItem)=>{
@@ -587,12 +600,12 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
     <section className="picking-progress-card"><div className="row"><strong>{resolved}/{session.items_total} سطر مكتمل</strong><strong>{progress}%</strong></div><div className="progress"><i style={{width:`${progress}%`}}/></div><div className="picking-summary"><span>مكتمل {session.items_picked}</span><span>نواقص {session.shortage_count}</span><span>بدائل {session.substitution_count}</span></div></section>
     {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
 
-    {session.fulfillment_state==="picking"&&<form className="scanner-card" onSubmit={scan}><div className="scanner-title"><ScanLine/><div><strong>امسح باركود المنتج</strong><small>الماسح يكتب هنا مباشرة ثم Enter</small></div></div><div className="scanner-input-wrap"><Barcode/><input ref={scannerRef} value={barcode} onChange={(e)=>setBarcode(e.target.value)} placeholder="Barcode" inputMode="numeric" autoComplete="off"/></div>{matchedItem?.is_weight_based&&<label className="weight-field"><Scale/><span>الوزن الفعلي بالكيلو</span><input type="number" inputMode="decimal" min="0.001" step="0.001" value={weight} onChange={(e)=>setWeight(e.target.value)} placeholder={String(remainingQuantity(matchedItem))}/></label>}<button className="primary scanner-submit" disabled={!barcode.trim()||acting}>{acting?<Loader2 className="spin"/>:<ScanLine/>}تسجيل الصنف</button></form>}
+    {session.fulfillment_state==="picking"&&<form className="scanner-card" onSubmit={scan}><div className="scanner-title"><ScanLine/><div><strong>امسح باركود المنتج</strong><small>الماسح يكتب هنا مباشرة ثم Enter</small></div></div><div className="scanner-input-wrap"><Barcode/><input ref={scannerRef} value={barcode} onChange={(e)=>setBarcode(e.target.value)} placeholder="Barcode" inputMode="numeric" autoComplete="off"/></div>{matchedItem?.is_weight_based&&<label className="weight-field"><Scale/><span>الوزن الفعلي بالكيلو</span><input data-weight-input type="number" inputMode="decimal" min="0.001" step="0.001" value={weight} onChange={(e)=>setWeight(e.target.value)} placeholder={String(remainingQuantity(matchedItem))}/></label>}<button className="primary scanner-submit" disabled={!barcode.trim()||acting}>{acting?<Loader2 className="spin"/>:<ScanLine/>}تسجيل الصنف</button></form>}
 
     <div className="picking-items">{session.items.map((item)=>{
       const remaining=remainingQuantity(item);
       const resolvedLine=["picked","shortage","substituted"].includes(item.status);
-      return <article className={`picking-item ${resolvedLine?"resolved":""}`} key={item.id}>{item.image_url?<img src={item.image_url} alt=""/>:<div className="item-placeholder"><PackageCheck/></div>}<div className="item-body"><div className="row"><strong>{item.product_name}</strong>{resolvedLine&&<CheckCircle2 className="resolved-icon"/>}</div><div className="item-badges">{item.is_weight_based&&<span><Scale/>وزني</span>}{item.is_bulk&&<span>جملة</span>}{!item.barcode&&<span className="warning">بدون باركود</span>}</div><p>المطلوب: <b>{formatQuantity(item.required_quantity,item.is_weight_based)}</b>{item.picked_quantity>0&&<> · تم: <b>{formatQuantity(item.picked_quantity,item.is_weight_based)}</b></>}{remaining>0&&<> · متبقي: <b>{formatQuantity(remaining,item.is_weight_based)}</b></>}</p>{item.barcode&&<small>{item.barcode}</small>}{!resolvedLine&&<div className="item-actions">{!item.barcode&&<button className="primary" disabled={acting} onClick={()=>void confirmManual(item)}>تأكيد يدوي</button>}{item.is_weight_based&&item.barcode&&<button disabled={acting} onClick={()=>{setBarcode(item.barcode||"");window.setTimeout(()=>scannerRef.current?.focus(),20);}}>إدخال الوزن</button>}<button className="danger-action" disabled={acting} onClick={()=>void shortage(item)}>غير متوفر</button></div>}</div></article>;
+      return <article className={`picking-item ${resolvedLine?"resolved":""}`} key={item.id}>{item.image_url?<img src={item.image_url} alt=""/>:<div className="item-placeholder"><PackageCheck/></div>}<div className="item-body"><div className="row"><strong>{item.product_name}</strong>{resolvedLine&&<CheckCircle2 className="resolved-icon"/>}</div><div className="item-badges">{item.is_weight_based&&<span><Scale/>وزني</span>}{item.is_bulk&&<span>جملة</span>}{!item.barcode&&<span className="warning">بدون باركود</span>}</div><p>المطلوب: <b>{formatQuantity(item.required_quantity,item.is_weight_based)}</b>{item.picked_quantity>0&&<> · تم: <b>{formatQuantity(item.picked_quantity,item.is_weight_based)}</b></>}{remaining>0&&<> · متبقي: <b>{formatQuantity(remaining,item.is_weight_based)}</b></>}</p>{item.barcode&&<small>{item.barcode}</small>}{!resolvedLine&&<div className="item-actions">{!item.barcode&&<button className="primary" disabled={acting} onClick={()=>void confirmManual(item)}>تأكيد يدوي</button>}{item.is_weight_based&&item.barcode&&<button disabled={acting} onClick={()=>{setBarcode(item.barcode||"");window.setTimeout(()=>document.querySelector<HTMLInputElement>("[data-weight-input]")?.focus(),30);}}>إدخال الوزن</button>}<button className="danger-action" disabled={acting} onClick={()=>void shortage(item)}>غير متوفر</button></div>}</div></article>;
     })}</div>
 
     {session.fulfillment_state==="picking"&&allResolved&&<button className="primary full-action" disabled={acting} onClick={()=>void startPacking()}><PackageCheck/>بدء التعبئة</button>}

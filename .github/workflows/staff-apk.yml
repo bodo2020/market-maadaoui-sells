@@ -52,6 +52,19 @@ jobs:
 
           activity.write_text('''package com.elmadawy.staff;\n\nimport android.os.Bundle;\nimport android.view.View;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n    @Override\n    protected void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        if (getBridge() != null && getBridge().getWebView() != null) {\n            getBridge().getWebView().setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_YES);\n        }\n    }\n}\n''', encoding="utf-8")
 
+          activity.write_text('''package com.elmadawy.staff;\n\nimport android.os.Bundle;\nimport android.view.View;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n    @Override\n    protected void onCreate(Bundle savedInstanceState) {\n        registerPlugin(GooglePasswordManagerPlugin.class);\n        super.onCreate(savedInstanceState);\n        if (getBridge() != null && getBridge().getWebView() != null) {\n            getBridge().getWebView().setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_YES);\n        }\n    }\n}\n''', encoding="utf-8")
+
+          plugin = activity.with_name("GooglePasswordManagerPlugin.java")
+          plugin.write_text('''package com.elmadawy.staff;\n\nimport android.os.CancellationSignal;\n\nimport androidx.core.content.ContextCompat;\nimport androidx.credentials.CreateCredentialResponse;\nimport androidx.credentials.CreatePasswordRequest;\nimport androidx.credentials.CredentialManager;\nimport androidx.credentials.CredentialManagerCallback;\nimport androidx.credentials.exceptions.CreateCredentialException;\n\nimport com.getcapacitor.JSObject;\nimport com.getcapacitor.Plugin;\nimport com.getcapacitor.PluginCall;\nimport com.getcapacitor.PluginMethod;\nimport com.getcapacitor.annotation.CapacitorPlugin;\n\n@CapacitorPlugin(name = "GooglePasswordManager")\npublic class GooglePasswordManagerPlugin extends Plugin {\n    @PluginMethod\n    public void savePassword(PluginCall call) {\n        String username = call.getString("username");\n        String password = call.getString("password");\n        if (username == null || username.trim().isEmpty() || password == null || password.isEmpty()) {\n            call.reject("اسم المستخدم وكلمة المرور مطلوبان");\n            return;\n        }\n\n        CredentialManager manager = CredentialManager.create(getContext());\n        CreatePasswordRequest request = new CreatePasswordRequest(\n            username.trim(),\n            password,\n            null,\n            false,\n            false\n        );\n\n        manager.createCredentialAsync(\n            getActivity(),\n            request,\n            new CancellationSignal(),\n            ContextCompat.getMainExecutor(getContext()),\n            new CredentialManagerCallback<CreateCredentialResponse, CreateCredentialException>() {\n                @Override\n                public void onResult(CreateCredentialResponse result) {\n                    JSObject response = new JSObject();\n                    response.put("saved", true);\n                    call.resolve(response);\n                }\n\n                @Override\n                public void onError(CreateCredentialException error) {\n                    call.reject(error.getMessage() == null ? "تعذر حفظ كلمة المرور" : error.getMessage());\n                }\n            }\n        );\n    }\n}\n''', encoding="utf-8")
+
+          gradle = Path("android/app/build.gradle")
+          gradle_text = gradle.read_text(encoding="utf-8")
+          marker = "dependencies {"
+          dependencies = '''dependencies {\n    implementation "androidx.credentials:credentials:1.5.0"\n    implementation "androidx.credentials:credentials-play-services-auth:1.5.0"'''
+          if "androidx.credentials:credentials:" not in gradle_text:
+              gradle_text = gradle_text.replace(marker, dependencies, 1)
+              gradle.write_text(gradle_text, encoding="utf-8")
+
           manifest = Path("android/app/src/main/AndroidManifest.xml")
           text = manifest.read_text(encoding="utf-8")
           if 'android:usesCleartextTraffic="false"' not in text:
@@ -110,6 +123,9 @@ jobs:
           grep -R "current-password" dist >/dev/null
           grep -R "username" dist >/dev/null
           grep -n "IMPORTANT_FOR_AUTOFILL_YES" android/app/src/main/java/com/elmadawy/staff/MainActivity.java
+          grep -n "GooglePasswordManagerPlugin" android/app/src/main/java/com/elmadawy/staff/MainActivity.java
+          grep -n "CreatePasswordRequest" android/app/src/main/java/com/elmadawy/staff/GooglePasswordManagerPlugin.java
+          grep -n "androidx.credentials:credentials" android/app/build.gradle
           grep -n 'usesCleartextTraffic="false"' android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK

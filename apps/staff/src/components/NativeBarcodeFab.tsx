@@ -14,7 +14,6 @@ function writeReactInput(input: HTMLInputElement, value: string) {
   setter?.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
-  input.focus();
 }
 
 export default function NativeBarcodeFab() {
@@ -51,7 +50,10 @@ export default function NativeBarcodeFab() {
       const input = document.querySelector<HTMLInputElement>('input[placeholder="Barcode"]');
       if (!input) return;
       writeReactInput(input, code);
-      window.setTimeout(() => input.closest("form")?.requestSubmit(), 180);
+      window.setTimeout(() => {
+        input.closest("form")?.requestSubmit();
+        input.blur();
+      }, 180);
     } catch (error) {
       console.warn("Native barcode scan cancelled or failed", error);
     } finally {
