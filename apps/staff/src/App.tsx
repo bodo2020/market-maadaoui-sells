@@ -225,7 +225,7 @@ function Shell({ identity, branch, children }: { identity: StaffIdentity; branch
           ["/tasks", ClipboardList, "المهام"],
           ["/operations", PackageCheck, "التشغيل"],
           ["/attendance", Clock3, "الحضور"],
-          ["/account", UserRound, "حسابي"],
+          ["/account", IdCard, "خدماتي"],
         ].map(([to, Icon, label]) => (
           <NavLink key={to as string} to={to as string} end={to === "/"}>{<Icon size={20} />}<span>{label as string}</span></NavLink>
         ))}
