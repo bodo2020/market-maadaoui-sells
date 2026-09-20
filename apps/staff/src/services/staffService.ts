@@ -1471,39 +1471,41 @@ export async function receiveCashHandoff(handoffId: string, receivedAmount: numb
 
 
 export async function getInventoryRiskWorkspace(branchId: string, status: InventoryRiskStatus = "low_stock") {
-  const result=await rpc("get_inventory_control_center_v2",{
-    p_branch_id:branchId,p_search:null,p_status:status,p_category_id:null,p_limit:50,p_offset:0,
+  return cachedRead(cacheKey("inventory_risk",`${branchId}:${status}`),async()=>{
+    const result=await rpc("get_inventory_control_center_v2",{
+      p_branch_id:branchId,p_search:null,p_status:status,p_category_id:null,p_limit:50,p_offset:0,
+    });
+    if(result.error)throw inventoryError(result.error.message);
+    const raw=(result.data||{}) as Record<string,unknown>;
+    const summary=(raw.summary||{}) as Record<string,unknown>;
+    const permissions=(raw.permissions||{}) as Record<string,unknown>;
+    const rows=Array.isArray(raw.products)?raw.products as Array<Record<string,unknown>>:[];
+    return {
+      summary:{
+        low_stock_rows:Number(summary.low_stock_rows||0),
+        out_of_stock_rows:Number(summary.out_of_stock_rows||0),
+        coverage_risk_rows:Number(summary.coverage_risk_rows||0),
+        pending_audit_tasks:Number(summary.pending_audit_tasks||0),
+      },
+      permissions:{can_manage_sessions:Boolean(permissions.can_manage_sessions)},
+      products:rows.map((row)=>({
+        product_id:String(row.product_id||""),
+        product_name:String(row.product_name||"منتج"),
+        barcode:row.barcode==null?null:String(row.barcode),
+        image_url:row.image_url==null?null:String(row.image_url),
+        quantity:Number(row.quantity||0),
+        reserved_quantity:Number(row.reserved_quantity||0),
+        available_quantity:Number(row.available_quantity??row.quantity??0),
+        unit_of_measure:String(row.unit_of_measure||"قطعة"),
+        shelf_location:row.shelf_location==null?null:String(row.shelf_location),
+        category_name:String(row.category_name||"بدون قسم"),
+        min_stock_level:Number(row.min_stock_level||0),
+        days_cover:row.days_cover==null?null:Number(row.days_cover),
+        stock_status:String(row.stock_status||status),
+        last_audit_at:row.last_audit_at==null?null:String(row.last_audit_at),
+      })),
+    } as InventoryRiskWorkspace;
   });
-  if(result.error)throw inventoryError(result.error.message);
-  const raw=(result.data||{}) as Record<string,unknown>;
-  const summary=(raw.summary||{}) as Record<string,unknown>;
-  const permissions=(raw.permissions||{}) as Record<string,unknown>;
-  const rows=Array.isArray(raw.products)?raw.products as Array<Record<string,unknown>>:[];
-  return {
-    summary:{
-      low_stock_rows:Number(summary.low_stock_rows||0),
-      out_of_stock_rows:Number(summary.out_of_stock_rows||0),
-      coverage_risk_rows:Number(summary.coverage_risk_rows||0),
-      pending_audit_tasks:Number(summary.pending_audit_tasks||0),
-    },
-    permissions:{can_manage_sessions:Boolean(permissions.can_manage_sessions)},
-    products:rows.map((row)=>({
-      product_id:String(row.product_id||""),
-      product_name:String(row.product_name||"منتج"),
-      barcode:row.barcode==null?null:String(row.barcode),
-      image_url:row.image_url==null?null:String(row.image_url),
-      quantity:Number(row.quantity||0),
-      reserved_quantity:Number(row.reserved_quantity||0),
-      available_quantity:Number(row.available_quantity??row.quantity??0),
-      unit_of_measure:String(row.unit_of_measure||"قطعة"),
-      shelf_location:row.shelf_location==null?null:String(row.shelf_location),
-      category_name:String(row.category_name||"بدون قسم"),
-      min_stock_level:Number(row.min_stock_level||0),
-      days_cover:row.days_cover==null?null:Number(row.days_cover),
-      stock_status:String(row.stock_status||status),
-      last_audit_at:row.last_audit_at==null?null:String(row.last_audit_at),
-    })),
-  } as InventoryRiskWorkspace;
 }
 
 export async function createSpotInventoryAudit(branchId: string, productIds: string[]) {
