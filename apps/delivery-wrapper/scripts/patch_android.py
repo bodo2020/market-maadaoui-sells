@@ -333,7 +333,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
         new Handler(Looper.getMainLooper()).postDelayed(this::injectHotfix, 500);
     }
