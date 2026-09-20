@@ -40,6 +40,45 @@ export type StaffBranch = {
 
 
 
+
+export type CashHandoff = {
+  handoff_id: string;
+  shift_id: string;
+  cashier_id: string;
+  cashier_name: string;
+  device_id: string;
+  device_name: string;
+  drawer_account_id: string;
+  drawer_balance: number;
+  expected_amount: number;
+  closed_at: string;
+  status: "pending" | "completed";
+};
+
+export type CashHandoffWorkspace = {
+  version: number;
+  branch_id: string;
+  branch_name: string;
+  permissions: { can_manage: boolean };
+  safe: null | { account_id: string; name: string; balance: number };
+  pending: CashHandoff[];
+  recent: Array<{
+    handoff_id: string;
+    shift_id: string;
+    cashier_id: string;
+    cashier_name: string;
+    device_id: string;
+    device_name: string;
+    expected_amount: number;
+    received_amount: number;
+    variance_amount: number;
+    variance_reason: string | null;
+    received_by_name: string | null;
+    received_at: string;
+    status: "completed";
+  }>;
+};
+
 export type ManagerOperationsEmployee = {
   user_id: string;
   name: string;
@@ -1190,5 +1229,34 @@ export async function getManagerOperationsPerformance(branchId: string, from: st
     throw new Error(value||"تعذر تحميل تشغيل الفريق.");
   }
   return result.data as ManagerOperationsPerformance;
+}
+
+
+
+export async function getCashHandoffWorkspace(branchId: string) {
+  const result=await rpc("get_finance_cash_handoff_workspace_v2",{p_branch_id:branchId,p_limit:100});
+  if(result.error){
+    const value=result.error.message||"";
+    if(value.includes("FINANCE_CASH_HANDOFF_ACCESS_DENIED"))throw new Error("ليس لديك صلاحية عرض تسليمات النقدية.");
+    throw new Error(value||"تعذر تحميل تسليمات النقدية.");
+  }
+  return result.data as CashHandoffWorkspace;
+}
+
+export async function receiveCashHandoff(handoffId: string, receivedAmount: number, varianceReason?: string|null) {
+  const result=await rpc("receive_pos_shift_cash_handoff_v2",{
+    p_handoff_id:handoffId,
+    p_received_amount:receivedAmount,
+    p_variance_reason:varianceReason?.trim()||null,
+  });
+  if(result.error){
+    const value=result.error.message||"";
+    if(value.includes("FINANCE_CASH_HANDOFF_MANAGE_DENIED"))throw new Error("ليس لديك صلاحية استلام عهدة الوردية.");
+    if(value.includes("INVALID_HANDOFF_AMOUNT"))throw new Error("اكتب المبلغ المستلم فعليًا بصورة صحيحة.");
+    if(value.includes("CASH_HANDOFF_VARIANCE_REASON_REQUIRED"))throw new Error("فيه فرق في العهدة؛ اكتب سبب الفرق.");
+    if(value.includes("CASH_HANDOFF_DRAWER_CHANGED"))throw new Error("رصيد الدرج تغيّر بعد إغلاق الوردية. حدّث البيانات قبل الاستلام.");
+    throw new Error(value||"تعذر استلام عهدة الوردية.");
+  }
+  return result.data as Record<string,unknown>;
 }
 
