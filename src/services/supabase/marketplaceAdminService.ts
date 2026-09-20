@@ -68,6 +68,48 @@ export type MarketplaceSettlement = {
   paid_at?: string | null;
 };
 
+export type MarketplaceSettlementPreviewV1 = {
+  merchant_id: string;
+  merchant_name: string;
+  period_start?: string | null;
+  period_end: string;
+  latest_entry_at?: string | null;
+  entry_count: number;
+  gross_credits: number;
+  total_deductions: number;
+  net_payable: number;
+  currency: string;
+  balance_direction: "platform_owes_merchant" | "merchant_owes_platform" | "balanced";
+  breakdown: Record<string, number>;
+  eligible: boolean;
+};
+
+export type MarketplaceSettlementEventV1 = {
+  event_type: string;
+  from_status?: string | null;
+  to_status?: string | null;
+  reason?: string | null;
+  created_at: string;
+};
+
+export type MarketplaceSettlementControlRowV1 = MarketplaceSettlement & {
+  external_reference?: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
+  entry_count: number;
+  breakdown: Record<string, number>;
+  events: MarketplaceSettlementEventV1[];
+};
+
+export type MarketplaceSettlementControlV1 = {
+  version: number;
+  merchant_id: string;
+  permissions: { can_manage: boolean };
+  preview: MarketplaceSettlementPreviewV1;
+  settlements: MarketplaceSettlementControlRowV1[];
+  generated_at: string;
+};
+
 export type MarketplaceDashboard = {
   version: number;
   tenant: MarketplaceTenant & {
@@ -229,6 +271,15 @@ function marketplaceError(message?: string) {
   if (value.includes("merchant_and_branch_name_required")) return new Error("اسم المتجر واسم الفرع مطلوبان.");
   if (value.includes("commission_rule_name_required")) return new Error("اسم قاعدة العمولة مطلوب.");
   if (value.includes("invalid_commission_percent")) return new Error("نسبة العمولة يجب أن تكون بين 0 و100.");
+  if (value.includes("PARTNER_SETTLEMENT_MANAGE_DENIED")) return new Error("ليس لديك صلاحية إدارة تسويات هذا الشريك.");
+  if (value.includes("PARTNER_SETTLEMENT_NO_UNSETTLED_ENTRIES")) return new Error("لا توجد قيود مالية غير مسواة لهذا الشريك.");
+  if (value.includes("PARTNER_SETTLEMENT_NOT_DRAFT")) return new Error("يمكن اعتماد التسوية عندما تكون Draft فقط.");
+  if (value.includes("PARTNER_SETTLEMENT_NOT_APPROVED")) return new Error("اعتمد التسوية أولًا قبل تسجيل الدفع.");
+  if (value.includes("PARTNER_SETTLEMENT_PAYMENT_REFERENCE_REQUIRED")) return new Error("مرجع التحويل أو الدفع مطلوب.");
+  if (value.includes("PARTNER_SETTLEMENT_CANCEL_REASON_REQUIRED")) return new Error("سبب إلغاء التسوية مطلوب.");
+  if (value.includes("PARTNER_SETTLEMENT_CANNOT_CANCEL")) return new Error("لا يمكن إلغاء تسوية مدفوعة أو ملغاة.");
+  if (value.includes("PARTNER_SETTLEMENT_INTEGRITY_MISMATCH")) return new Error("إجمالي التسوية لا يطابق قيودها. راجع المالية قبل المتابعة.");
+  if (value.includes("merchant_settlements_paid_external_reference_v1_idx")) return new Error("مرجع الدفع مستخدم بالفعل لهذا الشريك.");
   if (value.includes("branch_address_required")) return new Error("عنوان الفرع مطلوب قبل الاعتماد.");
   if (value.includes("branch_does_not_belong_to_merchant")) return new Error("الفرع لا يتبع هذا المتجر.");
   if (value.includes("duplicate key") || value.includes("unique constraint")) return new Error("القيمة مستخدمة بالفعل. راجع كود الفرع أو البيانات المدخلة.");
@@ -399,4 +450,50 @@ export async function unpublishMarketplaceMerchant(merchantId: string) {
     merchant_id: string;
     customer_published: false;
   };
+}
+
+export async function fetchMarketplaceSettlementControlV1(merchantId: string, limit = 50): Promise<MarketplaceSettlementControlV1> {
+  const { data, error } = await rpc("get_marketplace_settlement_control_v1", {
+    p_merchant_id: merchantId,
+    p_limit: limit,
+  });
+  if (error) throw marketplaceError(error.message);
+  return data as MarketplaceSettlementControlV1;
+}
+
+export async function createMarketplaceSettlementV2(merchantId: string, periodEnd = new Date().toISOString()) {
+  const { data, error } = await rpc("create_marketplace_settlement_v2", {
+    p_merchant_id: merchantId,
+    p_period_end: periodEnd,
+  });
+  if (error) throw marketplaceError(error.message);
+  return data as { settlement_id: string; reference: string; status: "draft"; entry_count: number; gross_credits: number; total_deductions: number; net_payable: number; currency: string };
+}
+
+export async function approveMarketplaceSettlementV1(settlementId: string, note?: string | null) {
+  const { data, error } = await rpc("approve_marketplace_settlement_v1", {
+    p_settlement_id: settlementId,
+    p_note: note?.trim() || null,
+  });
+  if (error) throw marketplaceError(error.message);
+  return data as { settlement_id: string; status: "approved"; entry_count: number };
+}
+
+export async function markMarketplaceSettlementPaidV1(settlementId: string, externalReference: string, note?: string | null) {
+  const { data, error } = await rpc("mark_marketplace_settlement_paid_v1", {
+    p_settlement_id: settlementId,
+    p_external_reference: externalReference.trim(),
+    p_note: note?.trim() || null,
+  });
+  if (error) throw marketplaceError(error.message);
+  return data as { settlement_id: string; status: "paid"; external_reference: string; paid_at: string };
+}
+
+export async function cancelMarketplaceSettlementV1(settlementId: string, reason: string) {
+  const { data, error } = await rpc("cancel_marketplace_settlement_v1", {
+    p_settlement_id: settlementId,
+    p_reason: reason.trim(),
+  });
+  if (error) throw marketplaceError(error.message);
+  return data as { settlement_id: string; status: "cancelled"; released_entries: number };
 }

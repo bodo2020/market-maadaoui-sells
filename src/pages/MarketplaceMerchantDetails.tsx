@@ -14,10 +14,12 @@ import {
   ShieldCheck,
   Store,
   Truck,
+  WalletCards,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import MainLayout from "@/components/layout/MainLayout";
+import PartnerSettlementControlV1 from "@/components/marketplace/PartnerSettlementControlV1";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -374,6 +376,7 @@ export default function MarketplaceMerchantDetails() {
                 <TabsTrigger value="commission" className="rounded-xl"><Percent className="ml-2 h-4 w-4" />العمولة</TabsTrigger>
                 <TabsTrigger value="catalog" className="rounded-xl"><PackagePlus className="ml-2 h-4 w-4" />المنتجات</TabsTrigger>
                 <TabsTrigger value="delivery" className="rounded-xl"><Truck className="ml-2 h-4 w-4" />التوصيل</TabsTrigger>
+                {merchant.merchant_type === "partner" && <TabsTrigger value="settlements" className="rounded-xl"><WalletCards className="ml-2 h-4 w-4" />التسويات</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="branches" className="space-y-4">
@@ -421,6 +424,8 @@ export default function MarketplaceMerchantDetails() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              {merchant.merchant_type === "partner" && <TabsContent value="settlements"><PartnerSettlementControlV1 merchantId={merchantId} /></TabsContent>}
             </Tabs>
           </>
         )}
