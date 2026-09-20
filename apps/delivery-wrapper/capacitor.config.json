@@ -1,0 +1,16 @@
+{
+  "appId": "com.elmadawy.delivery",
+  "appName": "المعداوي Delivery",
+  "webDir": "www",
+  "server": {
+    "url": "https://elmadawy-delivery.bodo102.chatgpt.site",
+    "androidScheme": "https",
+    "cleartext": false,
+    "allowNavigation": [
+      "elmadawy-delivery.bodo102.chatgpt.site"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
