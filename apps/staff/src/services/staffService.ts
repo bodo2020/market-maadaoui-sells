@@ -37,6 +37,93 @@ export type StaffBranch = {
   permissions: string[];
 };
 
+
+export type InventoryAdjustmentReason = "theft" | "damage" | "breakage" | "receiving_error" | "selling_error" | "previous_error" | "unknown";
+export type InventoryAdjustmentRejectionReason = "counting_error" | "insufficient_evidence" | "investigation_required" | "other";
+
+export type InventoryAuditTaskDetail = {
+  task_id: string;
+  task_type: string;
+  source_kind: string;
+  status: string;
+  due_at?: string | null;
+  product_id: string;
+  product_name: string;
+  barcode?: string | null;
+  image_url?: string | null;
+  shelf_location?: string | null;
+  unit_of_measure?: string | null;
+  barcode_type?: string | null;
+  blind_count: boolean;
+  is_recount?: boolean;
+  first_count?: number | null;
+  first_variance?: number | null;
+  recount?: number | null;
+  recount_variance?: number | null;
+  verification_status?: string | null;
+  variance_value?: number | null;
+  current_system_quantity?: number | null;
+  current_expected_quantity?: number | null;
+  projected_physical_quantity?: number | null;
+  current_adjustment_delta?: number | null;
+  movement_ledger_gap?: number | null;
+  allowed_reason_codes?: InventoryAdjustmentReason[];
+};
+
+export type InventoryCountSubmissionResult = {
+  task_id: string;
+  status: string;
+  result: string;
+  recount_task_id?: string | null;
+  adjustment_review_task_id?: string | null;
+  idempotent?: boolean;
+};
+
+export type InventoryTransferItem = {
+  id: string;
+  product_id: string;
+  product_name: string;
+  barcode: string | null;
+  unit: string;
+  quantity: number;
+  received_quantity: number | null;
+  variance_quantity: number | null;
+};
+
+export type InventoryTransfer = {
+  id: string;
+  transfer_number: string;
+  from_branch_id: string;
+  from_branch_name: string;
+  to_branch_id: string;
+  to_branch_name: string;
+  status: "requested" | "dispatched" | "received" | "received_with_variance" | "cancelled";
+  direction: "outgoing" | "incoming";
+  notes: string | null;
+  created_at: string;
+  expected_arrival_date: string | null;
+  dispatched_at: string | null;
+  received_at: string | null;
+  items_count: number;
+  has_variance: boolean;
+  can_dispatch: boolean;
+  can_receive: boolean;
+  items: InventoryTransferItem[];
+};
+
+export type InventoryTransferWorkspace = {
+  branch_id: string;
+  permissions: { can_transfer: boolean };
+  summary: {
+    requested: number;
+    dispatched: number;
+    received: number;
+    received_with_variance: number;
+    cancelled: number;
+  };
+  transfers: InventoryTransfer[];
+};
+
 export type OperationsTask = {
   id: string;
   title: string;
@@ -821,3 +908,123 @@ export async function markReady(orderId: string, bags = 0) {
     p_note: "تم إنهاء تجهيز الطلب من تطبيق الموظفين",
   }));
 }
+
+
+function inventoryError(message?: string) {
+  const value = message || "";
+  if (value.includes("INVENTORY_SELF_RECOUNT_DENIED")) return new Error("لا يمكنك إعادة عد منتج قمت بعدّه أول مرة. يجب أن يراجعه موظف آخر.");
+  if (value.includes("INVENTORY_TASK_NOT_OWNER") || value.includes("TASK_NOT_OWNER")) return new Error("مهمة الجرد لم تعد مسندة لك.");
+  if (value.includes("INVALID_ACTUAL_COUNT")) return new Error("اكتب كمية فعلية صحيحة.");
+  if (value.includes("INVENTORY_MOVEMENT_LEDGER_GAP")) return new Error("يوجد اختلاف في سجل حركة المخزون. لم يتم تعديل الرصيد.");
+  if (value.includes("INVENTORY_ADJUSTMENT_REVIEW_DENIED")) return new Error("ليس لديك صلاحية اعتماد فرق المخزون.");
+  if (value.includes("INVENTORY_ADJUSTMENT_NOTE_REQUIRED")) return new Error("اكتب ملاحظة توضح قرار المراجعة.");
+  if (value.includes("TRANSFER_TASK_CLAIMED_BY_ANOTHER_USER")) return new Error("مهمة التحويل استلمها موظف آخر.");
+  if (value.includes("TRANSFER_NOT_DISPATCHABLE")) return new Error("التحويل لم يعد جاهزًا للشحن.");
+  if (value.includes("TRANSFER_NOT_RECEIVABLE")) return new Error("التحويل لم يعد جاهزًا للاستلام.");
+  if (value.includes("TRANSFER_RECEIPT_QUANTITY_INVALID")) return new Error("راجع الكميات المستلمة.");
+  if (value.includes("TRANSFER_SOURCE_PERMISSION_DENIED") || value.includes("TRANSFER_DISPATCH_DENIED") || value.includes("TRANSFER_RECEIVE_DENIED")) return new Error("ليس لديك صلاحية تنفيذ هذا التحويل.");
+  return new Error(message || "تعذر تنفيذ عملية المخزون.");
+}
+
+export function isInventoryTask(task: Pick<OperationsTask, "source_kind" | "task_type">) {
+  return task.source_kind === "inventory_count"
+    || task.source_kind === "inventory_recount"
+    || task.source_kind === "inventory_adjustment"
+    || task.task_type === "inventory_daily_count"
+    || task.task_type === "inventory_variance_recount"
+    || task.task_type === "inventory_adjustment_review";
+}
+
+export function isInventoryTransferTask(task: Pick<OperationsTask, "source_kind" | "task_type">) {
+  return task.source_kind === "inventory_transfer_dispatch"
+    || task.source_kind === "inventory_transfer_receive"
+    || task.source_kind === "inventory_transfer_variance"
+    || task.task_type.startsWith("inventory_transfer_");
+}
+
+export async function ensureDailyInventoryAudit(branchId: string) {
+  const result = await rpc("ensure_daily_inventory_audit_tasks_v3", { p_branch_id: branchId, p_audit_date: null });
+  if (result.error) throw inventoryError(result.error.message);
+  return result.data as { session_id?: string; generated: number; existing: number; eligible_staff: number; audit_date: string };
+}
+
+export async function getInventoryAuditTask(taskId: string) {
+  const result = await rpc("get_inventory_audit_task_v2", { p_task_id: taskId });
+  if (result.error) throw inventoryError(result.error.message);
+  return result.data as InventoryAuditTaskDetail;
+}
+
+export async function submitInventoryCount(taskId: string, actualCount: number, note?: string) {
+  const result = await rpc("submit_inventory_count_v2", {
+    p_task_id: taskId,
+    p_actual_count: actualCount,
+    p_note: note?.trim() || null,
+  });
+  if (result.error) throw inventoryError(result.error.message);
+  return result.data as InventoryCountSubmissionResult;
+}
+
+export async function submitInventoryRecount(taskId: string, actualCount: number, note?: string) {
+  const result = await rpc("submit_inventory_recount_v2", {
+    p_task_id: taskId,
+    p_actual_count: actualCount,
+    p_note: note?.trim() || null,
+  });
+  if (result.error) throw inventoryError(result.error.message);
+  return result.data as InventoryCountSubmissionResult;
+}
+
+export async function approveInventoryAdjustment(taskId: string, reasonCode: InventoryAdjustmentReason, note: string) {
+  const result = await rpc("approve_inventory_adjustment_v2", {
+    p_task_id: taskId,
+    p_request_id: crypto.randomUUID(),
+    p_reason_code: reasonCode,
+    p_note: note.trim(),
+  });
+  if (result.error) throw inventoryError(result.error.message);
+  return result.data as Record<string, unknown>;
+}
+
+export async function rejectInventoryAdjustment(taskId: string, reasonCode: InventoryAdjustmentRejectionReason, note: string) {
+  const result = await rpc("reject_inventory_adjustment_v2", {
+    p_task_id: taskId,
+    p_reason_code: reasonCode,
+    p_note: note.trim(),
+  });
+  if (result.error) throw inventoryError(result.error.message);
+  return result.data as Record<string, unknown>;
+}
+
+export async function getInventoryTransferWorkspace(branchId: string) {
+  const result = await rpc("get_inventory_transfer_workspace_v2", {
+    p_branch_id: branchId,
+    p_status: "active",
+    p_limit: 100,
+  });
+  if (result.error) throw inventoryError(result.error.message);
+  return result.data as InventoryTransferWorkspace;
+}
+
+export async function dispatchInventoryTransfer(transferId: string, note?: string) {
+  const result = await rpc("dispatch_inventory_transfer_v2", {
+    p_transfer_id: transferId,
+    p_note: note?.trim() || null,
+  });
+  if (result.error) throw inventoryError(result.error.message);
+  return result.data as Record<string, unknown>;
+}
+
+export async function receiveInventoryTransfer(
+  transferId: string,
+  items: Array<{ product_id: string; quantity: number }>,
+  note?: string,
+) {
+  const result = await rpc("receive_inventory_transfer_v2", {
+    p_transfer_id: transferId,
+    p_receipt_items: items,
+    p_note: note?.trim() || null,
+  });
+  if (result.error) throw inventoryError(result.error.message);
+  return result.data as Record<string, unknown>;
+}
+
