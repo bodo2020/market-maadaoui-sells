@@ -8,6 +8,10 @@ export type ReportingMetricKey =
   | 'pos_net_sales'
   | 'pos_net_cogs'
   | 'pos_gross_profit'
+  | 'online_net_sales'
+  | 'online_cogs'
+  | 'online_gross_profit'
+  | 'combined_gross_profit'
   | 'merchant_payment_fees'
   | 'expenses'
   | 'known_operating_result'
@@ -99,6 +103,36 @@ export const reportingMetricDefinitions: Record<ReportingMetricKey, ReportingMet
     source: 'get_reporting_profitability_v2 → summary.pos_gross_profit',
     caveat: 'لا يتضمن ربح الأونلاين حتى تتوفر تكلفة عناصر الأونلاين بصورة موثوقة.',
   },
+  online_net_sales: {
+    key: 'online_net_sales',
+    label: 'صافي مبيعات الأونلاين',
+    definition: 'قيمة المنتجات في الطلبات الأونلاين المسلّمة والمدفوعة بعد فصل رسوم التوصيل عن إيراد البضاعة.',
+    formula: 'Delivered & paid online order total − shipping charged',
+    source: 'get_reporting_online_profit_v1 → summary.online_net_sales',
+  },
+  online_cogs: {
+    key: 'online_cogs',
+    label: 'تكلفة مبيعات الأونلاين',
+    definition: 'تكلفة أصناف الطلبات الأونلاين المحققة، من Snapshot لسعر الشراء عند تحقق الطلب. البيانات التاريخية السابقة للتطوير معلمة كمُعاد بنائها.',
+    formula: 'Σ online item purchase-cost snapshots',
+    source: 'get_reporting_online_profit_v1 → summary.online_cogs',
+    caveat: 'إذا وُجد بند بلا تكلفة موثقة، لا يعرض النظام رقم ربح تخميني للفترة.',
+  },
+  online_gross_profit: {
+    key: 'online_gross_profit',
+    label: 'إجمالي ربح الأونلاين',
+    definition: 'ربح البضاعة في الطلبات الأونلاين بعد خصم تكلفة الأصناف وقبل تكلفة التوصيل ورسوم الدفع التشغيلية.',
+    formula: 'Online Net Sales − Online COGS',
+    source: 'get_reporting_online_profit_v1 → summary.online_gross_profit',
+    caveat: 'رسوم التوصيل وتكلفته تعرض منفصلة؛ هذا المؤشر هو Gross Profit للبضاعة وليس صافي ربح التوصيل.',
+  },
+  combined_gross_profit: {
+    key: 'combined_gross_profit',
+    label: 'إجمالي الربح POS + Online',
+    definition: 'مجموع إجمالي ربح نقطة البيع وإجمالي ربح البضاعة في الأونلاين عندما تكون تكلفة القناتين مكتملة.',
+    formula: 'POS Gross Profit + Online Gross Profit',
+    source: 'Business app reporting merge',
+  },
   merchant_payment_fees: {
     key: 'merchant_payment_fees',
     label: 'رسوم وسائل الدفع على المتجر',
@@ -121,10 +155,10 @@ export const reportingMetricDefinitions: Record<ReportingMetricKey, ReportingMet
     key: 'known_operating_result',
     label: 'النتيجة التشغيلية المعروفة',
     shortLabel: 'النتيجة التشغيلية',
-    definition: 'النتيجة التشغيلية القابلة للحساب بصورة موثوقة من بيانات POS والتكاليف والرسوم والمصروفات المتاحة حاليًا.',
+    definition: 'النتيجة التشغيلية المعروفة لقناة POS بعد التكلفة ورسوم الدفع والمصروفات المسجلة.',
     formula: 'POS Net Sales − POS Net COGS − Merchant Payment Fees − Active Expenses',
     source: 'get_reporting_profitability_v2 → summary.known_operating_result',
-    caveat: 'لا تُسمى صافي ربح شامل لأنها تستبعد ربح الأونلاين إلى أن تكتمل تكلفة عناصر الأونلاين.',
+    caveat: 'تظل منفصلة عن Gross Profit الأونلاين لأن رسوم الدفع وتكلفة التوصيل للأونلاين ليست جزءًا من هذه الصيغة.',
   },
   payment_net_movement: {
     key: 'payment_net_movement',
@@ -139,6 +173,8 @@ export const reportingMetricDefinitions: Record<ReportingMetricKey, ReportingMet
 export const coreReportingMetricKeys: ReportingMetricKey[] = [
   'net_sales',
   'pos_gross_profit',
+  'online_gross_profit',
+  'combined_gross_profit',
   'known_operating_result',
   'average_ticket',
   'returns',
