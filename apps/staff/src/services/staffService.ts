@@ -174,6 +174,7 @@ export type InventoryTransferWorkspace = {
 
 export type OperationsTask = {
   id: string;
+  task_type: string;
   title: string;
   description?: string | null;
   priority: string;
