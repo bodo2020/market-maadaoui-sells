@@ -1138,7 +1138,7 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
         <div><span>نوع العقد</span><strong>{profile?.contract_type||"—"}</strong></div>
         <div><span>تاريخ التعيين</span><strong>{profile?.hire_date?new Date(profile.hire_date).toLocaleDateString("ar-EG"):"—"}</strong></div>
       </div>
-      {data?.advances?.length>0&&<><h3>السلف الحالية</h3><div className="request-list">{data.advances.slice(0,3).map((item)=><div className="request-row" key={item.id}><div><strong>{Number(item.principal_amount).toLocaleString("ar-EG")} ج.م</strong><small>متبقي {Number(item.outstanding_amount).toLocaleString("ar-EG")} ج.م · {item.repayment_months} شهر</small></div><span>{requestStatusLabel(item.status)}</span></div>)}</div></>}
+      {(data?.advances?.length??0)>0&&<><h3>السلف الحالية</h3><div className="request-list">{(data?.advances??[]).slice(0,3).map((item)=><div className="request-row" key={item.id}><div><strong>{Number(item.principal_amount).toLocaleString("ar-EG")} ج.م</strong><small>متبقي {Number(item.outstanding_amount).toLocaleString("ar-EG")} ج.م · {item.repayment_months} شهر</small></div><span>{requestStatusLabel(item.status)}</span></div>)}</div></>}
     </section>}
 
     {view==="advance"&&<section className="self-service-panel request-form">
