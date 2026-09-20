@@ -434,6 +434,7 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
   const navigate = useNavigate();
   const { orderId = "" } = useParams();
   const scannerRef = useRef<HTMLInputElement>(null);
+  const scanLockRef = useRef(false);
   const [session, setSession] = useState<PickingSession | null>(null);
   const [order, setOrder] = useState<FulfillmentOrder | null>(null);
   const [staging, setStaging] = useState<StagingSession | null>(null);
@@ -484,20 +485,24 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
   const scan = async(event:FormEvent)=>{
     event.preventDefault();
     const code=barcode.trim();
-    if(!code||acting)return;
+    if(!code||acting||scanLockRef.current)return;
     const target=session?.items.find((item)=>item.barcode===code&&remainingQuantity(item)>0);
     const quantity=target?.is_weight_based?Number(weight):null;
     if(target?.is_weight_based&&(!quantity||quantity<=0)){
       setMessage({type:"error",text:"الصنف وزني — اكتب الوزن الفعلي أولًا"});
       return;
     }
-    setActing(true);
+    scanLockRef.current=true;setActing(true);
     try{
       const result=await staff.scanPickingBarcode(orderId,code,quantity);
-      setMessage({type:"ok",text:`تم تسجيل ${result.line.product_name}`});
-      setBarcode("");setWeight("");await load(false);
-    }catch(caught){setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});}
-    finally{setActing(false);window.setTimeout(()=>scannerRef.current?.focus(),50);}
+      setBarcode("");setWeight("");await load(false);setMessage({type:"ok",text:`تم تسجيل ${result.line.product_name}`});
+    }catch(caught){
+      const message=caught instanceof Error?caught.message:"";
+      if(message.includes("ITEM_ALREADY_COMPLETE")){
+        setBarcode("");setWeight("");await load(false);setMessage({type:"ok",text:"الصنف متسجل بالفعل وتم تحديث الجلسة"});
+      }else setMessage({type:"error",text:pickingError(message)});
+    }
+    finally{scanLockRef.current=false;setActing(false);window.setTimeout(()=>scannerRef.current?.focus(),50);}
   };
 
   const confirmManual=async(item:PickingItem)=>{
