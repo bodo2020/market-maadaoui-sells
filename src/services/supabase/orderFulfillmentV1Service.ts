@@ -37,7 +37,7 @@ export const startOrderPacking = async (orderId: string, bagsCount = 0) => {
   return unwrap<any>(data, error);
 };
 
-export const markOrderReady = async (orderId: string, bagsCount: number, note?: string) => {
+export const markOrderReady = async (orderId: string, bagsCount = 0, note?: string) => {
   const { data, error } = await rpc("mark_order_ready_v1", { p_order_id: orderId, p_bags_count: bagsCount, p_note: note?.trim() || null });
   return unwrap<any>(data, error);
 };
@@ -46,6 +46,8 @@ export const assignRecommendedDelivery = async (orderId: string, force = false) 
   const { data, error } = await rpc("assign_recommended_delivery_v1", { p_order_id: orderId, p_force: force });
   return unwrap<any>(data, error);
 };
+
+export const retryRecommendedDelivery = async (orderId: string) => assignRecommendedDelivery(orderId, true);
 
 export type PickerAssignmentPolicy = {
   branch_id: string;
