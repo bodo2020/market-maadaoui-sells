@@ -1106,11 +1106,14 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
   const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
   const canCount = branch.permissions.includes("inventory.count") || branch.permissions.includes("inventory.recount");
   const canTransfer = branch.permissions.includes("inventory.transfer") || branch.permissions.includes("inventory.manage");
-  const [tab,setTab]=useState<"tasks"|"transfers"|"risks">("tasks");
+  const canExpiry = branch.permissions.includes("inventory.manage") || branch.permissions.includes("products.manage") || branch.permissions.includes("purchases.manage");
+  const [tab,setTab]=useState<"tasks"|"transfers"|"risks"|"expiry">("tasks");
   const [riskStatus,setRiskStatus]=useState<staff.InventoryRiskStatus>("low_stock");
+  const [expiryDays,setExpiryDays]=useState(30);
   const [tasks,setTasks]=useState<staff.OperationsTask[]>([]);
   const [transfers,setTransfers]=useState<staff.InventoryTransferWorkspace|null>(null);
   const [risks,setRisks]=useState<staff.InventoryRiskWorkspace|null>(null);
+  const [expiry,setExpiry]=useState<staff.ExpiryWorkspace|null>(null);
   const [busy,setBusy]=useState(true);
   const [acting,setActing]=useState("");
   const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
@@ -1130,19 +1133,21 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     if(showBusy)setBusy(true);
     try{
       if(canCount){try{await staff.ensureDailyInventoryAudit(branch.branch_id);}catch{/* scheduler/server policy remains authoritative */}}
-      const [taskRows,transferData,riskData]=await Promise.all([
+      const [taskRows,transferData,riskData,expiryData]=await Promise.all([
         staff.listTasks(branch.branch_id,"active"),
         canTransfer?staff.getInventoryTransferWorkspace(branch.branch_id).catch(()=>null):Promise.resolve(null),
         staff.getInventoryRiskWorkspace(branch.branch_id,riskStatus).catch(()=>null),
+        canExpiry?staff.getExpiryWorkspace(branch.branch_id,expiryDays).catch(()=>null):Promise.resolve(null),
       ]);
       setTasks(taskRows.filter((task)=>staff.isInventoryTask(task)||staff.isInventoryTransferTask(task)));
       setTransfers(transferData);
       setRisks(riskData);
+      setExpiry(expiryData);
       setMessage(null);
     }catch(caught){
       setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل عمليات المخزون"});
     }finally{if(showBusy)setBusy(false);}
-  },[branch.branch_id,canCount,canInventory,canTransfer,riskStatus]);
+  },[branch.branch_id,canCount,canExpiry,canInventory,canTransfer,expiryDays,riskStatus]);
 
   useEffect(()=>{void load();},[load]);
 
@@ -1240,6 +1245,24 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     finally{setActing("");}
   };
 
+  const createExpiryCheck=async(item:staff.ExpiryBatchItem)=>{
+    if(acting)return;
+    setActing(item.batch_id);setMessage(null);
+    try{
+      await staff.createSpotInventoryAudit(branch.branch_id,[item.product_id]);
+      setTab("tasks");
+      setMessage({type:"ok",text:`تم إنشاء جرد تحقق لـ ${item.product_name} قبل أي إجراء على الدفعة ${item.batch_number}`});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إنشاء جرد التحقق"});}
+    finally{setActing("");}
+  };
+
+  const expiryDaysLeft=(value:string)=>{
+    const today=new Date();today.setHours(12,0,0,0);
+    const target=new Date(`${value}T12:00:00`);
+    return Math.ceil((target.getTime()-today.getTime())/86400000);
+  };
+
   if(!canInventory)return <><PageTitle title="المخزون" subtitle="الوحدة غير مفعلة لهذا الدور"/><Empty text="دورك الحالي لا يملك صلاحيات تشغيل المخزون"/></>;
 
   const auditTasks=tasks.filter((task)=>staff.isInventoryTask(task));
@@ -1251,7 +1274,7 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     <PageTitle title="المخزون" subtitle="الجرد والتحويلات من نفس مهام التشغيل"/>
     {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
     <div className="stats"><div><strong>{mine}</strong><span>مهام جرد لي</span></div><div><strong>{overdue}</strong><span>متأخرة</span></div><div><strong>{risks?.summary.low_stock_rows||0}</strong><span>مخزون منخفض</span></div></div>
-    <div className="chips"><button className={tab==="tasks"?"active":""} onClick={()=>setTab("tasks")}>الجرد</button>{canTransfer&&<button className={tab==="transfers"?"active":""} onClick={()=>setTab("transfers")}>التحويلات</button>}<button className={tab==="risks"?"active":""} onClick={()=>setTab("risks")}>مخاطر المخزون</button><button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
+    <div className="chips"><button className={tab==="tasks"?"active":""} onClick={()=>setTab("tasks")}>الجرد</button>{canTransfer&&<button className={tab==="transfers"?"active":""} onClick={()=>setTab("transfers")}>التحويلات</button>}<button className={tab==="risks"?"active":""} onClick={()=>setTab("risks")}>مخاطر المخزون</button>{canExpiry&&<button className={tab==="expiry"?"active":""} onClick={()=>setTab("expiry")}>الصلاحية</button>}<button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
 
     {busy?<Loading/>:tab==="tasks"?<div className="stack inventory-task-list">
       {auditTasks.map((task)=><article className={`task-card ${task.is_overdue?"danger":""}`} key={task.id}>
@@ -1276,6 +1299,15 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
         <div className="risk-stock-values"><span>فعلي <b>{product.quantity}</b></span><span>محجوز <b>{product.reserved_quantity}</b></span><span>متاح <b>{product.available_quantity}</b></span><span>الحد الأدنى <b>{product.min_stock_level}</b></span></div>
         {risks?.permissions.can_manage_sessions&&<button className="secondary full-action" disabled={acting===product.product_id} onClick={()=>void createRiskCheck(product)}>{acting===product.product_id?<Loader2 className="spin"/>:<Scale/>}إنشاء جرد سريع قبل التصرف</button>}
       </article>)}{!risks?.products.length&&<Empty text="مفيش منتجات في الحالة دي حاليًا"/>}</div>
+    </div>:<div className="expiry-workspace">
+      <div className="expiry-toolbar"><div><CalendarDays/><div><strong>دفعات الصلاحية</strong><span>من product_batches للفرع فقط</span></div></div><label>الفترة<select value={expiryDays} onChange={(e)=>setExpiryDays(Number(e.target.value))}><option value={7}>7 أيام</option><option value={14}>14 يوم</option><option value={30}>30 يوم</option><option value={60}>60 يوم</option><option value={90}>90 يوم</option></select></label></div>
+      <div className="expiry-summary"><div><strong>{expiry?.summary.expired||0}</strong><span>منتهي</span></div><div><strong>{expiry?.summary.today||0}</strong><span>ينتهي اليوم</span></div><div><strong>{expiry?.summary.within_3_days||0}</strong><span>خلال 3 أيام</span></div><div><strong>{Number(expiry?.summary.purchase_value_at_risk||0).toLocaleString("ar-EG",{maximumFractionDigits:2})}</strong><span>قيمة شراء معرضة</span></div></div>
+      <div className="stack expiry-list">{(expiry?.items||[]).map((item)=>{const days=expiryDaysLeft(item.expiry_date);return <article className={`expiry-card ${days<0?"expired":days<=3?"critical":days<=7?"warning":""}`} key={item.batch_id}>
+        <div className="expiry-product">{item.image_url?<img src={item.image_url} alt=""/>:<div className="risk-product-placeholder"><CalendarDays/></div>}<div><div className="row"><strong>{item.product_name}</strong><span className="expiry-status">{days<0?`منتهي من ${Math.abs(days)} يوم`:days===0?"ينتهي اليوم":`متبقي ${days} يوم`}</span></div><small>دفعة {item.batch_number} · {item.shelf_location?`رف ${item.shelf_location}`:"رف غير محدد"}</small></div></div>
+        <div className="expiry-values"><span>الكمية <b>{item.quantity}</b></span><span>تاريخ الصلاحية <b>{new Date(`${item.expiry_date}T12:00:00`).toLocaleDateString("ar-EG")}</b></span><span>سعر الشراء <b>{Number(item.purchase_price).toLocaleString("ar-EG")} ج.م</b></span></div>
+        <div className="expiry-safety-note"><ShieldCheck/><span>قبل الإهلاك أو الإرجاع للمورد: تحقق من الكمية الفعلية. المعالجة المالية القديمة غير مستخدمة هنا.</span></div>
+        <button className="secondary full-action" disabled={acting===item.batch_id} onClick={()=>void createExpiryCheck(item)}>{acting===item.batch_id?<Loader2 className="spin"/>:<Scale/>}جرد تحقق لهذه الدفعة</button>
+      </article>})}{!expiry?.items.length&&<Empty text="مفيش دفعات منتهية أو قريبة من الانتهاء في الفترة دي"/>}</div>
     </div>}
 
     {selectedTask&&detail&&<div className="inventory-modal-backdrop" onClick={closeTask}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
