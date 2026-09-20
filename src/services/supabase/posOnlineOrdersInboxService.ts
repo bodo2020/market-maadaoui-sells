@@ -66,5 +66,5 @@ export async function fetchPosOnlineOrderInbox(branchId: string, limit = 30): Pr
 export async function acceptPosOnlineOrder(orderId: string) {
   const { data, error } = await rpc("accept_pos_online_order_v1", { p_order_id: orderId });
   if (error) throw new Error(error.message || error.code || "ORDER_ACCEPT_FAILED");
-  return data as { ok: boolean; order_id: string; status: string; idempotent?: boolean };
+  return data as { ok: boolean; order_id: string; status: string; idempotent?: boolean; delivery_dispatch?: { ok?: boolean; delivery_name?: string; delivery_user_id?: string; reason?: string } };
 }
