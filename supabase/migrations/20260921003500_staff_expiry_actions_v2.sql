@@ -227,6 +227,7 @@ declare
   v_inventory_after numeric;
   v_expense_id uuid;
   v_supplier_return_id uuid;
+  v_recent_verified boolean:=false;
 begin
   if v_uid is null then
     raise exception using errcode='42501',message='AUTH_REQUIRED';
@@ -309,6 +310,19 @@ begin
 
   if upper(coalesce(v_batch.batch_number,'')) like 'DAMAGED-%' then
     raise exception using errcode='22023',message='EXPIRY_LEGACY_DAMAGED_BATCH';
+  end if;
+
+  select exists(
+    select 1
+    from private.inventory_audit_counts_v2 c
+    where c.branch_id=p_branch_id
+      and c.product_id=v_batch.product_id
+      and c.status='matched'
+      and c.submitted_at>=now()-interval '4 hours'
+  ) into v_recent_verified;
+
+  if not v_recent_verified then
+    raise exception using errcode='22023',message='EXPIRY_RECENT_AUDIT_REQUIRED';
   end if;
 
   select coalesce(b.inventory_source_branch_id,b.id)
