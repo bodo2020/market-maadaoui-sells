@@ -263,6 +263,9 @@ function HomePage({ branch, identity }: { identity: StaffIdentity; branch: Staff
   const current = tasks.find((task) => task.is_mine) || tasks[0];
   const canPrepare = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
   const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
+  const canApprove = branch.permissions.some((permission) =>
+    permission.includes("approve") || permission.includes("review") || permission === "finance.manage" || permission === "pos.manage_shifts" || permission === "inventory.manage"
+  );
 
   return (
     <>
@@ -284,6 +287,7 @@ function HomePage({ branch, identity }: { identity: StaffIdentity; branch: Staff
           <NavLink className="secondary" to="/tasks"><ClipboardList />المهام</NavLink>
           {canPrepare && <NavLink className="secondary" to="/operations"><PackageCheck />تجهيز الطلبات</NavLink>}
           {canInventory && <NavLink className="secondary" to="/inventory"><Layers3 />المخزون والجرد</NavLink>}
+          {canApprove && <NavLink className="secondary" to="/approvals"><ShieldCheck />الموافقات</NavLink>}
           <NavLink className="secondary" to="/attendance"><Clock3 />الحضور والوردية</NavLink>
           <NavLink className="secondary" to="/account"><IdCard />خدمات الموظف</NavLink>
         </div>
@@ -1274,6 +1278,136 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
   </>;
 }
 
+
+function approvalSourceLabel(value:string){
+  if(value==="inventory_adjustment")return "فرق مخزون";
+  if(value==="attendance_exception")return "استثناء حضور";
+  if(value==="hr_request")return "طلب موظف";
+  if(value==="shift_reconciliation")return "فرق وردية";
+  if(value==="cash_handoff")return "فرق عهدة";
+  if(value==="inventory_transfer_variance")return "فرق تحويل";
+  if(value==="order_substitution")return "بديل طلب";
+  return "موافقة تشغيلية";
+}
+
+function ApprovalsPage({branch}:{branch:StaffBranch}){
+  const [scope,setScope]=useState<staff.ApprovalScope>("pending");
+  const [data,setData]=useState<staff.ApprovalCenter|null>(null);
+  const [busy,setBusy]=useState(true);
+  const [acting,setActing]=useState("");
+  const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
+  const [selected,setSelected]=useState<staff.ApprovalItem|null>(null);
+  const [inventoryDetail,setInventoryDetail]=useState<staff.InventoryAuditTaskDetail|null>(null);
+  const [hrDetail,setHrDetail]=useState<staff.HrRequestReviewDetail|null>(null);
+  const [attendanceDetail,setAttendanceDetail]=useState<staff.AttendanceExceptionReview|null>(null);
+  const [note,setNote]=useState("");
+  const [adjustmentReason,setAdjustmentReason]=useState<staff.InventoryAdjustmentReason>("unknown");
+  const [rejectionReason,setRejectionReason]=useState<staff.InventoryAdjustmentRejectionReason>("insufficient_evidence");
+
+  const load=useCallback(async(show=true)=>{
+    if(show)setBusy(true);
+    try{setData(await staff.getApprovalCenter(branch.branch_id,scope));setMessage(null);}
+    catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل الموافقات"});}
+    finally{if(show)setBusy(false);}
+  },[branch.branch_id,scope]);
+  useEffect(()=>{void load();},[load]);
+
+  const clear=()=>{setSelected(null);setInventoryDetail(null);setHrDetail(null);setAttendanceDetail(null);setNote("");};
+
+  const open=async(item:staff.ApprovalItem)=>{
+    setActing(item.id);setMessage(null);
+    try{
+      if(item.status==="open"&&item.can_claim)await staff.claimTask(item.id);
+      try{await staff.startTask(item.id);}catch{/* specialized workflow may already own the transition */}
+      setSelected(item);setNote("");
+      if(item.source_kind==="inventory_adjustment")setInventoryDetail(await staff.getInventoryAuditTask(item.id));
+      else if(item.source_kind==="hr_request")setHrDetail(await staff.getHrRequestForReview(item.id));
+      else if(item.source_kind==="attendance_exception")setAttendanceDetail(await staff.getAttendanceExceptionForReview(item.source_id));
+      await load(false);
+    }catch(caught){clear();setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر فتح الموافقة"});}
+    finally{setActing("");}
+  };
+
+  const decideInventory=async(decision:"approve"|"reject")=>{
+    if(!selected||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة واضحة للقرار"});return;}
+    setActing(selected.id);
+    try{
+      if(decision==="approve")await staff.approveInventoryAdjustment(selected.id,adjustmentReason,note);
+      else await staff.rejectInventoryAdjustment(selected.id,rejectionReason,note);
+      clear();setMessage({type:"ok",text:decision==="approve"?"تم اعتماد فرق المخزون":"تم رفض التسوية وإرجاعها لإعادة العد"});await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر حفظ القرار"});}
+    finally{setActing("");}
+  };
+
+  const decideHr=async(decision:"approved"|"rejected")=>{
+    if(!selected||!hrDetail||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة واضحة للقرار"});return;}
+    setActing(selected.id);
+    try{
+      await staff.decideHrRequest(selected.id,decision,note,decision==="approved"?hrDetail.request.payload:null);
+      clear();setMessage({type:"ok",text:decision==="approved"?"تم اعتماد طلب الموظف":"تم رفض طلب الموظف"});await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر حفظ القرار"});}
+    finally{setActing("");}
+  };
+
+  const decideAttendance=async(decision:"approved"|"rejected")=>{
+    if(!selected||!attendanceDetail||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة واضحة للقرار"});return;}
+    setActing(selected.id);
+    try{
+      await staff.decideAttendanceException(attendanceDetail.id,decision,note);
+      clear();setMessage({type:"ok",text:decision==="approved"?"تم اعتماد استثناء الحضور":"تم رفض استثناء الحضور"});await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر حفظ القرار"});}
+    finally{setActing("");}
+  };
+
+  const completeGeneral=async()=>{
+    if(!selected||acting)return;
+    const specialized=["order_substitution","order_substitution_financial_adjustment","order_shortage_financial_adjustment"];
+    if(specialized.includes(selected.source_kind)){setMessage({type:"error",text:"هذه الموافقة تحتاج شاشة القرار المتخصصة في Control Center حاليًا"});return;}
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب نتيجة المراجعة"});return;}
+    setActing(selected.id);
+    try{await staff.completeTask(selected.id,note);clear();setMessage({type:"ok",text:"تم تسجيل نتيجة المراجعة"});await load(false);}
+    catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إغلاق الموافقة"});}
+    finally{setActing("");}
+  };
+
+  return <>
+    <PageTitle title="الموافقات" subtitle="Inbox واحد للمشرف والمدير حسب صلاحياته"/>
+    {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
+    <div className="approval-summary"><div><strong>{data?.summary.pending||0}</strong><span>معلقة</span></div><div><strong>{data?.summary.mine||0}</strong><span>عندي</span></div><div><strong>{data?.summary.overdue||0}</strong><span>متأخرة</span></div><div><strong>{data?.summary.critical||0}</strong><span>حرجة</span></div></div>
+    <div className="chips">{([["pending","معلقة"],["mine","عندي"],["overdue","متأخرة"],["completed","مكتملة"]] as Array<[staff.ApprovalScope,string]>).map(([id,label])=><button key={id} className={scope===id?"active":""} onClick={()=>setScope(id)}>{label}</button>)}<button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
+    {busy?<Loading/>:<div className="stack approval-list">{(data?.items||[]).map((item)=><article className={`task-card ${item.is_overdue?"danger":""}`} key={item.id}><div className="row"><span className="pill normal">{approvalSourceLabel(item.source_kind)}</span>{item.priority==="urgent"&&<span className="danger-text">حرجة</span>}</div><h3>{item.title}</h3>{item.description&&<p>{item.description}</p>}<small>{new Date(item.created_at).toLocaleString("ar-EG")}{item.claimed_by_name?` · ${item.claimed_by_name}`:""}</small>{["open","claimed","in_progress","failed"].includes(item.status)&&<div className="actions"><button className="primary" disabled={acting===item.id} onClick={()=>void open(item)}>{acting===item.id?<Loader2 className="spin"/>:<ShieldCheck/>}{item.is_mine?"فتح القرار":"استلام ومراجعة"}</button></div>}</article>)}{!data?.items.length&&<Empty text="مفيش موافقات في القسم ده"/>}</div>}
+
+    {selected&&<div className="inventory-modal-backdrop" onClick={clear}><section className="inventory-modal approval-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>{approvalSourceLabel(selected.source_kind)}</small><h2>{selected.title}</h2></div><button className="icon-btn" onClick={clear}><XCircle/></button></div>
+      {selected.description&&<p className="approval-description">{selected.description}</p>}
+      {selected.source_kind==="inventory_adjustment"&&inventoryDetail?<>
+        <div className="inventory-review-grid"><div><span>رصيد النظام</span><strong>{inventoryDetail.current_system_quantity??"—"}</strong></div><div><span>إعادة العد</span><strong>{inventoryDetail.recount??"—"}</strong></div><div><span>فرق التسوية</span><strong>{inventoryDetail.current_adjustment_delta??"—"}</strong></div></div>
+        <label className="inventory-field">سبب التسوية<select value={adjustmentReason} onChange={(e)=>setAdjustmentReason(e.target.value as staff.InventoryAdjustmentReason)}><option value="unknown">غير معروف</option><option value="damage">تالف</option><option value="breakage">كسر</option><option value="theft">فقد / سرقة</option><option value="receiving_error">خطأ استلام</option><option value="selling_error">خطأ بيع</option><option value="previous_error">خطأ رصيد سابق</option></select></label>
+        <label className="inventory-field">ملاحظة<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideInventory("reject")}>رفض وإعادة عد</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideInventory("approve")}>اعتماد</button></div>
+      </>:selected.source_kind==="hr_request"&&hrDetail?<>
+        <div className="approval-person"><UserRound/><div><strong>{hrDetail.employee.name}</strong><span>{hrDetail.request.request_type==="leave"?"طلب إجازة":hrDetail.request.request_type==="salary_advance"?"طلب سلفة":"تصحيح حضور"}</span></div></div>
+        <div className="approval-request-body"><strong>السبب</strong><p>{hrDetail.request.reason}</p><pre>{JSON.stringify(hrDetail.request.payload,null,2)}</pre></div>
+        <label className="inventory-field">ملاحظة القرار<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideHr("rejected")}>رفض</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideHr("approved")}>اعتماد</button></div>
+      </>:selected.source_kind==="attendance_exception"&&attendanceDetail?<>
+        <div className="approval-person"><MapPin/><div><strong>{attendanceDetail.employee_name}</strong><span>{attendanceDetail.distance_m==null?"المسافة غير متاحة":`يبعد ${Math.round(attendanceDetail.distance_m)} متر عن الفرع`}</span></div></div>
+        {attendanceDetail.verification_photo_signed_url&&<img className="attendance-review-photo" src={attendanceDetail.verification_photo_signed_url} alt="صورة تحقق الحضور"/>}
+        <div className="approval-request-body"><strong>السبب</strong><p>{attendanceDetail.reason}</p></div>
+        <label className="inventory-field">ملاحظة القرار<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideAttendance("rejected")}>رفض</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideAttendance("approved")}>اعتماد</button></div>
+      </>:<>
+        <div className="approval-request-body"><p>{["order_substitution","order_substitution_financial_adjustment","order_shortage_financial_adjustment"].includes(selected.source_kind)?"هذه الموافقة لها قرار متخصص وسيتم نقل شاشتها للموبايل في المرحلة التالية.":"راجع التفاصيل ثم سجل نتيجة القرار."}</p></div>
+        <label className="inventory-field">نتيجة المراجعة<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <button className="primary full-action" disabled={Boolean(acting)||["order_substitution","order_substitution_financial_adjustment","order_shortage_financial_adjustment"].includes(selected.source_kind)} onClick={()=>void completeGeneral()}>إغلاق الموافقة</button>
+      </>}
+    </section></div>}
+  </>;
+}
+
 function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: StaffBranch }) {
   const navigate=useNavigate();
   const [data,setData]=useState<StaffSelfServiceSnapshot|null>(null);
@@ -1442,7 +1576,7 @@ function AuthenticatedApp({state}:{state:ReturnType<typeof useStaffSession>}) {
   if(state.loading)return <Loading/>;
   if(!state.identity||!state.branch)return <Navigate to="/login" replace/>;
   const props={identity:state.identity,branch:state.branch};
-  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
+  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
 }
 
 export default function App(){
