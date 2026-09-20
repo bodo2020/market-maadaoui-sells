@@ -39,6 +39,51 @@ export type StaffBranch = {
 
 
 
+
+export type ManagerOperationsEmployee = {
+  user_id: string;
+  name: string;
+  role: string;
+  employee_code?: string | null;
+  department_name?: string | null;
+  job_title_name?: string | null;
+  cashier_invoices: number;
+  cashier_sales: number;
+  cash_variance: number;
+  payment_variance: number;
+  inventory_counts_assigned: number;
+  inventory_counts_submitted: number;
+  inventory_differences_found: number;
+  inventory_recounts_submitted: number;
+  inventory_recounts_conflicting: number;
+  delivery_assigned: number;
+  delivery_active_open: number;
+  delivery_delivered: number;
+  online_handled_orders: number;
+  online_cancellations: number;
+  followups_assigned: number;
+  followups_closed: number;
+  followups_overdue_open: number;
+  needs_attention: boolean;
+};
+
+export type ManagerOperationsPerformance = {
+  branch_id: string;
+  period: { from: string; to: string };
+  summary: {
+    employees: number;
+    employees_with_specialist_activity: number;
+    employees_needing_attention: number;
+    cashier: { invoices: number; sales: number; cash_variance: number; payment_variance: number };
+    inventory: { counts_assigned: number; counts_submitted: number; differences_found: number; recounts_submitted: number; recount_conflicts: number };
+    delivery: { assigned: number; active_open: number; delivered: number };
+    online: { handled_orders: number; transitions: number; cancellations: number };
+    customer_service: { assigned: number; closed: number; overdue_open: number };
+  };
+  employees: ManagerOperationsEmployee[];
+  notes: string[];
+};
+
 export type ApprovalScope = "pending" | "mine" | "overdue" | "completed" | "all";
 export type ApprovalItem = {
   id: string;
@@ -1127,5 +1172,23 @@ export async function decideAttendanceException(exceptionId: string, decision: "
   if(!result?.ok)throw new Error(result?.code||"تعذر إتمام قرار الحضور");
   if(!result.photo_deleted)throw new Error("لم يؤكد النظام حذف صورة التحقق؛ لم يتم اعتماد القرار");
   return result;
+}
+
+
+
+export async function getManagerOperationsPerformance(branchId: string, from: string, to: string) {
+  const result=await rpc("get_hr_manager_team_operations_v1",{
+    p_branch_id:branchId,
+    p_from:from,
+    p_to:to,
+  });
+  if(result.error){
+    const value=result.error.message||"";
+    if(value.includes("permission_denied"))throw new Error("ليس لديك صلاحية عرض تشغيل الفريق.");
+    if(value.includes("date_range_too_large"))throw new Error("الفترة القصوى سنة واحدة.");
+    if(value.includes("invalid_date_range"))throw new Error("الفترة الزمنية غير صحيحة.");
+    throw new Error(value||"تعذر تحميل تشغيل الفريق.");
+  }
+  return result.data as ManagerOperationsPerformance;
 }
 
