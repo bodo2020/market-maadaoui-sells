@@ -211,10 +211,12 @@ function useNotificationBadge(identity: StaffIdentity, branch: StaffBranch) {
 function Shell({ identity, branch, children }: { identity: StaffIdentity; branch: StaffBranch; children: ReactNode }) {
   const unread = useNotificationBadge(identity, branch);
   const canOperate = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
+  const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
   const navItems = [
     { to: "/", Icon: Home, label: "الرئيسية" },
     { to: "/tasks", Icon: ClipboardList, label: "المهام" },
-    ...(canOperate ? [{ to: "/operations", Icon: PackageCheck, label: "التشغيل" }] : []),
+    ...(canOperate ? [{ to: "/operations", Icon: PackageCheck, label: "الطلبات" }] : []),
+    ...(canInventory ? [{ to: "/inventory", Icon: Layers3, label: "المخزون" }] : []),
     { to: "/attendance", Icon: Clock3, label: "الحضور" },
     { to: "/account", Icon: IdCard, label: "خدماتي" },
   ];
@@ -228,7 +230,7 @@ function Shell({ identity, branch, children }: { identity: StaffIdentity; branch
         </NavLink>
       </header>
       <main className="content">{children}</main>
-      <nav className="bottom-nav">
+      <nav className="bottom-nav" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
         {navItems.map(({ to, Icon, label }) => (
           <NavLink key={to} to={to} end={to === "/"}><Icon size={20} /><span>{label}</span></NavLink>
         ))}
@@ -260,6 +262,7 @@ function HomePage({ branch, identity }: { identity: StaffIdentity; branch: Staff
   const mine = tasks.filter((task) => task.is_mine).length;
   const current = tasks.find((task) => task.is_mine) || tasks[0];
   const canPrepare = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
+  const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
 
   return (
     <>
@@ -280,6 +283,7 @@ function HomePage({ branch, identity }: { identity: StaffIdentity; branch: Staff
         <div className="actions staff-home-actions">
           <NavLink className="secondary" to="/tasks"><ClipboardList />المهام</NavLink>
           {canPrepare && <NavLink className="secondary" to="/operations"><PackageCheck />تجهيز الطلبات</NavLink>}
+          {canInventory && <NavLink className="secondary" to="/inventory"><Layers3 />المخزون والجرد</NavLink>}
           <NavLink className="secondary" to="/attendance"><Clock3 />الحضور والوردية</NavLink>
           <NavLink className="secondary" to="/account"><IdCard />خدمات الموظف</NavLink>
         </div>
@@ -294,7 +298,9 @@ function HomePage({ branch, identity }: { identity: StaffIdentity; branch: Staff
 }
 
 function TaskCard({ task, onChanged }: { task: staff.OperationsTask; onChanged: () => Promise<void> }) {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const inventoryWorkflow = staff.isInventoryTask(task) || staff.isInventoryTransferTask(task);
   const act = async (kind: "claim" | "start" | "complete") => {
     setBusy(true);
     try {
@@ -312,9 +318,13 @@ function TaskCard({ task, onChanged }: { task: staff.OperationsTask; onChanged: 
       <div className="row"><span className={`pill ${task.priority}`}>{task.priority === "urgent" ? "عاجل" : task.priority === "high" ? "عالي" : "عادي"}</span>{task.is_overdue && <span className="danger-text">متأخرة</span>}</div>
       <h3>{task.title}</h3>{task.description && <p>{task.description}</p>}<small>{task.source_kind}</small>
       <div className="actions">
-        {task.status === "open" && task.can_claim && <button className="primary" onClick={() => void act("claim")} disabled={busy}>استلام المهمة</button>}
-        {task.is_mine && task.status === "claimed" && <button className="primary" onClick={() => void act("start")} disabled={busy}><Play />بدء التنفيذ</button>}
-        {task.is_mine && task.status === "in_progress" && <button className="primary" onClick={() => void act("complete")} disabled={busy}><CheckCircle2 />تم التنفيذ</button>}
+        {inventoryWorkflow
+          ? <button className="primary" onClick={() => navigate(`/inventory?task=${task.id}`)}><Layers3 />فتح مهمة المخزون</button>
+          : <>
+            {task.status === "open" && task.can_claim && <button className="primary" onClick={() => void act("claim")} disabled={busy}>استلام المهمة</button>}
+            {task.is_mine && task.status === "claimed" && <button className="primary" onClick={() => void act("start")} disabled={busy}><Play />بدء التنفيذ</button>}
+            {task.is_mine && task.status === "in_progress" && <button className="primary" onClick={() => void act("complete")} disabled={busy}><CheckCircle2 />تم التنفيذ</button>}
+          </>}
       </div>
     </article>
   );
@@ -1043,7 +1053,7 @@ function NotificationsPage({ branch, identity }: { branch: StaffBranch; identity
   const load=useCallback(async(show=true)=>{if(show)setBusy(true);try{setData(await staff.getNotifications(branch.branch_id,filter));}finally{if(show)setBusy(false);}},[branch.branch_id,filter]);
   useEffect(()=>{void load();},[load]);
   useEffect(()=>{const channel=supabase.channel(`staff-center-${identity.user_id}`).on("postgres_changes",{event:"INSERT",schema:"public",table:"notification_realtime_signals_v2",filter:`recipient_user_id=eq.${identity.user_id}`},()=>void load(false)).subscribe();return()=>{void supabase.removeChannel(channel);};},[identity.user_id,load]);
-  const open=async(item:NotificationItem)=>{if(!item.read_at)await staff.markNotificationRead(item.id);if(item.action_url&&item.action_url.startsWith("/")){const allowed=["/tasks","/operations","/attendance","/account","/notifications"];if(allowed.some((p)=>item.action_url?.startsWith(p)))navigate(item.action_url);}await load(false);};
+  const open=async(item:NotificationItem)=>{if(!item.read_at)await staff.markNotificationRead(item.id);if(item.action_url&&item.action_url.startsWith("/")){if(item.action_url.startsWith("/inventory-transfers")||item.action_url.startsWith("/tasks?type=inventory"))navigate("/inventory");else{const allowed=["/tasks","/operations","/inventory","/attendance","/account","/notifications"];if(allowed.some((p)=>item.action_url?.startsWith(p)))navigate(item.action_url);}}await load(false);};
   return <><div className="section-head notification-title"><PageTitle title="الإشعارات" subtitle="تنبيهات ومهام تحتاج انتباهك"/><button className="mark-read" onClick={async()=>{await staff.markAllNotificationsRead(branch.branch_id);await load(false);}}><Check/>قراءة الكل</button></div><div className="notification-summary"><div><strong>{data?.summary.unread||0}</strong><span>غير مقروء</span></div><div><strong>{data?.summary.action_required||0}</strong><span>يحتاج إجراء</span></div><div><strong>{data?.summary.critical||0}</strong><span>حرج</span></div></div><div className="chips">{[["all","الكل"],["unread","غير مقروء"],["critical","حرج"],["action","إجراء"]].map(([id,label])=><button key={id} className={filter===id?"active":""} onClick={()=>setFilter(id)}>{label}</button>)}</div>{busy?<Loading/>:<div className="notification-list">{(data?.items||[]).map((item)=><button key={item.id} className={`notification-card ${!item.read_at?"unread":""} ${item.severity}`} onClick={()=>void open(item)}><div className="notification-icon">{item.requires_action?<BellRing/>:<Bell/>}</div><div><div className="row"><strong>{item.title}</strong><span className="severity">{severityLabel(item.severity)}</span></div>{item.body&&<p>{item.body}</p>}<small>{new Date(item.created_at).toLocaleString("ar-EG")}</small></div></button>)}{!data?.items.length&&<Empty text="مفيش إشعارات في القسم ده"/>}</div>}</>;
 }
 
@@ -1072,6 +1082,196 @@ function requestTypeLabel(value:string){
 }
 function requestStatusLabel(value:string){
   return value==="pending"?"قيد المراجعة":value==="approved"?"موافق عليه":value==="rejected"?"مرفوض":value==="cancelled"?"ملغي":value==="fulfilled"?"تم التنفيذ":value;
+}
+
+
+function inventoryTaskLabel(task: staff.OperationsTask) {
+  if (task.source_kind === "inventory_count") return "جرد";
+  if (task.source_kind === "inventory_recount") return "إعادة عد";
+  if (task.source_kind === "inventory_adjustment") return "اعتماد فرق";
+  if (task.source_kind === "inventory_transfer_dispatch") return "شحن تحويل";
+  if (task.source_kind === "inventory_transfer_receive") return "استلام تحويل";
+  if (task.source_kind === "inventory_transfer_variance") return "مراجعة فرق تحويل";
+  return "مخزون";
+}
+
+function InventoryPage({ branch }: { branch: StaffBranch }) {
+  const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
+  const canCount = branch.permissions.includes("inventory.count") || branch.permissions.includes("inventory.recount");
+  const canTransfer = branch.permissions.includes("inventory.transfer") || branch.permissions.includes("inventory.manage");
+  const [tab,setTab]=useState<"tasks"|"transfers">("tasks");
+  const [tasks,setTasks]=useState<staff.OperationsTask[]>([]);
+  const [transfers,setTransfers]=useState<staff.InventoryTransferWorkspace|null>(null);
+  const [busy,setBusy]=useState(true);
+  const [acting,setActing]=useState("");
+  const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
+  const [selectedTask,setSelectedTask]=useState<staff.OperationsTask|null>(null);
+  const [detail,setDetail]=useState<staff.InventoryAuditTaskDetail|null>(null);
+  const [barcode,setBarcode]=useState("");
+  const [actualCount,setActualCount]=useState("");
+  const [note,setNote]=useState("");
+  const [adjustmentReason,setAdjustmentReason]=useState<staff.InventoryAdjustmentReason>("unknown");
+  const [rejectionReason,setRejectionReason]=useState<staff.InventoryAdjustmentRejectionReason>("insufficient_evidence");
+  const [selectedTransfer,setSelectedTransfer]=useState<staff.InventoryTransfer|null>(null);
+  const [receipt,setReceipt]=useState<Record<string,string>>({});
+  const [transferNote,setTransferNote]=useState("");
+
+  const load=useCallback(async(showBusy=true)=>{
+    if(!canInventory){setBusy(false);return;}
+    if(showBusy)setBusy(true);
+    try{
+      if(canCount){try{await staff.ensureDailyInventoryAudit(branch.branch_id);}catch{/* scheduler/server policy remains authoritative */}}
+      const [taskRows,transferData]=await Promise.all([
+        staff.listTasks(branch.branch_id,"active"),
+        canTransfer?staff.getInventoryTransferWorkspace(branch.branch_id).catch(()=>null):Promise.resolve(null),
+      ]);
+      setTasks(taskRows.filter((task)=>staff.isInventoryTask(task)||staff.isInventoryTransferTask(task)));
+      setTransfers(transferData);
+      setMessage(null);
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل عمليات المخزون"});
+    }finally{if(showBusy)setBusy(false);}
+  },[branch.branch_id,canCount,canInventory,canTransfer]);
+
+  useEffect(()=>{void load();},[load]);
+
+  const openTask=useCallback(async(task:staff.OperationsTask)=>{
+    if(staff.isInventoryTransferTask(task)){setTab("transfers");return;}
+    setActing(task.id);setMessage(null);
+    try{
+      if(task.status==="open"&&task.can_claim)await staff.claimTask(task.id);
+      if(task.status==="open"||task.status==="claimed"){try{await staff.startTask(task.id);}catch{/* may already be started */}}
+      const next=await staff.getInventoryAuditTask(task.id);
+      setSelectedTask(task);setDetail(next);setBarcode("");setActualCount("");setNote("");
+      await load(false);
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر فتح مهمة الجرد"});
+    }finally{setActing("");}
+  },[load]);
+
+  useEffect(()=>{
+    const taskId=new URLSearchParams(window.location.search).get("task");
+    if(!taskId||!tasks.length||selectedTask)return;
+    const match=tasks.find((task)=>task.id===taskId);
+    if(match)void openTask(match);
+  },[tasks,selectedTask,openTask]);
+
+  const closeTask=()=>{setSelectedTask(null);setDetail(null);setBarcode("");setActualCount("");setNote("");};
+
+  const submitCount=async()=>{
+    if(!selectedTask||!detail||acting)return;
+    if(detail.barcode&&barcode.trim()!==detail.barcode.trim()){setMessage({type:"error",text:"امسح باركود المنتج الصحيح قبل تسجيل الكمية"});return;}
+    const qty=Number(actualCount);
+    if(!Number.isFinite(qty)||qty<0){setMessage({type:"error",text:"اكتب الكمية الفعلية التي وجدتها"});return;}
+    setActing(selectedTask.id);setMessage(null);
+    try{
+      const result=selectedTask.source_kind==="inventory_recount"
+        ?await staff.submitInventoryRecount(selectedTask.id,qty,note)
+        :await staff.submitInventoryCount(selectedTask.id,qty,note);
+      closeTask();
+      setMessage({type:"ok",text:result.result==="matched"||result.result==="matched_system"?"تم تسجيل العد والرصيد مطابق":"تم تسجيل الفرق وتحويله تلقائيًا لمسار المراجعة"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تسجيل الجرد"});}
+    finally{setActing("");}
+  };
+
+  const decideAdjustment=async(decision:"approve"|"reject")=>{
+    if(!selectedTask||!detail||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة توضح قرار المراجعة"});return;}
+    setActing(selectedTask.id);setMessage(null);
+    try{
+      if(decision==="approve")await staff.approveInventoryAdjustment(selectedTask.id,adjustmentReason,note);
+      else await staff.rejectInventoryAdjustment(selectedTask.id,rejectionReason,note);
+      closeTask();setMessage({type:"ok",text:decision==="approve"?"تم اعتماد فرق المخزون وتوثيق التسوية":"تم رفض التسوية وإرجاعها لإعادة الجرد"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر حفظ قرار المراجعة"});}
+    finally{setActing("");}
+  };
+
+  const openTransfer=(transfer:staff.InventoryTransfer)=>{
+    setSelectedTransfer(transfer);setTransferNote("");
+    setReceipt(Object.fromEntries(transfer.items.map((item)=>[item.product_id,String(item.quantity)])));
+  };
+
+  const dispatchTransfer=async()=>{
+    if(!selectedTransfer||acting)return;
+    setActing(selectedTransfer.id);setMessage(null);
+    try{
+      await staff.dispatchInventoryTransfer(selectedTransfer.id,transferNote);
+      setSelectedTransfer(null);setMessage({type:"ok",text:"تم تأكيد شحن التحويل وإنشاء مهمة الاستلام للفرع المستلم"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر شحن التحويل"});}
+    finally{setActing("");}
+  };
+
+  const receiveTransfer=async()=>{
+    if(!selectedTransfer||acting)return;
+    const items=selectedTransfer.items.map((item)=>({product_id:item.product_id,quantity:Number(receipt[item.product_id]??item.quantity)}));
+    if(items.some((item)=>!Number.isFinite(item.quantity)||item.quantity<0)){setMessage({type:"error",text:"راجع الكميات المستلمة"});return;}
+    setActing(selectedTransfer.id);setMessage(null);
+    try{
+      await staff.receiveInventoryTransfer(selectedTransfer.id,items,transferNote);
+      setSelectedTransfer(null);setMessage({type:"ok",text:"تم استلام التحويل وتحديث المخزون. أي فرق تم تحويله لمسار المراجعة"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر استلام التحويل"});}
+    finally{setActing("");}
+  };
+
+  if(!canInventory)return <><PageTitle title="المخزون" subtitle="الوحدة غير مفعلة لهذا الدور"/><Empty text="دورك الحالي لا يملك صلاحيات تشغيل المخزون"/></>;
+
+  const auditTasks=tasks.filter((task)=>staff.isInventoryTask(task));
+  const transferTasks=tasks.filter((task)=>staff.isInventoryTransferTask(task));
+  const mine=auditTasks.filter((task)=>task.is_mine).length;
+  const overdue=auditTasks.filter((task)=>task.is_overdue).length;
+
+  return <>
+    <PageTitle title="المخزون" subtitle="الجرد والتحويلات من نفس مهام التشغيل"/>
+    {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
+    <div className="stats"><div><strong>{mine}</strong><span>مهام جرد لي</span></div><div><strong>{overdue}</strong><span>متأخرة</span></div><div><strong>{transferTasks.length}</strong><span>مهام تحويل</span></div></div>
+    <div className="chips"><button className={tab==="tasks"?"active":""} onClick={()=>setTab("tasks")}>الجرد</button>{canTransfer&&<button className={tab==="transfers"?"active":""} onClick={()=>setTab("transfers")}>التحويلات</button>}<button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
+
+    {busy?<Loading/>:tab==="tasks"?<div className="stack inventory-task-list">
+      {auditTasks.map((task)=><article className={`task-card ${task.is_overdue?"danger":""}`} key={task.id}>
+        <div className="row"><span className="pill normal">{inventoryTaskLabel(task)}</span>{task.is_overdue&&<span className="danger-text">متأخرة</span>}</div>
+        <h3>{task.title}</h3><p>{task.description||"افتح المهمة واتبع تعليمات الجرد"}</p>
+        <div className="actions"><button className="primary" disabled={acting===task.id} onClick={()=>void openTask(task)}>{acting===task.id?<Loader2 className="spin"/>:<Scale/>}فتح الجرد</button></div>
+      </article>)}
+      {!auditTasks.length&&<Empty text="مفيش مهام جرد نشطة حاليًا"/>}
+    </div>:<div className="stack">
+      {(transfers?.transfers||[]).map((transfer)=><article className={`task-card ${transfer.has_variance?"danger":""}`} key={transfer.id}>
+        <div className="row"><strong>{transfer.transfer_number}</strong><span className="pill normal">{transfer.status==="requested"?"بانتظار الشحن":transfer.status==="dispatched"?"في الطريق":transfer.status==="received_with_variance"?"مستلم بفرق":"مستلم"}</span></div>
+        <h3>{transfer.direction==="incoming"?`من ${transfer.from_branch_name}`:`إلى ${transfer.to_branch_name}`}</h3>
+        <p>{transfer.items_count} منتج{transfer.expected_arrival_date?` · متوقع ${new Date(transfer.expected_arrival_date).toLocaleDateString("ar-EG")}`:""}</p>
+        {(transfer.can_dispatch||transfer.can_receive)&&<div className="actions"><button className="primary" onClick={()=>openTransfer(transfer)}>{transfer.can_dispatch?"تأكيد الشحن":"استلام التحويل"}</button></div>}
+      </article>)}
+      {!transfers?.transfers.length&&<Empty text="مفيش تحويلات مخزون تحتاج تنفيذ حاليًا"/>}
+    </div>}
+
+    {selectedTask&&detail&&<div className="inventory-modal-backdrop" onClick={closeTask}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>{inventoryTaskLabel(selectedTask)}</small><h2>{detail.product_name}</h2></div><button className="icon-btn" onClick={closeTask}><XCircle/></button></div>
+      {detail.image_url&&<img className="inventory-product-image" src={detail.image_url} alt=""/>}
+      <div className="inventory-facts"><span>الرف <b>{detail.shelf_location||"—"}</b></span><span>الوحدة <b>{detail.unit_of_measure||"قطعة"}</b></span></div>
+      {detail.source_kind==="inventory_adjustment"?<>
+        <div className="inventory-review-grid"><div><span>العد الأول</span><strong>{detail.first_count??"—"}</strong></div><div><span>إعادة العد</span><strong>{detail.recount??"—"}</strong></div><div><span>الفرق المقترح</span><strong>{detail.current_adjustment_delta??"—"}</strong></div></div>
+        <label className="inventory-field">سبب التسوية<select value={adjustmentReason} onChange={(e)=>setAdjustmentReason(e.target.value as staff.InventoryAdjustmentReason)}><option value="unknown">غير معروف</option><option value="damage">تالف</option><option value="breakage">كسر</option><option value="theft">فقد / سرقة</option><option value="receiving_error">خطأ استلام</option><option value="selling_error">خطأ بيع</option><option value="previous_error">خطأ رصيد سابق</option></select></label>
+        <label className="inventory-field">ملاحظة<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideAdjustment("reject")}>رفض وإعادة جرد</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideAdjustment("approve")}>{acting?<Loader2 className="spin"/>:<Check/>}اعتماد التسوية</button></div>
+      </>:<>
+        <div className="blind-count-note"><ShieldCheck/><div><strong>Blind Count</strong><span>رصيد النظام مخفي. عدّ الموجود فعليًا فقط.</span></div></div>
+        {detail.barcode&&<label className="inventory-field">باركود المنتج<input value={barcode} onChange={(e)=>setBarcode(e.target.value)} inputMode="numeric" placeholder="امسح الباركود"/></label>}
+        <label className="inventory-field">الكمية الفعلية<input value={actualCount} onChange={(e)=>setActualCount(e.target.value)} inputMode="decimal" type="number" min="0" step="0.001" placeholder="0"/></label>
+        <label className="inventory-field">ملاحظة اختيارية<textarea rows={2} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void submitCount()}>{acting?<Loader2 className="spin"/>:<CheckCircle2/>}تسجيل نتيجة الجرد</button>
+      </>}
+    </section></div>}
+
+    {selectedTransfer&&<div className="inventory-modal-backdrop" onClick={()=>setSelectedTransfer(null)}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>{selectedTransfer.transfer_number}</small><h2>{selectedTransfer.can_dispatch?"شحن التحويل":"استلام التحويل"}</h2></div><button className="icon-btn" onClick={()=>setSelectedTransfer(null)}><XCircle/></button></div>
+      <div className="transfer-items">{selectedTransfer.items.map((item)=><div className="transfer-item" key={item.id}><div><strong>{item.product_name}</strong><small>{item.barcode||"بدون باركود"} · المشحون {item.quantity}</small></div>{selectedTransfer.can_receive&&<input type="number" min="0" step="0.001" value={receipt[item.product_id]??""} onChange={(e)=>setReceipt((current)=>({...current,[item.product_id]:e.target.value}))}/>}</div>)}</div>
+      <label className="inventory-field">ملاحظة<textarea rows={2} value={transferNote} onChange={(e)=>setTransferNote(e.target.value)} placeholder="اختياري"/></label>
+      <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void (selectedTransfer.can_dispatch?dispatchTransfer():receiveTransfer())}>{acting?<Loader2 className="spin"/>:<PackageCheck/>}{selectedTransfer.can_dispatch?"تأكيد خروج الشحنة":"تأكيد الاستلام"}</button>
+    </section></div>}
+  </>;
 }
 
 function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: StaffBranch }) {
@@ -1242,7 +1442,7 @@ function AuthenticatedApp({state}:{state:ReturnType<typeof useStaffSession>}) {
   if(state.loading)return <Loading/>;
   if(!state.identity||!state.branch)return <Navigate to="/login" replace/>;
   const props={identity:state.identity,branch:state.branch};
-  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
+  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
 }
 
 export default function App(){
