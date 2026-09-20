@@ -126,3 +126,17 @@
 .expiry-values{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0}.expiry-values span{display:flex;flex-direction:column;background:#f7f9f8;border-radius:10px;padding:7px;font-size:8px;color:#74837b}.expiry-values b{font-size:10px;color:#173426;margin-top:2px}
 .expiry-safety-note{display:flex;align-items:flex-start;gap:7px;background:#f4f8f6;border-radius:12px;padding:9px;color:#607269;font-size:9px;line-height:1.55;margin-bottom:9px}.expiry-safety-note svg{width:17px;flex:0 0 auto;color:#005931}
 @media(max-width:520px){.expiry-toolbar{align-items:stretch;flex-direction:column}.expiry-toolbar label{width:100%}.expiry-summary{grid-template-columns:1fr 1fr}.expiry-values{grid-template-columns:1fr 1fr}}
+
+
+/* Staff V1 atomic expiry actions */
+.expiry-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:9px}
+.expiry-actions button,.full-action{min-height:44px;justify-content:center}
+.danger-action{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #efc5c5;background:#fff3f3;color:#a61b1b;border-radius:12px;padding:10px 12px;font:inherit;font-weight:900;cursor:pointer}
+.danger-action:hover{background:#ffe8e8}.danger-action:disabled{opacity:.55;cursor:not-allowed}
+.expiry-legacy-warning{display:flex;align-items:flex-start;gap:7px;border:1px solid #f3d39b;background:#fff8e7;color:#8a6200;border-radius:12px;padding:9px;font-size:9px;line-height:1.5;margin-top:8px}.expiry-legacy-warning svg{width:17px;flex:0 0 auto}
+.expiry-action-modal{border-top:4px solid #005931}
+.supplier-returns-workspace{display:grid;gap:12px;margin-top:12px}.supplier-return-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid #dfe8e3;border-radius:18px;padding:13px}.supplier-return-summary>div{display:flex;align-items:center;gap:9px}.supplier-return-summary svg{width:21px;color:#005931}.supplier-return-summary>div>div{display:flex;flex-direction:column}.supplier-return-summary strong{font-size:12px}.supplier-return-summary span{font-size:9px;color:#77867e;margin-top:2px}.supplier-return-summary>b{min-width:34px;height:34px;border-radius:999px;background:#eef8f3;color:#005931;display:flex;align-items:center;justify-content:center}
+.supplier-return-list{gap:9px}.supplier-return-card{background:#fff;border:1px solid #e2eae6;border-radius:18px;padding:13px}.supplier-return-card h3{margin:2px 0 0;font-size:13px}.supplier-return-card small{font-size:9px;color:#76867d}
+.supplier-return-values{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:10px 0}.supplier-return-values span{display:flex;flex-direction:column;background:#f7f9f8;border-radius:11px;padding:8px;font-size:8px;color:#75857c}.supplier-return-values b{font-size:11px;color:#173426;margin-top:2px}
+.supplier-return-items{display:grid;gap:5px;margin-bottom:10px}.supplier-return-items>div{display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px dashed #e1e8e4;padding:6px 0;font-size:9px}.supplier-return-items>div:last-child{border-bottom:0}.supplier-return-items span{color:#64756c}.supplier-return-items b{color:#173426;text-align:left}
+@media(max-width:520px){.expiry-actions{grid-template-columns:1fr}.supplier-return-items>div{align-items:flex-start;flex-direction:column}.supplier-return-values{grid-template-columns:1fr 1fr}}
