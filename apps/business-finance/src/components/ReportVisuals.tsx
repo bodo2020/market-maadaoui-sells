@@ -199,10 +199,10 @@ export function ReportVisuals({ reportKey, data }: { reportKey: ReportKey; data:
   }
 
   if (reportKey === 'profitability') {
-    const daily = records(data.daily).map((row) => ({ label: dateLabel(row.date), value: num(row.net_sales), secondary: num(row.gross_profit) }));
+    const daily = records(data.daily).map((row) => ({ label: dateLabel(row.date), value: num(row.gross_profit), secondary: num(row.online_gross_profit) }));
     const waterfall = records(data.waterfall).map((row) => ({ label: text(row.label ?? row.key), value: num(row.value) }));
     return <VisualGrid>
-      <TrendAreaChart eyebrow="Profit Trend" title="اتجاه المبيعات والربح" points={daily} valueLabel="صافي المبيعات" secondaryLabel="إجمالي الربح"/>
+      <TrendAreaChart eyebrow="Profit Trend" title="اتجاه أرباح POS والأونلاين" points={daily} valueLabel="ربح POS" secondaryLabel="ربح الأونلاين"/>
       <WaterfallChart eyebrow="Profit Bridge" title="جسر تكوين الربح" points={waterfall}/>
     </VisualGrid>;
   }
@@ -269,8 +269,10 @@ export function ReportVisuals({ reportKey, data }: { reportKey: ReportKey; data:
   if (reportKey === 'online') {
     const statuses = records(data.statuses);
     const daily = records(data.daily).map((row) => ({ label: dateLabel(row.day), value: num(row.order_value) }));
+    const profitDaily = records(data.daily).map((row) => ({ label: dateLabel(row.day), value: num(row.online_gross_profit) }));
     return <VisualGrid>
       <TrendAreaChart eyebrow="Online Trend" title="اتجاه قيمة الطلبات اليومية" points={daily} valueLabel="قيمة الطلبات"/>
+      <TrendAreaChart eyebrow="Online Profit" title="اتجاه ربح الأونلاين" points={profitDaily} valueLabel="إجمالي الربح"/>
       <DonutChart eyebrow="Order Mix" title="توزيع الطلبات حسب الحالة" centerLabel="الطلبات" formatValue={(value) => number(value)} segments={statuses.map((row) => ({ label: statusLabel(row.status), value: num(row.orders) }))}/>
       <RankedBarChart eyebrow="Order Value" title="قيمة الطلبات حسب الحالة" items={statuses.map((row) => ({ label: statusLabel(row.status), value: num(row.order_value) }))}/>
     </VisualGrid>;
