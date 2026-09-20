@@ -1106,9 +1106,11 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
   const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
   const canCount = branch.permissions.includes("inventory.count") || branch.permissions.includes("inventory.recount");
   const canTransfer = branch.permissions.includes("inventory.transfer") || branch.permissions.includes("inventory.manage");
-  const [tab,setTab]=useState<"tasks"|"transfers">("tasks");
+  const [tab,setTab]=useState<"tasks"|"transfers"|"risks">("tasks");
+  const [riskStatus,setRiskStatus]=useState<staff.InventoryRiskStatus>("low_stock");
   const [tasks,setTasks]=useState<staff.OperationsTask[]>([]);
   const [transfers,setTransfers]=useState<staff.InventoryTransferWorkspace|null>(null);
+  const [risks,setRisks]=useState<staff.InventoryRiskWorkspace|null>(null);
   const [busy,setBusy]=useState(true);
   const [acting,setActing]=useState("");
   const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
@@ -1128,17 +1130,19 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     if(showBusy)setBusy(true);
     try{
       if(canCount){try{await staff.ensureDailyInventoryAudit(branch.branch_id);}catch{/* scheduler/server policy remains authoritative */}}
-      const [taskRows,transferData]=await Promise.all([
+      const [taskRows,transferData,riskData]=await Promise.all([
         staff.listTasks(branch.branch_id,"active"),
         canTransfer?staff.getInventoryTransferWorkspace(branch.branch_id).catch(()=>null):Promise.resolve(null),
+        staff.getInventoryRiskWorkspace(branch.branch_id,riskStatus).catch(()=>null),
       ]);
       setTasks(taskRows.filter((task)=>staff.isInventoryTask(task)||staff.isInventoryTransferTask(task)));
       setTransfers(transferData);
+      setRisks(riskData);
       setMessage(null);
     }catch(caught){
       setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل عمليات المخزون"});
     }finally{if(showBusy)setBusy(false);}
-  },[branch.branch_id,canCount,canInventory,canTransfer]);
+  },[branch.branch_id,canCount,canInventory,canTransfer,riskStatus]);
 
   useEffect(()=>{void load();},[load]);
 
@@ -1224,6 +1228,18 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     finally{setActing("");}
   };
 
+  const createRiskCheck=async(product:staff.InventoryRiskProduct)=>{
+    if(acting)return;
+    setActing(product.product_id);setMessage(null);
+    try{
+      await staff.createSpotInventoryAudit(branch.branch_id,[product.product_id]);
+      setTab("tasks");
+      setMessage({type:"ok",text:`تم إنشاء جرد سريع لـ ${product.product_name} وإسناده لموظف جرد مؤهل`});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إنشاء الجرد السريع"});}
+    finally{setActing("");}
+  };
+
   if(!canInventory)return <><PageTitle title="المخزون" subtitle="الوحدة غير مفعلة لهذا الدور"/><Empty text="دورك الحالي لا يملك صلاحيات تشغيل المخزون"/></>;
 
   const auditTasks=tasks.filter((task)=>staff.isInventoryTask(task));
@@ -1234,8 +1250,8 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
   return <>
     <PageTitle title="المخزون" subtitle="الجرد والتحويلات من نفس مهام التشغيل"/>
     {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
-    <div className="stats"><div><strong>{mine}</strong><span>مهام جرد لي</span></div><div><strong>{overdue}</strong><span>متأخرة</span></div><div><strong>{transferTasks.length}</strong><span>مهام تحويل</span></div></div>
-    <div className="chips"><button className={tab==="tasks"?"active":""} onClick={()=>setTab("tasks")}>الجرد</button>{canTransfer&&<button className={tab==="transfers"?"active":""} onClick={()=>setTab("transfers")}>التحويلات</button>}<button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
+    <div className="stats"><div><strong>{mine}</strong><span>مهام جرد لي</span></div><div><strong>{overdue}</strong><span>متأخرة</span></div><div><strong>{risks?.summary.low_stock_rows||0}</strong><span>مخزون منخفض</span></div></div>
+    <div className="chips"><button className={tab==="tasks"?"active":""} onClick={()=>setTab("tasks")}>الجرد</button>{canTransfer&&<button className={tab==="transfers"?"active":""} onClick={()=>setTab("transfers")}>التحويلات</button>}<button className={tab==="risks"?"active":""} onClick={()=>setTab("risks")}>مخاطر المخزون</button><button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
 
     {busy?<Loading/>:tab==="tasks"?<div className="stack inventory-task-list">
       {auditTasks.map((task)=><article className={`task-card ${task.is_overdue?"danger":""}`} key={task.id}>
@@ -1252,6 +1268,14 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
         {(transfer.can_dispatch||transfer.can_receive)&&<div className="actions"><button className="primary" onClick={()=>openTransfer(transfer)}>{transfer.can_dispatch?"تأكيد الشحن":"استلام التحويل"}</button></div>}
       </article>)}
       {!transfers?.transfers.length&&<Empty text="مفيش تحويلات مخزون تحتاج تنفيذ حاليًا"/>}
+    </div>:<div className="inventory-risk-workspace">
+      <div className="chips risk-filter">{([["low_stock","منخفض"],["out_of_stock","نافد"],["coverage_risk","تغطية منخفضة"]] as Array<[staff.InventoryRiskStatus,string]>).map(([id,label])=><button key={id} className={riskStatus===id?"active":""} onClick={()=>setRiskStatus(id)}>{label}</button>)}</div>
+      <div className="inventory-risk-summary"><span>منخفض <b>{risks?.summary.low_stock_rows||0}</b></span><span>نافد <b>{risks?.summary.out_of_stock_rows||0}</b></span><span>تغطية منخفضة <b>{risks?.summary.coverage_risk_rows||0}</b></span><span>جرد معلق <b>{risks?.summary.pending_audit_tasks||0}</b></span></div>
+      <div className="stack">{(risks?.products||[]).map((product)=><article className="risk-product-card" key={product.product_id}>
+        <div className="risk-product-main">{product.image_url?<img src={product.image_url} alt=""/>:<div className="risk-product-placeholder"><PackageCheck/></div>}<div><div className="row"><strong>{product.product_name}</strong><span className={`risk-state ${product.stock_status}`}>{product.stock_status==="out_of_stock"?"نافد":product.stock_status==="coverage_risk"?"تغطية منخفضة":"منخفض"}</span></div><small>{product.shelf_location?`رف ${product.shelf_location}`:"رف غير محدد"} · {product.barcode||"بدون باركود"}</small></div></div>
+        <div className="risk-stock-values"><span>فعلي <b>{product.quantity}</b></span><span>محجوز <b>{product.reserved_quantity}</b></span><span>متاح <b>{product.available_quantity}</b></span><span>الحد الأدنى <b>{product.min_stock_level}</b></span></div>
+        {risks?.permissions.can_manage_sessions&&<button className="secondary full-action" disabled={acting===product.product_id} onClick={()=>void createRiskCheck(product)}>{acting===product.product_id?<Loader2 className="spin"/>:<Scale/>}إنشاء جرد سريع قبل التصرف</button>}
+      </article>)}{!risks?.products.length&&<Empty text="مفيش منتجات في الحالة دي حاليًا"/>}</div>
     </div>}
 
     {selectedTask&&detail&&<div className="inventory-modal-backdrop" onClick={closeTask}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
