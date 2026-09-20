@@ -79,9 +79,13 @@ jobs:
           STAFF_KEY_PASSWORD: ${{ secrets.STAFF_ANDROID_KEY_PASSWORD }}
         run: |
           if [ -z "$STAFF_KEYSTORE_BASE64" ] || [ -z "$STAFF_STORE_PASSWORD" ] || [ -z "$STAFF_KEY_ALIAS" ] || [ -z "$STAFF_KEY_PASSWORD" ]; then
-            echo "mode=debug" >> "$GITHUB_OUTPUT"
-            echo "::warning::Stable Android signing secrets are not configured. Debug fallback will be built."
-            exit 0
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "mode=debug" >> "$GITHUB_OUTPUT"
+              echo "::warning::Stable Android signing secrets are not configured. PR debug fallback will be built for testing only."
+              exit 0
+            fi
+            echo "::error::Stable Android signing is required for distributable Staff APK builds."
+            exit 1
           fi
           echo "$STAFF_KEYSTORE_BASE64" | base64 --decode > android/app/staff-release.jks
           printf '%s\n' "STAFF_STORE_FILE=staff-release.jks" "STAFF_STORE_PASSWORD=$STAFF_STORE_PASSWORD" "STAFF_KEY_ALIAS=$STAFF_KEY_ALIAS" "STAFF_KEY_PASSWORD=$STAFF_KEY_PASSWORD" >> android/gradle.properties
