@@ -227,6 +227,9 @@ export type ExpiryBatchItem = {
   shelf_location: string | null;
   purchase_price: number;
   supplier_id: string | null;
+  supplier_name: string | null;
+  can_supplier_return: boolean;
+  legacy_remaining_batch: boolean;
   notes: string | null;
 };
 
@@ -241,7 +244,56 @@ export type ExpiryWorkspace = {
     within_7_days: number;
     total_quantity: number;
     purchase_value_at_risk: number;
+    supplier_return_ready: number;
+    legacy_remaining_rows: number;
   };
+};
+
+export type ExpiryActionResult = {
+  ok: boolean;
+  idempotent: boolean;
+  action_id: string;
+  action_type: "dispose" | "supplier_return";
+  product_id?: string;
+  batch_id?: string;
+  batch_number?: string;
+  quantity: number;
+  batch_quantity_after?: number;
+  inventory_quantity_after?: number;
+  purchase_price: number;
+  value_amount: number;
+  cost_missing?: boolean;
+  supplier_id?: string | null;
+  supplier_return_id?: string | null;
+  expense_id?: string | null;
+};
+
+export type SupplierReturnWorkspace = {
+  branch_id: string;
+  status: string;
+  items: Array<{
+    id: string;
+    branch_id: string;
+    supplier_id: string;
+    supplier_name: string;
+    status: "pending_credit" | "credited" | "cancelled";
+    expected_credit_amount: number;
+    actual_credit_amount: number | null;
+    credit_note_number: string | null;
+    notes: string | null;
+    created_at: string;
+    settled_at: string | null;
+    items: Array<{
+      id: string;
+      product_id: string;
+      product_name: string;
+      batch_id: string;
+      batch_number: string;
+      quantity: number;
+      purchase_price: number;
+      line_amount: number;
+    }>;
+  }>;
 };
 
 export type InventoryRiskStatus = "low_stock" | "out_of_stock" | "coverage_risk";
@@ -1479,73 +1531,71 @@ export async function settleOrderShortageFinancialAdjustment(adjustmentId:string
 
 
 
-function localDateOnly(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+function expiryActionError(message?: string) {
+  const value=message||"";
+  if(value.includes("EXPIRY_VIEW_DENIED"))return new Error("ليس لديك صلاحية عرض دفعات الصلاحية.");
+  if(value.includes("EXPIRY_DISPOSE_DENIED"))return new Error("ليس لديك صلاحية إهلاك منتجات الصلاحية.");
+  if(value.includes("EXPIRY_SUPPLIER_RETURN_DENIED"))return new Error("ليس لديك صلاحية إرجاع دفعات للمورد.");
+  if(value.includes("EXPIRY_SUPPLIER_REQUIRED"))return new Error("الدفعة غير مرتبطة بمورد أو فاتورة شراء؛ لا يمكن إنشاء إرجاع للمورد قبل ربطها.");
+  if(value.includes("EXPIRY_BATCH_QUANTITY_EXCEEDED"))return new Error("الكمية المطلوبة أكبر من الكمية المسجلة في الدفعة.");
+  if(value.includes("EXPIRY_LEGACY_DAMAGED_BATCH"))return new Error("هذه دفعة تالف قديمة ولا يسمح النظام بمعالجتها مرة ثانية.");
+  if(value.includes("INSUFFICIENT_STOCK"))return new Error("لا توجد كمية متاحة كافية بعد خصم حجوزات الطلبات الإلكترونية.");
+  if(value.includes("EXPIRY_NOTE_REQUIRED"))return new Error("اكتب سببًا واضحًا للإجراء.");
+  if(value.includes("REQUEST_CONFLICT"))return new Error("تم استخدام رقم العملية لطلب مختلف. حدّث الشاشة وحاول مرة أخرى.");
+  if(value.includes("SUPPLIER_RETURN_SETTLE_DENIED"))return new Error("ليس لديك صلاحية تسوية إرجاع المورد.");
+  if(value.includes("SUPPLIER_RETURN_CREDIT_NOTE_REQUIRED"))return new Error("اكتب رقم Credit Note أو مرجع اعتماد المورد.");
+  if(value.includes("SUPPLIER_RETURN_NOT_PENDING"))return new Error("إرجاع المورد لم يعد بانتظار التسوية.");
+  return new Error(message||"تعذر تنفيذ إجراء الصلاحية.");
 }
 
 export async function getExpiryWorkspace(branchId: string, daysAhead = 30) {
   const safeDays=Math.min(Math.max(Math.trunc(daysAhead||30),1),90);
-  const future=new Date();
-  future.setDate(future.getDate()+safeDays);
-
-  const query=await supabase
-    .from("product_batches")
-    .select("id,product_id,batch_number,expiry_date,quantity,shelf_location,purchase_price,supplier_id,notes,products(name,barcode,image_urls)")
-    .eq("branch_id",branchId)
-    .gt("quantity",0)
-    .lte("expiry_date",localDateOnly(future))
-    .order("expiry_date",{ascending:true})
-    .limit(250);
-
-  if(query.error){
-    const value=query.error.message||"";
-    if(value.includes("permission denied")||value.includes("row-level security"))throw new Error("دورك لا يملك صلاحية عرض دفعات الصلاحية لهذا الفرع.");
-    throw new Error(value||"تعذر تحميل دفعات الصلاحية.");
-  }
-
-  const today=localDateOnly(new Date());
-  let expired=0,todayCount=0,within3=0,within7=0,totalQuantity=0,purchaseValue=0;
-  const items=(query.data||[]).map((row:any)=>{
-    const product=Array.isArray(row.products)?row.products[0]:row.products;
-    const quantity=Number(row.quantity||0);
-    const purchasePrice=Number(row.purchase_price||0);
-    const expiry=String(row.expiry_date||"");
-    const diff=Math.ceil((new Date(`${expiry}T12:00:00`).getTime()-new Date(`${today}T12:00:00`).getTime())/86400000);
-    if(diff<0)expired+=1;
-    else if(diff===0)todayCount+=1;
-    else if(diff<=3)within3+=1;
-    if(diff>=0&&diff<=7)within7+=1;
-    totalQuantity+=quantity;
-    purchaseValue+=quantity*purchasePrice;
-    const images=Array.isArray(product?.image_urls)?product.image_urls:[];
-    return {
-      batch_id:String(row.id),
-      product_id:String(row.product_id),
-      product_name:String(product?.name||"منتج"),
-      barcode:product?.barcode==null?null:String(product.barcode),
-      image_url:images.length?String(images[0]):null,
-      batch_number:String(row.batch_number||""),
-      expiry_date:expiry,
-      quantity,
-      shelf_location:row.shelf_location==null?null:String(row.shelf_location),
-      purchase_price:purchasePrice,
-      supplier_id:row.supplier_id==null?null:String(row.supplier_id),
-      notes:row.notes==null?null:String(row.notes),
-    } satisfies ExpiryBatchItem;
+  const result=await rpc("get_expiry_workspace_v2",{
+    p_branch_id:branchId,
+    p_days_ahead:safeDays,
+    p_limit:250,
   });
-
-  return {
-    branch_id:branchId,
-    days_ahead:safeDays,
-    items,
-    summary:{
-      expired,
-      today:todayCount,
-      within_3_days:within3,
-      within_7_days:within7,
-      total_quantity:Math.round(totalQuantity*1000)/1000,
-      purchase_value_at_risk:Math.round(purchaseValue*100)/100,
-    },
-  } as ExpiryWorkspace;
+  if(result.error)throw expiryActionError(result.error.message);
+  return result.data as ExpiryWorkspace;
 }
 
+export async function processExpiryBatchAction(
+  requestId:string,
+  branchId:string,
+  batchId:string,
+  quantity:number,
+  action:"dispose"|"supplier_return",
+  note:string,
+) {
+  const result=await rpc("process_expiry_batch_action_v2",{
+    p_request_id:requestId,
+    p_branch_id:branchId,
+    p_batch_id:batchId,
+    p_quantity:quantity,
+    p_action:action,
+    p_note:note.trim(),
+  });
+  if(result.error)throw expiryActionError(result.error.message);
+  return result.data as ExpiryActionResult;
+}
+
+export async function getSupplierReturnsWorkspace(branchId:string,status:"pending_credit"|"credited"|"cancelled"|"all"="pending_credit") {
+  const result=await rpc("get_supplier_returns_workspace_v2",{
+    p_branch_id:branchId,
+    p_status:status,
+    p_limit:100,
+  });
+  if(result.error)throw expiryActionError(result.error.message);
+  return result.data as SupplierReturnWorkspace;
+}
+
+export async function settleSupplierReturn(returnId:string,actualCreditAmount:number,creditNoteNumber:string,note?:string) {
+  const result=await rpc("settle_supplier_return_v2",{
+    p_return_id:returnId,
+    p_actual_credit_amount:actualCreditAmount,
+    p_credit_note_number:creditNoteNumber.trim(),
+    p_note:note?.trim()||null,
+  });
+  if(result.error)throw expiryActionError(result.error.message);
+  return result.data as Record<string,unknown>;
+}
