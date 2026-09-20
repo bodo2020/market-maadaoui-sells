@@ -1360,7 +1360,7 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     <PageTitle title="المخزون" subtitle="الجرد والتحويلات من نفس مهام التشغيل"/>
     {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
     <div className="stats"><div><strong>{mine}</strong><span>مهام جرد لي</span></div><div><strong>{overdue}</strong><span>متأخرة</span></div><div><strong>{risks?.summary.low_stock_rows||0}</strong><span>مخزون منخفض</span></div></div>
-    <div className="chips"><button className={tab==="tasks"?"active":""} onClick={()=>setTab("tasks")}>الجرد</button>{canTransfer&&<button className={tab==="transfers"?"active":""} onClick={()=>setTab("transfers")}>التحويلات</button>}<button className={tab==="risks"?"active":""} onClick={()=>setTab("risks")}>مخاطر المخزون</button>{canExpiry&&<button className={tab==="expiry"?"active":""} onClick={()=>setTab("expiry")}>الصلاحية</button>}<button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
+    <div className="chips"><button className={tab==="tasks"?"active":""} onClick={()=>setTab("tasks")}>الجرد</button>{canTransfer&&<button className={tab==="transfers"?"active":""} onClick={()=>setTab("transfers")}>التحويلات</button>}<button className={tab==="risks"?"active":""} onClick={()=>setTab("risks")}>مخاطر المخزون</button>{canExpiry&&<button className={tab==="expiry"?"active":""} onClick={()=>setTab("expiry")}>الصلاحية</button>}{canSupplierReturns&&<button className={tab==="supplier_returns"?"active":""} onClick={()=>setTab("supplier_returns")}>إرجاعات الموردين</button>}<button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
 
     {busy?<Loading/>:tab==="tasks"?<div className="stack inventory-task-list">
       {auditTasks.map((task)=><article className={`task-card ${task.is_overdue?"danger":""}`} key={task.id}>
@@ -1385,15 +1385,28 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
         <div className="risk-stock-values"><span>فعلي <b>{product.quantity}</b></span><span>محجوز <b>{product.reserved_quantity}</b></span><span>متاح <b>{product.available_quantity}</b></span><span>الحد الأدنى <b>{product.min_stock_level}</b></span></div>
         {risks?.permissions.can_manage_sessions&&<button className="secondary full-action" disabled={acting===product.product_id} onClick={()=>void createRiskCheck(product)}>{acting===product.product_id?<Loader2 className="spin"/>:<Scale/>}إنشاء جرد سريع قبل التصرف</button>}
       </article>)}{!risks?.products.length&&<Empty text="مفيش منتجات في الحالة دي حاليًا"/>}</div>
-    </div>:<div className="expiry-workspace">
+    </div>:tab==="expiry"?<div className="expiry-workspace">
       <div className="expiry-toolbar"><div><CalendarDays/><div><strong>دفعات الصلاحية</strong><span>من product_batches للفرع فقط</span></div></div><label>الفترة<select value={expiryDays} onChange={(e)=>setExpiryDays(Number(e.target.value))}><option value={7}>7 أيام</option><option value={14}>14 يوم</option><option value={30}>30 يوم</option><option value={60}>60 يوم</option><option value={90}>90 يوم</option></select></label></div>
       <div className="expiry-summary"><div><strong>{expiry?.summary.expired||0}</strong><span>منتهي</span></div><div><strong>{expiry?.summary.today||0}</strong><span>ينتهي اليوم</span></div><div><strong>{expiry?.summary.within_3_days||0}</strong><span>خلال 3 أيام</span></div><div><strong>{Number(expiry?.summary.purchase_value_at_risk||0).toLocaleString("ar-EG",{maximumFractionDigits:2})}</strong><span>قيمة شراء معرضة</span></div></div>
       <div className="stack expiry-list">{(expiry?.items||[]).map((item)=>{const days=expiryDaysLeft(item.expiry_date);return <article className={`expiry-card ${days<0?"expired":days<=3?"critical":days<=7?"warning":""}`} key={item.batch_id}>
         <div className="expiry-product">{item.image_url?<img src={item.image_url} alt=""/>:<div className="risk-product-placeholder"><CalendarDays/></div>}<div><div className="row"><strong>{item.product_name}</strong><span className="expiry-status">{days<0?`منتهي من ${Math.abs(days)} يوم`:days===0?"ينتهي اليوم":`متبقي ${days} يوم`}</span></div><small>دفعة {item.batch_number} · {item.shelf_location?`رف ${item.shelf_location}`:"رف غير محدد"}</small></div></div>
         <div className="expiry-values"><span>الكمية <b>{item.quantity}</b></span><span>تاريخ الصلاحية <b>{new Date(`${item.expiry_date}T12:00:00`).toLocaleDateString("ar-EG")}</b></span><span>سعر الشراء <b>{Number(item.purchase_price).toLocaleString("ar-EG")} ج.م</b></span></div>
-        <div className="expiry-safety-note"><ShieldCheck/><span>قبل الإهلاك أو الإرجاع للمورد: تحقق من الكمية الفعلية. المعالجة المالية القديمة غير مستخدمة هنا.</span></div>
-        <button className="secondary full-action" disabled={acting===item.batch_id} onClick={()=>void createExpiryCheck(item)}>{acting===item.batch_id?<Loader2 className="spin"/>:<Scale/>}جرد تحقق لهذه الدفعة</button>
+        {item.legacy_remaining_batch&&<div className="expiry-legacy-warning"><AlertTriangle/><span>هذه دفعة متبقية أنشأها النظام القديم؛ اعمل جرد تحقق قبل أي إجراء.</span></div>}
+        <div className="expiry-safety-note"><ShieldCheck/><span>{item.supplier_name?`المورد: ${item.supplier_name}. `:""}أي خصم جديد يحترم حجوزات الطلبات الأونلاين ويُسجل في Inventory Ledger.</span></div>
+        <div className="expiry-actions">
+          <button className="secondary" disabled={acting===item.batch_id} onClick={()=>void createExpiryCheck(item)}>{acting===item.batch_id?<Loader2 className="spin"/>:<Scale/>}جرد تحقق</button>
+          {canDisposeExpiry&&<button className="danger-action" disabled={acting===item.batch_id} onClick={()=>openExpiryAction(item,"dispose")}><XCircle/>إهلاك</button>}
+          {canSupplierReturns&&item.can_supplier_return&&<button className="primary" disabled={acting===item.batch_id} onClick={()=>openExpiryAction(item,"supplier_return")}><Send/>إرجاع للمورد</button>}
+        </div>
       </article>})}{!expiry?.items.length&&<Empty text="مفيش دفعات منتهية أو قريبة من الانتهاء في الفترة دي"/>}</div>
+    </div>:<div className="supplier-returns-workspace">
+      <div className="supplier-return-summary"><div><FileText/><div><strong>إرجاعات بانتظار اعتماد المورد</strong><span>المخزون خرج بالفعل؛ التسوية هنا لتسجيل الـCredit Note فقط.</span></div></div><b>{supplierReturns?.items.length||0}</b></div>
+      <div className="stack supplier-return-list">{(supplierReturns?.items||[]).map((item)=><article className="supplier-return-card" key={item.id}>
+        <div className="row"><div><small>{item.supplier_name}</small><h3>إرجاع مورد</h3></div><span className="pill high">Pending Credit</span></div>
+        <div className="supplier-return-values"><span>المتوقع <b>{Number(item.expected_credit_amount).toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})} ج.م</b></span><span>التاريخ <b>{new Date(item.created_at).toLocaleDateString("ar-EG")}</b></span></div>
+        <div className="supplier-return-items">{item.items.map((line)=><div key={line.id}><span>{line.product_name} · دفعة {line.batch_number}</span><b>{line.quantity} × {Number(line.purchase_price).toLocaleString("ar-EG")} ج.م</b></div>)}</div>
+        {canSettleSupplierReturns&&<button className="primary full-action" disabled={acting===item.id} onClick={()=>openSupplierSettlement(item)}><Check/>تسجيل Credit Note</button>}
+      </article>)}{!supplierReturns?.items.length&&<Empty text="مفيش إرجاعات مورد معلقة حاليًا"/>}</div>
     </div>}
 
     {selectedTask&&detail&&<div className="inventory-modal-backdrop" onClick={closeTask}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
