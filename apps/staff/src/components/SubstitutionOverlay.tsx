@@ -1,5 +1,5 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, PackageSearch, RefreshCw, Search, X } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, PackageSearch, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import * as staff from "../services/staffService";
 import type { PickingItem, PickingSession, SubstitutionCandidate } from "../services/staffService";
@@ -40,6 +40,16 @@ function financialStateLabel(state?: string | null) {
   return "جاري تحديث التسوية المالية";
 }
 
+function smartReasons(candidate: SubstitutionCandidate) {
+  const reasons: string[] = [];
+  if (candidate.is_predefined) reasons.push("بديل معتمد مسبقًا");
+  if (candidate.same_brand) reasons.push("نفس العلامة");
+  else reasons.push("نفس التصنيف");
+  if (Number(candidate.price_delta_per_unit || 0) <= 0) reasons.push("بدون زيادة سعر");
+  if (Number(candidate.available_quantity || 0) >= 3) reasons.push("مخزونه مطمئن");
+  return reasons.slice(0, 3);
+}
+
 function StatusBlock({ item, onChanged }: { item: PickingItem; onChanged: () => Promise<void> }) {
   const sub = item.substitution;
   const [busy, setBusy] = useState(false);
@@ -71,6 +81,7 @@ export default function SubstitutionOverlay() {
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
   const [error, setError] = useState("");
+  const searchSequence = useRef(0);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -83,7 +94,7 @@ export default function SubstitutionOverlay() {
   const load = useCallback(async () => {
     if (!orderId) { setSession(null); return; }
     try { setSession(await staff.getPickingSession(orderId)); setError(""); }
-    catch { setSession(null); }
+    catch { /* Keep the last good session so an intermittent refresh never closes the overlay. */ }
   }, [orderId]);
 
   useEffect(() => { void load(); }, [load]);
@@ -100,27 +111,57 @@ export default function SubstitutionOverlay() {
   const pending = useMemo(() => unresolved.filter((item) => item.substitution?.status === "pending").length, [unresolved]);
   const policy = session?.substitution_policy || "manager";
   const available = Boolean(orderId && session?.fulfillment_state === "picking" && unresolved.length);
-  if (!available) return null;
+  const rankedCandidates = useMemo(
+    () => [...candidates].sort((a, b) => Number(b.match_score || 0) - Number(a.match_score || 0)),
+    [candidates],
+  );
 
-  const search = async (event?: FormEvent) => {
-    event?.preventDefault();
-    if (!selected) return;
+  const runSearch = useCallback(async (itemId: string, searchQuery: string) => {
+    const sequence = ++searchSequence.current;
     setLoading(true); setError("");
     try {
-      const result = await staff.searchSubstitutionCandidates(selected.id, query, 25);
+      const result = await staff.searchSubstitutionCandidates(itemId, searchQuery.trim(), 25);
+      if (sequence !== searchSequence.current) return;
       setCandidates(result.items || []);
       if (!result.items?.length) setError("مفيش بدائل متاحة بنفس التصنيف والمخزون حاليًا.");
     } catch (caught) {
+      if (sequence !== searchSequence.current) return;
       setError(caught instanceof Error ? caught.message : "تعذر تحميل البدائل");
-    } finally { setLoading(false); }
+    } finally {
+      if (sequence === searchSequence.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    const timer = window.setTimeout(
+      () => void runSearch(selected.id, query),
+      query.trim() ? 350 : 0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [selected?.id, query, runSearch]);
+
+  if (!available && !open) return null;
+
+  const search = (event?: FormEvent) => {
+    event?.preventDefault();
+    if (!selected) return;
+    void runSearch(selected.id, query);
   };
 
-  const chooseItem = async (item: PickingItem) => {
+  const chooseItem = (item: PickingItem) => {
+    searchSequence.current += 1;
     setSelected(item); setQuery(""); setCandidates([]); setError("");
-    setLoading(true);
-    try { const result = await staff.searchSubstitutionCandidates(item.id, "", 25); setCandidates(result.items || []); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "تعذر تحميل البدائل"); }
-    finally { setLoading(false); }
+  };
+
+  const leaveCandidateSearch = () => {
+    searchSequence.current += 1;
+    setSelected(null); setCandidates([]); setQuery(""); setError(""); setLoading(false);
+  };
+
+  const closeOverlay = () => {
+    searchSequence.current += 1;
+    setOpen(false); setSelected(null); setCandidates([]); setQuery(""); setError(""); setLoading(false);
   };
 
   const markAsShortage = async (item: PickingItem) => {
@@ -170,7 +211,7 @@ export default function SubstitutionOverlay() {
         <div className="sub-sheet">
           <div className="sub-head">
             <div><small>تجهيز الطلب</small><h2>{selected ? "اختيار البديل" : "الأصناف غير المحسومة"}</h2></div>
-            <div className="sub-head-actions">{selected && <button onClick={() => { setSelected(null); setCandidates([]); setError(""); }}><ArrowRight /></button>}<button onClick={() => { setOpen(false); setSelected(null); }}><X /></button></div>
+            <div className="sub-head-actions">{selected && <button onClick={leaveCandidateSearch}><ArrowRight /></button>}<button onClick={closeOverlay}><X /></button></div>
           </div>
 
           {!selected ? <>
@@ -187,20 +228,22 @@ export default function SubstitutionOverlay() {
                 {!hasPending && item.status !== "substituted" && (
                   policy === "remove_item"
                     ? <button className="sub-primary" disabled={acting} onClick={() => void markAsShortage(item)}><AlertTriangle />تسجيل كناقص وحذف الصنف</button>
-                    : <button className="sub-primary" onClick={() => void chooseItem(item)}><Search />اقتراح بديل</button>
+                    : <button className="sub-primary" onClick={() => chooseItem(item)}><Search />اقتراح بديل</button>
                 )}
               </article>;
             })}
           </div></> : <>
             <article className="sub-selected-origin"><span>بديل عن</span><strong>{selected.product_name}</strong><small>الكمية المطلوبة للبديل: {qty(remaining(selected), selected.is_weight_based)}</small></article>
-            <form className="sub-search" onSubmit={(event) => void search(event)}><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="اسم المنتج أو الباركود" autoFocus /><button disabled={loading}>{loading ? <Loader2 className="spin" /> : <Search />}</button></form>
+            <form className="sub-search" onSubmit={search}><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="اسم المنتج أو الباركود" type="search" enterKeyHint="search" autoComplete="off" spellCheck={false} /><button disabled={loading}>{loading ? <Loader2 className="spin" /> : <Search />}</button></form>
             {error && <div className="sub-error">{error}</div>}
+            {!query.trim() && (loading || rankedCandidates.length > 0) && <div className="sub-ai-heading"><Sparkles /><div><strong>اقتراحات AI</strong><small>مرتبة حسب العلامة والتصنيف والسعر والمخزون المتاح</small></div></div>}
             <div className="sub-candidates">
-              {candidates.map((candidate) => {
+              {rankedCandidates.map((candidate, index) => {
                 const totalDelta = Number(candidate.price_delta_per_unit || 0) * remaining(selected);
-                return <article key={`${candidate.product_id}:${candidate.variant_id || "base"}`} className="sub-candidate">
+                const reasons = smartReasons(candidate);
+                return <article key={`${candidate.product_id}:${candidate.variant_id || "base"}`} className={`sub-candidate ${index === 0 && !query.trim() ? "ai-best" : ""}`}>
                   {candidate.image_url ? <img src={candidate.image_url} alt="" /> : <div className="sub-img-placeholder"><PackageSearch /></div>}
-                  <div className="sub-candidate-body"><strong>{candidate.name}</strong>{candidate.is_predefined ? <small>محدد مسبقًا كبديل</small> : candidate.same_brand ? <small>من نفس العلامة</small> : null}<small>{candidate.barcode || "بدون باركود"}</small><div className="sub-price-row"><span>{Number(candidate.unit_price).toLocaleString("ar-EG")} ج.م</span><span className={totalDelta > 0 ? "up" : totalDelta < 0 ? "down" : "same"}>فرق {money(totalDelta)}</span></div><small>متاح: {qty(candidate.available_quantity, selected.is_weight_based)}</small></div>
+                  <div className="sub-candidate-body">{index === 0 && !query.trim() && <span className="sub-ai-badge"><Sparkles />أفضل اقتراح</span>}<strong>{candidate.name}</strong><div className="sub-ai-reasons">{reasons.map((reason) => <span key={reason}>{reason}</span>)}</div><small>{candidate.barcode || "بدون باركود"}</small><div className="sub-price-row"><span>{Number(candidate.unit_price).toLocaleString("ar-EG")} ج.م</span><span className={totalDelta > 0 ? "up" : totalDelta < 0 ? "down" : "same"}>فرق {money(totalDelta)}</span></div><small>متاح: {qty(candidate.available_quantity, selected.is_weight_based)}</small></div>
                   <button disabled={acting || candidate.available_quantity + 0.0005 < remaining(selected)} onClick={() => void propose(candidate)}>{acting ? <Loader2 className="spin" /> : "اختيار"}</button>
                 </article>;
               })}
