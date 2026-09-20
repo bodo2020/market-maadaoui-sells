@@ -208,8 +208,21 @@ function useNotificationBadge(identity: StaffIdentity, branch: StaffBranch) {
   return unread;
 }
 
+function useOnlineStatus() {
+  const [online,setOnline]=useState(()=>typeof navigator==="undefined"?true:navigator.onLine);
+  useEffect(()=>{
+    const onOnline=()=>setOnline(true);
+    const onOffline=()=>setOnline(false);
+    window.addEventListener("online",onOnline);
+    window.addEventListener("offline",onOffline);
+    return ()=>{window.removeEventListener("online",onOnline);window.removeEventListener("offline",onOffline);};
+  },[]);
+  return online;
+}
+
 function Shell({ identity, branch, children }: { identity: StaffIdentity; branch: StaffBranch; children: ReactNode }) {
   const unread = useNotificationBadge(identity, branch);
+  const online = useOnlineStatus();
   const canOperate = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
   const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
   const navItems = [
@@ -229,6 +242,7 @@ function Shell({ identity, branch, children }: { identity: StaffIdentity; branch
           <Bell />{unread > 0 && <b>{unread > 99 ? "99+" : unread}</b>}
         </NavLink>
       </header>
+      {!online&&<div className="offline-banner"><AlertTriangle/><div><strong>أنت بدون اتصال</strong><span>هتشوف آخر بيانات محفوظة. التنفيذ والتأكيد هيرجع لما الإنترنت يرجع.</span></div></div>}
       <main className="content">{children}</main>
       <nav className="bottom-nav" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
         {navItems.map(({ to, Icon, label }) => (
