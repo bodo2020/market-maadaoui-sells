@@ -123,6 +123,49 @@ export type ManagerOperationsPerformance = {
   notes: string[];
 };
 
+
+export type OrderSubstitutionApprovalDetail = {
+  id: string;
+  task_id: string | null;
+  order_id: string;
+  tracking_number: string | null;
+  item_id: string;
+  original_product_name: string;
+  replacement_product_name: string;
+  replacement_product_id: string;
+  replacement_barcode: string | null;
+  replacement_image_url: string | null;
+  quantity: number;
+  original_unit_price: number;
+  replacement_unit_price: number;
+  price_delta_total: number;
+  financial_state: string;
+  status: string;
+  proposed_by_name: string | null;
+  proposed_at: string;
+  due_at: string | null;
+};
+
+export type OrderFinancialAdjustmentDetail = {
+  id: string;
+  order_id: string;
+  direction: "charge" | "refund" | "neutral";
+  signed_amount: number;
+  amount: number;
+  payment_method: string | null;
+  payment_status: string | null;
+  order_total_before: number;
+  target_order_total: number;
+  order_total_after: number;
+  settlement_state: string;
+  provider_reference: string | null;
+  note: string | null;
+  original_product_name?: string;
+  replacement_product_name?: string;
+  product_name?: string;
+  shortage_quantity?: number;
+};
+
 export type ApprovalScope = "pending" | "mine" | "overdue" | "completed" | "all";
 export type ApprovalItem = {
   id: string;
@@ -1342,5 +1385,65 @@ export async function createSpotInventoryAudit(branchId: string, productIds: str
     throw inventoryError(value);
   }
   return result.data as {session_id:string;product_count?:number;task_count?:number};
+}
+
+
+
+function substitutionError(message?: string){
+  const value=message||"";
+  if(value.includes("SUBSTITUTION_APPROVAL_DENIED"))return new Error("ليس لديك صلاحية اعتماد بدائل الطلبات.");
+  if(value.includes("SUBSTITUTION_DECISION_NOTE_REQUIRED"))return new Error("اكتب ملاحظة واضحة للقرار.");
+  if(value.includes("SUBSTITUTE_INSUFFICIENT_STOCK"))return new Error("مخزون المنتج البديل لم يعد كافيًا.");
+  if(value.includes("PICKING_NOT_ACTIVE"))return new Error("الطلب لم يعد في مرحلة التجهيز.");
+  if(value.includes("SUBSTITUTION_FINANCE_ACCESS_DENIED")||value.includes("SHORTAGE_FINANCE_ACCESS_DENIED"))return new Error("ليس لديك صلاحية التسوية المالية.");
+  if(value.includes("PROVIDER_REFERENCE_REQUIRED"))return new Error("اكتب مرجع عملية التحصيل أو الرد.");
+  if(value.includes("FINANCE_NOTE_REQUIRED"))return new Error("اكتب ملاحظة التسوية المالية.");
+  if(value.includes("FINANCE_NOT_PENDING"))return new Error("هذه التسوية لم تعد معلقة.");
+  return new Error(message||"تعذر تنفيذ قرار الطلب.");
+}
+
+export async function getOrderSubstitutionApproval(branchId:string,substitutionId:string){
+  const result=await rpc("list_order_substitution_approvals_v1",{p_branch_id:branchId,p_limit:150});
+  if(result.error)throw substitutionError(result.error.message);
+  const raw=(result.data||{}) as {items?:OrderSubstitutionApprovalDetail[]};
+  const item=Array.isArray(raw.items)?raw.items.find((row)=>row.id===substitutionId):undefined;
+  if(!item)throw new Error("موافقة البديل لم تعد معلقة.");
+  return item;
+}
+
+export async function decideOrderSubstitution(substitutionId:string,decision:"approve"|"reject",note:string){
+  const result=await rpc("decide_order_fulfillment_substitution_v1",{
+    p_substitution_id:substitutionId,p_decision:decision,p_note:note.trim(),
+  });
+  if(result.error)throw substitutionError(result.error.message);
+  return result.data as {ok:boolean;status:string;price_delta_total?:number;financial_state?:string};
+}
+
+export async function getOrderSubstitutionFinancialAdjustment(adjustmentId:string){
+  const result=await rpc("get_order_substitution_financial_adjustment_v1",{p_adjustment_id:adjustmentId});
+  if(result.error)throw substitutionError(result.error.message);
+  return result.data as OrderFinancialAdjustmentDetail;
+}
+
+export async function settleOrderSubstitutionFinancialAdjustment(adjustmentId:string,providerReference:string,note:string){
+  const result=await rpc("settle_order_substitution_financial_adjustment_v1",{
+    p_adjustment_id:adjustmentId,p_provider_reference:providerReference.trim(),p_note:note.trim(),
+  });
+  if(result.error)throw substitutionError(result.error.message);
+  return result.data as Record<string,unknown>;
+}
+
+export async function getOrderShortageFinancialAdjustment(adjustmentId:string){
+  const result=await rpc("get_order_shortage_financial_adjustment_v1",{p_adjustment_id:adjustmentId});
+  if(result.error)throw substitutionError(result.error.message);
+  return result.data as OrderFinancialAdjustmentDetail;
+}
+
+export async function settleOrderShortageFinancialAdjustment(adjustmentId:string,providerReference:string,note:string){
+  const result=await rpc("settle_order_shortage_financial_adjustment_v1",{
+    p_adjustment_id:adjustmentId,p_provider_reference:providerReference.trim(),p_note:note.trim(),
+  });
+  if(result.error)throw substitutionError(result.error.message);
+  return result.data as Record<string,unknown>;
 }
 
