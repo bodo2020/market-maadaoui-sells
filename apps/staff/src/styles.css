@@ -63,3 +63,18 @@
 .staff-home-actions a{min-height:54px;justify-content:flex-start;text-decoration:none}
 .staff-home-actions a svg{width:19px;flex:0 0 auto}
 @media(max-width:420px){.staff-home-actions{grid-template-columns:1fr}}
+
+
+/* Staff V1 inventory workspace */
+.inventory-task-list{margin-top:14px}
+.inventory-modal-backdrop{position:fixed;inset:0;z-index:80;background:rgba(3,22,13,.58);display:flex;align-items:flex-end;justify-content:center;padding:18px}
+.inventory-modal{width:min(680px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:26px 26px 18px 18px;padding:18px;box-shadow:0 24px 70px rgba(0,20,10,.28);display:grid;gap:14px}
+.inventory-modal h2{margin:3px 0 0;font-size:20px}.inventory-modal small{color:#77867e}
+.inventory-product-image{width:96px;height:96px;border-radius:18px;object-fit:contain;background:#f6f9f7;border:1px solid #e1e9e4;margin:auto}
+.inventory-facts{display:grid;grid-template-columns:1fr 1fr;gap:8px}.inventory-facts span{background:#f6f9f7;border:1px solid #e5ece8;border-radius:13px;padding:10px;display:flex;flex-direction:column;color:#78877f;font-size:10px}.inventory-facts b{color:#173426;font-size:12px;margin-top:3px}
+.blind-count-note{display:flex;align-items:center;gap:10px;background:#eef8f2;border:1px solid #cce8d7;color:#005931;border-radius:16px;padding:12px}.blind-count-note svg{width:22px;flex:0 0 auto}.blind-count-note div{display:flex;flex-direction:column}.blind-count-note span{font-size:10px;color:#577065;margin-top:2px}
+.inventory-field{display:grid;gap:6px;font-size:10px;font-weight:800;color:#52645a}.inventory-field input,.inventory-field select,.inventory-field textarea{width:100%;border:1px solid #dce5e0;border-radius:13px;background:#fff;padding:11px;font:inherit;outline:none}.inventory-field input,.inventory-field select{min-height:46px}.inventory-field input:focus,.inventory-field select:focus,.inventory-field textarea:focus{border-color:#005931;box-shadow:0 0 0 3px rgba(0,89,49,.08)}
+.inventory-review-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.inventory-review-grid>div{background:#f7f9f8;border-radius:14px;padding:11px;display:flex;flex-direction:column}.inventory-review-grid span{font-size:9px;color:#7c8a82}.inventory-review-grid strong{font-size:17px;color:#173426;margin-top:3px}
+.transfer-items{display:grid;gap:8px}.transfer-item{display:grid;grid-template-columns:1fr minmax(80px,120px);align-items:center;gap:10px;border:1px solid #e3ebe7;border-radius:14px;padding:11px;background:#fbfcfb}.transfer-item>div{display:flex;min-width:0;flex-direction:column}.transfer-item strong{font-size:12px}.transfer-item small{font-size:9px}.transfer-item input{width:100%;border:1px solid #dce5e0;border-radius:11px;padding:9px;font:inherit}
+.chips button svg{width:14px;height:14px}
+@media(max-width:520px){.inventory-modal-backdrop{padding:0}.inventory-modal{border-radius:24px 24px 0 0;max-height:92vh;padding-bottom:calc(20px + env(safe-area-inset-bottom))}.inventory-review-grid{grid-template-columns:1fr 1fr}.transfer-item{grid-template-columns:1fr 86px}}
