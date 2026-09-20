@@ -6,6 +6,11 @@ on:
     paths:
       - "apps/staff/**"
       - ".github/workflows/staff-app.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/staff/**"
+      - ".github/workflows/staff-app.yml"
   workflow_dispatch:
 
 permissions:
