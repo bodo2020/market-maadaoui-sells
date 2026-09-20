@@ -1114,13 +1114,26 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
   const canCount = branch.permissions.includes("inventory.count") || branch.permissions.includes("inventory.recount");
   const canTransfer = branch.permissions.includes("inventory.transfer") || branch.permissions.includes("inventory.manage");
   const canExpiry = branch.permissions.includes("inventory.manage") || branch.permissions.includes("products.manage") || branch.permissions.includes("purchases.manage");
-  const [tab,setTab]=useState<"tasks"|"transfers"|"risks"|"expiry">("tasks");
+  const canDisposeExpiry = branch.permissions.includes("inventory.manage");
+  const canSupplierReturns = branch.permissions.includes("inventory.manage") || branch.permissions.includes("purchases.manage") || branch.permissions.includes("finance.manage");
+  const canSettleSupplierReturns = branch.permissions.includes("purchases.manage") || branch.permissions.includes("finance.manage");
+  const [tab,setTab]=useState<"tasks"|"transfers"|"risks"|"expiry"|"supplier_returns">("tasks");
   const [riskStatus,setRiskStatus]=useState<staff.InventoryRiskStatus>("low_stock");
   const [expiryDays,setExpiryDays]=useState(30);
   const [tasks,setTasks]=useState<staff.OperationsTask[]>([]);
   const [transfers,setTransfers]=useState<staff.InventoryTransferWorkspace|null>(null);
   const [risks,setRisks]=useState<staff.InventoryRiskWorkspace|null>(null);
   const [expiry,setExpiry]=useState<staff.ExpiryWorkspace|null>(null);
+  const [supplierReturns,setSupplierReturns]=useState<staff.SupplierReturnWorkspace|null>(null);
+  const [selectedExpiry,setSelectedExpiry]=useState<staff.ExpiryBatchItem|null>(null);
+  const [expiryAction,setExpiryAction]=useState<"dispose"|"supplier_return">("dispose");
+  const [expiryRequestId,setExpiryRequestId]=useState("");
+  const [expiryActionQuantity,setExpiryActionQuantity]=useState("");
+  const [expiryActionNote,setExpiryActionNote]=useState("");
+  const [selectedSupplierReturn,setSelectedSupplierReturn]=useState<staff.SupplierReturnWorkspace["items"][number]|null>(null);
+  const [supplierCreditAmount,setSupplierCreditAmount]=useState("");
+  const [supplierCreditNote,setSupplierCreditNote]=useState("");
+  const [supplierSettlementNote,setSupplierSettlementNote]=useState("");
   const [busy,setBusy]=useState(true);
   const [acting,setActing]=useState("");
   const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
@@ -1140,21 +1153,23 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     if(showBusy)setBusy(true);
     try{
       if(canCount){try{await staff.ensureDailyInventoryAudit(branch.branch_id);}catch{/* scheduler/server policy remains authoritative */}}
-      const [taskRows,transferData,riskData,expiryData]=await Promise.all([
+      const [taskRows,transferData,riskData,expiryData,supplierReturnData]=await Promise.all([
         staff.listTasks(branch.branch_id,"active"),
         canTransfer?staff.getInventoryTransferWorkspace(branch.branch_id).catch(()=>null):Promise.resolve(null),
         staff.getInventoryRiskWorkspace(branch.branch_id,riskStatus).catch(()=>null),
         canExpiry?staff.getExpiryWorkspace(branch.branch_id,expiryDays).catch(()=>null):Promise.resolve(null),
+        canSupplierReturns?staff.getSupplierReturnsWorkspace(branch.branch_id,"pending_credit").catch(()=>null):Promise.resolve(null),
       ]);
       setTasks(taskRows.filter((task)=>staff.isInventoryTask(task)||staff.isInventoryTransferTask(task)));
       setTransfers(transferData);
       setRisks(riskData);
       setExpiry(expiryData);
+      setSupplierReturns(supplierReturnData);
       setMessage(null);
     }catch(caught){
       setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل عمليات المخزون"});
     }finally{if(showBusy)setBusy(false);}
-  },[branch.branch_id,canCount,canExpiry,canInventory,canTransfer,expiryDays,riskStatus]);
+  },[branch.branch_id,canCount,canExpiry,canInventory,canSupplierReturns,canTransfer,expiryDays,riskStatus]);
 
   useEffect(()=>{void load();},[load]);
 
