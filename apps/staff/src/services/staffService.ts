@@ -214,6 +214,36 @@ export type AttendanceExceptionReview = {
 };
 
 
+
+export type ExpiryBatchItem = {
+  batch_id: string;
+  product_id: string;
+  product_name: string;
+  barcode: string | null;
+  image_url: string | null;
+  batch_number: string;
+  expiry_date: string;
+  quantity: number;
+  shelf_location: string | null;
+  purchase_price: number;
+  supplier_id: string | null;
+  notes: string | null;
+};
+
+export type ExpiryWorkspace = {
+  branch_id: string;
+  days_ahead: number;
+  items: ExpiryBatchItem[];
+  summary: {
+    expired: number;
+    today: number;
+    within_3_days: number;
+    within_7_days: number;
+    total_quantity: number;
+    purchase_value_at_risk: number;
+  };
+};
+
 export type InventoryRiskStatus = "low_stock" | "out_of_stock" | "coverage_risk";
 export type InventoryRiskProduct = {
   product_id: string;
@@ -1445,5 +1475,77 @@ export async function settleOrderShortageFinancialAdjustment(adjustmentId:string
   });
   if(result.error)throw substitutionError(result.error.message);
   return result.data as Record<string,unknown>;
+}
+
+
+
+function localDateOnly(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
+
+export async function getExpiryWorkspace(branchId: string, daysAhead = 30) {
+  const safeDays=Math.min(Math.max(Math.trunc(daysAhead||30),1),90);
+  const future=new Date();
+  future.setDate(future.getDate()+safeDays);
+
+  const query=await supabase
+    .from("product_batches")
+    .select("id,product_id,batch_number,expiry_date,quantity,shelf_location,purchase_price,supplier_id,notes,products(name,barcode,image_urls)")
+    .eq("branch_id",branchId)
+    .gt("quantity",0)
+    .lte("expiry_date",localDateOnly(future))
+    .order("expiry_date",{ascending:true})
+    .limit(250);
+
+  if(query.error){
+    const value=query.error.message||"";
+    if(value.includes("permission denied")||value.includes("row-level security"))throw new Error("دورك لا يملك صلاحية عرض دفعات الصلاحية لهذا الفرع.");
+    throw new Error(value||"تعذر تحميل دفعات الصلاحية.");
+  }
+
+  const today=localDateOnly(new Date());
+  let expired=0,todayCount=0,within3=0,within7=0,totalQuantity=0,purchaseValue=0;
+  const items=(query.data||[]).map((row:any)=>{
+    const product=Array.isArray(row.products)?row.products[0]:row.products;
+    const quantity=Number(row.quantity||0);
+    const purchasePrice=Number(row.purchase_price||0);
+    const expiry=String(row.expiry_date||"");
+    const diff=Math.ceil((new Date(`${expiry}T12:00:00`).getTime()-new Date(`${today}T12:00:00`).getTime())/86400000);
+    if(diff<0)expired+=1;
+    else if(diff===0)todayCount+=1;
+    else if(diff<=3)within3+=1;
+    if(diff>=0&&diff<=7)within7+=1;
+    totalQuantity+=quantity;
+    purchaseValue+=quantity*purchasePrice;
+    const images=Array.isArray(product?.image_urls)?product.image_urls:[];
+    return {
+      batch_id:String(row.id),
+      product_id:String(row.product_id),
+      product_name:String(product?.name||"منتج"),
+      barcode:product?.barcode==null?null:String(product.barcode),
+      image_url:images.length?String(images[0]):null,
+      batch_number:String(row.batch_number||""),
+      expiry_date:expiry,
+      quantity,
+      shelf_location:row.shelf_location==null?null:String(row.shelf_location),
+      purchase_price:purchasePrice,
+      supplier_id:row.supplier_id==null?null:String(row.supplier_id),
+      notes:row.notes==null?null:String(row.notes),
+    } satisfies ExpiryBatchItem;
+  });
+
+  return {
+    branch_id:branchId,
+    days_ahead:safeDays,
+    items,
+    summary:{
+      expired,
+      today:todayCount,
+      within_3_days:within3,
+      within_7_days:within7,
+      total_quantity:Math.round(totalQuantity*1000)/1000,
+      purchase_value_at_risk:Math.round(purchaseValue*100)/100,
+    },
+  } as ExpiryWorkspace;
 }
 
