@@ -94,14 +94,16 @@ function mergeProfitabilityReport(base: ReportDocument, online: ReportDocument |
 
   const onlineByDate = new Map(rows(online.daily).map((row) => [String(row.date || ''), row]));
   const daily = rows(base.daily).map((row) => {
-    const onlineRow = onlineByDate.get(String(row.date || '')) || {};
+    const onlineRow = onlineByDate.get(String(row.date || ''));
     const posProfit = nullableNumber(row.gross_profit);
-    const onlineProfit = nullableNumber(onlineRow.online_gross_profit);
+    const onlineProfit = onlineRow
+      ? (onlineRow.cost_complete === false ? null : nullableNumber(onlineRow.online_gross_profit) ?? 0)
+      : 0;
     return {
       ...row,
-      online_net_sales: onlineRow.online_net_sales ?? 0,
-      online_cogs: onlineRow.online_cogs ?? (onlineRow.cost_complete === false ? null : 0),
-      online_gross_profit: onlineRow.online_gross_profit ?? (onlineRow.cost_complete === false ? null : 0),
+      online_net_sales: onlineRow?.online_net_sales ?? 0,
+      online_cogs: onlineRow ? (onlineRow.cost_complete === false ? null : onlineRow.online_cogs ?? 0) : 0,
+      online_gross_profit: onlineProfit,
       combined_gross_profit: posProfit == null || onlineProfit == null ? null : roundMoney(posProfit + onlineProfit),
     };
   });
