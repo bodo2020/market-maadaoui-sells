@@ -1,0 +1,66 @@
+name: Business Finance APK
+
+on:
+  push:
+    branches: [feature/business-finance-app]
+    paths:
+      - 'apps/business-finance/**'
+      - '.github/workflows/business-finance-apk.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/business-finance/**'
+      - '.github/workflows/business-finance-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: business-finance-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-apk:
+    name: Build Android debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/business-finance
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/business-finance/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and sync Capacitor
+        run: npm run android:sync
+
+      - name: Build APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare artifact
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Elmadawy-Business-v1.0.1.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Elmadawy-Business-v1.0.1-APK
+          path: apps/business-finance/Elmadawy-Business-v1.0.1.apk
+          if-no-files-found: error
+          retention-days: 30

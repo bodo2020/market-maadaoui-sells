@@ -1,0 +1,135 @@
+.payroll-period-panel,
+.analytics-guidance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.payroll-period-panel h3,
+.analytics-guidance h3 {
+  margin: 4px 0;
+}
+
+.payroll-period-panel p,
+.analytics-guidance p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.payroll-period-fields {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+}
+
+.payroll-period-fields label {
+  display: grid;
+  gap: 6px;
+  color: #667085;
+  font-size: 11px;
+}
+
+.payroll-period-fields select,
+.payroll-period-fields input {
+  min-width: 130px;
+  min-height: 42px;
+  border: 1px solid #dfe5e1;
+  border-radius: 11px;
+  background: #fff;
+  color: #1d2939;
+  padding: 0 11px;
+  font: inherit;
+}
+
+.table-subtext {
+  display: block;
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.peak-heatmap-wrap {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.peak-heatmap {
+  min-width: 1040px;
+  display: grid;
+  grid-template-columns: 92px repeat(24, minmax(34px, 1fr));
+  gap: 4px;
+  align-items: stretch;
+}
+
+.peak-heatmap__corner,
+.peak-heatmap__hour,
+.peak-heatmap__day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  color: #667085;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.peak-heatmap__day {
+  justify-content: flex-start;
+  color: #344054;
+}
+
+.peak-heatmap__cell {
+  position: relative;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(0, 89, 49, var(--heat, .06));
+  border: 1px solid rgba(0, 89, 49, .04);
+  color: #173b2d;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.peak-heatmap__cell:hover {
+  outline: 2px solid rgba(0, 89, 49, .22);
+  outline-offset: 1px;
+}
+
+.engine-banner--soft {
+  border-color: rgba(208, 166, 71, .25);
+  background: rgba(208, 166, 71, .07);
+}
+
+@media (max-width: 720px) {
+  .payroll-period-panel,
+  .analytics-guidance {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .payroll-period-fields {
+    width: 100%;
+  }
+
+  .payroll-period-fields label,
+  .payroll-period-fields select,
+  .payroll-period-fields input {
+    width: 100%;
+  }
+}
+
+@media print {
+  .payroll-period-panel,
+  .financial-report-actions,
+  .analytics-guidance {
+    break-inside: avoid;
+  }
+}

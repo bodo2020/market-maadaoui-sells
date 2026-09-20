@@ -11,6 +11,13 @@ export type POSLoyaltyCustomer = {
   redeemable_credit_egp: number;
   redemption_points: number;
   redemption_value_egp: number;
+  online_registered: boolean;
+  credit_enabled: boolean;
+  credit_active: boolean;
+  credit_limit: number;
+  receivable_balance: number;
+  credit_available: number;
+  credit_payment_method_id: string | null;
 };
 
 export type POSLoyaltyVoucher = {
@@ -42,7 +49,17 @@ export async function lookupPOSLoyaltyCustomer(code: string, branchId: string): 
     if (error.message?.includes("CUSTOMER_NOT_FOUND")) return null;
     throw error;
   }
-  return data as POSLoyaltyCustomer;
+  const row = data as POSLoyaltyCustomer;
+  return {
+    ...row,
+    online_registered: Boolean(row.online_registered),
+    credit_enabled: Boolean(row.credit_enabled),
+    credit_active: Boolean(row.credit_active),
+    credit_limit: Number(row.credit_limit || 0),
+    receivable_balance: Number(row.receivable_balance || 0),
+    credit_available: Number(row.credit_available || 0),
+    credit_payment_method_id: row.credit_payment_method_id || null,
+  };
 }
 
 export async function lookupPOSLoyaltyVoucher(code: string, branchId: string, customerId: string): Promise<POSLoyaltyVoucher | null> {

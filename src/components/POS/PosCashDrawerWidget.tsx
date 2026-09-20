@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Banknote, Clock3, Landmark, ReceiptText, RefreshCw, WalletCards } from "lucide-react";
 import PosShiftPaymentSummary from "@/components/POS/PosShiftPaymentSummary";
+import PosShiftExpensePanel from "@/components/POS/PosShiftExpensePanel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -149,6 +150,7 @@ export default function PosCashDrawerWidget({ device }: { device: LocalPosDevice
               <div className="rounded-xl bg-slate-50 p-3"><div className="text-slate-500">إضافات للدرج</div><strong>{money(summary?.transfers_in)}</strong></div>
             </div>
 
+            <PosShiftExpensePanel device={device} shiftOpen={!!summary.shift_id && !error} onCashChanged={() => refresh(true)} />
             </>}
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => void refresh()} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> تحديث</Button>
