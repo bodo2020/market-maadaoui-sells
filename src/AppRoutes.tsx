@@ -68,6 +68,7 @@ import FranchiseDetailsPage from '@/pages/FranchiseDetailsPage';
 import FranchiseOperationApprovalsPage from '@/pages/FranchiseOperationApprovalsPage';
 import CustomersAdvanced from '@/pages/CustomersAdvanced';
 import CustomerMyTasksPage from '@/pages/CustomerMyTasksPage';
+import CustomerServiceWorkspace from '@/pages/CustomerServiceWorkspace';
 import OperationsTasksPage from '@/pages/OperationsTasksPage';
 import ApprovalsCenterPage from '@/pages/ApprovalsCenterPage';
 import NotificationsCenterV2 from '@/pages/NotificationsCenterV2';
@@ -199,6 +200,7 @@ export default function AppRoutes() {
       <Route path='/marketplace' element={<ProtectedRoute allowedRoles={marketplaceRoles}><Marketplace /></ProtectedRoute>} />
       <Route path='/marketplace/:merchantId' element={<ProtectedRoute allowedRoles={marketplaceRoles}><MarketplaceMerchantDetails /></ProtectedRoute>} />
       <Route path='/customers' element={<ProtectedRoute><CustomersWorkspace /></ProtectedRoute>} />
+      <Route path='/customer-service' element={<ProtectedRoute><CustomerServiceWorkspace /></ProtectedRoute>} />
       <Route path='/customer-tasks' element={<ProtectedRoute><CustomerMyTasksPage /></ProtectedRoute>} />
       <Route path='/customers/:customerId' element={<ProtectedRoute><Customer360Workspace /></ProtectedRoute>} />
       <Route path='/suppliers' element={<ProtectedRoute><Suppliers /></ProtectedRoute>} />

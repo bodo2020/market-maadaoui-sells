@@ -11,7 +11,7 @@ import { fetchNotificationCenterV2 } from "@/services/supabase/notificationCente
 const pageTitles: Array<[string, string]> = [
   ["/pos", "نقطة البيع"], ["/reports", "التقارير والتحليلات"], ["/tasks", "مركز المهام"], ["/approvals", "مركز الموافقات"],
   ["/notifications", "مركز الإشعارات"], ["/online-orders/operations", "تشغيل وتجهيز الطلبات"], ["/online-orders", "الطلبات الإلكترونية"], ["/invoices", "الفواتير"], ["/products", "المنتجات"],
-  ["/inventory", "إدارة المخزون"], ["/customers", "العملاء"], ["/finance", "المالية"], ["/payment-methods", "وسائل الدفع"],
+  ["/inventory", "إدارة المخزون"], ["/customer-service", "خدمة العملاء"], ["/customers", "العملاء"], ["/finance", "المالية"], ["/payment-methods", "وسائل الدفع"],
   ["/cash-tracking", "تتبع النقدية"], ["/employees", "إدارة الموظفين"], ["/organization", "الهيكل التنظيمي"], ["/attendance", "الحضور والانصراف"],
   ["/my-hr", "بوابة الموظف"], ["/hr/payroll", "مسير الرواتب"], ["/hr/shifts", "جدولة الورديات"], ["/hr/leave-calendar", "تقويم الإجازات"],
   ["/account", "حسابي"], ["/settings", "الإعدادات"],
