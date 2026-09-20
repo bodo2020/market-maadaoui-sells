@@ -170,6 +170,30 @@ export type AttendanceExceptionReview = {
   verification_photo_signed_url?: string | null;
 };
 
+
+export type InventoryRiskStatus = "low_stock" | "out_of_stock" | "coverage_risk";
+export type InventoryRiskProduct = {
+  product_id: string;
+  product_name: string;
+  barcode: string | null;
+  image_url: string | null;
+  quantity: number;
+  reserved_quantity: number;
+  available_quantity: number;
+  unit_of_measure: string;
+  shelf_location: string | null;
+  category_name: string;
+  min_stock_level: number;
+  days_cover: number | null;
+  stock_status: InventoryRiskStatus | string;
+  last_audit_at: string | null;
+};
+export type InventoryRiskWorkspace = {
+  summary: { low_stock_rows: number; out_of_stock_rows: number; coverage_risk_rows: number; pending_audit_tasks: number };
+  permissions: { can_manage_sessions: boolean };
+  products: InventoryRiskProduct[];
+};
+
 export type InventoryAdjustmentReason = "theft" | "damage" | "breakage" | "receiving_error" | "selling_error" | "previous_error" | "unknown";
 export type InventoryAdjustmentRejectionReason = "counting_error" | "insufficient_evidence" | "investigation_required" | "other";
 
@@ -1258,5 +1282,65 @@ export async function receiveCashHandoff(handoffId: string, receivedAmount: numb
     throw new Error(value||"تعذر استلام عهدة الوردية.");
   }
   return result.data as Record<string,unknown>;
+}
+
+
+
+export async function getInventoryRiskWorkspace(branchId: string, status: InventoryRiskStatus = "low_stock") {
+  const result=await rpc("get_inventory_control_center_v2",{
+    p_branch_id:branchId,p_search:null,p_status:status,p_category_id:null,p_limit:50,p_offset:0,
+  });
+  if(result.error)throw inventoryError(result.error.message);
+  const raw=(result.data||{}) as Record<string,unknown>;
+  const summary=(raw.summary||{}) as Record<string,unknown>;
+  const permissions=(raw.permissions||{}) as Record<string,unknown>;
+  const rows=Array.isArray(raw.products)?raw.products as Array<Record<string,unknown>>:[];
+  return {
+    summary:{
+      low_stock_rows:Number(summary.low_stock_rows||0),
+      out_of_stock_rows:Number(summary.out_of_stock_rows||0),
+      coverage_risk_rows:Number(summary.coverage_risk_rows||0),
+      pending_audit_tasks:Number(summary.pending_audit_tasks||0),
+    },
+    permissions:{can_manage_sessions:Boolean(permissions.can_manage_sessions)},
+    products:rows.map((row)=>({
+      product_id:String(row.product_id||""),
+      product_name:String(row.product_name||"منتج"),
+      barcode:row.barcode==null?null:String(row.barcode),
+      image_url:row.image_url==null?null:String(row.image_url),
+      quantity:Number(row.quantity||0),
+      reserved_quantity:Number(row.reserved_quantity||0),
+      available_quantity:Number(row.available_quantity??row.quantity??0),
+      unit_of_measure:String(row.unit_of_measure||"قطعة"),
+      shelf_location:row.shelf_location==null?null:String(row.shelf_location),
+      category_name:String(row.category_name||"بدون قسم"),
+      min_stock_level:Number(row.min_stock_level||0),
+      days_cover:row.days_cover==null?null:Number(row.days_cover),
+      stock_status:String(row.stock_status||status),
+      last_audit_at:row.last_audit_at==null?null:String(row.last_audit_at),
+    })),
+  } as InventoryRiskWorkspace;
+}
+
+export async function createSpotInventoryAudit(branchId: string, productIds: string[]) {
+  const unique=[...new Set(productIds.filter(Boolean))];
+  if(!unique.length)throw new Error("اختر منتجًا واحدًا على الأقل للجرد السريع.");
+  const result=await rpc("create_inventory_audit_session_v2",{
+    p_branch_id:branchId,
+    p_audit_kind:"spot",
+    p_title:"فحص مخزون حرج من Staff",
+    p_description:"جرد سريع للتحقق من صنف منخفض أو نافد قبل اتخاذ إجراء شراء أو تحويل.",
+    p_scope_type:"custom",
+    p_scope_filter:{product_ids:unique},
+    p_assignee_id:null,
+    p_due_at:null,
+  });
+  if(result.error){
+    const value=result.error.message||"";
+    if(value.includes("INVENTORY_SESSION_MANAGE_DENIED"))throw new Error("ليس لديك صلاحية إنشاء جرد سريع.");
+    if(value.includes("NO_ELIGIBLE_STAFF"))throw new Error("لا يوجد موظف مؤهل للجرد في هذا الفرع.");
+    throw inventoryError(value);
+  }
+  return result.data as {session_id:string;product_count?:number;task_count?:number};
 }
 
