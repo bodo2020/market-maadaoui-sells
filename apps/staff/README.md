@@ -32,11 +32,19 @@ Staff لا يحل محل POS ولا Delivery:
 
 ونفس المبدأ سيطبق على الوحدات التالية بدل عرض شاشات لا تخص دور الموظف.
 
+## المنفذ في Staff V1
+
+- Role-aware Home وNavigation.
+- Inventory workspace: جرد أعمى، إعادة عد، اعتماد فروق، شحن واستلام التحويلات.
+- Approval Inbox: مخزون، طلبات موظفين، واستثناءات حضور.
+- Manager workspace: تشغيل الفريق، المتأخر، الموافقات، المخزون، الأونلاين، الكاش وخدمة العملاء.
+- كل العمليات تعتمد على نفس RPCs وAudit trails الخاصة بـControl Center.
+
 ## Next milestones
 
-1. Inventory workspace: جرد، Low Stock، Expiry، استلام وتحويلات.
-2. Approval inbox للمشرفين والمديرين.
-3. Shift handoff وملخص نهاية الوردية.
-4. Manager workspace للفريق وSLA والمشاكل.
-5. Push notifications وOffline recovery.
-6. توحيد Design System وتقسيم `App.tsx` إلى Features مستقلة.
+1. Shift handoff وملخص نهاية الوردية.
+2. Low Stock + Expiry execution workflows داخل Staff.
+3. Specialized approvals للبدائل والتسويات المالية.
+4. Push notifications وOffline recovery.
+5. توحيد Design System وتقسيم `App.tsx` إلى Features مستقلة.
+6. QA على أدوار فعلية ثم Release APK تجريبي.
