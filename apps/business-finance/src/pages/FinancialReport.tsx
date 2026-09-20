@@ -74,11 +74,15 @@ export default function FinancialReport({ kind }: { kind: FinancialReportKind })
   const summary = record(data?.summary);
   const permission = record(data?.permissions);
   const canFinance = kind !== 'payments' || Boolean(permission.can_view_finance);
+  const reconstructedOnlineLines = numeric(record(data?.online_profit_quality).reconstructed_legacy_lines);
+  const missingOnlineCostLines = numeric(record(data?.online_profit_quality).missing_cost_lines);
   const note = kind === 'profitability' && data && !Boolean(data.online_profit_complete)
-    ? 'الربحية المؤكدة حاليًا تعتمد على تكلفة POS الموثقة في Snapshot الفاتورة؛ تكلفة وربح الأونلاين تظهر منفصلة إلى أن يكتمل مصدر التكلفة الموثوق.'
-    : kind === 'payments' && data && !canFinance
-      ? 'تفاصيل التسويات والأرصدة الحية محجوبة حسب صلاحيات الحساب، بينما أرقام التحصيل المتاحة تظل ظاهرة.'
-      : null;
+    ? `ربح الأونلاين غير مكتمل لأن تكلفة ${number(missingOnlineCostLines)} بند لم تُحفظ بعد؛ لن يتم تخمين الربح لهذه البنود.`
+    : kind === 'profitability' && data && reconstructedOnlineLines > 0
+      ? `أرباح الأونلاين ظاهرة الآن. ${number(reconstructedOnlineLines)} بند تاريخي أُعيد بناؤه من سعر الشراء الموجود وقت التحديث؛ الطلبات الجديدة تحفظ Snapshot للتكلفة عند تحقق البيع.`
+      : kind === 'payments' && data && !canFinance
+        ? 'تفاصيل التسويات والأرصدة الحية محجوبة حسب صلاحيات الحساب، بينما أرقام التحصيل المتاحة تظل ظاهرة.'
+        : null;
 
   function exportCsv() {
     if (!data) return;
@@ -131,8 +135,12 @@ export default function FinancialReport({ kind }: { kind: FinancialReportKind })
         ? <>
           <Summary label="صافي مبيعات POS" value={money(numeric(summary.pos_net_sales))}/>
           <Summary label="إجمالي ربح POS" value={moneyNullable(summary.pos_gross_profit)}/>
-          <Summary label="رسوم الدفع" value={money(numeric(summary.merchant_payment_fees))}/>
-          <Summary label="النتيجة التشغيلية المعروفة" value={moneyNullable(summary.known_operating_result)}/>
+          <Summary label="صافي مبيعات الأونلاين" value={money(numeric(summary.online_net_sales))}/>
+          <Summary label="تكلفة الأونلاين" value={moneyNullable(summary.online_cogs)}/>
+          <Summary label="إجمالي ربح الأونلاين" value={moneyNullable(summary.online_gross_profit)}/>
+          <Summary label="هامش ربح الأونلاين" value={percentNullable(summary.online_margin_percent)}/>
+          <Summary label="إجمالي الربح POS + Online" value={moneyNullable(summary.combined_gross_profit)}/>
+          <Summary label="النتيجة التشغيلية المعروفة (POS)" value={moneyNullable(summary.known_operating_result)}/>
         </>
         : <>
           <Summary label="إجمالي التحصيل" value={money(numeric(summary.gross_collected))}/>
@@ -155,7 +163,7 @@ function ProfitabilityTables({ data }: { data: ReportDocument }) {
   const daily = rows(data.daily);
   return <>
     <TableCard eyebrow="Profit Waterfall" title="تكوين الربح" columns={['البند', 'القيمة']} rows={waterfall.map((row) => [text(row.label ?? row.key), money(numeric(row.value))])} empty="لا توجد مكونات ربح داخل الفترة."/>
-    <TableCard eyebrow="Daily Profitability" title="الربحية حسب اليوم" columns={['اليوم', 'صافي المبيعات', 'التكلفة', 'إجمالي الربح', 'النتيجة المعروفة']} rows={daily.map((row) => [text(row.date), money(numeric(row.net_sales)), money(numeric(row.net_cogs)), money(numeric(row.gross_profit)), money(numeric(row.known_operating_result))])} empty="لا توجد حركة يومية داخل الفترة."/>
+    <TableCard eyebrow="Daily Profitability" title="الربحية حسب اليوم" columns={['اليوم', 'صافي POS', 'تكلفة POS', 'ربح POS', 'صافي Online', 'تكلفة Online', 'ربح Online', 'إجمالي الربح']} rows={daily.map((row) => [text(row.date), money(numeric(row.net_sales)), money(numeric(row.net_cogs)), money(numeric(row.gross_profit)), money(numeric(row.online_net_sales)), moneyNullable(row.online_cogs), moneyNullable(row.online_gross_profit), moneyNullable(row.combined_gross_profit)])} empty="لا توجد حركة يومية داخل الفترة."/>
   </>;
 }
 
@@ -182,7 +190,7 @@ function Summary({ label, value }: { label: string; value: string }) {
 function profitabilityCsv(data: ReportDocument): CsvTable[] {
   return [
     { title: 'تكوين الربح', columns: ['البند', 'القيمة'], rows: rows(data.waterfall).map((row) => [text(row.label ?? row.key), numeric(row.value)]) },
-    { title: 'الربحية حسب اليوم', columns: ['اليوم', 'صافي المبيعات', 'التكلفة', 'إجمالي الربح', 'النتيجة المعروفة'], rows: rows(data.daily).map((row) => [text(row.date), numeric(row.net_sales), numeric(row.net_cogs), numeric(row.gross_profit), numeric(row.known_operating_result)]) },
+    { title: 'الربحية حسب اليوم', columns: ['اليوم', 'صافي POS', 'تكلفة POS', 'ربح POS', 'صافي Online', 'تكلفة Online', 'ربح Online', 'إجمالي الربح'], rows: rows(data.daily).map((row) => [text(row.date), numeric(row.net_sales), numeric(row.net_cogs), numeric(row.gross_profit), numeric(row.online_net_sales), nullableCsvNumber(row.online_cogs), nullableCsvNumber(row.online_gross_profit), nullableCsvNumber(row.combined_gross_profit)]) },
   ];
 }
 
@@ -200,6 +208,8 @@ function rows(value: unknown): Record<string, unknown>[] { return Array.isArray(
 function numeric(value: unknown): number { const parsed = Number(value ?? 0); return Number.isFinite(parsed) ? parsed : 0; }
 function text(value: unknown, fallback = '—'): string { return value == null || value === '' ? fallback : String(value); }
 function moneyNullable(value: unknown) { return value == null || value === '' ? '—' : money(numeric(value)); }
+function percentNullable(value: unknown) { return value == null || value === '' ? '—' : `${number(numeric(value))}%`; }
+function nullableCsvNumber(value: unknown) { return value == null || value === '' ? '' : numeric(value); }
 function dateTime(value: unknown) { if (!value) return '—'; const date = new Date(String(value)); return Number.isNaN(date.getTime()) ? text(value) : date.toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }); }
 function csvCell(value: unknown) { const string = String(value ?? ''); return `"${string.replace(/"/g, '""')}"`; }
 function cairoToday() { const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()); const values = Object.fromEntries(parts.map((part) => [part.type, part.value])); return `${values.year}-${values.month}-${values.day}`; }
