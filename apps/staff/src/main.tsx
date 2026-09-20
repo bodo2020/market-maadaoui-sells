@@ -13,6 +13,7 @@ import "./picking.css";
 import "./native-safe-area.css";
 import "./staff-v05.css";
 import "./substitutions.css";
+import "./substitution-stability.css";
 import "./staging.css";
 import "./assignment-offer.css";
 import "./attendance-validation.css";
