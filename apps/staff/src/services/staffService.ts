@@ -1601,6 +1601,7 @@ function expiryActionError(message?: string) {
   if(value.includes("EXPIRY_SUPPLIER_REQUIRED"))return new Error("الدفعة غير مرتبطة بمورد أو فاتورة شراء؛ لا يمكن إنشاء إرجاع للمورد قبل ربطها.");
   if(value.includes("EXPIRY_BATCH_QUANTITY_EXCEEDED"))return new Error("الكمية المطلوبة أكبر من الكمية المسجلة في الدفعة.");
   if(value.includes("EXPIRY_LEGACY_DAMAGED_BATCH"))return new Error("هذه دفعة تالف قديمة ولا يسمح النظام بمعالجتها مرة ثانية.");
+  if(value.includes("EXPIRY_RECENT_AUDIT_REQUIRED"))return new Error("لازم تعمل جرد تحقق مطابق للمنتج خلال آخر 4 ساعات قبل الإهلاك أو الإرجاع للمورد.");
   if(value.includes("INSUFFICIENT_STOCK"))return new Error("لا توجد كمية متاحة كافية بعد خصم حجوزات الطلبات الإلكترونية.");
   if(value.includes("EXPIRY_NOTE_REQUIRED"))return new Error("اكتب سببًا واضحًا للإجراء.");
   if(value.includes("REQUEST_CONFLICT"))return new Error("تم استخدام رقم العملية لطلب مختلف. حدّث الشاشة وحاول مرة أخرى.");
