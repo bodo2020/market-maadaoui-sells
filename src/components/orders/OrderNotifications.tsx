@@ -4,7 +4,6 @@ import { useBranchStore } from '@/stores/branchStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import StaffInAppNotificationHost from '@/components/notifications/StaffInAppNotificationHost';
 
 export default function OrderNotifications(){
   const {isAuthenticated}=useAuth();
@@ -45,7 +44,6 @@ export default function OrderNotifications(){
   };
 
   return <>
-    <StaffInAppNotificationHost />
     <div dir="rtl" className="flex flex-wrap items-center justify-end gap-3 border-b bg-white px-4 py-2 text-sm">
       <span className="text-muted-foreground">الإشعارات داخل التطبيق مفعّلة دائمًا</span>
       <Button size="sm" variant="ghost" onClick={activate} disabled={busy} className="text-xs text-muted-foreground">
