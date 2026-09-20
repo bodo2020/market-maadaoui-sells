@@ -288,6 +288,7 @@ function HomePage({ branch, identity }: { identity: StaffIdentity; branch: Staff
           {canPrepare && <NavLink className="secondary" to="/operations"><PackageCheck />تجهيز الطلبات</NavLink>}
           {canInventory && <NavLink className="secondary" to="/inventory"><Layers3 />المخزون والجرد</NavLink>}
           {canApprove && <NavLink className="secondary" to="/approvals"><ShieldCheck />الموافقات</NavLink>}
+          {canApprove && <NavLink className="secondary" to="/manager"><UsersRound />فريقي اليوم</NavLink>}
           <NavLink className="secondary" to="/attendance"><Clock3 />الحضور والوردية</NavLink>
           <NavLink className="secondary" to="/account"><IdCard />خدمات الموظف</NavLink>
         </div>
@@ -1408,6 +1409,108 @@ function ApprovalsPage({branch}:{branch:StaffBranch}){
   </>;
 }
 
+
+function localIsoDate(daysAgo=0){
+  const date=new Date();
+  date.setDate(date.getDate()-daysAgo);
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
+
+function ManagerWorkspace({branch}:{branch:StaffBranch}){
+  const [from,setFrom]=useState(()=>localIsoDate(6));
+  const [to,setTo]=useState(()=>localIsoDate(0));
+  const [data,setData]=useState<staff.ManagerOperationsPerformance|null>(null);
+  const [approvals,setApprovals]=useState<staff.ApprovalCenter|null>(null);
+  const [tasks,setTasks]=useState<staff.OperationsTask[]>([]);
+  const [busy,setBusy]=useState(true);
+  const [error,setError]=useState("");
+
+  const load=useCallback(async()=>{
+    setBusy(true);setError("");
+    try{
+      const [performance,approvalData,taskRows]=await Promise.all([
+        staff.getManagerOperationsPerformance(branch.branch_id,from,to),
+        staff.getApprovalCenter(branch.branch_id,"pending").catch(()=>null),
+        staff.listTasks(branch.branch_id,"active"),
+      ]);
+      setData(performance);setApprovals(approvalData);setTasks(taskRows);
+    }catch(caught){
+      setData(null);setError(caught instanceof Error?caught.message:"تعذر تحميل تشغيل الفريق");
+    }finally{setBusy(false);}
+  },[branch.branch_id,from,to]);
+
+  useEffect(()=>{void load();},[load]);
+
+  const overdue=tasks.filter((task)=>task.is_overdue).length;
+  const urgent=tasks.filter((task)=>task.priority==="urgent"||task.priority==="high").length;
+  const attention=(data?.employees||[]).filter((employee)=>employee.needs_attention);
+  const inventory=data?.summary.inventory;
+  const online=data?.summary.online;
+  const cashier=data?.summary.cashier;
+
+  return <>
+    <PageTitle title="فريقي اليوم" subtitle="ملخص تشغيل الفرع والتدخلات اللي محتاجة مدير"/>
+    <section className="manager-filter-card">
+      <div><strong>{branch.branch_name}</strong><span>الفترة القصوى سنة واحدة</span></div>
+      <div className="manager-date-range">
+        <label>من<input type="date" value={from} onChange={(e)=>setFrom(e.target.value)}/></label>
+        <label>إلى<input type="date" value={to} onChange={(e)=>setTo(e.target.value)}/></label>
+        <button className="icon-btn" onClick={()=>void load()} aria-label="تحديث"><RefreshCw className={busy?"spin":""}/></button>
+      </div>
+    </section>
+    {error&&<div className="error-box">{error}</div>}
+    {busy&&!data?<Loading/>:data&&<>
+      <div className="manager-kpis">
+        <NavLink to="/approvals"><ShieldCheck/><strong>{approvals?.summary.pending||0}</strong><span>موافقات معلقة</span></NavLink>
+        <NavLink to="/tasks"><AlertTriangle/><strong>{overdue}</strong><span>مهام متأخرة</span></NavLink>
+        <div><UsersRound/><strong>{data.summary.employees}</strong><span>موظفو الفريق</span></div>
+        <div><BellRing/><strong>{urgent}</strong><span>أولوية عالية</span></div>
+      </div>
+
+      <section className="manager-section">
+        <div className="section-head"><div><h2>صحة التشغيل</h2><p>أرقام فعلية من أنشطة الفريق خلال الفترة</p></div></div>
+        <div className="manager-operations-grid">
+          <article><PackageCheck/><div><span>الأونلاين</span><strong>{online?.handled_orders||0} طلب</strong><small>{online?.cancellations||0} إلغاء</small></div></article>
+          <article><Scale/><div><span>الجرد</span><strong>{inventory?.counts_submitted||0}/{inventory?.counts_assigned||0}</strong><small>{inventory?.differences_found||0} فرق مكتشف</small></div></article>
+          <article><Banknote/><div><span>الكاشير</span><strong>{cashier?.invoices||0} فاتورة</strong><small>فرق نقدية {Number(cashier?.cash_variance||0).toLocaleString("ar-EG")} ج.م</small></div></article>
+          <article><ClipboardList/><div><span>خدمة العملاء</span><strong>{data.summary.customer_service.closed||0}/{data.summary.customer_service.assigned||0}</strong><small>{data.summary.customer_service.overdue_open||0} متابعة متأخرة</small></div></article>
+        </div>
+      </section>
+
+      <section className="manager-section">
+        <div className="section-head"><div><h2>يحتاج تدخل</h2><p>{data.summary.employees_needing_attention} موظف عليهم مؤشرات تحتاج متابعة</p></div></div>
+        <div className="manager-team-list">
+          {attention.map((employee)=><article key={employee.user_id} className="manager-employee-card">
+            <div className="manager-employee-head"><div className="avatar">{employee.name.slice(0,1)}</div><div><strong>{employee.name}</strong><span>{employee.job_title_name||employee.role}{employee.department_name?` · ${employee.department_name}`:""}</span></div><AlertTriangle/></div>
+            <div className="manager-employee-metrics">
+              <span>مهام متابعة متأخرة <b>{employee.followups_overdue_open}</b></span>
+              <span>فروق جرد <b>{employee.inventory_differences_found}</b></span>
+              <span>تعارض إعادة عد <b>{employee.inventory_recounts_conflicting}</b></span>
+              <span>فرق كاش <b>{Number(employee.cash_variance||0).toLocaleString("ar-EG")}</b></span>
+            </div>
+          </article>)}
+          {!attention.length&&<div className="manager-all-clear"><CheckCircle2/><strong>مفيش مؤشرات حرجة على الفريق في الفترة دي</strong></div>}
+        </div>
+      </section>
+
+      <section className="manager-section">
+        <div className="section-head"><div><h2>كل الفريق</h2><p>ملخص سريع بدون تقييم أو Score غامض</p></div></div>
+        <div className="manager-team-list">
+          {data.employees.map((employee)=><article key={employee.user_id} className="manager-employee-card compact">
+            <div className="manager-employee-head"><div className="avatar">{employee.name.slice(0,1)}</div><div><strong>{employee.name}</strong><span>{employee.job_title_name||employee.role}</span></div>{employee.needs_attention?<AlertTriangle/>:<CheckCircle2/>}</div>
+            <div className="manager-employee-metrics">
+              <span>جرد <b>{employee.inventory_counts_submitted}/{employee.inventory_counts_assigned}</b></span>
+              <span>أونلاين <b>{employee.online_handled_orders}</b></span>
+              <span>توصيل <b>{employee.delivery_delivered}</b></span>
+              <span>متابعات <b>{employee.followups_closed}/{employee.followups_assigned}</b></span>
+            </div>
+          </article>)}
+        </div>
+      </section>
+    </>}
+  </>;
+}
+
 function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: StaffBranch }) {
   const navigate=useNavigate();
   const [data,setData]=useState<StaffSelfServiceSnapshot|null>(null);
@@ -1576,7 +1679,7 @@ function AuthenticatedApp({state}:{state:ReturnType<typeof useStaffSession>}) {
   if(state.loading)return <Loading/>;
   if(!state.identity||!state.branch)return <Navigate to="/login" replace/>;
   const props={identity:state.identity,branch:state.branch};
-  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
+  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/manager" element={<ManagerWorkspace branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
 }
 
 export default function App(){
