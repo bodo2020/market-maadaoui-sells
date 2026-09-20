@@ -1,0 +1,78 @@
+name: Delivery APK Hotfix
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "work/delivery-apk-safearea-password-hotfix"
+    paths:
+      - "apps/delivery-wrapper/**"
+      - ".github/workflows/delivery-apk.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install wrapper dependencies
+        working-directory: apps/delivery-wrapper
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Android project
+        working-directory: apps/delivery-wrapper
+        run: npx cap add android
+
+      - name: Apply delivery native hotfixes
+        working-directory: apps/delivery-wrapper
+        run: python scripts/patch_android.py
+
+      - name: Verify hotfix metadata
+        working-directory: apps/delivery-wrapper
+        run: |
+          grep -n "targetSdkVersion = 34" android/variables.gradle
+          grep -n "IMPORTANT_FOR_AUTOFILL_YES" android/app/src/main/java/com/elmadawy/delivery/MainActivity.java
+          grep -n "CreatePasswordRequest" android/app/src/main/java/com/elmadawy/delivery/MainActivity.java
+          grep -n "WindowCompat.setDecorFitsSystemWindows" android/app/src/main/java/com/elmadawy/delivery/MainActivity.java
+          grep -n "elmadawy-receiving-switch" android/app/src/main/java/com/elmadawy/delivery/MainActivity.java
+          grep -n "ACCESS_FINE_LOCATION" android/app/src/main/AndroidManifest.xml
+
+      - name: Build debug APK
+        working-directory: apps/delivery-wrapper/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p artifact
+          cp apps/delivery-wrapper/android/app/build/outputs/apk/debug/app-debug.apk artifact/elmadawy-delivery-hotfix.apk
+          sha256sum artifact/elmadawy-delivery-hotfix.apk > artifact/SHA256.txt
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: elmadawy-delivery-hotfix-apk
+          path: artifact/*
+          if-no-files-found: error
+          retention-days: 14
