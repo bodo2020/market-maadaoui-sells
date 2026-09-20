@@ -92,6 +92,11 @@ function useStaffSession() {
       const [identity, branches] = await Promise.all([staff.getStaffIdentity(), staff.getStaffBranches()]);
       if (!identity?.active || !branches?.length) throw new Error("STAFF_ACCESS_REQUIRED");
       const branch = branches.find((row) => row.is_primary) || branches[0];
+      try {
+        await restoreKnownStaffDevice(branch.branch_id);
+      } catch {
+        // Device recovery must never block a valid staff login.
+      }
       setState({ loading: false, identity, branch });
     } catch {
       await supabase.auth.signOut();
@@ -706,6 +711,64 @@ async function getDeviceIdentity() {
   localStorage.setItem(DEVICE_KEY_KEY,identity.deviceKey);
   return identity;
 }
+
+type DeviceTrustState="none"|"pending"|"trusted"|"rejected";
+
+async function restoreKnownStaffDevice(branchId:string):Promise<DeviceTrustState>{
+  const identity=await getDeviceIdentity();
+  const stored=readStoredDevice();
+
+  if(stored){
+    const state=await staff.validateStaffDevice(stored.id,stored.token);
+    if(state.trusted){
+      try{
+        const bound=await staff.bindStaffDeviceFingerprint(
+          stored.id,stored.token,identity.deviceKey,identity.metadata,
+        );
+        if(!bound.requires_recovery)return "trusted";
+
+        const recovered=await staff.recoverStaffDevice(
+          branchId,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
+        );
+        if(recovered.trusted&&recovered.device_id&&recovered.device_token){
+          storeTrustedDevice(recovered.device_id,recovered.device_token);
+          return "trusted";
+        }
+        return recovered.code==="DEVICE_PENDING_APPROVAL"
+          ?"pending"
+          :recovered.code==="DEVICE_REJECTED"
+            ?"rejected"
+            :"none";
+      }catch{
+        // If migration to the persistent fingerprint fails, the validated
+        // current device token remains authoritative.
+        return "trusted";
+      }
+    }
+
+    const recovered=await staff.recoverStaffDevice(
+      branchId,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
+    );
+    if(recovered.trusted&&recovered.device_id&&recovered.device_token){
+      storeTrustedDevice(recovered.device_id,recovered.device_token);
+      return "trusted";
+    }
+    if(recovered.code==="DEVICE_PENDING_APPROVAL"||state.code==="DEVICE_PENDING_APPROVAL")return "pending";
+    if(recovered.code==="DEVICE_REJECTED"||state.code==="DEVICE_REJECTED")return "rejected";
+    return "none";
+  }
+
+  const recovered=await staff.recoverStaffDevice(
+    branchId,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
+  );
+  if(recovered.trusted&&recovered.device_id&&recovered.device_token){
+    storeTrustedDevice(recovered.device_id,recovered.device_token);
+    return "trusted";
+  }
+  if(recovered.code==="DEVICE_PENDING_APPROVAL")return "pending";
+  if(recovered.code==="DEVICE_REJECTED")return "rejected";
+  return "none";
+}
 function attendanceError(code: string) {
   const map: Record<string,string> = {
     TRUSTED_DEVICE_REQUIRED:"الجهاز غير معتمد للحضور. اربطه من الإدارة أولًا.",
@@ -803,45 +866,12 @@ function AttendancePage({ branch }: { branch: StaffBranch }) {
   const load = useCallback(async()=>{
     setBusy(true);
     try{
-      const [attendance,identity] = await Promise.all([
+      const [attendance,nextDeviceState] = await Promise.all([
         staff.getAttendance(branch.branch_id),
-        getDeviceIdentity(),
+        restoreKnownStaffDevice(branch.branch_id),
       ]);
       setData(attendance);
-
-      const stored=readStoredDevice();
-      if(stored){
-        const state=await staff.validateStaffDevice(stored.id,stored.token);
-        if(state.trusted){
-          try{
-            const bound=await staff.bindStaffDeviceFingerprint(
-              stored.id,stored.token,identity.deviceKey,identity.metadata,
-            );
-            if(bound.requires_recovery){
-              const recovered=await staff.recoverStaffDevice(
-                branch.branch_id,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
-              );
-              if(recovered.trusted&&recovered.device_id&&recovered.device_token){
-                storeTrustedDevice(recovered.device_id,recovered.device_token);
-              }
-            }
-          }catch{
-            // Attendance stays usable with the current token even if fingerprint migration fails.
-          }
-          setDeviceState("trusted");
-          return;
-        }
-      }
-
-      const recovered=await staff.recoverStaffDevice(
-        branch.branch_id,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
-      );
-      if(recovered.trusted&&recovered.device_id&&recovered.device_token){
-        storeTrustedDevice(recovered.device_id,recovered.device_token);
-        setDeviceState("trusted");
-      }else{
-        setDeviceState(recovered.code==="DEVICE_PENDING_APPROVAL"?"pending":recovered.code==="DEVICE_REJECTED"?"rejected":"none");
-      }
+      setDeviceState(nextDeviceState);
     }catch(caught){setMessage({type:"error",text:attendanceError(caught instanceof Error?caught.message:"")});}
     finally{setBusy(false);}
   },[branch.branch_id]);
