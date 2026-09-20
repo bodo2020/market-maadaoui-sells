@@ -1279,6 +1279,70 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     finally{setActing("");}
   };
 
+  const openExpiryAction=(item:staff.ExpiryBatchItem,action:"dispose"|"supplier_return")=>{
+    setSelectedExpiry(item);
+    setExpiryAction(action);
+    setExpiryRequestId(crypto.randomUUID());
+    setExpiryActionQuantity(String(item.quantity));
+    setExpiryActionNote(action==="dispose"?"إهلاك دفعة منتهية/غير صالحة بعد التحقق الفعلي":"إرجاع دفعة للمورد بعد التحقق الفعلي");
+  };
+
+  const closeExpiryAction=()=>{
+    setSelectedExpiry(null);
+    setExpiryRequestId("");
+    setExpiryActionQuantity("");
+    setExpiryActionNote("");
+  };
+
+  const submitExpiryAction=async()=>{
+    if(!selectedExpiry||acting)return;
+    const qty=Number(expiryActionQuantity);
+    if(!Number.isFinite(qty)||qty<=0||qty>selectedExpiry.quantity){setMessage({type:"error",text:"راجع كمية الإجراء؛ يجب أن تكون أكبر من صفر ولا تتجاوز كمية الدفعة"});return;}
+    if(expiryActionNote.trim().length<3){setMessage({type:"error",text:"اكتب سببًا واضحًا للإجراء"});return;}
+    setActing(selectedExpiry.batch_id);setMessage(null);
+    try{
+      const result=await staff.processExpiryBatchAction(expiryRequestId,branch.branch_id,selectedExpiry.batch_id,qty,expiryAction,expiryActionNote);
+      closeExpiryAction();
+      setMessage({
+        type:"ok",
+        text:expiryAction==="dispose"
+          ?`تم إهلاك ${qty} وتسجيل أثر تكلفة ${Number(result.value_amount||0).toLocaleString("ar-EG",{maximumFractionDigits:2})} ج.م بدون حركة نقدية`
+          :`تم إخراج ${qty} من المخزون وإنشاء إرجاع للمورد بقيمة متوقعة ${Number(result.value_amount||0).toLocaleString("ar-EG",{maximumFractionDigits:2})} ج.م`,
+      });
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تنفيذ إجراء الصلاحية"});}
+    finally{setActing("");}
+  };
+
+  const openSupplierSettlement=(item:staff.SupplierReturnWorkspace["items"][number])=>{
+    setSelectedSupplierReturn(item);
+    setSupplierCreditAmount(String(item.expected_credit_amount||0));
+    setSupplierCreditNote("");
+    setSupplierSettlementNote("");
+  };
+
+  const closeSupplierSettlement=()=>{
+    setSelectedSupplierReturn(null);
+    setSupplierCreditAmount("");
+    setSupplierCreditNote("");
+    setSupplierSettlementNote("");
+  };
+
+  const submitSupplierSettlement=async()=>{
+    if(!selectedSupplierReturn||acting)return;
+    const amount=Number(supplierCreditAmount);
+    if(!Number.isFinite(amount)||amount<0){setMessage({type:"error",text:"اكتب قيمة Credit صحيحة"});return;}
+    if(supplierCreditNote.trim().length<2){setMessage({type:"error",text:"اكتب رقم Credit Note أو مرجع اعتماد المورد"});return;}
+    setActing(selectedSupplierReturn.id);setMessage(null);
+    try{
+      await staff.settleSupplierReturn(selectedSupplierReturn.id,amount,supplierCreditNote,supplierSettlementNote);
+      closeSupplierSettlement();
+      setMessage({type:"ok",text:"تم تسجيل اعتماد المورد وإغلاق الإرجاع كـ Credited"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تسوية إرجاع المورد"});}
+    finally{setActing("");}
+  };
+
   const expiryDaysLeft=(value:string)=>{
     const today=new Date();today.setHours(12,0,0,0);
     const target=new Date(`${value}T12:00:00`);
