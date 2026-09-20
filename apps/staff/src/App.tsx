@@ -130,9 +130,9 @@ function Login() {
         <div className="brand-mark">م</div>
         <h1>المعداوي Staff</h1>
         <p>شغلك اليومي في مكان واحد</p>
-        <form onSubmit={submit}>
-          <label>اسم المستخدم<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required /></label>
-          <label>كلمة المرور<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
+        <form onSubmit={submit} autoComplete="on">
+          <label htmlFor="staff-username">اسم المستخدم<input id="staff-username" name="username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} required /></label>
+          <label htmlFor="staff-password">كلمة المرور<input id="staff-password" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
           {error && <div className="error-box">{error}</div>}
           <button className="primary" disabled={busy}>{busy ? <Loader2 className="spin" /> : "تسجيل الدخول"}</button>
         </form>

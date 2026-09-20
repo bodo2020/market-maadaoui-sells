@@ -39,10 +39,25 @@ jobs:
         working-directory: apps/staff
         run: npx cap add android
 
-      - name: Configure Android SDK
+      - name: Configure Android SDK and WebView autofill
         working-directory: apps/staff
         run: |
           sed -i -E 's/minSdkVersion = [0-9]+/minSdkVersion = 26/' android/variables.gradle
+          python - <<'PY'
+          from pathlib import Path
+
+          activity = Path("android/app/src/main/java/com/elmadawy/staff/MainActivity.java")
+          if not activity.exists():
+              raise SystemExit(f"MainActivity not found: {activity}")
+
+          activity.write_text('''package com.elmadawy.staff;\n\nimport android.os.Bundle;\nimport android.view.View;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {\n    @Override\n    protected void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        if (getBridge() != null && getBridge().getWebView() != null) {\n            getBridge().getWebView().setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_YES);\n        }\n    }\n}\n''', encoding="utf-8")
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text(encoding="utf-8")
+          if 'android:usesCleartextTraffic="false"' not in text:
+              text = text.replace('<application', '<application android:usesCleartextTraffic="false"', 1)
+              manifest.write_text(text, encoding="utf-8")
+          PY
           grep -n "minSdkVersion" android/variables.gradle
 
       - name: Sync Android project
@@ -88,6 +103,14 @@ jobs:
           print("AndroidManifest.xml is valid and camera/location permissions are present")
           PY
           grep -n -E "ACCESS_.*LOCATION|android.permission.CAMERA" android/app/src/main/AndroidManifest.xml
+
+      - name: Verify Google Password Manager metadata
+        working-directory: apps/staff
+        run: |
+          grep -R "current-password" dist >/dev/null
+          grep -R "username" dist >/dev/null
+          grep -n "IMPORTANT_FOR_AUTOFILL_YES" android/app/src/main/java/com/elmadawy/staff/MainActivity.java
+          grep -n 'usesCleartextTraffic="false"' android/app/src/main/AndroidManifest.xml
 
       - name: Build debug APK
         working-directory: apps/staff/android
