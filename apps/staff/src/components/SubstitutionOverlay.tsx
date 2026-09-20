@@ -82,6 +82,7 @@ export default function SubstitutionOverlay() {
   const [acting, setActing] = useState(false);
   const [error, setError] = useState("");
   const searchSequence = useRef(0);
+  const searchTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -134,11 +135,16 @@ export default function SubstitutionOverlay() {
 
   useEffect(() => {
     if (!selected) return;
-    const timer = window.setTimeout(
+    searchSequence.current += 1;
+    searchTimer.current = window.setTimeout(
       () => void runSearch(selected.id, query),
       query.trim() ? 350 : 0,
     );
-    return () => window.clearTimeout(timer);
+    return () => {
+      if (searchTimer.current !== null) window.clearTimeout(searchTimer.current);
+      searchTimer.current = null;
+      searchSequence.current += 1;
+    };
   }, [selected?.id, query, runSearch]);
 
   if (!available && !open) return null;
@@ -146,6 +152,8 @@ export default function SubstitutionOverlay() {
   const search = (event?: FormEvent) => {
     event?.preventDefault();
     if (!selected) return;
+    if (searchTimer.current !== null) window.clearTimeout(searchTimer.current);
+    searchTimer.current = null;
     void runSearch(selected.id, query);
   };
 
