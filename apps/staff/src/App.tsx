@@ -1327,6 +1327,9 @@ function ApprovalsPage({branch}:{branch:StaffBranch}){
   const [inventoryDetail,setInventoryDetail]=useState<staff.InventoryAuditTaskDetail|null>(null);
   const [hrDetail,setHrDetail]=useState<staff.HrRequestReviewDetail|null>(null);
   const [attendanceDetail,setAttendanceDetail]=useState<staff.AttendanceExceptionReview|null>(null);
+  const [substitutionDetail,setSubstitutionDetail]=useState<staff.OrderSubstitutionApprovalDetail|null>(null);
+  const [financialDetail,setFinancialDetail]=useState<staff.OrderFinancialAdjustmentDetail|null>(null);
+  const [providerReference,setProviderReference]=useState("");
   const [note,setNote]=useState("");
   const [adjustmentReason,setAdjustmentReason]=useState<staff.InventoryAdjustmentReason>("unknown");
   const [rejectionReason,setRejectionReason]=useState<staff.InventoryAdjustmentRejectionReason>("insufficient_evidence");
@@ -1339,7 +1342,7 @@ function ApprovalsPage({branch}:{branch:StaffBranch}){
   },[branch.branch_id,scope]);
   useEffect(()=>{void load();},[load]);
 
-  const clear=()=>{setSelected(null);setInventoryDetail(null);setHrDetail(null);setAttendanceDetail(null);setNote("");};
+  const clear=()=>{setSelected(null);setInventoryDetail(null);setHrDetail(null);setAttendanceDetail(null);setSubstitutionDetail(null);setFinancialDetail(null);setProviderReference("");setNote("");};
 
   const open=async(item:staff.ApprovalItem)=>{
     setActing(item.id);setMessage(null);
@@ -1350,6 +1353,9 @@ function ApprovalsPage({branch}:{branch:StaffBranch}){
       if(item.source_kind==="inventory_adjustment")setInventoryDetail(await staff.getInventoryAuditTask(item.id));
       else if(item.source_kind==="hr_request")setHrDetail(await staff.getHrRequestForReview(item.id));
       else if(item.source_kind==="attendance_exception")setAttendanceDetail(await staff.getAttendanceExceptionForReview(item.source_id));
+      else if(item.source_kind==="order_substitution")setSubstitutionDetail(await staff.getOrderSubstitutionApproval(branch.branch_id,item.source_id));
+      else if(item.source_kind==="order_substitution_financial_adjustment")setFinancialDetail(await staff.getOrderSubstitutionFinancialAdjustment(item.source_id));
+      else if(item.source_kind==="order_shortage_financial_adjustment")setFinancialDetail(await staff.getOrderShortageFinancialAdjustment(item.source_id));
       await load(false);
     }catch(caught){clear();setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر فتح الموافقة"});}
     finally{setActing("");}
@@ -1389,10 +1395,35 @@ function ApprovalsPage({branch}:{branch:StaffBranch}){
     finally{setActing("");}
   };
 
+  const decideSubstitution=async(decision:"approve"|"reject")=>{
+    if(!selected||!substitutionDetail||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة واضحة للقرار"});return;}
+    setActing(selected.id);setMessage(null);
+    try{
+      const result=await staff.decideOrderSubstitution(substitutionDetail.id,decision,note);
+      clear();
+      const delta=Number(result.price_delta_total||0);
+      setMessage({type:"ok",text:decision==="approve"?(Math.abs(delta)>=0.01?"تم اعتماد البديل وإنشاء التسوية المالية المطلوبة":"تم اعتماد البديل بدون فرق مالي"):"تم رفض البديل وإرجاع الطلب لمسار التجهيز"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر حفظ قرار البديل"});}
+    finally{setActing("");}
+  };
+
+  const settleFinancial=async()=>{
+    if(!selected||!financialDetail||acting)return;
+    if(providerReference.trim().length<2){setMessage({type:"error",text:"اكتب مرجع عملية التحصيل أو الرد"});return;}
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة واضحة للتسوية"});return;}
+    setActing(selected.id);setMessage(null);
+    try{
+      if(selected.source_kind==="order_substitution_financial_adjustment")await staff.settleOrderSubstitutionFinancialAdjustment(financialDetail.id,providerReference,note);
+      else await staff.settleOrderShortageFinancialAdjustment(financialDetail.id,providerReference,note);
+      clear();setMessage({type:"ok",text:financialDetail.direction==="charge"?"تم تسجيل تحصيل فرق الطلب":"تم تسجيل رد المبلغ وتسوية الطلب"});await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تسوية فرق الطلب"});}
+    finally{setActing("");}
+  };
+
   const completeGeneral=async()=>{
     if(!selected||acting)return;
-    const specialized=["order_substitution","order_substitution_financial_adjustment","order_shortage_financial_adjustment"];
-    if(specialized.includes(selected.source_kind)){setMessage({type:"error",text:"هذه الموافقة تحتاج شاشة القرار المتخصصة في Control Center حاليًا"});return;}
     if(note.trim().length<3){setMessage({type:"error",text:"اكتب نتيجة المراجعة"});return;}
     setActing(selected.id);
     try{await staff.completeTask(selected.id,note);clear();setMessage({type:"ok",text:"تم تسجيل نتيجة المراجعة"});await load(false);}
@@ -1426,10 +1457,29 @@ function ApprovalsPage({branch}:{branch:StaffBranch}){
         <div className="approval-request-body"><strong>السبب</strong><p>{attendanceDetail.reason}</p></div>
         <label className="inventory-field">ملاحظة القرار<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
         <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideAttendance("rejected")}>رفض</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideAttendance("approved")}>اعتماد</button></div>
+      </>:selected.source_kind==="order_substitution"&&substitutionDetail?<>
+        <div className="substitution-review-card">
+          <div className="substitution-product"><span>الأصلي</span><strong>{substitutionDetail.original_product_name}</strong><small>{Number(substitutionDetail.original_unit_price).toLocaleString("ar-EG")} ج.م</small></div>
+          <ArrowRight/>
+          <div className="substitution-product replacement">{substitutionDetail.replacement_image_url&&<img src={substitutionDetail.replacement_image_url} alt=""/>}<span>البديل المقترح</span><strong>{substitutionDetail.replacement_product_name}</strong><small>{Number(substitutionDetail.replacement_unit_price).toLocaleString("ar-EG")} ج.م × {substitutionDetail.quantity}</small></div>
+        </div>
+        <div className="approval-finance-impact"><span>فرق إجمالي الطلب</span><strong className={Number(substitutionDetail.price_delta_total)>0?"charge":Number(substitutionDetail.price_delta_total)<0?"refund":""}>{Number(substitutionDetail.price_delta_total).toLocaleString("ar-EG",{minimumFractionDigits:2})} ج.م</strong></div>
+        <label className="inventory-field">ملاحظة القرار<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)} placeholder="سبب الاعتماد أو الرفض"/></label>
+        <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideSubstitution("reject")}>رفض البديل</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideSubstitution("approve")}>اعتماد البديل</button></div>
+      </>:["order_substitution_financial_adjustment","order_shortage_financial_adjustment"].includes(selected.source_kind)&&financialDetail?<>
+        <div className="approval-request-body">
+          <strong>{selected.source_kind==="order_shortage_financial_adjustment"?financialDetail.product_name:`${financialDetail.original_product_name||""} → ${financialDetail.replacement_product_name||""}`}</strong>
+          <p>{financialDetail.direction==="charge"?"مطلوب تحصيل فرق من العميل":"مطلوب رد مبلغ للعميل"} · وسيلة الدفع {financialDetail.payment_method||"غير محددة"}</p>
+        </div>
+        <div className="inventory-review-grid"><div><span>قبل</span><strong>{Number(financialDetail.order_total_before).toFixed(2)}</strong></div><div><span>{financialDetail.direction==="charge"?"تحصيل":"رد"}</span><strong>{Number(financialDetail.amount).toFixed(2)}</strong></div><div><span>بعد</span><strong>{Number(financialDetail.target_order_total).toFixed(2)}</strong></div></div>
+        <label className="inventory-field">مرجع مزود الدفع<input value={providerReference} onChange={(e)=>setProviderReference(e.target.value)} placeholder="رقم العملية / المرجع"/></label>
+        <label className="inventory-field">ملاحظة التسوية<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)} placeholder="اكتب ما تم فعليًا"/></label>
+        <div className="handoff-warning"><ShieldCheck/><span>التأكيد يسجل التسوية في Payment Ledger ويعدل حالة الطلب حسب منطق الباك إند، وليس مجرد إغلاق Task.</span></div>
+        <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void settleFinancial()}>{acting?<Loader2 className="spin"/>:<Check/>}{financialDetail.direction==="charge"?"تأكيد التحصيل":"تأكيد رد المبلغ"}</button>
       </>:<>
-        <div className="approval-request-body"><p>{["order_substitution","order_substitution_financial_adjustment","order_shortage_financial_adjustment"].includes(selected.source_kind)?"هذه الموافقة لها قرار متخصص وسيتم نقل شاشتها للموبايل في المرحلة التالية.":"راجع التفاصيل ثم سجل نتيجة القرار."}</p></div>
+        <div className="approval-request-body"><p>راجع التفاصيل ثم سجل نتيجة القرار.</p></div>
         <label className="inventory-field">نتيجة المراجعة<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
-        <button className="primary full-action" disabled={Boolean(acting)||["order_substitution","order_substitution_financial_adjustment","order_shortage_financial_adjustment"].includes(selected.source_kind)} onClick={()=>void completeGeneral()}>إغلاق الموافقة</button>
+        <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void completeGeneral()}>إغلاق الموافقة</button>
       </>}
     </section></div>}
   </>;
