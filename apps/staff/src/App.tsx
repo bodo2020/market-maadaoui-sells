@@ -210,31 +210,34 @@ function useNotificationBadge(identity: StaffIdentity, branch: StaffBranch) {
 
 function Shell({ identity, branch, children }: { identity: StaffIdentity; branch: StaffBranch; children: ReactNode }) {
   const unread = useNotificationBadge(identity, branch);
+  const canOperate = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
+  const navItems = [
+    { to: "/", Icon: Home, label: "الرئيسية" },
+    { to: "/tasks", Icon: ClipboardList, label: "المهام" },
+    ...(canOperate ? [{ to: "/operations", Icon: PackageCheck, label: "التشغيل" }] : []),
+    { to: "/attendance", Icon: Clock3, label: "الحضور" },
+    { to: "/account", Icon: IdCard, label: "خدماتي" },
+  ];
+
   return (
     <div className="app-shell">
       <header>
-        <div><small>{branch.branch_name}</small><strong>أهلًا، {identity.name}</strong></div>
+        <div><small>{branch.branch_name} · {branch.role_name_ar}</small><strong>أهلًا، {identity.name}</strong></div>
         <NavLink to="/notifications" className="icon-btn notification-button" aria-label="الإشعارات">
           <Bell />{unread > 0 && <b>{unread > 99 ? "99+" : unread}</b>}
         </NavLink>
       </header>
       <main className="content">{children}</main>
       <nav className="bottom-nav">
-        {[
-          ["/", Home, "الرئيسية"],
-          ["/tasks", ClipboardList, "المهام"],
-          ["/operations", PackageCheck, "التشغيل"],
-          ["/attendance", Clock3, "الحضور"],
-          ["/account", IdCard, "خدماتي"],
-        ].map(([to, Icon, label]) => (
-          <NavLink key={to as string} to={to as string} end={to === "/"}>{<Icon size={20} />}<span>{label as string}</span></NavLink>
+        {navItems.map(({ to, Icon, label }) => (
+          <NavLink key={to} to={to} end={to === "/"}><Icon size={20} /><span>{label}</span></NavLink>
         ))}
       </nav>
     </div>
   );
 }
 
-function HomePage({ branch }: { identity: StaffIdentity; branch: StaffBranch }) {
+function HomePage({ branch, identity }: { identity: StaffIdentity; branch: StaffBranch }) {
   const [tasks, setTasks] = useState<staff.OperationsTask[]>([]);
   const [attendance, setAttendance] = useState<any>(null);
   const [busy, setBusy] = useState(true);
@@ -252,14 +255,40 @@ function HomePage({ branch }: { identity: StaffIdentity; branch: StaffBranch }) 
     }
   }, [branch.branch_id]);
   useEffect(() => { void load(); }, [load]);
+
   const overdue = tasks.filter((task) => task.is_overdue).length;
+  const mine = tasks.filter((task) => task.is_mine).length;
   const current = tasks.find((task) => task.is_mine) || tasks[0];
+  const canPrepare = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
 
   return (
     <>
-      <section className="hero"><small>{branch.role_name_ar}</small><h1>يومي</h1><p>{attendance?.active_session ? "أنت داخل الوردية الآن" : "ابدأ يومك وتابع أول مهمة مطلوبة"}</p></section>
-      <div className="stats"><div><strong>{tasks.length}</strong><span>مهام نشطة</span></div><div><strong>{overdue}</strong><span>متأخرة</span></div><div><strong>{attendance?.active_session ? "نشط" : "—"}</strong><span>الحضور</span></div></div>
-      <section className="section"><div className="section-head"><h2>الأولوية الآن</h2><button className="icon-btn" onClick={() => void load()}>{busy ? <Loader2 className="spin" /> : <RefreshCw />}</button></div>{current ? <TaskCard task={current} onChanged={load} /> : <Empty text="مفيش مهام محتاجة منك إجراء حاليًا" />}</section>
+      <section className="hero">
+        <small>{branch.role_name_ar} · {branch.branch_name}</small>
+        <h1>يومك يا {identity.name.split(" ")[0]}</h1>
+        <p>{attendance?.active_session ? "وردية نشطة — ركّز على أولويتك الحالية" : "ابدأ ورديتك وبعدها هتظهر لك الأولويات المطلوبة حسب دورك"}</p>
+      </section>
+
+      <div className="stats">
+        <div><strong>{mine}</strong><span>مهامي</span></div>
+        <div><strong>{overdue}</strong><span>متأخرة</span></div>
+        <div><strong>{attendance?.active_session ? "نشط" : "—"}</strong><span>الوردية</span></div>
+      </div>
+
+      <section className="section staff-home-shortcuts">
+        <div className="section-head"><h2>اختصارات شغلك</h2></div>
+        <div className="actions staff-home-actions">
+          <NavLink className="secondary" to="/tasks"><ClipboardList />المهام</NavLink>
+          {canPrepare && <NavLink className="secondary" to="/operations"><PackageCheck />تجهيز الطلبات</NavLink>}
+          <NavLink className="secondary" to="/attendance"><Clock3 />الحضور والوردية</NavLink>
+          <NavLink className="secondary" to="/account"><IdCard />خدمات الموظف</NavLink>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section-head"><h2>الأولوية الآن</h2><button className="icon-btn" onClick={() => void load()}>{busy ? <Loader2 className="spin" /> : <RefreshCw />}</button></div>
+        {current ? <TaskCard task={current} onChanged={load} /> : <Empty text="مفيش مهام محتاجة منك إجراء حاليًا" />}
+      </section>
     </>
   );
 }
