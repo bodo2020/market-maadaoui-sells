@@ -16,6 +16,54 @@ const withTimeout = <T>(promise: PromiseLike<T>, timeoutMs: number, code: string
     new Promise<T>((_, reject) => window.setTimeout(() => reject(new Error(code)), timeoutMs)),
   ]);
 
+const STAFF_CACHE_PREFIX = "elmadawy_staff_cache_v1";
+
+function onlineNow() {
+  return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+function requireOnlineWrite() {
+  if (!onlineNow()) throw new Error("OFFLINE_WRITE_BLOCKED");
+}
+
+function cacheKey(name: string, scope: string) {
+  return `${STAFF_CACHE_PREFIX}:${name}:${scope}`;
+}
+
+function saveCache<T>(key: string, value: T) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ saved_at: new Date().toISOString(), value }));
+  } catch {
+    // Cache failure must never block live operations.
+  }
+}
+
+function readCache<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { value?: T };
+    return parsed.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function cachedRead<T>(key: string, loader: () => Promise<T>): Promise<T> {
+  try {
+    const value = await loader();
+    saveCache(key, value);
+    return value;
+  } catch (error) {
+    if (!onlineNow()) {
+      const cached = readCache<T>(key);
+      if (cached !== null) return cached;
+      throw new Error("OFFLINE_NO_CACHE");
+    }
+    throw error;
+  }
+}
+
 export type StaffIdentity = {
   user_id: string;
   name: string;
@@ -795,27 +843,30 @@ export async function getStaffBranches() {
 }
 
 export async function listTasks(branchId: string, scope = "active") {
-  return unwrap<OperationsTask[]>(await rpc("list_operations_tasks", {
+  return cachedRead(cacheKey("tasks",`${branchId}:${scope}`),async()=>unwrap<OperationsTask[]>(await rpc("list_operations_tasks", {
     p_branch_id: branchId,
     p_scope: scope,
     p_limit: 100,
-  }));
+  })));
 }
 
 export async function claimTask(id: string) {
+  requireOnlineWrite();
   return unwrap(await rpc("claim_operations_task", { p_task_id: id }));
 }
 
 export async function startTask(id: string) {
+  requireOnlineWrite();
   return unwrap(await rpc("start_operations_task", { p_task_id: id }));
 }
 
 export async function completeTask(id: string, note = "تم التنفيذ من تطبيق الموظفين") {
+  requireOnlineWrite();
   return unwrap(await rpc("complete_operations_task", { p_task_id: id, p_note: note }));
 }
 
 export async function getAttendance(branchId: string) {
-  return unwrap<AttendancePayload>(await rpc("get_my_attendance_v1", { p_branch_id: branchId }));
+  return cachedRead(cacheKey("attendance",branchId),async()=>unwrap<AttendancePayload>(await rpc("get_my_attendance_v1", { p_branch_id: branchId })));
 }
 
 
@@ -1009,12 +1060,12 @@ export async function attendanceCheckOut(
 }
 
 export async function getNotifications(branchId: string, filter = "all") {
-  return unwrap<NotificationCenter>(await rpc("get_my_notification_center_v2", {
+  return cachedRead(cacheKey("notifications",`${branchId}:${filter}`),async()=>unwrap<NotificationCenter>(await rpc("get_my_notification_center_v2", {
     p_branch_id: branchId,
     p_filter: filter,
     p_category: null,
     p_limit: 100,
-  }));
+  })));
 }
 
 export async function markNotificationRead(id: string) {
