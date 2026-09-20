@@ -270,18 +270,39 @@ function TasksPage({ branch }: { branch: StaffBranch }) {
   return <><PageTitle title="المهام" subtitle="كل المطلوب منك في الفرع" /><div className="chips">{[["active","نشطة"],["mine","مهامي"],["overdue","متأخرة"],["completed","مكتملة"]].map(([id,label]) => <button className={scope === id ? "active" : ""} onClick={() => setScope(id)} key={id}>{label}</button>)}</div>{busy ? <Loading /> : <div className="stack">{rows.map((task) => <TaskCard key={task.id} task={task} onChanged={load} />)}{!rows.length && <Empty text="مفيش مهام في القسم ده" />}</div>}</>;
 }
 
-function useOrderOperationsRealtime(branchId: string, refresh: () => void) {
+function useOrderOperationsRealtime(branchId: string, refresh: () => void, orderId?: string) {
+  const refreshRef = useRef(refresh);
+
   useEffect(() => {
-    const channel = supabase.channel(`staff-order-ops-${branchId}`)
+    refreshRef.current = refresh;
+  }, [refresh]);
+
+  useEffect(() => {
+    let timer: number | null = null;
+    const scheduleRefresh = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        refreshRef.current();
+      }, 300);
+    };
+
+    const signalFilter = orderId ? `order_id=eq.${orderId}` : `branch_id=eq.${branchId}`;
+    const channelKey = orderId ? `${branchId}-${orderId}` : branchId;
+    const channel = supabase.channel(`staff-order-ops-${channelKey}`)
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
         table: "order_operations_realtime_signals_v1",
-        filter: `branch_id=eq.${branchId}`,
-      }, () => refresh())
+        filter: signalFilter,
+      }, scheduleRefresh)
       .subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [branchId, refresh]);
+
+    return () => {
+      if (timer !== null) window.clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [branchId, orderId]);
 }
 
 function OperationsPage({ branch, identity }: { branch: StaffBranch; identity: StaffIdentity }) {
@@ -413,6 +434,9 @@ function pickingError(message: string) {
     ["FULFILLMENT_NOT_OWNER","الطلب مستلم بواسطة موظف آخر"],
     ["PENDING_SUBSTITUTIONS_EXIST","فيه بدائل لسه مستنية اعتماد قبل التعبئة"],
     ["PICKING_ITEMS_UNRESOLVED","لسه فيه أصناف لم يتم حسمها"],
+    ["FULFILLMENT_ITEMS_INCOMPLETE","لسه فيه أصناف لم يتم حسمها"],
+    ["ORDER_NOT_IN_PREPARING","حالة الطلب اتغيرت. حدّث الجلسة وحاول مرة أخرى."],
+    ["FULFILLMENT_PERMISSION_DENIED","حسابك لا يملك صلاحية إنهاء تجهيز الطلب"],
   ];
   return pairs.find(([code]) => message.includes(code))?.[1] || "تعذر تنفيذ الإجراء. حدّث الجلسة وحاول مرة أخرى.";
 }
@@ -427,6 +451,22 @@ function allItemsResolved(session: PickingSession | null) {
   if (!session) return false;
   return session.items_total > 0 && session.resolved_count >= session.items_total;
 }
+
+function mergePickingLine(session: PickingSession, line: PickingItem) {
+  const items = session.items.map((item) => item.id === line.id ? { ...item, ...line } : item);
+  const itemsPicked = items.filter((item) => item.status === "picked").length;
+  const shortageCount = items.filter((item) => item.status === "shortage").length;
+  const substitutionCount = items.filter((item) => item.status === "substituted").length;
+  const resolvedCount = items.filter((item) => remainingQuantity(item) <= 0.0005).length;
+  return {
+    ...session,
+    items,
+    items_picked: itemsPicked,
+    shortage_count: shortageCount,
+    substitution_count: substitutionCount,
+    resolved_count: resolvedCount,
+  };
+}
 function PickingPage({ branch }: { branch: StaffBranch }) {
   const navigate = useNavigate();
   const { orderId = "" } = useParams();
@@ -437,12 +477,28 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
   const [barcode, setBarcode] = useState("");
   const [weight, setWeight] = useState("");
   const [busy, setBusy] = useState(true);
-  const [acting, setActing] = useState(false);
+  const [scanBusy, setScanBusy] = useState(false);
+  const [finishBusy, setFinishBusy] = useState(false);
+  const [itemBusy, setItemBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{type:"ok"|"error";text:string}|null>(null);
 
-  const load = useCallback(async (showBusy=true) => {
+  const refreshSession = useCallback(async (showError = false) => {
+    if (!orderId) return null;
+    try {
+      const nextSession = await staff.getPickingSession(orderId);
+      setSession(nextSession);
+      return nextSession;
+    } catch (caught) {
+      if (showError) {
+        setMessage({type:"error",text:pickingError(caught instanceof Error ? caught.message : "")});
+      }
+      return null;
+    }
+  }, [orderId]);
+
+  const load = useCallback(async () => {
     if (!orderId) return;
-    if (showBusy) setBusy(true);
+    setBusy(true);
     try {
       const [nextSession, workspace] = await Promise.all([
         staff.getPickingSession(orderId),
@@ -450,17 +506,22 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
       ]);
       setSession(nextSession);
       setOrder(workspace.orders.find((entry)=>entry.order_id===orderId)||null);
-      setMessage(null);
-      if (nextSession.fulfillment_state === "picking" && !Capacitor.isNativePlatform()) window.setTimeout(()=>scannerRef.current?.focus(),50);
+      if (nextSession.fulfillment_state === "picking" && !Capacitor.isNativePlatform()) {
+        window.setTimeout(()=>scannerRef.current?.focus(),50);
+      }
     } catch(caught) {
       setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});
     } finally {
-      if(showBusy)setBusy(false);
+      setBusy(false);
     }
   },[branch.branch_id,orderId]);
 
   useEffect(()=>{void load();},[load]);
-  useOrderOperationsRealtime(branch.branch_id,useCallback(()=>{void load(false);},[load]));
+  useOrderOperationsRealtime(
+    branch.branch_id,
+    useCallback(()=>{void refreshSession(false);},[refreshSession]),
+    orderId,
+  );
 
   const matchedItem = useMemo(()=>{
     const code=barcode.trim();
@@ -471,26 +532,51 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
   const scan = async(event:FormEvent)=>{
     event.preventDefault();
     const code=barcode.trim();
-    if(!code||acting||scanLockRef.current)return;
+    if(!code||scanBusy||finishBusy||itemBusy||scanLockRef.current)return;
     const target=session?.items.find((item)=>item.barcode===code&&remainingQuantity(item)>0);
     const quantity=target?.is_weight_based?Number(weight):null;
     if(target?.is_weight_based&&(!quantity||quantity<=0)){
       setMessage({type:"error",text:"الصنف وزني — اكتب الوزن الفعلي أولًا"});
       return;
     }
-    scanLockRef.current=true;setActing(true);
+
+    scanLockRef.current=true;
+    setScanBusy(true);
+    setMessage(null);
     try{
       const result=await staff.scanPickingBarcode(orderId,code,quantity);
-      setBarcode("");setWeight("");await load(false);setMessage({type:"ok",text:`تم تسجيل ${result.line.product_name}`});
+      const beforeRemaining = target ? remainingQuantity(target) : 0;
+      const addedQuantity = target?.is_weight_based ? Number(quantity || 0) : 1;
+      const completesLine = Boolean(target && beforeRemaining <= addedQuantity + 0.0005);
+      const completesOrder = Boolean(session && completesLine && session.resolved_count + 1 >= session.items_total);
+
+      if(session) setSession(mergePickingLine(session,result.line));
+      setBarcode("");
+      setWeight("");
+      setMessage({
+        type:"ok",
+        text:completesOrder
+          ? `تم تسجيل ${result.line.product_name} — اكتمل تجهيز كل الأصناف`
+          : `تم تسجيل ${result.line.product_name}`,
+      });
+
+      // The RPC already returns the updated line. Reconcile the full session in the
+      // background instead of blocking the scanner on an expensive workspace reload.
+      void refreshSession(false);
     }catch(caught){
-      const message=caught instanceof Error?caught.message:"";
-      if(message.includes("ITEM_ALREADY_COMPLETE")){
-        setBarcode("");setWeight("");await load(false);setMessage({type:"ok",text:"الصنف متسجل بالفعل وتم تحديث الجلسة"});
-      }else setMessage({type:"error",text:pickingError(message)});
-    }
-    finally{
-      scanLockRef.current=false;setActing(false);
-      if(Capacitor.isNativePlatform())scannerRef.current?.blur();
+      const errorMessage=caught instanceof Error?caught.message:"";
+      if(errorMessage.includes("ITEM_ALREADY_COMPLETE")){
+        setBarcode("");
+        setWeight("");
+        setMessage({type:"ok",text:"الصنف مكتمل بالفعل — تم تحديث الجلسة"});
+        void refreshSession(false);
+      }else{
+        setMessage({type:"error",text:pickingError(errorMessage)});
+      }
+    } finally {
+      scanLockRef.current=false;
+      setScanBusy(false);
+      if(Capacitor.isNativePlatform()) scannerRef.current?.blur();
       else window.setTimeout(()=>scannerRef.current?.focus(),50);
     }
   };
@@ -504,34 +590,51 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
       quantity=Number(input);
       if(!quantity||quantity<=0)return;
     }
-    setActing(true);
-    try{await staff.confirmPickingItem(item.id,quantity);setMessage({type:"ok",text:`تم تأكيد ${item.product_name}`});await load(false);}
-    catch(caught){setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});}
-    finally{setActing(false);}
+    setItemBusy(item.id);
+    setMessage(null);
+    try{
+      await staff.confirmPickingItem(item.id,quantity);
+      setMessage({type:"ok",text:`تم تأكيد ${item.product_name}`});
+      await refreshSession(false);
+    } catch(caught) {
+      setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});
+    } finally {
+      setItemBusy(null);
+    }
   };
 
   const shortage=async(item:PickingItem)=>{
     const remaining=remainingQuantity(item);
     if(remaining<=0)return;
     if(!window.confirm(`تسجيل المتبقي من ${item.product_name} كناقص؟`))return;
-    setActing(true);
-    try{await staff.markPickingShortage(item.id,remaining,"غير متوفر أثناء التجهيز");setMessage({type:"ok",text:`تم تسجيل النقص في ${item.product_name}`});await load(false);}
-    catch(caught){setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});}
-    finally{setActing(false);}
+    setItemBusy(item.id);
+    setMessage(null);
+    try{
+      await staff.markPickingShortage(item.id,remaining,"غير متوفر أثناء التجهيز");
+      setMessage({type:"ok",text:`تم تسجيل النقص في ${item.product_name}`});
+      await refreshSession(false);
+    } catch(caught) {
+      setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});
+    } finally {
+      setItemBusy(null);
+    }
   };
 
   const finishOrder=async()=>{
-    if(!allItemsResolved(session))return;
-    setActing(true);
+    if(!allItemsResolved(session)||scanBusy||itemBusy||finishBusy)return;
+    setFinishBusy(true);
+    setMessage(null);
     try{
       await staff.markReady(orderId,0);
       setMessage({type:"ok",text:"تم إنهاء التجهيز والطلب جاهز للاستلام"});
       navigate("/operations",{replace:true});
     }catch(caught){
       setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});
-    }finally{setActing(false);}
+      void refreshSession(false);
+    }finally{
+      setFinishBusy(false);
+    }
   };
-
 
   if(busy&&!session)return <Loading/>;
   if(!session)return <><PageTitle title="جلسة التجهيز" subtitle="تعذر تحميل الطلب"/><Empty text="الطلب غير متاح لك أو لم يعد ضمن مهامك"/></>;
@@ -539,24 +642,25 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
   const resolved=session.resolved_count;
   const progress=session.items_total?Math.round((resolved/session.items_total)*100):0;
   const allResolved=session.items_total>0&&resolved>=session.items_total;
+  const anyItemBusy=Boolean(itemBusy);
 
   return <>
     <div className="picking-header"><button className="icon-btn" onClick={()=>navigate("/operations")}><ArrowRight/></button><div><small>{order?.display_id||"طلب تجهيز"}</small><h1>{order?.customer_name||"جلسة Picking"}</h1></div><span className="pill normal">{fulfillmentLabel(session.fulfillment_state)}</span></div>
     <section className="picking-progress-card"><div className="row"><strong>{resolved}/{session.items_total} سطر مكتمل</strong><strong>{progress}%</strong></div><div className="progress"><i style={{width:`${progress}%`}}/></div><div className="picking-summary"><span>مكتمل {session.items_picked}</span><span>نواقص {session.shortage_count}</span><span>بدائل {session.substitution_count}</span></div></section>
     {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
 
-    {session.fulfillment_state==="picking"&&<form className="scanner-card" onSubmit={scan}><div className="scanner-title"><ScanLine/><div><strong>امسح باركود المنتج</strong><small>الماسح يكتب هنا مباشرة ثم Enter</small></div></div><div className="scanner-input-wrap"><Barcode/><input ref={scannerRef} value={barcode} onChange={(e)=>setBarcode(e.target.value)} placeholder="Barcode" inputMode="numeric" autoComplete="off"/></div>{matchedItem?.is_weight_based&&<label className="weight-field"><Scale/><span>الوزن الفعلي بالكيلو</span><input data-weight-input type="number" inputMode="decimal" min="0.001" step="0.001" value={weight} onChange={(e)=>setWeight(e.target.value)} placeholder={String(remainingQuantity(matchedItem))}/></label>}<button className="primary scanner-submit" disabled={!barcode.trim()||acting}>{acting?<Loader2 className="spin"/>:<ScanLine/>}تسجيل الصنف</button></form>}
+    {session.fulfillment_state==="picking"&&<form className="scanner-card" onSubmit={scan}><div className="scanner-title"><ScanLine/><div><strong>امسح باركود المنتج</strong><small>الماسح يكتب هنا مباشرة ثم Enter</small></div></div><div className="scanner-input-wrap"><Barcode/><input ref={scannerRef} value={barcode} onChange={(e)=>setBarcode(e.target.value)} placeholder="Barcode" inputMode="numeric" autoComplete="off"/></div>{matchedItem?.is_weight_based&&<label className="weight-field"><Scale/><span>الوزن الفعلي بالكيلو</span><input data-weight-input type="number" inputMode="decimal" min="0.001" step="0.001" value={weight} onChange={(e)=>setWeight(e.target.value)} placeholder={String(remainingQuantity(matchedItem))}/></label>}<button className="primary scanner-submit" disabled={!barcode.trim()||scanBusy||finishBusy||anyItemBusy}>{scanBusy?<Loader2 className="spin"/>:<ScanLine/>}تسجيل الصنف</button></form>}
 
     <div className="picking-items">{session.items.map((item)=>{
       const remaining=remainingQuantity(item);
       const resolvedLine=["picked","shortage","substituted"].includes(item.status);
-      return <article className={`picking-item ${resolvedLine?"resolved":""}`} key={item.id}>{item.image_url?<img src={item.image_url} alt=""/>:<div className="item-placeholder"><PackageCheck/></div>}<div className="item-body"><div className="row"><strong>{item.product_name}</strong>{resolvedLine&&<CheckCircle2 className="resolved-icon"/>}</div><div className="item-badges">{item.is_weight_based&&<span><Scale/>وزني</span>}{item.is_bulk&&<span>جملة</span>}{!item.barcode&&<span className="warning">بدون باركود</span>}</div><p>المطلوب: <b>{formatQuantity(item.required_quantity,item.is_weight_based)}</b>{item.picked_quantity>0&&<> · تم: <b>{formatQuantity(item.picked_quantity,item.is_weight_based)}</b></>}{remaining>0&&<> · متبقي: <b>{formatQuantity(remaining,item.is_weight_based)}</b></>}</p>{item.barcode&&<small>{item.barcode}</small>}{!resolvedLine&&<div className="item-actions">{!item.barcode&&<button className="primary" disabled={acting} onClick={()=>void confirmManual(item)}>تأكيد يدوي</button>}{item.is_weight_based&&item.barcode&&<button disabled={acting} onClick={()=>{setBarcode(item.barcode||"");window.setTimeout(()=>document.querySelector<HTMLInputElement>("[data-weight-input]")?.focus(),30);}}>إدخال الوزن</button>}<button className="danger-action" disabled={acting} onClick={()=>void shortage(item)}>غير متوفر</button></div>}</div></article>;
+      const thisItemBusy=itemBusy===item.id;
+      return <article className={`picking-item ${resolvedLine?"resolved":""}`} key={item.id}>{item.image_url?<img src={item.image_url} alt=""/>:<div className="item-placeholder"><PackageCheck/></div>}<div className="item-body"><div className="row"><strong>{item.product_name}</strong>{resolvedLine&&<CheckCircle2 className="resolved-icon"/>}</div><div className="item-badges">{item.is_weight_based&&<span><Scale/>وزني</span>}{item.is_bulk&&<span>جملة</span>}{!item.barcode&&<span className="warning">بدون باركود</span>}</div><p>المطلوب: <b>{formatQuantity(item.required_quantity,item.is_weight_based)}</b>{item.picked_quantity>0&&<> · تم: <b>{formatQuantity(item.picked_quantity,item.is_weight_based)}</b></>}{remaining>0&&<> · متبقي: <b>{formatQuantity(remaining,item.is_weight_based)}</b></>}</p>{item.barcode&&<small>{item.barcode}</small>}{!resolvedLine&&<div className="item-actions">{!item.barcode&&<button className="primary" disabled={thisItemBusy||scanBusy||finishBusy} onClick={()=>void confirmManual(item)}>{thisItemBusy?<Loader2 className="spin"/>:"تأكيد يدوي"}</button>}{item.is_weight_based&&item.barcode&&<button disabled={thisItemBusy||scanBusy||finishBusy} onClick={()=>{setBarcode(item.barcode||"");window.setTimeout(()=>document.querySelector<HTMLInputElement>("[data-weight-input]")?.focus(),30);}}>إدخال الوزن</button>}<button className="danger-action" disabled={thisItemBusy||scanBusy||finishBusy} onClick={()=>void shortage(item)}>{thisItemBusy?<Loader2 className="spin"/>:"غير متوفر"}</button></div>}</div></article>;
     })}</div>
 
-    {["picking","packing"].includes(session.fulfillment_state)&&allResolved&&<button className="primary full-action" disabled={acting} onClick={()=>void finishOrder()}>{acting?<Loader2 className="spin"/>:<CheckCircle2/>}إنهاء التجهيز — الطلب جاهز</button>}
+    {["picking","packing"].includes(session.fulfillment_state)&&allResolved&&<button className="primary full-action" disabled={finishBusy||scanBusy||anyItemBusy} onClick={()=>void finishOrder()}>{finishBusy?<Loader2 className="spin"/>:<CheckCircle2/>}إنهاء التجهيز — الطلب جاهز</button>}
   </>;
 }
-
 function readStoredDevice() {
   const id = localStorage.getItem(DEVICE_ID_KEY);
   const token = localStorage.getItem(DEVICE_TOKEN_KEY);
