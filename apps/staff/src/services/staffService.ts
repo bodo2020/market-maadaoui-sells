@@ -38,6 +38,54 @@ export type StaffBranch = {
 };
 
 
+
+export type ApprovalScope = "pending" | "mine" | "overdue" | "completed" | "all";
+export type ApprovalItem = {
+  id: string;
+  branch_id: string;
+  task_type: string;
+  source_kind: string;
+  source_id: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  priority: string;
+  amount: number;
+  claimed_by?: string | null;
+  claimed_by_name?: string | null;
+  completed_by_name?: string | null;
+  due_at?: string | null;
+  created_at: string;
+  metadata?: Record<string, unknown> | null;
+  is_mine: boolean;
+  can_claim: boolean;
+  can_decide: boolean;
+  is_overdue: boolean;
+  resolution_note?: string | null;
+};
+export type ApprovalCenter = {
+  summary: { pending: number; mine: number; overdue: number; critical: number; inventory: number; finance: number; transfers: number; completed_today: number };
+  items: ApprovalItem[];
+};
+export type HrRequestReviewDetail = {
+  request: { id: string; request_type: "leave" | "salary_advance" | "attendance_correction"; status: string; reason: string; payload: Record<string, unknown>; requested_at: string };
+  employee: { id: string; name: string; username?: string | null; phone?: string | null };
+  profile?: { employee_code?: string | null; work_mode?: string | null } | null;
+  task: { id: string; status: string; priority: string; due_at?: string | null };
+};
+export type AttendanceExceptionReview = {
+  id: string;
+  employee_name: string;
+  branch_name: string;
+  requested_at: string;
+  distance_m: number | null;
+  accuracy_m: number | null;
+  reason: string;
+  status: string;
+  verification_photo_path: string | null;
+  verification_photo_signed_url?: string | null;
+};
+
 export type InventoryAdjustmentReason = "theft" | "damage" | "breakage" | "receiving_error" | "selling_error" | "previous_error" | "unknown";
 export type InventoryAdjustmentRejectionReason = "counting_error" | "insufficient_evidence" | "investigation_required" | "other";
 
@@ -1026,5 +1074,57 @@ export async function receiveInventoryTransfer(
   });
   if (result.error) throw inventoryError(result.error.message);
   return result.data as Record<string, unknown>;
+}
+
+
+
+export async function getApprovalCenter(branchId: string, scope: ApprovalScope = "pending") {
+  const result = await rpc("get_approval_center_v1", { p_branch_id: branchId, p_scope: scope, p_limit: 100 });
+  if (result.error) throw new Error(result.error.message || "تعذر تحميل مركز الموافقات");
+  const raw=(result.data||{}) as Record<string,unknown>;
+  const summary=(raw.summary||{}) as Record<string,unknown>;
+  return {
+    summary:{
+      pending:Number(summary.pending||0),mine:Number(summary.mine||0),overdue:Number(summary.overdue||0),
+      critical:Number(summary.critical||0),inventory:Number(summary.inventory||0),finance:Number(summary.finance||0),
+      transfers:Number(summary.transfers||0),completed_today:Number(summary.completed_today||0),
+    },
+    items:Array.isArray(raw.items)?raw.items as ApprovalItem[]:[],
+  } as ApprovalCenter;
+}
+
+export async function getHrRequestForReview(taskId: string) {
+  const result=await rpc("get_hr_request_for_review_v1",{p_task_id:taskId});
+  if(result.error)throw new Error(result.error.message||"تعذر تحميل طلب الموظف");
+  return result.data as HrRequestReviewDetail;
+}
+
+export async function decideHrRequest(taskId: string, decision: "approved"|"rejected", note: string, approvedPayload?: Record<string,unknown>|null) {
+  const result=await rpc("decide_hr_request_v1",{
+    p_task_id:taskId,p_decision:decision,p_note:note.trim(),p_approved_payload:approvedPayload||null,
+  });
+  if(result.error)throw new Error(result.error.message||"تعذر تسجيل قرار الطلب");
+  return result.data as Record<string,unknown>;
+}
+
+export async function getAttendanceExceptionForReview(exceptionId: string) {
+  const result=await rpc("get_attendance_exception_v1",{p_exception_id:exceptionId});
+  if(result.error)throw new Error(result.error.message||"تعذر تحميل استثناء الحضور");
+  const detail=(result.data||null) as AttendanceExceptionReview|null;
+  if(!detail?.verification_photo_path||detail.status!=="pending")return detail;
+  const signed=await supabase.storage.from("hr_attendance_verification").createSignedUrl(detail.verification_photo_path,60);
+  if(signed.error)throw new Error("تعذر فتح صورة التحقق المؤقتة");
+  return {...detail,verification_photo_signed_url:signed.data.signedUrl};
+}
+
+export async function decideAttendanceException(exceptionId: string, decision: "approved"|"rejected", note?: string) {
+  const invoked=await supabase.functions.invoke("attendance-exception-decision-v2",{
+    body:{exception_id:exceptionId,decision,note:note?.trim()||null},
+  });
+  if(invoked.error)throw new Error(invoked.error.message||"تعذر إتمام قرار الحضور");
+  const result=invoked.data as {ok?:boolean;code?:string;photo_deleted?:boolean};
+  if(!result?.ok)throw new Error(result?.code||"تعذر إتمام قرار الحضور");
+  if(!result.photo_deleted)throw new Error("لم يؤكد النظام حذف صورة التحقق؛ لم يتم اعتماد القرار");
+  return result;
 }
 
