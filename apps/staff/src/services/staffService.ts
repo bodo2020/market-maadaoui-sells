@@ -23,7 +23,7 @@ function onlineNow() {
 }
 
 function requireOnlineWrite() {
-  if (!onlineNow()) throw new Error("OFFLINE_WRITE_BLOCKED");
+  if (!onlineNow()) throw new Error("أنت بدون اتصال. تقدر تراجع آخر بيانات محفوظة، لكن التنفيذ والتأكيد يحتاج إنترنت.");
 }
 
 function cacheKey(name: string, scope: string) {
@@ -58,7 +58,7 @@ async function cachedRead<T>(key: string, loader: () => Promise<T>): Promise<T> 
     if (!onlineNow()) {
       const cached = readCache<T>(key);
       if (cached !== null) return cached;
-      throw new Error("OFFLINE_NO_CACHE");
+      throw new Error("أنت بدون اتصال ومفيش نسخة محفوظة من البيانات دي على الجهاز.");
     }
     throw error;
   }
@@ -1288,6 +1288,7 @@ export async function getInventoryAuditTask(taskId: string) {
 }
 
 export async function submitInventoryCount(taskId: string, actualCount: number, note?: string) {
+  requireOnlineWrite();
   const result = await rpc("submit_inventory_count_v2", {
     p_task_id: taskId,
     p_actual_count: actualCount,
@@ -1298,6 +1299,7 @@ export async function submitInventoryCount(taskId: string, actualCount: number, 
 }
 
 export async function submitInventoryRecount(taskId: string, actualCount: number, note?: string) {
+  requireOnlineWrite();
   const result = await rpc("submit_inventory_recount_v2", {
     p_task_id: taskId,
     p_actual_count: actualCount,
@@ -1308,6 +1310,7 @@ export async function submitInventoryRecount(taskId: string, actualCount: number
 }
 
 export async function approveInventoryAdjustment(taskId: string, reasonCode: InventoryAdjustmentReason, note: string) {
+  requireOnlineWrite();
   const result = await rpc("approve_inventory_adjustment_v2", {
     p_task_id: taskId,
     p_request_id: crypto.randomUUID(),
@@ -1319,6 +1322,7 @@ export async function approveInventoryAdjustment(taskId: string, reasonCode: Inv
 }
 
 export async function rejectInventoryAdjustment(taskId: string, reasonCode: InventoryAdjustmentRejectionReason, note: string) {
+  requireOnlineWrite();
   const result = await rpc("reject_inventory_adjustment_v2", {
     p_task_id: taskId,
     p_reason_code: reasonCode,
@@ -1329,16 +1333,19 @@ export async function rejectInventoryAdjustment(taskId: string, reasonCode: Inve
 }
 
 export async function getInventoryTransferWorkspace(branchId: string) {
-  const result = await rpc("get_inventory_transfer_workspace_v2", {
-    p_branch_id: branchId,
-    p_status: "active",
-    p_limit: 100,
+  return cachedRead(cacheKey("inventory_transfers",branchId),async()=>{
+    const result = await rpc("get_inventory_transfer_workspace_v2", {
+      p_branch_id: branchId,
+      p_status: "active",
+      p_limit: 100,
+    });
+    if (result.error) throw inventoryError(result.error.message);
+    return result.data as InventoryTransferWorkspace;
   });
-  if (result.error) throw inventoryError(result.error.message);
-  return result.data as InventoryTransferWorkspace;
 }
 
 export async function dispatchInventoryTransfer(transferId: string, note?: string) {
+  requireOnlineWrite();
   const result = await rpc("dispatch_inventory_transfer_v2", {
     p_transfer_id: transferId,
     p_note: note?.trim() || null,
@@ -1352,6 +1359,7 @@ export async function receiveInventoryTransfer(
   items: Array<{ product_id: string; quantity: number }>,
   note?: string,
 ) {
+  requireOnlineWrite();
   const result = await rpc("receive_inventory_transfer_v2", {
     p_transfer_id: transferId,
     p_receipt_items: items,
@@ -1499,6 +1507,7 @@ export async function getInventoryRiskWorkspace(branchId: string, status: Invent
 }
 
 export async function createSpotInventoryAudit(branchId: string, productIds: string[]) {
+  requireOnlineWrite();
   const unique=[...new Set(productIds.filter(Boolean))];
   if(!unique.length)throw new Error("اختر منتجًا واحدًا على الأقل للجرد السريع.");
   const result=await rpc("create_inventory_audit_session_v2",{
@@ -1601,13 +1610,15 @@ function expiryActionError(message?: string) {
 
 export async function getExpiryWorkspace(branchId: string, daysAhead = 30) {
   const safeDays=Math.min(Math.max(Math.trunc(daysAhead||30),1),90);
-  const result=await rpc("get_expiry_workspace_v2",{
-    p_branch_id:branchId,
-    p_days_ahead:safeDays,
-    p_limit:250,
+  return cachedRead(cacheKey("expiry",`${branchId}:${safeDays}`),async()=>{
+    const result=await rpc("get_expiry_workspace_v2",{
+      p_branch_id:branchId,
+      p_days_ahead:safeDays,
+      p_limit:250,
+    });
+    if(result.error)throw expiryActionError(result.error.message);
+    return result.data as ExpiryWorkspace;
   });
-  if(result.error)throw expiryActionError(result.error.message);
-  return result.data as ExpiryWorkspace;
 }
 
 export async function processExpiryBatchAction(
@@ -1618,6 +1629,7 @@ export async function processExpiryBatchAction(
   action:"dispose"|"supplier_return",
   note:string,
 ) {
+  requireOnlineWrite();
   const result=await rpc("process_expiry_batch_action_v2",{
     p_request_id:requestId,
     p_branch_id:branchId,
@@ -1631,16 +1643,19 @@ export async function processExpiryBatchAction(
 }
 
 export async function getSupplierReturnsWorkspace(branchId:string,status:"pending_credit"|"credited"|"cancelled"|"all"="pending_credit") {
-  const result=await rpc("get_supplier_returns_workspace_v2",{
-    p_branch_id:branchId,
-    p_status:status,
-    p_limit:100,
+  return cachedRead(cacheKey("supplier_returns",`${branchId}:${status}`),async()=>{
+    const result=await rpc("get_supplier_returns_workspace_v2",{
+      p_branch_id:branchId,
+      p_status:status,
+      p_limit:100,
+    });
+    if(result.error)throw expiryActionError(result.error.message);
+    return result.data as SupplierReturnWorkspace;
   });
-  if(result.error)throw expiryActionError(result.error.message);
-  return result.data as SupplierReturnWorkspace;
 }
 
 export async function settleSupplierReturn(returnId:string,actualCreditAmount:number,creditNoteNumber:string,note?:string) {
+  requireOnlineWrite();
   const result=await rpc("settle_supplier_return_v2",{
     p_return_id:returnId,
     p_actual_credit_amount:actualCreditAmount,
