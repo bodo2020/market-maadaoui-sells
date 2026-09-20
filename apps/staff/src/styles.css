@@ -78,3 +78,12 @@
 .transfer-items{display:grid;gap:8px}.transfer-item{display:grid;grid-template-columns:1fr minmax(80px,120px);align-items:center;gap:10px;border:1px solid #e3ebe7;border-radius:14px;padding:11px;background:#fbfcfb}.transfer-item>div{display:flex;min-width:0;flex-direction:column}.transfer-item strong{font-size:12px}.transfer-item small{font-size:9px}.transfer-item input{width:100%;border:1px solid #dce5e0;border-radius:11px;padding:9px;font:inherit}
 .chips button svg{width:14px;height:14px}
 @media(max-width:520px){.inventory-modal-backdrop{padding:0}.inventory-modal{border-radius:24px 24px 0 0;max-height:92vh;padding-bottom:calc(20px + env(safe-area-inset-bottom))}.inventory-review-grid{grid-template-columns:1fr 1fr}.transfer-item{grid-template-columns:1fr 86px}}
+
+
+/* Staff V1 approval inbox */
+.approval-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 14px}.approval-summary>div{background:#fff;border:1px solid #e2eae6;border-radius:16px;padding:12px;display:flex;flex-direction:column}.approval-summary strong{font-size:20px;color:#005931}.approval-summary span{font-size:9px;color:#74837b}
+.approval-list{margin-top:14px}.approval-description{margin:0;color:#64756c;font-size:11px;line-height:1.7}
+.approval-person{display:flex;align-items:center;gap:10px;border:1px solid #e2eae6;background:#f8faf9;border-radius:16px;padding:12px}.approval-person>svg{width:24px;color:#005931;flex:0 0 auto}.approval-person>div{display:flex;flex-direction:column}.approval-person strong{font-size:13px}.approval-person span{font-size:10px;color:#76867d;margin-top:2px}
+.approval-request-body{border:1px solid #e4ebe7;background:#fbfcfb;border-radius:15px;padding:12px}.approval-request-body strong{font-size:11px}.approval-request-body p{margin:5px 0 0;font-size:11px;line-height:1.7;color:#5f7067}.approval-request-body pre{white-space:pre-wrap;word-break:break-word;direction:ltr;text-align:left;background:#f3f6f4;border-radius:10px;padding:9px;font-size:9px;max-height:170px;overflow:auto}
+.attendance-review-photo{width:100%;max-height:320px;object-fit:cover;border-radius:18px;border:1px solid #dfe8e3}
+@media(max-width:520px){.approval-summary{grid-template-columns:1fr 1fr}.approval-modal{max-height:94vh}}
