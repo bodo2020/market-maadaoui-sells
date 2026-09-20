@@ -65,7 +65,7 @@ export default function OrderDetails() {
     try {
       setIsProcessing(true);
       const result = await acceptPosOnlineOrder(order.id);
-      const dispatch = (result as typeof result & { delivery_dispatch?: { ok?: boolean; delivery_name?: string; reason?: string } }).delivery_dispatch;
+      const dispatch = result.delivery_dispatch;
       if (dispatch?.ok && dispatch.delivery_name) {
         toast.success('تم استلام الطلب وبدأ التجهيز', { description: `تم تكليف ${dispatch.delivery_name} بالتوصيل بالتوازي.` });
       } else {
