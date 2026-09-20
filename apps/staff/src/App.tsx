@@ -1002,8 +1002,8 @@ function EmployeeBarcode({value}:{value:string}) {
   bits+="01010";
   for(let i=7;i<=12;i++)bits+=eanRight[value[i]];
   bits+="101";
-  return <div className="employee-barcode" aria-label={\`باركود الموظف \${value}\`}>
-    <svg viewBox={\`0 0 \${bits.length} 58\`} role="img">{[...bits].map((bit,index)=>bit==="1"?<rect key={index} x={index} y="0" width="1" height="50"/>:null)}</svg>
+  return <div className="employee-barcode" aria-label={`باركود الموظف ${value}`}>
+    <svg viewBox={`0 0 ${bits.length} 58`} role="img">{[...bits].map((bit,index)=>bit==="1"?<rect key={index} x={index} y="0" width="1" height="50"/>:null)}</svg>
     <strong dir="ltr">{value}</strong>
   </div>;
 }
@@ -1168,7 +1168,7 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
 
     {view==="requests"&&<section className="self-service-panel">
       <div className="section-head"><h3>طلباتي</h3><button className="icon-btn" onClick={()=>void load()}><RefreshCw/></button></div>
-      <div className="request-list">{recentRequests.map((item)=><article className="request-row request-history" key={item.id}><div><div className="row"><strong>{requestTypeLabel(item.request_type)}</strong><span className={\`request-status \${item.status}\`}>{requestStatusLabel(item.status)}</span></div><p>{item.reason}</p><small>{new Date(item.requested_at).toLocaleString("ar-EG")}</small>{item.decision_note&&<em>{item.decision_note}</em>}</div>{item.status==="pending"&&<button className="cancel-request" disabled={acting} onClick={()=>void cancelRequest(item)}><XCircle/>إلغاء</button>}</article>)}{!recentRequests.length&&<Empty text="لسه مفيش طلبات"/>}</div>
+      <div className="request-list">{recentRequests.map((item)=><article className="request-row request-history" key={item.id}><div><div className="row"><strong>{requestTypeLabel(item.request_type)}</strong><span className={`request-status ${item.status}`}>{requestStatusLabel(item.status)}</span></div><p>{item.reason}</p><small>{new Date(item.requested_at).toLocaleString("ar-EG")}</small>{item.decision_note&&<em>{item.decision_note}</em>}</div>{item.status==="pending"&&<button className="cancel-request" disabled={acting} onClick={()=>void cancelRequest(item)}><XCircle/>إلغاء</button>}</article>)}{!recentRequests.length&&<Empty text="لسه مفيش طلبات"/>}</div>
     </section>}
 
     <button className="logout self-service-logout" onClick={async()=>{await supabase.auth.signOut();navigate("/login",{replace:true});}}><LogOut/>تسجيل الخروج</button>
