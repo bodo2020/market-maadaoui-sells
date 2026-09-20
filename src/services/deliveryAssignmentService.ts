@@ -4,6 +4,13 @@ export type DeliveryCandidate = {
   id: string;
   name: string;
   role: string;
+  availability?: "available" | "busy" | "offline" | string;
+  active_orders?: number;
+  distance_km?: number | null;
+  travel_minutes?: number | null;
+  last_location_at?: string | null;
+  dispatch_ready?: boolean;
+  status_reason?: "available" | "busy" | "offline" | "location_missing" | "location_stale" | "distance_unknown" | "outside_dispatch_radius" | string;
 };
 
 export type DeliveryAssignmentWorkspace = {
@@ -18,6 +25,7 @@ export type DeliveryAssignmentWorkspace = {
     name: string;
     assigned_at: string;
     tracking_number: string | null;
+    delivery_state?: string | null;
   };
   candidates: DeliveryCandidate[];
 };

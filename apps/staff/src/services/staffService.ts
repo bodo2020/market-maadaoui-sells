@@ -660,10 +660,10 @@ export async function finalizeStaging(orderId: string, note = "تم تسكين �
   }));
 }
 
-export async function markReady(orderId: string, bags = 1) {
+export async function markReady(orderId: string, bags = 0) {
   return unwrap(await rpc("mark_order_ready_v1", {
     p_order_id: orderId,
     p_bags_count: bags,
-    p_note: "جاهز من تطبيق الموظفين",
+    p_note: "تم إنهاء تجهيز الطلب من تطبيق الموظفين",
   }));
 }

@@ -26,7 +26,7 @@ const fulfillmentLabel: Record<string, string> = {
   awaiting_confirmation: "بانتظار المراجعة",
   queued: "في طابور التجهيز",
   picking: "جمع الأصناف",
-  packing: "التعبئة",
+  packing: "جاري التجهيز",
   ready: "جاهز",
   handed_over: "تم التسليم للمندوب",
 };
@@ -156,7 +156,7 @@ export default function POSOnlineOrdersDock() {
     setAcceptingId(orderId);
     try {
       await acceptPosOnlineOrder(orderId);
-      toast.success("تم استلام وتأكيد الطلب", { description: "تم إرسال الطلب تلقائيًا لمنظومة التجهيز." });
+      toast.success("تم استلام الطلب", { description: "بدأ التجهيز والبحث عن مندوب بالتوازي." });
       await refresh(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : "ORDER_ACCEPT_FAILED";

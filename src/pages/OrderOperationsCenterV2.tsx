@@ -33,7 +33,7 @@ const stateLabel: Record<string, string> = {
   awaiting_confirmation: "بانتظار التأكيد",
   queued: "في طابور التجهيز",
   picking: "جاري جمع الأصناف",
-  packing: "جاري التعبئة",
+  packing: "جاري التجهيز",
   ready: "جاهز للاستلام",
   handed_over: "تم التسليم للمندوب",
   completed: "مكتمل",
@@ -88,7 +88,7 @@ const dispatchReasonLabel: Record<string, string> = {
 const pickupIssueLabel: Record<string, string> = {
   store_closed: "المتجر مغلق",
   order_not_ready: "الطلب غير جاهز",
-  order_mismatch: "الطلب أو الأكياس غير مطابقة",
+  order_mismatch: "الطلب غير مطابق عند الاستلام",
   pickup_access: "تعذر الوصول لنقطة الاستلام",
   other: "مشكلة أخرى",
 };

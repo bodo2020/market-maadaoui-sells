@@ -58,9 +58,6 @@ import type {
   PickingSession,
   StaffBranch,
   StaffIdentity,
-  StagingBag,
-  StagingSession,
-  StagingZone,
 } from "./services/staffService";
 
 type SessionState = {
@@ -403,7 +400,7 @@ function OperationsPage({ branch, identity }: { branch: StaffBranch; identity: S
 }
 
 function fulfillmentLabel(value: string) {
-  return ({ awaiting_confirmation:"بانتظار التأكيد", queued:"في الطابور", picking:"جاري الجمع", packing:"التعبئة والتسكين", ready:"جاهز", handed_over:"تم التسليم للمندوب" } as Record<string,string>)[value] || value;
+  return ({ awaiting_confirmation:"بانتظار التأكيد", queued:"في الطابور", picking:"جاري التجهيز", packing:"جاري التجهيز", ready:"جاهز", handed_over:"تم التسليم للمندوب" } as Record<string,string>)[value] || value;
 }
 
 function pickingError(message: string) {
@@ -416,15 +413,6 @@ function pickingError(message: string) {
     ["FULFILLMENT_NOT_OWNER","الطلب مستلم بواسطة موظف آخر"],
     ["PENDING_SUBSTITUTIONS_EXIST","فيه بدائل لسه مستنية اعتماد قبل التعبئة"],
     ["PICKING_ITEMS_UNRESOLVED","لسه فيه أصناف لم يتم حسمها"],
-    ["ORDER_NOT_IN_PACKING","الطلب مش في مرحلة التعبئة والتسكين"],
-    ["STAGING_BAGS_REQUIRED","لازم تكوّن أكياس الطلب الأول"],
-    ["STAGING_INCOMPLETE","لسه فيه أكياس لم يتم تسكينها"],
-    ["STAGING_ZONE_MISMATCH","مكان التسكين لا يناسب نوع الكيس"],
-    ["STAGING_LOCATION_NOT_FOUND","مكان التسكين غير موجود أو غير نشط"],
-    ["STAGING_LOCATION_FULL","مكان التسكين ممتلئ — اختار مكان تاني"],
-    ["STAGING_BAGS_LOCKED","بدأ تسكين الأكياس بالفعل؛ لا يمكن إعادة تكوينها"],
-    ["INVALID_BAG_COUNT","عدد الأكياس غير صحيح"],
-    ["BAGS_COUNT_MISMATCH","عدد الأكياس لا يطابق سجل التسكين"],
   ];
   return pairs.find(([code]) => message.includes(code))?.[1] || "تعذر تنفيذ الإجراء. حدّث الجلسة وحاول مرة أخرى.";
 }
@@ -435,10 +423,10 @@ function remainingQuantity(item: PickingItem) {
 function formatQuantity(value: number, weight: boolean) {
   return weight ? `${Number(value).toLocaleString("ar-EG", { maximumFractionDigits: 3 })} كجم` : Number(value).toLocaleString("ar-EG");
 }
-function zoneLabel(zone: StagingZone) {
-  return zone === "chilled" ? "مبرد" : zone === "frozen" ? "مجمد" : "عادي";
+function allItemsResolved(session: PickingSession | null) {
+  if (!session) return false;
+  return session.items_total > 0 && session.resolved_count >= session.items_total;
 }
-
 function PickingPage({ branch }: { branch: StaffBranch }) {
   const navigate = useNavigate();
   const { orderId = "" } = useParams();
@@ -446,13 +434,8 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
   const scanLockRef = useRef(false);
   const [session, setSession] = useState<PickingSession | null>(null);
   const [order, setOrder] = useState<FulfillmentOrder | null>(null);
-  const [staging, setStaging] = useState<StagingSession | null>(null);
   const [barcode, setBarcode] = useState("");
   const [weight, setWeight] = useState("");
-  const [ambientBags, setAmbientBags] = useState("1");
-  const [chilledBags, setChilledBags] = useState("0");
-  const [frozenBags, setFrozenBags] = useState("0");
-  const [locationChoice, setLocationChoice] = useState<Record<string,string>>({});
   const [busy, setBusy] = useState(true);
   const [acting, setActing] = useState(false);
   const [message, setMessage] = useState<{type:"ok"|"error";text:string}|null>(null);
@@ -467,12 +450,6 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
       ]);
       setSession(nextSession);
       setOrder(workspace.orders.find((entry)=>entry.order_id===orderId)||null);
-      if (["packing","ready"].includes(nextSession.fulfillment_state)) {
-        try { setStaging(await staff.getStagingSession(orderId)); }
-        catch { setStaging(null); }
-      } else {
-        setStaging(null);
-      }
       setMessage(null);
       if (nextSession.fulfillment_state === "picking" && !Capacitor.isNativePlatform()) window.setTimeout(()=>scannerRef.current?.focus(),50);
     } catch(caught) {
@@ -543,50 +520,18 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
     finally{setActing(false);}
   };
 
-  const startPacking=async()=>{
+  const finishOrder=async()=>{
+    if(!allItemsResolved(session))return;
     setActing(true);
-    try{await staff.startPacking(orderId,0);await load(false);}
-    catch(caught){setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});}
-    finally{setActing(false);}
+    try{
+      await staff.markReady(orderId,0);
+      setMessage({type:"ok",text:"تم إنهاء التجهيز والطلب جاهز للاستلام"});
+      navigate("/operations",{replace:true});
+    }catch(caught){
+      setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});
+    }finally{setActing(false);}
   };
 
-  const prepareBags=async()=>{
-    const counts = [
-      ["ambient",Math.max(0,Number(ambientBags)||0)],
-      ["chilled",Math.max(0,Number(chilledBags)||0)],
-      ["frozen",Math.max(0,Number(frozenBags)||0)],
-    ] as Array<[StagingZone,number]>;
-    const zones=counts.flatMap(([zone,count])=>Array.from({length:count},()=>zone));
-    if(!zones.length){setMessage({type:"error",text:"حدد كيس واحد على الأقل"});return;}
-    setActing(true);
-    try{setStaging(await staff.prepareStagingBags(orderId,zones));setMessage({type:"ok",text:`تم تكوين ${zones.length} كيس. دلوقتي سكّن كل كيس في مكانه.`});}
-    catch(caught){setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});}
-    finally{setActing(false);}
-  };
-
-  const stageOne=async(bag:StagingBag)=>{
-    const options=staging?.locations.filter((location)=>location.zone===bag.zone&&location.available_bags>0)||[];
-    const locationCode=locationChoice[bag.id]||options[0]?.code||"";
-    if(!locationCode){setMessage({type:"error",text:`مفيش مكان ${zoneLabel(bag.zone)} متاح حاليًا`});return;}
-    setActing(true);
-    try{setStaging(await staff.stageBag(orderId,bag.bag_code,locationCode));setMessage({type:"ok",text:`تم تسكين الكيس ${bag.bag_no} في ${locationCode}`});}
-    catch(caught){setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});}
-    finally{setActing(false);}
-  };
-
-  const unstageOne=async(bag:StagingBag)=>{
-    setActing(true);
-    try{setStaging(await staff.unstageBag(orderId,bag.bag_code));setMessage({type:"ok",text:`تم إلغاء تسكين الكيس ${bag.bag_no}`});}
-    catch(caught){setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});}
-    finally{setActing(false);}
-  };
-
-  const finalize=async()=>{
-    setActing(true);
-    try{await staff.finalizeStaging(orderId);navigate("/operations",{replace:true});}
-    catch(caught){setMessage({type:"error",text:pickingError(caught instanceof Error?caught.message:"")});}
-    finally{setActing(false);}
-  };
 
   if(busy&&!session)return <Loading/>;
   if(!session)return <><PageTitle title="جلسة التجهيز" subtitle="تعذر تحميل الطلب"/><Empty text="الطلب غير متاح لك أو لم يعد ضمن مهامك"/></>;
@@ -608,32 +553,7 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
       return <article className={`picking-item ${resolvedLine?"resolved":""}`} key={item.id}>{item.image_url?<img src={item.image_url} alt=""/>:<div className="item-placeholder"><PackageCheck/></div>}<div className="item-body"><div className="row"><strong>{item.product_name}</strong>{resolvedLine&&<CheckCircle2 className="resolved-icon"/>}</div><div className="item-badges">{item.is_weight_based&&<span><Scale/>وزني</span>}{item.is_bulk&&<span>جملة</span>}{!item.barcode&&<span className="warning">بدون باركود</span>}</div><p>المطلوب: <b>{formatQuantity(item.required_quantity,item.is_weight_based)}</b>{item.picked_quantity>0&&<> · تم: <b>{formatQuantity(item.picked_quantity,item.is_weight_based)}</b></>}{remaining>0&&<> · متبقي: <b>{formatQuantity(remaining,item.is_weight_based)}</b></>}</p>{item.barcode&&<small>{item.barcode}</small>}{!resolvedLine&&<div className="item-actions">{!item.barcode&&<button className="primary" disabled={acting} onClick={()=>void confirmManual(item)}>تأكيد يدوي</button>}{item.is_weight_based&&item.barcode&&<button disabled={acting} onClick={()=>{setBarcode(item.barcode||"");window.setTimeout(()=>document.querySelector<HTMLInputElement>("[data-weight-input]")?.focus(),30);}}>إدخال الوزن</button>}<button className="danger-action" disabled={acting} onClick={()=>void shortage(item)}>غير متوفر</button></div>}</div></article>;
     })}</div>
 
-    {session.fulfillment_state==="picking"&&allResolved&&<button className="primary full-action" disabled={acting} onClick={()=>void startPacking()}><PackageCheck/>بدء التعبئة</button>}
-
-    {session.fulfillment_state==="packing"&&<section className="packing-card staging-card">
-      <div className="row"><div><small>المرحلة الأخيرة داخل الفرع</small><h2>التعبئة والتسكين</h2></div><MapPin /></div>
-      <p>كل كيس لازم يتسجل حسب حرارته ويتحط فعليًا في مكان Staging قبل ما الطلب يبقى جاهز للمندوب.</p>
-
-      {(!staging||staging.summary.total_bags===0)?<>
-        <div className="bag-plan-grid">
-          <label><span>عادي</span><input type="number" min="0" max="20" inputMode="numeric" value={ambientBags} onChange={(e)=>setAmbientBags(e.target.value)}/></label>
-          <label><span>مبرد</span><input type="number" min="0" max="20" inputMode="numeric" value={chilledBags} onChange={(e)=>setChilledBags(e.target.value)}/></label>
-          <label><span>مجمد</span><input type="number" min="0" max="20" inputMode="numeric" value={frozenBags} onChange={(e)=>setFrozenBags(e.target.value)}/></label>
-        </div>
-        <button className="primary full-action" disabled={acting} onClick={()=>void prepareBags()}>{acting?<Loader2 className="spin"/>:<PackageCheck/>}إنشاء أكياس الطلب</button>
-      </>:<>
-        <div className="staging-summary"><div><strong>{staging.summary.staged_bags}/{staging.summary.total_bags}</strong><span>تم تسكينها</span></div><div><strong>{staging.summary.created_bags}</strong><span>في انتظار مكان</span></div></div>
-        <div className="staging-bags">{staging.bags.map((bag)=>{
-          const options=staging.locations.filter((location)=>location.zone===bag.zone && (location.available_bags>0||location.id===bag.location_id));
-          const chosen=locationChoice[bag.id]||bag.location_code||options[0]?.code||"";
-          return <article className={`staging-bag ${bag.status}`} key={bag.id}>
-            <div className="row"><div><strong>كيس {bag.bag_no}</strong><small dir="ltr">{bag.bag_code}</small></div><span className={`zone-tag ${bag.zone}`}>{zoneLabel(bag.zone)}</span></div>
-            {bag.status==="staged"?<><div className="staged-location"><MapPin/> {bag.location_label||bag.location_code}</div><button className="secondary" disabled={acting} onClick={()=>void unstageOne(bag)}>تغيير مكان التسكين</button></>:<div className="stage-controls"><select value={chosen} onChange={(e)=>setLocationChoice((current)=>({...current,[bag.id]:e.target.value}))}>{options.map((location)=><option key={location.id} value={location.code}>{location.label} · متاح {location.available_bags}</option>)}</select><button className="primary" disabled={acting||!chosen} onClick={()=>void stageOne({...bag})}>{acting?<Loader2 className="spin"/>:<MapPin/>}تسكين الكيس</button></div>}
-          </article>;
-        })}</div>
-        <button className="primary full-action staging-finalize" disabled={acting||!staging.summary.ready_to_finalize} onClick={()=>void finalize()}>{acting?<Loader2 className="spin"/>:<CheckCircle2/>}{staging.summary.ready_to_finalize?"كل الأكياس في مكانها — الطلب جاهز للمندوب":`لسه ${staging.summary.created_bags} كيس محتاج تسكين`}</button>
-      </>}
-    </section>}
+    {["picking","packing"].includes(session.fulfillment_state)&&allResolved&&<button className="primary full-action" disabled={acting} onClick={()=>void finishOrder()}>{acting?<Loader2 className="spin"/>:<CheckCircle2/>}إنهاء التجهيز — الطلب جاهز</button>}
   </>;
 }
 
