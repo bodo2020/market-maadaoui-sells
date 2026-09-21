@@ -13,6 +13,7 @@ import {
   Gauge,
   Headphones,
   IdCard,
+  KeyRound,
   Layers3,
   Loader2,
   PackageCheck,
@@ -95,6 +96,10 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
   const [busy,setBusy]=useState(true);
   const [performanceBusy,setPerformanceBusy]=useState(false);
   const [error,setError]=useState<string|null>(null);
+  const [pin,setPin]=useState("");
+  const [pinConfirm,setPinConfirm]=useState("");
+  const [pinBusy,setPinBusy]=useState(false);
+  const [pinMessage,setPinMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
 
   const loadBase=useCallback(async()=>{
     setBusy(true);setError(null);
@@ -131,6 +136,20 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
 
   useEffect(()=>{void loadBase();},[loadBase]);
   useEffect(()=>{if(view==="performance")void loadPerformance();},[view,loadPerformance]);
+
+  const changeSuperAdminPin=async()=>{
+    if(!identity.is_super_admin||pinBusy)return;
+    if(!/^\d{4,6}$/.test(pin)){setPinMessage({type:"error",text:"PIN الجديد يجب أن يكون من 4 إلى 6 أرقام."});return;}
+    if(pin!==pinConfirm){setPinMessage({type:"error",text:"تأكيد PIN غير مطابق."});return;}
+    setPinBusy(true);setPinMessage(null);
+    try{
+      await staff.superAdminSetOwnStaffPin(identity.user_id,pin);
+      setPin("");setPinConfirm("");
+      setPinMessage({type:"ok",text:"تم تعيين PIN جديد وتحديث PIN نقطة البيع المرتبط بالحساب."});
+    }catch(caught){
+      setPinMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تغيير PIN"});
+    }finally{setPinBusy(false);}
+  };
 
   const p=profile?.profile;
   const user=profile?.user;
@@ -223,6 +242,16 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
           <div><span>إنشاء الحساب</span><strong>{user?.created_at?new Date(user.created_at).toLocaleDateString("ar-EG"):"—"}</strong></div>
         </div>
       </section>
+
+      {identity.is_super_admin&&<section className="employment-section">
+        <div className="employment-section-title"><KeyRound/><div><h3>أمان الحساب</h3><p>مدير النظام يقدر يضع PIN جديد لحسابه بدون معرفة الرمز القديم. العملية مسجلة في سجل التدقيق.</p></div></div>
+        {pinMessage&&<div className={pinMessage.type==="ok"?"success-box":"error-box"}>{pinMessage.text}</div>}
+        <div className="employment-pin-grid">
+          <label>PIN الجديد<input type="password" inputMode="numeric" maxLength={6} autoComplete="off" value={pin} onChange={(e)=>setPin(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="••••"/></label>
+          <label>تأكيد PIN<input type="password" inputMode="numeric" maxLength={6} autoComplete="off" value={pinConfirm} onChange={(e)=>setPinConfirm(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="••••"/></label>
+        </div>
+        <button className="primary full-action" disabled={pinBusy||!pin||!pinConfirm} onClick={()=>void changeSuperAdminPin()}>{pinBusy?<Loader2 className="spin"/>:<KeyRound/>}تعيين PIN جديد</button>
+      </section>}
 
       <section className="employment-section">
         <div className="employment-section-title"><Store/><div><h3>الفروع المسموحة</h3><p>الفرع الوظيفي الأساسي لا يلغي صلاحيات الوصول للفروع الأخرى.</p></div></div>
