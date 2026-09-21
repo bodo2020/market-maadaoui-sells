@@ -1108,6 +1108,23 @@ export async function getMyDeliveryPerformance(employeeId:string,branchId:string
   return result.data as StaffDeliveryPerformance;
 }
 
+export async function superAdminSetOwnStaffPin(employeeId:string,newPin:string) {
+  requireOnlineWrite();
+  if(!/^\d{4,6}$/.test(newPin))throw new Error("PIN الجديد يجب أن يكون من 4 إلى 6 أرقام.");
+  const result=await rpc("super_admin_set_staff_app_pin_v2",{
+    p_user_id:employeeId,
+    p_new_pin:newPin,
+  });
+  if(result.error){
+    const value=result.error.message||"";
+    if(value.includes("SUPER_ADMIN_REQUIRED"))throw new Error("هذه العملية متاحة لمدير النظام فقط.");
+    if(value.includes("INVALID_APP_PIN"))throw new Error("PIN يجب أن يكون من 4 إلى 6 أرقام.");
+    if(value.includes("TARGET_STAFF_INACTIVE"))throw new Error("حساب الموظف غير موجود أو غير نشط.");
+    throw new Error(value||"تعذر تغيير PIN.");
+  }
+  return result.data as {ok:boolean;user_id:string;changed:boolean};
+}
+
 export async function getMyOnlinePerformance(employeeId:string,branchId:string,from:string,to:string) {
   const result=await rpc("get_hr_online_customer_service_performance_v1",{p_employee_id:employeeId,p_branch_id:branchId,p_from:from,p_to:to});
   if(result.error)throw hrSelfError(result.error.message);
