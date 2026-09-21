@@ -1475,7 +1475,7 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
       batch_number:line.legacy_remaining?"":line.batch_number,
       quantity:Number(line.quantity),
       purchase_price:Number(line.purchase_price||0),
-      note:line.legacy_remaining?"إعادة تعريف دفعة قديمة بعد التحقق الفعلي":line.note||null,
+      note:line.legacy_remaining?[line.note,"إعادة تعريف دفعة قديمة بعد التحقق الفعلي"].filter(Boolean).join(" | "):line.note||null,
     })));
   };
 
