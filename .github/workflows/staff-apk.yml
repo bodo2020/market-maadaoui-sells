@@ -60,6 +60,18 @@ jobs:
           fi
           echo "$STAFF_FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
           python -m json.tool android/app/google-services.json >/dev/null
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path("android/app/google-services.json").read_text())
+          packages={
+              client.get("client_info",{}).get("android_client_info",{}).get("package_name")
+              for client in data.get("client",[])
+          }
+          if "com.elmadawy.staff" not in packages:
+              raise SystemExit("google-services.json does not contain Android package com.elmadawy.staff")
+          print("Verified Firebase Android package com.elmadawy.staff")
+          PY
           echo "configured=true" >> "$GITHUB_OUTPUT"
 
       - name: Configure native Staff Android
