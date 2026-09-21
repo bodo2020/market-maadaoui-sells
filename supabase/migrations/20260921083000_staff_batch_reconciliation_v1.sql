@@ -66,12 +66,14 @@ begin
   with affected as (
     select distinct b.product_id
     from public.product_batches b
+    join public.products p on p.id=b.product_id
+    left join public.purchase_items pi on pi.id=b.purchase_item_id
     where b.branch_id=p_branch_id
       and b.quantity>0
       and upper(coalesce(b.batch_number,'')) not like 'DAMAGED-%'
       and (
         upper(coalesce(b.batch_number,'')) like 'REMAINING-%'
-        or coalesce(b.purchase_price,0)<=0
+        or coalesce(nullif(b.purchase_price,0),nullif(pi.price,0),nullif(p.purchase_price,0),0)<=0
         or exists(
           select 1 from public.product_batches x
           where x.id<>b.id
@@ -108,11 +110,12 @@ begin
       coalesce((
         select count(*)
         from public.product_batches b
+        left join public.purchase_items pi on pi.id=b.purchase_item_id
         where b.branch_id=p_branch_id
           and b.product_id=a.product_id
           and b.quantity>0
           and upper(coalesce(b.batch_number,'')) not like 'DAMAGED-%'
-          and coalesce(b.purchase_price,0)<=0
+          and coalesce(nullif(b.purchase_price,0),nullif(pi.price,0),nullif(p.purchase_price,0),0)<=0
       ),0)::integer zero_cost_rows,
       coalesce((
         select count(*)
