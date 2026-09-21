@@ -414,7 +414,7 @@ begin
   end if;
 
   perform pg_advisory_xact_lock(hashtextextended(
-    p_branch_id::text||':'||v_batch.product_id::text,91
+    v_inventory_branch::text||':'||v_batch.product_id::text,91
   ));
 
   -- Re-read under row lock after acquiring the product lock in case another
