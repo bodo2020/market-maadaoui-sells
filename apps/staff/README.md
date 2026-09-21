@@ -16,6 +16,7 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 ### الأساس
 - تسجيل الدخول، Google Password Manager، Trusted Device.
 - الرئيسية "يومي" حسب الدور.
+- Bottom Nav ثابت 5 عناصر مع Work Hub «العمل» للوحدات التشغيلية حسب الصلاحية.
 - Task Center.
 - الحضور والانصراف والاستثناءات.
 - الإشعارات.
@@ -47,6 +48,8 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 - الإهلاك يسجل Non-cash expense مشتقًا من تكلفة الشراء، ولا يسحب من الخزنة.
 - Supplier Return يخرج المخزون ويظل `pending_credit` حتى وصول Credit Note.
 - تسجيل Credit Note يتم لاحقًا بواسطة المشتريات/المالية ولا يعدل رصيد المورد تلقائيًا بدون مستند محاسبي.
+- Data-quality guard يمنع الإجراءات على `REMAINING-*` القديمة أو Duplicate batches أو تكلفة شراء صفر.
+- الصفوف غير الموثوقة تظل ظاهرة للتحقق والجرد، لكن الإهلاك/الإرجاع يظل محظورًا حتى التسوية.
 
 ### Approval & manager
 - Approval Inbox: مخزون، HR، حضور، بدائل، وتسويات مالية.
@@ -64,6 +67,7 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 - Cache محلي لآخر Tasks / Attendance / Notifications وبعض Workspaces التشغيلية.
 - Inventory risks / transfers / expiry / supplier returns تدعم fallback للقراءة.
 - العمليات الحساسة لا تنفذ Offline؛ تنتظر عودة الاتصال بدل تكرار أو نصف تنفيذ.
+- Cache مربوط بـ user_id وليس الفرع فقط، ويتم تنظيفه عند Logout لمنع ظهور بيانات موظف سابق على نفس الجهاز.
 
 ### Native Push foundation
 - Capacitor Push Notifications متوافق مع Capacitor 7.
