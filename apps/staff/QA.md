@@ -256,3 +256,18 @@ Operational status:
 - لا يسمح بتشغيل worker لو provider غير configured/valid.
 - بعد التفعيل النهائي: `ready = true`.
 - queue sent/failed/retrying قابلة للمراجعة.
+
+
+## 14. Work Hub / Navigation
+
+Expected:
+- Bottom Nav ثابت على 5 عناصر كحد أقصى: الرئيسية / المهام / العمل / الحضور / خدماتي.
+- لا تظهر Orders وInventory كتبات مستقلة في Bottom Nav.
+- صفحة «العمل» تعرض الوحدات حسب Role/Permissions.
+- Picker يرى تجهيز الطلبات فقط من الوحدات التشغيلية المسموحة له.
+- Inventory employee يرى المخزون والجرد فقط حسب صلاحياته.
+- Supervisor يرى Approvals لو صلاحيته تسمح.
+- Manager يرى «فريقي اليوم» فقط مع `hr.view` أو `branch.manage_staff` أو Super Admin.
+- Finance/shift manager يرى تسليمات الوردية حسب الصلاحية.
+- فتح URL مباشر لوحدة غير مصرح بها لا يمنح أي بيانات أو إجراء من الباك إند.
+- العودة من الوحدات إلى «العمل» ثم Bottom Nav تظل مستقرة بدون duplicate active states.
