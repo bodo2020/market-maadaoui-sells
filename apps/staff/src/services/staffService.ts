@@ -319,7 +319,12 @@ export type ExpiryBatchItem = {
   legacy_remaining_batch: boolean;
   duplicate_count: number;
   cost_missing: boolean;
+  inventory_quantity: number;
+  verified_count_id: string | null;
+  last_verified_at: string | null;
+  audit_verified: boolean;
   safe_for_action: boolean;
+  action_ready: boolean;
   notes: string | null;
 };
 
