@@ -1,7 +1,7 @@
 # Elmadawy Staff V1 — QA Matrix
 
 Target branch: `work/staff-app-v1`
-App version: `0.13.0`
+App version: `0.14.0`
 
 ## قواعد الاختبار
 
@@ -205,3 +205,54 @@ Expected:
 - Stable Android signing متاح.
 - اختبار جهاز Android فعلي واحد على الأقل.
 - تأكيد عدم وجود Regression في POS / Customer / Delivery.
+
+
+## 13. Native Push
+
+Prerequisites:
+- APK مبني بـ Firebase client config الصحيح لـ `com.elmadawy.staff`.
+- FCM HTTP v1 provider configured.
+- Push worker مفعّل فقط بعد نجاح health checks.
+
+Device registration:
+1. افتح «خدماتي».
+2. قبل التفعيل: لا يظهر Android permission بشكل إجباري عند startup.
+3. اضغط «تفعيل إشعارات العمل».
+4. وافق على Permission.
+5. تحقق أن `get_my_push_device_status_v2` يعرض الجهاز.
+6. تحقق أن `app_kind = staff`.
+7. إعادة فتح التطبيق مع Permission granted تعيد التسجيل بصورة آمنة بدون جهاز مكرر.
+
+Notification delivery:
+- General notification.
+- Task notification.
+- Order notification.
+- Critical/high priority notification.
+- Foreground: notification تظهر ويحدث unread badge.
+- Background: notification تصل.
+- App killed: notification تصل حسب Android/FCM.
+- Tap يفتح `action_url` المسموح.
+- action_url غير مسموح يعود إلى `/notifications`.
+
+Channels:
+- `general`
+- `tasks`
+- `orders`
+- `offers`
+
+Token lifecycle:
+- Logout يلغي تسجيل token لهذا الجهاز.
+- Login بحساب موظف آخر يعيد ربط token بالحساب الجديد.
+- FCM UNREGISTERED token يتم تعطيله server-side.
+- 429/5xx يدخل retry وليس duplicate send.
+
+Permission cases:
+- granted.
+- prompt.
+- denied.
+- Android app بدون google-services config: التطبيق لا ينهار؛ تفعيل Push يعطي خطأ مفهوم بدل crash.
+
+Operational status:
+- لا يسمح بتشغيل worker لو provider غير configured/valid.
+- بعد التفعيل النهائي: `ready = true`.
+- queue sent/failed/retrying قابلة للمراجعة.
