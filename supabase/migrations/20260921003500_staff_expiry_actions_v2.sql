@@ -425,6 +425,10 @@ begin
     raise exception using errcode='22023',message='BRANCH_NOT_FOUND';
   end if;
 
+  if v_inventory_branch is distinct from p_branch_id then
+    raise exception using errcode='22023',message='EXPIRY_SHARED_INVENTORY_REQUIRES_SOURCE_BRANCH';
+  end if;
+
   perform pg_advisory_xact_lock(hashtextextended(
     v_inventory_branch::text||':'||v_batch.product_id::text,91
   ));
