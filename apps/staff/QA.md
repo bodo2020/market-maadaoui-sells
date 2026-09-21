@@ -365,7 +365,10 @@ Canonical lines:
 - duplicate `batch_number + expiry_date` is rejected.
 - same existing batch_id cannot be reused twice.
 - supplier is optional but, when present, must be a real supplier.
+- supplier selector exposes only id/name/code from active suppliers; phone/email/address/balance are not exposed to Staff reconciliation.
+- a reconciled batch with supplier selected can later enter supplier-return flow without manual DB repair.
 - total quantity across canonical lines must equal current Inventory exactly (tolerance 0.001).
+- Inventory = 0 + stale positive batches: fresh matched zero count permits an empty canonical batch list, clearing stale active batch stock safely.
 
 Atomicity:
 - old active non-DAMAGED rows become superseded with quantity 0.
