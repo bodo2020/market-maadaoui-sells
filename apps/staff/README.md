@@ -61,6 +61,7 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 - Performance panels تخصصية تظهر حسب النشاط الفعلي: Cashier / Inventory / Delivery / Online & Customer Service.
 - الموظف يقرأ ملفه فقط عبر نفس RPCs الآمنة الموجودة في HR.
 - لا توجد أزرار تعديل HR داخل Staff؛ تعديلات القسم/الحالة/المدير/التواريخ تظل في HR/Control Center.
+- Super Admin فقط يرى بطاقة أمان الحساب لتعيين PIN جديد عبر الـRPC المدقق الموجود أصلًا؛ هذا لا يفتح تعديل بيانات HR.
 - الملف الوظيفي والأداء Live-only ولا يتم تخزين بيانات HR الحساسة في Offline cache.
 
 ### Approval & manager
