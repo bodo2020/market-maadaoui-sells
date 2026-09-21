@@ -1590,11 +1590,12 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
         {item.legacy_remaining_batch&&<div className="expiry-legacy-warning"><AlertTriangle/><span>دفعة `REMAINING-*` من النظام القديم؛ الإهلاك والإرجاع متوقفان لحد تسوية سجل الدفعة.</span></div>}
         {item.duplicate_count>1&&<div className="expiry-legacy-warning"><AlertTriangle/><span>فيه {item.duplicate_count} سجلات موجبة لنفس رقم الدفعة وتاريخ الصلاحية. لازم دمج/تسوية البيانات أولًا.</span></div>}
         {item.cost_missing&&<div className="expiry-legacy-warning"><Banknote/><span>تكلفة الشراء غير موثوقة أو صفر؛ النظام يمنع تسجيل خسارة أو Credit بقيمة غير صحيحة.</span></div>}
-        <div className="expiry-safety-note"><ShieldCheck/><span>{item.supplier_name?`المورد: ${item.supplier_name}. `:""}أي خصم جديد يحترم حجوزات الطلبات الأونلاين ويُسجل في Inventory Ledger.</span></div>
+        <div className={item.audit_verified?"expiry-verification ready":"expiry-verification pending"}><ShieldCheck/><span>{item.audit_verified?`تم التحقق بجرد مطابق للرصيد الحالي${item.last_verified_at?` · ${new Date(item.last_verified_at).toLocaleString("ar-EG")}`:""}`:"لا يوجد جرد تحقق صالح حاليًا أو الرصيد تغيّر بعد آخر جرد"}</span></div>
+        <div className="expiry-safety-note"><ShieldCheck/><span>{item.supplier_name?`المورد: ${item.supplier_name}. `:""}Inventory الحالي {item.inventory_quantity}. أي خصم جديد يحترم حجوزات الطلبات الأونلاين ويُسجل في Inventory Ledger.</span></div>
         <div className="expiry-actions">
-          <button className="secondary" disabled={acting===item.batch_id} onClick={()=>void createExpiryCheck(item)}>{acting===item.batch_id?<Loader2 className="spin"/>:<Scale/>}جرد تحقق</button>
-          {canDisposeExpiry&&<button className="danger-action" disabled={acting===item.batch_id||!item.safe_for_action} onClick={()=>openExpiryAction(item,"dispose")}><XCircle/>{item.safe_for_action?"إهلاك":"تسوية البيانات أولًا"}</button>}
-          {canSupplierReturns&&item.can_supplier_return&&<button className="primary" disabled={acting===item.batch_id||!item.safe_for_action} onClick={()=>openExpiryAction(item,"supplier_return")}><Send/>{item.safe_for_action?"إرجاع للمورد":"تسوية البيانات أولًا"}</button>}
+          <button className="secondary" disabled={acting===item.batch_id} onClick={()=>void createExpiryCheck(item)}>{acting===item.batch_id?<Loader2 className="spin"/>:<Scale/>}{item.audit_verified?"إعادة جرد تحقق":"جرد تحقق"}</button>
+          {canDisposeExpiry&&<button className="danger-action" disabled={acting===item.batch_id||!item.action_ready} onClick={()=>openExpiryAction(item,"dispose")}><XCircle/>{!item.safe_for_action?"تسوية البيانات أولًا":!item.audit_verified?"جرد تحقق أولًا":"إهلاك"}</button>}
+          {canSupplierReturns&&item.can_supplier_return&&<button className="primary" disabled={acting===item.batch_id||!item.action_ready} onClick={()=>openExpiryAction(item,"supplier_return")}><Send/>{!item.safe_for_action?"تسوية البيانات أولًا":!item.audit_verified?"جرد تحقق أولًا":"إرجاع للمورد"}</button>}
         </div>
       </article>})}{!expiry?.items.length&&<Empty text="مفيش دفعات منتهية أو قريبة من الانتهاء في الفترة دي"/>}</div>
     </div>:tab==="supplier_returns"?<div className="supplier-returns-workspace">
