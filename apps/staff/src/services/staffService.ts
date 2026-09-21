@@ -1985,6 +1985,7 @@ function batchReconciliationError(message?:string){
   if(value.includes("BATCH_RECON_TOTAL_MUST_MATCH_INVENTORY"))return new Error("مجموع كميات الدفعات الجديدة لازم يساوي رصيد المخزون الحالي بالضبط.");
   if(value.includes("BATCH_RECON_LINES_REQUIRED"))return new Error("الرصيد الحالي أكبر من صفر، لذلك لازم تسجل دفعة واحدة على الأقل.");
   if(value.includes("BATCH_RECON_INVENTORY_INVALID"))return new Error("رصيد Inventory غير صالح للتسوية.");
+  if(value.includes("BATCH_RECON_SHARED_INVENTORY_REQUIRES_SOURCE_BRANCH"))return new Error("الفرع يستخدم مخزونًا مشتركًا. تسوية الدفعات تتم من فرع المخزون المصدر فقط.");
   if(value.includes("BATCH_RECON_DUPLICATE_CANONICAL_LINE"))return new Error("لا تكرر نفس رقم الدفعة وتاريخ الصلاحية في التسوية الجديدة.");
   if(value.includes("BATCH_RECON_BATCH_NUMBER_INVALID"))return new Error("رقم الدفعة الجديد لازم يكون حقيقي ومش من REMAINING أو DAMAGED القديم.");
   if(value.includes("BATCH_RECON_COST_INVALID"))return new Error("كل دفعة لازم يكون لها سعر شراء صحيح أكبر من صفر.");
