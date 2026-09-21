@@ -652,45 +652,6 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
 
   useEffect(()=>{void load();},[load]);
 
-  const loadPush=useCallback(async()=>{
-    if(!isStaffPushSupported()){
-      setPushPermission("unsupported");
-      setPushStatus(null);
-      return;
-    }
-    const [permission,status]=await Promise.all([
-      getStaffPushPermissionState(),
-      staff.getMyPushDeviceStatus().catch(()=>null),
-    ]);
-    setPushPermission(permission);
-    setPushStatus(status);
-  },[]);
-
-  useEffect(()=>{void loadPush();},[loadPush]);
-
-  const enablePush=async()=>{
-    setPushBusy(true);setMessage(null);
-    try{
-      const status=await enableStaffPush();
-      setPushStatus(status);
-      setPushPermission(await getStaffPushPermissionState());
-      setMessage({type:"ok",text:"تم تسجيل الجهاز لاستقبال إشعارات العمل"});
-    }catch(caught){
-      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تفعيل إشعارات العمل"});
-    }finally{setPushBusy(false);}
-  };
-
-  const disablePush=async()=>{
-    setPushBusy(true);setMessage(null);
-    try{
-      await disableStaffPush();
-      setPushStatus(await staff.getMyPushDeviceStatus().catch(()=>({registered:false,device_count:0,platforms:[],providers:[]})));
-      setPushPermission(await getStaffPushPermissionState());
-      setMessage({type:"ok",text:"تم إيقاف Push على هذا الجهاز"});
-    }catch(caught){
-      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إيقاف إشعارات الجهاز"});
-    }finally{setPushBusy(false);}
-  };
   useOrderOperationsRealtime(
     branch.branch_id,
     useCallback(()=>{void refreshSession(false);},[refreshSession]),
@@ -1922,6 +1883,47 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
   },[branch.branch_id]);
 
   useEffect(()=>{void load();},[load]);
+
+  const loadPush=useCallback(async()=>{
+    if(!isStaffPushSupported()){
+      setPushPermission("unsupported");
+      setPushStatus(null);
+      return;
+    }
+    const [permission,status]=await Promise.all([
+      getStaffPushPermissionState(),
+      staff.getMyPushDeviceStatus().catch(()=>null),
+    ]);
+    setPushPermission(permission);
+    setPushStatus(status);
+  },[]);
+
+  useEffect(()=>{void loadPush();},[loadPush]);
+
+  const enablePush=async()=>{
+    setPushBusy(true);setMessage(null);
+    try{
+      const status=await enableStaffPush();
+      setPushStatus(status);
+      setPushPermission(await getStaffPushPermissionState());
+      setMessage({type:"ok",text:"تم تسجيل الجهاز لاستقبال إشعارات العمل"});
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تفعيل إشعارات العمل"});
+    }finally{setPushBusy(false);}
+  };
+
+  const disablePush=async()=>{
+    setPushBusy(true);setMessage(null);
+    try{
+      await disableStaffPush();
+      setPushStatus(await staff.getMyPushDeviceStatus().catch(()=>({registered:false,device_count:0,platforms:[],providers:[]})));
+      setPushPermission(await getStaffPushPermissionState());
+      setMessage({type:"ok",text:"تم إيقاف Push على هذا الجهاز"});
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إيقاف إشعارات الجهاز"});
+    }finally{setPushBusy(false);}
+  };
+
 
   const submitRequest=async(kind:"salary_advance"|"leave"|"attendance_correction")=>{
     setActing(true);setMessage(null);
