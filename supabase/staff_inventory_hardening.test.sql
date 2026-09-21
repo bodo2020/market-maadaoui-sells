@@ -70,6 +70,7 @@ select
   gen_random_uuid() tenant_id,
   gen_random_uuid() merchant_id,
   gen_random_uuid() branch_id,
+  gen_random_uuid() shared_branch_id,
   gen_random_uuid() admin_id,
   gen_random_uuid() outsider_id,
   gen_random_uuid() recon_product,
@@ -111,6 +112,17 @@ select branch_id,
        'Staff Inventory Test Branch '||substr(branch_id::text,1,8),
        'SIT-'||substr(branch_id::text,1,8),
        true,'internal',true,true,
+       branch_id,branch_id,tenant_id,merchant_id
+from staff_inventory_fixture;
+
+insert into public.branches(
+  id,name,code,active,branch_type,independent_pricing,independent_inventory,
+  inventory_source_branch_id,pricing_source_branch_id,tenant_id,merchant_id
+)
+select shared_branch_id,
+       'Staff Shared Inventory Branch '||substr(shared_branch_id::text,1,8),
+       'SIS-'||substr(shared_branch_id::text,1,8),
+       true,'internal',false,false,
        branch_id,branch_id,tenant_id,merchant_id
 from staff_inventory_fixture;
 
@@ -185,6 +197,15 @@ insert into public.product_batches(
 select expiry_product,'EXP-VALID-01',current_date-1,5,6,supplier_id,branch_id,'fixture expiry batch'
 from staff_inventory_fixture;
 
+insert into public.product_batches(
+  product_id,batch_number,expiry_date,quantity,purchase_price,supplier_id,branch_id,notes
+)
+select recon_product,'SHARED-RECON-01',current_date+20,10,4,supplier_id,shared_branch_id,'fixture shared-branch recon batch'
+from staff_inventory_fixture
+union all
+select expiry_product,'SHARED-EXP-01',current_date-1,5,6,supplier_id,shared_branch_id,'fixture shared-branch expiry batch'
+from staff_inventory_fixture;
+
 insert into private.inventory_audit_sessions_v2(
   id,branch_id,inventory_branch_id,audit_date,audit_kind,status,items_per_employee,generated_by,title
 )
@@ -239,7 +260,79 @@ select set_config('request.jwt.claim.sub',(select admin_id::text from staff_inve
 select set_config('request.jwt.claim.role','authenticated',true);
 set local role authenticated;
 
--- 2) Workspace flags duplicate/mismatch rows and zero-stock legacy row as reconcilable after fresh matched counts.
+-- 2) Shared logical branches cannot mutate the physical source Inventory batch ledger.
+do $
+declare
+  f record;
+  w jsonb;
+  item jsonb;
+  shared_batch uuid;
+begin
+  select * into f from staff_inventory_fixture;
+
+  w:=public.get_inventory_batch_reconciliation_workspace_v1(f.shared_branch_id,100);
+  if coalesce((w->>'requires_source_branch')::boolean,false) is not true then
+    raise exception 'Shared reconciliation workspace did not require source branch';
+  end if;
+  item:=(
+    select value from jsonb_array_elements(w->'items')
+    where value->>'product_id'=f.recon_product::text
+    limit 1
+  );
+  if item is not null and coalesce((item->>'ready_for_reconciliation')::boolean,true) is not false then
+    raise exception 'Shared reconciliation item incorrectly became ready';
+  end if;
+
+  begin
+    perform public.reconcile_product_batches_v1(
+      gen_random_uuid(),
+      f.shared_branch_id,
+      f.recon_product,
+      jsonb_build_array(jsonb_build_object(
+        'batch_id',null,
+        'batch_number','SHARED-CANONICAL',
+        'expiry_date',(current_date+20)::text,
+        'quantity',10,
+        'purchase_price',4,
+        'supplier_id',f.supplier_id
+      )),
+      'Shared branch must use physical source branch'
+    );
+    raise exception 'Shared logical branch reconciliation was accepted';
+  exception when invalid_parameter_value then null;
+  end;
+
+  select id into shared_batch
+  from public.product_batches
+  where branch_id=f.shared_branch_id
+    and product_id=f.expiry_product
+    and batch_number='SHARED-EXP-01'
+  limit 1;
+
+  begin
+    perform public.process_expiry_batch_action_v2(
+      gen_random_uuid(),f.shared_branch_id,shared_batch,1,'dispose',
+      'Shared branch must use physical source branch'
+    );
+    raise exception 'Shared logical branch expiry action was accepted';
+  exception when invalid_parameter_value then null;
+  end;
+
+  w:=public.get_expiry_workspace_v2(f.shared_branch_id,30,250);
+  if coalesce((w->>'requires_source_branch')::boolean,false) is not true then
+    raise exception 'Shared expiry workspace did not require source branch';
+  end if;
+  item:=(
+    select value from jsonb_array_elements(w->'items')
+    where value->>'product_id'=f.expiry_product::text
+    limit 1
+  );
+  if item is not null and coalesce((item->>'action_ready')::boolean,true) is not false then
+    raise exception 'Shared expiry item incorrectly became action-ready';
+  end if;
+end $;
+
+-- 3) Workspace flags duplicate/mismatch rows and zero-stock legacy row as reconcilable after fresh matched counts.
 do $$
 declare
   f record;
@@ -287,7 +380,7 @@ begin
   end if;
 end $$;
 
--- 3) Successful reconciliation preserves Inventory, produces exactly one audit row, and retry is idempotent.
+-- 4) Successful reconciliation preserves Inventory, produces exactly one audit row, and retry is idempotent.
 do $$
 declare
   f record;
@@ -356,7 +449,7 @@ begin
   end if;
 end $$;
 
--- 4) Same request id with changed payload must conflict and leave state unchanged.
+-- 5) Same request id with changed payload must conflict and leave state unchanged.
 do $$
 declare
   f record;
@@ -389,7 +482,7 @@ begin
   end if;
 end $$;
 
--- 5) Invalid totals and duplicate canonical lines roll back fully.
+-- 6) Invalid totals and duplicate canonical lines roll back fully.
 do $$
 declare
   f record;
@@ -438,7 +531,7 @@ begin
   end if;
 end $$;
 
--- 6) Inventory=0 may reconcile stale active batches to an empty canonical set.
+-- 7) Inventory=0 may reconcile stale active batches to an empty canonical set.
 do $$
 declare
   f record;
@@ -461,7 +554,7 @@ begin
   end if;
 end $$;
 
--- 7) Expiry workspace is action-ready only when audit is fresh AND batch ledger equals Inventory.
+-- 8) Expiry workspace is action-ready only when audit is fresh AND batch ledger equals Inventory.
 do $$
 declare
   f record;
@@ -483,7 +576,7 @@ begin
   if coalesce((item->>'action_ready')::boolean,false) is not true then raise exception 'Valid expiry item not action-ready'; end if;
 end $$;
 
--- 8) A stale count after Inventory changes must block expiry, and batch/financial state must roll back.
+-- 9) A stale count after Inventory changes must block expiry, and batch/financial state must roll back.
 do $$
 declare
   f record;
@@ -524,7 +617,7 @@ begin
   end if;
 end $$;
 
--- 9) Even with a refreshed count, mismatched active batch total vs Inventory must route to reconciliation.
+-- 10) Even with a refreshed count, mismatched active batch total vs Inventory must route to reconciliation.
 do $$
 declare
   f record;
@@ -569,7 +662,7 @@ begin
   end;
 end $$;
 
--- 10) After restoring Inventory alignment and a fresh matched count, expiry disposal succeeds once and is idempotent.
+-- 11) After restoring Inventory alignment and a fresh matched count, expiry disposal succeeds once and is idempotent.
 do $$
 declare
   f record;
@@ -627,6 +720,6 @@ end $$;
 reset role;
 set constraints all immediate;
 
-select 'PASS: Staff inventory RLS/grants, authorization, reconciliation, idempotency, rollback, zero-stock cleanup, expiry freshness, batch-ledger alignment, and atomic disposal' as result;
+select 'PASS: Staff inventory RLS/grants, authorization, shared-source isolation, reconciliation, idempotency, rollback, zero-stock cleanup, expiry freshness, batch-ledger alignment, and atomic disposal' as result;
 
 rollback;
