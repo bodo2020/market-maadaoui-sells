@@ -11,7 +11,7 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 - Control Center: الإدارة الكاملة والتهيئة والتقارير المتقدمة.
 - Staff: التنفيذ اليومي داخل الفرع، الإشراف السريع، وخدمات الموظف.
 
-## Staff V1 — 0.13.0
+## Staff V1 — 0.14.0
 
 ### الأساس
 - تسجيل الدخول، Google Password Manager، Trusted Device.
@@ -65,6 +65,19 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 - Inventory risks / transfers / expiry / supplier returns تدعم fallback للقراءة.
 - العمليات الحساسة لا تنفذ Offline؛ تنتظر عودة الاتصال بدل تكرار أو نصف تنفيذ.
 
+### Native Push foundation
+- Capacitor Push Notifications متوافق مع Capacitor 7.
+- تسجيل Staff device في الباك إند الحالي عبر `register_push_device_v2`.
+- Android notification channels: `general`, `orders`, `tasks`, `offers`.
+- لا يظهر Permission prompt إجباري عند فتح التطبيق؛ الموظف يفعّل الإشعارات من «خدماتي».
+- لو الإذن سبق منحه، التطبيق يعيد تسجيل الجهاز تلقائيًا.
+- الضغط على الإشعار يفتح Deep Link آمن داخل Staff فقط.
+- عند Logout يحاول التطبيق إلغاء تسجيل Push token لهذا الجهاز.
+- Firebase client config اختياري في CI؛ غيابه لا يكسر APK التجريبي.
+- الـFCM worker يستخدم Supabase Vault كمصدر موحد للـService Account مع Environment fallback.
+- حالة Production الحالية وقت التطوير: لا يوجد Staff push device مسجل، FCM provider غير مكوّن، والـworker متوقف.
+- دليل التفعيل موجود في `apps/staff/PUSH_SETUP.md`.
+
 ## Backend migration
 
 Expiry actions موجودة في:
@@ -75,8 +88,8 @@ Expiry actions موجودة في:
 
 ## المتبقي قبل Release
 
-1. اختبار Migration على Supabase Preview/Development branch قبل Production.
-2. Push Notifications Native بعد توفير FCM / Google Services configuration.
+1. اختبار Expiry Migration على Supabase Preview/Development branch قبل Production.
+2. توفير Firebase Android `google-services.json` وFCM HTTP v1 Service Account ثم تفعيل Push حسب `PUSH_SETUP.md`.
 3. QA بأدوار حقيقية: Picker، Inventory، Cashier، Online Supervisor، Inventory Supervisor، Branch Manager، Finance.
 4. Stable Android signing secrets.
 5. APK تجريبي ثم إصلاح ملاحظات الأجهزة الفعلية.
