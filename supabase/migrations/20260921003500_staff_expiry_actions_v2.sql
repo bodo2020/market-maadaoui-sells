@@ -192,6 +192,7 @@ begin
         and duplicate_count=1
         and audit_verified
         and abs(active_batch_quantity-inventory_quantity)<=0.001
+        and v_inventory_branch=p_branch_id
     )
   )
   into v_summary
@@ -288,7 +289,7 @@ begin
     'last_verified_at',last_verified_at,
     'audit_verified',verified_count_id is not null,
     'safe_for_action',purchase_price>0 and not legacy_remaining_batch and duplicate_count=1,
-    'action_ready',purchase_price>0 and not legacy_remaining_batch and duplicate_count=1 and verified_count_id is not null and abs(active_batch_quantity-inventory_quantity)<=0.001,
+    'action_ready',purchase_price>0 and not legacy_remaining_batch and duplicate_count=1 and verified_count_id is not null and abs(active_batch_quantity-inventory_quantity)<=0.001 and v_inventory_branch=p_branch_id,
     'notes',notes
   ) order by expiry_date,batch_number),'[]'::jsonb)
   into v_items
@@ -296,6 +297,8 @@ begin
 
   return jsonb_build_object(
     'branch_id',p_branch_id,
+    'inventory_branch_id',v_inventory_branch,
+    'requires_source_branch',v_inventory_branch<>p_branch_id,
     'days_ahead',v_days,
     'summary',coalesce(v_summary,'{}'::jsonb),
     'items',v_items
