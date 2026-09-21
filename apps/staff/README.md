@@ -11,7 +11,7 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 - Control Center: الإدارة الكاملة والتهيئة والتقارير المتقدمة.
 - Staff: التنفيذ اليومي داخل الفرع، الإشراف السريع، وخدمات الموظف.
 
-## Staff V1 — 0.17.0
+## Staff V1 — 0.18.0
 
 ### الأساس
 - تسجيل الدخول، Google Password Manager، Trusted Device.
@@ -130,3 +130,10 @@ Expiry actions موجودة في:
 4. Stable Android signing secrets.
 5. APK تجريبي ثم إصلاح ملاحظات الأجهزة الفعلية.
 6. تقسيم `App.tsx` تدريجيًا إلى Features بعد تثبيت السلوك.
+
+
+### Inventory hardening QA
+- `supabase/staff_inventory_hardening.test.sql` is a self-contained `BEGIN ... ROLLBACK` integration suite.
+- Covers authorization, reconciliation idempotency/conflicts, invalid-total rollback, zero-stock cleanup, stale-count invalidation, batch/Inventory alignment, and atomic expiry disposal.
+- `supabase/STAFF_INVENTORY_PREVIEW_QA.md` contains the Preview runbook and manual Android QA matrix.
+- Production migrations remain blocked until this suite passes on a Supabase Development/Preview branch.
