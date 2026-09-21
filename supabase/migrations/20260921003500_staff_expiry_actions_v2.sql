@@ -399,6 +399,26 @@ begin
     );
   end if;
 
+  -- Resolve the product before row locking, then serialize every expiry/reconciliation
+  -- mutation for the same branch+product through the same advisory lock key.
+  select * into v_batch
+  from public.product_batches
+  where id=p_batch_id;
+
+  if not found then
+    raise exception using errcode='22023',message='EXPIRY_BATCH_NOT_FOUND';
+  end if;
+
+  if v_batch.branch_id is distinct from p_branch_id then
+    raise exception using errcode='42501',message='EXPIRY_BATCH_BRANCH_MISMATCH';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended(
+    p_branch_id::text||':'||v_batch.product_id::text,91
+  ));
+
+  -- Re-read under row lock after acquiring the product lock in case another
+  -- transaction changed the batch while this action was waiting.
   select * into v_batch
   from public.product_batches
   where id=p_batch_id
