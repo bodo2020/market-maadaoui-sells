@@ -1962,6 +1962,7 @@ function ManagerWorkspace({branch}:{branch:StaffBranch}){
               <span>تعارض إعادة عد <b>{employee.inventory_recounts_conflicting}</b></span>
               <span>فرق كاش <b>{Number(employee.cash_variance||0).toLocaleString("ar-EG")}</b></span>
             </div>
+            <NavLink className="manager-profile-link" to={`/manager/employees/${employee.user_id}`}><IdCard/>الملف الوظيفي</NavLink>
           </article>)}
           {!attention.length&&<div className="manager-all-clear"><CheckCircle2/><strong>مفيش مؤشرات حرجة على الفريق في الفترة دي</strong></div>}
         </div>
@@ -1978,6 +1979,7 @@ function ManagerWorkspace({branch}:{branch:StaffBranch}){
               <span>توصيل <b>{employee.delivery_delivered}</b></span>
               <span>متابعات <b>{employee.followups_closed}/{employee.followups_assigned}</b></span>
             </div>
+            <NavLink className="manager-profile-link" to={`/manager/employees/${employee.user_id}`}><IdCard/>فتح الملف الوظيفي</NavLink>
           </article>)}
         </div>
       </section>
@@ -2283,7 +2285,7 @@ function AuthenticatedApp({state}:{state:ReturnType<typeof useStaffSession>}) {
   if(state.loading)return <Loading/>;
   if(!state.identity||!state.branch)return <Navigate to="/login" replace/>;
   const props={identity:state.identity,branch:state.branch};
-  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/work" element={<WorkPage {...props}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch} identity={state.identity}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/manager" element={<ManagerWorkspace branch={state.branch}/>}/><Route path="/handoffs" element={<CashHandoffPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="/account/employment-file" element={<EmploymentFilePage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
+  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/work" element={<WorkPage {...props}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch} identity={state.identity}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/manager" element={<ManagerWorkspace branch={state.branch}/>}/><Route path="/manager/employees/:employeeId" element={<EmploymentFilePage {...props}/>}/><Route path="/handoffs" element={<CashHandoffPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="/account/employment-file" element={<EmploymentFilePage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
 }
 
 export default function App(){
