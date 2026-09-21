@@ -1221,7 +1221,7 @@ function inventoryTaskLabel(task: staff.OperationsTask) {
   return "مخزون";
 }
 
-function InventoryPage({ branch }: { branch: StaffBranch }) {
+function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: StaffIdentity }) {
   const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
   const canCount = branch.permissions.includes("inventory.count") || branch.permissions.includes("inventory.recount");
   const canTransfer = branch.permissions.includes("inventory.transfer") || branch.permissions.includes("inventory.manage");
@@ -1229,7 +1229,7 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
   const canDisposeExpiry = branch.permissions.includes("inventory.manage");
   const canSupplierReturns = branch.permissions.includes("inventory.manage") || branch.permissions.includes("purchases.manage") || branch.permissions.includes("finance.manage");
   const canSettleSupplierReturns = branch.permissions.includes("purchases.manage") || branch.permissions.includes("finance.manage");
-  const canReconcileBatches = branch.permissions.includes("inventory.manage") && branch.permissions.includes("purchases.manage");
+  const canReconcileBatches = identity.is_super_admin || (branch.permissions.includes("inventory.manage") && branch.permissions.includes("purchases.manage"));
   const [tab,setTab]=useState<"tasks"|"transfers"|"risks"|"expiry"|"supplier_returns"|"batch_reconciliation">("tasks");
   const [riskStatus,setRiskStatus]=useState<staff.InventoryRiskStatus>("low_stock");
   const [expiryDays,setExpiryDays]=useState(30);
@@ -2278,7 +2278,7 @@ function AuthenticatedApp({state}:{state:ReturnType<typeof useStaffSession>}) {
   if(state.loading)return <Loading/>;
   if(!state.identity||!state.branch)return <Navigate to="/login" replace/>;
   const props={identity:state.identity,branch:state.branch};
-  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/work" element={<WorkPage {...props}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/manager" element={<ManagerWorkspace branch={state.branch}/>}/><Route path="/handoffs" element={<CashHandoffPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="/account/employment-file" element={<EmploymentFilePage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
+  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/work" element={<WorkPage {...props}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch} identity={state.identity}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/manager" element={<ManagerWorkspace branch={state.branch}/>}/><Route path="/handoffs" element={<CashHandoffPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="/account/employment-file" element={<EmploymentFilePage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
 }
 
 export default function App(){
