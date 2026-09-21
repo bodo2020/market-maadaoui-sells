@@ -407,3 +407,11 @@ Employment File manager scope:
 - employee wallet/card/self-service financial balances are hidden when viewing another employee.
 - Super Admin may use audited PIN reset on the target employee.
 - back navigation returns to Manager Workspace for team profiles and to Employee Services for self profile.
+
+
+Shared Inventory source branch:
+- logical child workspace shows a source-branch warning.
+- Expiry action buttons never become actionable from the child branch.
+- Batch Reconciliation never becomes actionable from the child branch.
+- backend rejects direct child-branch mutation even if a client bypasses the UI.
+- switch to the physical inventory source branch before creating/using the final verification count and executing the batch mutation.
