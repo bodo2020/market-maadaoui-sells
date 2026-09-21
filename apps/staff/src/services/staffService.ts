@@ -86,6 +86,25 @@ export type StaffBranch = {
 };
 
 
+export type PushDeviceStatus = {
+  registered: boolean;
+  device_count: number;
+  platforms: string[];
+  providers: string[];
+};
+
+export type PushDeviceRegistration = {
+  device_id: string;
+  platform: string;
+  provider: string;
+  app_kind: string;
+  enabled: boolean;
+  permission_status: string;
+  registered_at: string;
+  last_seen_at: string;
+};
+
+
 
 
 
@@ -1057,6 +1076,43 @@ export async function attendanceCheckOut(
     p_longitude: longitude,
     p_accuracy_m: accuracy,
   }));
+}
+
+export async function getMyPushDeviceStatus() {
+  const result=await rpc("get_my_push_device_status_v2");
+  if(result.error)throw new Error(result.error.message||"تعذر تحميل حالة الإشعارات");
+  const raw=(result.data||{}) as Record<string,unknown>;
+  return {
+    registered:Boolean(raw.registered),
+    device_count:Number(raw.device_count||0),
+    platforms:Array.isArray(raw.platforms)?raw.platforms.filter((value): value is string=>typeof value==="string"):[],
+    providers:Array.isArray(raw.providers)?raw.providers.filter((value): value is string=>typeof value==="string"):[],
+  } as PushDeviceStatus;
+}
+
+export async function registerPushDevice(token:string,platform:"android"|"ios"|"web",deviceKey?:string|null) {
+  requireOnlineWrite();
+  const result=await rpc("register_push_device_v2",{
+    p_token:token,
+    p_platform:platform,
+    p_app_kind:"staff",
+    p_device_key:deviceKey?.trim()||null,
+    p_locale:"ar-EG",
+  });
+  if(result.error){
+    const value=result.error.message||"";
+    if(value.includes("STAFF_PROFILE_REQUIRED"))throw new Error("حساب الموظف غير نشط ولا يمكن تسجيل Push.");
+    if(value.includes("INVALID_PUSH_TOKEN"))throw new Error("توكن الإشعارات غير صالح.");
+    throw new Error(value||"تعذر تسجيل جهاز الإشعارات.");
+  }
+  return result.data as PushDeviceRegistration;
+}
+
+export async function unregisterPushDevice(token:string) {
+  requireOnlineWrite();
+  const result=await rpc("unregister_push_device_v2",{p_token:token});
+  if(result.error)throw new Error(result.error.message||"تعذر إلغاء تسجيل جهاز الإشعارات.");
+  return Boolean(result.data);
 }
 
 export async function getNotifications(branchId: string, filter = "all") {
