@@ -93,6 +93,7 @@ function useStaffSession() {
   const resolve = useCallback(async () => {
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
+      staff.clearStaffOfflineCache();
       setState({ loading: false, identity: null, branch: null });
       return;
     }
@@ -2070,7 +2071,7 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
       <div className="request-list">{recentRequests.map((item)=><article className="request-row request-history" key={item.id}><div><div className="row"><strong>{requestTypeLabel(item.request_type)}</strong><span className={`request-status ${item.status}`}>{requestStatusLabel(item.status)}</span></div><p>{item.reason}</p><small>{new Date(item.requested_at).toLocaleString("ar-EG")}</small>{item.decision_note&&<em>{item.decision_note}</em>}</div>{item.status==="pending"&&<button className="cancel-request" disabled={acting} onClick={()=>void cancelRequest(item)}><XCircle/>إلغاء</button>}</article>)}{!recentRequests.length&&<Empty text="لسه مفيش طلبات"/>}</div>
     </section>}
 
-    <button className="logout self-service-logout" onClick={async()=>{try{await disableStaffPush();}catch{/* logout must not be blocked by push cleanup */}await supabase.auth.signOut();navigate("/login",{replace:true});}}><LogOut/>تسجيل الخروج</button>
+    <button className="logout self-service-logout" onClick={async()=>{try{await disableStaffPush();}catch{/* logout must not be blocked by push cleanup */}staff.clearStaffOfflineCache();await supabase.auth.signOut();navigate("/login",{replace:true});}}><LogOut/>تسجيل الخروج</button>
   </>;
 }
 
