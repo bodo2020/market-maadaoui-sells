@@ -1594,7 +1594,7 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
           {canSupplierReturns&&item.can_supplier_return&&<button className="primary" disabled={acting===item.batch_id||!item.safe_for_action} onClick={()=>openExpiryAction(item,"supplier_return")}><Send/>{item.safe_for_action?"إرجاع للمورد":"تسوية البيانات أولًا"}</button>}
         </div>
       </article>})}{!expiry?.items.length&&<Empty text="مفيش دفعات منتهية أو قريبة من الانتهاء في الفترة دي"/>}</div>
-    </div>:<div className="supplier-returns-workspace">
+    </div>:tab==="supplier_returns"?<div className="supplier-returns-workspace">
       <div className="supplier-return-summary"><div><FileText/><div><strong>إرجاعات بانتظار اعتماد المورد</strong><span>المخزون خرج بالفعل؛ التسوية هنا لتسجيل الـCredit Note فقط.</span></div></div><b>{supplierReturns?.items.length||0}</b></div>
       <div className="stack supplier-return-list">{(supplierReturns?.items||[]).map((item)=><article className="supplier-return-card" key={item.id}>
         <div className="row"><div><small>{item.supplier_name}</small><h3>إرجاع مورد</h3></div><span className="pill high">Pending Credit</span></div>
@@ -1602,7 +1602,52 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
         <div className="supplier-return-items">{item.items.map((line)=><div key={line.id}><span>{line.product_name} · دفعة {line.batch_number}</span><b>{line.quantity} × {Number(line.purchase_price).toLocaleString("ar-EG")} ج.م</b></div>)}</div>
         {canSettleSupplierReturns&&<button className="primary full-action" disabled={acting===item.id} onClick={()=>openSupplierSettlement(item)}><Check/>تسجيل Credit Note</button>}
       </article>)}{!supplierReturns?.items.length&&<Empty text="مفيش إرجاعات مورد معلقة حاليًا"/>}</div>
+    </div>:<div className="batch-reconciliation-workspace">
+      <div className="batch-reconciliation-intro"><ShieldCheck/><div><strong>تسوية دفعات المخزون</strong><span>تصحيح سجل الدفعات فقط. رصيد Inventory والحركات المالية لا يتغيروا.</span></div></div>
+      <div className="stack">{(batchReconciliation?.items||[]).map((item)=><article className="batch-reconciliation-card" key={item.product_id}>
+        <div className="row"><div><small>{item.barcode||"بدون باركود"}</small><h3>{item.product_name}</h3></div><span className={item.ready_for_reconciliation?"recon-ready":"recon-blocked"}>{item.ready_for_reconciliation?"جرد مطابق حديث":"محتاج جرد تحقق"}</span></div>
+        <div className="reconciliation-totals">
+          <span>Inventory <b>{item.inventory_quantity}</b></span>
+          <span>مجموع الدفعات <b>{item.batch_quantity}</b></span>
+          <span>الفرق <b>{item.quantity_gap>0?"+":""}{item.quantity_gap}</b></span>
+        </div>
+        <div className="reconciliation-issues">
+          {item.legacy_rows>0&&<span>قديم {item.legacy_rows}</span>}
+          {item.zero_cost_rows>0&&<span>بدون تكلفة {item.zero_cost_rows}</span>}
+          {item.duplicate_rows>0&&<span>مكرر {item.duplicate_rows}</span>}
+        </div>
+        <div className="reconciliation-current-batches">{item.batches.map((line,index)=><div key={line.batch_id||index}><span>{line.batch_number} · {line.expiry_date}</span><b>{line.quantity} × {Number(line.purchase_price||0).toLocaleString("ar-EG")} ج.م</b></div>)}</div>
+        <div className="actions">
+          {!item.ready_for_reconciliation&&<button className="secondary" disabled={acting===item.product_id} onClick={()=>void createReconciliationCheck(item)}>{acting===item.product_id?<Loader2 className="spin"/>:<Scale/>}إنشاء جرد تحقق</button>}
+          <button className="primary" disabled={!item.ready_for_reconciliation||acting===item.product_id} onClick={()=>openBatchReconciliation(item)}><ShieldCheck/>فتح التسوية</button>
+        </div>
+      </article>)}{!batchReconciliation?.items.length&&<Empty text="مفيش منتجات محتاجة تسوية دفعات حاليًا"/>}</div>
     </div>}
+
+    {selectedReconciliation&&<div className="inventory-modal-backdrop" onClick={closeBatchReconciliation}><section className="inventory-modal reconciliation-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>Inventory = {selectedReconciliation.inventory_quantity}</small><h2>تسوية دفعات {selectedReconciliation.product_name}</h2></div><button className="icon-btn" onClick={closeBatchReconciliation}><XCircle/></button></div>
+      <div className="reconciliation-modal-note"><ShieldCheck/><span>مجموع الكميات أدناه لازم يساوي رصيد Inventory بالضبط. التسوية لا تزيد ولا تخصم مخزون.</span></div>
+      <div className="reconciliation-lines">{reconciliationLines.map((line,index)=><div className="reconciliation-line" key={line.batch_id||`new-${index}`}>
+        <div className="row"><strong>دفعة {index+1}</strong><button className="icon-btn small" onClick={()=>removeReconciliationLine(index)} aria-label="حذف الدفعة"><XCircle/></button></div>
+        <div className="reconciliation-line-grid">
+          <label>رقم الدفعة<input value={line.batch_number} onChange={(e)=>updateReconciliationLine(index,{batch_number:e.target.value})} placeholder="BATCH-..."/></label>
+          <label>تاريخ الصلاحية<input type="date" value={line.expiry_date} onChange={(e)=>updateReconciliationLine(index,{expiry_date:e.target.value})}/></label>
+          <label>الكمية<input type="number" min="0.001" step="0.001" inputMode="decimal" value={line.quantity} onChange={(e)=>updateReconciliationLine(index,{quantity:Number(e.target.value)})}/></label>
+          <label>سعر الشراء<input type="number" min="0.01" step="0.01" inputMode="decimal" value={line.purchase_price} onChange={(e)=>updateReconciliationLine(index,{purchase_price:Number(e.target.value)})}/></label>
+          <label>الرف<input value={line.shelf_location||""} onChange={(e)=>updateReconciliationLine(index,{shelf_location:e.target.value||null})} placeholder="اختياري"/></label>
+          <label>ملاحظة<input value={line.note||""} onChange={(e)=>updateReconciliationLine(index,{note:e.target.value||null})} placeholder="مصدر التحقق"/></label>
+        </div>
+        {line.supplier_name&&<small className="reconciliation-supplier">المورد الحالي: {line.supplier_name}</small>}
+      </div>)}</div>
+      <button className="secondary full-action" onClick={addReconciliationLine}><PackageCheck/>إضافة دفعة</button>
+      <div className="reconciliation-balance">
+        <span>المجموع الجديد <b>{reconciliationLines.reduce((sum,line)=>sum+Number(line.quantity||0),0).toLocaleString("ar-EG",{maximumFractionDigits:3})}</b></span>
+        <span>Inventory <b>{selectedReconciliation.inventory_quantity}</b></span>
+        <span>الفرق <b>{(reconciliationLines.reduce((sum,line)=>sum+Number(line.quantity||0),0)-selectedReconciliation.inventory_quantity).toLocaleString("ar-EG",{maximumFractionDigits:3})}</b></span>
+      </div>
+      <label className="inventory-field">سبب ومصدر التسوية<textarea rows={3} value={reconciliationNote} onChange={(e)=>setReconciliationNote(e.target.value)} placeholder="مثال: تمت مراجعة الموجود فعليًا وتوزيعه حسب تواريخ الصلاحية على الرف"/></label>
+      <button className="primary full-action" disabled={Boolean(acting)||Math.abs(reconciliationLines.reduce((sum,line)=>sum+Number(line.quantity||0),0)-selectedReconciliation.inventory_quantity)>0.001} onClick={()=>void submitBatchReconciliation()}>{acting?<Loader2 className="spin"/>:<Check/>}اعتماد سجل الدفعات الجديد</button>
+    </section></div>}
 
     {selectedTask&&detail&&<div className="inventory-modal-backdrop" onClick={closeTask}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
       <div className="section-head"><div><small>{inventoryTaskLabel(selectedTask)}</small><h2>{detail.product_name}</h2></div><button className="icon-btn" onClick={closeTask}><XCircle/></button></div>
