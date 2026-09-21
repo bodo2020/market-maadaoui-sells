@@ -1582,6 +1582,7 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
       </article>)}{!risks?.products.length&&<Empty text="مفيش منتجات في الحالة دي حاليًا"/>}</div>
     </div>:tab==="expiry"?<div className="expiry-workspace">
       <div className="expiry-toolbar"><div><CalendarDays/><div><strong>دفعات الصلاحية</strong><span>من product_batches للفرع فقط</span></div></div><label>الفترة<select value={expiryDays} onChange={(e)=>setExpiryDays(Number(e.target.value))}><option value={7}>7 أيام</option><option value={14}>14 يوم</option><option value={30}>30 يوم</option><option value={60}>60 يوم</option><option value={90}>90 يوم</option></select></label></div>
+      {expiry?.requires_source_branch&&<div className="expiry-data-quality-banner"><AlertTriangle/><div><strong>الفرع يستخدم مخزونًا مشتركًا</strong><span>إدارة دفعات الصلاحية والتصرف المالي تتم من فرع المخزون المصدر فقط. بدّل للفرع المصدر قبل الجرد أو الإهلاك أو الإرجاع.</span></div></div>}
       <div className="expiry-summary"><div><strong>{expiry?.summary.expired||0}</strong><span>منتهي</span></div><div><strong>{expiry?.summary.today||0}</strong><span>ينتهي اليوم</span></div><div><strong>{expiry?.summary.action_ready_rows||0}</strong><span>جاهز للتصرف</span></div><div><strong>{Number(expiry?.summary.purchase_value_at_risk||0).toLocaleString("ar-EG",{maximumFractionDigits:2})}</strong><span>قيمة شراء معرضة</span></div></div>
       {Boolean((expiry?.summary.zero_cost_rows||0)+(expiry?.summary.duplicate_rows||0)+(expiry?.summary.legacy_remaining_rows||0))&&<div className="expiry-data-quality-banner"><AlertTriangle/><div><strong>بيانات صلاحية تحتاج تسوية</strong><span>{expiry?.summary.zero_cost_rows||0} بدون تكلفة · {expiry?.summary.duplicate_rows||0} سجلات مكررة · {expiry?.summary.legacy_remaining_rows||0} دفعات قديمة. الإجراءات المالية متوقفة على الصفوف غير الموثوقة.</span></div></div>}
       {Boolean((expiry?.summary.batch_mismatch_rows||0)+(expiry?.summary.audit_pending_rows||0))&&<div className="expiry-readiness-banner"><ShieldCheck/><div><strong>بوابات الأمان قبل التصرف</strong><span>{expiry?.summary.batch_mismatch_rows||0} صف يحتاج تسوية دفعات · {expiry?.summary.audit_pending_rows||0} صف يحتاج جرد تحقق حديث. الجاهز فعليًا: {expiry?.summary.action_ready_rows||0}.</span></div></div>}
@@ -1595,7 +1596,7 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
         <div className={item.batch_inventory_aligned?"expiry-verification ready":"expiry-verification pending"}><PackageCheck/><span>{item.batch_inventory_aligned?`سجل الدفعات متطابق مع Inventory: ${item.inventory_quantity}`:`سجل الدفعات ${item.active_batch_quantity} لا يساوي Inventory ${item.inventory_quantity} — يلزم تسوية دفعات`}</span></div>
         <div className="expiry-safety-note"><ShieldCheck/><span>{item.supplier_name?`المورد: ${item.supplier_name}. `:""}Inventory الحالي {item.inventory_quantity}. أي خصم جديد يحترم حجوزات الطلبات الأونلاين ويُسجل في Inventory Ledger.</span></div>
         <div className="expiry-actions">
-          <button className="secondary" disabled={acting===item.batch_id} onClick={()=>void createExpiryCheck(item)}>{acting===item.batch_id?<Loader2 className="spin"/>:<Scale/>}{item.audit_verified?"إعادة جرد تحقق":"جرد تحقق"}</button>
+          <button className="secondary" disabled={acting===item.batch_id||Boolean(expiry?.requires_source_branch)} onClick={()=>void createExpiryCheck(item)}>{acting===item.batch_id?<Loader2 className="spin"/>:<Scale/>}{item.audit_verified?"إعادة جرد تحقق":"جرد تحقق"}</button>
           {canDisposeExpiry&&<button className="danger-action" disabled={acting===item.batch_id||!item.action_ready} onClick={()=>openExpiryAction(item,"dispose")}><XCircle/>{!item.safe_for_action?"تسوية البيانات أولًا":!item.batch_inventory_aligned?"تسوية الدفعات أولًا":!item.audit_verified?"جرد تحقق أولًا":"إهلاك"}</button>}
           {canSupplierReturns&&item.can_supplier_return&&<button className="primary" disabled={acting===item.batch_id||!item.action_ready} onClick={()=>openExpiryAction(item,"supplier_return")}><Send/>{!item.safe_for_action?"تسوية البيانات أولًا":!item.batch_inventory_aligned?"تسوية الدفعات أولًا":!item.audit_verified?"جرد تحقق أولًا":"إرجاع للمورد"}</button>}
         </div>
@@ -1610,8 +1611,9 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
       </article>)}{!supplierReturns?.items.length&&<Empty text="مفيش إرجاعات مورد معلقة حاليًا"/>}</div>
     </div>:<div className="batch-reconciliation-workspace">
       <div className="batch-reconciliation-intro"><ShieldCheck/><div><strong>تسوية دفعات المخزون</strong><span>تصحيح سجل الدفعات فقط. رصيد Inventory والحركات المالية لا يتغيروا.</span></div></div>
+      {batchReconciliation?.requires_source_branch&&<div className="expiry-data-quality-banner"><AlertTriangle/><div><strong>التسوية من فرع المخزون المصدر فقط</strong><span>الفرع الحالي يشارك Inventory من فرع آخر. بدّل لفرع المخزون المصدر قبل إنشاء جرد تحقق أو اعتماد أي توزيع دفعات.</span></div></div>}
       <div className="stack">{(batchReconciliation?.items||[]).map((item)=><article className="batch-reconciliation-card" key={item.product_id}>
-        <div className="row"><div><small>{item.barcode||"بدون باركود"}</small><h3>{item.product_name}</h3></div><span className={item.ready_for_reconciliation?"recon-ready":"recon-blocked"}>{item.ready_for_reconciliation?"جرد مطابق حديث":"محتاج جرد تحقق"}</span></div>
+        <div className="row"><div><small>{item.barcode||"بدون باركود"}</small><h3>{item.product_name}</h3></div><span className={item.ready_for_reconciliation?"recon-ready":"recon-blocked"}>{batchReconciliation?.requires_source_branch?"فرع المصدر مطلوب":item.ready_for_reconciliation?"جرد مطابق حديث":"محتاج جرد تحقق"}</span></div>
         <div className="reconciliation-totals">
           <span>Inventory <b>{item.inventory_quantity}</b></span>
           <span>مجموع الدفعات <b>{item.batch_quantity}</b></span>
@@ -1624,7 +1626,7 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
         </div>
         <div className="reconciliation-current-batches">{item.batches.map((line,index)=><div key={line.batch_id||index}><span>{line.batch_number} · {line.expiry_date}</span><b>{line.quantity} × {Number(line.purchase_price||0).toLocaleString("ar-EG")} ج.م</b></div>)}</div>
         <div className="actions">
-          {!item.ready_for_reconciliation&&<button className="secondary" disabled={acting===item.product_id} onClick={()=>void createReconciliationCheck(item)}>{acting===item.product_id?<Loader2 className="spin"/>:<Scale/>}إنشاء جرد تحقق</button>}
+          {!item.ready_for_reconciliation&&!batchReconciliation?.requires_source_branch&&<button className="secondary" disabled={acting===item.product_id} onClick={()=>void createReconciliationCheck(item)}>{acting===item.product_id?<Loader2 className="spin"/>:<Scale/>}إنشاء جرد تحقق</button>}
           <button className="primary" disabled={!item.ready_for_reconciliation||acting===item.product_id} onClick={()=>openBatchReconciliation(item)}><ShieldCheck/>فتح التسوية</button>
         </div>
       </article>)}{!batchReconciliation?.items.length&&<Empty text="مفيش منتجات محتاجة تسوية دفعات حاليًا"/>}</div>
