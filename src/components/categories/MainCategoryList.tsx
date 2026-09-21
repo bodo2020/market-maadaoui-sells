@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { fetchMainCategories, deleteMainCategory } from "@/services/supabase/categoryService";
 import { MainCategory } from "@/types";
-import { fetchProductsByCategory } from "@/services/supabase/productService";
+import { fetchProductCategoryCounts } from "@/services/supabase/productService";
 import AddMainCategoryDialog from "./AddMainCategoryDialog";
 import CategoryOrderManager from "./CategoryOrderManager";
 
@@ -36,23 +36,11 @@ export default function MainCategoryList() {
         return;
       }
       
-      const categoriesWithCount = await Promise.all(
-        data.map(async (category) => {
-          try {
-            const products = await fetchProductsByCategory(category.id);
-            return {
-              ...category,
-              product_count: products ? products.length : 0
-            };
-          } catch (error) {
-            console.error(`Error fetching products for category ${category.id}:`, error);
-            return {
-              ...category,
-              product_count: 0
-            };
-          }
-        })
-      );
+      const { mainCategoryCounts } = await fetchProductCategoryCounts();
+      const categoriesWithCount = data.map((category) => ({
+        ...category,
+        product_count: mainCategoryCounts[category.id] || 0,
+      }));
       
       setCategories(categoriesWithCount);
     } catch (error) {
@@ -171,14 +159,6 @@ export default function MainCategoryList() {
           </div>
         )}
       </div>
-
-      {categories.length === 0 && (
-        <div className="text-center p-8 bg-gray-50 rounded-lg border">
-          <FolderPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-lg font-medium">لا توجد أقسام رئيسية</h3>
-          <p className="text-gray-500 mb-4">يمكنك إضافة أقسام جديدة من خلال الزر أعلاه</p>
-        </div>
-      )}
 
       <AddMainCategoryDialog
         open={showAddDialog}
