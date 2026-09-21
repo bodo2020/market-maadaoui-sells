@@ -64,6 +64,9 @@ create index if not exists expiry_inventory_actions_v2_branch_time_idx
 create index if not exists expiry_inventory_actions_v2_batch_idx
   on private.expiry_inventory_actions_v2(batch_id,created_at desc);
 
+alter table private.expiry_inventory_actions_v2 enable row level security;
+revoke all on table private.expiry_inventory_actions_v2 from public,anon,authenticated;
+
 alter table public.supplier_returns_v2 enable row level security;
 alter table public.supplier_return_items_v2 enable row level security;
 
