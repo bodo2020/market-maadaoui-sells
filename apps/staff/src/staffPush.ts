@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
+import type { Channel } from "@capacitor/push-notifications";
 import { getPersistentStaffDeviceIdentity } from "./deviceIdentity";
 import * as staff from "./services/staffService";
 
@@ -44,7 +45,7 @@ function safeStaffPath(value: unknown) {
 
 async function ensureStaffPushChannels() {
   if (!isStaffPushSupported()) return;
-  const channels = [
+  const channels: Channel[] = [
     { id: "general", name: "إشعارات العمل", description: "الإشعارات التشغيلية العامة", importance: 4 },
     { id: "orders", name: "الطلبات", description: "طلبات الأونلاين والتجهيز", importance: 5 },
     { id: "tasks", name: "المهام", description: "المهام والموافقات العاجلة", importance: 5 },
