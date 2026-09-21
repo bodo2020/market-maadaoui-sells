@@ -58,6 +58,7 @@ import {
   disableStaffPush,
   enableStaffPush,
   getStaffPushPermissionState,
+  getStoredStaffPushToken,
   isStaffPushSupported,
   setupStaffPush,
 } from "./staffPush";
@@ -1976,15 +1977,18 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
   const profile=data?.profile;
   const recentRequests=data?.requests||[];
   const pushRegistered=Boolean(pushStatus?.registered);
+  const currentDevicePushRegistered=Boolean(pushRegistered&&getStoredStaffPushToken());
   const pushStateLabel=pushPermission==="unsupported"
     ?"متاح في تطبيق Android فقط"
-    :pushRegistered
+    :currentDevicePushRegistered
       ?"هذا الجهاز مسجل للإشعارات"
-      :pushPermission==="denied"
-        ?"الإذن مرفوض من إعدادات الهاتف"
-        :pushPermission==="granted"
-          ?"الإذن موجود والجهاز يحتاج إعادة تسجيل"
-          :"الإشعارات غير مفعلة بعد";
+      :pushRegistered
+        ?"يوجد جهاز آخر مسجل على حسابك، لكن هذا الجهاز غير مسجل"
+        :pushPermission==="denied"
+          ?"الإذن مرفوض من إعدادات الهاتف"
+          :pushPermission==="granted"
+            ?"الإذن موجود وهذا الجهاز يحتاج تسجيل"
+            :"الإشعارات غير مفعلة بعد";
 
   return <>
     <PageTitle title="خدماتي" subtitle="هويتك وطلباتك وخدمات الموارد البشرية"/>
@@ -2027,9 +2031,9 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
         <div><span>تاريخ التعيين</span><strong>{profile?.hire_date?new Date(profile.hire_date).toLocaleDateString("ar-EG"):"—"}</strong></div>
       </div>
       <div className="staff-push-card">
-        <div className="staff-push-head"><BellRing/><div><strong>إشعارات العمل</strong><span>{pushStateLabel}</span></div><b className={pushRegistered?"ready":pushPermission==="denied"?"blocked":"pending"}>{pushRegistered?"مفعلة":pushPermission==="denied"?"مرفوضة":"غير مفعلة"}</b></div>
+        <div className="staff-push-head"><BellRing/><div><strong>إشعارات العمل</strong><span>{pushStateLabel}</span></div><b className={currentDevicePushRegistered?"ready":pushPermission==="denied"?"blocked":"pending"}>{currentDevicePushRegistered?"مفعلة على الجهاز":pushPermission==="denied"?"مرفوضة":"غير مفعلة على الجهاز"}</b></div>
         {pushPermission!=="unsupported"&&<div className="staff-push-meta"><span>الأجهزة المسجلة <b>{pushStatus?.device_count||0}</b></span><span>المزود <b>{pushStatus?.providers?.join(", ")||"—"}</b></span></div>}
-        {pushPermission==="unsupported"?<p>تسجيل Push Native يتم من نسخة Android فقط.</p>:pushRegistered
+        {pushPermission==="unsupported"?<p>تسجيل Push Native يتم من نسخة Android فقط.</p>:currentDevicePushRegistered
           ?<button className="secondary full-action" disabled={pushBusy} onClick={()=>void disablePush()}>{pushBusy?<Loader2 className="spin"/>:<Bell/>}إيقاف Push على هذا الجهاز</button>
           :<button className="primary full-action" disabled={pushBusy} onClick={()=>void enablePush()}>{pushBusy?<Loader2 className="spin"/>:<BellRing/>}تفعيل إشعارات العمل</button>}
       </div>
