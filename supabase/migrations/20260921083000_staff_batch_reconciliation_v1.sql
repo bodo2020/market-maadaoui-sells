@@ -328,13 +328,24 @@ begin
 
   if exists(
     select 1
-    from jsonb_array_elements(p_lines) a
-    cross join jsonb_array_elements(p_lines) b
-    where a<>b
-      and lower(trim(a->>'batch_number'))=lower(trim(b->>'batch_number'))
-      and (a->>'expiry_date')=(b->>'expiry_date')
+    from jsonb_array_elements(p_lines) with ordinality a(value,ord)
+    join jsonb_array_elements(p_lines) with ordinality b(value,ord)
+      on a.ord<b.ord
+    where lower(trim(a.value->>'batch_number'))=lower(trim(b.value->>'batch_number'))
+      and (a.value->>'expiry_date')=(b.value->>'expiry_date')
   ) then
     raise exception using errcode='22023',message='BATCH_RECON_DUPLICATE_CANONICAL_LINE';
+  end if;
+
+  if exists(
+    select 1
+    from jsonb_array_elements(p_lines) with ordinality a(value,ord)
+    join jsonb_array_elements(p_lines) with ordinality b(value,ord)
+      on a.ord<b.ord
+    where nullif(a.value->>'batch_id','') is not null
+      and (a.value->>'batch_id')=(b.value->>'batch_id')
+  ) then
+    raise exception using errcode='22023',message='BATCH_RECON_DUPLICATE_BATCH_ID';
   end if;
 
   select coalesce(sum((x->>'quantity')::numeric),0)
