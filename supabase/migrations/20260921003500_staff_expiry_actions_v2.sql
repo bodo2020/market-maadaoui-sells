@@ -118,7 +118,17 @@ begin
       s.name supplier_name,
       b.purchase_item_id,
       b.notes,
-      (upper(coalesce(b.batch_number,'')) like 'REMAINING-%') legacy_remaining_batch
+      (upper(coalesce(b.batch_number,'')) like 'REMAINING-%') legacy_remaining_batch,
+      (
+        select count(*)::integer
+        from public.product_batches bx
+        where bx.branch_id=b.branch_id
+          and bx.product_id=b.product_id
+          and coalesce(bx.batch_number,'')=coalesce(b.batch_number,'')
+          and bx.expiry_date=b.expiry_date
+          and bx.quantity>0
+          and upper(coalesce(bx.batch_number,'')) not like 'DAMAGED-%'
+      ) duplicate_count
     from public.product_batches b
     join public.products p on p.id=b.product_id
     left join public.purchase_items pi on pi.id=b.purchase_item_id
@@ -137,7 +147,10 @@ begin
     'total_quantity',round(coalesce(sum(quantity),0),3),
     'purchase_value_at_risk',round(coalesce(sum(quantity*purchase_price),0),2),
     'supplier_return_ready',count(*) filter(where supplier_id is not null),
-    'legacy_remaining_rows',count(*) filter(where legacy_remaining_batch)
+    'legacy_remaining_rows',count(*) filter(where legacy_remaining_batch),
+    'zero_cost_rows',count(*) filter(where purchase_price<=0),
+    'duplicate_rows',count(*) filter(where duplicate_count>1),
+    'safe_action_rows',count(*) filter(where purchase_price>0 and not legacy_remaining_batch and duplicate_count=1)
   )
   into v_summary
   from base;
@@ -157,7 +170,17 @@ begin
       coalesce(b.supplier_id,pu.supplier_id) supplier_id,
       s.name supplier_name,
       b.notes,
-      (upper(coalesce(b.batch_number,'')) like 'REMAINING-%') legacy_remaining_batch
+      (upper(coalesce(b.batch_number,'')) like 'REMAINING-%') legacy_remaining_batch,
+      (
+        select count(*)::integer
+        from public.product_batches bx
+        where bx.branch_id=b.branch_id
+          and bx.product_id=b.product_id
+          and coalesce(bx.batch_number,'')=coalesce(b.batch_number,'')
+          and bx.expiry_date=b.expiry_date
+          and bx.quantity>0
+          and upper(coalesce(bx.batch_number,'')) not like 'DAMAGED-%'
+      ) duplicate_count
     from public.product_batches b
     join public.products p on p.id=b.product_id
     left join public.purchase_items pi on pi.id=b.purchase_item_id
@@ -185,6 +208,9 @@ begin
     'supplier_name',supplier_name,
     'can_supplier_return',supplier_id is not null,
     'legacy_remaining_batch',legacy_remaining_batch,
+    'duplicate_count',duplicate_count,
+    'cost_missing',purchase_price<=0,
+    'safe_for_action',purchase_price>0 and not legacy_remaining_batch and duplicate_count=1,
     'notes',notes
   ) order by expiry_date,batch_number),'[]'::jsonb)
   into v_items
@@ -228,6 +254,7 @@ declare
   v_expense_id uuid;
   v_supplier_return_id uuid;
   v_recent_verified boolean:=false;
+  v_duplicate_count integer:=0;
 begin
   if v_uid is null then
     raise exception using errcode='42501',message='AUTH_REQUIRED';
@@ -312,6 +339,23 @@ begin
     raise exception using errcode='22023',message='EXPIRY_LEGACY_DAMAGED_BATCH';
   end if;
 
+  if upper(coalesce(v_batch.batch_number,'')) like 'REMAINING-%' then
+    raise exception using errcode='22023',message='EXPIRY_LEGACY_REMAINING_REQUIRES_RECONCILIATION';
+  end if;
+
+  select count(*)::integer into v_duplicate_count
+  from public.product_batches bx
+  where bx.branch_id=v_batch.branch_id
+    and bx.product_id=v_batch.product_id
+    and coalesce(bx.batch_number,'')=coalesce(v_batch.batch_number,'')
+    and bx.expiry_date=v_batch.expiry_date
+    and bx.quantity>0
+    and upper(coalesce(bx.batch_number,'')) not like 'DAMAGED-%';
+
+  if v_duplicate_count>1 then
+    raise exception using errcode='22023',message='EXPIRY_DUPLICATE_BATCH_REQUIRES_RECONCILIATION';
+  end if;
+
   select exists(
     select 1
     from private.inventory_audit_counts_v2 c
@@ -362,6 +406,11 @@ begin
   left join public.purchase_items pi on pi.id=v_batch.purchase_item_id;
 
   v_purchase_price:=greatest(coalesce(v_purchase_price,0),0);
+
+  if v_purchase_price<=0 then
+    raise exception using errcode='22023',message='EXPIRY_COST_REQUIRED';
+  end if;
+
   v_value:=round(p_quantity*v_purchase_price,2);
 
   if v_action='supplier_return' and v_supplier_id is null then
