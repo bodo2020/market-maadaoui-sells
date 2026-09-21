@@ -257,13 +257,10 @@ function Shell({ identity, branch, children }: { identity: StaffIdentity; branch
   useStaffPushBridge(identity, branch);
   const unread = useNotificationBadge(identity, branch);
   const online = useOnlineStatus();
-  const canOperate = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
-  const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
   const navItems = [
     { to: "/", Icon: Home, label: "الرئيسية" },
     { to: "/tasks", Icon: ClipboardList, label: "المهام" },
-    ...(canOperate ? [{ to: "/operations", Icon: PackageCheck, label: "الطلبات" }] : []),
-    ...(canInventory ? [{ to: "/inventory", Icon: Layers3, label: "المخزون" }] : []),
+    { to: "/work", Icon: Layers3, label: "العمل" },
     { to: "/attendance", Icon: Clock3, label: "الحضور" },
     { to: "/account", Icon: IdCard, label: "خدماتي" },
   ];
@@ -285,6 +282,61 @@ function Shell({ identity, branch, children }: { identity: StaffIdentity; branch
       </nav>
     </div>
   );
+}
+
+function WorkPage({ branch, identity }: { identity: StaffIdentity; branch: StaffBranch }) {
+  const canOperate = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
+  const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
+  const canApprove = branch.permissions.some((permission) =>
+    permission.includes("approve")
+    || permission.includes("review")
+    || permission === "hr.approvals.view"
+    || permission === "finance.manage"
+    || permission === "pos.manage_shifts"
+    || permission === "inventory.manage"
+    || permission === "online_orders.manage"
+  );
+  const canManager = identity.is_super_admin || branch.permissions.includes("hr.view") || branch.permissions.includes("branch.manage_staff");
+  const canHandoffs = branch.permissions.includes("finance.manage") || branch.permissions.includes("finance.view") || branch.permissions.includes("pos.manage_shifts");
+
+  const modules = [
+    ...(canOperate ? [{
+      to:"/operations", Icon:PackageCheck, title:"تجهيز الطلبات",
+      description:"استلام الطلبات، الباركود، النواقص والبدائل.",
+    }] : []),
+    ...(canInventory ? [{
+      to:"/inventory", Icon:Scale, title:"المخزون والجرد",
+      description:"الجرد، التحويلات، المخاطر، الصلاحية وإرجاعات الموردين.",
+    }] : []),
+    ...(canApprove ? [{
+      to:"/approvals", Icon:ShieldCheck, title:"الموافقات",
+      description:"طلبات تحتاج قرارك: مخزون، حضور، HR، بدائل وتسويات.",
+    }] : []),
+    ...(canManager ? [{
+      to:"/manager", Icon:UsersRound, title:"فريقي اليوم",
+      description:"المتأخر، التدخلات ومؤشرات التشغيل الفعلية للفريق.",
+    }] : []),
+    ...(canHandoffs ? [{
+      to:"/handoffs", Icon:Banknote, title:"تسليمات الوردية",
+      description:"استلام عهدة الكاشير وتوريدها للخزنة مع توثيق الفروق.",
+    }] : []),
+  ];
+
+  return <>
+    <PageTitle title="العمل" subtitle={branch.role_name_ar+" · "+branch.branch_name}/>
+    <section className="work-hub-intro">
+      <div className="work-hub-icon"><Layers3/></div>
+      <div><strong>مساحة شغلك</strong><span>الوحدات اللي تظهر هنا مرتبطة بصلاحياتك فقط.</span></div>
+    </section>
+    <div className="work-hub-grid">
+      {modules.map(({to,Icon,title,description})=><NavLink className="work-hub-card" to={to} key={to}>
+        <div className="work-hub-card-icon"><Icon/></div>
+        <div><strong>{title}</strong><p>{description}</p></div>
+        <ArrowRight/>
+      </NavLink>)}
+    </div>
+    {!modules.length&&<Empty text="مفيش وحدات تشغيل إضافية مفعلة لدورك الحالي"/>}
+  </>;
 }
 
 function HomePage({ branch, identity }: { identity: StaffIdentity; branch: StaffBranch }) {
@@ -2083,7 +2135,7 @@ function AuthenticatedApp({state}:{state:ReturnType<typeof useStaffSession>}) {
   if(state.loading)return <Loading/>;
   if(!state.identity||!state.branch)return <Navigate to="/login" replace/>;
   const props={identity:state.identity,branch:state.branch};
-  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/manager" element={<ManagerWorkspace branch={state.branch}/>}/><Route path="/handoffs" element={<CashHandoffPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
+  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/work" element={<WorkPage {...props}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/manager" element={<ManagerWorkspace branch={state.branch}/>}/><Route path="/handoffs" element={<CashHandoffPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
 }
 
 export default function App(){
