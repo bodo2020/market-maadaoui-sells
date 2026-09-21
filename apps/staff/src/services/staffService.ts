@@ -1077,21 +1077,17 @@ function hrSelfError(message?:string) {
 }
 
 export async function getMyEmploymentProfile(employeeId:string,branchId:string) {
-  return cachedRead(cacheKey("employment_profile",branchId),async()=>{
-    const result=await rpc("get_hr_employee_profile_v1",{p_employee_id:employeeId,p_branch_id:branchId});
-    if(result.error)throw hrSelfError(result.error.message);
-    return result.data as StaffEmploymentProfile;
-  });
+  const result=await rpc("get_hr_employee_profile_v1",{p_employee_id:employeeId,p_branch_id:branchId});
+  if(result.error)throw hrSelfError(result.error.message);
+  return result.data as StaffEmploymentProfile;
 }
 
 export async function getMyHrPerformance(employeeId:string,branchId:string,from:string,to:string) {
-  return cachedRead(cacheKey("hr_performance",`${branchId}:${from}:${to}`),async()=>{
-    const result=await rpc("get_hr_employee_performance_detail_v1",{
-      p_employee_id:employeeId,p_branch_id:branchId,p_from:from,p_to:to,
-    });
-    if(result.error)throw hrSelfError(result.error.message);
-    return result.data as StaffHrPerformance;
+  const result=await rpc("get_hr_employee_performance_detail_v1",{
+    p_employee_id:employeeId,p_branch_id:branchId,p_from:from,p_to:to,
   });
+  if(result.error)throw hrSelfError(result.error.message);
+  return result.data as StaffHrPerformance;
 }
 
 export async function getMyCashierPerformance(employeeId:string,branchId:string,from:string,to:string) {
