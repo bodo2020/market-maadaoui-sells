@@ -413,6 +413,15 @@ begin
     raise exception using errcode='42501',message='EXPIRY_BATCH_BRANCH_MISMATCH';
   end if;
 
+  select coalesce(b.inventory_source_branch_id,b.id)
+  into v_inventory_branch
+  from public.branches b
+  where b.id=p_branch_id and b.active;
+
+  if v_inventory_branch is null then
+    raise exception using errcode='22023',message='BRANCH_NOT_FOUND';
+  end if;
+
   perform pg_advisory_xact_lock(hashtextextended(
     v_inventory_branch::text||':'||v_batch.product_id::text,91
   ));
@@ -455,15 +464,6 @@ begin
 
   if v_duplicate_count>1 then
     raise exception using errcode='22023',message='EXPIRY_DUPLICATE_BATCH_REQUIRES_RECONCILIATION';
-  end if;
-
-  select coalesce(b.inventory_source_branch_id,b.id)
-    into v_inventory_branch
-  from public.branches b
-  where b.id=p_branch_id and b.active;
-
-  if v_inventory_branch is null then
-    raise exception using errcode='22023',message='BRANCH_NOT_FOUND';
   end if;
 
   select coalesce(i.quantity,0)
