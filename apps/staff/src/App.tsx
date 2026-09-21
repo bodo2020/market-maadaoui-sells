@@ -1239,6 +1239,7 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
   const [expiry,setExpiry]=useState<staff.ExpiryWorkspace|null>(null);
   const [supplierReturns,setSupplierReturns]=useState<staff.SupplierReturnWorkspace|null>(null);
   const [batchReconciliation,setBatchReconciliation]=useState<staff.BatchReconciliationWorkspace|null>(null);
+  const [reconciliationSuppliers,setReconciliationSuppliers]=useState<staff.BatchReconciliationSupplierOption[]>([]);
   const [selectedReconciliation,setSelectedReconciliation]=useState<staff.BatchReconciliationItem|null>(null);
   const [reconciliationRequestId,setReconciliationRequestId]=useState("");
   const [reconciliationLines,setReconciliationLines]=useState<staff.BatchReconciliationLine[]>([]);
@@ -1271,13 +1272,14 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
     if(showBusy)setBusy(true);
     try{
       if(canCount){try{await staff.ensureDailyInventoryAudit(branch.branch_id);}catch{/* scheduler/server policy remains authoritative */}}
-      const [taskRows,transferData,riskData,expiryData,supplierReturnData,reconciliationData]=await Promise.all([
+      const [taskRows,transferData,riskData,expiryData,supplierReturnData,reconciliationData,reconciliationSupplierData]=await Promise.all([
         staff.listTasks(branch.branch_id,"active"),
         canTransfer?staff.getInventoryTransferWorkspace(branch.branch_id).catch(()=>null):Promise.resolve(null),
         staff.getInventoryRiskWorkspace(branch.branch_id,riskStatus).catch(()=>null),
         canExpiry?staff.getExpiryWorkspace(branch.branch_id,expiryDays).catch(()=>null):Promise.resolve(null),
         canSupplierReturns?staff.getSupplierReturnsWorkspace(branch.branch_id,"pending_credit").catch(()=>null):Promise.resolve(null),
         canReconcileBatches?staff.getBatchReconciliationWorkspace(branch.branch_id).catch(()=>null):Promise.resolve(null),
+        canReconcileBatches?staff.getBatchReconciliationSuppliers(branch.branch_id).catch(()=>[]):Promise.resolve([]),
       ]);
       setTasks(taskRows.filter((task)=>staff.isInventoryTask(task)||staff.isInventoryTransferTask(task)));
       setTransfers(transferData);
@@ -1285,6 +1287,7 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
       setExpiry(expiryData);
       setSupplierReturns(supplierReturnData);
       setBatchReconciliation(reconciliationData);
+      setReconciliationSuppliers(reconciliationSupplierData);
       setMessage(null);
     }catch(caught){
       setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل عمليات المخزون"});
@@ -1634,6 +1637,7 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
           <label>تاريخ الصلاحية<input type="date" value={line.expiry_date} onChange={(e)=>updateReconciliationLine(index,{expiry_date:e.target.value})}/></label>
           <label>الكمية<input type="number" min="0.001" step="0.001" inputMode="decimal" value={line.quantity} onChange={(e)=>updateReconciliationLine(index,{quantity:Number(e.target.value)})}/></label>
           <label>سعر الشراء<input type="number" min="0.01" step="0.01" inputMode="decimal" value={line.purchase_price} onChange={(e)=>updateReconciliationLine(index,{purchase_price:Number(e.target.value)})}/></label>
+          <label>المورد<select value={line.supplier_id||""} onChange={(e)=>updateReconciliationLine(index,{supplier_id:e.target.value||null,supplier_name:reconciliationSuppliers.find((item)=>item.id===e.target.value)?.name||null})}><option value="">بدون مورد</option>{reconciliationSuppliers.map((supplier)=><option key={supplier.id} value={supplier.id}>{supplier.name}{supplier.code?` · ${supplier.code}`:""}</option>)}</select></label>
           <label>الرف<input value={line.shelf_location||""} onChange={(e)=>updateReconciliationLine(index,{shelf_location:e.target.value||null})} placeholder="اختياري"/></label>
           <label>ملاحظة<input value={line.note||""} onChange={(e)=>updateReconciliationLine(index,{note:e.target.value||null})} placeholder="مصدر التحقق"/></label>
         </div>
