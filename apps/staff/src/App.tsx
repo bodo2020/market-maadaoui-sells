@@ -2091,6 +2091,9 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
     </div>
 
     {view==="home"&&<section className="self-service-panel">
+      <button className="employment-file-entry" onClick={()=>navigate("/account/employment-file")}>
+        <BriefcaseBusiness/><div><strong>الملف الوظيفي الكامل</strong><span>بيانات HR، الفروع، الأداء والحضور والتخصصات</span></div><ArrowRight/>
+      </button>
       <h3>بيانات العمل</h3>
       <div className="profile-facts">
         <div><span>الحالة</span><strong>{profile?.employment_status==="active"?"نشط":profile?.employment_status||"—"}</strong></div>
