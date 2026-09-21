@@ -54,6 +54,13 @@ import {
 import { supabase } from "./lib/supabase";
 import { googlePasswordManager } from "./googlePasswordManager";
 import { getPersistentStaffDeviceIdentity } from "./deviceIdentity";
+import {
+  disableStaffPush,
+  enableStaffPush,
+  getStaffPushPermissionState,
+  isStaffPushSupported,
+  setupStaffPush,
+} from "./staffPush";
 import * as staff from "./services/staffService";
 import type {
   BatchPickingShadow,
@@ -205,6 +212,11 @@ function useNotificationBadge(identity: StaffIdentity, branch: StaffBranch) {
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [identity.user_id, load]);
+  useEffect(() => {
+    const refresh = () => void load();
+    window.addEventListener("staff-push-received", refresh);
+    return () => window.removeEventListener("staff-push-received", refresh);
+  }, [load]);
   return unread;
 }
 
@@ -220,7 +232,27 @@ function useOnlineStatus() {
   return online;
 }
 
+function useStaffPushBridge(identity: StaffIdentity, branch: StaffBranch) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    let dispose: (() => void | Promise<void>) | null = null;
+    let cancelled = false;
+    void setupStaffPush({
+      onOpen: (path) => navigate(path),
+      onReceived: () => window.dispatchEvent(new Event("staff-push-received")),
+    }).then((cleanup) => {
+      if (cancelled) void cleanup();
+      else dispose = cleanup;
+    });
+    return () => {
+      cancelled = true;
+      if (dispose) void dispose();
+    };
+  }, [branch.branch_id, identity.user_id, navigate]);
+}
+
 function Shell({ identity, branch, children }: { identity: StaffIdentity; branch: StaffBranch; children: ReactNode }) {
+  useStaffPushBridge(identity, branch);
   const unread = useNotificationBadge(identity, branch);
   const online = useOnlineStatus();
   const canOperate = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
