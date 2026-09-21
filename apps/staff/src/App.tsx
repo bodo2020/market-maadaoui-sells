@@ -13,6 +13,7 @@ import {
   NavLink,
   Route,
   Routes,
+  useLocation,
   useNavigate,
   useParams,
 } from "react-router-dom";
@@ -257,6 +258,9 @@ function Shell({ identity, branch, children }: { identity: StaffIdentity; branch
   useStaffPushBridge(identity, branch);
   const unread = useNotificationBadge(identity, branch);
   const online = useOnlineStatus();
+  const location = useLocation();
+  const workActive = ["/work","/operations","/inventory","/approvals","/manager","/handoffs"]
+    .some((path)=>location.pathname===path||location.pathname.startsWith(path+"/"));
   const navItems = [
     { to: "/", Icon: Home, label: "الرئيسية" },
     { to: "/tasks", Icon: ClipboardList, label: "المهام" },
@@ -277,7 +281,12 @@ function Shell({ identity, branch, children }: { identity: StaffIdentity; branch
       <main className="content">{children}</main>
       <nav className="bottom-nav" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
         {navItems.map(({ to, Icon, label }) => (
-          <NavLink key={to} to={to} end={to === "/"}><Icon size={20} /><span>{label}</span></NavLink>
+          <NavLink
+            key={to}
+            to={to}
+            end={to === "/"}
+            className={({isActive})=>(isActive||(to==="/work"&&workActive))?"active":""}
+          ><Icon size={20} /><span>{label}</span></NavLink>
         ))}
       </nav>
     </div>
