@@ -87,6 +87,7 @@ declare
   v_limit integer:=least(greatest(coalesce(p_limit,250),1),500);
   v_items jsonb;
   v_summary jsonb;
+  v_inventory_branch uuid;
 begin
   if v_uid is null then raise exception using errcode='42501',message='AUTH_REQUIRED'; end if;
 
@@ -101,6 +102,15 @@ begin
     or public.staff_has_permission('purchases.manage',p_branch_id)
   ) then
     raise exception using errcode='42501',message='EXPIRY_VIEW_DENIED';
+  end if;
+
+  select coalesce(b.inventory_source_branch_id,b.id)
+  into v_inventory_branch
+  from public.branches b
+  where b.id=p_branch_id and b.active;
+
+  if v_inventory_branch is null then
+    raise exception using errcode='22023',message='BRANCH_NOT_FOUND';
   end if;
 
   with base as (
@@ -171,6 +181,26 @@ begin
       coalesce(b.supplier_id,pu.supplier_id) supplier_id,
       s.name supplier_name,
       b.notes,
+      coalesce(i.quantity,0)::numeric inventory_quantity,
+      (
+        select c.id
+        from private.inventory_audit_counts_v2 c
+        where c.branch_id=p_branch_id
+          and c.product_id=b.product_id
+          and c.status='matched'
+          and c.submitted_at>=now()-interval '4 hours'
+          and abs(coalesce(c.actual_count,0)-coalesce(i.quantity,0))<=0.001
+        order by c.submitted_at desc
+        limit 1
+      ) verified_count_id,
+      (
+        select max(c.submitted_at)
+        from private.inventory_audit_counts_v2 c
+        where c.branch_id=p_branch_id
+          and c.product_id=b.product_id
+          and c.status='matched'
+          and abs(coalesce(c.actual_count,0)-coalesce(i.quantity,0))<=0.001
+      ) last_verified_at,
       (upper(coalesce(b.batch_number,'')) like 'REMAINING-%') legacy_remaining_batch,
       (
         select count(*)::integer
@@ -187,6 +217,7 @@ begin
     left join public.purchase_items pi on pi.id=b.purchase_item_id
     left join public.purchases pu on pu.id=pi.purchase_id
     left join public.suppliers s on s.id=coalesce(b.supplier_id,pu.supplier_id)
+    left join public.inventory i on i.branch_id=v_inventory_branch and i.product_id=b.product_id
     where b.branch_id=p_branch_id
       and b.quantity>0
       and b.expiry_date<=current_date+v_days
@@ -211,7 +242,12 @@ begin
     'legacy_remaining_batch',legacy_remaining_batch,
     'duplicate_count',duplicate_count,
     'cost_missing',purchase_price<=0,
+    'inventory_quantity',round(inventory_quantity,3),
+    'verified_count_id',verified_count_id,
+    'last_verified_at',last_verified_at,
+    'audit_verified',verified_count_id is not null,
     'safe_for_action',purchase_price>0 and not legacy_remaining_batch and duplicate_count=1,
+    'action_ready',purchase_price>0 and not legacy_remaining_batch and duplicate_count=1 and verified_count_id is not null,
     'notes',notes
   ) order by expiry_date,batch_number),'[]'::jsonb)
   into v_items
