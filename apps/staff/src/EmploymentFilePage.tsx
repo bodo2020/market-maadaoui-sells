@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ComponentType } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -24,6 +23,7 @@ import {
   UserRoundCog,
   WalletCards,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { StaffBranch, StaffIdentity } from "./services/staffService";
 import * as staff from "./services/staffService";
 
@@ -71,7 +71,7 @@ function date(value:string|null|undefined){
   return new Date(`${value}T12:00:00`).toLocaleDateString("ar-EG");
 }
 
-function Metric({label,value,icon:Icon}:{label:string;value:string|number;icon?:ComponentType<{size?:number}>}){
+function Metric({label,value,icon:Icon}:{label:string;value:string|number;icon?:LucideIcon}){
   return <div className="employment-metric">{Icon&&<Icon size={18}/>}<strong>{value}</strong><span>{label}</span></div>;
 }
 function DetailRows({rows}:{rows:Array<[string,string|number]>}){
