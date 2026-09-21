@@ -195,10 +195,15 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
         <div className="employment-section-title"><WalletCards/><div><h3>الراتب وبطاقة الموظف</h3><p>Wallet + السلف والمزايا طبقات مالية مستقلة وقابلة للمراجعة.</p></div></div>
         <div className="employment-finance-grid">
           <Metric icon={WalletCards} label="رصيد المزايا" value={money(wallet?.benefit_balance)}/>
+          <Metric icon={WalletCards} label="البدل الشهري" value={money(wallet?.benefit_monthly_allowance)}/>
+          <Metric icon={Banknote} label="الحد الائتماني" value={money(wallet?.credit_limit)}/>
+          <Metric icon={Banknote} label="المتاح من الائتمان" value={money(wallet?.credit_available)}/>
           <Metric icon={Banknote} label="المستحق للشركة" value={money(wallet?.receivable_balance)}/>
           <Metric icon={Banknote} label="سلف متبقية" value={money(selfService?.advance_summary?.outstanding_amount)}/>
+          <Metric icon={Banknote} label="عدد السلف النشطة" value={num(selfService?.advance_summary?.active_count)}/>
           <Metric icon={CalendarCheck2} label="إجازة معتمدة هذا العام" value={num(selfService?.leave_summary?.approved_days_ytd)}/>
         </div>
+        <div className="employment-finance-policy"><ShieldCheck/><span>{wallet?.payroll_deduction_enabled?"الحساب مؤهل للتسوية عبر الراتب بعد الاعتماد.":"خصم الراتب غير مفعّل لهذا الحساب."}</span></div>
         <div className="employment-card-code">
           <IdCard/>
           <div><span>رقم عضوية الموظف</span><strong dir="ltr">{selfService?.employee_card?.membership_number||"—"}</strong><small>الباركود: {selfService?.employee_card?.barcode||"—"}</small></div>
@@ -301,7 +306,8 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
             ]}/></div>
             <div><h4>الورديات والتسويات</h4><DetailRows rows={[
               ["الورديات",cashier.shifts.count],["ورديات مغلقة",cashier.shifts.closed_count],
-              ["بنود تسوية بها فرق",cashier.shifts.variance_lines],["فرق رصيد افتتاحي",money(cashier.shifts.absolute_opening_variance)],
+              ["بنود التسوية",cashier.shifts.reconciliation_lines],["بنود تسوية بها فرق",cashier.shifts.variance_lines],
+              ["فرق رصيد افتتاحي",money(cashier.shifts.absolute_opening_variance)],["فرق التسويات المطلق",money(cashier.shifts.absolute_payment_variance)],
             ]}/></div>
           </div>
           <Notes items={cashier.notes}/>
@@ -321,13 +327,17 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
           </div>
           <div className="employment-detail-grid">
             <div><h4>العد الأول</h4><DetailRows rows={[
-              ["مهام مسندة",inventory.counts.assigned],["تم إرسال العد",inventory.counts.submitted],["مطابق",inventory.counts.matched],
-              ["كشف فرق",inventory.counts.discrepancy],["أنجز داخل الموعد",inventory.counts.completed_on_time],
+              ["مهام مسندة",inventory.counts.assigned],["تم إرسال العد",inventory.counts.submitted],["نسبة الإنجاز",pct(inventory.counts.completion_rate)],
+              ["مطابق",inventory.counts.matched],["كشف فرق",inventory.counts.discrepancy],["نسبة التطابق",pct(inventory.counts.match_rate)],
+              ["وحدات فرق مطلقة",num(inventory.counts.abs_variance_units)],["قيمة فرق مطلقة",money(inventory.counts.abs_variance_value)],
+              ["متوسط زمن التنفيذ",duration(inventory.counts.avg_active_minutes)],["أنجز داخل الموعد",inventory.counts.completed_on_time],
+              ["متأخر مفتوح",inventory.counts.overdue_open],
             ]}/></div>
             <div><h4>إعادة العد المستقلة</h4><DetailRows rows={[
-              ["Recount مسند",inventory.recounts.assigned],["Recount منفذ",inventory.recounts.submitted],
-              ["مطابق للنظام",inventory.recounts.matched_system],["أكد وجود الفرق",inventory.recounts.confirmed_variance],
-              ["تعارض",inventory.recounts.conflicting],
+              ["Recount مسند",inventory.recounts.assigned],["Recount منفذ",inventory.recounts.submitted],["نسبة الإنجاز",pct(inventory.recounts.completion_rate)],
+              ["مطابق للنظام",inventory.recounts.matched_system],["أكد وجود الفرق",inventory.recounts.confirmed_variance],["تعارض",inventory.recounts.conflicting],
+              ["وحدات فرق مطلقة",num(inventory.recounts.abs_variance_units)],["قيمة فرق مطلقة",money(inventory.recounts.abs_variance_value)],
+              ["متوسط زمن التنفيذ",duration(inventory.recounts.avg_active_minutes)],["متأخر مفتوح",inventory.recounts.overdue_open],
             ]}/></div>
             <div><h4>Peer Review</h4><DetailRows rows={[
               ["تمت مراجعتها",inventory.peer_review.reviewed],["أكدت نفس الكمية",inventory.peer_review.confirmed],
@@ -380,19 +390,30 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
           </div>
           <div className="employment-detail-grid">
             <div><h4>رحلة الطلب</h4><DetailRows rows={[
+              ["طلبات تعامل معها",online.orders.handled_orders],["تغييرات حالة",online.orders.status_transitions],
               ["تأكيد",online.orders.confirmed],["بدأ التجهيز",online.orders.preparing],["جاهز",online.orders.ready],
               ["خرج للتوصيل",online.orders.shipped],["تم التوصيل",online.orders.delivered],["إلغاء",online.orders.cancelled],
+              ["طلبات بها مرتجع",online.orders.handled_orders_with_returns],
             ]}/></div>
             <div><h4>الاستجابة وSLA</h4><DetailRows rows={[
               ["عينات أول استجابة",online.orders.first_response_samples],["متوسط أول استجابة",duration(online.orders.avg_first_response_minutes)],
+              ["هدف أول استجابة",online.orders.sla.enabled?duration(online.orders.sla.first_response_target_minutes):"غير مفعّل"],
+              ["الالتزام بأول استجابة",online.orders.sla.enabled?pct(online.orders.sla.first_response_rate):"—"],
               ["عينات التجهيز",online.orders.preparation_samples],["متوسط التجهيز",duration(online.orders.avg_preparation_minutes)],
+              ["هدف التجهيز",online.orders.sla.enabled?duration(online.orders.sla.preparation_target_minutes):"غير مفعّل"],
+              ["الالتزام بالتجهيز",online.orders.sla.enabled?pct(online.orders.sla.preparation_rate):"—"],
               ["SLA إجمالي",online.orders.sla.enabled?pct(online.orders.sla.overall_rate):"غير مفعّل"],
+              ["عينات SLA مقيمة",online.orders.sla.evaluated_samples],
             ]}/></div>
             <div><h4>خدمة العملاء</h4><DetailRows rows={[
               ["أنشأ متابعات",online.customer_service.created_by_employee],["مسندة",online.customer_service.assigned],
+              ["مسندة مغلقة",online.customer_service.assigned_closed],["نسبة الإغلاق",pct(online.customer_service.completion_rate)],
               ["أغلقها بنفسه",online.customer_service.assigned_closed_by_employee],["أغلقها موظف آخر",online.customer_service.assigned_closed_by_other],
-              ["متأخرة مفتوحة",online.customer_service.overdue_open],
-            ]}/></div>
+              ["إجمالي ما أغلقه",online.customer_service.completed_by_employee],["متابعات بموعد",online.customer_service.scheduled_due],
+              ["أغلقت متأخر",online.customer_service.completed_late_assigned],["متأخرة مفتوحة",online.customer_service.overdue_open],
+              ["متوسط دورة المتابعة",duration(online.customer_service.avg_assigned_lifecycle_minutes)],
+            ]}/>
+            {Object.keys(online.customer_service.outcomes||{}).length>0&&<div className="employment-outcomes">{Object.entries(online.customer_service.outcomes).map(([key,value])=><span key={key}>{key}<b>{value}</b></span>)}</div>}</div>
           </div>
           <Notes items={online.notes}/>
         </section>}
