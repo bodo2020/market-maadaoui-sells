@@ -309,7 +309,19 @@ begin
     raise exception using errcode='22023',message='BATCH_RECON_LINES_INVALID';
   end if;
 
-  perform pg_advisory_xact_lock(hashtextextended(p_branch_id::text||':'||p_product_id::text,91));
+  select coalesce(b.inventory_source_branch_id,b.id)
+  into v_inventory_branch
+  from public.branches b
+  where b.id=p_branch_id and b.active;
+
+  if v_inventory_branch is null then
+    raise exception using errcode='22023',message='BRANCH_NOT_FOUND';
+  end if;
+
+  -- Serialize retries first, then every mutation touching the same physical
+  -- Inventory source + product. This matches Expiry V2 lock ordering.
+  perform pg_advisory_xact_lock(hashtextextended(p_request_id::text,84));
+  perform pg_advisory_xact_lock(hashtextextended(v_inventory_branch::text||':'||p_product_id::text,91));
 
   v_fingerprint:=md5(jsonb_build_object(
     'branch_id',p_branch_id,'product_id',p_product_id,'lines',p_lines,'note',v_note
@@ -333,15 +345,6 @@ begin
     select 1 from public.products p where p.id=p_product_id
   ) then
     raise exception using errcode='22023',message='PRODUCT_NOT_FOUND';
-  end if;
-
-  select coalesce(b.inventory_source_branch_id,b.id)
-  into v_inventory_branch
-  from public.branches b
-  where b.id=p_branch_id and b.active;
-
-  if v_inventory_branch is null then
-    raise exception using errcode='22023',message='BRANCH_NOT_FOUND';
   end if;
 
   select coalesce(i.quantity,0)
