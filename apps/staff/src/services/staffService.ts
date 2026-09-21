@@ -345,7 +345,10 @@ export type ExpiryWorkspace = {
     legacy_remaining_rows: number;
     zero_cost_rows: number;
     duplicate_rows: number;
-    safe_action_rows: number;
+    batch_mismatch_rows: number;
+    audit_pending_rows: number;
+    data_quality_safe_rows: number;
+    action_ready_rows: number;
   };
 };
 
