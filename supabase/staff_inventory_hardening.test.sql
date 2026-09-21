@@ -67,6 +67,9 @@ end $;
 
 create temporary table staff_inventory_fixture as
 select
+  gen_random_uuid() tenant_id,
+  gen_random_uuid() merchant_id,
+  gen_random_uuid() branch_id,
   gen_random_uuid() admin_id,
   gen_random_uuid() outsider_id,
   gen_random_uuid() recon_product,
@@ -77,28 +80,39 @@ select
   gen_random_uuid() recon_request_id,
   gen_random_uuid() zero_request_id,
   gen_random_uuid() expiry_request_id,
-  gen_random_uuid() conflict_request_id,
-  (
-    select b.id
-    from public.branches b
-    where coalesce(b.active,true)
-      and coalesce(b.inventory_source_branch_id,b.id)=b.id
-    order by b.created_at nulls last,b.id
-    limit 1
-  ) branch_id;
+  gen_random_uuid() conflict_request_id;
 
-do $$
-begin
-  if (select branch_id from staff_inventory_fixture) is null then
-    raise exception 'No active self-sourced branch available for staff inventory fixture';
-  end if;
-  if not exists(
-    select 1 from public.staff_roles
-    where code='super_admin' and scope='system' and active
-  ) then
-    raise exception 'No active super_admin system role available for staff inventory fixture';
-  end if;
-end $$;
+-- Preview branches do not contain Production rows. Create a complete tenant /
+-- merchant / physical branch fixture inside this transaction.
+insert into public.staff_roles(code,name_ar,scope,description,is_system,active)
+values('super_admin','مدير نظام - اختبار','system','Preview-only Staff inventory integration fixture',true,true)
+on conflict(code) do update
+set scope='system',active=true;
+
+insert into public.tenants(id,name,subdomain,status,subscription_status)
+select tenant_id,
+       'Staff Inventory Test Tenant '||substr(tenant_id::text,1,8),
+       'staff-inv-'||replace(substr(tenant_id::text,1,12),'-',''),
+       'active','trial'
+from staff_inventory_fixture;
+
+insert into public.merchants(id,tenant_id,code,name,merchant_type,status)
+select merchant_id,tenant_id,
+       'staff-inv-'||substr(merchant_id::text,1,8),
+       'Staff Inventory Test Merchant',
+       'owned','active'
+from staff_inventory_fixture;
+
+insert into public.branches(
+  id,name,code,active,branch_type,independent_pricing,independent_inventory,
+  inventory_source_branch_id,pricing_source_branch_id,tenant_id,merchant_id
+)
+select branch_id,
+       'Staff Inventory Test Branch '||substr(branch_id::text,1,8),
+       'SIT-'||substr(branch_id::text,1,8),
+       true,'internal',true,true,
+       branch_id,branch_id,tenant_id,merchant_id
+from staff_inventory_fixture;
 
 insert into auth.users(id,raw_user_meta_data)
 select admin_id,'{"name":"Staff Inventory Hardening Admin"}'::jsonb
@@ -138,21 +152,14 @@ union all
 select expiry_product,'Staff Expiry Product','STAFF-EXP-'||substr(expiry_product::text,1,8),15,6,0,true
 from staff_inventory_fixture;
 
-do $$
-declare
-  f record;
-begin
-  select * into f from staff_inventory_fixture;
-  if not exists(select 1 from public.inventory where branch_id=f.branch_id and product_id=f.recon_product)
-     or not exists(select 1 from public.inventory where branch_id=f.branch_id and product_id=f.zero_product)
-     or not exists(select 1 from public.inventory where branch_id=f.branch_id and product_id=f.expiry_product) then
-    raise exception 'Product inventory bootstrap did not create fixture rows';
-  end if;
-
-  update public.inventory set quantity=10 where branch_id=f.branch_id and product_id=f.recon_product;
-  update public.inventory set quantity=0 where branch_id=f.branch_id and product_id=f.zero_product;
-  update public.inventory set quantity=5 where branch_id=f.branch_id and product_id=f.expiry_product;
-end $$;
+insert into public.inventory(product_id,quantity,branch_id)
+select recon_product,10,branch_id from staff_inventory_fixture
+union all
+select zero_product,0,branch_id from staff_inventory_fixture
+union all
+select expiry_product,5,branch_id from staff_inventory_fixture
+on conflict(product_id,branch_id) do update
+set quantity=excluded.quantity,updated_at=now();
 
 -- Reconciliation product deliberately has duplicate/overstated batches: 15 batch units vs 10 Inventory.
 insert into public.product_batches(
