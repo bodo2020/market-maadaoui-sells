@@ -45,6 +45,7 @@ Expected final row:
 The suite covers:
 
 - protected-table RLS/direct-access denial and RPC grant checks;
+- shared-source write isolation: child logical branches cannot mutate batch/expiry stock;
 - unauthorized reconciliation workspace denial;
 - minimal supplier selector privacy;
 - duplicate/legacy batch detection;
@@ -96,10 +97,17 @@ Repeat in the opposite direction:
 
 ### Shared Inventory Source
 
-If a Preview branch pair shares one `inventory_source_branch_id`:
-- use the same product on both logical branches;
-- verify the advisory key resolves to the physical inventory source, not the logical branch id;
-- concurrent mutations for that product must serialize on the same key.
+Create/use a logical branch whose `inventory_source_branch_id` points to another physical branch.
+
+Expected:
+- workspace reports `requires_source_branch=true`;
+- reconciliation items never become ready on the logical child branch;
+- expiry items never become action-ready on the logical child branch;
+- `reconcile_product_batches_v1` rejects writes from the logical child branch;
+- `process_expiry_batch_action_v2` rejects writes from the logical child branch;
+- after switching to the physical inventory-source branch, writes use the physical source+product advisory key.
+
+This prevents a child branch batch ledger from rewriting or consuming the full shared Inventory balance.
 
 Fail the release if:
 - PostgreSQL reports a deadlock;
