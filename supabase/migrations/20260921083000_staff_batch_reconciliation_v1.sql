@@ -321,6 +321,10 @@ begin
     raise exception using errcode='22023',message='BRANCH_NOT_FOUND';
   end if;
 
+  if v_inventory_branch is distinct from p_branch_id then
+    raise exception using errcode='22023',message='BATCH_RECON_SHARED_INVENTORY_REQUIRES_SOURCE_BRANCH';
+  end if;
+
   -- Serialize retries first, then every mutation touching the same physical
   -- Inventory source + product. This matches Expiry V2 lock ordering.
   perform pg_advisory_xact_lock(hashtextextended(p_request_id::text,84));
