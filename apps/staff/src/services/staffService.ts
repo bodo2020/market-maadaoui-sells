@@ -379,6 +379,12 @@ export type BatchReconciliationWorkspace = {
   items: BatchReconciliationItem[];
 };
 
+export type BatchReconciliationSupplierOption = {
+  id: string;
+  name: string;
+  code: string | null;
+};
+
 export type ExpiryActionResult = {
   ok: boolean;
   idempotent: boolean;
@@ -1984,6 +1990,14 @@ export async function getBatchReconciliationWorkspace(branchId:string){
   });
   if(result.error)throw batchReconciliationError(result.error.message);
   return result.data as BatchReconciliationWorkspace;
+}
+
+export async function getBatchReconciliationSuppliers(branchId:string){
+  const result=await rpc("get_inventory_batch_reconciliation_suppliers_v1",{
+    p_branch_id:branchId,
+  });
+  if(result.error)throw batchReconciliationError(result.error.message);
+  return result.data as BatchReconciliationSupplierOption[];
 }
 
 export async function reconcileProductBatches(
