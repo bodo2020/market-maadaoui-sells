@@ -25,7 +25,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import type { StaffBranch, StaffIdentity } from "./services/staffService";
 import * as staff from "./services/staffService";
 
@@ -86,6 +86,9 @@ function Notes({items}:{items?:string[]}){
 
 export default function EmploymentFilePage({identity,branch}:{identity:StaffIdentity;branch:StaffBranch}){
   const navigate=useNavigate();
+  const { employeeId }=useParams();
+  const targetEmployeeId=employeeId||identity.user_id;
+  const isSelf=targetEmployeeId===identity.user_id;
   const [view,setView]=useState<View>("employment");
   const [days,setDays]=useState(30);
   const [profile,setProfile]=useState<staff.StaffEmploymentProfile|null>(null);
@@ -106,26 +109,25 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
   const loadBase=useCallback(async()=>{
     setBusy(true);setError(null);
     try{
-      const [nextProfile,nextSelf]=await Promise.all([
-        staff.getMyEmploymentProfile(identity.user_id,branch.branch_id),
-        staff.getStaffSelfService(branch.branch_id),
-      ]);
+      const nextProfile=await staff.getMyEmploymentProfile(targetEmployeeId,branch.branch_id);
       setProfile(nextProfile);
-      setSelfService(nextSelf);
+      setSelfService(isSelf?await staff.getStaffSelfService(branch.branch_id):null);
     }catch(caught){
+      setProfile(null);
+      setSelfService(null);
       setError(caught instanceof Error?caught.message:"تعذر تحميل الملف الوظيفي");
     }finally{setBusy(false);}
-  },[branch.branch_id,identity.user_id]);
+  },[branch.branch_id,isSelf,targetEmployeeId]);
 
   const loadPerformance=useCallback(async()=>{
     setPerformanceBusy(true);
     const range=rangeFor(days);
     const results=await Promise.allSettled([
-      staff.getMyHrPerformance(identity.user_id,branch.branch_id,range.from,range.to),
-      staff.getMyCashierPerformance(identity.user_id,branch.branch_id,range.from,range.to),
-      staff.getMyInventoryPerformance(identity.user_id,branch.branch_id,range.from,range.to),
-      staff.getMyDeliveryPerformance(identity.user_id,branch.branch_id,range.from,range.to),
-      staff.getMyOnlinePerformance(identity.user_id,branch.branch_id,range.from,range.to),
+      staff.getMyHrPerformance(targetEmployeeId,branch.branch_id,range.from,range.to),
+      staff.getMyCashierPerformance(targetEmployeeId,branch.branch_id,range.from,range.to),
+      staff.getMyInventoryPerformance(targetEmployeeId,branch.branch_id,range.from,range.to),
+      staff.getMyDeliveryPerformance(targetEmployeeId,branch.branch_id,range.from,range.to),
+      staff.getMyOnlinePerformance(targetEmployeeId,branch.branch_id,range.from,range.to),
     ]);
     const value=<T,>(index:number)=>results[index].status==="fulfilled"?(results[index] as PromiseFulfilledResult<T>).value:null;
     setPerformance(value<staff.StaffHrPerformance>(0));
@@ -134,7 +136,7 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
     setDelivery(value<staff.StaffDeliveryPerformance>(3));
     setOnline(value<staff.StaffOnlinePerformance>(4));
     setPerformanceBusy(false);
-  },[branch.branch_id,days,identity.user_id]);
+  },[branch.branch_id,days,targetEmployeeId]);
 
   useEffect(()=>{void loadBase();},[loadBase]);
   useEffect(()=>{if(view==="performance")void loadPerformance();},[view,loadPerformance]);
@@ -145,7 +147,7 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
     if(pin!==pinConfirm){setPinMessage({type:"error",text:"تأكيد PIN غير مطابق."});return;}
     setPinBusy(true);setPinMessage(null);
     try{
-      await staff.superAdminSetOwnStaffPin(identity.user_id,pin);
+      await staff.superAdminSetOwnStaffPin(targetEmployeeId,pin);
       setPin("");setPinConfirm("");
       setPinMessage({type:"ok",text:"تم تعيين PIN جديد وتحديث PIN نقطة البيع المرتبط بالحساب."});
     }catch(caught){
@@ -165,16 +167,16 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
 
   return <div className="employment-file-page">
     <div className="employment-file-title">
-      <button className="icon-btn" onClick={()=>navigate("/account")} aria-label="رجوع لخدماتي"><ArrowRight/></button>
-      <div><h1>الملف الوظيفي</h1><p>نفس بيانات HR الخاصة بك — للعرض والمتابعة من Staff</p></div>
+      <button className="icon-btn" onClick={()=>navigate(isSelf?"/account":"/manager")} aria-label={isSelf?"رجوع لخدماتي":"رجوع للفريق"}><ArrowRight/></button>
+      <div><h1>الملف الوظيفي</h1><p>{isSelf?"نفس بيانات HR الخاصة بك — للعرض والمتابعة من Staff":"ملف الموظف من HR — قراءة ومتابعة حسب صلاحياتك"}</p></div>
       <button className="icon-btn" onClick={()=>void loadBase()} aria-label="تحديث"><RefreshCw className={busy?"spin":""}/></button>
     </div>
     {error&&<div className="error-box">{error}</div>}
 
     <section className="employment-hero">
-      <div className="employment-avatar">{(user?.name||identity.name).slice(0,1)}</div>
+      <div className="employment-avatar">{(user?.name||(isSelf?identity.name:"موظف")).slice(0,1)}</div>
       <div className="employment-hero-copy">
-        <div className="employment-name-row"><h2>{user?.name||identity.name}</h2><span className={p?.employment_status==="active"?"active":"inactive"}>{statusLabels[p?.employment_status||"active"]||p?.employment_status||"—"}</span></div>
+        <div className="employment-name-row"><h2>{user?.name||(isSelf?identity.name:"موظف")}</h2><span className={p?.employment_status==="active"?"active":"inactive"}>{statusLabels[p?.employment_status||"active"]||p?.employment_status||"—"}</span></div>
         <p>{p?.employee_code||"بدون رقم وظيفي"} · {profile?.job_title?.name_ar||branch.role_name_ar}</p>
         <small>{profile?.department?.name_ar||"غير محدد القسم"} · {branch.branch_name}</small>
       </div>
@@ -212,7 +214,7 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
         <div className="employment-hr-note"><FileText/><div><strong>ملاحظات HR</strong><p>{p?.notes?.trim()||"لا توجد ملاحظات مسجلة في الملف."}</p></div></div>
       </section>
 
-      <section className="employment-section">
+      {isSelf&&<section className="employment-section">
         <div className="employment-section-title"><WalletCards/><div><h3>الراتب وبطاقة الموظف</h3><p>Wallet + السلف والمزايا طبقات مالية مستقلة وقابلة للمراجعة.</p></div></div>
         <div className="employment-finance-grid">
           <Metric icon={WalletCards} label="رصيد المزايا" value={money(wallet?.benefit_balance)}/>
@@ -229,12 +231,12 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
           <IdCard/>
           <div><span>رقم عضوية الموظف</span><strong dir="ltr">{selfService?.employee_card?.membership_number||"—"}</strong><small>الباركود: {selfService?.employee_card?.barcode||"—"}</small></div>
         </div>
-      </section>
+      </section>}
     </div>}
 
     {view==="account"&&<div className="employment-stack">
       <section className="employment-section">
-        <div className="employment-section-title"><IdCard/><div><h3>الحساب</h3><p>بيانات الدخول الأساسية المرتبطة بحسابك.</p></div></div>
+        <div className="employment-section-title"><IdCard/><div><h3>الحساب</h3><p>{isSelf?"بيانات الدخول الأساسية المرتبطة بحسابك.":"بيانات الحساب المرتبطة بالموظف ضمن صلاحيات HR."}</p></div></div>
         <div className="employment-facts">
           <div><span>اسم المستخدم</span><strong dir="ltr">{user?.username||"—"}</strong></div>
           <div><span>Role النظام</span><strong>{user?.role||"—"}</strong></div>
@@ -246,7 +248,7 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
       </section>
 
       {identity.is_super_admin&&<section className="employment-section">
-        <div className="employment-section-title"><KeyRound/><div><h3>أمان الحساب</h3><p>مدير النظام يقدر يضع PIN جديد لحسابه بدون معرفة الرمز القديم. العملية مسجلة في سجل التدقيق.</p></div></div>
+        <div className="employment-section-title"><KeyRound/><div><h3>أمان الحساب</h3><p>مدير النظام يقدر يضع PIN جديد للحساب المستهدف بدون معرفة الرمز القديم. العملية مسجلة في سجل التدقيق.</p></div></div>
         {pinMessage&&<div className={pinMessage.type==="ok"?"success-box":"error-box"}>{pinMessage.text}</div>}
         <div className="employment-pin-grid">
           <label>PIN الجديد<input type="password" inputMode="numeric" maxLength={6} autoComplete="off" value={pin} onChange={(e)=>setPin(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="••••"/></label>
