@@ -211,3 +211,6 @@
 
 
 .expiry-verification{display:flex;align-items:flex-start;gap:7px;margin-top:8px;border-radius:12px;padding:8px 9px;font-size:8px;line-height:1.5}.expiry-verification svg{width:16px;flex:0 0 auto}.expiry-verification.ready{background:#eaf7ef;border:1px solid #cde7d8;color:#23603f}.expiry-verification.ready svg{color:#005931}.expiry-verification.pending{background:#fff6e5;border:1px solid #f0d69f;color:#7d5b07}.expiry-verification.pending svg{color:#9a6c00}
+
+
+.manager-profile-link{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:9px;border:1px solid #cfe1d6;background:#f2f9f5;color:#005931;border-radius:12px;padding:9px;text-decoration:none;font-size:9px;font-weight:900}.manager-profile-link svg{width:16px}.manager-profile-link:active{transform:translateY(1px)}
