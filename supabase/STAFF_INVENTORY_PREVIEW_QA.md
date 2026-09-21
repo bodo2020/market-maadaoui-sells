@@ -123,3 +123,31 @@ Do not merge or apply to Production unless:
 - migration behavior is confirmed on a Production-like Preview schema.
 
 After approval, deploy migrations through the normal migration path; do not copy/paste ad-hoc SQL into Production.
+
+
+## Production advisor baseline
+
+Captured before applying these migrations to any Preview branch.
+
+Security:
+- `rls_enabled_no_policy`: INFO, 144 existing findings (mostly private-schema tables; RPC access is used instead of direct table access).
+- `pg_graphql_anon_table_exposed`: WARN, 15 existing findings.
+- `pg_graphql_authenticated_table_exposed`: WARN, 84 existing findings.
+- `anon_security_definer_function_executable`: WARN, 43 existing findings.
+- `authenticated_security_definer_function_executable`: WARN, 671 existing findings.
+- `auth_otp_long_expiry`: WARN, 1 existing finding.
+- `auth_leaked_password_protection`: WARN, 1 existing finding.
+- Relevant existing finding: `public.product_batches` is already discoverable to authenticated users through GraphQL/SELECT.
+
+Performance:
+- `unindexed_foreign_keys`: INFO, 347 existing findings.
+- `auth_rls_initplan`: WARN, 38 existing findings.
+- `unused_index`: INFO, 269 existing findings.
+- `multiple_permissive_policies`: WARN, 93 existing findings.
+- `duplicate_index`: WARN, 3 existing findings.
+- Relevant existing finding: `product_batches` already has multiple permissive SELECT policies.
+
+Preview acceptance rule:
+- compare Preview advisor output to this baseline;
+- do not fail the release merely because these pre-existing counts remain;
+- fail/review if the new migrations add a new critical/warn exposure, unexpected anon EXECUTE, new public-table exposure, or a material performance warning on the new reconciliation tables/indexes.
