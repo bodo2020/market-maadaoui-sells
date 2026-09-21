@@ -11,7 +11,7 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 - Control Center: الإدارة الكاملة والتهيئة والتقارير المتقدمة.
 - Staff: التنفيذ اليومي داخل الفرع، الإشراف السريع، وخدمات الموظف.
 
-## Staff V1 — 0.15.0
+## Staff V1 — 0.16.0
 
 ### الأساس
 - تسجيل الدخول، Google Password Manager، Trusted Device.
