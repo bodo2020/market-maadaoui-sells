@@ -1229,7 +1229,8 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
   const canDisposeExpiry = branch.permissions.includes("inventory.manage");
   const canSupplierReturns = branch.permissions.includes("inventory.manage") || branch.permissions.includes("purchases.manage") || branch.permissions.includes("finance.manage");
   const canSettleSupplierReturns = branch.permissions.includes("purchases.manage") || branch.permissions.includes("finance.manage");
-  const [tab,setTab]=useState<"tasks"|"transfers"|"risks"|"expiry"|"supplier_returns">("tasks");
+  const canReconcileBatches = branch.permissions.includes("inventory.manage") && branch.permissions.includes("purchases.manage");
+  const [tab,setTab]=useState<"tasks"|"transfers"|"risks"|"expiry"|"supplier_returns"|"batch_reconciliation">("tasks");
   const [riskStatus,setRiskStatus]=useState<staff.InventoryRiskStatus>("low_stock");
   const [expiryDays,setExpiryDays]=useState(30);
   const [tasks,setTasks]=useState<staff.OperationsTask[]>([]);
@@ -1237,6 +1238,11 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
   const [risks,setRisks]=useState<staff.InventoryRiskWorkspace|null>(null);
   const [expiry,setExpiry]=useState<staff.ExpiryWorkspace|null>(null);
   const [supplierReturns,setSupplierReturns]=useState<staff.SupplierReturnWorkspace|null>(null);
+  const [batchReconciliation,setBatchReconciliation]=useState<staff.BatchReconciliationWorkspace|null>(null);
+  const [selectedReconciliation,setSelectedReconciliation]=useState<staff.BatchReconciliationItem|null>(null);
+  const [reconciliationRequestId,setReconciliationRequestId]=useState("");
+  const [reconciliationLines,setReconciliationLines]=useState<staff.BatchReconciliationLine[]>([]);
+  const [reconciliationNote,setReconciliationNote]=useState("");
   const [selectedExpiry,setSelectedExpiry]=useState<staff.ExpiryBatchItem|null>(null);
   const [expiryAction,setExpiryAction]=useState<"dispose"|"supplier_return">("dispose");
   const [expiryRequestId,setExpiryRequestId]=useState("");
@@ -1265,23 +1271,25 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     if(showBusy)setBusy(true);
     try{
       if(canCount){try{await staff.ensureDailyInventoryAudit(branch.branch_id);}catch{/* scheduler/server policy remains authoritative */}}
-      const [taskRows,transferData,riskData,expiryData,supplierReturnData]=await Promise.all([
+      const [taskRows,transferData,riskData,expiryData,supplierReturnData,reconciliationData]=await Promise.all([
         staff.listTasks(branch.branch_id,"active"),
         canTransfer?staff.getInventoryTransferWorkspace(branch.branch_id).catch(()=>null):Promise.resolve(null),
         staff.getInventoryRiskWorkspace(branch.branch_id,riskStatus).catch(()=>null),
         canExpiry?staff.getExpiryWorkspace(branch.branch_id,expiryDays).catch(()=>null):Promise.resolve(null),
         canSupplierReturns?staff.getSupplierReturnsWorkspace(branch.branch_id,"pending_credit").catch(()=>null):Promise.resolve(null),
+        canReconcileBatches?staff.getBatchReconciliationWorkspace(branch.branch_id).catch(()=>null):Promise.resolve(null),
       ]);
       setTasks(taskRows.filter((task)=>staff.isInventoryTask(task)||staff.isInventoryTransferTask(task)));
       setTransfers(transferData);
       setRisks(riskData);
       setExpiry(expiryData);
       setSupplierReturns(supplierReturnData);
+      setBatchReconciliation(reconciliationData);
       setMessage(null);
     }catch(caught){
       setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل عمليات المخزون"});
     }finally{if(showBusy)setBusy(false);}
-  },[branch.branch_id,canCount,canExpiry,canInventory,canSupplierReturns,canTransfer,expiryDays,riskStatus]);
+  },[branch.branch_id,canCount,canExpiry,canInventory,canReconcileBatches,canSupplierReturns,canTransfer,expiryDays,riskStatus]);
 
   useEffect(()=>{void load();},[load]);
 
@@ -1472,7 +1480,7 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     <PageTitle title="المخزون" subtitle="الجرد والتحويلات من نفس مهام التشغيل"/>
     {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
     <div className="stats"><div><strong>{mine}</strong><span>مهام جرد لي</span></div><div><strong>{overdue}</strong><span>متأخرة</span></div><div><strong>{risks?.summary.low_stock_rows||0}</strong><span>مخزون منخفض</span></div></div>
-    <div className="chips"><button className={tab==="tasks"?"active":""} onClick={()=>setTab("tasks")}>الجرد</button>{canTransfer&&<button className={tab==="transfers"?"active":""} onClick={()=>setTab("transfers")}>التحويلات</button>}<button className={tab==="risks"?"active":""} onClick={()=>setTab("risks")}>مخاطر المخزون</button>{canExpiry&&<button className={tab==="expiry"?"active":""} onClick={()=>setTab("expiry")}>الصلاحية</button>}{canSupplierReturns&&<button className={tab==="supplier_returns"?"active":""} onClick={()=>setTab("supplier_returns")}>إرجاعات الموردين</button>}<button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
+    <div className="chips"><button className={tab==="tasks"?"active":""} onClick={()=>setTab("tasks")}>الجرد</button>{canTransfer&&<button className={tab==="transfers"?"active":""} onClick={()=>setTab("transfers")}>التحويلات</button>}<button className={tab==="risks"?"active":""} onClick={()=>setTab("risks")}>مخاطر المخزون</button>{canExpiry&&<button className={tab==="expiry"?"active":""} onClick={()=>setTab("expiry")}>الصلاحية</button>}{canSupplierReturns&&<button className={tab==="supplier_returns"?"active":""} onClick={()=>setTab("supplier_returns")}>إرجاعات الموردين</button>}{canReconcileBatches&&<button className={tab==="batch_reconciliation"?"active":""} onClick={()=>setTab("batch_reconciliation")}>تسوية الدفعات</button>}<button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
 
     {busy?<Loading/>:tab==="tasks"?<div className="stack inventory-task-list">
       {auditTasks.map((task)=><article className={`task-card ${task.is_overdue?"danger":""}`} key={task.id}>
