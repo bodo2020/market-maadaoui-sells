@@ -211,6 +211,46 @@ begin
 end;
 $function$;
 
+create or replace function public.get_inventory_batch_reconciliation_suppliers_v1(
+  p_branch_id uuid
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path=''
+as $function$
+declare
+  v_uid uuid:=auth.uid();
+  v_items jsonb;
+begin
+  if v_uid is null then raise exception using errcode='42501',message='AUTH_REQUIRED'; end if;
+  if not public.has_branch_access(v_uid,p_branch_id) then
+    raise exception using errcode='42501',message='BATCH_RECON_BRANCH_ACCESS_DENIED';
+  end if;
+  if not (
+    private.staff_is_super_admin(v_uid)
+    or (
+      public.staff_has_permission('inventory.manage',p_branch_id)
+      and public.staff_has_permission('purchases.manage',p_branch_id)
+    )
+  ) then
+    raise exception using errcode='42501',message='BATCH_RECON_PERMISSION_DENIED';
+  end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',s.id,
+    'name',s.name,
+    'code',s.code
+  ) order by s.name),'[]'::jsonb)
+  into v_items
+  from public.suppliers s
+  where coalesce(s.active,true);
+
+  return v_items;
+end;
+$function$;
+
 create or replace function public.reconcile_product_batches_v1(
   p_request_id uuid,
   p_branch_id uuid,
@@ -527,7 +567,9 @@ end;
 $function$;
 
 revoke all on function public.get_inventory_batch_reconciliation_workspace_v1(uuid,integer) from public,anon;
+revoke all on function public.get_inventory_batch_reconciliation_suppliers_v1(uuid) from public,anon;
 revoke all on function public.reconcile_product_batches_v1(uuid,uuid,uuid,jsonb,text) from public,anon;
 
 grant execute on function public.get_inventory_batch_reconciliation_workspace_v1(uuid,integer) to authenticated,service_role;
+grant execute on function public.get_inventory_batch_reconciliation_suppliers_v1(uuid) to authenticated,service_role;
 grant execute on function public.reconcile_product_batches_v1(uuid,uuid,uuid,jsonb,text) to authenticated,service_role;
