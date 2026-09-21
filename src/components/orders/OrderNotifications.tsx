@@ -17,7 +17,7 @@ export default function OrderNotifications(){
     let active=true;
     const channel=supabase.channel('pos-device-orders-'+currentBranchId).on('postgres_changes',{event:'INSERT',schema:'public',table:'online_orders',filter:`branch_id=eq.${currentBranchId}`},async payload=>{
       try {
-        const registration=await navigator.serviceWorker.register('/order-notifications-sw.js');
+        const registration=await navigator.serviceWorker.register('/pos-service-worker.js');
         const ready=await navigator.serviceWorker.ready;
         if(!active || !registration.active)return;
         await ready.showNotification('طلب جديد في المعداوي',{body:'افتح الطلب لمراجعة التفاصيل.',icon:'/elmadawy-logo.png',tag:'order-'+payload.new.id,data:{orderId:payload.new.id},dir:'rtl'});
@@ -35,7 +35,7 @@ export default function OrderNotifications(){
     try{
       const permission=await Notification.requestPermission();
       if(permission!=='granted'){toast.info('الإشعارات غير مسموحة. تقدر تفعّلها لاحقًا من إعدادات الموقع.');return;}
-      await navigator.serviceWorker.register('/order-notifications-sw.js');
+      await navigator.serviceWorker.register('/pos-service-worker.js');
       await navigator.serviceWorker.ready;
       localStorage.setItem('pos-notifications','true');setEnabled(true);
       toast.success('تم تفعيل إشعارات الجهاز الاختيارية.');

@@ -4,6 +4,15 @@ import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
 import { invalidatePOSCatalogCache } from "@/services/supabase/posCatalogService";
 import { invalidatePosPreflightCache } from "@/services/supabase/posPreflightService";
 import {
+  listOfflineSales,
+  readOfflineSale,
+  readPOSPaymentMethodsSnapshot,
+  pruneSyncedOfflineSales,
+  saveOfflineSaleWithStockDeduction,
+  updateOfflineSale,
+  type OfflineSaleRecord,
+} from "@/services/offline/posOfflineStore";
+import {
   posLoyaltyContextKey,
   posVoucherContextKey,
   readPOSLoyaltyCustomer,
@@ -31,6 +40,10 @@ type PendingModernSale = {
 };
 
 type RpcResult = { data: unknown; error: { message?: string; code?: string } | null };
+const rpc = supabase.rpc.bind(supabase) as unknown as (
+  name: string,
+  args: Record<string, unknown>,
+) => Promise<RpcResult>;
 
 function key(userId: string, branchId: string, checkoutId: string) {
   return `pos-sale-v4-request:${userId}:${branchId}:${checkoutId}`;
@@ -73,6 +86,92 @@ function deterministic(error: { message?: string; code?: string } | null) {
   return Boolean(friendly(error.message)) || Boolean(error.code?.startsWith("22")) || error.code === "42501" || error.code === "55000";
 }
 
+async function currentUserId(verifyOnline: boolean): Promise<string> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  let sessionUserId = sessionData.session?.user?.id;
+  if (!sessionUserId && !verifyOnline) {
+    try { sessionUserId = (JSON.parse(localStorage.getItem("user") || "null") as { id?: string } | null)?.id; } catch { /* invalid local session */ }
+  }
+  if (!sessionUserId) throw new Error("سجّل الدخول مرة أخرى لإتمام البيع.");
+  if (!verifyOnline) return sessionUserId;
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error("سجّل الدخول مرة أخرى لإتمام البيع.");
+  return data.user.id;
+}
+
+async function validateOfflineCashSale(
+  branchId: string,
+  payload: Record<string, unknown>,
+  selection: ModernPOSPaymentSelection,
+) {
+  if (selection.employeeId || payload.customer_id || payload.voucher_code) {
+    throw new Error("أثناء انقطاع الإنترنت البيع متاح نقدي فقط وبدون عميل أو كوبون أو آجل موظف.");
+  }
+  const methodIds = (payload.payment_splits as Array<{ payment_method_id?: string }> || [])
+    .map(part => part.payment_method_id)
+    .filter(Boolean) as string[];
+  const snapshot = await readPOSPaymentMethodsSnapshot(branchId);
+  const selected = snapshot?.methods.filter(method => methodIds.includes(method.id)) || [];
+  if (!methodIds.length || selected.length !== methodIds.length || selected.some(method => method.method_type !== "cash" || !method.active)) {
+    throw new Error("أثناء انقطاع الإنترنت اختار الدفع النقدي فقط.");
+  }
+}
+
+function optimisticOfflineSale(
+  sale: Omit<Sale, "id" | "created_at" | "updated_at">,
+  requestId: string,
+  deviceCode: string,
+): Sale & Record<string, unknown> {
+  const now = new Date().toISOString();
+  return {
+    ...sale,
+    id: requestId,
+    invoice_number: `OFF-${deviceCode}-${requestId.slice(0, 6).toUpperCase()}`,
+    created_at: now,
+    updated_at: now,
+    amount_due: Number(sale.total || 0),
+    amount_charged: Number(sale.total || 0),
+    payment_method_name: "نقدي · بانتظار المزامنة",
+    offline_pending: true,
+    sync_status: "pending",
+  };
+}
+
+async function queueOfflineSale(
+  pending: PendingModernSale,
+  sale: Omit<Sale, "id" | "created_at" | "updated_at">,
+  userId: string,
+  branchId: string,
+  checkoutId: string,
+  deviceCode: string,
+) {
+  const existing = await readOfflineSale(pending.requestId);
+  if (existing) return existing.optimisticSale;
+  const optimisticSale = optimisticOfflineSale(sale, pending.requestId, deviceCode);
+  const now = new Date().toISOString();
+  const record: OfflineSaleRecord = {
+    id: pending.requestId,
+    branchId,
+    userId,
+    checkoutId,
+    fingerprint: pending.fingerprint,
+    payload: pending.payload,
+    optimisticSale,
+    status: "pending",
+    attempts: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+  try {
+    await saveOfflineSaleWithStockDeduction(record, sale.items);
+  } catch {
+    throw new Error("تعذر حفظ الفاتورة بأمان على الجهاز. لا تستلم المبلغ قبل إتاحة مساحة تخزين للمتصفح.");
+  }
+  invalidatePOSCatalogCache(branchId);
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pos:sale-queued", { detail: optimisticSale }));
+  return optimisticSale;
+}
+
 export function clearConfirmedModernPosSale(userId: string, branchId: string, checkoutId: string) {
   try {
     const storageKey = key(userId, branchId, checkoutId);
@@ -90,10 +189,11 @@ export async function submitModernPosSale(
   checkoutId: string,
   selection: ModernPOSPaymentSelection,
 ): Promise<Sale & Record<string, unknown>> {
-  if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("الإنترنت مقطوع حاليًا. السلة محفوظة؛ رجّع الاتصال وحاول مرة ثانية.");
-
-  const { data: authData, error: authError } = await supabase.auth.getUser();
-  if (authError || !authData.user) throw new Error("سجّل الدخول مرة أخرى لإتمام البيع.");
+  const isOnline = typeof navigator === "undefined" || navigator.onLine;
+  // The server RPC remains the authority while online. Reading the cached
+  // session here also lets a previously verified cashier queue a cash sale
+  // when the browser has not detected the outage yet.
+  const userId = await currentUserId(false);
 
   const branchId = sale.branch_id || localStorage.getItem("currentBranchId");
   if (!branchId) throw new Error("اختار الفرع قبل إتمام البيع.");
@@ -146,7 +246,7 @@ export async function submitModernPosSale(
   };
 
   const fingerprint = JSON.stringify(payload);
-  const storageKey = key(authData.user.id, branchId, checkoutId);
+  const storageKey = key(userId, branchId, checkoutId);
   let pending: PendingModernSale;
   try {
     const raw = localStorage.getItem(storageKey);
@@ -160,7 +260,14 @@ export async function submitModernPosSale(
   }
   try { localStorage.setItem(storageKey, JSON.stringify(pending)); } catch { /* noop */ }
 
-  const call = async () => await (supabase.rpc as any)("create_pos_sale_v4", {
+  if (!isOnline) {
+    await validateOfflineCashSale(branchId, pending.payload, selection);
+    const queued = await queueOfflineSale(pending, sale, userId, branchId, checkoutId, device.device_code);
+    try { localStorage.setItem(storageKey, JSON.stringify({ ...pending, confirmed: true })); } catch { /* queued in IndexedDB */ }
+    return queued;
+  }
+
+  const call = async () => await rpc("create_pos_sale_v4", {
     p_request_id: pending.requestId,
     p_branch_id: branchId,
     p_sale: pending.payload,
@@ -175,10 +282,19 @@ export async function submitModernPosSale(
   if (result.error) {
     if (deterministic(result.error)) {
       try { localStorage.removeItem(storageKey); } catch { /* noop */ }
+      throw new Error(friendly(result.error.message) || "تعذر إتمام البيع. راجع البيانات وحاول مرة أخرى.");
     }
-    throw new Error(friendly(result.error.message) || "تعذر تأكيد حفظ البيع بسبب اتصال غير مؤكد. أعد المحاولة نفسها ولن تتكرر الفاتورة.");
+    await validateOfflineCashSale(branchId, pending.payload, selection);
+    const queued = await queueOfflineSale(pending, sale, userId, branchId, checkoutId, device.device_code);
+    try { localStorage.setItem(storageKey, JSON.stringify({ ...pending, confirmed: true })); } catch { /* queued in IndexedDB */ }
+    return queued;
   }
-  if (!result.data) throw new Error("لم يصل تأكيد البيع. أعد نفس المحاولة ولن تُسجّل الفاتورة مرتين.");
+  if (!result.data) {
+    await validateOfflineCashSale(branchId, pending.payload, selection);
+    const queued = await queueOfflineSale(pending, sale, userId, branchId, checkoutId, device.device_code);
+    try { localStorage.setItem(storageKey, JSON.stringify({ ...pending, confirmed: true })); } catch { /* queued in IndexedDB */ }
+    return queued;
+  }
 
   const confirmed = result.data as Sale & Record<string, unknown>;
   try {
@@ -193,4 +309,49 @@ export async function submitModernPosSale(
   invalidatePosPreflightCache(branchId);
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pos:sale-completed", { detail: confirmed }));
   return confirmed;
+}
+
+let syncing = false;
+
+export async function syncOfflinePOSSales(branchId?: string) {
+  if (syncing || (typeof navigator !== "undefined" && !navigator.onLine)) return;
+  syncing = true;
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pos:offline-sync-started"));
+  try {
+    const userId = await currentUserId(true);
+    const rows = (await listOfflineSales(branchId)).filter(row => row.status === "pending" || row.status === "syncing");
+    for (const row of rows) {
+      if (row.userId !== userId) continue;
+      await updateOfflineSale(row.id, { status: "syncing", attempts: row.attempts + 1, lastError: null });
+      const result = await rpc("create_pos_sale_v4", {
+        p_request_id: row.id,
+        p_branch_id: row.branchId,
+        p_sale: row.payload,
+      }) as RpcResult;
+      if (result.error) {
+        const message = friendly(result.error.message) || result.error.message || "تعذر مزامنة الفاتورة.";
+        if (deterministic(result.error)) {
+          await updateOfflineSale(row.id, { status: "needs_review", lastError: message });
+        } else {
+          await updateOfflineSale(row.id, { status: "pending", lastError: message });
+          break;
+        }
+        continue;
+      }
+      const confirmed = result.data as Sale & Record<string, unknown>;
+      await updateOfflineSale(row.id, {
+        status: "synced",
+        syncedAt: new Date().toISOString(),
+        lastError: null,
+        optimisticSale: confirmed || row.optimisticSale,
+      });
+      invalidatePOSCatalogCache(row.branchId);
+      invalidatePosPreflightCache(row.branchId);
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pos:sale-completed", { detail: confirmed }));
+    }
+    await pruneSyncedOfflineSales();
+  } finally {
+    syncing = false;
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pos:offline-sync-finished"));
+  }
 }

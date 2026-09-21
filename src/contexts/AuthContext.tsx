@@ -10,6 +10,7 @@ import {
 import { createPosQuickSession, LocalPosDevice } from "@/services/supabase/posDeviceService";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { clearOfflineStaffPins } from "@/services/offline/staffOfflinePin";
 
 interface AuthContextType {
   user: User | null;
@@ -60,6 +61,7 @@ function clearLivePosWorkspace() {
 function clearStaffAppLockSession() {
   const keys = Array.from({ length: sessionStorage.length }, (_, index) => sessionStorage.key(index)).filter(Boolean) as string[];
   keys.filter(key => key.startsWith("staff-app-pin-unlocked:") || key.startsWith("staff-app-pin-locked:")).forEach(key => sessionStorage.removeItem(key));
+  clearOfflineStaffPins();
 }
 
 function stashPosWorkspace(userId: string | null | undefined, branchId: string | null | undefined) {
@@ -168,7 +170,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session && active) {
+      if (!session && active && (typeof navigator === "undefined" || navigator.onLine)) {
         clearLivePosWorkspace();
         applyLoginState(null);
       }

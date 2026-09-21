@@ -13,6 +13,7 @@ import {
   Ticket,
   Trash2,
   UserRound,
+  WifiOff,
   X,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -102,13 +103,14 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   const [error, setError] = useState<string | null>(null);
   const [sale, setSale] = useState<Sale | null>(null);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && !navigator.onLine);
   const scanTargetRef = useRef<ScanTarget>(null);
 
   const visibleMethods = useMemo(
     () => methods
-      .filter(row => row.active && (row.code !== "employee_credit" || Boolean(employee)))
+      .filter(row => row.active && (!offline || row.method_type === "cash") && (row.code !== "employee_credit" || Boolean(employee)))
       .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "ar")),
-    [methods, employee],
+    [methods, employee, offline],
   );
   const mixedEligibleMethods = useMemo(() => visibleMethods.filter(row => row.code !== "employee_credit"), [visibleMethods]);
   const selectedMethod = useMemo(() => visibleMethods.find(row => row.id === methodId) || null, [visibleMethods, methodId]);
@@ -185,6 +187,16 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
       setLoadingMethods(false);
     }
   }, [currentBranchId]);
+
+  useEffect(() => {
+    const update = () => setOffline(!navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -265,6 +277,10 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
   }, [currentBranchId, customer, storeCustomer, storeVoucher, toast]);
 
   const beginScan = (target: Exclude<ScanTarget, null>, camera = false) => {
+    if (offline) {
+      setError("ربط العميل والكوبونات والآجل متاحين بعد رجوع الإنترنت. البيع النقدي المباشر يعمل الآن.");
+      return;
+    }
     scanTargetRef.current = target;
     setScanTarget(target);
     if (camera) setCameraOpen(true);
@@ -373,7 +389,16 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
     setProcessing(true);
     setError(null);
     try {
-      const checked = await preflightPosCart(currentBranchId, items);
+      if (offline && (customer || employee || voucher || mixedMode || selectedMethod?.method_type !== "cash")) {
+        throw new Error("البيع أوفلاين متاح نقدي مباشر فقط، بدون عميل أو كوبون أو دفع مختلط أو آجل.");
+      }
+      const checked = offline ? {
+        items,
+        subtotal: items.reduce((sum, item) => sum + Number(item.total || 0) + Number(item.discount || 0) * Number(item.weight ?? item.quantity ?? 1), 0),
+        discount: items.reduce((sum, item) => sum + Number(item.discount || 0) * Number(item.weight ?? item.quantity ?? 1), 0),
+        total: Number(total || 0),
+        repriced: false,
+      } : await preflightPosCart(currentBranchId, items);
       if (checked.repriced || Math.abs(Number(checked.total) - Number(total)) > 0.009) {
         onRepriced(checked.items);
         setError("تم تحديث سعر أو عرض في السلة. راجع الإجمالي ثم أكد البيع مرة أخرى.");
@@ -419,9 +444,12 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
       setVoucher(null);
       onSaleCommitted?.(confirmed as Sale);
       const employeeCredit = Number((confirmed as any).employee_credit_amount || 0);
+      const queuedOffline = Boolean((confirmed as any).offline_pending);
       toast({
-        title: employeeCredit > 0 ? "تم تسجيل البيع الآجل" : "تم البيع بنجاح",
-        description: employeeCredit > 0
+        title: queuedOffline ? "تم حفظ البيع على الجهاز" : employeeCredit > 0 ? "تم تسجيل البيع الآجل" : "تم البيع بنجاح",
+        description: queuedOffline
+          ? `فاتورة مؤقتة ${(confirmed as Sale).invoice_number} · ستتم المزامنة تلقائيًا`
+          : employeeCredit > 0
           ? `فاتورة ${(confirmed as Sale).invoice_number} · آجل ${money(employeeCredit)}`
           : `فاتورة ${(confirmed as Sale).invoice_number}`,
       });
@@ -469,12 +497,14 @@ export default function POSCheckoutModernDialog({ open, onOpenChange, checkoutId
                 )}
                 {Number(sale.loyalty_points_earned || 0) > 0 && <div className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-sm font-bold">+ {Number(sale.loyalty_points_earned || 0).toLocaleString("ar-EG")} نقطة للعميل</div>}
                 {saleEmployeePoints > 0 && <div className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-sm font-bold">+ {saleEmployeePoints.toLocaleString("ar-EG")} نقطة للموظف</div>}
+                {Boolean((sale as any).offline_pending) && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">محفوظة على الجهاز وبانتظار المزامنة · لا تغلق الوردية قبل رجوع الإنترنت</div>}
               </div>
               <Button variant="outline" className="h-12 w-full" onClick={() => setInvoiceOpen(true)}><PackageCheck className="ml-2 h-4 w-4" />عرض وطباعة الفاتورة</Button>
               <Button className="h-12 w-full bg-[#005931]" onClick={startNewSale}>عملية بيع جديدة</Button>
             </div>
           ) : (
             <div className="space-y-5">
+              {offline && <Alert className="border-amber-300 bg-amber-50 text-amber-950"><WifiOff className="h-4 w-4" /><AlertDescription><strong>وضع أوفلاين:</strong> البيع النقدي المباشر والطباعة متاحان. العميل والكوبون والآجل ووسائل الدفع الإلكترونية متوقفة لحين رجوع الإنترنت.</AlertDescription></Alert>}
               {error && <Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertDescription>{error}</AlertDescription></Alert>}
 
               <section className="rounded-3xl border p-4">

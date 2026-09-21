@@ -13,6 +13,7 @@ import {
   verifyMyStaffAppPin,
 } from "@/services/staffAppPinService";
 import { reauthenticateCurrentStaff } from "@/services/supabase/staffAuthService";
+import { offlineStaffPinStatus, rememberOfflineStaffPin, verifyOfflineStaffPin } from "@/services/offline/staffOfflinePin";
 
 const pinPattern = /^\d{4,6}$/;
 
@@ -131,7 +132,14 @@ export default function StaffAppPinGate({ children }: { children: React.ReactNod
   const statusQuery = useQuery({
     queryKey: ["staff-app-pin-status-v2", user?.id],
     enabled: Boolean(user?.id),
-    queryFn: getMyStaffAppPinStatus,
+    queryFn: () => {
+      if (typeof navigator !== "undefined" && !navigator.onLine && user?.id) {
+        const status = offlineStaffPinStatus(user.id);
+        if (!status.configured) throw new Error("وصّل الإنترنت وافتح التطبيق بالـPIN مرة واحدة لتفعيل الدخول الأوفلاين الآمن.");
+        return Promise.resolve({ configured: true, locked: status.locked, locked_until: status.lockedUntil, failed_attempts: status.failedAttempts });
+      }
+      return getMyStaffAppPinStatus();
+    },
     staleTime: 15_000,
     retry: false,
   });
@@ -139,6 +147,7 @@ export default function StaffAppPinGate({ children }: { children: React.ReactNod
   const setupMutation = useMutation({
     mutationFn: (newPin: string) => setMyStaffAppPin(newPin),
     onSuccess: async () => {
+      if (user?.id) await rememberOfflineStaffPin(user.id, firstPin);
       markUnlocked();
       setFirstPin("");
       setSetupStage("new");
@@ -155,6 +164,10 @@ export default function StaffAppPinGate({ children }: { children: React.ReactNod
   const verifyMutation = useMutation({
     mutationFn: async () => {
       if (!pinPattern.test(pin)) throw new Error("أدخل PIN من 4 إلى 6 أرقام.");
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        if (!user?.id) throw new Error("جلسة المستخدم غير متاحة.");
+        return verifyOfflineStaffPin(user.id, pin);
+      }
       const result = await verifyMyStaffAppPin(pin);
       if (!result.ok) {
         if (result.error === "APP_PIN_LOCKED") throw new Error("تم قفل PIN لمدة 10 دقائق بسبب المحاولات الخاطئة.");
@@ -164,7 +177,10 @@ export default function StaffAppPinGate({ children }: { children: React.ReactNod
       }
       return result;
     },
-    onSuccess: markUnlocked,
+    onSuccess: async () => {
+      if (user?.id && (typeof navigator === "undefined" || navigator.onLine)) await rememberOfflineStaffPin(user.id, pin);
+      markUnlocked();
+    },
     onError: async error => {
       setMessage(error instanceof Error ? error.message : "تعذر فتح التطبيق.");
       setPin("");
@@ -191,6 +207,7 @@ export default function StaffAppPinGate({ children }: { children: React.ReactNod
   const recoveryMutation = useMutation({
     mutationFn: (newPin: string) => recoverMyStaffAppPin(newPin),
     onSuccess: async () => {
+      if (user?.id) await rememberOfflineStaffPin(user.id, recoveryFirstPin);
       markUnlocked();
       await statusQuery.refetch();
     },
@@ -308,7 +325,7 @@ export default function StaffAppPinGate({ children }: { children: React.ReactNod
                 {busy ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <LockKeyhole className="ml-2 h-4 w-4" />}
                 {recoveryStage === "new" ? "التالي" : recoveryStage === "confirm" ? "حفظ الرمز وفتح التطبيق" : configured ? "فتح التطبيق" : setupStage === "new" ? "التالي" : "حفظ الرمز وفتح التطبيق"}
               </Button>
-              {configured && !recoveryStage && <Button variant="outline" className="w-full" disabled={busy} onClick={() => { setRecoveryStage("credentials"); setRecoveryUsername(user.username || ""); setPin(""); setMessage(null); }}>نسيت PIN؟ استخدم اليوزر والباسورد</Button>}
+              {configured && !recoveryStage && (typeof navigator === "undefined" || navigator.onLine) && <Button variant="outline" className="w-full" disabled={busy} onClick={() => { setRecoveryStage("credentials"); setRecoveryUsername(user.username || ""); setPin(""); setMessage(null); }}>نسيت PIN؟ استخدم اليوزر والباسورد</Button>}
               {recoveryStage && <Button variant="ghost" className="w-full" disabled={busy} onClick={() => { setRecoveryStage("credentials"); setRecoveryFirstPin(""); setPin(""); setMessage(null); }}>الرجوع لتأكيد الحساب</Button>}
             </>
           )}

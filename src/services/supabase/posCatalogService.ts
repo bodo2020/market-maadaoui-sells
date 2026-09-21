@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Product } from '@/types';
+import { readPOSCatalogSnapshot, savePOSCatalogSnapshot } from '@/services/offline/posOfflineStore';
 
 const posRpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
@@ -47,6 +48,16 @@ async function queryCatalog(params: { search?: string | null; barcode?: string |
   });
   if (error) throw error;
   return (Array.isArray(data) ? data : []).map(row => normalizeCatalogProduct(row as Product));
+}
+
+function localSearch(products: Product[], query: string): Product[] {
+  const value = query.trim().toLocaleLowerCase('ar');
+  if (!value) return products;
+  return products.filter(product =>
+    product.name?.toLocaleLowerCase('ar').includes(value)
+    || product.barcode?.includes(value)
+    || product.bulk_barcode?.includes(value),
+  ).slice(0, 100);
 }
 
 type ScaleBarcode = {
@@ -98,19 +109,43 @@ export async function fetchPOSProducts(search?: string): Promise<Product[]> {
   const branchId = currentBranchId();
   const query = search?.trim();
 
-  // Search stays server-side so a large catalog never has to be downloaded to the cashier.
-  if (query) return queryCatalog({ search: query, barcode: null, limit: 100 });
+  if (query) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const local = catalogCache?.branchId === branchId ? catalogCache.products : (await readPOSCatalogSnapshot(branchId))?.products || [];
+      return localSearch(local, query);
+    }
+    try {
+      return await queryCatalog({ search: query, barcode: null, limit: 100 });
+    } catch (error) {
+      const local = catalogCache?.branchId === branchId ? catalogCache.products : (await readPOSCatalogSnapshot(branchId))?.products || [];
+      if (local.length) return localSearch(local, query);
+      throw error;
+    }
+  }
 
   if (catalogCache?.branchId === branchId) return catalogCache.products;
   if (catalogRequest) return catalogRequest;
 
-  // The server orders favorites and in-stock products first. 500 is enough for the
-  // fast browse screen while barcode/search can still reach every product in the branch.
-  catalogRequest = queryCatalog({ search: null, barcode: null, limit: 500 })
-    .then(products => {
+  catalogRequest = (async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const snapshot = await readPOSCatalogSnapshot(branchId);
+      if (!snapshot?.products.length) throw new Error('افتح نقطة البيع مرة واحدة بالإنترنت لتحميل المنتجات على الجهاز.');
+      catalogCache = { branchId, products: snapshot.products, loadedAt: Date.parse(snapshot.savedAt) || Date.now() };
+      return snapshot.products;
+    }
+    try {
+      // A full branch snapshot makes name search and barcode scanning available offline.
+      const products = await queryCatalog({ search: null, barcode: null, limit: 5000 });
       catalogCache = { branchId, products, loadedAt: Date.now() };
+      await savePOSCatalogSnapshot(branchId, products);
       return products;
-    })
+    } catch (error) {
+      const snapshot = await readPOSCatalogSnapshot(branchId);
+      if (!snapshot?.products.length) throw error;
+      catalogCache = { branchId, products: snapshot.products, loadedAt: Date.parse(snapshot.savedAt) || Date.now() };
+      return snapshot.products;
+    }
+  })()
     .finally(() => {
       catalogRequest = null;
     });
@@ -122,9 +157,21 @@ export async function fetchPOSProductByBarcode(barcode: string): Promise<{ produ
   const cleanBarcode = barcode.trim();
   if (!cleanBarcode) return { product: null, isBulkBarcode: false };
 
+  const branchId = currentBranchId();
+  const localProducts = async () => catalogCache?.branchId === branchId
+    ? catalogCache.products
+    : (await readPOSCatalogSnapshot(branchId))?.products || [];
+  const localExact = async (value: string) => (await localProducts()).find(product => product.barcode === value || product.bulk_barcode === value) || null;
+
   // Always prefer an exact product/bulk barcode match.
-  const exactRows = await queryCatalog({ search: null, barcode: cleanBarcode, limit: 2 });
-  const exactProduct = exactRows[0] || null;
+  let exactProduct: Product | null = null;
+  try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) exactProduct = await localExact(cleanBarcode);
+    else exactProduct = (await queryCatalog({ search: null, barcode: cleanBarcode, limit: 2 }))[0] || null;
+  } catch (error) {
+    exactProduct = await localExact(cleanBarcode);
+    if (!exactProduct && !(await localProducts()).length) throw error;
+  }
   if (exactProduct) {
     return {
       product: exactProduct,
@@ -137,8 +184,14 @@ export async function fetchPOSProductByBarcode(barcode: string): Promise<{ produ
 
   let scaleProduct: Product | null = null;
   for (const candidate of scale.productCandidates) {
-    const rows = await queryCatalog({ search: null, barcode: candidate, limit: 2 });
-    const product = rows[0] || null;
+    let product: Product | null = null;
+    try {
+      product = typeof navigator !== 'undefined' && !navigator.onLine
+        ? await localExact(candidate)
+        : (await queryCatalog({ search: null, barcode: candidate, limit: 2 }))[0] || null;
+    } catch {
+      product = await localExact(candidate);
+    }
     if (product?.barcode_type === 'scale') {
       scaleProduct = product;
       break;

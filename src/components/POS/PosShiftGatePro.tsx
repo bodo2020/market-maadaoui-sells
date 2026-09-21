@@ -24,6 +24,39 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, LogOut, MonitorSmartphone, Play, RefreshCw, Store, WalletCards } from "lucide-react";
+import { getOfflineOutboxSummary } from "@/services/offline/posOfflineStore";
+
+const OFFLINE_SHIFT_TTL_MS = 12 * 60 * 60 * 1000;
+
+type OfflineShiftSnapshot = {
+  userId: string;
+  savedAt: number;
+  shift: PosShift;
+  cashSummary: PosCashSummary;
+};
+
+function offlineShiftKey(deviceId: string) { return `pos-open-shift-offline:v1:${deviceId}`; }
+
+function saveOfflineShift(deviceId: string, userId: string, shift: PosShift, cashSummary: PosCashSummary) {
+  try {
+    const snapshot: OfflineShiftSnapshot = { userId, savedAt: Date.now(), shift, cashSummary };
+    localStorage.setItem(offlineShiftKey(deviceId), JSON.stringify(snapshot));
+  } catch {
+    // Online shift operation remains authoritative.
+  }
+}
+
+function readOfflineShift(deviceId: string, userId: string): OfflineShiftSnapshot | null {
+  try {
+    const snapshot = JSON.parse(localStorage.getItem(offlineShiftKey(deviceId)) || "null") as OfflineShiftSnapshot | null;
+    if (!snapshot || snapshot.userId !== userId || Date.now() - Number(snapshot.savedAt || 0) > OFFLINE_SHIFT_TTL_MS) return null;
+    return snapshot;
+  } catch {
+    return null;
+  }
+}
+
+function clearOfflineShift(deviceId: string) { localStorage.removeItem(offlineShiftKey(deviceId)); }
 
 function money(value: number | null | undefined) {
   return `${Number(value || 0).toFixed(2)} ج.م`;
@@ -74,6 +107,20 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     setError(null);
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      const snapshot = user?.id ? readOfflineShift(device.device_id, user.id) : null;
+      if (snapshot) {
+        setShift(snapshot.shift);
+        setCashSummary(snapshot.cashSummary);
+        setLoading(false);
+        return;
+      }
+      setError("لا توجد وردية موثقة حديثًا على الجهاز. وصّل الإنترنت وافتح الوردية مرة واحدة.");
+      setShift(null);
+      setCashSummary(null);
+      setLoading(false);
+      return;
+    }
     try {
       const [current, cash] = await Promise.all([
         getMyOpenPosShift(device),
@@ -81,6 +128,8 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
       ]);
       setShift(current);
       setCashSummary(cash);
+      if (current && user?.id) saveOfflineShift(device.device_id, user.id, current, cash);
+      if (!current) clearOfflineShift(device.device_id);
       if (!current) setOpeningCash(Number(cash.drawer_balance || 0).toFixed(2));
     } catch (e: any) {
       setError(e.message || "تعذر تجهيز وردية الكاشير");
@@ -114,7 +163,8 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
       const opened = await openPosShift(device, amount);
       setShift(opened);
       setClosingSummary(null);
-      await refreshCash();
+      const cash = await refreshCash();
+      if (cash && user?.id) saveOfflineShift(device.device_id, user.id, opened, cash);
     } catch (e: any) {
       setError(e.message || "تعذر بدء الوردية");
     } finally {
@@ -124,6 +174,21 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
 
   const openCloseDialog = async (switchEmployee = false) => {
     if (!device || !shift) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setError("لا يمكن إغلاق الوردية أو تبديل الموظف قبل رجوع الإنترنت ومزامنة الفواتير المحفوظة.");
+      return;
+    }
+    let offlineSummary;
+    try {
+      offlineSummary = await getOfflineOutboxSummary(currentBranchId || undefined);
+    } catch {
+      setError("تعذر التأكد من طابور الفواتير الأوفلاين. أعد فتح الشاشة قبل إغلاق الوردية.");
+      return;
+    }
+    if (offlineSummary.pending > 0 || offlineSummary.needsReview > 0) {
+      setError(`لا يمكن إغلاق الوردية: ${offlineSummary.pending} فاتورة بانتظار المزامنة و${offlineSummary.needsReview} تحتاج مراجعة.`);
+      return;
+    }
     setSwitchRequested(switchEmployee);
     setClosingNotes("");
     setError(null);
@@ -175,6 +240,7 @@ export default function PosShiftGatePro({ children }: { children: ReactNode }) {
       const result = await closePosShiftV2(device, shift.id, rows, closingNotes);
       setClosingSummary(result);
       setShift(null);
+      clearOfflineShift(device.device_id);
       setClosingOpen(false);
       setReconciliationPreview(null);
       setReconciliationValues({});

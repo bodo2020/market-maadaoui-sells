@@ -4,6 +4,8 @@ import { useBranchStore } from "@/stores/branchStore";
 
 const GENERIC_LOGIN_ERROR = "اسم المستخدم أو كلمة المرور غير صحيح";
 const NO_BRANCH_ERROR = "لا يوجد فرع نشط متاح لهذا الحساب";
+const OFFLINE_STAFF_STATE_KEY = "staffOfflineSession:v1";
+const OFFLINE_STAFF_STATE_TTL_MS = 12 * 60 * 60 * 1000;
 
 export type StaffBranchContext = {
   branch_id: string;
@@ -31,6 +33,13 @@ export type StaffLoginState = {
   branches: StaffBranchContext[];
   requiresBranchSelection: boolean;
   isSuperAdmin: boolean;
+};
+
+type CachedOfflineStaffState = {
+  userId: string;
+  branchId: string;
+  savedAt: number;
+  state: StaffLoginState;
 };
 
 const rpc = supabase.rpc.bind(supabase) as unknown as (
@@ -151,6 +160,34 @@ function clearStaffAccessContext() {
   localStorage.removeItem("currentStaffPosEnabled");
 }
 
+function saveOfflineStaffState(state: StaffLoginState) {
+  try {
+    const branchId = localStorage.getItem("currentBranchId");
+    if (!state.user || !branchId || branchId === "null") return;
+    const cached: CachedOfflineStaffState = { userId: state.user.id, branchId, savedAt: Date.now(), state };
+    localStorage.setItem(OFFLINE_STAFF_STATE_KEY, JSON.stringify(cached));
+  } catch {
+    // Online authentication must still succeed if local offline storage is blocked.
+  }
+}
+
+function readOfflineStaffState(expectedUserId?: string | null): StaffLoginState | null {
+  try {
+    const raw = localStorage.getItem(OFFLINE_STAFF_STATE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as CachedOfflineStaffState;
+    if (!cached.userId || !cached.branchId || !cached.state?.user) return null;
+    if (expectedUserId && cached.userId !== expectedUserId) return null;
+    if (Date.now() - Number(cached.savedAt || 0) > OFFLINE_STAFF_STATE_TTL_MS) return null;
+    const context = cached.state.branches.find(branch => branch.branch_id === cached.branchId);
+    if (!context || !context.pos_enabled) return null;
+    saveStaffAccessContext(context, cached.userId);
+    return cached.state;
+  } catch {
+    return null;
+  }
+}
+
 function findBranch(contexts: StaffBranchContext[], branchId: string | null | undefined) {
   if (!branchId) return undefined;
   return contexts.find(item => item.branch_id === branchId);
@@ -247,7 +284,9 @@ export async function authenticateStaffUser(
     const identity = await fetchMyIdentity();
     if (identity.user_id !== signInResult.data.user.id) throw new Error(GENERIC_LOGIN_ERROR);
     const contexts = await fetchMyStaffBranches();
-    return await buildLoginState(identity, contexts, "fresh-login");
+    const state = await buildLoginState(identity, contexts, "fresh-login");
+    saveOfflineStaffState(state);
+    return state;
   } catch (error) {
     await supabase.auth.signOut();
     clearStaffAccessContext();
@@ -288,23 +327,31 @@ export async function selectStaffBranch(branchId: string): Promise<StaffLoginSta
   if (identity.user_id !== sessionData.session.user.id) throw new Error("INVALID_STAFF_SESSION");
   const contexts = await fetchMyStaffBranches();
   const user = await activateBranchForIdentity(identity, contexts, branchId);
-  return {
+  const state: StaffLoginState = {
     user,
     branches: contexts,
     requiresBranchSelection: false,
     isSuperAdmin: identity.is_super_admin,
   };
+  saveOfflineStaffState(state);
+  return state;
 }
 
 export async function restoreStaffSession(): Promise<StaffLoginState | null> {
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError || !sessionData.session?.user) return null;
+  const sessionUserId = sessionData.session?.user?.id || null;
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return readOfflineStaffState(sessionUserId);
+  }
+  if (sessionError || !sessionUserId) return null;
 
   try {
     const identity = await fetchMyIdentity();
-    if (identity.user_id !== sessionData.session.user.id) throw new Error("INVALID_STAFF_SESSION");
+    if (identity.user_id !== sessionUserId) throw new Error("INVALID_STAFF_SESSION");
     const contexts = await fetchMyStaffBranches();
-    return await buildLoginState(identity, contexts, "restore");
+    const state = await buildLoginState(identity, contexts, "restore");
+    saveOfflineStaffState(state);
+    return state;
   } catch {
     await supabase.auth.signOut();
     clearStaffAccessContext();
@@ -328,4 +375,5 @@ export async function signOutStaff(): Promise<void> {
   await supabase.auth.signOut();
   clearStaffAccessContext();
   localStorage.removeItem("user");
+  localStorage.removeItem(OFFLINE_STAFF_STATE_KEY);
 }

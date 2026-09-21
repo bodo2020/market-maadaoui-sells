@@ -31,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import POSTabs from "@/components/POS/POSTabs";
 import BarcodeScanner from "@/components/POS/BarcodeScanner";
 import POSCheckoutModernDialog from "@/components/POS/POSCheckoutModernDialog";
+import POSOfflineStatus from "@/components/POS/POSOfflineStatus";
 import { fetchPOSProductByBarcode, fetchPOSProducts } from "@/services/supabase/posCatalogService";
 import { getLocalPosDevice } from "@/services/supabase/posDeviceService";
 import { getPosCashSummary, type PosCashSummary } from "@/services/supabase/posCashService";
@@ -220,11 +221,12 @@ export default function POSPro() {
 
   const loadWorkspace = useCallback(async (quiet = false) => {
     if (!currentBranchId) return;
-    quiet ? setRefreshing(true) : setLoading(true);
+    if (quiet) setRefreshing(true);
+    else setLoading(true);
     try {
       const [catalog, favoriteRows] = await Promise.all([
         fetchPOSProducts(),
-        user?.id ? getFavoriteProducts(user.id) : Promise.resolve([]),
+        user?.id && (typeof navigator === "undefined" || navigator.onLine) ? getFavoriteProducts(user.id) : Promise.resolve([]),
       ]);
       setProducts(catalog);
       setFavorites(favoriteRows);
@@ -502,6 +504,11 @@ export default function POSPro() {
     if (!cartItems.length || preflighting || !currentBranchId) return;
     setPreflighting(true);
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setMobileCartOpen(false);
+        setCheckoutOpen(true);
+        return;
+      }
       const checked = await preflightPosCart(currentBranchId, cartItems);
       setCartItems(checked.items);
       syncProductsFromPreflight(checked.items);
@@ -802,7 +809,7 @@ export default function POSPro() {
         <div className="sticky top-0 z-30 -mx-3 border-b bg-white/95 px-3 py-3 backdrop-blur md:-mx-6 md:px-6">
           <div className="flex flex-wrap items-center gap-2">
             <div className="ml-auto min-w-0">
-              <div className="flex items-center gap-2"><h1 className="text-xl font-black">نقطة البيع</h1><Badge className="bg-emerald-50 text-[#005931] hover:bg-emerald-50">الوردية مفتوحة</Badge></div>
+              <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-black">نقطة البيع</h1><Badge className="bg-emerald-50 text-[#005931] hover:bg-emerald-50">الوردية مفتوحة</Badge><POSOfflineStatus branchId={currentBranchId} /></div>
               <p className="truncate text-xs text-muted-foreground">{user?.name || "الكاشير"} · {currentBranchName || "الفرع الحالي"} · {device?.device_name || "جهاز POS"}</p>
             </div>
             <div className="flex items-center gap-2 rounded-2xl border bg-slate-50 px-3 py-2"><WalletCards className="h-4 w-4 text-[#005931]" /><div><div className="text-[10px] text-muted-foreground">رصيد الدرج الآن</div><div className="text-sm font-bold">{cashSummary ? money(cashSummary.drawer_balance) : "—"}</div></div></div>

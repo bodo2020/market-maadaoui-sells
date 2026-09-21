@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { readPOSPaymentMethodsSnapshot, savePOSPaymentMethodsSnapshot } from "@/services/offline/posOfflineStore";
 
 export type POSPaymentMethodType = "cash" | "card" | "digital_wallet" | "bank_transfer" | "other";
 export type POSPaymentFeeType = "none" | "percent" | "fixed";
@@ -65,9 +66,22 @@ function normalize(row: POSPaymentMethod): POSPaymentMethod {
 }
 
 export async function fetchPOSPaymentMethods(branchId: string): Promise<POSPaymentMethod[]> {
-  const { data, error } = await rpc("get_pos_payment_methods", { p_branch_id: branchId });
-  if (error) throw paymentMethodError(error.message);
-  return ((data || []) as POSPaymentMethod[]).map(normalize);
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    const snapshot = await readPOSPaymentMethodsSnapshot(branchId);
+    if (!snapshot?.methods.length) throw new Error("وصّل الإنترنت مرة واحدة لتحميل وسيلة الدفع النقدي على الجهاز.");
+    return snapshot.methods.map(normalize);
+  }
+  try {
+    const { data, error } = await rpc("get_pos_payment_methods", { p_branch_id: branchId });
+    if (error) throw paymentMethodError(error.message);
+    const methods = ((data || []) as POSPaymentMethod[]).map(normalize);
+    await savePOSPaymentMethodsSnapshot(branchId, methods);
+    return methods;
+  } catch (error) {
+    const snapshot = await readPOSPaymentMethodsSnapshot(branchId);
+    if (snapshot?.methods.length) return snapshot.methods.map(normalize);
+    throw error;
+  }
 }
 
 export async function savePOSPaymentMethod(branchId: string, method: POSPaymentMethodDraft): Promise<POSPaymentMethod> {
