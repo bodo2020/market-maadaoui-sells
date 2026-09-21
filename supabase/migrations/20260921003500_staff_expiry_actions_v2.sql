@@ -95,7 +95,8 @@ begin
   end if;
 
   if not (
-    public.staff_has_permission('inventory.manage',p_branch_id)
+    private.staff_is_super_admin(v_uid)
+    or public.staff_has_permission('inventory.manage',p_branch_id)
     or public.staff_has_permission('products.manage',p_branch_id)
     or public.staff_has_permission('purchases.manage',p_branch_id)
   ) then
@@ -251,6 +252,7 @@ declare
   v_purchase_price numeric:=0;
   v_value numeric:=0;
   v_inventory_after numeric;
+  v_inventory_quantity numeric:=0;
   v_expense_id uuid;
   v_supplier_return_id uuid;
   v_recent_verified boolean:=false;
@@ -282,12 +284,16 @@ begin
   end if;
 
   if v_action='dispose' then
-    if not public.staff_has_permission('inventory.manage',p_branch_id) then
+    if not (
+      private.staff_is_super_admin(v_uid)
+      or public.staff_has_permission('inventory.manage',p_branch_id)
+    ) then
       raise exception using errcode='42501',message='EXPIRY_DISPOSE_DENIED';
     end if;
   else
     if not (
-      public.staff_has_permission('inventory.manage',p_branch_id)
+      private.staff_is_super_admin(v_uid)
+      or public.staff_has_permission('inventory.manage',p_branch_id)
       or public.staff_has_permission('purchases.manage',p_branch_id)
     ) then
       raise exception using errcode='42501',message='EXPIRY_SUPPLIER_RETURN_DENIED';
@@ -356,19 +362,6 @@ begin
     raise exception using errcode='22023',message='EXPIRY_DUPLICATE_BATCH_REQUIRES_RECONCILIATION';
   end if;
 
-  select exists(
-    select 1
-    from private.inventory_audit_counts_v2 c
-    where c.branch_id=p_branch_id
-      and c.product_id=v_batch.product_id
-      and c.status='matched'
-      and c.submitted_at>=now()-interval '4 hours'
-  ) into v_recent_verified;
-
-  if not v_recent_verified then
-    raise exception using errcode='22023',message='EXPIRY_RECENT_AUDIT_REQUIRED';
-  end if;
-
   select coalesce(b.inventory_source_branch_id,b.id)
     into v_inventory_branch
   from public.branches b
@@ -376,6 +369,31 @@ begin
 
   if v_inventory_branch is null then
     raise exception using errcode='22023',message='BRANCH_NOT_FOUND';
+  end if;
+
+  select coalesce(i.quantity,0)
+    into v_inventory_quantity
+  from public.inventory i
+  where i.branch_id=v_inventory_branch
+    and i.product_id=v_batch.product_id
+  for update;
+
+  if not found then
+    v_inventory_quantity:=0;
+  end if;
+
+  select exists(
+    select 1
+    from private.inventory_audit_counts_v2 c
+    where c.branch_id=p_branch_id
+      and c.product_id=v_batch.product_id
+      and c.status='matched'
+      and c.submitted_at>=now()-interval '4 hours'
+      and abs(coalesce(c.actual_count,0)-v_inventory_quantity)<=0.001
+  ) into v_recent_verified;
+
+  if not v_recent_verified then
+    raise exception using errcode='22023',message='EXPIRY_RECENT_AUDIT_REQUIRED';
   end if;
 
   select * into v_product
@@ -520,7 +538,8 @@ begin
     raise exception using errcode='42501',message='SUPPLIER_RETURN_BRANCH_ACCESS_DENIED';
   end if;
   if not (
-    public.staff_has_permission('purchases.manage',p_branch_id)
+    private.staff_is_super_admin(v_uid)
+    or public.staff_has_permission('purchases.manage',p_branch_id)
     or public.staff_has_permission('inventory.manage',p_branch_id)
     or public.staff_has_permission('finance.manage',p_branch_id)
   ) then
