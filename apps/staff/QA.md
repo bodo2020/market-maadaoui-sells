@@ -391,3 +391,10 @@ UI:
 - rows can be added/removed.
 - legacy batch number is blanked for supervisor to enter a real verified batch number.
 - reconciliation tab is not available to normal count-only employees.
+
+
+Batch reconciliation provenance checks:
+- supplier dropdown only exposes supplier id/name/code.
+- original batch note is retained when an existing row is reused.
+- legacy note is retained and reconciliation context is appended.
+- new reconciled batch purchase_date remains null unless a real purchase linkage exists; current date is never fabricated.
