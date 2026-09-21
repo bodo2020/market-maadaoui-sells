@@ -320,6 +320,8 @@ export type ExpiryBatchItem = {
   duplicate_count: number;
   cost_missing: boolean;
   inventory_quantity: number;
+  active_batch_quantity: number;
+  batch_inventory_aligned: boolean;
   verified_count_id: string | null;
   last_verified_at: string | null;
   audit_verified: boolean;
