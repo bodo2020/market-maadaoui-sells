@@ -190,7 +190,7 @@ begin
     'duplicate_rows',duplicate_rows,
     'verified_count_id',verified_count_id,
     'last_verified_at',last_verified_at,
-    'ready_for_reconciliation',verified_count_id is not null and inventory_quantity>0,
+    'ready_for_reconciliation',verified_count_id is not null,
     'batches',batches
   ) order by abs(batch_quantity-inventory_quantity) desc,product_name),'[]'::jsonb)
   into v_items
@@ -261,7 +261,7 @@ begin
   if length(v_note)<5 or length(v_note)>500 then
     raise exception using errcode='22023',message='BATCH_RECON_NOTE_REQUIRED';
   end if;
-  if p_lines is null or jsonb_typeof(p_lines)<>'array' or jsonb_array_length(p_lines)<1 or jsonb_array_length(p_lines)>50 then
+  if p_lines is null or jsonb_typeof(p_lines)<>'array' or jsonb_array_length(p_lines)>50 then
     raise exception using errcode='22023',message='BATCH_RECON_LINES_INVALID';
   end if;
 
@@ -307,8 +307,12 @@ begin
   for update;
 
   if not found then v_inventory_quantity:=0; end if;
-  if v_inventory_quantity<=0 then
-    raise exception using errcode='22023',message='BATCH_RECON_POSITIVE_INVENTORY_REQUIRED';
+  if v_inventory_quantity<0 then
+    raise exception using errcode='22023',message='BATCH_RECON_INVENTORY_INVALID';
+  end if;
+
+  if v_inventory_quantity>0 and jsonb_array_length(p_lines)<1 then
+    raise exception using errcode='22023',message='BATCH_RECON_LINES_REQUIRED';
   end if;
 
   select c.id
