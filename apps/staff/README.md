@@ -78,6 +78,7 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 - الدفعات الجديدة الناتجة عن Reconciliation لا تُسجل لها purchase_date وهمية؛ يبقى التاريخ Null ما لم يوجد مصدر شراء حقيقي.
 - ملاحظات الدفعة الأصلية تُحفظ داخل التسوية مع أثر التحقق.
 - مجموع الدفعات الجديدة يجب أن يساوي Inventory الحالي بالضبط.
+- Shared Inventory: أي write للصلاحية أو تسوية الدفعات يتم من فرع `inventory_source_branch_id` الفعلي فقط؛ الفرع الفرعي يعرض تنبيهًا ولا يسمح بالتصرف.
 - التسوية لا تغيّر Inventory ولا تنشئ Inventory Movement أو Expense أو Supplier Credit.
 - يحتفظ النظام بـ before/after snapshots وactor وverified count وrequest id.
 - Migration موجودة في `supabase/migrations/20260921083000_staff_batch_reconciliation_v1.sql`.
