@@ -182,6 +182,14 @@ begin
       s.name supplier_name,
       b.notes,
       coalesce(i.quantity,0)::numeric inventory_quantity,
+      coalesce((
+        select sum(bq.quantity)
+        from public.product_batches bq
+        where bq.branch_id=p_branch_id
+          and bq.product_id=b.product_id
+          and bq.quantity>0
+          and upper(coalesce(bq.batch_number,'')) not like 'DAMAGED-%'
+      ),0)::numeric active_batch_quantity,
       (
         select c.id
         from private.inventory_audit_counts_v2 c
@@ -243,11 +251,13 @@ begin
     'duplicate_count',duplicate_count,
     'cost_missing',purchase_price<=0,
     'inventory_quantity',round(inventory_quantity,3),
+    'active_batch_quantity',round(active_batch_quantity,3),
+    'batch_inventory_aligned',abs(active_batch_quantity-inventory_quantity)<=0.001,
     'verified_count_id',verified_count_id,
     'last_verified_at',last_verified_at,
     'audit_verified',verified_count_id is not null,
     'safe_for_action',purchase_price>0 and not legacy_remaining_batch and duplicate_count=1,
-    'action_ready',purchase_price>0 and not legacy_remaining_batch and duplicate_count=1 and verified_count_id is not null,
+    'action_ready',purchase_price>0 and not legacy_remaining_batch and duplicate_count=1 and verified_count_id is not null and abs(active_batch_quantity-inventory_quantity)<=0.001,
     'notes',notes
   ) order by expiry_date,batch_number),'[]'::jsonb)
   into v_items
@@ -289,6 +299,7 @@ declare
   v_value numeric:=0;
   v_inventory_after numeric;
   v_inventory_quantity numeric:=0;
+  v_active_batch_quantity numeric:=0;
   v_expense_id uuid;
   v_supplier_return_id uuid;
   v_recent_verified boolean:=false;
@@ -416,6 +427,18 @@ begin
 
   if not found then
     v_inventory_quantity:=0;
+  end if;
+
+  select coalesce(sum(bx.quantity),0)
+  into v_active_batch_quantity
+  from public.product_batches bx
+  where bx.branch_id=p_branch_id
+    and bx.product_id=v_batch.product_id
+    and bx.quantity>0
+    and upper(coalesce(bx.batch_number,'')) not like 'DAMAGED-%';
+
+  if abs(v_active_batch_quantity-v_inventory_quantity)>0.001 then
+    raise exception using errcode='22023',message='EXPIRY_BATCH_INVENTORY_MISMATCH_REQUIRES_RECONCILIATION';
   end if;
 
   select exists(
