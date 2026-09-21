@@ -317,6 +317,9 @@ export type ExpiryBatchItem = {
   supplier_name: string | null;
   can_supplier_return: boolean;
   legacy_remaining_batch: boolean;
+  duplicate_count: number;
+  cost_missing: boolean;
+  safe_for_action: boolean;
   notes: string | null;
 };
 
@@ -333,6 +336,9 @@ export type ExpiryWorkspace = {
     purchase_value_at_risk: number;
     supplier_return_ready: number;
     legacy_remaining_rows: number;
+    zero_cost_rows: number;
+    duplicate_rows: number;
+    safe_action_rows: number;
   };
 };
 
@@ -1677,6 +1683,9 @@ function expiryActionError(message?: string) {
   if(value.includes("EXPIRY_SUPPLIER_REQUIRED"))return new Error("الدفعة غير مرتبطة بمورد أو فاتورة شراء؛ لا يمكن إنشاء إرجاع للمورد قبل ربطها.");
   if(value.includes("EXPIRY_BATCH_QUANTITY_EXCEEDED"))return new Error("الكمية المطلوبة أكبر من الكمية المسجلة في الدفعة.");
   if(value.includes("EXPIRY_LEGACY_DAMAGED_BATCH"))return new Error("هذه دفعة تالف قديمة ولا يسمح النظام بمعالجتها مرة ثانية.");
+  if(value.includes("EXPIRY_LEGACY_REMAINING_REQUIRES_RECONCILIATION"))return new Error("هذه دفعة متبقية من النظام القديم. لازم تسوية بيانات الدفعة قبل الإهلاك أو الإرجاع.");
+  if(value.includes("EXPIRY_DUPLICATE_BATCH_REQUIRES_RECONCILIATION"))return new Error("يوجد أكثر من سجل لنفس الدفعة. لازم دمج/تسوية البيانات قبل تنفيذ إجراء صلاحية.");
+  if(value.includes("EXPIRY_COST_REQUIRED"))return new Error("تكلفة شراء الدفعة غير موثوقة أو تساوي صفر. اربط تكلفة صحيحة قبل الإهلاك أو الإرجاع.");
   if(value.includes("EXPIRY_RECENT_AUDIT_REQUIRED"))return new Error("لازم تعمل جرد تحقق مطابق للمنتج خلال آخر 4 ساعات قبل الإهلاك أو الإرجاع للمورد.");
   if(value.includes("INSUFFICIENT_STOCK"))return new Error("لا توجد كمية متاحة كافية بعد خصم حجوزات الطلبات الإلكترونية.");
   if(value.includes("EXPIRY_NOTE_REQUIRED"))return new Error("اكتب سببًا واضحًا للإجراء.");
