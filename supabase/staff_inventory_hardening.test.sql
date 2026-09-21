@@ -5,6 +5,66 @@
 -- Self-contained transaction: fixtures and action rows are always rolled back.
 begin;
 
+-- 0) Security surface: private audit tables are direct-access denied and RPC grants are explicit.
+do $
+declare
+  fn text;
+begin
+  if not (
+    select relrowsecurity
+    from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='private' and c.relname='expiry_inventory_actions_v2'
+  ) then raise exception 'Expiry private audit table RLS is not enabled'; end if;
+
+  if not (
+    select relrowsecurity
+    from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='private' and c.relname='inventory_batch_reconciliations_v1'
+  ) then raise exception 'Reconciliation private audit table RLS is not enabled'; end if;
+
+  if not (
+    select relrowsecurity
+    from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relname='supplier_returns_v2'
+  ) then raise exception 'Supplier return table RLS is not enabled'; end if;
+
+  if not (
+    select relrowsecurity
+    from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relname='supplier_return_items_v2'
+  ) then raise exception 'Supplier return item table RLS is not enabled'; end if;
+
+  if has_table_privilege('authenticated','private.expiry_inventory_actions_v2','SELECT')
+     or has_table_privilege('authenticated','private.inventory_batch_reconciliations_v1','SELECT')
+     or has_table_privilege('authenticated','public.supplier_returns_v2','SELECT')
+     or has_table_privilege('authenticated','public.supplier_return_items_v2','SELECT') then
+    raise exception 'Authenticated role has direct read access to protected Staff inventory tables';
+  end if;
+
+  if has_table_privilege('anon','public.supplier_returns_v2','SELECT')
+     or has_table_privilege('anon','public.supplier_return_items_v2','SELECT') then
+    raise exception 'Anon role has direct read access to supplier return tables';
+  end if;
+
+  foreach fn in array array[
+    'public.get_expiry_workspace_v2(uuid,integer,integer)',
+    'public.process_expiry_batch_action_v2(uuid,uuid,uuid,numeric,text,text)',
+    'public.get_supplier_returns_workspace_v2(uuid,text,integer)',
+    'public.settle_supplier_return_v2(uuid,numeric,text,text)',
+    'public.get_inventory_batch_reconciliation_workspace_v1(uuid,integer)',
+    'public.get_inventory_batch_reconciliation_suppliers_v1(uuid)',
+    'public.reconcile_product_batches_v1(uuid,uuid,uuid,jsonb,text)'
+  ]
+  loop
+    if has_function_privilege('anon',fn,'EXECUTE') then
+      raise exception 'Anon EXECUTE leaked on %',fn;
+    end if;
+    if not has_function_privilege('authenticated',fn,'EXECUTE') then
+      raise exception 'Authenticated EXECUTE missing on %',fn;
+    end if;
+  end loop;
+end $;
+
 create temporary table staff_inventory_fixture as
 select
   gen_random_uuid() admin_id,
@@ -560,6 +620,6 @@ end $$;
 reset role;
 set constraints all immediate;
 
-select 'PASS: staff inventory authorization, batch reconciliation, idempotency, rollback, zero-stock cleanup, expiry freshness, batch-ledger alignment, and atomic disposal' as result;
+select 'PASS: Staff inventory RLS/grants, authorization, reconciliation, idempotency, rollback, zero-stock cleanup, expiry freshness, batch-ledger alignment, and atomic disposal' as result;
 
 rollback;
