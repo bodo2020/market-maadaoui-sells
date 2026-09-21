@@ -27,7 +27,13 @@ function requireOnlineWrite() {
 }
 
 function cacheKey(name: string, scope: string) {
-  return `${STAFF_CACHE_PREFIX}:${name}:${scope}`;
+  return `${name}:${scope}`;
+}
+
+async function scopedCacheKey(key: string) {
+  const { data } = await supabase.auth.getSession();
+  const userId = data.session?.user.id || "signed-out";
+  return `${STAFF_CACHE_PREFIX}:${userId}:${key}`;
 }
 
 function saveCache<T>(key: string, value: T) {
@@ -49,14 +55,28 @@ function readCache<T>(key: string): T | null {
   }
 }
 
+export function clearStaffOfflineCache() {
+  try {
+    const keys: string[] = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(`${STAFF_CACHE_PREFIX}:`)) keys.push(key);
+    }
+    keys.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // Best-effort privacy cleanup only.
+  }
+}
+
 async function cachedRead<T>(key: string, loader: () => Promise<T>): Promise<T> {
+  const scopedKey = await scopedCacheKey(key);
   try {
     const value = await loader();
-    saveCache(key, value);
+    saveCache(scopedKey, value);
     return value;
   } catch (error) {
     if (!onlineNow()) {
-      const cached = readCache<T>(key);
+      const cached = readCache<T>(scopedKey);
       if (cached !== null) return cached;
       throw new Error("أنت بدون اتصال ومفيش نسخة محفوظة من البيانات دي على الجهاز.");
     }
