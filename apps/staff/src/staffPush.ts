@@ -174,6 +174,11 @@ export async function disableStaffPush() {
   if (!isStaffPushSupported()) return;
   const token = getStoredStaffPushToken();
   if (token) await staff.unregisterPushDevice(token);
+  try {
+    await PushNotifications.removeAllDeliveredNotifications();
+  } catch {
+    // Notification shade cleanup is best-effort.
+  }
   await PushNotifications.unregister();
   localStorage.removeItem(PUSH_TOKEN_KEY);
   localStorage.removeItem(PUSH_LAST_ERROR_KEY);
