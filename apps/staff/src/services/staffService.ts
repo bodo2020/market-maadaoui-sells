@@ -332,6 +332,8 @@ export type ExpiryBatchItem = {
 
 export type ExpiryWorkspace = {
   branch_id: string;
+  inventory_branch_id: string;
+  requires_source_branch: boolean;
   days_ahead: number;
   items: ExpiryBatchItem[];
   summary: {
@@ -386,6 +388,7 @@ export type BatchReconciliationItem = {
 export type BatchReconciliationWorkspace = {
   branch_id: string;
   inventory_branch_id: string;
+  requires_source_branch: boolean;
   items: BatchReconciliationItem[];
 };
 
