@@ -129,6 +129,24 @@ begin
       s.name supplier_name,
       b.purchase_item_id,
       b.notes,
+      coalesce(i.quantity,0)::numeric inventory_quantity,
+      coalesce((
+        select sum(bq.quantity)
+        from public.product_batches bq
+        where bq.branch_id=p_branch_id
+          and bq.product_id=b.product_id
+          and bq.quantity>0
+          and upper(coalesce(bq.batch_number,'')) not like 'DAMAGED-%'
+      ),0)::numeric active_batch_quantity,
+      exists(
+        select 1
+        from private.inventory_audit_counts_v2 c
+        where c.branch_id=p_branch_id
+          and c.product_id=b.product_id
+          and c.status='matched'
+          and c.submitted_at>=now()-interval '4 hours'
+          and abs(coalesce(c.actual_count,0)-coalesce(i.quantity,0))<=0.001
+      ) audit_verified,
       (upper(coalesce(b.batch_number,'')) like 'REMAINING-%') legacy_remaining_batch,
       (
         select count(*)::integer
@@ -145,6 +163,7 @@ begin
     left join public.purchase_items pi on pi.id=b.purchase_item_id
     left join public.purchases pu on pu.id=pi.purchase_id
     left join public.suppliers s on s.id=coalesce(b.supplier_id,pu.supplier_id)
+    left join public.inventory i on i.branch_id=v_inventory_branch and i.product_id=b.product_id
     where b.branch_id=p_branch_id
       and b.quantity>0
       and b.expiry_date<=current_date+v_days
@@ -161,7 +180,16 @@ begin
     'legacy_remaining_rows',count(*) filter(where legacy_remaining_batch),
     'zero_cost_rows',count(*) filter(where purchase_price<=0),
     'duplicate_rows',count(*) filter(where duplicate_count>1),
-    'safe_action_rows',count(*) filter(where purchase_price>0 and not legacy_remaining_batch and duplicate_count=1)
+    'batch_mismatch_rows',count(*) filter(where abs(active_batch_quantity-inventory_quantity)>0.001),
+    'audit_pending_rows',count(*) filter(where not audit_verified),
+    'data_quality_safe_rows',count(*) filter(where purchase_price>0 and not legacy_remaining_batch and duplicate_count=1),
+    'action_ready_rows',count(*) filter(
+      where purchase_price>0
+        and not legacy_remaining_batch
+        and duplicate_count=1
+        and audit_verified
+        and abs(active_batch_quantity-inventory_quantity)<=0.001
+    )
   )
   into v_summary
   from base;
