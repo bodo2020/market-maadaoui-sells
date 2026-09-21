@@ -64,6 +64,17 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 - Super Admin فقط يرى بطاقة أمان الحساب لتعيين PIN جديد عبر الـRPC المدقق الموجود أصلًا؛ هذا لا يفتح تعديل بيانات HR.
 - الملف الوظيفي والأداء Live-only ولا يتم تخزين بيانات HR الحساسة في Offline cache.
 
+### Batch Reconciliation V1
+- تبويب «تسوية الدفعات» للمنتجات المحظورة بسبب بيانات قديمة/مكررة/بدون تكلفة.
+- يتطلب `inventory.manage` + `purchases.manage` معًا أو Super Admin.
+- جرد مطابق حديث خلال 4 ساعات شرط إجباري.
+- المشرف يعيد توزيع رصيد Inventory على دفعات موثوقة برقم/تاريخ/كمية/تكلفة.
+- مجموع الدفعات الجديدة يجب أن يساوي Inventory الحالي بالضبط.
+- التسوية لا تغيّر Inventory ولا تنشئ Inventory Movement أو Expense أو Supplier Credit.
+- يحتفظ النظام بـ before/after snapshots وactor وverified count وrequest id.
+- Migration موجودة في `supabase/migrations/20260921083000_staff_batch_reconciliation_v1.sql`.
+- Migration لم تطبق على Production.
+
 ### Approval & manager
 - Approval Inbox: مخزون، HR، حضور، بدائل، وتسويات مالية.
 - Manager Workspace: الفريق، الموافقات، المتأخر، الأونلاين، الجرد، الكاش وخدمة العملاء.
