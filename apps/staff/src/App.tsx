@@ -1463,6 +1463,78 @@ function InventoryPage({ branch }: { branch: StaffBranch }) {
     finally{setActing("");}
   };
 
+  const openBatchReconciliation=(item:staff.BatchReconciliationItem)=>{
+    setSelectedReconciliation(item);
+    setReconciliationRequestId(crypto.randomUUID());
+    setReconciliationNote("تسوية دفعات قديمة بعد جرد فعلي مطابق");
+    setReconciliationLines(item.batches.map((line)=>({
+      ...line,
+      batch_number:line.legacy_remaining?"":line.batch_number,
+      quantity:Number(line.quantity),
+      purchase_price:Number(line.purchase_price||0),
+      note:line.legacy_remaining?"إعادة تعريف دفعة قديمة بعد التحقق الفعلي":line.note||null,
+    })));
+  };
+
+  const closeBatchReconciliation=()=>{
+    setSelectedReconciliation(null);
+    setReconciliationRequestId("");
+    setReconciliationLines([]);
+    setReconciliationNote("");
+  };
+
+  const updateReconciliationLine=(index:number,patch:Partial<staff.BatchReconciliationLine>)=>{
+    setReconciliationLines((current)=>current.map((line,i)=>i===index?{...line,...patch}:line));
+  };
+
+  const addReconciliationLine=()=>{
+    setReconciliationLines((current)=>[...current,{
+      batch_id:null,batch_number:"",expiry_date:new Date().toISOString().slice(0,10),
+      quantity:0,purchase_price:0,supplier_id:null,shelf_location:null,note:"دفعة موثقة أثناء التسوية",
+    }]);
+  };
+
+  const removeReconciliationLine=(index:number)=>{
+    setReconciliationLines((current)=>current.filter((_,i)=>i!==index));
+  };
+
+  const createReconciliationCheck=async(item:staff.BatchReconciliationItem)=>{
+    if(acting)return;
+    setActing(item.product_id);setMessage(null);
+    try{
+      await staff.createSpotInventoryAudit(branch.branch_id,[item.product_id]);
+      setTab("tasks");
+      setMessage({type:"ok",text:`تم إنشاء جرد تحقق لـ ${item.product_name}. بعد ظهور نتيجة مطابقة ارجع لتسوية الدفعات.`});
+      await load(false);
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إنشاء جرد التحقق"});
+    }finally{setActing("");}
+  };
+
+  const submitBatchReconciliation=async()=>{
+    if(!selectedReconciliation||acting)return;
+    const total=reconciliationLines.reduce((sum,line)=>sum+Number(line.quantity||0),0);
+    if(reconciliationLines.length<1){setMessage({type:"error",text:"أضف دفعة واحدة على الأقل"});return;}
+    if(Math.abs(total-selectedReconciliation.inventory_quantity)>0.001){
+      setMessage({type:"error",text:`مجموع الدفعات ${total} لازم يساوي رصيد المخزون ${selectedReconciliation.inventory_quantity}`});return;
+    }
+    if(reconciliationLines.some((line)=>!line.batch_number.trim()||!line.expiry_date||Number(line.quantity)<=0||Number(line.purchase_price)<=0)){
+      setMessage({type:"error",text:"كل دفعة لازم يكون لها رقم حقيقي وتاريخ صلاحية وكمية وتكلفة شراء صحيحة"});return;
+    }
+    if(reconciliationNote.trim().length<5){setMessage({type:"error",text:"اكتب ملاحظة واضحة لسبب التسوية"});return;}
+    setActing(selectedReconciliation.product_id);setMessage(null);
+    try{
+      await staff.reconcileProductBatches(
+        reconciliationRequestId,branch.branch_id,selectedReconciliation.product_id,reconciliationLines,reconciliationNote,
+      );
+      closeBatchReconciliation();
+      setMessage({type:"ok",text:"تمت تسوية سجل الدفعات بدون تغيير رصيد Inventory أو إنشاء حركة مالية"});
+      await load(false);
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تنفيذ تسوية الدفعات"});
+    }finally{setActing("");}
+  };
+
   const expiryDaysLeft=(value:string)=>{
     const today=new Date();today.setHours(12,0,0,0);
     const target=new Date(`${value}T12:00:00`);
