@@ -651,6 +651,46 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
   },[branch.branch_id,orderId]);
 
   useEffect(()=>{void load();},[load]);
+
+  const loadPush=useCallback(async()=>{
+    if(!isStaffPushSupported()){
+      setPushPermission("unsupported");
+      setPushStatus(null);
+      return;
+    }
+    const [permission,status]=await Promise.all([
+      getStaffPushPermissionState(),
+      staff.getMyPushDeviceStatus().catch(()=>null),
+    ]);
+    setPushPermission(permission);
+    setPushStatus(status);
+  },[]);
+
+  useEffect(()=>{void loadPush();},[loadPush]);
+
+  const enablePush=async()=>{
+    setPushBusy(true);setMessage(null);
+    try{
+      const status=await enableStaffPush();
+      setPushStatus(status);
+      setPushPermission(await getStaffPushPermissionState());
+      setMessage({type:"ok",text:"تم تسجيل الجهاز لاستقبال إشعارات العمل"});
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تفعيل إشعارات العمل"});
+    }finally{setPushBusy(false);}
+  };
+
+  const disablePush=async()=>{
+    setPushBusy(true);setMessage(null);
+    try{
+      await disableStaffPush();
+      setPushStatus(await staff.getMyPushDeviceStatus().catch(()=>({registered:false,device_count:0,platforms:[],providers:[]})));
+      setPushPermission(await getStaffPushPermissionState());
+      setMessage({type:"ok",text:"تم إيقاف Push على هذا الجهاز"});
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إيقاف إشعارات الجهاز"});
+    }finally{setPushBusy(false);}
+  };
   useOrderOperationsRealtime(
     branch.branch_id,
     useCallback(()=>{void refreshSession(false);},[refreshSession]),
@@ -1855,6 +1895,9 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
   const [acting,setActing]=useState(false);
   const [view,setView]=useState<"home"|"advance"|"leave"|"attendance"|"requests">("home");
   const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
+  const [pushStatus,setPushStatus]=useState<staff.PushDeviceStatus|null>(null);
+  const [pushPermission,setPushPermission]=useState<string>("unsupported");
+  const [pushBusy,setPushBusy]=useState(false);
 
   const [advanceAmount,setAdvanceAmount]=useState("");
   const [advanceMonths,setAdvanceMonths]=useState("1");
@@ -1930,6 +1973,16 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
   if(busy&&!data)return <Loading/>;
   const profile=data?.profile;
   const recentRequests=data?.requests||[];
+  const pushRegistered=Boolean(pushStatus?.registered);
+  const pushStateLabel=pushPermission==="unsupported"
+    ?"متاح في تطبيق Android فقط"
+    :pushRegistered
+      ?"هذا الجهاز مسجل للإشعارات"
+      :pushPermission==="denied"
+        ?"الإذن مرفوض من إعدادات الهاتف"
+        :pushPermission==="granted"
+          ?"الإذن موجود والجهاز يحتاج إعادة تسجيل"
+          :"الإشعارات غير مفعلة بعد";
 
   return <>
     <PageTitle title="خدماتي" subtitle="هويتك وطلباتك وخدمات الموارد البشرية"/>
@@ -1971,6 +2024,13 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
         <div><span>نوع العقد</span><strong>{profile?.contract_type||"—"}</strong></div>
         <div><span>تاريخ التعيين</span><strong>{profile?.hire_date?new Date(profile.hire_date).toLocaleDateString("ar-EG"):"—"}</strong></div>
       </div>
+      <div className="staff-push-card">
+        <div className="staff-push-head"><BellRing/><div><strong>إشعارات العمل</strong><span>{pushStateLabel}</span></div><b className={pushRegistered?"ready":pushPermission==="denied"?"blocked":"pending"}>{pushRegistered?"مفعلة":pushPermission==="denied"?"مرفوضة":"غير مفعلة"}</b></div>
+        {pushPermission!=="unsupported"&&<div className="staff-push-meta"><span>الأجهزة المسجلة <b>{pushStatus?.device_count||0}</b></span><span>المزود <b>{pushStatus?.providers?.join(", ")||"—"}</b></span></div>}
+        {pushPermission==="unsupported"?<p>تسجيل Push Native يتم من نسخة Android فقط.</p>:pushRegistered
+          ?<button className="secondary full-action" disabled={pushBusy} onClick={()=>void disablePush()}>{pushBusy?<Loader2 className="spin"/>:<Bell/>}إيقاف Push على هذا الجهاز</button>
+          :<button className="primary full-action" disabled={pushBusy} onClick={()=>void enablePush()}>{pushBusy?<Loader2 className="spin"/>:<BellRing/>}تفعيل إشعارات العمل</button>}
+      </div>
       {(data?.advances?.length??0)>0&&<><h3>السلف الحالية</h3><div className="request-list">{(data?.advances??[]).slice(0,3).map((item)=><div className="request-row" key={item.id}><div><strong>{Number(item.principal_amount).toLocaleString("ar-EG")} ج.م</strong><small>متبقي {Number(item.outstanding_amount).toLocaleString("ar-EG")} ج.م · {item.repayment_months} شهر</small></div><span>{requestStatusLabel(item.status)}</span></div>)}</div></>}
     </section>}
 
@@ -2004,7 +2064,7 @@ function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: St
       <div className="request-list">{recentRequests.map((item)=><article className="request-row request-history" key={item.id}><div><div className="row"><strong>{requestTypeLabel(item.request_type)}</strong><span className={`request-status ${item.status}`}>{requestStatusLabel(item.status)}</span></div><p>{item.reason}</p><small>{new Date(item.requested_at).toLocaleString("ar-EG")}</small>{item.decision_note&&<em>{item.decision_note}</em>}</div>{item.status==="pending"&&<button className="cancel-request" disabled={acting} onClick={()=>void cancelRequest(item)}><XCircle/>إلغاء</button>}</article>)}{!recentRequests.length&&<Empty text="لسه مفيش طلبات"/>}</div>
     </section>}
 
-    <button className="logout self-service-logout" onClick={async()=>{await supabase.auth.signOut();navigate("/login",{replace:true});}}><LogOut/>تسجيل الخروج</button>
+    <button className="logout self-service-logout" onClick={async()=>{try{await disableStaffPush();}catch{/* logout must not be blocked by push cleanup */}await supabase.auth.signOut();navigate("/login",{replace:true});}}><LogOut/>تسجيل الخروج</button>
   </>;
 }
 
