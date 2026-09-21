@@ -145,7 +145,14 @@ jobs:
           fi
           echo "signing_mode=${{ steps.signing.outputs.mode }}" > ../../staff-build-info.txt
           echo "push_client_configured=${{ steps.fcm.outputs.configured }}" >> ../../staff-build-info.txt
-          keytool -printcert -jarfile ../../elmadawy-staff.apk | sed -n '1,24p' >> ../../staff-build-info.txt || true
+          echo "app_version=$(node -p "require('./package.json').version")" >> ../../staff-build-info.txt
+          echo "apk_sha256=$(sha256sum ../../elmadawy-staff.apk | awk '{print $1}')" >> ../../staff-build-info.txt
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+          if [ -n "$APKSIGNER" ]; then
+            "$APKSIGNER" verify --verbose --print-certs ../../elmadawy-staff.apk >> ../../staff-build-info.txt
+          else
+            echo "apksigner=unavailable" >> ../../staff-build-info.txt
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
