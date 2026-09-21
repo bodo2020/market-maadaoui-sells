@@ -398,3 +398,12 @@ Batch reconciliation provenance checks:
 - original batch note is retained when an existing row is reused.
 - legacy note is retained and reconciliation context is appended.
 - new reconciled batch purchase_date remains null unless a real purchase linkage exists; current date is never fabricated.
+
+
+Employment File manager scope:
+- Manager Workspace → employee employment file opens `/manager/employees/:employeeId`.
+- HR profile RPC remains authoritative for access; unauthorized target must return permission_denied/employee_out_of_scope.
+- manager/HR view shows employment data, account/branches and performance only.
+- employee wallet/card/self-service financial balances are hidden when viewing another employee.
+- Super Admin may use audited PIN reset on the target employee.
+- back navigation returns to Manager Workspace for team profiles and to Employee Services for self profile.
