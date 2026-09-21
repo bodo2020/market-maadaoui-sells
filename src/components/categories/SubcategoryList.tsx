@@ -10,7 +10,7 @@ import AssignProductsToSubcategoryDialog from "./AssignProductsToSubcategoryDial
 import SubcategoryOrderManager from "./SubcategoryOrderManager";
 import { fetchSubcategories, deleteSubcategory } from "@/services/supabase/categoryService";
 import { 
-  fetchProductsBySubcategory, 
+  fetchProductCategoryCounts,
   getProductsWithoutSubcategoryCount 
 } from "@/services/supabase/productService";
 import { Subcategory } from "@/types";
@@ -42,10 +42,11 @@ export default function SubcategoryList() {
   const loadSubcategories = async () => {
     try {
       setLoading(true);
-      const data = await fetchSubcategories(categoryId);
-      
-      // Load products without subcategory count
-      const withoutSubcategoryCount = await getProductsWithoutSubcategoryCount();
+      const [data, withoutSubcategoryCount, { subcategoryCounts }] = await Promise.all([
+        fetchSubcategories(categoryId),
+        getProductsWithoutSubcategoryCount(categoryId),
+        fetchProductCategoryCounts(),
+      ]);
       setProductsWithoutSubcategoryCount(withoutSubcategoryCount);
       
       if (!data || data.length === 0) {
@@ -53,23 +54,10 @@ export default function SubcategoryList() {
         return;
       }
       
-      const subcategoriesWithCount = await Promise.all(
-        data.map(async (subcategory) => {
-          try {
-            const products = await fetchProductsBySubcategory(subcategory.id);
-            return {
-              ...subcategory,
-              product_count: products ? products.length : 0
-            };
-          } catch (error) {
-            console.error(`Error fetching products for subcategory ${subcategory.id}:`, error);
-            return {
-              ...subcategory,
-              product_count: 0
-            };
-          }
-        })
-      );
+      const subcategoriesWithCount = data.map((subcategory) => ({
+        ...subcategory,
+        product_count: subcategoryCounts[subcategory.id] || 0,
+      }));
       
       setSubcategories(subcategoriesWithCount);
     } catch (error) {

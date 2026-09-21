@@ -648,15 +648,21 @@ export async function fetchProductsBySubcategory(subcategoryId: string) {
   }
 }
 
-export async function fetchProductsWithoutSubcategory() {
+export async function fetchProductsWithoutSubcategory(mainCategoryId?: string) {
   console.log("Fetching products without subcategory");
   
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("products")
       .select("*")
       .is("subcategory_id", null)
       .order("name");
+
+    if (mainCategoryId) {
+      query = query.eq("main_category_id", mainCategoryId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching products without subcategory:", error);
@@ -671,12 +677,18 @@ export async function fetchProductsWithoutSubcategory() {
   }
 }
 
-export async function getProductsWithoutSubcategoryCount() {
+export async function getProductsWithoutSubcategoryCount(mainCategoryId?: string) {
   try {
-    const { count, error } = await supabase
+    let query = supabase
       .from("products")
       .select("id", { count: "exact" })
       .is("subcategory_id", null);
+
+    if (mainCategoryId) {
+      query = query.eq("main_category_id", mainCategoryId);
+    }
+
+    const { count, error } = await query;
 
     if (error) {
       console.error("Error counting products without subcategory:", error);
@@ -688,6 +700,108 @@ export async function getProductsWithoutSubcategoryCount() {
     console.error("Error in getProductsWithoutSubcategoryCount:", error);
     return 0;
   }
+}
+
+export type CategoryAssignmentProduct = Pick<
+  Product,
+  "id" | "name" | "barcode" | "image_urls" | "main_category_id" | "subcategory_id"
+>;
+
+/**
+ * Loads every product with an incomplete category assignment. Supabase projects
+ * commonly cap a single Data API response at 1,000 rows, so this query is
+ * deliberately paginated instead of silently hiding older products.
+ */
+export async function fetchProductsNeedingCategoryAssignment() {
+  const pageSize = 500;
+  const products: CategoryAssignmentProduct[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("products")
+      .select("id,name,barcode,image_urls,main_category_id,subcategory_id")
+      .or("main_category_id.is.null,subcategory_id.is.null")
+      .order("name")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const page = (data || []) as CategoryAssignmentProduct[];
+    products.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  return products;
+}
+
+/** Fetch lightweight category columns once and build all card counters locally. */
+export async function fetchProductCategoryCounts() {
+  const pageSize = 1000;
+  const mainCategoryCounts: Record<string, number> = {};
+  const subcategoryCounts: Record<string, number> = {};
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("products")
+      .select("main_category_id,subcategory_id")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw error;
+
+    const page = data || [];
+    page.forEach((product) => {
+      if (product.main_category_id) {
+        mainCategoryCounts[product.main_category_id] =
+          (mainCategoryCounts[product.main_category_id] || 0) + 1;
+      }
+      if (product.subcategory_id) {
+        subcategoryCounts[product.subcategory_id] =
+          (subcategoryCounts[product.subcategory_id] || 0) + 1;
+      }
+    });
+
+    if (page.length < pageSize) break;
+  }
+
+  return { mainCategoryCounts, subcategoryCounts };
+}
+
+export async function assignProductsToCategoryHierarchy(
+  productIds: string[],
+  mainCategoryId: string,
+  subcategoryId: string | null
+) {
+  if (!productIds.length) throw new Error("اختر منتجًا واحدًا على الأقل");
+  if (!mainCategoryId) throw new Error("اختر القسم الرئيسي");
+
+  if (subcategoryId) {
+    const { data: subcategory, error: subcategoryError } = await supabase
+      .from("subcategories")
+      .select("id,category_id")
+      .eq("id", subcategoryId)
+      .eq("category_id", mainCategoryId)
+      .maybeSingle();
+
+    if (subcategoryError) throw subcategoryError;
+    if (!subcategory) throw new Error("القسم الفرعي لا يتبع القسم الرئيسي المحدد");
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .update({
+      main_category_id: mainCategoryId,
+      subcategory_id: subcategoryId,
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", productIds)
+    .select("id");
+
+  if (error) throw error;
+  if ((data?.length || 0) !== productIds.length) {
+    throw new Error("لم يتم تحديث كل المنتجات. راجع صلاحيات تعديل المنتجات ثم حاول مرة أخرى");
+  }
+
+  return data;
 }
 
 export async function assignProductsToSubcategory(subcategoryId: string, mainCategoryId: string, productIds: string[]) {
@@ -765,4 +879,3 @@ export async function updateProductBarcode(productId: string, barcode: string) {
     throw error;
   }
 }
-

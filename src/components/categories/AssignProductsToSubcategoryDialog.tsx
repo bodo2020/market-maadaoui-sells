@@ -46,7 +46,7 @@ const AssignProductsToSubcategoryDialog = ({
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const products = await fetchProductsWithoutSubcategory();
+      const products = await fetchProductsWithoutSubcategory(subcategory.category_id);
       setAllProducts(products);
     } catch (error) {
       console.error("Error loading products:", error);
