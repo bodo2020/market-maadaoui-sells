@@ -1,7 +1,7 @@
 # Elmadawy Staff V1 — QA Matrix
 
 Target branch: `work/staff-app-v1`
-App version: `0.14.0`
+App version: `0.15.0`
 
 ## قواعد الاختبار
 
@@ -271,3 +271,66 @@ Expected:
 - Finance/shift manager يرى تسليمات الوردية حسب الصلاحية.
 - فتح URL مباشر لوحدة غير مصرح بها لا يمنح أي بيانات أو إجراء من الباك إند.
 - العودة من الوحدات إلى «العمل» ثم Bottom Nav تظل مستقرة بدون duplicate active states.
+
+
+## 15. Employment File / HR 360
+
+Access:
+- من «خدماتي» يظهر زر «الملف الوظيفي».
+- route: `/account/employment-file`.
+- الموظف العادي يرى ملفه هو فقط.
+- لا توجد controls لتعديل القسم، الفريق، المسمى، المدير، الحالة أو التواريخ.
+- محاولة استخدام RPC لملف موظف آخر بدون HR permission تُرفض من الباك إند.
+
+البيانات الوظيفية:
+- employee code.
+- department.
+- team.
+- job title + grade.
+- direct manager.
+- work mode.
+- contract type.
+- employment status.
+- hire date.
+- termination date.
+- HR notes.
+
+الحساب والفروع:
+- username / system role.
+- phone / email.
+- account status / created date.
+- كل user branch roles.
+- primary employment branch.
+
+Wallet / card:
+- benefit balance.
+- monthly allowance.
+- credit limit / available credit.
+- receivable balance.
+- outstanding advances + active count.
+- approved leave days YTD.
+- membership number + employee barcode.
+- payroll deduction eligibility.
+
+Performance:
+- 7 / 30 / 90 days.
+- attendance rate only when schedule exists.
+- absence / work hours / punctuality.
+- tasks completion / SLA / overdue.
+- inventory count accuracy.
+- Cashier panel يظهر فقط لو applicable.
+- Inventory panel يظهر فقط لو applicable.
+- Delivery panel يظهر فقط لو applicable.
+- Online & Customer Service panel يظهر فقط لو applicable.
+- كل panel يعرض notes التفسيرية؛ المؤشرات ليست Productivity Score.
+
+Privacy:
+- Employment file لا يدخل Offline cache.
+- HR performance لا يدخل Offline cache.
+- Offline يعرض فشل اتصال واضح بدل بيانات HR قديمة محفوظة.
+- Logout cleanup لا يترك HR snapshot في localStorage.
+
+Mobile UX:
+- Tabs: البيانات الوظيفية / الحساب والفروع / الأداء والحضور.
+- على 360–420px لا يوجد horizontal overflow.
+- قائمة «خدماتي» تبقى horizontal scroll بعد إضافة الملف الوظيفي.
