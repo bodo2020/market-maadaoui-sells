@@ -47,6 +47,21 @@ jobs:
         working-directory: apps/staff
         run: npx cap add android
 
+      - name: Configure optional Staff Firebase client
+        id: fcm
+        working-directory: apps/staff
+        env:
+          STAFF_FIREBASE_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.STAFF_FIREBASE_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -z "$STAFF_FIREBASE_GOOGLE_SERVICES_JSON_BASE64" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Staff Firebase client config is not present. APK will build, but native Push registration will remain unavailable."
+            exit 0
+          fi
+          echo "$STAFF_FIREBASE_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+          python -m json.tool android/app/google-services.json >/dev/null
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
       - name: Configure native Staff Android
         working-directory: apps/staff
         run: python scripts/configure_android.py
@@ -68,6 +83,8 @@ jobs:
           grep -n "androidx.credentials:credentials" android/app/build.gradle
           grep -n "com.elmadawy.staff" capacitor.config.ts
           grep -n -E "versionCode|versionName" android/app/build.gradle
+          grep -n "@capacitor/push-notifications" package.json
+          grep -n "capacitor-push-notifications" android/settings.gradle
 
       - name: Configure stable release signing
         id: signing
@@ -115,6 +132,7 @@ jobs:
             cp android/app/build/outputs/apk/debug/app-debug.apk ../../elmadawy-staff.apk
           fi
           echo "signing_mode=${{ steps.signing.outputs.mode }}" > ../../staff-build-info.txt
+          echo "push_client_configured=${{ steps.fcm.outputs.configured }}" >> ../../staff-build-info.txt
           keytool -printcert -jarfile ../../elmadawy-staff.apk | sed -n '1,24p' >> ../../staff-build-info.txt || true
 
       - uses: actions/upload-artifact@v4
