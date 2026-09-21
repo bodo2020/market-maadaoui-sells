@@ -23,6 +23,9 @@ create index if not exists inventory_batch_reconciliations_v1_branch_time_idx
 create index if not exists inventory_batch_reconciliations_v1_product_time_idx
   on private.inventory_batch_reconciliations_v1(product_id,created_at desc);
 
+alter table private.inventory_batch_reconciliations_v1 enable row level security;
+revoke all on table private.inventory_batch_reconciliations_v1 from public,anon,authenticated;
+
 create or replace function public.get_inventory_batch_reconciliation_workspace_v1(
   p_branch_id uuid,
   p_limit integer default 100
