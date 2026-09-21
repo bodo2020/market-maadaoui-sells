@@ -1,7 +1,7 @@
 # Elmadawy Staff V1 — QA Matrix
 
 Target branch: `work/staff-app-v1`
-App version: `0.15.0`
+App version: `0.16.0`
 
 ## قواعد الاختبار
 
