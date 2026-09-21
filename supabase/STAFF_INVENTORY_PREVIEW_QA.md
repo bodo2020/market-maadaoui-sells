@@ -44,6 +44,7 @@ Expected final row:
 
 The suite covers:
 
+- protected-table RLS/direct-access denial and RPC grant checks;
 - unauthorized reconciliation workspace denial;
 - minimal supplier selector privacy;
 - duplicate/legacy batch detection;
@@ -60,6 +61,50 @@ The suite covers:
 - successful expiry disposal only after fresh count + batch ledger alignment;
 - expiry action idempotency;
 - noncash expiry expense behavior.
+
+## Two-session concurrency QA
+
+Run this after the automated transaction suite. Use two SQL sessions against the same Preview branch.
+
+The write RPCs use one lock order:
+
+1. idempotent request advisory lock;
+2. physical `inventory_source_branch_id + product_id` advisory lock;
+3. batch / Inventory row locks.
+
+This must serialize Expiry and Reconciliation for the same physical stock instead of deadlocking.
+
+### Reconciliation holds product, Expiry waits
+
+1. Pick a Preview fixture product with aligned Inventory/batches and a valid count.
+2. Session A:
+   - begin a transaction;
+   - acquire the same product advisory key used by the RPC:
+     `pg_advisory_xact_lock(hashtextextended(inventory_source_branch_id::text || ':' || product_id::text, 91))`;
+   - keep the transaction open.
+3. Session B: call `process_expiry_batch_action_v2` for that product.
+4. Expected: Session B waits; it must not error with a deadlock and must not mutate anything while A holds the lock.
+5. Roll back Session A.
+6. Expected: Session B continues, then re-validates current batch/Inventory/count state before acting.
+
+### Expiry holds product, Reconciliation waits
+
+Repeat in the opposite direction:
+- Session A holds the same source+product advisory lock.
+- Session B calls `reconcile_product_batches_v1`.
+- Session B must wait and continue after A releases the lock, with no deadlock.
+
+### Shared Inventory Source
+
+If a Preview branch pair shares one `inventory_source_branch_id`:
+- use the same product on both logical branches;
+- verify the advisory key resolves to the physical inventory source, not the logical branch id;
+- concurrent mutations for that product must serialize on the same key.
+
+Fail the release if:
+- PostgreSQL reports a deadlock;
+- both mutations run concurrently on the same physical stock;
+- a waiting action skips the post-wait batch / Inventory / count revalidation.
 
 ## Manual Staff UI QA
 
