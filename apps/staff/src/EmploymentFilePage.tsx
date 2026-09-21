@@ -25,6 +25,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { StaffBranch, StaffIdentity } from "./services/staffService";
 import * as staff from "./services/staffService";
 
@@ -84,6 +85,7 @@ function Notes({items}:{items?:string[]}){
 }
 
 export default function EmploymentFilePage({identity,branch}:{identity:StaffIdentity;branch:StaffBranch}){
+  const navigate=useNavigate();
   const [view,setView]=useState<View>("employment");
   const [days,setDays]=useState(30);
   const [profile,setProfile]=useState<staff.StaffEmploymentProfile|null>(null);
@@ -163,7 +165,7 @@ export default function EmploymentFilePage({identity,branch}:{identity:StaffIden
 
   return <div className="employment-file-page">
     <div className="employment-file-title">
-      <button className="icon-btn" onClick={()=>history.back()} aria-label="رجوع"><ArrowRight/></button>
+      <button className="icon-btn" onClick={()=>navigate("/account")} aria-label="رجوع لخدماتي"><ArrowRight/></button>
       <div><h1>الملف الوظيفي</h1><p>نفس بيانات HR الخاصة بك — للعرض والمتابعة من Staff</p></div>
       <button className="icon-btn" onClick={()=>void loadBase()} aria-label="تحديث"><RefreshCw className={busy?"spin":""}/></button>
     </div>
