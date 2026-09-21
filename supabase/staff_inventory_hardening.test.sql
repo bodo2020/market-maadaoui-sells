@@ -2,7 +2,8 @@
 -- PRECONDITION: run after applying:
 --   20260921003500_staff_expiry_actions_v2.sql
 --   20260921083000_staff_batch_reconciliation_v1.sql
--- Execute the entire file inside BEGIN / ROLLBACK. No fixtures may be committed.
+-- Self-contained transaction: fixtures and action rows are always rolled back.
+begin;
 
 create temporary table staff_inventory_fixture as
 select
@@ -560,3 +561,5 @@ reset role;
 set constraints all immediate;
 
 select 'PASS: staff inventory authorization, batch reconciliation, idempotency, rollback, zero-stock cleanup, expiry freshness, batch-ledger alignment, and atomic disposal' as result;
+
+rollback;
