@@ -336,3 +336,55 @@ Mobile UX:
 - Tabs: البيانات الوظيفية / الحساب والفروع / الأداء والحضور.
 - على 360–420px لا يوجد horizontal overflow.
 - قائمة «خدماتي» تبقى horizontal scroll بعد إضافة الملف الوظيفي.
+
+
+## 16. Batch Reconciliation
+
+Permissions:
+- requires both `inventory.manage` and `purchases.manage` (or Super Admin).
+- other inventory roles must not see/execute reconciliation.
+
+Workspace:
+- shows products blocked by legacy `REMAINING-*`, duplicate active batches, or missing purchase cost.
+- shows Inventory quantity, active batch total, and the gap.
+- shows current active non-DAMAGED batch rows.
+- DAMAGED legacy history is never counted as active stock.
+
+Verification gate:
+1. without a matched inventory count from the last 4 hours => reconciliation is blocked.
+2. create Spot Count from the workspace.
+3. submitted count must be `matched`.
+4. the matched actual_count must still equal current Inventory quantity when reconciliation is submitted.
+5. any inventory movement after the count that changes the quantity invalidates the gate.
+
+Canonical lines:
+- at least one line.
+- quantity > 0, max 3 decimal places.
+- purchase price > 0, max 2 decimals.
+- batch number cannot start with `DAMAGED-` or `REMAINING-`.
+- duplicate `batch_number + expiry_date` is rejected.
+- same existing batch_id cannot be reused twice.
+- supplier is optional but, when present, must be a real supplier.
+- total quantity across canonical lines must equal current Inventory exactly (tolerance 0.001).
+
+Atomicity:
+- old active non-DAMAGED rows become superseded with quantity 0.
+- selected existing rows are rewritten or new verified rows inserted.
+- Inventory quantity MUST NOT change.
+- no Inventory movement MUST be generated.
+- no expense/payment/supplier-credit movement MUST be generated.
+- after-write batch sum is checked against Inventory before commit.
+- any failure rolls back the full transaction.
+- request_id retry returns idempotent result and cannot duplicate changes.
+
+Audit:
+- reconciliation stores before_batches and after_batches snapshots.
+- stores verified count id, actor, note, inventory quantity and timestamp.
+- old DAMAGED history remains untouched.
+
+UI:
+- live balance shows new batch total vs Inventory.
+- submit disabled while totals differ.
+- rows can be added/removed.
+- legacy batch number is blanked for supervisor to enter a real verified batch number.
+- reconciliation tab is not available to normal count-only employees.
