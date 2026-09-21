@@ -197,7 +197,7 @@ begin
     'duplicate_rows',duplicate_rows,
     'verified_count_id',verified_count_id,
     'last_verified_at',last_verified_at,
-    'ready_for_reconciliation',verified_count_id is not null,
+    'ready_for_reconciliation',verified_count_id is not null and v_inventory_branch=p_branch_id,
     'batches',batches
   ) order by abs(batch_quantity-inventory_quantity) desc,product_name),'[]'::jsonb)
   into v_items
@@ -210,6 +210,7 @@ begin
   return jsonb_build_object(
     'branch_id',p_branch_id,
     'inventory_branch_id',v_inventory_branch,
+    'requires_source_branch',v_inventory_branch<>p_branch_id,
     'items',v_items
   );
 end;
