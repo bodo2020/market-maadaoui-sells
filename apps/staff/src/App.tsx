@@ -1514,7 +1514,7 @@ function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: St
   const submitBatchReconciliation=async()=>{
     if(!selectedReconciliation||acting)return;
     const total=reconciliationLines.reduce((sum,line)=>sum+Number(line.quantity||0),0);
-    if(reconciliationLines.length<1){setMessage({type:"error",text:"أضف دفعة واحدة على الأقل"});return;}
+    if(selectedReconciliation.inventory_quantity>0&&reconciliationLines.length<1){setMessage({type:"error",text:"الرصيد أكبر من صفر؛ أضف دفعة واحدة على الأقل"});return;}
     if(Math.abs(total-selectedReconciliation.inventory_quantity)>0.001){
       setMessage({type:"error",text:`مجموع الدفعات ${total} لازم يساوي رصيد المخزون ${selectedReconciliation.inventory_quantity}`});return;
     }
