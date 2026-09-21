@@ -189,3 +189,7 @@
 
 .employment-finance-policy{display:flex;align-items:flex-start;gap:8px;margin-top:9px;border:1px solid #dce8e1;background:#f5faf7;border-radius:12px;padding:9px;color:#315c46;font-size:8px;line-height:1.5}.employment-finance-policy svg{width:16px;flex:0 0 auto;color:#005931}
 .employment-outcomes{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;padding-top:8px;border-top:1px dashed #e5ebe8}.employment-outcomes span{display:inline-flex;align-items:center;gap:5px;border-radius:999px;background:#f4f7f5;padding:5px 7px;font-size:7px;color:#62746a}.employment-outcomes b{color:#173426;font-size:8px}
+
+
+.employment-pin-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}.employment-pin-grid label{display:flex;flex-direction:column;gap:5px;font-size:8px;font-weight:800;color:#61736a}.employment-pin-grid input{height:44px;border:1px solid #dce5e0;border-radius:12px;padding:10px;font:inherit;outline:none}.employment-pin-grid input:focus{border-color:#005931;box-shadow:0 0 0 3px rgba(0,89,49,.08)}
+@media(max-width:420px){.employment-pin-grid{grid-template-columns:1fr}}
