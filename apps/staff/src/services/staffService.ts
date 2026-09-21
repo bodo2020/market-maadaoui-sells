@@ -814,6 +814,158 @@ export type StaffSelfServiceRequest = {
   fulfilled_at?: string | null;
 };
 
+export type StaffEmploymentProfile = {
+  user: {
+    id: string;
+    name: string;
+    username: string | null;
+    phone: string | null;
+    email: string | null;
+    role: string;
+    active: boolean;
+    created_at: string;
+  };
+  profile: {
+    employee_code: string | null;
+    employment_status: string | null;
+    work_mode: string | null;
+    contract_type: string | null;
+    hire_date: string | null;
+    termination_date: string | null;
+    notes: string | null;
+    primary_branch_id: string | null;
+    department_id: string | null;
+    team_id: string | null;
+    job_title_id: string | null;
+    direct_manager_id: string | null;
+  } | null;
+  department: { id: string; name_ar: string; code: string | null } | null;
+  team: { id: string; name_ar: string } | null;
+  job_title: { id: string; name_ar: string; grade: string | null } | null;
+  manager: { id: string; name: string } | null;
+  branches: Array<{
+    branch_id: string;
+    branch_name: string;
+    is_primary: boolean;
+    active: boolean;
+    role: string;
+  }>;
+};
+
+export type StaffHrPerformance = {
+  employee: {
+    id: string;
+    name: string;
+    employee_code: string | null;
+    department_name: string | null;
+    team_name: string | null;
+    job_title_name: string | null;
+    work_mode: string | null;
+  };
+  period: { from: string; to: string; days: number };
+  attendance: {
+    sessions: number;
+    checkins: number;
+    completed_sessions: number;
+    worked_minutes: number;
+    scheduled_days: number;
+    approved_leave_days: number;
+    attended_scheduled_days: number;
+    absence_days: number;
+    attendance_rate: number | null;
+    late_sessions: number;
+    late_minutes: number;
+    early_departure_sessions: number;
+    early_departure_minutes: number;
+    on_time_sessions: number;
+    punctuality_rate: number | null;
+  };
+  tasks: {
+    assigned: number;
+    completed: number;
+    completion_rate: number | null;
+    overdue_open: number;
+    sla_measured_completed: number;
+    sla_met: number;
+    completed_late: number;
+    sla_rate: number | null;
+    avg_completion_minutes: number;
+  };
+  inventory: {
+    counts_completed: number;
+    matched: number;
+    with_variance: number;
+    recounts_completed: number;
+    count_accuracy_rate: number | null;
+  };
+  notes: string[];
+};
+
+export type StaffCashierPerformance = {
+  applicable: boolean;
+  role: string;
+  period: { from: string; to: string };
+  sales: {
+    invoice_count: number; sales_total: number; average_ticket: number; items_sold: number;
+    items_per_invoice: number | null; discounts: number; loyalty_voucher_amount: number; merchant_payment_fees: number;
+  };
+  returns: { approved_count: number; approved_amount: number; return_amount_pct: number | null };
+  shifts: {
+    count: number; closed_count: number; absolute_cash_variance: number; absolute_opening_variance: number;
+    reconciliation_lines: number; variance_lines: number; absolute_payment_variance: number;
+  };
+  notes: string[];
+};
+
+export type StaffInventoryPerformance = {
+  applicable: boolean;
+  counts: {
+    assigned: number; submitted: number; completion_rate: number | null; matched: number; discrepancy: number;
+    match_rate: number | null; abs_variance_units: number; abs_variance_value: number; avg_active_minutes: number | null;
+    completed_on_time: number; overdue_open: number;
+  };
+  recounts: {
+    assigned: number; submitted: number; completion_rate: number | null; matched_system: number;
+    confirmed_variance: number; conflicting: number; abs_variance_units: number; abs_variance_value: number;
+    avg_active_minutes: number | null; overdue_open: number;
+  };
+  peer_review: { reviewed: number; confirmed: number; disagreed: number; confirmation_rate: number | null };
+  notes: string[];
+};
+
+export type StaffDeliveryPerformance = {
+  applicable: boolean;
+  assignments: { records: number; assigned_in_period: number; reassigned_away_in_period: number; active_open_orders: number };
+  delivery: {
+    shipped_orders: number; delivered_orders: number; cancelled_orders: number; delivered_value: number;
+    delivered_orders_with_returns: number; delivery_duration_samples: number; avg_delivery_minutes: number | null;
+    pickup_duration_samples: number; avg_pickup_minutes: number | null;
+  };
+  notes: string[];
+};
+
+export type StaffOnlinePerformance = {
+  applicable: boolean;
+  orders: {
+    status_transitions: number; handled_orders: number; confirmed: number; preparing: number; ready: number;
+    shipped: number; delivered: number; cancelled: number; handled_orders_with_returns: number;
+    first_response_samples: number; avg_first_response_minutes: number | null; preparation_samples: number;
+    avg_preparation_minutes: number | null;
+    sla: {
+      enabled: boolean; rate: number | null; overall_rate: number | null; first_response_rate: number | null;
+      preparation_rate: number | null; evaluated_samples: number; first_response_target_minutes: number;
+      preparation_target_minutes: number; reason: string | null;
+    };
+  };
+  customer_service: {
+    created_by_employee: number; assigned: number; assigned_closed: number; assigned_closed_by_employee: number;
+    assigned_closed_by_other: number; completion_rate: number | null; completed_by_employee: number;
+    scheduled_due: number; completed_late_assigned: number; overdue_open: number;
+    avg_assigned_lifecycle_minutes: number | null; outcomes: Record<string, number>;
+  };
+  notes: string[];
+};
+
 export type StaffSelfServiceSnapshot = {
   profile: {
     user_id: string;
@@ -914,6 +1066,57 @@ export async function getAttendance(branchId: string) {
   return cachedRead(cacheKey("attendance",branchId),async()=>unwrap<AttendancePayload>(await rpc("get_my_attendance_v1", { p_branch_id: branchId })));
 }
 
+
+function hrSelfError(message?:string) {
+  const value=message||"";
+  if(value.includes("permission_denied"))return new Error("ليس لديك صلاحية عرض الملف الوظيفي.");
+  if(value.includes("employee_out_of_scope"))return new Error("الحساب خارج نطاق الفرع الحالي.");
+  if(value.includes("invalid_date_range"))return new Error("الفترة الزمنية غير صحيحة.");
+  if(value.includes("date_range_too_large"))return new Error("أقصى فترة للأداء سنة واحدة.");
+  return new Error(message||"تعذر تحميل بيانات الملف الوظيفي.");
+}
+
+export async function getMyEmploymentProfile(employeeId:string,branchId:string) {
+  return cachedRead(cacheKey("employment_profile",branchId),async()=>{
+    const result=await rpc("get_hr_employee_profile_v1",{p_employee_id:employeeId,p_branch_id:branchId});
+    if(result.error)throw hrSelfError(result.error.message);
+    return result.data as StaffEmploymentProfile;
+  });
+}
+
+export async function getMyHrPerformance(employeeId:string,branchId:string,from:string,to:string) {
+  return cachedRead(cacheKey("hr_performance",`${branchId}:${from}:${to}`),async()=>{
+    const result=await rpc("get_hr_employee_performance_detail_v1",{
+      p_employee_id:employeeId,p_branch_id:branchId,p_from:from,p_to:to,
+    });
+    if(result.error)throw hrSelfError(result.error.message);
+    return result.data as StaffHrPerformance;
+  });
+}
+
+export async function getMyCashierPerformance(employeeId:string,branchId:string,from:string,to:string) {
+  const result=await rpc("get_hr_cashier_performance_v1",{p_employee_id:employeeId,p_branch_id:branchId,p_from:from,p_to:to});
+  if(result.error)throw hrSelfError(result.error.message);
+  return result.data as StaffCashierPerformance;
+}
+
+export async function getMyInventoryPerformance(employeeId:string,branchId:string,from:string,to:string) {
+  const result=await rpc("get_hr_inventory_performance_v1",{p_employee_id:employeeId,p_branch_id:branchId,p_from:from,p_to:to});
+  if(result.error)throw hrSelfError(result.error.message);
+  return result.data as StaffInventoryPerformance;
+}
+
+export async function getMyDeliveryPerformance(employeeId:string,branchId:string,from:string,to:string) {
+  const result=await rpc("get_hr_delivery_performance_v1",{p_employee_id:employeeId,p_branch_id:branchId,p_from:from,p_to:to});
+  if(result.error)throw hrSelfError(result.error.message);
+  return result.data as StaffDeliveryPerformance;
+}
+
+export async function getMyOnlinePerformance(employeeId:string,branchId:string,from:string,to:string) {
+  const result=await rpc("get_hr_online_customer_service_performance_v1",{p_employee_id:employeeId,p_branch_id:branchId,p_from:from,p_to:to});
+  if(result.error)throw hrSelfError(result.error.message);
+  return result.data as StaffOnlinePerformance;
+}
 
 export async function getStaffSelfService(branchId: string) {
   return unwrap<StaffSelfServiceSnapshot>(await rpc("get_my_staff_self_service_v1", {
