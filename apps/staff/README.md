@@ -69,6 +69,9 @@ Staff لا يحل محل POS أو Delivery أو Control Center:
 - يتطلب `inventory.manage` + `purchases.manage` معًا أو Super Admin.
 - جرد مطابق حديث خلال 4 ساعات شرط إجباري.
 - المشرف يعيد توزيع رصيد Inventory على دفعات موثوقة برقم/تاريخ/كمية/تكلفة.
+- Supplier selector يعرض فقط id/name/code للموردين النشطين؛ بيانات الاتصال والرصيد لا تُعرض داخل Staff.
+- الدفعات الجديدة الناتجة عن Reconciliation لا تُسجل لها purchase_date وهمية؛ يبقى التاريخ Null ما لم يوجد مصدر شراء حقيقي.
+- ملاحظات الدفعة الأصلية تُحفظ داخل التسوية مع أثر التحقق.
 - مجموع الدفعات الجديدة يجب أن يساوي Inventory الحالي بالضبط.
 - التسوية لا تغيّر Inventory ولا تنشئ Inventory Movement أو Expense أو Supplier Credit.
 - يحتفظ النظام بـ before/after snapshots وactor وverified count وrequest id.
