@@ -165,6 +165,7 @@ begin
           'supplier_name',s.name,
           'shelf_location',coalesce(b.shelf_location,p.shelf_location),
           'purchase_item_id',b.purchase_item_id,
+          'note',b.notes,
           'legacy_remaining',upper(coalesce(b.batch_number,'')) like 'REMAINING-%',
           'cost_missing',coalesce(nullif(b.purchase_price,0),nullif(pi.price,0),nullif(p.purchase_price,0),0)<=0
         ) order by b.expiry_date,b.created_at,b.id)
@@ -514,7 +515,7 @@ begin
         product_id,batch_number,expiry_date,quantity,shelf_location,purchase_date,
         supplier_id,notes,purchase_price,branch_id
       ) values(
-        p_product_id,v_number,v_expiry,v_qty,v_shelf,current_date,
+        p_product_id,v_number,v_expiry,v_qty,v_shelf,null,
         v_supplier,concat_ws(E'\n',v_line_note,'[Batch Reconciliation] verified '||now()::text),
         v_cost,p_branch_id
       );
