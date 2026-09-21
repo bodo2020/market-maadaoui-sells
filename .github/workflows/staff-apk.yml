@@ -84,7 +84,7 @@ jobs:
           grep -n "com.elmadawy.staff" capacitor.config.ts
           grep -n -E "versionCode|versionName" android/app/build.gradle
           grep -n "@capacitor/push-notifications" package.json
-          grep -n "capacitor-push-notifications" android/settings.gradle
+          grep -R "capacitor-push-notifications" android >/dev/null
 
       - name: Configure stable release signing
         id: signing
