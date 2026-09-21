@@ -342,6 +342,43 @@ export type ExpiryWorkspace = {
   };
 };
 
+export type BatchReconciliationLine = {
+  batch_id: string | null;
+  batch_number: string;
+  expiry_date: string;
+  quantity: number;
+  purchase_price: number;
+  supplier_id: string | null;
+  supplier_name?: string | null;
+  shelf_location: string | null;
+  purchase_item_id?: string | null;
+  legacy_remaining?: boolean;
+  cost_missing?: boolean;
+  note?: string | null;
+};
+
+export type BatchReconciliationItem = {
+  product_id: string;
+  product_name: string;
+  barcode: string | null;
+  inventory_quantity: number;
+  batch_quantity: number;
+  quantity_gap: number;
+  legacy_rows: number;
+  zero_cost_rows: number;
+  duplicate_rows: number;
+  verified_count_id: string | null;
+  last_verified_at: string | null;
+  ready_for_reconciliation: boolean;
+  batches: BatchReconciliationLine[];
+};
+
+export type BatchReconciliationWorkspace = {
+  branch_id: string;
+  inventory_branch_id: string;
+  items: BatchReconciliationItem[];
+};
+
 export type ExpiryActionResult = {
   ok: boolean;
   idempotent: boolean;
@@ -1923,6 +1960,65 @@ export async function getExpiryWorkspace(branchId: string, daysAhead = 30) {
     if(result.error)throw expiryActionError(result.error.message);
     return result.data as ExpiryWorkspace;
   });
+}
+
+function batchReconciliationError(message?:string){
+  const value=message||"";
+  if(value.includes("BATCH_RECON_PERMISSION_DENIED"))return new Error("تسوية الدفعات تحتاج صلاحية إدارة المخزون والمشتريات معًا.");
+  if(value.includes("BATCH_RECON_RECENT_MATCHED_COUNT_REQUIRED"))return new Error("لازم جرد مطابق حديث خلال آخر 4 ساعات ومساوي للرصيد الحالي قبل التسوية.");
+  if(value.includes("BATCH_RECON_TOTAL_MUST_MATCH_INVENTORY"))return new Error("مجموع كميات الدفعات الجديدة لازم يساوي رصيد المخزون الحالي بالضبط.");
+  if(value.includes("BATCH_RECON_DUPLICATE_CANONICAL_LINE"))return new Error("لا تكرر نفس رقم الدفعة وتاريخ الصلاحية في التسوية الجديدة.");
+  if(value.includes("BATCH_RECON_BATCH_NUMBER_INVALID"))return new Error("رقم الدفعة الجديد لازم يكون حقيقي ومش من REMAINING أو DAMAGED القديم.");
+  if(value.includes("BATCH_RECON_COST_INVALID"))return new Error("كل دفعة لازم يكون لها سعر شراء صحيح أكبر من صفر.");
+  if(value.includes("BATCH_RECON_QUANTITY_INVALID"))return new Error("كمية الدفعة غير صحيحة.");
+  if(value.includes("BATCH_RECON_NOTE_REQUIRED"))return new Error("اكتب ملاحظة تسوية واضحة.");
+  if(value.includes("REQUEST_CONFLICT"))return new Error("رقم طلب التسوية تم استخدامه لعملية مختلفة.");
+  return new Error(message||"تعذر تنفيذ تسوية الدفعات.");
+}
+
+export async function getBatchReconciliationWorkspace(branchId:string){
+  const result=await rpc("get_inventory_batch_reconciliation_workspace_v1",{
+    p_branch_id:branchId,p_limit:100,
+  });
+  if(result.error)throw batchReconciliationError(result.error.message);
+  return result.data as BatchReconciliationWorkspace;
+}
+
+export async function reconcileProductBatches(
+  requestId:string,
+  branchId:string,
+  productId:string,
+  lines:BatchReconciliationLine[],
+  note:string,
+){
+  requireOnlineWrite();
+  const result=await rpc("reconcile_product_batches_v1",{
+    p_request_id:requestId,
+    p_branch_id:branchId,
+    p_product_id:productId,
+    p_lines:lines.map((line)=>({
+      batch_id:line.batch_id||null,
+      batch_number:line.batch_number.trim(),
+      expiry_date:line.expiry_date,
+      quantity:Number(line.quantity),
+      purchase_price:Number(line.purchase_price),
+      supplier_id:line.supplier_id||null,
+      shelf_location:line.shelf_location?.trim()||null,
+      note:line.note?.trim()||null,
+    })),
+    p_note:note.trim(),
+  });
+  if(result.error)throw batchReconciliationError(result.error.message);
+  return result.data as {
+    ok:boolean;
+    idempotent:boolean;
+    reconciliation_id:string;
+    product_id:string;
+    inventory_quantity:number;
+    verified_count_id:string;
+    before_batches:unknown[];
+    after_batches:unknown[];
+  };
 }
 
 export async function processExpiryBatchAction(
