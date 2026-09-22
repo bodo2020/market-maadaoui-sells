@@ -36,6 +36,10 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
 
   const handleStatusChange = async (newStatus: Order['status']) => {
     if (newStatus === currentStatus || isUpdating) return;
+    if (newStatus === 'delivered') {
+      toast.error('سجّل التسليم من تفاصيل الطلب مع إثبات الاستلام.');
+      return;
+    }
     
     try {
       setIsUpdating(true);
@@ -127,14 +131,6 @@ export function OrderStatusDropdown({ order, onStatusChange }: OrderStatusDropdo
         >
           {currentStatus === 'shipped' && <Check className="h-4 w-4" />}
           تم الشحن
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="gap-2"
-          onClick={() => handleStatusChange('delivered')}
-          disabled={currentStatus === 'delivered' || isUpdating}
-        >
-          {currentStatus === 'delivered' && <Check className="h-4 w-4" />}
-          تم التسليم
         </DropdownMenuItem>
         <DropdownMenuItem
           className="gap-2"

@@ -7,6 +7,7 @@ import { Order } from "@/types/index";
 import { UpdateOrderStatusDialog } from "./UpdateOrderStatusDialog";
 import { PaymentConfirmationDialog } from "./PaymentConfirmationDialog";
 import { AssignDeliveryPersonDialog } from "./AssignDeliveryPersonDialog";
+import { CompleteWithoutDriverDialog } from "./CompleteWithoutDriverDialog";
 import { OrderItemsList } from "./OrderItemsList";
 import { OrderSummaryActions } from "./OrderSummaryActions";
 import { CustomerInfoCards } from "./CustomerInfoCards";
@@ -39,6 +40,7 @@ export function OrderDetailsDialog({
   const [isUpdatingShipping, setIsUpdatingShipping] = useState(false);
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
   const [assignDeliveryOpen, setAssignDeliveryOpen] = useState(false);
+  const [completeWithoutDriverOpen, setCompleteWithoutDriverOpen] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
 
   const { data: routingInfo } = useQuery({
@@ -85,14 +87,14 @@ export function OrderDetailsDialog({
 
   if (!order) return null;
 
-  const updateShippingStatus = async (status: 'shipped' | 'delivered') => {
+  const updateShippingStatus = async (status: 'shipped') => {
     if (!order || isUpdatingShipping) return;
     
     try {
       setIsUpdatingShipping(true);
       await changeOnlineOrderStatus(order.id, order.status, status);
       if (onStatusUpdated) onStatusUpdated();
-      toast.success(`تم تحديث حالة الشحن إلى ${status === 'shipped' ? 'خرج للتوصيل' : 'تم التوصيل'}`);
+      toast.success('تم تحديث حالة الشحن إلى خرج للتوصيل');
     } catch (error) {
       console.error('Error updating shipping status:', error);
       toast.error(error instanceof Error ? error.message : 'حدث خطأ أثناء تحديث حالة الشحن');
@@ -139,7 +141,7 @@ export function OrderDetailsDialog({
                 items={order.items} orderId={order.id} onItemDeleted={onStatusUpdated} onItemUpdated={onStatusUpdated}
               />
             </div>
-            <OrderSummaryActions order={order} onUpdateStatus={() => setUpdateStatusOpen(true)} onPaymentConfirm={() => setPaymentConfirmOpen(true)} onAssignDelivery={() => setAssignDeliveryOpen(true)} onUpdateShipping={updateShippingStatus} isUpdatingShipping={isUpdatingShipping} />
+            <OrderSummaryActions order={order} onUpdateStatus={() => setUpdateStatusOpen(true)} onPaymentConfirm={() => setPaymentConfirmOpen(true)} onAssignDelivery={() => setAssignDeliveryOpen(true)} onUpdateShipping={updateShippingStatus} onCompleteWithoutDriver={() => setCompleteWithoutDriverOpen(true)} isUpdatingShipping={isUpdatingShipping} />
           </div>
 
           <div className="w-full md:w-2/5 space-y-4">
@@ -170,6 +172,7 @@ export function OrderDetailsDialog({
         <UpdateOrderStatusDialog order={order} open={updateStatusOpen} onOpenChange={setUpdateStatusOpen} onStatusUpdated={onStatusUpdated} />
         <PaymentConfirmationDialog open={paymentConfirmOpen} onOpenChange={setPaymentConfirmOpen} orderId={order.id} onConfirm={onStatusUpdated} />
         <AssignDeliveryPersonDialog open={assignDeliveryOpen} onOpenChange={setAssignDeliveryOpen} orderId={order.id} onConfirm={onStatusUpdated} />
+        <CompleteWithoutDriverDialog open={completeWithoutDriverOpen} onOpenChange={setCompleteWithoutDriverOpen} orderId={order.id} onComplete={onStatusUpdated} />
         <OnlineOrderInvoiceDialog isOpen={invoiceDialogOpen} onClose={() => setInvoiceDialogOpen(false)} order={order} />
       </DialogContent>
     </Dialog>
