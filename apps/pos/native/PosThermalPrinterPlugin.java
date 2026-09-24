@@ -167,7 +167,7 @@ public class PosThermalPrinterPlugin extends Plugin {
             currentView[0] = view;
             view.setLayerType(WebView.LAYER_TYPE_SOFTWARE, null);
             view.setBackgroundColor(0xffffffff);
-            view.getSettings().setLoadsImagesAutomatically(true);
+            view.getSettings().setJavaScriptEnabled(true);\n            view.getSettings().setLoadsImagesAutomatically(true);
             view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width, android.view.View.MeasureSpec.EXACTLY), android.view.View.MeasureSpec.makeMeasureSpec(2000, android.view.View.MeasureSpec.EXACTLY));
             view.layout(0, 0, width, 2000);
             view.setWebViewClient(new WebViewClient() {
@@ -175,7 +175,7 @@ public class PosThermalPrinterPlugin extends Plugin {
                 @Override public void onPageFinished(WebView loaded, String url) {
                     if (started || !preparing.get()) return;
                     started = true;
-                    loaded.postDelayed(() -> {
+                    main.postDelayed(() -> {
                       if (!preparing.get()) return;
                       loaded.evaluateJavascript("Math.ceil(document.documentElement.scrollHeight * (window.devicePixelRatio || 1))", raw -> {
                         try {
