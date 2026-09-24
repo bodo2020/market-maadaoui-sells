@@ -266,10 +266,19 @@ public class PosThermalPrinterPlugin extends Plugin {
                     usbWrite(usbDeviceId, new byte[] {27, 64}, 3000);
                     usbWrite(usbDeviceId, data, 3000);
                 } else {
-                    OutputStream output = getPersistentOutput(address);
-                    output.write(new byte[] {27, 64});
-                    output.write(data);
-                    output.flush();
+                    try {
+                        OutputStream output = getPersistentOutput(address);
+                        output.write(new byte[] {27, 64});
+                        output.write(data);
+                        output.flush();
+                    } catch (Exception first) {
+                        // A BluetoothSocket can still report isConnected() after the printer closed
+                        // its side. Force one clean reconnect before reporting failure.
+                        OutputStream output = reconnectPersistentOutput(address);
+                        output.write(new byte[] {27, 64});
+                        output.write(data);
+                        output.flush();
+                    }
                 }
                 JSObject result = new JSObject();
                 result.put("sent", true);
@@ -695,6 +704,15 @@ public class PosThermalPrinterPlugin extends Plugin {
         return persistentOutput;
     }
 
+    private synchronized OutputStream reconnectPersistentOutput(String address) throws Exception {
+        closePersistentConnection();
+        connectionBackoff();
+        persistentSocket = connectPrinter(address);
+        persistentOutput = persistentSocket.getOutputStream();
+        persistentAddress = address;
+        return persistentOutput;
+    }
+
     private void sendBitmapUsb(int deviceId, Bitmap bitmap) throws Exception {
         try {
             usbWrite(deviceId, new byte[] {27, 64}, 3000);
@@ -764,25 +782,100 @@ public class PosThermalPrinterPlugin extends Plugin {
     private BluetoothSocket connectPrinter(String address) throws Exception {
         BluetoothAdapter bluetooth = adapter();
         if (bluetooth == null || !bluetooth.isEnabled()) throw new IllegalStateException("Bluetooth مغلق");
+
         BluetoothDevice device = null;
         Set<BluetoothDevice> bonded = bluetooth.getBondedDevices();
         for (BluetoothDevice item : bonded) if (item.getAddress().equals(address)) device = item;
         if (device == null) throw new IllegalStateException("الطابعة لم تعد مقترنة بالجهاز");
-        if (Build.VERSION.SDK_INT >= 31 && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) bluetooth.cancelDiscovery();
-        IOException secureError;
-        BluetoothSocket secure = device.createRfcommSocketToServiceRecord(SPP);
-        try { connectWithDeadline(secure); return secure; }
-        catch (IOException error) {
-            secureError = error;
-            try { secure.close(); } catch (IOException ignored) { }
+
+        if (Build.VERSION.SDK_INT >= 31
+            && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
+            bluetooth.cancelDiscovery();
         }
-        // Paired receipt printers without authenticated SPP pairing may only accept this socket.
-        BluetoothSocket fallback = device.createInsecureRfcommSocketToServiceRecord(SPP);
-        try { connectWithDeadline(fallback); return fallback; }
-        catch (IOException error) {
-            try { fallback.close(); } catch (IOException ignored) { }
-            throw new IOException("لم يقبل منفذ الطابعة الاتصال؛ تأكد من تشغيلها واقترانها (" + secureError.getMessage() + ")", error);
+
+        String selectedName = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("name", "");
+        boolean xpP323b = selectedName != null && selectedName.toUpperCase(java.util.Locale.ROOT).contains("XP-P323B");
+        StringBuilder errors = new StringBuilder();
+
+        // XP-P323B behaves more reliably on Android when we avoid authenticated RFCOMM first.
+        // Windows drivers hide this transport detail, but Android exposes it directly.
+        if (xpP323b) {
+            BluetoothSocket socket = tryInsecureSpp(device, errors);
+            if (socket != null) return socket;
+            connectionBackoff();
+
+            socket = tryRfcommChannelOne(device, errors);
+            if (socket != null) return socket;
+            connectionBackoff();
+
+            socket = trySecureSpp(device, errors);
+            if (socket != null) return socket;
+        } else {
+            BluetoothSocket socket = trySecureSpp(device, errors);
+            if (socket != null) return socket;
+            connectionBackoff();
+
+            socket = tryInsecureSpp(device, errors);
+            if (socket != null) return socket;
+            connectionBackoff();
+
+            socket = tryRfcommChannelOne(device, errors);
+            if (socket != null) return socket;
         }
+
+        throw new IOException("لم يقبل منفذ الطابعة الاتصال. جرّب إطفاء وتشغيل الطابعة ثم اضغط اختبار مرة أخرى. التفاصيل: " + errors);
+    }
+
+    private BluetoothSocket trySecureSpp(BluetoothDevice device, StringBuilder errors) {
+        BluetoothSocket socket = null;
+        try {
+            socket = device.createRfcommSocketToServiceRecord(SPP);
+            connectWithDeadline(socket);
+            return socket;
+        } catch (Exception error) {
+            appendConnectError(errors, "SPP آمن", error);
+            if (socket != null) try { socket.close(); } catch (Exception ignored) { }
+            return null;
+        }
+    }
+
+    private BluetoothSocket tryInsecureSpp(BluetoothDevice device, StringBuilder errors) {
+        BluetoothSocket socket = null;
+        try {
+            socket = device.createInsecureRfcommSocketToServiceRecord(SPP);
+            connectWithDeadline(socket);
+            return socket;
+        } catch (Exception error) {
+            appendConnectError(errors, "SPP مباشر", error);
+            if (socket != null) try { socket.close(); } catch (Exception ignored) { }
+            return null;
+        }
+    }
+
+    private BluetoothSocket tryRfcommChannelOne(BluetoothDevice device, StringBuilder errors) {
+        BluetoothSocket socket = null;
+        try {
+            java.lang.reflect.Method method = device.getClass().getMethod("createRfcommSocket", int.class);
+            socket = (BluetoothSocket) method.invoke(device, 1);
+            connectWithDeadline(socket);
+            return socket;
+        } catch (Exception error) {
+            Throwable cause = error.getCause() == null ? error : error.getCause();
+            appendConnectError(errors, "RFCOMM قناة 1", cause);
+            if (socket != null) try { socket.close(); } catch (Exception ignored) { }
+            return null;
+        }
+    }
+
+    private void appendConnectError(StringBuilder errors, String method, Throwable error) {
+        if (errors.length() > 0) errors.append(" | ");
+        String message = error == null ? "unknown" : error.getMessage();
+        errors.append(method).append(": ").append(message == null ? error.getClass().getSimpleName() : message);
+    }
+
+    private void connectionBackoff() {
+        try { Thread.sleep(350); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
     }
 
     private void connectWithDeadline(BluetoothSocket socket) throws IOException {
