@@ -109,6 +109,11 @@ function quantityLabel(item: Sale["items"][number]) {
   return Number(item.quantity || 0).toLocaleString("ar-EG", { maximumFractionDigits: 3 });
 }
 
+function unitPriceLabel(item: Sale["items"][number], currency: string) {
+  const base = money(item.price, currency);
+  return Number(item.weight || 0) > 0 ? `${base} / كجم` : base;
+}
+
 function resolveLogo(overrides?: InvoiceBrandOverrides) {
   const choice = overrides?.logoChoice || siteConfig.invoice.logoChoice || "store";
   if (choice === "none") return null;
@@ -118,22 +123,28 @@ function resolveLogo(overrides?: InvoiceBrandOverrides) {
 
 function build58mmItems(sale: Sale, currency: string, compact: boolean) {
   return `
-    <div class="items-58 ${compact ? "compact" : ""}">
+    <div class="items-stacked items-58 ${compact ? "compact" : ""}">
       <div class="items-heading">الأصناف</div>
       ${sale.items.map((item) => {
         const discount = Number(item.discount || 0);
         return `
-          <div class="item-58">
-            <div class="item-58-name">${esc(item.product.name)}</div>
-            <div class="item-58-calc">
-              <span>${esc(quantityLabel(item))} × ${esc(money(item.price, currency))}</span>
-              <strong>${esc(money(item.total, currency))}</strong>
+          <div class="receipt-item">
+            <div class="receipt-item-name">${esc(item.product.name)}</div>
+            <div class="receipt-item-metrics">
+              <div class="metric quantity-metric">
+                <span>الكمية</span>
+                <strong>${esc(quantityLabel(item))}</strong>
+              </div>
+              <div class="metric">
+                <span>سعر الوحدة</span>
+                <strong>${esc(unitPriceLabel(item, currency))}</strong>
+              </div>
+              <div class="metric total-metric">
+                <span>الإجمالي</span>
+                <strong>${esc(money(item.total, currency))}</strong>
+              </div>
             </div>
-            ${item.product.barcode || discount > 0 ? `
-              <div class="item-58-extra">
-                ${item.product.barcode ? `<span>باركود: ${esc(item.product.barcode)}</span>` : ""}
-                ${discount > 0 ? `<strong>خصم: ${esc(money(discount, currency))}</strong>` : ""}
-              </div>` : ""}
+            ${discount > 0 ? `<div class="receipt-item-discount"><span>خصم الصنف</span><strong>- ${esc(money(discount, currency))}</strong></div>` : ""}
           </div>`;
       }).join("")}
     </div>`;
@@ -141,32 +152,31 @@ function build58mmItems(sale: Sale, currency: string, compact: boolean) {
 
 function build80mmItems(sale: Sale, currency: string, compact: boolean) {
   return `
-    <table class="items-80 ${compact ? "compact" : ""}">
-      <thead>
-        <tr>
-          <th class="product">الصنف</th>
-          <th class="qty">الكمية</th>
-          <th class="unit">سعر الوحدة</th>
-          <th class="total">الإجمالي</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${sale.items.map((item) => {
-          const discount = Number(item.discount || 0);
-          return `
-            <tr>
-              <td class="product">
-                <strong>${esc(item.product.name)}</strong>
-                ${item.product.barcode ? `<small>${esc(item.product.barcode)}</small>` : ""}
-                ${discount > 0 ? `<small class="discount">خصم ${esc(money(discount, currency))}</small>` : ""}
-              </td>
-              <td class="qty">${esc(quantityLabel(item))}</td>
-              <td class="unit">${esc(money(item.price, currency))}</td>
-              <td class="total"><strong>${esc(money(item.total, currency))}</strong></td>
-            </tr>`;
-        }).join("")}
-      </tbody>
-    </table>`;
+    <div class="items-stacked items-80 ${compact ? "compact" : ""}">
+      <div class="items-heading">الأصناف</div>
+      ${sale.items.map((item) => {
+        const discount = Number(item.discount || 0);
+        return `
+          <div class="receipt-item">
+            <div class="receipt-item-name">${esc(item.product.name)}</div>
+            <div class="receipt-item-metrics">
+              <div class="metric quantity-metric">
+                <span>الكمية</span>
+                <strong>${esc(quantityLabel(item))}</strong>
+              </div>
+              <div class="metric">
+                <span>سعر الوحدة</span>
+                <strong>${esc(unitPriceLabel(item, currency))}</strong>
+              </div>
+              <div class="metric total-metric">
+                <span>الإجمالي</span>
+                <strong>${esc(money(item.total, currency))}</strong>
+              </div>
+            </div>
+            ${discount > 0 ? `<div class="receipt-item-discount"><span>خصم الصنف</span><strong>- ${esc(money(discount, currency))}</strong></div>` : ""}
+          </div>`;
+      }).join("")}
+    </div>`;
 }
 
 function buildReceiptBody(sale: Sale, preferences: InvoicePrintPreferences, overrides?: InvoiceBrandOverrides) {
@@ -312,12 +322,13 @@ function buildNativeReceiptPayload(
       ? invoiceBarcodeDataUrl(sale.invoice_number, preferences.paperSize)
       : "",
     footer: overrides?.footer || siteConfig.invoice.footer || "شكرًا لزيارتكم",
+    itemCount: sale.items.length,
     items: sale.items.map((item) => ({
       name: item.product.name,
-      barcode: item.product.barcode || "",
       quantity: quantityLabel(item),
-      price: money(item.price, currency),
+      price: unitPriceLabel(item, currency),
       total: money(item.total, currency),
+      discount: Number(item.discount || 0) > 0 ? money(item.discount, currency) : "",
     })),
   };
 }
@@ -412,32 +423,31 @@ export function buildSaleInvoiceHtml(
         .customer-line strong { font-size: 9px; }
         .customer-line bdi { direction: ltr; font-weight: 700; }
 
-        .items-heading { padding: 5px 0 3px; border-bottom: 1.5px solid #000; text-align: center; font-size: 8px; font-weight: 900; }
-        .item-58 { padding: 5px 0; border-bottom: 1px dashed #000; break-inside: avoid; page-break-inside: avoid; }
-        .items-58.compact .item-58 { padding: 3px 0; }
-        .item-58-name { font-size: 9px; line-height: 1.35; font-weight: 900; overflow-wrap: anywhere; }
-        .item-58-calc { margin-top: 2px; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; direction: rtl; }
-        .item-58-calc span { font-size: 7.7px; white-space: nowrap; }
-        .item-58-calc strong { font-size: 9.2px; white-space: nowrap; }
-        .item-58-extra { margin-top: 2px; display: flex; justify-content: space-between; gap: 5px; font-size: 6.8px; line-height: 1.3; overflow-wrap: anywhere; }
-        .item-58-extra strong { font-weight: 900; }
-
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .items-80 { margin-top: 4px; }
-        .items-80 th { padding: 4px 2px; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; font-size: 7.8px; font-weight: 900; text-align: right; }
-        .items-80 td { padding: 5px 2px; border-bottom: 1px dashed #000; vertical-align: top; font-size: 8.5px; break-inside: avoid; page-break-inside: avoid; }
-        .items-80.compact td { padding-top: 3px; padding-bottom: 3px; }
-        .items-80 .product { width: 43%; text-align: right; }
-        .items-80 .qty { width: 16%; text-align: center; }
-        .items-80 .unit { width: 19%; text-align: center; }
-        .items-80 .total { width: 22%; text-align: left; }
-        .items-80 .product strong { display: block; font-size: 8.8px; line-height: 1.3; overflow-wrap: anywhere; }
-        .items-80 .product small { display: block; margin-top: 1px; font-size: 6.7px; line-height: 1.25; overflow-wrap: anywhere; }
-        .items-80 .product .discount { font-weight: 800; }
-        .paper-a4 .items-80 th { font-size: 10px; }
-        .paper-a4 .items-80 td { font-size: 11px; }
-        .paper-a4 .items-80 .product strong { font-size: 11px; }
-        .paper-a4 .items-80 .product small { font-size: 8px; }
+        .items-heading { padding: 5px 0 4px; border-bottom: 1.5px solid #000; text-align: center; font-size: 8px; font-weight: 900; }
+        .items-stacked { margin-top: 4px; }
+        .receipt-item { padding: 6px 0; border-bottom: 1px dashed #000; break-inside: avoid; page-break-inside: avoid; }
+        .items-stacked.compact .receipt-item { padding: 4px 0; }
+        .receipt-item-name { font-size: 9px; line-height: 1.32; font-weight: 900; overflow-wrap: anywhere; }
+        .paper-80 .receipt-item-name { font-size: 10px; }
+        .paper-a4 .receipt-item-name { font-size: 12px; }
+        .receipt-item-metrics { margin-top: 4px; display: grid; grid-template-columns: .82fr 1.18fr 1.1fr; gap: 4px; align-items: stretch; }
+        .metric { min-width: 0; padding: 2px 3px; border-inline-start: 1px solid #000; }
+        .metric:first-child { border-inline-start: 0; }
+        .metric span { display: block; font-size: 6.6px; font-weight: 700; color: #000; }
+        .metric strong { display: block; margin-top: 1px; font-size: 8px; line-height: 1.25; font-weight: 900; overflow-wrap: anywhere; }
+        .quantity-metric strong { font-size: 10.4px; font-weight: 900; }
+        .total-metric strong { font-size: 9px; }
+        .paper-80 .metric span { font-size: 7.2px; }
+        .paper-80 .metric strong { font-size: 8.8px; }
+        .paper-80 .quantity-metric strong { font-size: 11.8px; }
+        .paper-80 .total-metric strong { font-size: 10px; }
+        .paper-a4 .metric span { font-size: 9px; }
+        .paper-a4 .metric strong { font-size: 11px; }
+        .paper-a4 .quantity-metric strong { font-size: 14px; }
+        .receipt-item-discount { margin-top: 4px; padding-top: 3px; border-top: 1px dotted #000; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 7px; }
+        .receipt-item-discount strong { font-size: 7.8px; font-weight: 900; white-space: nowrap; }
+        .paper-80 .receipt-item-discount { font-size: 7.8px; }
+        .paper-80 .receipt-item-discount strong { font-size: 8.6px; }
 
         .totals { margin-top: 5px; padding-top: 4px; border-top: 1.5px solid #000; display: grid; gap: 3px; }
         .totals > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 8.5px; }
