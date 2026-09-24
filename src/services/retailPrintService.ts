@@ -503,7 +503,7 @@ export async function printSaleInvoice(
   if (isPosNative()) {
     try {
       const selected = await posThermalPrinter.getSelected();
-      if (selected.address) {
+      if (selected.address || selected.transport === 'usb') {
         const thermalPreferences = { ...normalized, paperSize: selected.paperSize === '58mm' ? '58mm' as const : '80mm' as const };
 
         // Android APK gets a dedicated native fast path. Windows/browser printing below
