@@ -85,6 +85,11 @@ public class PosThermalPrinterPlugin extends Plugin {
         return true;
     }
 
+    private boolean authorizedForSelected(PluginCall call) {
+        String transport = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("transport", "bluetooth");
+        return "usb".equals(transport) || authorized(call);
+    }
+
     @PermissionCallback
     private void permissionResult(PluginCall call) {
         if (Build.VERSION.SDK_INT >= 31 && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
@@ -245,7 +250,7 @@ public class PosThermalPrinterPlugin extends Plugin {
 
     @PluginMethod
     public void testConnection(PluginCall call) {
-        if (!authorized(call)) return;
+        if (!authorizedForSelected(call)) return;
         if (printing.get() || !testing.compareAndSet(false, true)) { call.reject("انتظر انتهاء الطباعة الحالية قبل الاختبار"); return; }
         android.content.SharedPreferences prefs = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE);
         String transport = prefs.getString("transport", "bluetooth");
@@ -280,7 +285,7 @@ public class PosThermalPrinterPlugin extends Plugin {
 
     @PluginMethod
     public void printReceipt(PluginCall call) {
-        if (!authorized(call)) return;
+        if (!authorizedForSelected(call)) return;
         android.content.SharedPreferences prefs = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE);
         String transport = prefs.getString("transport", "bluetooth");
         String address = prefs.getString("address", null);
@@ -321,7 +326,7 @@ public class PosThermalPrinterPlugin extends Plugin {
 
     @PluginMethod
     public void printHtml(PluginCall call) {
-        if (!authorized(call)) return;
+        if (!authorizedForSelected(call)) return;
         String html = call.getString("html", "");
         android.content.SharedPreferences prefs = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE);
         String transport = prefs.getString("transport", "bluetooth");
