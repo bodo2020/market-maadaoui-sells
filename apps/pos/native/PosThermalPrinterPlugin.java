@@ -823,33 +823,38 @@ public class PosThermalPrinterPlugin extends Plugin {
         boolean xpP323b = selectedName != null && selectedName.toUpperCase(java.util.Locale.ROOT).contains("XP-P323B");
         StringBuilder errors = new StringBuilder();
 
-        // XP-P323B behaves more reliably on Android when we avoid authenticated RFCOMM first.
-        // Windows drivers hide this transport detail, but Android exposes it directly.
         if (xpP323b) {
+            // Do not hammer this printer with multiple immediate RFCOMM handshakes.
+            // It can keep the serial profile busy for ~1s after a failed socket attempt.
             BluetoothSocket socket = tryInsecureSpp(device, errors);
             if (socket != null) return socket;
-            connectionBackoff();
+            connectionBackoff(900);
 
             socket = tryRfcommChannelOne(device, errors);
             if (socket != null) return socket;
-            connectionBackoff();
+            connectionBackoff(900);
 
             socket = trySecureSpp(device, errors);
+            if (socket != null) return socket;
+
+            // Final clean retry after letting the printer release the previous serial session.
+            connectionBackoff(1600);
+            socket = tryInsecureSpp(device, errors);
             if (socket != null) return socket;
         } else {
             BluetoothSocket socket = trySecureSpp(device, errors);
             if (socket != null) return socket;
-            connectionBackoff();
+            connectionBackoff(450);
 
             socket = tryInsecureSpp(device, errors);
             if (socket != null) return socket;
-            connectionBackoff();
+            connectionBackoff(450);
 
             socket = tryRfcommChannelOne(device, errors);
             if (socket != null) return socket;
         }
 
-        throw new IOException("لم يقبل منفذ الطابعة الاتصال. جرّب إطفاء وتشغيل الطابعة ثم اضغط اختبار مرة أخرى. التفاصيل: " + errors);
+        throw new IOException("لم يقبل منفذ الطابعة الاتصال. تأكد أنها ليست متصلة بتطبيق آخر ثم أعد المحاولة. التفاصيل: " + errors);
     }
 
     private BluetoothSocket trySecureSpp(BluetoothDevice device, StringBuilder errors) {
@@ -899,8 +904,10 @@ public class PosThermalPrinterPlugin extends Plugin {
         errors.append(method).append(": ").append(message == null ? error.getClass().getSimpleName() : message);
     }
 
-    private void connectionBackoff() {
-        try { Thread.sleep(350); }
+    private void connectionBackoff() { connectionBackoff(450); }
+
+    private void connectionBackoff(long millis) {
+        try { Thread.sleep(millis); }
         catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
     }
 
