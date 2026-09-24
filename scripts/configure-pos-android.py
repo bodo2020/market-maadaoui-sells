@@ -34,6 +34,9 @@ for line in (
 ):
     if line not in text:
         text = text.replace('<application', f'{line}\n\n    <application', 1)
+usb_host = '<uses-feature android:name="android.hardware.usb.host" android:required="false" />'
+if usb_host not in text:
+    text = text.replace('<application', f'{usb_host}\n\n    <application', 1)
 manifest.write_text(text, encoding='utf-8')
 
 activity.write_text('''package com.elmadawy.pos;
