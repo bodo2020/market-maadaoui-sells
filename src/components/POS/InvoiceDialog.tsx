@@ -15,6 +15,7 @@ import {
   type InvoicePrintPreferences,
 } from "@/services/retailPrintService";
 import { toast } from "sonner";
+import { isPosNative } from '@/native/posNative';
 
 interface InvoiceDialogProps {
   isOpen: boolean;
@@ -108,7 +109,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
       logoChoice: invoiceSettings.logoChoice,
       customLogoUrl: invoiceSettings.customLogoUrl,
     });
-    if (!opened) toast.error("تعذرت الطباعة. تحقق من خدمة الطباعة أو اسمح بالنوافذ المنبثقة.");
+    if (!opened && !isPosNative()) toast.error("تعذرت الطباعة. تحقق من خدمة الطباعة أو اسمح بالنوافذ المنبثقة.");
   };
 
   const handleQuickBlePrint = async () => {

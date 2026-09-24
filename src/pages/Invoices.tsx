@@ -36,6 +36,7 @@ import {
   type SupplierPurchaseRow,
 } from "@/services/supabase/supplierPurchasesV2Service";
 import { printSaleInvoice } from "@/services/retailPrintService";
+import { isPosNative } from '@/native/posNative';
 import type { Sale } from "@/types";
 import { siteConfig } from "@/config/site";
 import { toast } from "sonner";
@@ -198,7 +199,7 @@ export default function Invoices() {
   const quickPrint = async (row: PosInvoiceListItem) => {
     const sale = await loadSale(row);
     if (!sale) return;
-    if (!await printSaleInvoice(sale)) toast.error("تعذرت الطباعة. تحقق من خدمة الطباعة أو اسمح بالنوافذ المنبثقة.");
+    if (!await printSaleInvoice(sale) && !isPosNative()) toast.error("تعذرت الطباعة. تحقق من خدمة الطباعة أو اسمح بالنوافذ المنبثقة.");
   };
 
   const resetFilters = () => {

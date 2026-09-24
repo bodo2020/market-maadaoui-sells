@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { App as CapacitorApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import { toast } from 'sonner';
 import { isPosNative, posDevice } from './posNative';
 import './pos-safe-area.css';
 
@@ -11,6 +12,8 @@ export default function NativePosBridge() {
   useEffect(() => {
     if (!isPosNative()) return;
     document.body.classList.add('pos-native');
+    const printError = (event: Event) => toast.error((event as CustomEvent<string>).detail, { duration: 8500 });
+    window.addEventListener('pos:print-error', printError);
     void posDevice.getInsets().then(insets => {
       for (const side of ['top', 'bottom', 'left', 'right'] as const) {
         if (typeof insets[side] === 'number') document.documentElement.style.setProperty(`--pos-inset-${side}`, `${insets[side]}px`);
@@ -50,6 +53,7 @@ export default function NativePosBridge() {
     return () => {
       active = false;
       document.body.classList.remove('pos-native');
+      window.removeEventListener('pos:print-error', printError);
       void removeListener?.();
     };
   }, [navigate]);

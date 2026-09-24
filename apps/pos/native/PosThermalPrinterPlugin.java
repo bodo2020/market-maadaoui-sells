@@ -22,6 +22,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.io.OutputStream;
+import java.io.IOException;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -59,6 +60,7 @@ public class PosThermalPrinterPlugin extends Plugin {
         if ("list".equals(operation)) listPaired(call);
         else if ("save".equals(operation)) select(call);
         else if ("print".equals(operation)) printHtml(call);
+        else if ("test".equals(operation)) testConnection(call);
         else call.reject("عملية غير معروفة");
     }
 
@@ -116,6 +118,22 @@ public class PosThermalPrinterPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void testConnection(PluginCall call) {
+        if (!authorized(call)) return;
+        String address = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("address", null);
+        if (address == null) { call.reject("اختار الطابعة أولًا"); return; }
+        worker.execute(() -> {
+            try (BluetoothSocket socket = connectPrinter(address)) {
+                OutputStream output = socket.getOutputStream();
+                output.write(new byte[] {27, 64});
+                output.write("ELMADAWY POS - TEST\n\n\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                output.flush();
+                JSObject result = new JSObject(); result.put("sent", true); call.resolve(result);
+            } catch (Exception error) { call.reject("فشل اختبار اتصال الطابعة: " + error.getMessage(), error); }
+        });
+    }
+
+    @PluginMethod
     public void printHtml(PluginCall call) {
         if (!authorized(call)) return;
         String html = call.getString("html", "");
@@ -149,7 +167,7 @@ public class PosThermalPrinterPlugin extends Plugin {
                                 try {
                                     sendBitmap(address, bitmap);
                                     JSObject result = new JSObject(); result.put("printed", true); call.resolve(result);
-                                } catch (Exception error) { call.reject("تعذر الاتصال بالطابعة أو إرسال الفاتورة: " + error.getMessage(), error); }
+                } catch (Exception error) { call.reject("تعذر إرسال الفاتورة للطابعة: " + error.getMessage(), error); }
                                 finally { bitmap.recycle(); printing.set(false); getActivity().runOnUiThread(loaded::destroy); }
                             });
                         } catch (Exception error) {
@@ -165,20 +183,14 @@ public class PosThermalPrinterPlugin extends Plugin {
     }
 
     private void sendBitmap(String address, Bitmap bitmap) throws Exception {
-        BluetoothAdapter bluetooth = adapter();
-        if (bluetooth == null || !bluetooth.isEnabled()) throw new IllegalStateException("Bluetooth مغلق");
-        BluetoothDevice device = null;
-        Set<BluetoothDevice> bonded = bluetooth.getBondedDevices();
-        for (BluetoothDevice item : bonded) if (item.getAddress().equals(address)) device = item;
-        if (device == null) throw new IllegalStateException("الطابعة لم تعد مقترنة بالجهاز");
-        try (BluetoothSocket socket = device.createRfcommSocketToServiceRecord(SPP)) {
-            socket.connect();
+        try (BluetoothSocket socket = connectPrinter(address)) {
             OutputStream out = socket.getOutputStream();
             out.write(new byte[] {27, 64});
             int width = bitmap.getWidth();
             int rowBytes = (width + 7) / 8;
-            for (int top = 0; top < bitmap.getHeight(); top += 128) {
-                int rows = Math.min(128, bitmap.getHeight() - top);
+            // Portable printers have small Bluetooth buffers. Pace short raster bands.
+            for (int top = 0; top < bitmap.getHeight(); top += 24) {
+                int rows = Math.min(24, bitmap.getHeight() - top);
                 byte[] raster = new byte[8 + rowBytes * rows];
                 raster[0] = 29; raster[1] = 118; raster[2] = 48; raster[3] = 0;
                 raster[4] = (byte) rowBytes; raster[5] = (byte) (rowBytes >> 8);
@@ -188,10 +200,33 @@ public class PosThermalPrinterPlugin extends Plugin {
                     int luminance = ((color >> 16 & 255) * 299 + (color >> 8 & 255) * 587 + (color & 255) * 114) / 1000;
                     if (luminance < 180) raster[8 + y * rowBytes + x / 8] |= (byte) (0x80 >> (x % 8));
                 }
-                out.write(raster);
+                try { out.write(raster); }
+                catch (IOException error) { throw new IOException("انقطع الاتصال أثناء إرسال الفاتورة بعد " + top + " سطر", error); }
+                Thread.sleep(28);
             }
-            out.write(new byte[] {10, 10, 10, 29, 86, 1});
+            out.write(new byte[] {10, 10, 10});
             out.flush();
+        }
+    }
+
+    private BluetoothSocket connectPrinter(String address) throws Exception {
+        BluetoothAdapter bluetooth = adapter();
+        if (bluetooth == null || !bluetooth.isEnabled()) throw new IllegalStateException("Bluetooth مغلق");
+        BluetoothDevice device = null;
+        Set<BluetoothDevice> bonded = bluetooth.getBondedDevices();
+        for (BluetoothDevice item : bonded) if (item.getAddress().equals(address)) device = item;
+        if (device == null) throw new IllegalStateException("الطابعة لم تعد مقترنة بالجهاز");
+        if (Build.VERSION.SDK_INT >= 31 && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) bluetooth.cancelDiscovery();
+        IOException secureError;
+        BluetoothSocket secure = device.createRfcommSocketToServiceRecord(SPP);
+        try { secure.connect(); return secure; }
+        catch (IOException error) { secureError = error; secure.close(); }
+        // Paired receipt printers without authenticated SPP pairing may only accept this socket.
+        BluetoothSocket fallback = device.createInsecureRfcommSocketToServiceRecord(SPP);
+        try { fallback.connect(); return fallback; }
+        catch (IOException error) {
+            fallback.close();
+            throw new IOException("لم يقبل منفذ الطابعة الاتصال؛ تأكد من تشغيلها واقترانها (" + secureError.getMessage() + ")", error);
         }
     }
 }
