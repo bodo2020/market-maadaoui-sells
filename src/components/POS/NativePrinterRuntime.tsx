@@ -9,7 +9,14 @@ import { printSaleInvoice } from '@/services/retailPrintService';
 import type { Sale } from '@/types';
 
 type Printer = { address: string; name: string };
-type Selection = { address: string | null; name: string | null; paperSize: string };
+type UsbPrinter = { deviceId: number; vendorId: number; productId: number; name: string; permission: boolean };
+type Selection = {
+  address: string | null;
+  name: string | null;
+  paperSize: string;
+  transport?: 'bluetooth' | 'usb';
+  usbDeviceId?: number | null;
+};
 type PrintMetrics = {
   mode?: string;
   prepareMs?: number;
@@ -25,6 +32,7 @@ export default function NativePrinterRuntime() {
   const key = `pos:auto-print:${currentBranchId || ''}`;
   const [selection, setSelection] = useState<Selection | null>(null);
   const [devices, setDevices] = useState<Printer[]>([]);
+  const [usbDevices, setUsbDevices] = useState<UsbPrinter[]>([]);
   const [paperSize, setPaperSize] = useState<'58mm' | '80mm'>('80mm');
   const [auto, setAuto] = useState(() => localStorage.getItem(key) === '1');
   const [busy, setBusy] = useState(false);
@@ -60,7 +68,7 @@ export default function NativePrinterRuntime() {
       const sale = (event as CustomEvent<Sale>).detail;
       if (!sale?.id) return;
       setLastSale(sale);
-      if (autoRef.current && selectedRef.current?.address) void print(sale);
+      if (autoRef.current && (selectedRef.current?.address || selectedRef.current?.transport === 'usb')) void print(sale);
     };
     const onPrintError = (event: Event) => setPrintError((event as CustomEvent<string>).detail);
     const onPrintMetrics = (event: Event) => setMetrics((event as CustomEvent<PrintMetrics>).detail);
@@ -84,12 +92,32 @@ export default function NativePrinterRuntime() {
     finally { setBusy(false); }
   };
 
+  const refreshUsb = async () => {
+    setBusy(true);
+    try {
+      const result = await posThermalPrinter.listUsb();
+      setUsbDevices(result.devices);
+      if (!result.devices.length) toast.info('وصّل الطابعة بكابل USB OTG ثم افتح القائمة مرة أخرى.');
+    } catch (error) { toast.error((error as Error).message || 'تعذر عرض طابعات USB'); }
+    finally { setBusy(false); }
+  };
+
   const choose = async (device: Printer) => {
     setBusy(true);
     try {
       const value = await posThermalPrinter.select({ operation: 'save', address: device.address, paperSize });
       setSelection(value); toast.success(`تم حفظ ${value.name}. الطباعة التالية هتتوجه لها مباشرة.`);
     } catch (error) { toast.error((error as Error).message || 'تعذر اختيار الطابعة'); }
+    finally { setBusy(false); }
+  };
+
+  const chooseUsb = async (device: UsbPrinter) => {
+    setBusy(true);
+    try {
+      const value = await posThermalPrinter.selectUsb({ deviceId: device.deviceId, paperSize });
+      setSelection(value);
+      toast.success(`تم تفعيل USB Fast Mode على ${value.name || device.name}.`);
+    } catch (error) { toast.error((error as Error).message || 'تعذر اختيار طابعة USB'); }
     finally { setBusy(false); }
   };
 
@@ -112,6 +140,7 @@ export default function NativePrinterRuntime() {
         <div className="rounded-xl bg-slate-50 p-3 space-y-1">
           <div>الطابعة الحالية: <strong>{selection?.name || 'طباعة النظام'}</strong></div>
           {selection?.name?.toUpperCase().includes('XP-P323B') && <div className="text-xs font-semibold text-emerald-700">وضع XP-P323B السريع مفعّل تلقائيًا</div>}
+          {selection?.transport === 'usb' && <div className="text-xs font-semibold text-emerald-700">USB Fast Mode — أسرع مسار على أندرويد</div>}
         </div>
         {metrics && <div className="rounded-xl border bg-white p-3 text-xs leading-6">
           <div className="font-bold text-slate-800">آخر قياس للطباعة</div>
@@ -123,9 +152,15 @@ export default function NativePrinterRuntime() {
           </div>
         </div>}
         <div className="flex gap-2"><Button variant={paperSize === '58mm' ? 'default' : 'outline'} onClick={() => setPaperSize('58mm')}>58 مم</Button><Button variant={paperSize === '80mm' ? 'default' : 'outline'} onClick={() => setPaperSize('80mm')}>80 مم</Button></div>
-        <Button variant="outline" disabled={busy} onClick={() => void refresh()}><RefreshCw className="h-4 w-4" /> عرض الطابعات المقترنة</Button>
-        {devices.map(device => <Button key={device.address} variant="outline" className="w-full justify-start" disabled={busy} onClick={() => void choose(device)}>{device.name}{selection?.address === device.address ? ' ✓' : ''}</Button>)}
-        {selection?.address && <>
+        <div className="grid gap-2">
+          <Button variant="outline" disabled={busy} onClick={() => void refresh()}><RefreshCw className="h-4 w-4" /> طابعات Bluetooth</Button>
+          {devices.map(device => <Button key={device.address} variant="outline" className="w-full justify-start" disabled={busy} onClick={() => void choose(device)}>{device.name}{selection?.transport !== 'usb' && selection?.address === device.address ? ' ✓' : ''}</Button>)}
+        </div>
+        <div className="grid gap-2">
+          <Button variant="outline" disabled={busy} onClick={() => void refreshUsb()}><RefreshCw className="h-4 w-4" /> طابعات USB / OTG</Button>
+          {usbDevices.map(device => <Button key={device.deviceId} variant="outline" className="w-full justify-start" disabled={busy} onClick={() => void chooseUsb(device)}>{device.name}{selection?.transport === 'usb' && selection?.usbDeviceId === device.deviceId ? ' ✓' : ''}</Button>)}
+        </div>
+        {(selection?.address || selection?.transport === 'usb') && <>
           <Button variant="outline" className="w-full" disabled={busy || printing} onClick={() => void test()}>اختبار اتصال وطباعة الطابعة</Button>
           <Button variant="outline" className="w-full" disabled={!lastSale || busy || printing} onClick={() => lastSale && void print(lastSale)}><ReceiptText className="h-4 w-4" /> {printing ? 'جاري إرسال الفاتورة…' : 'طباعة آخر فاتورة'}</Button>
           <Button variant={auto ? 'default' : 'outline'} className="w-full" onClick={() => { const next = !auto; setAuto(next); autoRef.current = next; localStorage.setItem(key, next ? '1' : '0'); }}>الطباعة التلقائية بعد البيع: {auto ? 'مفعلة' : 'متوقفة'}</Button>
