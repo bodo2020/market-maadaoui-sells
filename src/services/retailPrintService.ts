@@ -523,6 +523,7 @@ export async function printSaleInvoice(
               sendMs: Number(fast.sendMs || 0),
               totalMs: Number(fast.totalMs || 0),
               persistentConnection: Boolean(fast.persistentConnection),
+              transport: fast.transport || selected.transport || 'bluetooth',
               copy: copy + 1,
               printer: selected.name || '',
               paperSize: thermalPreferences.paperSize,
