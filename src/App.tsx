@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AppRoutes from "@/AppRoutes";
 import FranchisePortalApp from "@/FranchisePortalApp";
+import NativePosBridge from "@/native/NativePosBridge";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -54,6 +55,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
+        <NativePosBridge />
         <TooltipProvider>
           <RoutedApplication />
           <SonnerToaster position="top-center" richColors />

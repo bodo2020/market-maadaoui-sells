@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'apps/pos/**'
+      - 'scripts/configure-pos-android.py'
       - 'src/**'
       - 'public/**'
       - 'index.html'
@@ -38,11 +39,13 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Build the original POS web app
-        run: npm run build
+        run: |
+          npx tsc -p tsconfig.app.json --noEmit
+          npm run build
 
       - name: Install pinned Capacitor dependencies
         working-directory: apps/pos
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Generate Android project
         working-directory: apps/pos
@@ -55,6 +58,14 @@ jobs:
       - name: Sync bundled web assets and native plugins
         working-directory: apps/pos
         run: npx cap sync android
+
+      - name: Verify native POS integration
+        run: |
+          grep -q 'registerPlugin(PosPrintPlugin.class)' apps/pos/android/app/src/main/java/com/elmadawy/pos/MainActivity.java
+          grep -q 'registerPlugin(PosCredentialsPlugin.class)' apps/pos/android/app/src/main/java/com/elmadawy/pos/MainActivity.java
+          grep -q 'androidx.credentials:credentials:1.5.0' apps/pos/android/app/build.gradle
+          grep -q 'android.permission.CAMERA' apps/pos/android/app/src/main/AndroidManifest.xml
+          grep -Rq 'current-password' apps/pos/android/app/src/main/assets/public/assets
 
       - name: Assemble installable debug APK
         working-directory: apps/pos/android

@@ -98,8 +98,8 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
     setPreferences(prev => saveInvoicePrintPreferences({ ...prev, [key]: value }));
   };
 
-  const handleDesignedPrint = () => {
-    const opened = printSaleInvoice(sale, preferences, {
+  const handleDesignedPrint = async () => {
+    const opened = await printSaleInvoice(sale, preferences, {
       footer: invoiceSettings.footer,
       website: invoiceSettings.website,
       showVat: invoiceSettings.showVat,
@@ -108,7 +108,7 @@ const InvoiceDialog: React.FC<InvoiceDialogProps> = ({ isOpen, onClose, sale, pr
       logoChoice: invoiceSettings.logoChoice,
       customLogoUrl: invoiceSettings.customLogoUrl,
     });
-    if (!opened) toast.error("المتصفح منع نافذة الطباعة. اسمح بالنوافذ المنبثقة لهذا الموقع.");
+    if (!opened) toast.error("تعذرت الطباعة. تحقق من خدمة الطباعة أو اسمح بالنوافذ المنبثقة.");
   };
 
   const handleQuickBlePrint = async () => {

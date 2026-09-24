@@ -1,6 +1,7 @@
 import JsBarcode from "jsbarcode";
 import { siteConfig } from "@/config/site";
 import type { Sale } from "@/types";
+import { isPosNative, posPrint } from "@/native/posNative";
 
 export type InvoicePaperSize = "58mm" | "80mm" | "a4";
 
@@ -445,12 +446,25 @@ export function buildSaleInvoiceHtml(
   </html>`;
 }
 
-export function printSaleInvoice(
+export async function printSaleInvoice(
   sale: Sale,
   preferences: InvoicePrintPreferences = getInvoicePrintPreferences(),
   overrides?: InvoiceBrandOverrides,
 ) {
   const normalized = saveInvoicePrintPreferences(preferences);
+  if (isPosNative()) {
+    try {
+      const result = await posPrint.printHtml({
+        html: buildSaleInvoiceHtml(sale, normalized, overrides),
+        title: `فاتورة ${sale.invoice_number}`,
+        paperSize: normalized.paperSize,
+      });
+      return result.started;
+    } catch (error) {
+      console.error('Native invoice printing failed', error);
+      return false;
+    }
+  }
   const popup = window.open("", "_blank", "width=920,height=820");
   if (!popup) return false;
 

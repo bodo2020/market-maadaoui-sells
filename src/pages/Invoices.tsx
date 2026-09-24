@@ -198,7 +198,7 @@ export default function Invoices() {
   const quickPrint = async (row: PosInvoiceListItem) => {
     const sale = await loadSale(row);
     if (!sale) return;
-    if (!printSaleInvoice(sale)) toast.error("اسمح بالنوافذ المنبثقة لفتح شاشة الطباعة");
+    if (!await printSaleInvoice(sale)) toast.error("تعذرت الطباعة. تحقق من خدمة الطباعة أو اسمح بالنوافذ المنبثقة.");
   };
 
   const resetFilters = () => {

@@ -9,9 +9,10 @@ android = root / 'apps/pos/android'
 variables = android / 'variables.gradle'
 manifest = android / 'app/src/main/AndroidManifest.xml'
 activity = android / 'app/src/main/java/com/elmadawy/pos/MainActivity.java'
+gradle = android / 'app/build.gradle'
 drawable = android / 'app/src/main/res/drawable'
 
-for path in (variables, manifest, activity):
+for path in (variables, manifest, activity, gradle):
     if not path.is_file():
         raise SystemExit(f'Expected generated Android file missing: {path}')
 
@@ -38,6 +39,8 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(PosPrintPlugin.class);
+        registerPlugin(PosCredentialsPlugin.class);
         super.onCreate(savedInstanceState);
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_YES);
@@ -46,6 +49,18 @@ public class MainActivity extends BridgeActivity {
 }
 ''', encoding='utf-8')
 
+for name in ('PosPrintPlugin.java', 'PosCredentialsPlugin.java'):
+    copyfile(root / 'apps/pos/native' / name, activity.with_name(name))
+
+gradle_text = gradle.read_text(encoding='utf-8')
+if 'androidx.credentials:credentials:' not in gradle_text:
+    if 'dependencies {' not in gradle_text:
+        raise SystemExit('Could not add Android Credential Manager dependencies')
+    gradle_text = gradle_text.replace('dependencies {', '''dependencies {
+    implementation "androidx.credentials:credentials:1.5.0"
+    implementation "androidx.credentials:credentials-play-services-auth:1.5.0"''', 1)
+    gradle.write_text(gradle_text, encoding='utf-8')
+
 drawable.mkdir(parents=True, exist_ok=True)
 copyfile(root / 'public/elmadawy-logo.png', drawable / 'elmadawy_pos_logo.png')
 for icon in (android / 'app/src/main/res').glob('mipmap-anydpi-v26/ic_launcher*.xml'):
@@ -53,4 +68,4 @@ for icon in (android / 'app/src/main/res').glob('mipmap-anydpi-v26/ic_launcher*.
     icon_text = icon_text.replace('@drawable/ic_launcher_foreground', '@drawable/elmadawy_pos_logo')
     icon.write_text(icon_text, encoding='utf-8')
 
-print('POS Android camera, autofill, HTTPS and app branding configured.')
+print('POS Android printing, credentials, camera, HTTPS and app branding configured.')

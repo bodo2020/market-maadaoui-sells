@@ -847,7 +847,7 @@ export default function POSPro() {
         </div>
       </div>
 
-      <div className="fixed inset-x-3 bottom-3 z-40 lg:hidden" dir="rtl"><Button className="h-14 w-full justify-between rounded-2xl bg-[#005931] px-5 text-base shadow-2xl hover:bg-[#004a29]" onClick={() => setMobileCartOpen(true)}><span className="flex items-center gap-2"><ShoppingCart className="h-5 w-5" /> السلة · {cartItems.length}</span><strong>{money(total)}</strong></Button></div>
+      <div className="pos-mobile-cart fixed inset-x-3 bottom-3 z-40 lg:hidden" dir="rtl"><Button className="h-14 w-full justify-between rounded-2xl bg-[#005931] px-5 text-base shadow-2xl hover:bg-[#004a29]" onClick={() => setMobileCartOpen(true)}><span className="flex items-center gap-2"><ShoppingCart className="h-5 w-5" /> السلة · {cartItems.length}</span><strong>{money(total)}</strong></Button></div>
 
       <Sheet open={mobileCartOpen} onOpenChange={setMobileCartOpen}><SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-3xl" dir="rtl"><SheetHeader><SheetTitle>سلة البيع الحالية</SheetTitle></SheetHeader><div className="mt-4">{cartPanel}</div></SheetContent></Sheet>
 
