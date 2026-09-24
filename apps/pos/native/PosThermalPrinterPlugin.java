@@ -480,9 +480,12 @@ public class PosThermalPrinterPlugin extends Plugin {
             out.write(new byte[] {27, 64});
             int width = bitmap.getWidth();
             int rowBytes = (width + 7) / 8;
-            // Larger raster bands + bulk pixel reads reduce CPU work and Bluetooth pauses.
-            // OutputStream.write still applies back-pressure if the printer buffer fills.
-            final int bandHeight = 48;
+            // XP-P323B has a substantially larger printer buffer than generic portable units.
+            // Use a dedicated fast profile for it, while keeping conservative pacing for unknown models.
+            String printerName = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("name", "");
+            boolean xpP323bFast = printerName != null && printerName.toUpperCase(java.util.Locale.ROOT).contains("XP-P323B");
+            final int bandHeight = xpP323bFast ? 128 : 48;
+            final int bandDelayMs = xpP323bFast ? 0 : 8;
             int[] pixels = new int[width * bandHeight];
             for (int top = 0; top < bitmap.getHeight(); top += bandHeight) {
                 int rows = Math.min(bandHeight, bitmap.getHeight() - top);
@@ -498,10 +501,10 @@ public class PosThermalPrinterPlugin extends Plugin {
                 }
                 try { out.write(raster); }
                 catch (IOException error) { throw new IOException("انقطع الاتصال أثناء إرسال الفاتورة بعد " + top + " سطر", error); }
-                Thread.sleep(8);
+                if (bandDelayMs > 0) Thread.sleep(bandDelayMs);
             }
-            // One feed line is enough for tearing without wasting a long blank tail.
-            out.write(new byte[] {10});
+            // ESC/POS feed one line: predictable tear margin without extra blank paper.
+            out.write(new byte[] {27, 100, 1});
             out.flush();
         } catch (Exception error) {
             closePersistentConnection();
