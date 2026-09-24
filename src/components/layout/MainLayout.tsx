@@ -48,7 +48,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   return (
     <TooltipProvider>
-      <div className="fixed inset-0 flex min-h-screen flex-col overflow-hidden bg-slate-50 md:flex-row">
+      <div className="pos-app-frame fixed inset-0 flex min-h-screen flex-col overflow-hidden bg-slate-50 md:flex-row">
         <ITDeviceRuntime />
         <Sidebar
           isMobile={isMobile}

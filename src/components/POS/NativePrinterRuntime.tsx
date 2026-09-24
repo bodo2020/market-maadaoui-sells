@@ -19,10 +19,12 @@ export default function NativePrinterRuntime() {
   const [paperSize, setPaperSize] = useState<'58mm' | '80mm'>('80mm');
   const [auto, setAuto] = useState(() => localStorage.getItem(key) === '1');
   const [busy, setBusy] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
   const autoRef = useRef(auto);
   const selectedRef = useRef(selection);
+  const printingRef = useRef(false);
 
   useEffect(() => { autoRef.current = auto; selectedRef.current = selection; }, [auto, selection]);
   useEffect(() => {
@@ -34,9 +36,13 @@ export default function NativePrinterRuntime() {
   }, [key]);
 
   const print = useCallback(async (sale: Sale) => {
-    const ok = await printSaleInvoice(sale);
-    if (!ok) setPrintError(current => current || 'تعذرت الطباعة؛ شغّل اختبار اتصال الطابعة لمعرفة السبب.');
-    else { setPrintError(null); toast.success('تم إرسال الفاتورة للطابعة'); }
+    if (printingRef.current) return;
+    printingRef.current = true; setPrinting(true); setPrintError(null);
+    try {
+      const ok = await printSaleInvoice(sale);
+      if (!ok) setPrintError(current => current || 'تعذرت الطباعة؛ شغّل اختبار اتصال الطابعة لمعرفة السبب.');
+      else { setPrintError(null); toast.success('تم إرسال الفاتورة للطابعة'); }
+    } finally { printingRef.current = false; setPrinting(false); }
   }, []);
 
   useEffect(() => {
@@ -92,8 +98,8 @@ export default function NativePrinterRuntime() {
         <Button variant="outline" disabled={busy} onClick={() => void refresh()}><RefreshCw className="h-4 w-4" /> عرض الطابعات المقترنة</Button>
         {devices.map(device => <Button key={device.address} variant="outline" className="w-full justify-start" disabled={busy} onClick={() => void choose(device)}>{device.name}{selection?.address === device.address ? ' ✓' : ''}</Button>)}
         {selection?.address && <>
-          <Button variant="outline" className="w-full" disabled={busy} onClick={() => void test()}>اختبار اتصال وطباعة الطابعة</Button>
-          <Button variant="outline" className="w-full" disabled={!lastSale || busy} onClick={() => lastSale && void print(lastSale)}><ReceiptText className="h-4 w-4" /> طباعة آخر فاتورة</Button>
+          <Button variant="outline" className="w-full" disabled={busy || printing} onClick={() => void test()}>اختبار اتصال وطباعة الطابعة</Button>
+          <Button variant="outline" className="w-full" disabled={!lastSale || busy || printing} onClick={() => lastSale && void print(lastSale)}><ReceiptText className="h-4 w-4" /> {printing ? 'جاري إرسال الفاتورة…' : 'طباعة آخر فاتورة'}</Button>
           <Button variant={auto ? 'default' : 'outline'} className="w-full" onClick={() => { const next = !auto; setAuto(next); autoRef.current = next; localStorage.setItem(key, next ? '1' : '0'); }}>الطباعة التلقائية بعد البيع: {auto ? 'مفعلة' : 'متوقفة'}</Button>
           <Button variant="ghost" className="w-full" onClick={() => void posThermalPrinter.clear().then(() => { setSelection(null); setAuto(false); localStorage.setItem(key, '0'); })}>إلغاء الطابعة المحفوظة واستخدام طباعة النظام</Button>
         </>}
