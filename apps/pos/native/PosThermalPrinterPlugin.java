@@ -281,28 +281,34 @@ public class PosThermalPrinterPlugin extends Plugin {
     @PluginMethod
     public void printReceipt(PluginCall call) {
         if (!authorized(call)) return;
-        String address = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("address", null);
-        if (address == null) { call.reject("اختار طابعة حرارية أولًا"); return; }
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE);
+        String transport = prefs.getString("transport", "bluetooth");
+        String address = prefs.getString("address", null);
+        int usbDeviceId = prefs.getInt("usbDeviceId", -1);
+        if ("usb".equals(transport) && usbDeviceId < 0) { call.reject("اختار طابعة USB أولًا"); return; }
+        if (!"usb".equals(transport) && address == null) { call.reject("اختار طابعة حرارية أولًا"); return; }
         JSObject receipt = call.getObject("receipt");
         if (receipt == null) { call.reject("بيانات الفاتورة غير صالحة"); return; }
         if (testing.get() || !printing.compareAndSet(false, true)) { call.reject("هناك فاتورة قيد الطباعة؛ انتظر انتهاءها أو حاول بعد قليل"); return; }
 
-        int width = "58mm".equals(getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("paperSize", "80mm")) ? 384 : 576;
+        int width = "58mm".equals(prefs.getString("paperSize", "80mm")) ? 384 : 576;
         worker.execute(() -> {
             Bitmap bitmap = null;
             long started = System.currentTimeMillis();
             try {
                 bitmap = renderNativeReceipt(receipt, width);
                 long prepared = System.currentTimeMillis();
-                sendBitmap(address, bitmap);
+                if ("usb".equals(transport)) sendBitmapUsb(usbDeviceId, bitmap);
+                else sendBitmap(address, bitmap);
                 long completed = System.currentTimeMillis();
                 JSObject result = new JSObject();
                 result.put("printed", true);
-                result.put("mode", "android_native_bitmap");
+                result.put("mode", "usb".equals(transport) ? "android_usb_native_bitmap" : "android_native_bitmap");
                 result.put("prepareMs", prepared - started);
                 result.put("sendMs", completed - prepared);
                 result.put("totalMs", completed - started);
                 result.put("persistentConnection", true);
+                result.put("transport", transport);
                 call.resolve(result);
             } catch (Exception error) {
                 call.reject("تعذر طباعة الفاتورة السريعة: " + error.getMessage(), error);
@@ -317,11 +323,15 @@ public class PosThermalPrinterPlugin extends Plugin {
     public void printHtml(PluginCall call) {
         if (!authorized(call)) return;
         String html = call.getString("html", "");
-        String address = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("address", null);
-        if (address == null) { call.reject("اختار طابعة حرارية أولًا"); return; }
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE);
+        String transport = prefs.getString("transport", "bluetooth");
+        String address = prefs.getString("address", null);
+        int usbDeviceId = prefs.getInt("usbDeviceId", -1);
+        if ("usb".equals(transport) && usbDeviceId < 0) { call.reject("اختار طابعة USB أولًا"); return; }
+        if (!"usb".equals(transport) && address == null) { call.reject("اختار طابعة حرارية أولًا"); return; }
         if (html.length() < 20 || html.length() > 750_000) { call.reject("محتوى الفاتورة غير صالح"); return; }
         if (testing.get() || !printing.compareAndSet(false, true)) { call.reject("هناك فاتورة قيد الطباعة؛ انتظر انتهاءها أو حاول بعد قليل"); return; }
-        int width = "58mm".equals(getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("paperSize", "80mm")) ? 384 : 576;
+        int width = "58mm".equals(prefs.getString("paperSize", "80mm")) ? 384 : 576;
         Handler main = new Handler(Looper.getMainLooper());
         AtomicBoolean preparing = new AtomicBoolean(true);
         WebView[] currentView = new WebView[1];
@@ -368,8 +378,9 @@ public class PosThermalPrinterPlugin extends Plugin {
                             main.removeCallbacks(timeout);
                             worker.execute(() -> {
                                 try {
-                                    sendBitmap(address, bitmap);
-                                    JSObject result = new JSObject(); result.put("printed", true); call.resolve(result);
+                                    if ("usb".equals(transport)) sendBitmapUsb(usbDeviceId, bitmap);
+                                    else sendBitmap(address, bitmap);
+                                    JSObject result = new JSObject(); result.put("printed", true); result.put("transport", transport); call.resolve(result);
                 } catch (Exception error) { call.reject("تعذر إرسال الفاتورة للطابعة: " + error.getMessage(), error); }
                                 finally { bitmap.recycle(); printing.set(false); getActivity().runOnUiThread(loaded::destroy); }
                             });
@@ -563,6 +574,98 @@ public class PosThermalPrinterPlugin extends Plugin {
         }
     }
 
+    private UsbDevice findUsbDevice(UsbManager manager, int deviceId) {
+        if (manager == null) return null;
+        for (UsbDevice device : manager.getDeviceList().values()) {
+            if (device.getDeviceId() == deviceId) return device;
+        }
+        return null;
+    }
+
+    private boolean hasBulkOutEndpoint(UsbDevice device) {
+        if (device == null) return false;
+        for (int i = 0; i < device.getInterfaceCount(); i++) {
+            UsbInterface intf = device.getInterface(i);
+            for (int e = 0; e < intf.getEndpointCount(); e++) {
+                UsbEndpoint endpoint = intf.getEndpoint(e);
+                if (endpoint.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK
+                    && endpoint.getDirection() == UsbConstants.USB_DIR_OUT) return true;
+            }
+        }
+        return false;
+    }
+
+    private synchronized void closePersistentUsbConnection() {
+        if (persistentUsbConnection != null && persistentUsbInterface != null) {
+            try { persistentUsbConnection.releaseInterface(persistentUsbInterface); } catch (Exception ignored) { }
+        }
+        if (persistentUsbConnection != null) {
+            try { persistentUsbConnection.close(); } catch (Exception ignored) { }
+        }
+        persistentUsbConnection = null;
+        persistentUsbOut = null;
+        persistentUsbInterface = null;
+        persistentUsbDeviceId = null;
+    }
+
+    private synchronized void ensureUsbConnection(int deviceId) throws Exception {
+        if (persistentUsbConnection != null && persistentUsbOut != null
+            && persistentUsbDeviceId != null && persistentUsbDeviceId == deviceId) return;
+
+        closePersistentUsbConnection();
+        UsbManager manager = (UsbManager) getContext().getSystemService(Context.USB_SERVICE);
+        if (manager == null) throw new IllegalStateException("USB غير متاح على هذا الجهاز");
+        UsbDevice device = findUsbDevice(manager, deviceId);
+        if (device == null) throw new IllegalStateException("طابعة USB غير متصلة");
+        if (!manager.hasPermission(device)) throw new SecurityException("صلاحية طابعة USB غير متاحة؛ اخترها مرة أخرى من الإعدادات");
+
+        for (int i = 0; i < device.getInterfaceCount(); i++) {
+            UsbInterface intf = device.getInterface(i);
+            UsbEndpoint out = null;
+            for (int e = 0; e < intf.getEndpointCount(); e++) {
+                UsbEndpoint endpoint = intf.getEndpoint(e);
+                if (endpoint.getType() == UsbConstants.USB_ENDPOINT_XFER_BULK
+                    && endpoint.getDirection() == UsbConstants.USB_DIR_OUT) {
+                    out = endpoint;
+                    break;
+                }
+            }
+            if (out == null) continue;
+            UsbDeviceConnection connection = manager.openDevice(device);
+            if (connection == null) throw new IOException("تعذر فتح اتصال USB بالطابعة");
+            if (!connection.claimInterface(intf, true)) {
+                connection.close();
+                continue;
+            }
+            persistentUsbConnection = connection;
+            persistentUsbOut = out;
+            persistentUsbInterface = intf;
+            persistentUsbDeviceId = deviceId;
+            return;
+        }
+        throw new IOException("لم يتم العثور على منفذ طباعة USB متوافق");
+    }
+
+    private synchronized void usbWrite(int deviceId, byte[] data, int timeoutMs) throws Exception {
+        ensureUsbConnection(deviceId);
+        int offset = 0;
+        while (offset < data.length) {
+            int chunk = Math.min(16 * 1024, data.length - offset);
+            byte[] part;
+            if (offset == 0 && chunk == data.length) part = data;
+            else {
+                part = new byte[chunk];
+                System.arraycopy(data, offset, part, 0, chunk);
+            }
+            int sent = persistentUsbConnection.bulkTransfer(persistentUsbOut, part, part.length, timeoutMs);
+            if (sent <= 0) {
+                closePersistentUsbConnection();
+                throw new IOException("فشل إرسال البيانات عبر USB");
+            }
+            offset += sent;
+        }
+    }
+
     private synchronized void closePersistentConnection() {
         if (persistentOutput != null) {
             try { persistentOutput.flush(); } catch (Exception ignored) { }
@@ -584,6 +687,34 @@ public class PosThermalPrinterPlugin extends Plugin {
         persistentOutput = persistentSocket.getOutputStream();
         persistentAddress = address;
         return persistentOutput;
+    }
+
+    private void sendBitmapUsb(int deviceId, Bitmap bitmap) throws Exception {
+        try {
+            usbWrite(deviceId, new byte[] {27, 64}, 3000);
+            int width = bitmap.getWidth();
+            int rowBytes = (width + 7) / 8;
+            final int bandHeight = 192;
+            int[] pixels = new int[width * bandHeight];
+            for (int top = 0; top < bitmap.getHeight(); top += bandHeight) {
+                int rows = Math.min(bandHeight, bitmap.getHeight() - top);
+                byte[] raster = new byte[8 + rowBytes * rows];
+                raster[0] = 29; raster[1] = 118; raster[2] = 48; raster[3] = 0;
+                raster[4] = (byte) rowBytes; raster[5] = (byte) (rowBytes >> 8);
+                raster[6] = (byte) rows; raster[7] = (byte) (rows >> 8);
+                bitmap.getPixels(pixels, 0, width, 0, top, width, rows);
+                for (int y = 0; y < rows; y++) for (int x = 0; x < width; x++) {
+                    int color = pixels[y * width + x];
+                    int luminance = ((color >> 16 & 255) * 299 + (color >> 8 & 255) * 587 + (color & 255) * 114) / 1000;
+                    if (luminance < 180) raster[8 + y * rowBytes + x / 8] |= (byte) (0x80 >> (x % 8));
+                }
+                usbWrite(deviceId, raster, 5000);
+            }
+            usbWrite(deviceId, new byte[] {27, 100, 1}, 3000);
+        } catch (Exception error) {
+            closePersistentUsbConnection();
+            throw error;
+        }
     }
 
     private void sendBitmap(String address, Bitmap bitmap) throws Exception {
