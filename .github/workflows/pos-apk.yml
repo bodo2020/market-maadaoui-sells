@@ -1,0 +1,77 @@
+name: Main POS APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/pos/**'
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - '.github/workflows/pos-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install web dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build the original POS web app
+        run: npm run build
+
+      - name: Install pinned Capacitor dependencies
+        working-directory: apps/pos
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Android project
+        working-directory: apps/pos
+        run: npx cap add android
+
+      - name: Configure POS Android permissions and branding
+        run: |
+          python3 scripts/configure-pos-android.py
+
+      - name: Sync bundled web assets and native plugins
+        working-directory: apps/pos
+        run: npx cap sync android
+
+      - name: Assemble installable debug APK
+        working-directory: apps/pos/android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Publish APK artifact
+        run: |
+          mkdir -p artifact
+          cp apps/pos/android/app/build/outputs/apk/debug/app-debug.apk "artifact/elmadawy-pos-${{ github.run_number }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elmadawy-pos-${{ github.run_number }}
+          path: artifact/*.apk
+          if-no-files-found: error
+          retention-days: 30
