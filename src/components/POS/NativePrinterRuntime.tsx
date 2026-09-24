@@ -10,6 +10,15 @@ import type { Sale } from '@/types';
 
 type Printer = { address: string; name: string };
 type Selection = { address: string | null; name: string | null; paperSize: string };
+type PrintMetrics = {
+  mode?: string;
+  prepareMs?: number;
+  sendMs?: number;
+  totalMs?: number;
+  persistentConnection?: boolean;
+  printer?: string;
+  paperSize?: string;
+};
 
 export default function NativePrinterRuntime() {
   const { currentBranchId } = useBranchStore();
@@ -22,6 +31,7 @@ export default function NativePrinterRuntime() {
   const [printing, setPrinting] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
   const [printError, setPrintError] = useState<string | null>(null);
+  const [metrics, setMetrics] = useState<PrintMetrics | null>(null);
   const autoRef = useRef(auto);
   const selectedRef = useRef(selection);
   const printingRef = useRef(false);
@@ -53,9 +63,15 @@ export default function NativePrinterRuntime() {
       if (autoRef.current && selectedRef.current?.address) void print(sale);
     };
     const onPrintError = (event: Event) => setPrintError((event as CustomEvent<string>).detail);
+    const onPrintMetrics = (event: Event) => setMetrics((event as CustomEvent<PrintMetrics>).detail);
     window.addEventListener('pos:sale-completed', completed);
     window.addEventListener('pos:print-error', onPrintError);
-    return () => { window.removeEventListener('pos:sale-completed', completed); window.removeEventListener('pos:print-error', onPrintError); };
+    window.addEventListener('pos:print-metrics', onPrintMetrics);
+    return () => {
+      window.removeEventListener('pos:sale-completed', completed);
+      window.removeEventListener('pos:print-error', onPrintError);
+      window.removeEventListener('pos:print-metrics', onPrintMetrics);
+    };
   }, [print]);
 
   const refresh = async () => {
@@ -93,7 +109,19 @@ export default function NativePrinterRuntime() {
       <div className="mt-6 space-y-4 text-sm">
         {printError && <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-red-800">{printError}</div>}
         <p>الطابعة الحرارية المقترنة ببلوتوث بتتحفظ على الجهاز مرة واحدة، والفواتير بتطبع مباشرة من التطبيق. لو مفيش طابعة مختارة، زر الفاتورة بيفتح طباعة أندرويد.</p>
-        <div className="rounded-xl bg-slate-50 p-3">الطابعة الحالية: <strong>{selection?.name || 'طباعة النظام'}</strong></div>
+        <div className="rounded-xl bg-slate-50 p-3 space-y-1">
+          <div>الطابعة الحالية: <strong>{selection?.name || 'طباعة النظام'}</strong></div>
+          {selection?.name?.toUpperCase().includes('XP-P323B') && <div className="text-xs font-semibold text-emerald-700">وضع XP-P323B السريع مفعّل تلقائيًا</div>}
+        </div>
+        {metrics && <div className="rounded-xl border bg-white p-3 text-xs leading-6">
+          <div className="font-bold text-slate-800">آخر قياس للطباعة</div>
+          <div className="grid grid-cols-2 gap-x-3">
+            <span>تجهيز الفاتورة</span><strong dir="ltr">{Math.round(metrics.prepareMs || 0)} ms</strong>
+            <span>إرسال للطابعة</span><strong dir="ltr">{Math.round(metrics.sendMs || 0)} ms</strong>
+            <span>الإجمالي</span><strong dir="ltr">{Math.round(metrics.totalMs || 0)} ms</strong>
+            <span>الاتصال المستمر</span><strong>{metrics.persistentConnection ? 'نعم' : 'لا'}</strong>
+          </div>
+        </div>}
         <div className="flex gap-2"><Button variant={paperSize === '58mm' ? 'default' : 'outline'} onClick={() => setPaperSize('58mm')}>58 مم</Button><Button variant={paperSize === '80mm' ? 'default' : 'outline'} onClick={() => setPaperSize('80mm')}>80 مم</Button></div>
         <Button variant="outline" disabled={busy} onClick={() => void refresh()}><RefreshCw className="h-4 w-4" /> عرض الطابعات المقترنة</Button>
         {devices.map(device => <Button key={device.address} variant="outline" className="w-full justify-start" disabled={busy} onClick={() => void choose(device)}>{device.name}{selection?.address === device.address ? ' ✓' : ''}</Button>)}
