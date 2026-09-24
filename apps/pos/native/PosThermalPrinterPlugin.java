@@ -151,6 +151,7 @@ public class PosThermalPrinterPlugin extends Plugin {
             String name = selected.getName() == null ? address : selected.getName();
             String oldAddress = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("address", null);
             if (oldAddress != null && !oldAddress.equals(address)) closePersistentConnection();
+            closePersistentUsbConnection();
             getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).edit()
                 .putString("address", address).putString("name", name).putString("paperSize", paperSize)
                 .putString("transport", "bluetooth").remove("usbDeviceId").apply();
