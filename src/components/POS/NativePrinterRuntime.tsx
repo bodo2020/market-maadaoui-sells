@@ -25,6 +25,7 @@ type PrintMetrics = {
   persistentConnection?: boolean;
   printer?: string;
   paperSize?: string;
+  transport?: 'bluetooth' | 'usb';
 };
 
 export default function NativePrinterRuntime() {
@@ -136,7 +137,7 @@ export default function NativePrinterRuntime() {
       <SheetHeader className="text-right"><SheetTitle>طباعة أندرويد</SheetTitle></SheetHeader>
       <div className="mt-6 space-y-4 text-sm">
         {printError && <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-red-800">{printError}</div>}
-        <p>الطابعة الحرارية المقترنة ببلوتوث بتتحفظ على الجهاز مرة واحدة، والفواتير بتطبع مباشرة من التطبيق. لو مفيش طابعة مختارة، زر الفاتورة بيفتح طباعة أندرويد.</p>
+        <p>اختَر Bluetooth للطباعة اللاسلكية أو USB/OTG لأسرع استجابة. الاختيار بيتحفظ على الجهاز، ولو مفيش طابعة مباشرة مختارة يفضل مسار طباعة أندرويد العادي متاح.</p>
         <div className="rounded-xl bg-slate-50 p-3 space-y-1">
           <div>الطابعة الحالية: <strong>{selection?.name || 'طباعة النظام'}</strong></div>
           {selection?.name?.toUpperCase().includes('XP-P323B') && <div className="text-xs font-semibold text-emerald-700">وضع XP-P323B السريع مفعّل تلقائيًا</div>}
@@ -148,6 +149,7 @@ export default function NativePrinterRuntime() {
             <span>تجهيز الفاتورة</span><strong dir="ltr">{Math.round(metrics.prepareMs || 0)} ms</strong>
             <span>إرسال للطابعة</span><strong dir="ltr">{Math.round(metrics.sendMs || 0)} ms</strong>
             <span>الإجمالي</span><strong dir="ltr">{Math.round(metrics.totalMs || 0)} ms</strong>
+            <span>نوع الاتصال</span><strong>{metrics.transport === 'usb' ? 'USB' : 'Bluetooth'}</strong>
             <span>الاتصال المستمر</span><strong>{metrics.persistentConnection ? 'نعم' : 'لا'}</strong>
           </div>
         </div>}
