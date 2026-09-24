@@ -274,6 +274,54 @@ function buildReceiptBody(sale: Sale, preferences: InvoicePrintPreferences, over
     </footer>`;
 }
 
+function buildNativeReceiptPayload(
+  sale: Sale,
+  preferences: InvoicePrintPreferences,
+  overrides?: InvoiceBrandOverrides,
+) {
+  const currency = siteConfig.currency || "ج.م";
+  const extra = sale as Sale & Record<string, any>;
+  const loyalty = Number(extra.loyalty_voucher_amount || 0);
+  const customerFee = Number(extra.customer_payment_fee_amount || 0);
+  const amountPaid = Math.max(
+    0,
+    Number(extra.amount_charged ?? extra.amount_due ?? (Number(sale.total || 0) - loyalty + customerFee)),
+  );
+  const invoiceDate = new Date(sale.date);
+  const dateLabel = invoiceDate.toLocaleDateString("ar-EG", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const timeLabel = invoiceDate.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+  const customer = [sale.customer_name || "", sale.customer_phone || ""].filter(Boolean).join(" - ");
+
+  return {
+    storeName: siteConfig.name || "المعداوي ماركت",
+    tagline: "مش مجرد ماركت",
+    address: siteConfig.address || "",
+    phone: siteConfig.phone || "",
+    invoiceNumber: sale.invoice_number,
+    dateLabel,
+    timeLabel,
+    cashier: sale.cashier_name || "—",
+    payment: paymentLabel(sale),
+    customer,
+    subtotal: money(sale.subtotal, currency),
+    discount: Number(sale.discount || 0) > 0 ? `- ${money(sale.discount, currency)}` : "",
+    loyalty: loyalty > 0 ? `- ${money(loyalty, currency)}` : "",
+    fee: customerFee > 0 ? `+ ${money(customerFee, currency)}` : "",
+    total: money(amountPaid, currency),
+    barcodeDataUrl: preferences.showInvoiceBarcode
+      ? invoiceBarcodeDataUrl(sale.invoice_number, preferences.paperSize)
+      : "",
+    footer: overrides?.footer || siteConfig.invoice.footer || "شكرًا لزيارتكم",
+    items: sale.items.map((item) => ({
+      name: item.product.name,
+      barcode: item.product.barcode || "",
+      quantity: quantityLabel(item),
+      price: money(item.price, currency),
+      total: money(item.total, currency),
+    })),
+  };
+}
+
 export function buildSaleInvoiceHtml(
   sale: Sale,
   preferences: InvoicePrintPreferences = getInvoicePrintPreferences(),
@@ -457,6 +505,33 @@ export async function printSaleInvoice(
       const selected = await posThermalPrinter.getSelected();
       if (selected.address) {
         const thermalPreferences = { ...normalized, paperSize: selected.paperSize === '58mm' ? '58mm' as const : '80mm' as const };
+
+        // Android APK gets a dedicated native fast path. Windows/browser printing below
+        // remains unchanged. If the native engine fails on a printer/firmware combination,
+        // keep the existing HTML raster path as a safe fallback.
+        try {
+          let printed = false;
+          for (let copy = 0; copy < clampCopies(thermalPreferences.copies); copy += 1) {
+            const fast = await posThermalPrinter.printReceipt({
+              operation: 'printReceipt',
+              receipt: buildNativeReceiptPayload(sale, thermalPreferences, overrides),
+            });
+            printed = fast.printed;
+            console.info('[POS thermal fast print]', {
+              mode: fast.mode,
+              prepareMs: fast.prepareMs,
+              sendMs: fast.sendMs,
+              totalMs: fast.totalMs,
+              persistentConnection: fast.persistentConnection,
+              copy: copy + 1,
+            });
+            if (!printed) break;
+          }
+          if (printed) return true;
+        } catch (fastError) {
+          console.warn('Android native fast receipt failed; falling back to HTML raster', fastError);
+        }
+
         const result = await posThermalPrinter.printHtml({
           operation: 'print',
           html: buildSaleInvoiceHtml(sale, thermalPreferences, overrides),
