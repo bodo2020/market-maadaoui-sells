@@ -169,8 +169,11 @@ public class PosThermalPrinterPlugin extends Plugin {
             view.setBackgroundColor(0xffffffff);
             view.getSettings().setJavaScriptEnabled(true);
             view.getSettings().setLoadsImagesAutomatically(true);
-            view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width, android.view.View.MeasureSpec.EXACTLY), android.view.View.MeasureSpec.makeMeasureSpec(2000, android.view.View.MeasureSpec.EXACTLY));
-            view.layout(0, 0, width, 2000);
+            // Keep the temporary viewport tiny. A tall detached WebView makes scrollHeight include
+            // blank viewport space and causes the printer to feed unnecessary paper.
+            final int previewHeight = 96;
+            view.measure(android.view.View.MeasureSpec.makeMeasureSpec(width, android.view.View.MeasureSpec.EXACTLY), android.view.View.MeasureSpec.makeMeasureSpec(previewHeight, android.view.View.MeasureSpec.EXACTLY));
+            view.layout(0, 0, width, previewHeight);
             view.setWebViewClient(new WebViewClient() {
                 boolean started;
                 @Override public void onPageFinished(WebView loaded, String url) {
@@ -178,7 +181,9 @@ public class PosThermalPrinterPlugin extends Plugin {
                     started = true;
                     main.postDelayed(() -> {
                       if (!preparing.get()) return;
-                      loaded.evaluateJavascript("Math.ceil(document.documentElement.scrollHeight * (window.devicePixelRatio || 1))", raw -> {
+                      loaded.evaluateJavascript(
+                        "(()=>{const r=document.querySelectorAll('.receipt');const last=r.length?r[r.length-1]:document.body;const rect=last.getBoundingClientRect();return Math.ceil(Math.max(1,rect.bottom)*(window.devicePixelRatio||1));})()",
+                        raw -> {
                         try {
                             if (!preparing.get()) return;
                             int height = (int) Math.ceil(Double.parseDouble(raw.replace("\"", "")));
@@ -208,7 +213,27 @@ public class PosThermalPrinterPlugin extends Plugin {
                 }
             });
             // The receipt layout itself is rendered to pixels, so Arabic and logos work without printer code pages.
-            String override = "<style>html,body{width:100%!important;overflow:visible!important} .receipt{width:100%!important;max-width:100%!important;margin:0!important}</style></head>";
+            String override = "<style>" +
+                "html,body{width:100%!important;overflow:visible!important}" +
+                ".receipt{width:100%!important;max-width:100%!important;margin:0!important}" +
+                ".paper-80{padding:1.8mm 2.2mm 2.2mm!important;font-size:8.3px!important;line-height:1.22!important}" +
+                ".paper-58{padding:1.6mm 1.8mm 2mm!important;font-size:7.7px!important;line-height:1.22!important}" +
+                ".paper-80 h1{font-size:14.5px!important}.paper-58 h1{font-size:12.5px!important}" +
+                ".paper-80 .tagline{font-size:7.8px!important}.paper-58 .tagline{font-size:7px!important}" +
+                ".paper-80 .store-lines{font-size:7.2px!important}.paper-58 .store-lines{font-size:6.7px!important}" +
+                ".paper-80 .invoice-number{font-size:11.5px!important}.paper-58 .invoice-number{font-size:10px!important}" +
+                ".paper-80 .meta-block span{font-size:6.8px!important}.paper-80 .meta-block strong{font-size:7.7px!important}" +
+                ".paper-58 .meta-block span{font-size:6.3px!important}.paper-58 .meta-block strong{font-size:7.2px!important}" +
+                ".items-80 th{font-size:6.9px!important;padding:3px 1px!important}.items-80 td{font-size:7.4px!important;padding:3px 1px!important}" +
+                ".items-80 .product strong{font-size:7.6px!important}.items-80 .product small{font-size:6px!important}" +
+                ".paper-80 .totals>div{font-size:8.2px!important}.paper-80 .grand-total{font-size:10.5px!important}.paper-80 .grand-total strong{font-size:11.5px!important}" +
+                ".paper-58 .grand-total{font-size:9.8px!important}.paper-58 .grand-total strong{font-size:10.5px!important}" +
+                ".paper-80 .payment-block>div{font-size:7.7px!important}.paper-58 .payment-block>div{font-size:7px!important}" +
+                ".receipt-head{padding-bottom:3px!important}.invoice-identity{padding:4px 0 3px!important}.meta-block{padding:3px 0!important;row-gap:2px!important}" +
+                ".totals{margin-top:3px!important;padding-top:3px!important}.payment-block{margin-top:3px!important;padding:3px 0!important}" +
+                ".invoice-barcode{margin-top:4px!important}.footer{margin-top:4px!important;padding-top:3px!important}" +
+                ".paper-80 .footer strong{font-size:8.5px!important}.paper-58 .footer strong{font-size:8px!important}" +
+                "</style></head>";
             view.loadDataWithBaseURL("https://localhost/", html.replace("</head>", override), "text/html", "UTF-8", null);
           } catch (Exception error) {
             if (preparing.compareAndSet(true, false)) {
@@ -226,23 +251,28 @@ public class PosThermalPrinterPlugin extends Plugin {
             out.write(new byte[] {27, 64});
             int width = bitmap.getWidth();
             int rowBytes = (width + 7) / 8;
-            // Portable printers have small Bluetooth buffers. Pace short raster bands.
-            for (int top = 0; top < bitmap.getHeight(); top += 24) {
-                int rows = Math.min(24, bitmap.getHeight() - top);
+            // Larger raster bands + bulk pixel reads reduce CPU work and Bluetooth pauses.
+            // OutputStream.write still applies back-pressure if the printer buffer fills.
+            final int bandHeight = 48;
+            int[] pixels = new int[width * bandHeight];
+            for (int top = 0; top < bitmap.getHeight(); top += bandHeight) {
+                int rows = Math.min(bandHeight, bitmap.getHeight() - top);
                 byte[] raster = new byte[8 + rowBytes * rows];
                 raster[0] = 29; raster[1] = 118; raster[2] = 48; raster[3] = 0;
                 raster[4] = (byte) rowBytes; raster[5] = (byte) (rowBytes >> 8);
                 raster[6] = (byte) rows; raster[7] = (byte) (rows >> 8);
+                bitmap.getPixels(pixels, 0, width, 0, top, width, rows);
                 for (int y = 0; y < rows; y++) for (int x = 0; x < width; x++) {
-                    int color = bitmap.getPixel(x, top + y);
+                    int color = pixels[y * width + x];
                     int luminance = ((color >> 16 & 255) * 299 + (color >> 8 & 255) * 587 + (color & 255) * 114) / 1000;
                     if (luminance < 180) raster[8 + y * rowBytes + x / 8] |= (byte) (0x80 >> (x % 8));
                 }
                 try { out.write(raster); }
                 catch (IOException error) { throw new IOException("انقطع الاتصال أثناء إرسال الفاتورة بعد " + top + " سطر", error); }
-                Thread.sleep(28);
+                Thread.sleep(8);
             }
-            out.write(new byte[] {10, 10, 10});
+            // One feed line is enough for tearing without wasting a long blank tail.
+            out.write(new byte[] {10});
             out.flush();
         }
     }
