@@ -517,14 +517,18 @@ export async function printSaleInvoice(
               receipt: buildNativeReceiptPayload(sale, thermalPreferences, overrides),
             });
             printed = fast.printed;
-            console.info('[POS thermal fast print]', {
-              mode: fast.mode,
-              prepareMs: fast.prepareMs,
-              sendMs: fast.sendMs,
-              totalMs: fast.totalMs,
-              persistentConnection: fast.persistentConnection,
+            const metrics = {
+              mode: fast.mode || 'android_native_bitmap',
+              prepareMs: Number(fast.prepareMs || 0),
+              sendMs: Number(fast.sendMs || 0),
+              totalMs: Number(fast.totalMs || 0),
+              persistentConnection: Boolean(fast.persistentConnection),
               copy: copy + 1,
-            });
+              printer: selected.name || '',
+              paperSize: thermalPreferences.paperSize,
+            };
+            console.info('[POS thermal fast print]', metrics);
+            window.dispatchEvent(new CustomEvent('pos:print-metrics', { detail: metrics }));
             if (!printed) break;
           }
           if (printed) return true;
