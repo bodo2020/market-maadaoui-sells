@@ -1,11 +1,15 @@
 package com.elmadawy.pos;
 
 import android.Manifest;
+import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -13,6 +17,12 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Typeface;
+import android.hardware.usb.UsbConstants;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbEndpoint;
+import android.hardware.usb.UsbInterface;
+import android.hardware.usb.UsbManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -57,6 +67,10 @@ public class PosThermalPrinterPlugin extends Plugin {
     private BluetoothSocket persistentSocket;
     private OutputStream persistentOutput;
     private String persistentAddress;
+    private UsbDeviceConnection persistentUsbConnection;
+    private UsbEndpoint persistentUsbOut;
+    private UsbInterface persistentUsbInterface;
+    private Integer persistentUsbDeviceId;
 
     private BluetoothAdapter adapter() {
         BluetoothManager manager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
@@ -92,6 +106,9 @@ public class PosThermalPrinterPlugin extends Plugin {
         result.put("address", getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("address", null));
         result.put("name", getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("name", null));
         result.put("paperSize", getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("paperSize", "80mm"));
+        result.put("transport", getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("transport", "bluetooth"));
+        int usbDeviceId = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getInt("usbDeviceId", -1);
+        result.put("usbDeviceId", usbDeviceId >= 0 ? usbDeviceId : null);
         call.resolve(result);
     }
 
@@ -130,7 +147,8 @@ public class PosThermalPrinterPlugin extends Plugin {
             String oldAddress = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("address", null);
             if (oldAddress != null && !oldAddress.equals(address)) closePersistentConnection();
             getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).edit()
-                .putString("address", address).putString("name", name).putString("paperSize", paperSize).apply();
+                .putString("address", address).putString("name", name).putString("paperSize", paperSize)
+                .putString("transport", "bluetooth").remove("usbDeviceId").apply();
             getSelected(call);
         } catch (SecurityException error) { call.reject("لا توجد صلاحية لاتصال Bluetooth", error); }
     }
@@ -138,28 +156,122 @@ public class PosThermalPrinterPlugin extends Plugin {
     @PluginMethod
     public void clear(PluginCall call) {
         closePersistentConnection();
+        closePersistentUsbConnection();
         getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).edit().clear().apply();
         call.resolve();
+    }
+
+    @PluginMethod
+    public void listUsb(PluginCall call) {
+        try {
+            UsbManager manager = (UsbManager) getContext().getSystemService(Context.USB_SERVICE);
+            JSArray devices = new JSArray();
+            if (manager != null) {
+                for (UsbDevice device : manager.getDeviceList().values()) {
+                    if (!hasBulkOutEndpoint(device)) continue;
+                    JSObject item = new JSObject();
+                    item.put("deviceId", device.getDeviceId());
+                    item.put("vendorId", device.getVendorId());
+                    item.put("productId", device.getProductId());
+                    String product = device.getProductName();
+                    item.put("name", product == null || product.trim().isEmpty() ? "USB Printer " + device.getDeviceId() : product);
+                    item.put("permission", manager.hasPermission(device));
+                    devices.put(item);
+                }
+            }
+            JSObject result = new JSObject();
+            result.put("devices", devices);
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("تعذر قراءة طابعات USB: " + error.getMessage(), error);
+        }
+    }
+
+    @PluginMethod
+    public void selectUsb(PluginCall call) {
+        Integer deviceId = call.getInt("deviceId");
+        String paperSize = call.getString("paperSize", "80mm");
+        if (deviceId == null || deviceId < 0) { call.reject("طابعة USB غير صالحة"); return; }
+        if (!"58mm".equals(paperSize) && !"80mm".equals(paperSize)) { call.reject("مقاس الورق غير صالح"); return; }
+        UsbManager manager = (UsbManager) getContext().getSystemService(Context.USB_SERVICE);
+        if (manager == null) { call.reject("USB غير متاح على هذا الجهاز"); return; }
+        UsbDevice device = findUsbDevice(manager, deviceId);
+        if (device == null || !hasBulkOutEndpoint(device)) { call.reject("لم يتم العثور على طابعة USB متوافقة"); return; }
+        if (manager.hasPermission(device)) {
+            saveUsbSelection(call, device, paperSize);
+            return;
+        }
+
+        String action = getContext().getPackageName() + ".USB_PRINTER_PERMISSION";
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent intent) {
+                if (!action.equals(intent.getAction())) return;
+                try { context.unregisterReceiver(this); } catch (Exception ignored) { }
+                UsbDevice granted = Build.VERSION.SDK_INT >= 33
+                    ? intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice.class)
+                    : (UsbDevice) intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                boolean allowed = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
+                if (!allowed || granted == null || granted.getDeviceId() != deviceId) {
+                    call.reject("اسمح للتطبيق بالوصول إلى طابعة USB");
+                    return;
+                }
+                saveUsbSelection(call, granted, paperSize);
+            }
+        };
+        IntentFilter filter = new IntentFilter(action);
+        if (Build.VERSION.SDK_INT >= 33) getContext().registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        else getContext().registerReceiver(receiver, filter);
+        PendingIntent permissionIntent = PendingIntent.getBroadcast(
+            getContext(), deviceId, new Intent(action).setPackage(getContext().getPackageName()),
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        manager.requestPermission(device, permissionIntent);
+    }
+
+    private void saveUsbSelection(PluginCall call, UsbDevice device, String paperSize) {
+        closePersistentConnection();
+        closePersistentUsbConnection();
+        String name = device.getProductName();
+        if (name == null || name.trim().isEmpty()) name = "USB Printer " + device.getDeviceId();
+        getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).edit()
+            .remove("address")
+            .putString("name", name)
+            .putString("paperSize", paperSize)
+            .putString("transport", "usb")
+            .putInt("usbDeviceId", device.getDeviceId())
+            .apply();
+        getSelected(call);
     }
 
     @PluginMethod
     public void testConnection(PluginCall call) {
         if (!authorized(call)) return;
         if (printing.get() || !testing.compareAndSet(false, true)) { call.reject("انتظر انتهاء الطباعة الحالية قبل الاختبار"); return; }
-        String address = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE).getString("address", null);
-        if (address == null) { testing.set(false); call.reject("اختار الطابعة أولًا"); return; }
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE);
+        String transport = prefs.getString("transport", "bluetooth");
+        String address = prefs.getString("address", null);
+        int usbDeviceId = prefs.getInt("usbDeviceId", -1);
+        if ("usb".equals(transport) && usbDeviceId < 0) { testing.set(false); call.reject("اختار طابعة USB أولًا"); return; }
+        if (!"usb".equals(transport) && address == null) { testing.set(false); call.reject("اختار الطابعة أولًا"); return; }
         worker.execute(() -> {
             try {
-                OutputStream output = getPersistentOutput(address);
-                output.write(new byte[] {27, 64});
-                output.write("ELMADAWY POS - TEST\n\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-                output.flush();
+                byte[] data = "ELMADAWY POS - TEST\n\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+                if ("usb".equals(transport)) {
+                    usbWrite(usbDeviceId, new byte[] {27, 64}, 3000);
+                    usbWrite(usbDeviceId, data, 3000);
+                } else {
+                    OutputStream output = getPersistentOutput(address);
+                    output.write(new byte[] {27, 64});
+                    output.write(data);
+                    output.flush();
+                }
                 JSObject result = new JSObject();
                 result.put("sent", true);
                 result.put("persistent", true);
+                result.put("transport", transport);
                 call.resolve(result);
             } catch (Exception error) {
-                closePersistentConnection();
+                if ("usb".equals(transport)) closePersistentUsbConnection(); else closePersistentConnection();
                 call.reject("فشل اختبار اتصال الطابعة: " + error.getMessage(), error);
             } finally { testing.set(false); }
         });
