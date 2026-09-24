@@ -448,7 +448,7 @@ public class PosThermalPrinterPlugin extends Plugin {
         int margin = width >= 500 ? 24 : 16;
         JSONArray items = receipt.optJSONArray("items");
         int itemCount = items == null ? 0 : items.length();
-        int maxHeight = Math.min(18000, Math.max(1200, 820 + itemCount * (width >= 500 ? 115 : 135)));
+        int maxHeight = Math.min(18000, Math.max(1200, 850 + itemCount * (width >= 500 ? 145 : 170)));
         Bitmap working = Bitmap.createBitmap(width, maxHeight, Bitmap.Config.RGB_565);
         working.eraseColor(Color.WHITE);
         Canvas canvas = new Canvas(working);
@@ -494,13 +494,49 @@ public class PosThermalPrinterPlugin extends Plugin {
             for (int i = 0; i < items.length(); i++) {
                 JSONObject item = items.optJSONObject(i);
                 if (item == null) continue;
-                y += drawTextBlock(canvas, item.optString("name", "صنف"), paint, margin, y, contentWidth, width >= 500 ? 17f : 15f, true, Layout.Alignment.ALIGN_NORMAL, true);
-                String calc = item.optString("quantity", "") + " × " + item.optString("price", "") + "    =    " + item.optString("total", "");
-                y += drawTextBlock(canvas, calc, paint, margin, y + 1, contentWidth, width >= 500 ? 14f : 12f, false, Layout.Alignment.ALIGN_NORMAL, true);
-                String productBarcode = item.optString("barcode", "");
-                if (!productBarcode.isEmpty()) y += drawTextBlock(canvas, productBarcode, paint, margin, y, contentWidth, width >= 500 ? 12f : 11f, false, Layout.Alignment.ALIGN_NORMAL, false);
+
+                y += drawTextBlock(
+                    canvas,
+                    item.optString("name", "صنف"),
+                    paint,
+                    margin,
+                    y,
+                    contentWidth,
+                    width >= 500 ? 18f : 16f,
+                    true,
+                    Layout.Alignment.ALIGN_NORMAL,
+                    true
+                );
+
+                y += drawItemMetrics(
+                    canvas,
+                    paint,
+                    margin,
+                    y + 2,
+                    contentWidth,
+                    item.optString("quantity", ""),
+                    item.optString("price", ""),
+                    item.optString("total", ""),
+                    width
+                );
+
+                String itemDiscount = item.optString("discount", "");
+                if (!itemDiscount.isEmpty()) {
+                    y += drawKeyValue(
+                        canvas,
+                        paint,
+                        margin,
+                        y + 1,
+                        contentWidth,
+                        "خصم الصنف",
+                        "- " + itemDiscount,
+                        width >= 500 ? 14f : 12f,
+                        true
+                    );
+                }
+
                 y += 3;
-                drawSeparator(canvas, margin, y, width - margin, true); y += 7;
+                drawSeparator(canvas, margin, y, width - margin, true); y += 8;
                 if (y > maxHeight - 500) throw new IllegalArgumentException("الفاتورة طويلة جدًا للطباعة السريعة");
             }
         }
@@ -582,6 +618,107 @@ public class PosThermalPrinterPlugin extends Plugin {
         layout.draw(canvas);
         canvas.restore();
         return layout.getHeight() + 3;
+    }
+
+    private int drawItemMetrics(
+        Canvas canvas,
+        TextPaint paint,
+        int x,
+        int y,
+        int width,
+        String quantity,
+        String unitPrice,
+        String total,
+        int pageWidth
+    ) {
+        if (pageWidth < 500) {
+            int height = 0;
+            height += drawTextBlock(
+                canvas,
+                "الكمية: " + quantity,
+                paint,
+                x,
+                y,
+                width,
+                17f,
+                true,
+                Layout.Alignment.ALIGN_NORMAL,
+                true
+            );
+            height += drawKeyValue(
+                canvas,
+                paint,
+                x,
+                y + height,
+                width,
+                "سعر الوحدة",
+                unitPrice,
+                12.5f,
+                false
+            );
+            height += drawKeyValue(
+                canvas,
+                paint,
+                x,
+                y + height,
+                width,
+                "الإجمالي",
+                total,
+                14f,
+                true
+            );
+            return height;
+        }
+
+        int gap = 8;
+        int col = (width - gap * 2) / 3;
+        int quantityX = x + (col + gap) * 2;
+        int priceX = x + col + gap;
+        int totalX = x;
+
+        int qh = drawMetricCell(canvas, paint, quantityX, y, col, "الكمية", quantity, 13.5f, 19f, true);
+        int ph = drawMetricCell(canvas, paint, priceX, y, col, "سعر الوحدة", unitPrice, 12f, 14f, false);
+        int th = drawMetricCell(canvas, paint, totalX, y, col, "الإجمالي", total, 12f, 16f, true);
+        return Math.max(qh, Math.max(ph, th)) + 4;
+    }
+
+    private int drawMetricCell(
+        Canvas canvas,
+        TextPaint paint,
+        int x,
+        int y,
+        int width,
+        String label,
+        String value,
+        float labelSize,
+        float valueSize,
+        boolean boldValue
+    ) {
+        int height = drawTextBlock(
+            canvas,
+            label,
+            paint,
+            x,
+            y,
+            width,
+            labelSize,
+            false,
+            Layout.Alignment.ALIGN_NORMAL,
+            true
+        );
+        height += drawTextBlock(
+            canvas,
+            value,
+            paint,
+            x,
+            y + height,
+            width,
+            valueSize,
+            boldValue,
+            Layout.Alignment.ALIGN_NORMAL,
+            true
+        );
+        return height;
     }
 
     private int drawKeyValue(Canvas canvas, TextPaint paint, int x, int y, int width, String label, String value, float size, boolean bold) {
