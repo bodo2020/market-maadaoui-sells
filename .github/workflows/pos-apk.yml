@@ -63,6 +63,9 @@ jobs:
         run: |
           grep -q 'registerPlugin(PosPrintPlugin.class)' apps/pos/android/app/src/main/java/com/elmadawy/pos/MainActivity.java
           grep -q 'registerPlugin(PosCredentialsPlugin.class)' apps/pos/android/app/src/main/java/com/elmadawy/pos/MainActivity.java
+          grep -q 'registerPlugin(PosDevicePlugin.class)' apps/pos/android/app/src/main/java/com/elmadawy/pos/MainActivity.java
+          grep -q 'registerPlugin(PosThermalPrinterPlugin.class)' apps/pos/android/app/src/main/java/com/elmadawy/pos/MainActivity.java
+          grep -q 'android.permission.BLUETOOTH_CONNECT' apps/pos/android/app/src/main/AndroidManifest.xml
           grep -q 'androidx.credentials:credentials:1.5.0' apps/pos/android/app/build.gradle
           grep -q 'android.permission.CAMERA' apps/pos/android/app/src/main/AndroidManifest.xml
           grep -Rq 'current-password' apps/pos/android/app/src/main/assets/public/assets

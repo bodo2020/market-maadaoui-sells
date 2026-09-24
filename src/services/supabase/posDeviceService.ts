@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { isPosNative, posDevice } from "@/native/posNative";
 
 export type PosDevice = {
   device_id: string;
@@ -85,6 +86,19 @@ export function getAnyLocalPosDevice(): LocalPosDevice | null {
 
 export function clearLocalPosDevice(branchId: string) {
   localStorage.removeItem(storageKey(branchId));
+  if (isPosNative()) void posDevice.remove({ branchId });
+}
+
+export async function restoreNativePosDevice(branchId: string): Promise<LocalPosDevice | null> {
+  const local = getLocalPosDevice(branchId);
+  if (local) return local;
+  if (!isPosNative()) return null;
+  const { device } = await posDevice.get({ branchId });
+  if (!device) return null;
+  const parsed = JSON.parse(device) as LocalPosDevice;
+  if (parsed.branch_id !== branchId || !parsed.device_id || !parsed.device_token) return null;
+  localStorage.setItem(storageKey(branchId), device);
+  return parsed;
 }
 
 export async function listPosDevices(branchId: string): Promise<PosDevice[]> {
@@ -125,6 +139,7 @@ export async function registerThisPosDevice(branchId: string, name: string): Pro
   }
 
   localStorage.setItem(storageKey(branchId), JSON.stringify(registered));
+  if (isPosNative()) await posDevice.save({ branchId, device: JSON.stringify(registered) });
   return registered;
 }
 

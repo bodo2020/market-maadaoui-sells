@@ -8,6 +8,8 @@ import type { Sale } from "@/types";
 import { useBranchStore } from "@/stores/branchStore";
 import { bluetoothPrinterService, type PrinterConnectionStatus } from "@/services/bluetoothPrinterService";
 import { buildCustomerInvoiceText } from "@/services/invoiceTextPrintService";
+import { isPosNative } from '@/native/posNative';
+import NativePrinterRuntime from './NativePrinterRuntime';
 
 function autoPrintKey(branchId: string) {
   return `pos:auto-print:${branchId}`;
@@ -21,7 +23,7 @@ function readAutoPrint(branchId: string) {
   }
 }
 
-export default function PosPrinterRuntime() {
+function WebPrinterRuntime() {
   const { currentBranchId } = useBranchStore();
   const [status, setStatus] = useState<PrinterConnectionStatus>(() => bluetoothPrinterService.getStatus());
   const [busy, setBusy] = useState(false);
@@ -210,4 +212,8 @@ export default function PosPrinterRuntime() {
       </SheetContent>
     </Sheet>
   );
+}
+
+export default function PosPrinterRuntime() {
+  return isPosNative() ? <NativePrinterRuntime /> : <WebPrinterRuntime />;
 }

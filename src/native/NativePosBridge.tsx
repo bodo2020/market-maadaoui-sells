@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { App as CapacitorApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
-import { isPosNative } from './posNative';
+import { isPosNative, posDevice } from './posNative';
 import './pos-safe-area.css';
 
 export default function NativePosBridge() {
@@ -11,6 +11,11 @@ export default function NativePosBridge() {
   useEffect(() => {
     if (!isPosNative()) return;
     document.body.classList.add('pos-native');
+    void posDevice.getInsets().then(insets => {
+      for (const side of ['top', 'bottom', 'left', 'right'] as const) {
+        if (typeof insets[side] === 'number') document.documentElement.style.setProperty(`--pos-inset-${side}`, `${insets[side]}px`);
+      }
+    });
     void StatusBar.setOverlaysWebView({ overlay: false });
     void StatusBar.setStyle({ style: Style.Light });
     void StatusBar.setBackgroundColor({ color: '#005931' });

@@ -1,7 +1,7 @@
 import JsBarcode from "jsbarcode";
 import { siteConfig } from "@/config/site";
 import type { Sale } from "@/types";
-import { isPosNative, posPrint } from "@/native/posNative";
+import { isPosNative, posPrint, posThermalPrinter } from "@/native/posNative";
 
 export type InvoicePaperSize = "58mm" | "80mm" | "a4";
 
@@ -454,6 +454,15 @@ export async function printSaleInvoice(
   const normalized = saveInvoicePrintPreferences(preferences);
   if (isPosNative()) {
     try {
+      const selected = await posThermalPrinter.getSelected();
+      if (selected.address) {
+        const thermalPreferences = { ...normalized, paperSize: selected.paperSize === '58mm' ? '58mm' as const : '80mm' as const };
+        const result = await posThermalPrinter.printHtml({
+          operation: 'print',
+          html: buildSaleInvoiceHtml(sale, thermalPreferences, overrides),
+        });
+        return result.printed;
+      }
       const result = await posPrint.printHtml({
         html: buildSaleInvoiceHtml(sale, normalized, overrides),
         title: `فاتورة ${sale.invoice_number}`,
@@ -462,6 +471,7 @@ export async function printSaleInvoice(
       return result.started;
     } catch (error) {
       console.error('Native invoice printing failed', error);
+      window.dispatchEvent(new CustomEvent('pos:print-error', { detail: (error as Error)?.message || 'تعذرت طباعة الفاتورة' }));
       return false;
     }
   }
