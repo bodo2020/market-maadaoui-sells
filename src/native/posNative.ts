@@ -37,6 +37,7 @@ type ThermalPrinterPlugin = {
     sendMs?: number;
     totalMs?: number;
     persistentConnection?: boolean;
+    transport?: 'bluetooth' | 'usb';
   }>;
   testConnection(options: { operation: 'test' }): Promise<{ sent: boolean; persistent?: boolean; transport?: string }>;
 };
