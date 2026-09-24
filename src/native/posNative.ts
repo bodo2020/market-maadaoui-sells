@@ -14,10 +14,20 @@ export const posPrint = registerPlugin<PrintPlugin>('PosPrint');
 export const posCredentials = registerPlugin<CredentialsPlugin>('PosCredentials');
 
 type PairedPrinter = { address: string; name: string };
+type UsbPrinter = { deviceId: number; vendorId: number; productId: number; name: string; permission: boolean };
+type SelectedPrinter = {
+  address: string | null;
+  name: string | null;
+  paperSize: string;
+  transport?: 'bluetooth' | 'usb';
+  usbDeviceId?: number | null;
+};
 type ThermalPrinterPlugin = {
   listPaired(options: { operation: 'list' }): Promise<{ devices: PairedPrinter[] }>;
-  select(options: { operation: 'save'; address: string; paperSize: '58mm' | '80mm' }): Promise<{ address: string; name: string; paperSize: string }>;
-  getSelected(): Promise<{ address: string | null; name: string | null; paperSize: string }>;
+  listUsb(): Promise<{ devices: UsbPrinter[] }>;
+  select(options: { operation: 'save'; address: string; paperSize: '58mm' | '80mm' }): Promise<SelectedPrinter>;
+  selectUsb(options: { deviceId: number; paperSize: '58mm' | '80mm' }): Promise<SelectedPrinter>;
+  getSelected(): Promise<SelectedPrinter>;
   clear(): Promise<void>;
   printHtml(options: { operation: 'print'; html: string }): Promise<{ printed: boolean }>;
   printReceipt(options: { operation: 'printReceipt'; receipt: Record<string, unknown> }): Promise<{
@@ -28,7 +38,7 @@ type ThermalPrinterPlugin = {
     totalMs?: number;
     persistentConnection?: boolean;
   }>;
-  testConnection(options: { operation: 'test' }): Promise<{ sent: boolean; persistent?: boolean }>;
+  testConnection(options: { operation: 'test' }): Promise<{ sent: boolean; persistent?: boolean; transport?: string }>;
 };
 type DevicePlugin = {
   getInsets(): Promise<{ top?: number; bottom?: number; left?: number; right?: number }>;
