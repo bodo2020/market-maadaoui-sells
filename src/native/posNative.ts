@@ -20,7 +20,15 @@ type ThermalPrinterPlugin = {
   getSelected(): Promise<{ address: string | null; name: string | null; paperSize: string }>;
   clear(): Promise<void>;
   printHtml(options: { operation: 'print'; html: string }): Promise<{ printed: boolean }>;
-  testConnection(options: { operation: 'test' }): Promise<{ sent: boolean }>;
+  printReceipt(options: { operation: 'printReceipt'; receipt: Record<string, unknown> }): Promise<{
+    printed: boolean;
+    mode?: string;
+    prepareMs?: number;
+    sendMs?: number;
+    totalMs?: number;
+    persistentConnection?: boolean;
+  }>;
+  testConnection(options: { operation: 'test' }): Promise<{ sent: boolean; persistent?: boolean }>;
 };
 type DevicePlugin = {
   getInsets(): Promise<{ top?: number; bottom?: number; left?: number; right?: number }>;
