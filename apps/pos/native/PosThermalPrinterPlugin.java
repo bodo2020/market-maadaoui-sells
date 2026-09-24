@@ -60,6 +60,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 })
 public class PosThermalPrinterPlugin extends Plugin {
     private static final UUID SPP = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    private static final String ELMADAWY_LOGO_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAARgAAACmAQAAAAApQq2QAAAD3ElEQVR42t2YP27lNhCHP1ICnorFWqW7pyO43AABzKPsSWJ6c4EcwcdIESBymk0XH0ELpNhSDlxoDT1NCv2jKIlUkAU2CJv3gPe9GXJm+OOQiIhIx53sD0REpOYcYDQANZ/ZHz3zQBtglAAokIgdAWyE6VTAyjgfTVlGmPYNRRWzk5PHfDWQ1TE7BWnMTg3xdRloYsz8GWKCQ2T0cheonzF6V4H6GZkmMJ8xU21gPuO3ZLb+x0at+uPn/uOxGH2N/3eYV9/XyPzorLaPQ3kO+KKMxlmCubik9wY6TIBpu/7TRn21R/Ku4kyj/3H9bDJ1GmJSDXO1bDNJe/erhmye+KPZ8NVJnwnBAs/mt505P0+Lf0KsBvjEYH4YBnf/P+gh9L4AOcVdb/oq5iorVxH9wCA1rt12yYg5HOdsUR2dHrx27rpSp1pv697OtFA77rTWNdrbqfyySuacpf2+yGoaTzSt86mHiPlyZ/x1pS1V4f1Uz4QG0BeMidah2kjHklEHzh1KEg7rfLnPXHMdtXOiiu+voVxsdaA2PscZ88X/3Q6l4iuGArgC+KSmXGxGd89XfoDJDjDpASY5olHlAeb7LcabQSKu2N/Kv9PMr8zYKNMdsNMeYBoVZS75kTnrr7T21PlyURtnsVtwer+U8xWz7tveO0wf8hd/ool1GOOFfthoizgXbM/ZZfrmJCBk05ztQ5x5X8eZvIkz2WucSSXUi449WCJN4reY9anD6cfsbqepN0+aPaY4wFyncSbN4kxSf0tN+GbMfQEoVQDKjCeLqMLJewu30sC5ToSTiFRciZQkTt5foJpOty8gBc9QcnF8PfVX1KlGXscMm9mXhbMw+OIsFXAS4Dz7sostWFONalhPviR4KZjjU3Rb3WPjMFcA57KXhhZ4B3Dn2OmopWxVf/yrCjh9LBGo2p1c5B3mmhtXyPR4nuulCqaOIGp/punRnn+ITDcz4l2Iit6PXdixqwa7WvnyJCxf33c0f67vaLlv57J0lnVYrz9U8NPefbRnPoD1RD7lh2VPKwYzVeVo+5fFUjVwAyZb9Fu/L7pTDbyBanFe2GX4tYXEUiN2/pPxs3YrUnNq+5pfqeakq28P7GVVtuE3BwPcrBvxVf1kB/rwoISPTNdX+Tjebdt56xR58nH7Tq2k5NSeRESknd9DGiUHta6MyuIxO9W4A3dftrStD9h5AZ5SELt3ymlzMYgB/dd+Q1XwqCBD8t106JxY2zKKyrlzj3r/HSmdDuXdEtLTA1kgnGIBJV3gzYpB+Tu43We6/mls3Y9MI/xK+Z89l++/y+J2mvZ/2pNExt/RFl3bbj1+SQAAAABJRU5ErkJggg==";
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final ScheduledExecutorService deadlines = Executors.newSingleThreadScheduledExecutor();
     private final AtomicBoolean printing = new AtomicBoolean(false);
@@ -456,7 +457,9 @@ public class PosThermalPrinterPlugin extends Plugin {
         int contentWidth = width - margin * 2;
         int y = width >= 500 ? 18 : 14;
 
-        y += drawTextBlock(canvas, receipt.optString("storeName", "المعداوي ماركت"), paint, margin, y, contentWidth, width >= 500 ? 30f : 25f, true, Layout.Alignment.ALIGN_CENTER, true);
+        int logoHeight = drawReceiptLogo(canvas, y, width);
+        if (logoHeight > 0) y += logoHeight;
+        else y += drawTextBlock(canvas, receipt.optString("storeName", "المعداوي ماركت"), paint, margin, y, contentWidth, width >= 500 ? 30f : 25f, true, Layout.Alignment.ALIGN_CENTER, true);
         String tagline = receipt.optString("tagline", "مش مجرد ماركت");
         if (!tagline.isEmpty()) y += drawTextBlock(canvas, tagline, paint, margin, y + 1, contentWidth, width >= 500 ? 17f : 15f, true, Layout.Alignment.ALIGN_CENTER, true) + 1;
         String address = receipt.optString("address", "");
@@ -539,6 +542,29 @@ public class PosThermalPrinterPlugin extends Plugin {
         Bitmap result = Bitmap.createBitmap(working, 0, 0, width, finalHeight);
         working.recycle();
         return result;
+    }
+
+    private int drawReceiptLogo(Canvas canvas, int y, int pageWidth) {
+        Bitmap logo = null;
+        try {
+            byte[] bytes = Base64.decode(ELMADAWY_LOGO_PNG_BASE64, Base64.DEFAULT);
+            logo = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            if (logo == null || logo.getWidth() <= 0 || logo.getHeight() <= 0) return 0;
+
+            int targetWidth = pageWidth >= 500 ? 250 : 210;
+            int targetHeight = Math.max(1, Math.round(logo.getHeight() * (targetWidth / (float) logo.getWidth())));
+            int left = (pageWidth - targetWidth) / 2;
+            android.graphics.Rect src = new android.graphics.Rect(0, 0, logo.getWidth(), logo.getHeight());
+            android.graphics.Rect dst = new android.graphics.Rect(left, y, left + targetWidth, y + targetHeight);
+            Paint logoPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            logoPaint.setFilterBitmap(false);
+            canvas.drawBitmap(logo, src, dst, logoPaint);
+            return targetHeight + (pageWidth >= 500 ? 8 : 6);
+        } catch (Exception ignored) {
+            return 0;
+        } finally {
+            if (logo != null) logo.recycle();
+        }
     }
 
     private int drawTextBlock(Canvas canvas, String text, TextPaint paint, int x, int y, int width, float size, boolean bold, Layout.Alignment alignment, boolean rtl) {
