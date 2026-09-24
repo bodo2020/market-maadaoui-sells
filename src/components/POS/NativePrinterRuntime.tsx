@@ -48,10 +48,60 @@ export default function NativePrinterRuntime() {
   useEffect(() => { autoRef.current = auto; selectedRef.current = selection; }, [auto, selection]);
   useEffect(() => {
     setAuto(localStorage.getItem(key) === '1');
-    void posThermalPrinter.getSelected().then(value => {
-      setSelection(value);
-      setPaperSize(value.paperSize === '58mm' ? '58mm' : '80mm');
-    }).catch(() => toast.error('تعذر قراءة إعدادات الطابعة'));
+    void (async () => {
+      try {
+        let value = await posThermalPrinter.getSelected();
+
+        // Keep a WebView-side backup so APK updates/reinstalls that preserve app data
+        // can restore the thermal printer instead of silently falling back to system print.
+        const backupRaw = localStorage.getItem('pos:thermal-printer-backup');
+        if (!value.address && value.transport !== 'usb') {
+          let restored = false;
+          if (backupRaw) {
+            try {
+              const backup = JSON.parse(backupRaw) as { address?: string; paperSize?: '58mm' | '80mm' };
+              if (backup.address) {
+                value = await posThermalPrinter.select({
+                  operation: 'save',
+                  address: backup.address,
+                  paperSize: backup.paperSize === '58mm' ? '58mm' : '80mm',
+                });
+                restored = true;
+              }
+            } catch {
+              // Continue to safe paired-device auto detection below.
+            }
+          }
+
+          if (!restored) {
+            try {
+              const paired = await posThermalPrinter.listPaired({ operation: 'list' });
+              const xp = paired.devices.filter(device => device.name?.toUpperCase().includes('XP-P323B'));
+              if (xp.length === 1) {
+                value = await posThermalPrinter.select({
+                  operation: 'save',
+                  address: xp[0].address,
+                  paperSize: value.paperSize === '58mm' ? '58mm' : '80mm',
+                });
+                localStorage.setItem('pos:thermal-printer-backup', JSON.stringify({
+                  address: xp[0].address,
+                  name: xp[0].name,
+                  paperSize: value.paperSize === '58mm' ? '58mm' : '80mm',
+                }));
+              }
+            } catch {
+              // Bluetooth may be off or permission may not be granted yet.
+            }
+          }
+        }
+
+        setSelection(value);
+        selectedRef.current = value;
+        setPaperSize(value.paperSize === '58mm' ? '58mm' : '80mm');
+      } catch {
+        toast.error('تعذر قراءة إعدادات الطابعة');
+      }
+    })();
   }, [key]);
 
   const print = useCallback(async (sale: Sale) => {
@@ -107,7 +157,14 @@ export default function NativePrinterRuntime() {
     setBusy(true);
     try {
       const value = await posThermalPrinter.select({ operation: 'save', address: device.address, paperSize });
-      setSelection(value); toast.success(`تم حفظ ${value.name}. الطباعة التالية هتتوجه لها مباشرة.`);
+      localStorage.setItem('pos:thermal-printer-backup', JSON.stringify({
+        address: device.address,
+        name: value.name || device.name,
+        paperSize,
+      }));
+      setSelection(value);
+      selectedRef.current = value;
+      toast.success(`تم حفظ ${value.name}. الطباعة التالية هتتوجه لها مباشرة.`);
     } catch (error) { toast.error((error as Error).message || 'تعذر اختيار الطابعة'); }
     finally { setBusy(false); }
   };
@@ -116,7 +173,9 @@ export default function NativePrinterRuntime() {
     setBusy(true);
     try {
       const value = await posThermalPrinter.selectUsb({ deviceId: device.deviceId, paperSize });
+      localStorage.removeItem('pos:thermal-printer-backup');
       setSelection(value);
+      selectedRef.current = value;
       toast.success(`تم تفعيل USB Fast Mode على ${value.name || device.name}.`);
     } catch (error) { toast.error((error as Error).message || 'تعذر اختيار طابعة USB'); }
     finally { setBusy(false); }
