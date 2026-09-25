@@ -97,6 +97,7 @@ export default function StaffLoginV2() {
           <div className="mb-6 lg:hidden"><div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#005931] text-white"><Store className="h-6 w-6" /></div><div><h1 className="text-xl font-black">ماركت المعداوي</h1><p className="text-xs text-muted-foreground">بوابة الموظفين</p></div></div></div>
           {hint}
           {content}
+          {!isPosNative() && <a href="/partner" className="mt-4 block min-h-11 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-center text-sm font-semibold text-emerald-800 hover:bg-emerald-50">دخول الشركاء</a>}
           <p className="mt-5 text-center text-[11px] leading-5 text-slate-400">بعد تسجيل الدخول يتم فتح التطبيق بالـPIN الشخصي للموظف. لا تشارك كلمة المرور أو PIN مع أي شخص.</p>
         </div>
       </main>
