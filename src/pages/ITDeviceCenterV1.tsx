@@ -29,6 +29,7 @@ import {
   upsertITPeripheral,
 } from "@/services/itDeviceService";
 import { bluetoothPrinterService } from "@/services/bluetoothPrinterService";
+import { isPosNative, posThermalPrinter } from "@/native/posNative";
 import { fetchPOSProductByBarcode } from "@/services/supabase/posCatalogService";
 import { toast } from "sonner";
 import {
@@ -172,6 +173,10 @@ export default function ITDeviceCenterV1() {
   const [scaleCode, setScaleCode] = useState("");
   const [scaleResult, setScaleResult] = useState<string | null>(null);
   const [capabilities, setCapabilities] = useState(() => getITCapabilities());
+  const [nativePrinter, setNativePrinter] = useState<{ address: string | null; name: string | null; paperSize: string; transport?: "bluetooth" | "usb"; usbDeviceId?: number | null } | null>(null);
+  const [nativeBluetoothPrinters, setNativeBluetoothPrinters] = useState<Array<{ address: string; name: string }>>([]);
+  const [nativeUsbPrinters, setNativeUsbPrinters] = useState<Array<{ deviceId: number; vendorId: number; productId: number; name: string; permission: boolean }>>([]);
+  const [nativePrinterBusy, setNativePrinterBusy] = useState(false);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -190,6 +195,14 @@ export default function ITDeviceCenterV1() {
     const timer = window.setInterval(() => void load(true), 30_000);
     return () => window.clearInterval(timer);
   }, [currentBranchId]);
+
+  useEffect(() => {
+    if (!isPosNative()) return;
+    void posThermalPrinter.getSelected()
+      .then(setNativePrinter)
+      .catch(() => setNativePrinter(null));
+  }, []);
+
 
   const stats = useMemo(() => ({
     online: data.sessions.filter(x => x.online).length,
@@ -225,6 +238,77 @@ export default function ITDeviceCenterV1() {
     if (reason === null) return;
     if (!window.confirm("سيحتاج هذا الجهاز اعتمادًا جديدًا لاستخدام الوظائف التي تتطلب جهازًا موثوقًا. متابعة؟")) return;
     void runAction(`trust-${deviceId}`, () => revokeStaffDevice(deviceId, reason), "تم إلغاء الثقة بالجهاز");
+  };
+
+  const refreshNativeBluetoothPrinters = async () => {
+    setNativePrinterBusy(true);
+    try {
+      const result = await posThermalPrinter.listPaired({ operation: "list" });
+      setNativeBluetoothPrinters(result.devices);
+      if (!result.devices.length) toast.info("اقرن XP-P323B من إعدادات Bluetooth في أندرويد أولًا.");
+    } catch (error: any) {
+      toast.error(error?.message || "تعذر قراءة طابعات Bluetooth");
+    } finally {
+      setNativePrinterBusy(false);
+    }
+  };
+
+  const refreshNativeUsbPrinters = async () => {
+    setNativePrinterBusy(true);
+    try {
+      const result = await posThermalPrinter.listUsb();
+      setNativeUsbPrinters(result.devices);
+      if (!result.devices.length) toast.info("وصّل الطابعة بكابل USB/OTG ثم أعد المحاولة.");
+    } catch (error: any) {
+      toast.error(error?.message || "تعذر قراءة طابعات USB");
+    } finally {
+      setNativePrinterBusy(false);
+    }
+  };
+
+  const selectNativeBluetoothPrinter = async (device: { address: string; name: string }) => {
+    setNativePrinterBusy(true);
+    try {
+      const value = await posThermalPrinter.select({
+        operation: "save",
+        address: device.address,
+        paperSize: nativePrinter?.paperSize === "58mm" ? "58mm" : "80mm",
+      });
+      setNativePrinter(value);
+      toast.success(`تم ربط ${value.name || device.name} داخل تطبيق Android`);
+    } catch (error: any) {
+      toast.error(error?.message || "تعذر ربط الطابعة");
+    } finally {
+      setNativePrinterBusy(false);
+    }
+  };
+
+  const selectNativeUsbPrinter = async (device: { deviceId: number; name: string }) => {
+    setNativePrinterBusy(true);
+    try {
+      const value = await posThermalPrinter.selectUsb({
+        deviceId: device.deviceId,
+        paperSize: nativePrinter?.paperSize === "58mm" ? "58mm" : "80mm",
+      });
+      setNativePrinter(value);
+      toast.success(`تم تفعيل USB Fast Mode على ${value.name || device.name}`);
+    } catch (error: any) {
+      toast.error(error?.message || "تعذر ربط طابعة USB");
+    } finally {
+      setNativePrinterBusy(false);
+    }
+  };
+
+  const testNativePrinter = async () => {
+    setNativePrinterBusy(true);
+    try {
+      const result = await posThermalPrinter.testConnection({ operation: "test" });
+      toast.success(`اختبار الطابعة نجح عبر ${result.transport === "usb" ? "USB" : "Bluetooth"}`);
+    } catch (error: any) {
+      toast.error(error?.message || "فشل اختبار الطابعة");
+    } finally {
+      setNativePrinterBusy(false);
+    }
   };
 
   const savePeripheral = async () => {
@@ -276,7 +360,13 @@ export default function ITDeviceCenterV1() {
     if (!peripheral.branch_id) return;
     setActionId(`peripheral-${peripheral.id}`);
     try {
-      if (peripheral.peripheral_type === "printer" && peripheral.connection_type === "bluetooth") {
+      if (peripheral.peripheral_type === "printer" && isPosNative()) {
+        const selected = await posThermalPrinter.getSelected();
+        if (!selected.address && selected.transport !== "usb") throw new Error("اختار الطابعة من إعداد Android أولًا");
+        await posThermalPrinter.testConnection({ operation: "test" });
+        await recordITPeripheralTest(peripheral.id, peripheral.branch_id, "success");
+        toast.success("اختبار الطابعة Native نجح");
+      } else if (peripheral.peripheral_type === "printer" && peripheral.connection_type === "bluetooth") {
         const connected = bluetoothPrinterService.isConnected() || await bluetoothPrinterService.connectPrinter();
         if (!connected) throw new Error("تعذر الاتصال بالطابعة");
         const ok = await bluetoothPrinterService.testPrint();
@@ -474,28 +564,72 @@ export default function ITDeviceCenterV1() {
             <div className="grid gap-4 xl:grid-cols-[0.9fr_1.5fr]">
               <Card className="rounded-2xl">
                 <CardHeader>
-                  <CardTitle className="text-lg">توصيل / تسجيل جهاز</CardTitle>
-                  <CardDescription>سجّل الجهاز في الفرع ثم اختبر الوصول إليه. طلب USB/Bluetooth لا يتم إلا عند الضغط منك.</CardDescription>
+                  <CardTitle className="text-lg">{isPosNative() ? "طابعة Android Native" : "توصيل / تسجيل جهاز"}</CardTitle>
+                  <CardDescription>{isPosNative() ? "الـAPK يستخدم اتصال Android المباشر للطابعة؛ لا يحتاج Chrome/Edge أو Web Bluetooth." : "سجّل الجهاز في الفرع ثم اختبر الوصول إليه. طلب USB/Bluetooth لا يتم إلا عند الضغط منك."}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {!currentBranchId && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">اختر فرعًا من الشريط العلوي قبل تسجيل جهاز طرفي.</div>}
-                  <Input value={draft.name} onChange={e => setDraft(p => ({ ...p, name: e.target.value }))} placeholder="اسم الجهاز — مثال: طابعة كاشير 1" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <select className="h-10 rounded-md border bg-white px-3 text-sm" value={draft.type} onChange={e => setDraft(p => ({ ...p, type: e.target.value as ITPeripheralType }))}>
-                      {Object.entries(peripheralTypeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                    <select className="h-10 rounded-md border bg-white px-3 text-sm" value={draft.connection} onChange={e => setDraft(p => ({ ...p, connection: e.target.value as ITConnectionType }))}>
-                      {Object.entries(connectionLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2"><Input inputMode="numeric" value={draft.vendorId} onChange={e => setDraft(p => ({ ...p, vendorId: e.target.value }))} placeholder="Vendor ID (اختياري)" /><Input inputMode="numeric" value={draft.productId} onChange={e => setDraft(p => ({ ...p, productId: e.target.value }))} placeholder="Product ID (اختياري)" /></div>
-                  <Input value={draft.serialNumber} onChange={e => setDraft(p => ({ ...p, serialNumber: e.target.value }))} placeholder="Serial Number (اختياري)" />
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={() => void detectUSB()}><Usb /> اكتشاف USB</Button>
-                    <Button variant="outline" onClick={() => void detectSerial()}><Plug /> إذن Serial</Button>
-                    <Button variant="outline" onClick={() => void bluetoothPrinterService.connectPrinter()}><Bluetooth /> ربط طابعة BLE</Button>
-                  </div>
-                  <Button className="w-full bg-[#005931] hover:bg-[#004827]" disabled={!currentBranchId || actionId === "new-peripheral"} onClick={() => void savePeripheral()}>حفظ في سجل الأجهزة</Button>
+                  {isPosNative() ? (
+                    <>
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-bold text-emerald-700">الطابعة الحالية</div>
+                            <div className="mt-1 font-black text-slate-900">{nativePrinter?.name || "لا توجد طابعة مختارة"}</div>
+                            <div className="mt-1 text-xs text-slate-500">{nativePrinter?.name ? `${nativePrinter.transport === "usb" ? "USB / OTG" : "Bluetooth"} · فواتير ESC/POS · استيكر TSPL` : "اختار XP-P323B من القائمة بالأسفل"}</div>
+                          </div>
+                          <Printer className="h-7 w-7 text-emerald-700" />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Button variant="outline" disabled={nativePrinterBusy} onClick={() => void refreshNativeBluetoothPrinters()}><Bluetooth /> طابعات Bluetooth</Button>
+                        <Button variant="outline" disabled={nativePrinterBusy} onClick={() => void refreshNativeUsbPrinters()}><Usb /> طابعات USB / OTG</Button>
+                      </div>
+
+                      {nativeBluetoothPrinters.map(device => (
+                        <Button key={device.address} variant="outline" className="w-full justify-between" disabled={nativePrinterBusy} onClick={() => void selectNativeBluetoothPrinter(device)}>
+                          <span>{device.name}</span>
+                          {nativePrinter?.address === device.address && nativePrinter?.transport !== "usb" ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Bluetooth className="h-4 w-4" />}
+                        </Button>
+                      ))}
+
+                      {nativeUsbPrinters.map(device => (
+                        <Button key={device.deviceId} variant="outline" className="w-full justify-between" disabled={nativePrinterBusy} onClick={() => void selectNativeUsbPrinter(device)}>
+                          <span>{device.name}</span>
+                          {nativePrinter?.transport === "usb" && nativePrinter?.usbDeviceId === device.deviceId ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Usb className="h-4 w-4" />}
+                        </Button>
+                      ))}
+
+                      <Button className="w-full bg-[#005931] hover:bg-[#004827]" disabled={!nativePrinter?.name || nativePrinterBusy} onClick={() => void testNativePrinter()}>
+                        <Printer /> اختبار اتصال وطباعة
+                      </Button>
+
+                      <div className="rounded-xl bg-slate-50 p-3 text-xs leading-6 text-slate-600">
+                        نفس XP-P323B تستخدم للفواتير والاستيكرات تلقائيًا. الفاتورة تعمل ESC/POS، وصفحة الباركود تعمل TSPL مع Gap Sensor.
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {!currentBranchId && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">اختر فرعًا من الشريط العلوي قبل تسجيل جهاز طرفي.</div>}
+                      <Input value={draft.name} onChange={e => setDraft(p => ({ ...p, name: e.target.value }))} placeholder="اسم الجهاز — مثال: طابعة كاشير 1" />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select className="h-10 rounded-md border bg-white px-3 text-sm" value={draft.type} onChange={e => setDraft(p => ({ ...p, type: e.target.value as ITPeripheralType }))}>
+                          {Object.entries(peripheralTypeLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                        <select className="h-10 rounded-md border bg-white px-3 text-sm" value={draft.connection} onChange={e => setDraft(p => ({ ...p, connection: e.target.value as ITConnectionType }))}>
+                          {Object.entries(connectionLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2"><Input inputMode="numeric" value={draft.vendorId} onChange={e => setDraft(p => ({ ...p, vendorId: e.target.value }))} placeholder="Vendor ID (اختياري)" /><Input inputMode="numeric" value={draft.productId} onChange={e => setDraft(p => ({ ...p, productId: e.target.value }))} placeholder="Product ID (اختياري)" /></div>
+                      <Input value={draft.serialNumber} onChange={e => setDraft(p => ({ ...p, serialNumber: e.target.value }))} placeholder="Serial Number (اختياري)" />
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => void detectUSB()}><Usb /> اكتشاف USB</Button>
+                        <Button variant="outline" onClick={() => void detectSerial()}><Plug /> إذن Serial</Button>
+                        <Button variant="outline" onClick={() => void bluetoothPrinterService.connectPrinter()}><Bluetooth /> ربط طابعة BLE</Button>
+                      </div>
+                      <Button className="w-full bg-[#005931] hover:bg-[#004827]" disabled={!currentBranchId || actionId === "new-peripheral"} onClick={() => void savePeripheral()}>حفظ في سجل الأجهزة</Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
@@ -564,9 +698,9 @@ export default function ITDeviceCenterV1() {
               <CardContent className="grid gap-2 p-4 md:grid-cols-2 xl:grid-cols-3">
                 <CapabilityRow label="اتصال الإنترنت" ok={capabilities.online} note={capabilities.online ? "الجهاز Online" : "التطبيق قد يعمل جزئيًا لكن المزامنة متوقفة"} />
                 <CapabilityRow label="HTTPS / Secure Context" ok={capabilities.secureContext} note="مطلوب لميزات Bluetooth/USB/Camera الحساسة" />
-                <CapabilityRow label="Bluetooth" ok={capabilities.bluetooth} note="مفيد للطابعات BLE المدعومة" />
-                <CapabilityRow label="WebUSB" ok={capabilities.usb} note="على Android سيظهر طلب إذن للنظام عند اختيار الجهاز" />
-                <CapabilityRow label="Web Serial" ok={capabilities.serial} note="الدعم أضعف على Android؛ لا نعتمد عليه وحده للموازين" />
+                <CapabilityRow label={isPosNative() ? "Android Native Bluetooth" : "Bluetooth"} ok={isPosNative() ? Boolean(nativePrinter?.name && nativePrinter.transport !== "usb") : capabilities.bluetooth} note={isPosNative() ? "الـAPK لا يعتمد على Web Bluetooth أو Chrome/Edge للطباعة" : "مفيد للطابعات BLE المدعومة"} />
+                <CapabilityRow label={isPosNative() ? "Android USB Host" : "WebUSB"} ok={isPosNative() ? Boolean(nativePrinter?.transport === "usb") : capabilities.usb} note={isPosNative() ? "USB/OTG يعمل من خلال Android Native عند اختيار الطابعة" : "على Android سيظهر طلب إذن للنظام عند اختيار الجهاز"} />
+                <CapabilityRow label="Web Serial" ok={capabilities.serial} note={isPosNative() ? "غير مستخدم لطابعة XP-P323B داخل الـAPK" : "الدعم أضعف على Android؛ لا نعتمد عليه وحده للموازين"} />
                 <CapabilityRow label="HID API" ok={capabilities.hid} note="قارئ Keyboard-wedge يظل يعمل حتى بدون WebHID" />
                 <CapabilityRow label="الكاميرا" ok={capabilities.camera} note="لفحص الباركود بالكاميرا" />
                 <CapabilityRow label="BarcodeDetector" ok={capabilities.barcodeDetector} note="عند عدم توفره يمكن استخدام القارئ الخارجي" />
