@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import OrderNotifications from '@/components/orders/OrderNotifications';
 import ApprovalCenterNotifications from "@/components/approvals/ApprovalCenterNotifications";
 import CustomerTaskNotifications from "@/components/customers/CustomerTaskNotifications";
@@ -16,6 +17,8 @@ import NativePosBridge from "@/native/NativePosBridge";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
+const PartnerWorkspace = lazy(() => import("@/partner/PartnerWorkspace"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
@@ -43,6 +46,8 @@ function StaffApplication() {
 function RoutedApplication() {
   const { pathname } = useLocation();
   const authCallback = typeof window !== "undefined" && (window.location.hash.includes("type=invite") || window.location.hash.includes("type=recovery"));
+  const isPartnerPortal = pathname === "/partner" || pathname.startsWith("/partner/");
+  if (isPartnerPortal) return <Suspense fallback={<div className="p-6 text-center">جاري فتح مساحة الشركاء…</div>}><PartnerWorkspace /></Suspense>;
   const isFranchisePortal = pathname === "/franchise-login"
     || pathname === "/franchise-auth"
     || pathname === "/franchise-portal"
