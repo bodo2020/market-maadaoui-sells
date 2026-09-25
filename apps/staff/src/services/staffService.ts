@@ -336,6 +336,87 @@ export type AttendancePayload = {
   pending_exception?: Record<string, unknown> | null;
 };
 
+export type StaffSelfServiceRequest = {
+  id: string;
+  branch_id: string;
+  branch_name?: string;
+  request_type: "leave" | "salary_advance" | "attendance_correction" | string;
+  status: string;
+  reason: string;
+  payload: Record<string, unknown>;
+  approved_payload?: Record<string, unknown> | null;
+  requested_at: string;
+  reviewed_at?: string | null;
+  decision_note?: string | null;
+  cancelled_at?: string | null;
+  fulfilled_at?: string | null;
+};
+
+export type StaffSelfServiceSnapshot = {
+  profile: {
+    user_id: string;
+    name: string;
+    username: string | null;
+    phone: string | null;
+    email: string | null;
+    employee_code: string | null;
+    employment_status: string;
+    work_mode: string | null;
+    contract_type: string | null;
+    hire_date: string | null;
+    primary_branch_id: string | null;
+    department?: { id: string; name_ar: string; code?: string | null } | null;
+    team?: { id: string; name_ar: string } | null;
+    job_title?: { id: string; name_ar: string; grade?: string | null } | null;
+    manager?: { id: string; name: string } | null;
+  };
+  employee_card: {
+    membership_number: string;
+    barcode: string;
+  };
+  wallet: {
+    benefit_balance: number;
+    benefit_monthly_allowance: number;
+    credit_limit: number;
+    receivable_balance: number;
+    credit_available: number;
+    payroll_deduction_enabled: boolean;
+  };
+  advance_summary: {
+    outstanding_amount: number;
+    active_count: number;
+  };
+  leave_summary: {
+    approved_days_ytd: number;
+  };
+  requests: StaffSelfServiceRequest[];
+  advances: Array<{
+    id: string;
+    request_id: string | null;
+    branch_id: string | null;
+    principal_amount: number;
+    repayment_months: number;
+    monthly_deduction: number;
+    outstanding_amount: number;
+    status: string;
+    paid_at: string | null;
+    settled_at: string | null;
+    approved_at: string | null;
+    created_at: string;
+  }>;
+  leaves: Array<{
+    id: string;
+    request_id: string | null;
+    branch_id: string | null;
+    leave_type: string;
+    start_date: string;
+    end_date: string;
+    partial_day: string;
+    status: string;
+    approved_at: string | null;
+  }>;
+};
+
 export async function getStaffIdentity() {
   return unwrap<StaffIdentity | null>(await rpc("get_my_staff_identity"));
 }
@@ -368,10 +449,83 @@ export async function getAttendance(branchId: string) {
   return unwrap<AttendancePayload>(await rpc("get_my_attendance_v1", { p_branch_id: branchId }));
 }
 
+
+export async function getStaffSelfService(branchId: string) {
+  return unwrap<StaffSelfServiceSnapshot>(await rpc("get_my_staff_self_service_v1", {
+    p_branch_id: branchId,
+  }));
+}
+
+export async function submitMyHrRequest(
+  branchId: string,
+  requestType: "leave" | "salary_advance" | "attendance_correction",
+  payload: Record<string, unknown>,
+  reason: string,
+) {
+  return unwrap<{ ok: boolean; request_id: string; review_task_id: string; status: string }>(
+    await rpc("submit_my_hr_request_v1", {
+      p_branch_id: branchId,
+      p_request_type: requestType,
+      p_payload: payload,
+      p_reason: reason,
+    }),
+  );
+}
+
+export async function cancelMyHrRequest(requestId: string) {
+  return unwrap(await rpc("cancel_my_hr_request_v1", { p_request_id: requestId }));
+}
+
 export async function validateStaffDevice(deviceId: string, token: string) {
   return unwrap<{ trusted: boolean; code?: string; approval_status?: string; device_id?: string }>(
     await rpc("validate_my_staff_device_v1", { p_device_id: deviceId, p_device_token: token }),
   );
+}
+
+
+export async function bindStaffDeviceFingerprint(
+  deviceId: string,
+  token: string,
+  deviceKey: string,
+  metadata: Record<string, unknown> = {},
+) {
+  return unwrap<{
+    ok: boolean;
+    device_id: string;
+    device_key: string;
+    already_bound: boolean;
+    requires_recovery: boolean;
+  }>(await rpc("bind_my_staff_device_fingerprint_v2", {
+    p_device_id: deviceId,
+    p_device_token: token,
+    p_device_key: deviceKey,
+    p_metadata: metadata,
+  }));
+}
+
+export async function recoverStaffDevice(
+  branchId: string,
+  deviceKey: string,
+  deviceName: string,
+  platform = "android",
+  metadata: Record<string, unknown> = {},
+) {
+  return unwrap<{
+    trusted: boolean;
+    code: string;
+    approval_status?: string;
+    device_id?: string;
+    device_token?: string;
+    branch_id?: string;
+    device_name?: string;
+    reason?: string | null;
+  }>(await rpc("recover_my_staff_device_v2", {
+    p_branch_id: branchId,
+    p_device_key: deviceKey,
+    p_device_name: deviceName,
+    p_platform: platform,
+    p_metadata: metadata,
+  }));
 }
 
 export async function redeemStaffDevicePairing(

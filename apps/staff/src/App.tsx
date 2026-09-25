@@ -22,14 +22,18 @@ import { Capacitor } from "@capacitor/core";
 import {
   AlertTriangle,
   ArrowRight,
+  Banknote,
   Barcode,
   Bell,
   BellRing,
   Check,
   CheckCircle2,
+  CalendarDays,
   ClipboardList,
   Clock3,
+  FileText,
   Home,
+  IdCard,
   Layers3,
   Loader2,
   LogIn,
@@ -40,13 +44,16 @@ import {
   RefreshCw,
   Scale,
   ScanLine,
+  Send,
   ShieldCheck,
   Smartphone,
   UserRound,
   UsersRound,
+  XCircle,
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import { googlePasswordManager } from "./googlePasswordManager";
+import { getPersistentStaffDeviceIdentity } from "./deviceIdentity";
 import * as staff from "./services/staffService";
 import type {
   BatchPickingShadow,
@@ -58,6 +65,8 @@ import type {
   PickingSession,
   StaffBranch,
   StaffIdentity,
+  StaffSelfServiceSnapshot,
+  StaffSelfServiceRequest,
 } from "./services/staffService";
 
 type SessionState = {
@@ -83,6 +92,11 @@ function useStaffSession() {
       const [identity, branches] = await Promise.all([staff.getStaffIdentity(), staff.getStaffBranches()]);
       if (!identity?.active || !branches?.length) throw new Error("STAFF_ACCESS_REQUIRED");
       const branch = branches.find((row) => row.is_primary) || branches[0];
+      try {
+        await restoreKnownStaffDevice(branch.branch_id);
+      } catch {
+        // Device recovery must never block a valid staff login.
+      }
       setState({ loading: false, identity, branch });
     } catch {
       await supabase.auth.signOut();
@@ -106,7 +120,27 @@ function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [credentialBusy, setCredentialBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const fillSavedPassword = useCallback(async () => {
+    if (Capacitor.getPlatform() !== "android") return;
+    setCredentialBusy(true);
+    try {
+      const saved = await googlePasswordManager.getPassword();
+      if (saved?.username) setUsername(saved.username);
+      if (saved?.password) setPassword(saved.password);
+    } catch {
+      // No saved credential or the user dismissed the account picker.
+    } finally {
+      setCredentialBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void fillSavedPassword(); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [fillSavedPassword]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -139,6 +173,7 @@ function Login() {
         <form onSubmit={submit} autoComplete="on">
           <label htmlFor="staff-username">اسم المستخدم<input id="staff-username" name="username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} required /></label>
           <label htmlFor="staff-password">كلمة المرور<input id="staff-password" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
+          {Capacitor.getPlatform()==="android"&&<button type="button" className="saved-credential-button" disabled={credentialBusy||busy} onClick={()=>void fillSavedPassword()}>{credentialBusy?<Loader2 className="spin"/>:<ShieldCheck/>}استخدام كلمة مرور محفوظة</button>}
           {error && <div className="error-box">{error}</div>}
           <button className="primary" disabled={busy}>{busy ? <Loader2 className="spin" /> : "تسجيل الدخول"}</button>
         </form>
@@ -190,7 +225,7 @@ function Shell({ identity, branch, children }: { identity: StaffIdentity; branch
           ["/tasks", ClipboardList, "المهام"],
           ["/operations", PackageCheck, "التشغيل"],
           ["/attendance", Clock3, "الحضور"],
-          ["/account", UserRound, "حسابي"],
+          ["/account", IdCard, "خدماتي"],
         ].map(([to, Icon, label]) => (
           <NavLink key={to as string} to={to as string} end={to === "/"}>{<Icon size={20} />}<span>{label as string}</span></NavLink>
         ))}
@@ -666,13 +701,73 @@ function readStoredDevice() {
   const token = localStorage.getItem(DEVICE_TOKEN_KEY);
   return id && token ? { id, token } : null;
 }
-function getDeviceKey() {
-  let key = localStorage.getItem(DEVICE_KEY_KEY);
-  if (!key) {
-    key = `staff-${crypto.randomUUID()}`;
-    localStorage.setItem(DEVICE_KEY_KEY, key);
+function storeTrustedDevice(id: string, token: string) {
+  localStorage.setItem(DEVICE_ID_KEY,id);
+  localStorage.setItem(DEVICE_TOKEN_KEY,token);
+}
+
+async function getDeviceIdentity() {
+  const identity=await getPersistentStaffDeviceIdentity();
+  localStorage.setItem(DEVICE_KEY_KEY,identity.deviceKey);
+  return identity;
+}
+
+type DeviceTrustState="none"|"pending"|"trusted"|"rejected";
+
+async function restoreKnownStaffDevice(branchId:string):Promise<DeviceTrustState>{
+  const identity=await getDeviceIdentity();
+  const stored=readStoredDevice();
+
+  if(stored){
+    const state=await staff.validateStaffDevice(stored.id,stored.token);
+    if(state.trusted){
+      try{
+        const bound=await staff.bindStaffDeviceFingerprint(
+          stored.id,stored.token,identity.deviceKey,identity.metadata,
+        );
+        if(!bound.requires_recovery)return "trusted";
+
+        const recovered=await staff.recoverStaffDevice(
+          branchId,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
+        );
+        if(recovered.trusted&&recovered.device_id&&recovered.device_token){
+          storeTrustedDevice(recovered.device_id,recovered.device_token);
+          return "trusted";
+        }
+        return recovered.code==="DEVICE_PENDING_APPROVAL"
+          ?"pending"
+          :recovered.code==="DEVICE_REJECTED"
+            ?"rejected"
+            :"none";
+      }catch{
+        // If migration to the persistent fingerprint fails, the validated
+        // current device token remains authoritative.
+        return "trusted";
+      }
+    }
+
+    const recovered=await staff.recoverStaffDevice(
+      branchId,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
+    );
+    if(recovered.trusted&&recovered.device_id&&recovered.device_token){
+      storeTrustedDevice(recovered.device_id,recovered.device_token);
+      return "trusted";
+    }
+    if(recovered.code==="DEVICE_PENDING_APPROVAL"||state.code==="DEVICE_PENDING_APPROVAL")return "pending";
+    if(recovered.code==="DEVICE_REJECTED"||state.code==="DEVICE_REJECTED")return "rejected";
+    return "none";
   }
-  return key;
+
+  const recovered=await staff.recoverStaffDevice(
+    branchId,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
+  );
+  if(recovered.trusted&&recovered.device_id&&recovered.device_token){
+    storeTrustedDevice(recovered.device_id,recovered.device_token);
+    return "trusted";
+  }
+  if(recovered.code==="DEVICE_PENDING_APPROVAL")return "pending";
+  if(recovered.code==="DEVICE_REJECTED")return "rejected";
+  return "none";
 }
 function attendanceError(code: string) {
   const map: Record<string,string> = {
@@ -771,13 +866,12 @@ function AttendancePage({ branch }: { branch: StaffBranch }) {
   const load = useCallback(async()=>{
     setBusy(true);
     try{
-      setData(await staff.getAttendance(branch.branch_id));
-      const device=readStoredDevice();
-      if(!device){setDeviceState("none");}
-      else{
-        const state=await staff.validateStaffDevice(device.id,device.token);
-        setDeviceState(state.trusted?"trusted":state.code==="DEVICE_PENDING_APPROVAL"?"pending":state.code==="DEVICE_REJECTED"?"rejected":"none");
-      }
+      const [attendance,nextDeviceState] = await Promise.all([
+        staff.getAttendance(branch.branch_id),
+        restoreKnownStaffDevice(branch.branch_id),
+      ]);
+      setData(attendance);
+      setDeviceState(nextDeviceState);
     }catch(caught){setMessage({type:"error",text:attendanceError(caught instanceof Error?caught.message:"")});}
     finally{setBusy(false);}
   },[branch.branch_id]);
@@ -790,12 +884,14 @@ function AttendancePage({ branch }: { branch: StaffBranch }) {
     if(!pairToken.trim()||pairCode.trim().length!==6)return;
     setActing(true);setMessage(null);
     try{
-      const result=await staff.redeemStaffDevicePairing(pairToken.trim(),pairCode.trim(),getDeviceKey(),"هاتف الموظف");
+      const identity=await getDeviceIdentity();
+      const result=await staff.redeemStaffDevicePairing(
+        pairToken.trim(),pairCode.trim(),identity.deviceKey,identity.deviceName,identity.platform,
+      );
       if(result.ok){
-        localStorage.setItem(DEVICE_ID_KEY,result.device_id);
-        localStorage.setItem(DEVICE_TOKEN_KEY,result.device_token);
+        storeTrustedDevice(result.device_id,result.device_token);
         setDeviceState(result.approval_status==="approved"?"trusted":"pending");
-        setMessage({type:"ok",text:result.approval_status==="approved"?"تم اعتماد الجهاز":"تم إرسال الجهاز للموافقة من الإدارة"});
+        setMessage({type:"ok",text:result.approval_status==="approved"?"تم اعتماد الجهاز وربطه ببصمته الثابتة":"تم إرسال الجهاز للموافقة من الإدارة"});
       }
     }catch{setMessage({type:"error",text:"بيانات ربط الجهاز غير صحيحة أو انتهت صلاحيتها"});}
     finally{setActing(false);}
@@ -922,9 +1018,191 @@ function NotificationsPage({ branch, identity }: { branch: StaffBranch; identity
   return <><div className="section-head notification-title"><PageTitle title="الإشعارات" subtitle="تنبيهات ومهام تحتاج انتباهك"/><button className="mark-read" onClick={async()=>{await staff.markAllNotificationsRead(branch.branch_id);await load(false);}}><Check/>قراءة الكل</button></div><div className="notification-summary"><div><strong>{data?.summary.unread||0}</strong><span>غير مقروء</span></div><div><strong>{data?.summary.action_required||0}</strong><span>يحتاج إجراء</span></div><div><strong>{data?.summary.critical||0}</strong><span>حرج</span></div></div><div className="chips">{[["all","الكل"],["unread","غير مقروء"],["critical","حرج"],["action","إجراء"]].map(([id,label])=><button key={id} className={filter===id?"active":""} onClick={()=>setFilter(id)}>{label}</button>)}</div>{busy?<Loading/>:<div className="notification-list">{(data?.items||[]).map((item)=><button key={item.id} className={`notification-card ${!item.read_at?"unread":""} ${item.severity}`} onClick={()=>void open(item)}><div className="notification-icon">{item.requires_action?<BellRing/>:<Bell/>}</div><div><div className="row"><strong>{item.title}</strong><span className="severity">{severityLabel(item.severity)}</span></div>{item.body&&<p>{item.body}</p>}<small>{new Date(item.created_at).toLocaleString("ar-EG")}</small></div></button>)}{!data?.items.length&&<Empty text="مفيش إشعارات في القسم ده"/>}</div>}</>;
 }
 
+
+const eanLeftOdd:Record<string,string>={"0":"0001101","1":"0011001","2":"0010011","3":"0111101","4":"0100011","5":"0110001","6":"0101111","7":"0111011","8":"0110111","9":"0001011"};
+const eanLeftEven:Record<string,string>={"0":"0100111","1":"0110011","2":"0011011","3":"0100001","4":"0011101","5":"0111001","6":"0000101","7":"0010001","8":"0001001","9":"0010111"};
+const eanRight:Record<string,string>={"0":"1110010","1":"1100110","2":"1101100","3":"1000010","4":"1011100","5":"1001110","6":"1010000","7":"1000100","8":"1001000","9":"1110100"};
+const eanParity:Record<string,string>={"0":"OOOOOO","1":"OOEOEE","2":"OOEEOE","3":"OOEEEO","4":"OEOOEE","5":"OEEOOE","6":"OEEEOO","7":"OEOEOE","8":"OEOEEO","9":"OEEOEO"};
+
+function EmployeeBarcode({value}:{value:string}) {
+  if(!/^\d{13}$/.test(value))return <div className="employee-barcode-fallback">{value||"باركود غير متاح"}</div>;
+  const parity=eanParity[value[0]];
+  let bits="101";
+  for(let i=1;i<=6;i++)bits+=(parity[i-1]==="O"?eanLeftOdd:eanLeftEven)[value[i]];
+  bits+="01010";
+  for(let i=7;i<=12;i++)bits+=eanRight[value[i]];
+  bits+="101";
+  return <div className="employee-barcode" aria-label={`باركود الموظف ${value}`}>
+    <svg viewBox={`0 0 ${bits.length} 58`} role="img">{[...bits].map((bit,index)=>bit==="1"?<rect key={index} x={index} y="0" width="1" height="50"/>:null)}</svg>
+    <strong dir="ltr">{value}</strong>
+  </div>;
+}
+
+function requestTypeLabel(value:string){
+  return value==="leave"?"إجازة":value==="salary_advance"?"سلفة":value==="attendance_correction"?"تصحيح حضور":value;
+}
+function requestStatusLabel(value:string){
+  return value==="pending"?"قيد المراجعة":value==="approved"?"موافق عليه":value==="rejected"?"مرفوض":value==="cancelled"?"ملغي":value==="fulfilled"?"تم التنفيذ":value;
+}
+
 function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: StaffBranch }) {
   const navigate=useNavigate();
-  return <><PageTitle title="حسابي" subtitle="هويتك وصلاحياتك في الفرع"/><section className="profile"><div className="avatar">{identity.name.slice(0,1)}</div><h2>{identity.name}</h2><p>{branch.role_name_ar} · {branch.branch_name}</p><div className="permission-list">{branch.permissions.slice(0,8).map((permission)=><span key={permission}>{permission}</span>)}</div><button className="logout" onClick={async()=>{await supabase.auth.signOut();navigate("/login",{replace:true});}}><LogOut/>تسجيل الخروج</button></section></>;
+  const [data,setData]=useState<StaffSelfServiceSnapshot|null>(null);
+  const [busy,setBusy]=useState(true);
+  const [acting,setActing]=useState(false);
+  const [view,setView]=useState<"home"|"advance"|"leave"|"attendance"|"requests">("home");
+  const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
+
+  const [advanceAmount,setAdvanceAmount]=useState("");
+  const [advanceMonths,setAdvanceMonths]=useState("1");
+  const [advanceReason,setAdvanceReason]=useState("");
+  const [leaveFrom,setLeaveFrom]=useState("");
+  const [leaveTo,setLeaveTo]=useState("");
+  const [leaveType,setLeaveType]=useState("annual");
+  const [leaveReason,setLeaveReason]=useState("");
+  const [attendanceDate,setAttendanceDate]=useState("");
+  const [attendanceType,setAttendanceType]=useState("time_correction");
+  const [requestedIn,setRequestedIn]=useState("");
+  const [requestedOut,setRequestedOut]=useState("");
+  const [attendanceReason,setAttendanceReason]=useState("");
+
+  const load=useCallback(async()=>{
+    setBusy(true);
+    try{
+      setData(await staff.getStaffSelfService(branch.branch_id));
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل خدمات الموظف"});
+    }finally{setBusy(false);}
+  },[branch.branch_id]);
+
+  useEffect(()=>{void load();},[load]);
+
+  const submitRequest=async(kind:"salary_advance"|"leave"|"attendance_correction")=>{
+    setActing(true);setMessage(null);
+    try{
+      if(kind==="salary_advance"){
+        if(Number(advanceAmount)<=0||advanceReason.trim().length<5)throw new Error("اكتب مبلغًا وسببًا واضحًا للسلفة");
+        await staff.submitMyHrRequest(branch.branch_id,kind,{
+          amount:Number(advanceAmount),
+          repayment_months:Number(advanceMonths),
+        },advanceReason.trim());
+        setAdvanceAmount("");setAdvanceMonths("1");setAdvanceReason("");
+      }else if(kind==="leave"){
+        if(!leaveFrom||!leaveTo||leaveReason.trim().length<5)throw new Error("حدد فترة الإجازة واكتب السبب");
+        await staff.submitMyHrRequest(branch.branch_id,kind,{
+          start_date:leaveFrom,end_date:leaveTo,leave_type:leaveType,partial_day:"none",
+        },leaveReason.trim());
+        setLeaveFrom("");setLeaveTo("");setLeaveReason("");
+      }else{
+        if(!attendanceDate||(!requestedIn&&!requestedOut)||attendanceReason.trim().length<5)throw new Error("أكمل بيانات تصحيح الحضور");
+        await staff.submitMyHrRequest(branch.branch_id,kind,{
+          attendance_date:attendanceDate,
+          correction_type:attendanceType,
+          requested_check_in:requestedIn||null,
+          requested_check_out:requestedOut||null,
+        },attendanceReason.trim());
+        setAttendanceDate("");setRequestedIn("");setRequestedOut("");setAttendanceReason("");
+      }
+      setMessage({type:"ok",text:"تم إرسال الطلب للمراجعة"});
+      setView("requests");
+      await load();
+    }catch(caught){
+      const raw=caught instanceof Error?caught.message:"تعذر إرسال الطلب";
+      setMessage({type:"error",text:raw.includes("HR_PENDING_REQUEST_EXISTS")?"عندك طلب من نفس النوع ما زال قيد المراجعة":raw});
+    }finally{setActing(false);}
+  };
+
+  const cancelRequest=async(item:StaffSelfServiceRequest)=>{
+    if(item.status!=="pending"||!window.confirm("إلغاء الطلب؟"))return;
+    setActing(true);setMessage(null);
+    try{
+      await staff.cancelMyHrRequest(item.id);
+      setMessage({type:"ok",text:"تم إلغاء الطلب"});
+      await load();
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إلغاء الطلب"});
+    }finally{setActing(false);}
+  };
+
+  if(busy&&!data)return <Loading/>;
+  const profile=data?.profile;
+  const recentRequests=data?.requests||[];
+
+  return <>
+    <PageTitle title="خدماتي" subtitle="هويتك وطلباتك وخدمات الموارد البشرية"/>
+    {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
+
+    <section className="employee-identity-card">
+      <div className="employee-card-head">
+        <div className="avatar">{(profile?.name||identity.name).slice(0,1)}</div>
+        <div><small>{profile?.employee_code||"موظف"}</small><h2>{profile?.name||identity.name}</h2><p>{profile?.job_title?.name_ar||branch.role_name_ar} · {branch.branch_name}</p></div>
+        <IdCard/>
+      </div>
+      {data?.employee_card?.barcode&&<EmployeeBarcode value={data.employee_card.barcode}/>}
+      <div className="employee-card-meta">
+        <span>رقم العضوية <b dir="ltr">{data?.employee_card?.membership_number||"—"}</b></span>
+        {profile?.department?.name_ar&&<span>القسم <b>{profile.department.name_ar}</b></span>}
+        {profile?.manager?.name&&<span>المدير <b>{profile.manager.name}</b></span>}
+      </div>
+    </section>
+
+    <div className="self-service-stats">
+      <div><Banknote/><strong>{Number(data?.advance_summary?.outstanding_amount||0).toLocaleString("ar-EG")} ج.م</strong><span>سلف متبقية</span></div>
+      <div><CalendarDays/><strong>{Number(data?.leave_summary?.approved_days_ytd||0)}</strong><span>أيام إجازة معتمدة هذا العام</span></div>
+      <div><FileText/><strong>{recentRequests.filter((r)=>r.status==="pending").length}</strong><span>طلبات قيد المراجعة</span></div>
+    </div>
+
+    <div className="self-service-menu">
+      <button className={view==="home"?"active":""} onClick={()=>setView("home")}><IdCard/>بياناتي</button>
+      <button className={view==="advance"?"active":""} onClick={()=>setView("advance")}><Banknote/>طلب سلفة</button>
+      <button className={view==="leave"?"active":""} onClick={()=>setView("leave")}><CalendarDays/>طلب إجازة</button>
+      <button className={view==="attendance"?"active":""} onClick={()=>setView("attendance")}><Clock3/>تصحيح حضور</button>
+      <button className={view==="requests"?"active":""} onClick={()=>setView("requests")}><FileText/>طلباتي</button>
+    </div>
+
+    {view==="home"&&<section className="self-service-panel">
+      <h3>بيانات العمل</h3>
+      <div className="profile-facts">
+        <div><span>الحالة</span><strong>{profile?.employment_status==="active"?"نشط":profile?.employment_status||"—"}</strong></div>
+        <div><span>نظام العمل</span><strong>{profile?.work_mode||"—"}</strong></div>
+        <div><span>نوع العقد</span><strong>{profile?.contract_type||"—"}</strong></div>
+        <div><span>تاريخ التعيين</span><strong>{profile?.hire_date?new Date(profile.hire_date).toLocaleDateString("ar-EG"):"—"}</strong></div>
+      </div>
+      {(data?.advances?.length??0)>0&&<><h3>السلف الحالية</h3><div className="request-list">{(data?.advances??[]).slice(0,3).map((item)=><div className="request-row" key={item.id}><div><strong>{Number(item.principal_amount).toLocaleString("ar-EG")} ج.م</strong><small>متبقي {Number(item.outstanding_amount).toLocaleString("ar-EG")} ج.م · {item.repayment_months} شهر</small></div><span>{requestStatusLabel(item.status)}</span></div>)}</div></>}
+    </section>}
+
+    {view==="advance"&&<section className="self-service-panel request-form">
+      <div className="service-panel-title"><Banknote/><div><h3>طلب سلفة راتب</h3><p>الطلب يذهب للمراجعة ثم الصرف حسب سياسة الموارد البشرية.</p></div></div>
+      <label>المبلغ<input type="number" min="1" inputMode="decimal" value={advanceAmount} onChange={(e)=>setAdvanceAmount(e.target.value)} placeholder="مثال: 1000"/></label>
+      <label>عدد أشهر السداد<select value={advanceMonths} onChange={(e)=>setAdvanceMonths(e.target.value)}>{[1,2,3,4,5,6,9,12].map((n)=><option key={n} value={n}>{n} شهر</option>)}</select></label>
+      <label>سبب السلفة<textarea rows={3} value={advanceReason} onChange={(e)=>setAdvanceReason(e.target.value)} placeholder="اكتب سبب الطلب"/></label>
+      <button className="primary" disabled={acting} onClick={()=>void submitRequest("salary_advance")}>{acting?<Loader2 className="spin"/>:<Send/>}إرسال طلب السلفة</button>
+    </section>}
+
+    {view==="leave"&&<section className="self-service-panel request-form">
+      <div className="service-panel-title"><CalendarDays/><div><h3>طلب إجازة</h3><p>حدد الفترة والنوع وسيصل الطلب للمسؤول.</p></div></div>
+      <div className="form-grid"><label>من<input type="date" value={leaveFrom} onChange={(e)=>setLeaveFrom(e.target.value)}/></label><label>إلى<input type="date" value={leaveTo} onChange={(e)=>setLeaveTo(e.target.value)}/></label></div>
+      <label>نوع الإجازة<select value={leaveType} onChange={(e)=>setLeaveType(e.target.value)}><option value="annual">سنوية</option><option value="casual">عارضة</option><option value="sick">مرضية</option><option value="unpaid">بدون أجر</option><option value="other">أخرى</option></select></label>
+      <label>السبب<textarea rows={3} value={leaveReason} onChange={(e)=>setLeaveReason(e.target.value)} placeholder="سبب الإجازة"/></label>
+      <button className="primary" disabled={acting} onClick={()=>void submitRequest("leave")}>{acting?<Loader2 className="spin"/>:<Send/>}إرسال طلب الإجازة</button>
+    </section>}
+
+    {view==="attendance"&&<section className="self-service-panel request-form">
+      <div className="service-panel-title"><Clock3/><div><h3>تصحيح الحضور</h3><p>لنسيان تسجيل الدخول/الخروج أو تصحيح وقت مسجل.</p></div></div>
+      <label>التاريخ<input type="date" value={attendanceDate} onChange={(e)=>setAttendanceDate(e.target.value)}/></label>
+      <label>نوع التصحيح<select value={attendanceType} onChange={(e)=>setAttendanceType(e.target.value)}><option value="time_correction">تصحيح وقت</option><option value="missed_check_in">نسيان الحضور</option><option value="missed_check_out">نسيان الانصراف</option><option value="other">أخرى</option></select></label>
+      <div className="form-grid"><label>وقت الحضور المطلوب<input type="time" value={requestedIn} onChange={(e)=>setRequestedIn(e.target.value)}/></label><label>وقت الانصراف المطلوب<input type="time" value={requestedOut} onChange={(e)=>setRequestedOut(e.target.value)}/></label></div>
+      <label>السبب<textarea rows={3} value={attendanceReason} onChange={(e)=>setAttendanceReason(e.target.value)} placeholder="اشرح سبب التصحيح"/></label>
+      <button className="primary" disabled={acting} onClick={()=>void submitRequest("attendance_correction")}>{acting?<Loader2 className="spin"/>:<Send/>}إرسال طلب التصحيح</button>
+    </section>}
+
+    {view==="requests"&&<section className="self-service-panel">
+      <div className="section-head"><h3>طلباتي</h3><button className="icon-btn" onClick={()=>void load()}><RefreshCw/></button></div>
+      <div className="request-list">{recentRequests.map((item)=><article className="request-row request-history" key={item.id}><div><div className="row"><strong>{requestTypeLabel(item.request_type)}</strong><span className={`request-status ${item.status}`}>{requestStatusLabel(item.status)}</span></div><p>{item.reason}</p><small>{new Date(item.requested_at).toLocaleString("ar-EG")}</small>{item.decision_note&&<em>{item.decision_note}</em>}</div>{item.status==="pending"&&<button className="cancel-request" disabled={acting} onClick={()=>void cancelRequest(item)}><XCircle/>إلغاء</button>}</article>)}{!recentRequests.length&&<Empty text="لسه مفيش طلبات"/>}</div>
+    </section>}
+
+    <button className="logout self-service-logout" onClick={async()=>{await supabase.auth.signOut();navigate("/login",{replace:true});}}><LogOut/>تسجيل الخروج</button>
+  </>;
 }
 
 const PageTitle=({title,subtitle}:{title:string;subtitle:string})=><div className="page-title"><div><h1>{title}</h1><p>{subtitle}</p></div></div>;
