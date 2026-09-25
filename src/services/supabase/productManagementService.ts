@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { requireCurrentBranchId } from "@/services/supabase/productEditorService";
+import { barcodeExists, requireCurrentBranchId } from "@/services/supabase/productEditorService";
 
 export type ProductManagementRow = {
   row_key: string;
@@ -65,6 +65,8 @@ export type ProductManagementFilters = {
   page?: number;
   pageSize?: number;
 };
+
+export type BarcodeCatalogFilter = "all" | "ready" | "missing" | "scale";
 
 const rpc = supabase.rpc.bind(supabase) as unknown as (
   name: string,
@@ -138,4 +140,94 @@ export async function fetchAllProductManagementRows(filters: Omit<ProductManagem
   }
 
   return rows;
+}
+
+
+function matchesBarcodeFilter(row: ProductManagementRow, filter: BarcodeCatalogFilter) {
+  if (filter === "ready") return Boolean(row.barcode?.trim());
+  if (filter === "missing") return !row.barcode?.trim();
+  if (filter === "scale") return row.barcode_type === "scale";
+  return true;
+}
+
+export async function fetchBarcodeManagementPage(input: {
+  search?: string;
+  filter?: BarcodeCatalogFilter;
+  page?: number;
+  pageSize?: number;
+}) {
+  const filter = input.filter || "all";
+  if (filter === "all") {
+    return fetchProductManagementPage({
+      search: input.search,
+      page: input.page,
+      pageSize: input.pageSize,
+    });
+  }
+
+  // The product-management RPC currently exposes search/category/company only.
+  // Pull its paged result set, then filter before pagination so counts/pages stay correct.
+  const allRows = await fetchAllProductManagementRows({ search: input.search });
+  const filtered = allRows.filter(row => matchesBarcodeFilter(row, filter));
+  const pageSize = Math.min(200, Math.max(10, Number(input.pageSize || 50)));
+  const page = Math.max(1, Number(input.page || 1));
+  const offset = (page - 1) * pageSize;
+
+  return {
+    rows: filtered.slice(offset, offset + pageSize),
+    total: filtered.length,
+    page,
+    pageSize,
+  };
+}
+
+function ean13Checksum(first12: string) {
+  const digits = first12.split("").map(Number);
+  const sum = digits.reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 1 : 3), 0);
+  return String((10 - (sum % 10)) % 10);
+}
+
+function candidateInternalBarcode() {
+  const time = Date.now().toString().slice(-8);
+  const random = Math.floor(Math.random() * 100).toString().padStart(2, "0");
+  const first12 = `29${time}${random}`;
+  return first12 + ean13Checksum(first12);
+}
+
+export async function assignInternalBarcode(row: ProductManagementRow) {
+  requireCurrentBranchId();
+  if (row.barcode?.trim()) return row.barcode.trim();
+  if (row.barcode_type === "scale") {
+    throw new Error("منتجات الميزان تحتاج باركود ميزان/PLU ولا يتم إنشاء باركود داخلي عادي لها تلقائيًا.");
+  }
+
+  let barcode = "";
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const candidate = candidateInternalBarcode();
+    if (!(await barcodeExists(candidate, row.record_type === "product" ? row.id : null))) {
+      barcode = candidate;
+      break;
+    }
+  }
+  if (!barcode) throw new Error("تعذر إنشاء باركود فريد. حاول مرة أخرى.");
+
+  const table = row.record_type === "sale_unit" ? "product_variants" : "products";
+  const { data, error } = await supabase
+    .from(table)
+    .update({ barcode })
+    .eq("id", row.id)
+    .select("id, barcode")
+    .single();
+
+  if (error) {
+    if (String(error.message || "").includes("duplicate")) {
+      throw new Error("الباركود المولد مستخدم بالفعل. حاول مرة أخرى.");
+    }
+    throw productManagementError(error.message);
+  }
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("catalog:changed", { detail: { branchId: requireCurrentBranchId() } }));
+  }
+  return String((data as { barcode?: string | null } | null)?.barcode || barcode);
 }
