@@ -45,16 +45,7 @@ type ThermalPrinterPlugin = {
     heightMm: number;
     gapMm?: number;
     labels: Array<{
-      name: string;
-      barcode: string;
-      barcodeDataUrl: string;
-      price: string;
-      unit?: string | null;
-      storeName?: string;
-      showStoreName?: boolean;
-      showProductName?: boolean;
-      showPrice?: boolean;
-      showBarcodeText?: boolean;
+      dataUrl: string;
       copies?: number;
     }>;
   }): Promise<{
