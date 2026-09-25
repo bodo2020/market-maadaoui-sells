@@ -238,25 +238,27 @@ export async function printBarcodeLabels(items: BarcodeLabelItem[], preferences 
 
   if (isPosNative()) {
     const selected = await posThermalPrinter.getSelected();
-    if (selected.address || selected.transport === "usb") {
-      const size = BARCODE_LABEL_SIZES[normalized.size];
-      const result = await posThermalPrinter.printLabels({
-        operation: "printLabels",
-        widthMm: size.width,
-        heightMm: size.height,
-        gapMm: 2,
-        labels: validItems.map(item => ({
-          dataUrl: nativeLabelDataUrl(item, normalized),
-          copies: clampCopies(Number(item.copies || normalized.copies)),
-        })),
-      });
-      return {
-        printed: Boolean(result.printed),
-        native: true,
-        totalLabels: Number(result.totalCopies || totalLabels),
-        totalMs: Number(result.totalMs || 0),
-      };
+    if (!selected.address && selected.transport !== "usb") {
+      throw new Error("اختار XP-P323B من إعداد الطابعة في التطبيق أولًا.");
     }
+
+    const size = BARCODE_LABEL_SIZES[normalized.size];
+    const result = await posThermalPrinter.printLabels({
+      operation: "printLabels",
+      widthMm: size.width,
+      heightMm: size.height,
+      gapMm: 2,
+      labels: validItems.map(item => ({
+        dataUrl: nativeLabelDataUrl(item, normalized),
+        copies: clampCopies(Number(item.copies || normalized.copies)),
+      })),
+    });
+    return {
+      printed: Boolean(result.printed),
+      native: true,
+      totalLabels: Number(result.totalCopies || totalLabels),
+      totalMs: Number(result.totalMs || 0),
+    };
   }
 
   const popup = window.open("", "_blank", "width=640,height=720");
