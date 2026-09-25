@@ -1,6 +1,8 @@
 import React from 'react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { Navigate } from 'react-router-dom';
+import { resolvePortalAccess, type PortalKind } from '@/services/supabase/portalAccessService';
 import { ArrowLeft, ArrowUpLeft, Bell, Check, ChevronDown, CircleAlert, Clock3, LayoutDashboard, Monitor, ChartNoAxesCombined, LogOut, PackageCheck, RefreshCw, Search, ShoppingBag, Store, Truck, Wallet, Boxes, Users, Menu } from 'lucide-react';
 import { PosDashboard, ReportsDashboard, type PartnerAnalytics } from './AnalyticsPages';
 import { PartnerPOS } from './PartnerPOS';
@@ -26,9 +28,8 @@ const nav: { id: Page; label: string; icon: typeof LayoutDashboard; group: strin
 function App() {
   const [session, setSession] = React.useState<Session | null>(null);
   const [authReady, setAuthReady] = React.useState(false);
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [busy, setBusy] = React.useState(false);
+  const [accessKind, setAccessKind] = React.useState<PortalKind | 'checking' | 'error'>('checking');
+  const [accessVersion, setAccessVersion] = React.useState(0);
   const [error, setError] = React.useState('');
   const [notice, setNotice] = React.useState('');
   const [merchants, setMerchants] = React.useState<Merchant[]>([]);
@@ -55,23 +56,35 @@ function App() {
 
   React.useEffect(() => {
     if (!db) { setAuthReady(true); return; }
-    db.auth.getSession().then(({ data }) => { setSession(data.session); setAuthReady(true); });
+    db.auth.getSession().then(({ data }) => { setSession(data.session); setAuthReady(true); }).catch(() => setAuthReady(true));
     const { data: { subscription } } = db.auth.onAuthStateChange((_event, newSession) => setSession(newSession));
     return () => subscription.unsubscribe();
   }, []);
 
   React.useEffect(() => {
-    if (!db || !session) { setMerchants([]); setMerchantId(''); setWorkspace(null); return; }
+    if (!db || !session) { setAccessKind('none'); setMerchants([]); setMerchantId(''); setWorkspace(null); return; }
     let live = true;
+    setAccessKind('checking');
     setLoading(true);
-    db.rpc('get_my_partner_portal_identity_v2').then(({ data, error: failure }) => {
+    setError('');
+    setWorkspace(null);
+    resolvePortalAccess().then(access => {
       if (!live) return;
-      if (failure) setError(failure.message);
-      else { const list = ((data?.memberships || []) as Array<{ merchant_id: string; merchant_name: string; merchant_status: string; role: string }>).map(m => ({ id: m.merchant_id, name: m.merchant_name, status: m.merchant_status, role: m.role })); setMerchants(list); setMerchantId(prev => list.some(m => m.id === prev) ? prev : (list[0]?.id || '')); }
+      setAccessKind(access.kind);
+      if (access.kind === 'partner') {
+        const list = access.memberships.map(m => ({ id: m.merchant_id, name: m.merchant_name, status: m.merchant_status, role: m.role }));
+        setMerchants(list);
+        setMerchantId(prev => list.some(m => m.id === prev) ? prev : (list[0]?.id || ''));
+      } else { setMerchants([]); setMerchantId(''); }
+      setLoading(false);
+    }).catch((failure: Error) => {
+      if (!live) return;
+      setAccessKind('error');
+      setError(failure.message || 'تعذر التحقق من صلاحية الحساب.');
       setLoading(false);
     });
     return () => { live = false; };
-  }, [session?.user.id]);
+  }, [session?.user.id, session?.access_token, accessVersion]);
 
   const refresh = React.useCallback(async (merchant: string, branch: string) => {
     if (!db || !merchant) return;
@@ -113,14 +126,6 @@ function App() {
   const reportProps = { data: analytics, loading: analyticsLoading, error: analyticsError, range: reportRange, onRange: (days: number) => { setReportRange(days); setAnalytics(null); }, onRetry: () => setAnalyticsVersion(v => v + 1), branchName: workspace?.branches.find(b => b.id === branchId)?.name || '', posEnabled: !!workspace?.pos_enabled, canUsePos: !!workspace?.can_use_pos };
 
 
-  async function signIn(e: React.FormEvent) {
-    e.preventDefault(); if (!db) return;
-    setBusy(true); setError('');
-    const { error: failure } = await db.auth.signInWithPassword({ email, password });
-    if (failure) setError('تعذر تسجيل الدخول. تأكد من البريد الإلكتروني وكلمة المرور.');
-    setBusy(false);
-  }
-
   async function advance(order: Order) {
     const next = nextStatus[order.status]; if (!db || !next || advancing) return;
     setAdvancing(true); setError(''); setNotice('');
@@ -132,7 +137,10 @@ function App() {
 
   if (!authReady) return <div className="splash"><div className="spinner"/> جاري التحميل...</div>;
   if (!db) return <div className="setup"><CircleAlert size={32}/><h2>الربط غير مضبوط</h2><p>أضف عنوان Supabase والمفتاح العام إلى ملف .env.local ثم أعد تشغيل التطبيق.</p></div>;
-  if (!session) return <main className="login-screen"><div className="login-art"><img className="login-logo" src="/elmadawy-logo.png" alt="المعداوي ماركت"/><span className="eyebrow">منظومة شركاء المعداوي</span><h1>كل شغلك،<br/>في مكان واحد.</h1><p>تابع طلباتك، جهز المنتجات، واطّلع على مستحقاتك بوضوح.</p><div className="art-chips"><span><PackageCheck size={17}/> إدارة الطلبات</span><span><Wallet size={17}/> متابعة المستحقات</span></div><div className="art-circle circle-one"/><div className="art-circle circle-two"/></div><div className="login-panel"><div className="login-card"><span className="mobile-brand">شركاء المعداوي</span><span className="eyebrow green">أهلًا بيك من جديد</span><h2>تسجيل الدخول</h2><p className="muted">ادخل بيانات حساب الشريك عشان تبدأ يومك.</p><form onSubmit={signIn}><label>البريد الإلكتروني<input dir="ltr" type="email" autoComplete="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required/></label><label>كلمة المرور<input dir="ltr" type="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required/></label>{error && <div className="alert">{error}</div>}<button className="primary full" disabled={busy}>{busy ? 'جاري الدخول...' : 'دخول إلى لوحة الشريك'} <ArrowLeft size={18}/></button></form><p className="login-help">للحصول على حساب أو استعادة الوصول، تواصل مع إدارة المعداوي.</p></div></div></main>;
+  if (!session) return <Navigate to="/login" replace />;
+  if (accessKind === 'checking') return <div className="splash"><div className="spinner"/> جاري التحقق من صلاحية الحساب...</div>;
+  if (accessKind === 'staff') return <Navigate to="/" replace />;
+  if (accessKind !== 'partner') return <main className="login-screen"><div className="login-panel"><div className="login-card"><CircleAlert size={30}/><h2>{accessKind === 'conflict' ? 'الحساب مرتبط بالنظامين' : accessKind === 'error' ? 'تعذر التحقق من الحساب' : 'ليس لديك صلاحية دخول'}</h2><p className="muted">{error || (accessKind === 'conflict' ? 'تواصل مع الإدارة لتحديد صلاحية واحدة للحساب.' : 'مساحة الشركاء متاحة للحسابات المرتبطة بشريك نشط فقط.')}</p>{accessKind === 'error' && <button className="primary full" onClick={() => setAccessVersion(value => value + 1)}>إعادة المحاولة</button>}<button className="logout" onClick={() => void db.auth.signOut()}>الدخول بحساب مختلف</button></div></div></main>;
 
   const orders = workspace?.orders || [];
   const products = workspace?.products || [];

@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { User, UserRole } from "@/types";
 import { useBranchStore } from "@/stores/branchStore";
+import { resolvePortalAccess } from "@/services/supabase/portalAccessService";
 
 const GENERIC_LOGIN_ERROR = "اسم المستخدم أو كلمة المرور غير صحيح";
 const NO_BRANCH_ERROR = "لا يوجد فرع نشط متاح لهذا الحساب";
@@ -104,6 +105,16 @@ async function fetchMyIdentity(): Promise<StaffIdentity> {
     throw new Error("هذا الحساب غير متاح حالياً");
   }
   return identity;
+}
+
+async function assertStaffPortalAccess(): Promise<void> {
+  const access = await resolvePortalAccess();
+  if (access.kind === "conflict") {
+    throw new Error("الحساب مرتبط بالنظامين. تواصل مع الإدارة لتحديد صلاحية واحدة.");
+  }
+  if (access.kind !== "staff") {
+    throw new Error("هذا الحساب غير مصرح له بدخول نظام الموظفين.");
+  }
 }
 
 export async function fetchMyStaffBranches(): Promise<StaffBranchContext[]> {
@@ -281,6 +292,7 @@ export async function authenticateStaffUser(
   }
 
   try {
+    await assertStaffPortalAccess();
     const identity = await fetchMyIdentity();
     if (identity.user_id !== signInResult.data.user.id) throw new Error(GENERIC_LOGIN_ERROR);
     const contexts = await fetchMyStaffBranches();
@@ -323,6 +335,7 @@ export async function selectStaffBranch(branchId: string): Promise<StaffLoginSta
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !sessionData.session?.user) throw new Error("انتهت جلسة تسجيل الدخول. سجل دخولك مرة تانية.");
 
+  await assertStaffPortalAccess();
   const identity = await fetchMyIdentity();
   if (identity.user_id !== sessionData.session.user.id) throw new Error("INVALID_STAFF_SESSION");
   const contexts = await fetchMyStaffBranches();
@@ -346,6 +359,12 @@ export async function restoreStaffSession(): Promise<StaffLoginState | null> {
   if (sessionError || !sessionUserId) return null;
 
   try {
+    const access = await resolvePortalAccess();
+    if (access.kind === "partner") {
+      clearStaffAccessContext();
+      return null;
+    }
+    if (access.kind !== "staff") throw new Error("INVALID_STAFF_SESSION");
     const identity = await fetchMyIdentity();
     if (identity.user_id !== sessionUserId) throw new Error("INVALID_STAFF_SESSION");
     const contexts = await fetchMyStaffBranches();
