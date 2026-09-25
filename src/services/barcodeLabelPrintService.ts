@@ -1,5 +1,6 @@
 import JsBarcode from "jsbarcode";
 import { siteConfig } from "@/config/site";
+import { isPosNative, posThermalPrinter } from "@/native/posNative";
 
 export type BarcodeLabelSize = "25x15" | "30x20" | "40x25" | "50x30";
 
@@ -40,7 +41,7 @@ const DEFAULTS: BarcodeLabelPreferences = {
 };
 
 function clampCopies(value: number) {
-  return Math.min(20, Math.max(1, Math.round(Number(value || 1))));
+  return Math.min(99, Math.max(1, Math.round(Number(value || 1))));
 }
 
 export function getBarcodeLabelPreferences(): BarcodeLabelPreferences {
@@ -91,6 +92,110 @@ function barcodeDataUrl(value: string, size: BarcodeLabelSize) {
   return canvas.toDataURL("image/png");
 }
 
+
+function drawCenteredText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  fontSize: number,
+  weight = 800,
+) {
+  context.save();
+  context.direction = "rtl";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  let size = fontSize;
+  do {
+    context.font = `${weight} ${size}px Cairo, Tahoma, Arial, sans-serif`;
+    if (context.measureText(text).width <= maxWidth || size <= 7) break;
+    size -= 1;
+  } while (size > 7);
+  context.fillText(text, x, y, maxWidth);
+  context.restore();
+}
+
+function nativeLabelDataUrl(item: BarcodeLabelItem, preferences: BarcodeLabelPreferences) {
+  const size = BARCODE_LABEL_SIZES[preferences.size];
+  const width = Math.round(size.width * 8);
+  const height = Math.round(size.height * 8);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("تعذر تجهيز الاستيكر للطباعة.");
+
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = "#000";
+
+  const compact = size.height <= 20;
+  const tiny = size.width <= 30;
+  const margin = tiny ? 6 : 8;
+  const center = width / 2;
+  let top = compact ? 5 : 7;
+  let bottomReserve = 4;
+
+  if (preferences.showStoreName) {
+    drawCenteredText(context, siteConfig.name, center, top + (tiny ? 5 : 6), width - margin * 2, tiny ? 9 : 11, 800);
+    top += tiny ? 11 : 14;
+  }
+
+  if (preferences.showProductName) {
+    drawCenteredText(context, item.name, center, top + (tiny ? 6 : 8), width - margin * 2, tiny ? 10 : size.width <= 40 ? 13 : 15, 900);
+    top += tiny ? 14 : 18;
+  }
+
+  if (preferences.showPrice) bottomReserve += tiny ? 17 : 22;
+  if (preferences.showBarcodeText) bottomReserve += tiny ? 10 : 12;
+
+  const barcodeCanvas = document.createElement("canvas");
+  const availableHeight = Math.max(24, height - top - bottomReserve - 4);
+  JsBarcode(barcodeCanvas, item.barcode.trim(), {
+    format: "CODE128",
+    width: tiny ? 1 : 1.3,
+    height: Math.max(22, Math.min(availableHeight, compact ? 38 : 54)),
+    displayValue: false,
+    margin: 0,
+    background: "#ffffff",
+    lineColor: "#000000",
+  });
+
+  const maxBarcodeWidth = width - margin * 2;
+  const ratio = Math.min(1, maxBarcodeWidth / Math.max(1, barcodeCanvas.width));
+  const barcodeWidth = Math.max(1, Math.round(barcodeCanvas.width * ratio));
+  const barcodeHeight = Math.max(1, Math.min(availableHeight, Math.round(barcodeCanvas.height * ratio)));
+  const barcodeY = top + Math.max(0, Math.floor((availableHeight - barcodeHeight) / 2));
+  context.drawImage(barcodeCanvas, Math.round((width - barcodeWidth) / 2), barcodeY, barcodeWidth, barcodeHeight);
+
+  let cursor = top + availableHeight + 2;
+  if (preferences.showBarcodeText) {
+    context.save();
+    context.direction = "ltr";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.font = `700 ${tiny ? 8 : 10}px monospace`;
+    context.fillText(item.barcode, center, cursor + (tiny ? 4 : 5), width - margin * 2);
+    context.restore();
+    cursor += tiny ? 10 : 12;
+  }
+
+  if (preferences.showPrice) {
+    const price = `${Number(item.price || 0).toLocaleString("ar-EG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siteConfig.currency}${item.unit ? ` / ${item.unit}` : ""}`;
+    drawCenteredText(context, price, center, Math.min(height - 7, cursor + (tiny ? 6 : 8)), width - margin * 2, tiny ? 11 : size.width <= 40 ? 15 : 18, 900);
+  }
+
+  return canvas.toDataURL("image/png");
+}
+
+export type BarcodePrintResult = {
+  printed: boolean;
+  native: boolean;
+  totalLabels: number;
+  totalMs?: number;
+};
+
 export function buildBarcodeLabelsHtml(items: BarcodeLabelItem[], preferences = getBarcodeLabelPreferences()) {
   const size = BARCODE_LABEL_SIZES[preferences.size];
   const labels = items.flatMap(item => {
@@ -125,12 +230,37 @@ export function buildBarcodeLabelsHtml(items: BarcodeLabelItem[], preferences = 
   </style></head><body>${labels}</body></html>`;
 }
 
-export function printBarcodeLabels(items: BarcodeLabelItem[], preferences = getBarcodeLabelPreferences()) {
+export async function printBarcodeLabels(items: BarcodeLabelItem[], preferences = getBarcodeLabelPreferences()): Promise<BarcodePrintResult> {
   const validItems = items.filter(item => item.barcode?.trim());
-  if (!validItems.length) return false;
+  if (!validItems.length) return { printed: false, native: false, totalLabels: 0 };
   const normalized = saveBarcodeLabelPreferences(preferences);
+  const totalLabels = validItems.reduce((sum, item) => sum + clampCopies(Number(item.copies || normalized.copies)), 0);
+
+  if (isPosNative()) {
+    const selected = await posThermalPrinter.getSelected();
+    if (selected.address || selected.transport === "usb") {
+      const size = BARCODE_LABEL_SIZES[normalized.size];
+      const result = await posThermalPrinter.printLabels({
+        operation: "printLabels",
+        widthMm: size.width,
+        heightMm: size.height,
+        gapMm: 2,
+        labels: validItems.map(item => ({
+          dataUrl: nativeLabelDataUrl(item, normalized),
+          copies: clampCopies(Number(item.copies || normalized.copies)),
+        })),
+      });
+      return {
+        printed: Boolean(result.printed),
+        native: true,
+        totalLabels: Number(result.totalCopies || totalLabels),
+        totalMs: Number(result.totalMs || 0),
+      };
+    }
+  }
+
   const popup = window.open("", "_blank", "width=640,height=720");
-  if (!popup) return false;
+  if (!popup) return { printed: false, native: false, totalLabels };
   popup.document.open();
   popup.document.write(buildBarcodeLabelsHtml(validItems, normalized));
   popup.document.close();
@@ -138,5 +268,5 @@ export function printBarcodeLabels(items: BarcodeLabelItem[], preferences = getB
   const trigger = () => { try { popup.print(); } catch { /* browser controlled */ } };
   if (popup.document.readyState === "complete") window.setTimeout(trigger, 250);
   else popup.addEventListener("load", () => window.setTimeout(trigger, 250), { once: true });
-  return true;
+  return { printed: true, native: false, totalLabels };
 }
