@@ -45,6 +45,7 @@ import {
   type BarcodeLabelSize,
 } from "@/services/barcodeLabelPrintService";
 import { bluetoothPrinterService } from "@/services/bluetoothPrinterService";
+import { isPosNative, posThermalPrinter } from "@/native/posNative";
 import { siteConfig } from "@/config/site";
 import { toast } from "sonner";
 
@@ -136,9 +137,18 @@ export default function Barcode() {
   const [preferences, setPreferences] = useState<BarcodeLabelPreferences>(() => getBarcodeLabelPreferences());
   const [printingAll, setPrintingAll] = useState(false);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [nativePrinter, setNativePrinter] = useState<{ name: string | null; transport?: "bluetooth" | "usb" } | null>(null);
   const pageSize = 60;
 
   useEffect(() => setPage(1), [search, filter, branchId]);
+
+  useEffect(() => {
+    if (!isPosNative()) return;
+    void posThermalPrinter.getSelected()
+      .then(value => setNativePrinter({ name: value.name, transport: value.transport }))
+      .catch(() => setNativePrinter(null));
+  }, []);
+
 
   const query = useQuery({
     queryKey: ["barcode-print-center-v3", branchId, search.trim(), filter, page],
@@ -324,7 +334,7 @@ export default function Barcode() {
           <Card className="border-slate-100 shadow-sm"><CardContent className="p-4"><p className="text-xs font-bold text-slate-500">نتائج الفلتر</p><p className="mt-2 text-2xl font-black">{total.toLocaleString("ar-EG")}</p><p className="mt-1 text-[11px] text-slate-400">العدد محسوب على الكتالوج كله</p></CardContent></Card>
           <Card className="border-slate-100 shadow-sm"><CardContent className="p-4"><p className="text-xs font-bold text-slate-500">طابور الطباعة</p><p className="mt-2 text-2xl font-black">{selected.size.toLocaleString("ar-EG")} منتج</p><p className="mt-1 text-[11px] text-slate-400">{totalLabels.toLocaleString("ar-EG")} ملصق جاهز</p></CardContent></Card>
           <Card className="border-slate-100 shadow-sm"><CardContent className="p-4"><p className="text-xs font-bold text-slate-500">مقاس الملصق</p><p className="mt-2 text-2xl font-black">{BARCODE_LABEL_SIZES[preferences.size].label}</p><p className="mt-1 text-[11px] text-slate-400">يمكن تغييره من المعاينة</p></CardContent></Card>
-          <Card className="border-slate-100 shadow-sm"><CardContent className="p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold text-slate-500">الطابعة</p><p className="mt-2 font-black">{printerStatus.name || "طباعة النظام"}</p><p className="mt-1 text-[11px] text-slate-400">{printerStatus.connected ? "متصلة حاليًا" : "سيتم الاختيار عند الطباعة"}</p></div><Bluetooth className={`h-5 w-5 ${printerStatus.connected ? "text-emerald-600" : "text-slate-300"}`} /></div></CardContent></Card>
+          <Card className="border-slate-100 shadow-sm"><CardContent className="p-4"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold text-slate-500">الطابعة</p><p className="mt-2 font-black">{nativePrinter?.name || printerStatus.name || "طباعة النظام"}</p><p className="mt-1 text-[11px] text-slate-400">{nativePrinter?.name ? `TSPL مباشر · ${nativePrinter.transport === "usb" ? "USB" : "Bluetooth"}` : printerStatus.connected ? "متصلة حاليًا" : "سيتم الاختيار عند الطباعة"}</p></div><Bluetooth className={`h-5 w-5 ${nativePrinter?.name || printerStatus.connected ? "text-emerald-600" : "text-slate-300"}`} /></div></CardContent></Card>
         </div>
 
         <Card className="border-slate-100 shadow-sm">
