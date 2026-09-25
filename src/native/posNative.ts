@@ -39,6 +39,32 @@ type ThermalPrinterPlugin = {
     persistentConnection?: boolean;
     transport?: 'bluetooth' | 'usb';
   }>;
+  printLabels(options: {
+    operation: 'printLabels';
+    widthMm: number;
+    heightMm: number;
+    gapMm?: number;
+    labels: Array<{
+      name: string;
+      barcode: string;
+      barcodeDataUrl: string;
+      price: string;
+      unit?: string | null;
+      storeName?: string;
+      showStoreName?: boolean;
+      showProductName?: boolean;
+      showPrice?: boolean;
+      showBarcodeText?: boolean;
+      copies?: number;
+    }>;
+  }): Promise<{
+    printed: boolean;
+    labels: number;
+    totalCopies: number;
+    transport?: 'bluetooth' | 'usb';
+    mode?: string;
+    totalMs?: number;
+  }>;
   testConnection(options: { operation: 'test' }): Promise<{ sent: boolean; persistent?: boolean; transport?: string }>;
 };
 type DevicePlugin = {
