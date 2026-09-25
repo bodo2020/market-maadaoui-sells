@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,6 +39,7 @@ import { addFavoriteProduct, getFavoriteProducts, removeFavoriteProduct } from "
 import { preflightPosCart } from "@/services/supabase/posPreflightService";
 
 const DEFAULT_TAB_ID = "tab-default";
+const productNameCollator = new Intl.Collator("ar");
 
 function money(value: number) {
   return `${Number(value || 0).toFixed(2)} ${siteConfig.currency}`;
@@ -108,7 +109,7 @@ export default function POSPro() {
   const lastCartRevealIndexRef = useRef<number | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [remoteSearchResults, setRemoteSearchResults] = useState<Product[] | null>(null);
+  const [remoteSearchResults, setRemoteSearchResults] = useState<{ query: string; rows: Product[] } | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [cashSummary, setCashSummary] = useState<PosCashSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -145,6 +146,7 @@ export default function POSPro() {
   );
   const cartItems = activeTab?.cartItems || [];
   const search = activeTab?.search || "";
+  const deferredSearch = useDeferredValue(search);
 
   const updateActiveTab = useCallback((updates: Partial<POSTab>) => {
     setTabs(prev => prev.map(tab => tab.id === activeTabIdRef.current ? { ...tab, ...updates } : tab));
@@ -460,8 +462,8 @@ export default function POSPro() {
     let cancelled = false;
     const timer = window.setTimeout(() => {
       void fetchPOSProducts(query)
-        .then(rows => { if (!cancelled) setRemoteSearchResults(rows); })
-        .catch(() => { if (!cancelled) setRemoteSearchResults([]); });
+        .then(rows => { if (!cancelled) setRemoteSearchResults({ query, rows }); })
+        .catch(() => { if (!cancelled) setRemoteSearchResults({ query, rows: [] }); });
     }, 180);
 
     return () => {
@@ -471,21 +473,22 @@ export default function POSPro() {
   }, [search, currentBranchId]);
 
   const visibleProducts = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = deferredSearch.trim().toLocaleLowerCase("ar");
+    const favoriteIds = new Set(favorites);
     const localMatches = query
-      ? products.filter(product => product.name.toLowerCase().includes(query) || product.barcode?.includes(query) || product.bulk_barcode?.includes(query))
+      ? products.filter(product => product.name.toLocaleLowerCase("ar").includes(query) || product.barcode?.includes(query) || product.bulk_barcode?.includes(query))
       : products;
-    const list = query ? (remoteSearchResults ?? localMatches) : products;
+    const list = query ? (remoteSearchResults?.query === deferredSearch.trim() ? remoteSearchResults.rows : localMatches) : products;
     return [...list].sort((a, b) => {
-      const aFav = favorites.includes(a.id) ? 1 : 0;
-      const bFav = favorites.includes(b.id) ? 1 : 0;
+      const aFav = favoriteIds.has(a.id) ? 1 : 0;
+      const bFav = favoriteIds.has(b.id) ? 1 : 0;
       if (aFav !== bFav) return bFav - aFav;
       const aStock = stockOf(a) > 0 ? 1 : 0;
       const bStock = stockOf(b) > 0 ? 1 : 0;
       if (aStock !== bStock) return bStock - aStock;
-      return a.name.localeCompare(b.name, "ar");
+      return productNameCollator.compare(a.name, b.name);
     }).slice(0, query ? 100 : 50);
-  }, [products, search, favorites, remoteSearchResults]);
+  }, [products, deferredSearch, favorites, remoteSearchResults]);
 
   const total = useMemo(() => cartItems.reduce((sum, item) => sum + Number(item.total || 0), 0), [cartItems]);
   const discount = useMemo(() => cartItems.reduce((sum, item) => {
@@ -735,7 +738,7 @@ export default function POSPro() {
                   </div>
                   <div className="text-left">
                     <div className="font-bold lg:text-sm">{money(item.total)}</div>
-                    <button type="button" aria-label="حذف الصنف" className="mt-2 rounded-lg p-1 text-red-500 hover:bg-red-50 lg:mt-0.5 lg:p-0.5" onClick={() => setCartItems(cartItems.filter((_, i) => i !== index))}>
+                    <button type="button" aria-label="حذف الصنف" className="mt-1 inline-flex h-11 w-11 items-center justify-center rounded-xl text-red-500 hover:bg-red-50" onClick={() => setCartItems(cartItems.filter((_, i) => i !== index))}>
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -743,9 +746,9 @@ export default function POSPro() {
 
                 {!item.isBulk && item.weight == null && (
                   <div className="mt-3 flex items-center gap-2 lg:mt-1.5 lg:gap-1.5">
-                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 lg:h-7 lg:w-7" onClick={() => changeQuantity(index, -1)}><Minus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
-                    <Input key={`qty-${index}-${item.quantity}`} type="number" min={1} step={1} inputMode="numeric" defaultValue={item.quantity} className="h-9 w-20 text-center font-bold lg:h-7 lg:w-14 lg:text-sm" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setNormalQuantity(index, next)) event.currentTarget.value = String(item.quantity); }} />
-                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 lg:h-7 lg:w-7" onClick={() => changeQuantity(index, 1)}><Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
+                    <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={() => changeQuantity(index, -1)}><Minus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
+                    <Input key={`qty-${index}-${item.quantity}`} type="number" min={1} step={1} inputMode="numeric" defaultValue={item.quantity} className="h-11 w-20 text-center font-bold lg:w-16 lg:text-sm" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setNormalQuantity(index, next)) event.currentTarget.value = String(item.quantity); }} />
+                    <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={() => changeQuantity(index, 1)}><Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
                     <span className="mr-auto text-xs text-muted-foreground">متاح {stockOf(item.product)}</span>
                   </div>
                 )}
@@ -753,9 +756,9 @@ export default function POSPro() {
                 {item.isBulk && (
                   <div className="mt-3 space-y-2 lg:mt-1.5 lg:space-y-1">
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 lg:h-7 lg:w-7" onClick={() => changeBulkPacks(index, -1)}><Minus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
-                      <Input key={`bulk-${index}-${bulkPacks}`} type="number" min={1} step={1} inputMode="numeric" defaultValue={bulkPacks} className="h-9 w-20 text-center font-bold lg:h-7 lg:w-14 lg:text-sm" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setBulkPackCount(index, next)) event.currentTarget.value = String(bulkPacks); }} />
-                      <Button variant="outline" size="icon" className="h-9 w-9 shrink-0 lg:h-7 lg:w-7" onClick={() => changeBulkPacks(index, 1)}><Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
+                      <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={() => changeBulkPacks(index, -1)}><Minus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
+                      <Input key={`bulk-${index}-${bulkPacks}`} type="number" min={1} step={1} inputMode="numeric" defaultValue={bulkPacks} className="h-11 w-20 text-center font-bold lg:w-16 lg:text-sm" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setBulkPackCount(index, next)) event.currentTarget.value = String(bulkPacks); }} />
+                      <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={() => changeBulkPacks(index, 1)}><Plus className="h-4 w-4 lg:h-3.5 lg:w-3.5" /></Button>
                       <span className="text-xs font-medium">عبوة × {bulkPackSize}</span>
                       <span className="mr-auto text-xs text-muted-foreground">متاح {stockOf(item.product)}</span>
                     </div>
@@ -766,7 +769,7 @@ export default function POSPro() {
                 {item.weight != null && (
                   <div className="mt-3 flex flex-wrap items-center gap-2 lg:mt-1.5 lg:gap-1.5">
                     <div className="flex items-center gap-1">
-                      <Input key={`weight-${index}-${Number(item.weight).toFixed(3)}`} type="number" min="0.001" step="0.001" inputMode="decimal" defaultValue={Number(item.weight).toFixed(3)} className="h-9 w-24 text-center font-bold lg:h-7 lg:w-20 lg:text-sm" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setCartWeight(index, next)) event.currentTarget.value = Number(item.weight).toFixed(3); }} />
+                      <Input key={`weight-${index}-${Number(item.weight).toFixed(3)}`} type="number" min="0.001" step="0.001" inputMode="decimal" defaultValue={Number(item.weight).toFixed(3)} className="h-11 w-24 text-center font-bold lg:text-sm" onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} onBlur={event => { const next = Number(event.currentTarget.value); if (!setCartWeight(index, next)) event.currentTarget.value = Number(item.weight).toFixed(3); }} />
                       <span className="text-xs">كجم</span>
                     </div>
                     <span className="text-xs text-muted-foreground">{money(item.price)} / كجم</span>
@@ -834,8 +837,8 @@ export default function POSPro() {
                 {visibleProducts.map(product => {
                   const out = stockOf(product) <= 0;
                   return (
-                    <div key={product.id} role="button" tabIndex={out ? -1 : 0} aria-disabled={out} onClick={() => !out && chooseProduct(product)} onKeyDown={event => { if (!out && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); chooseProduct(product); } }} className={`group relative overflow-hidden rounded-2xl border bg-white text-right shadow-sm transition ${out ? "cursor-not-allowed opacity-55" : "cursor-pointer hover:-translate-y-0.5 hover:border-[#005931]/40 hover:shadow-md active:scale-[.98]"}`}>
-                      <div className="relative aspect-[4/3] bg-slate-50 p-3"><img src={product.image_urls?.[0] || "/placeholder.svg"} alt={product.name} className="h-full w-full object-contain" loading="lazy" /><button type="button" aria-label="تثبيت المنتج" className="absolute left-2 top-2 rounded-full bg-white/95 p-2 shadow" onClick={event => { event.preventDefault(); event.stopPropagation(); void toggleFavorite(product.id); }}>{favorites.includes(product.id) ? <Pin className="h-4 w-4 text-[#005931]" /> : <PinOff className="h-4 w-4 text-slate-500" />}</button><div className="absolute bottom-2 right-2 flex gap-1">{out ? <Badge variant="destructive">نفد المخزون</Badge> : <Badge className="bg-white/95 text-slate-700 hover:bg-white">متاح {stockOf(product)}</Badge>}</div></div>
+                    <div key={product.id} role="button" tabIndex={out ? -1 : 0} aria-disabled={out} onClick={() => !out && chooseProduct(product)} onKeyDown={event => { if (!out && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); chooseProduct(product); } }} className={`group relative overflow-hidden rounded-2xl border bg-white text-right shadow-sm transition-colors motion-reduce:transition-none ${out ? "cursor-not-allowed opacity-55" : "cursor-pointer hover:border-[#005931]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#005931]"}`}>
+                      <div className="relative aspect-[4/3] bg-slate-50 p-3"><img src={product.image_urls?.[0] || "/placeholder.svg"} alt={product.name} className="h-full w-full object-contain" loading="lazy" /><button type="button" aria-label="تثبيت المنتج" className="absolute left-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-white/95 shadow" onClick={event => { event.preventDefault(); event.stopPropagation(); void toggleFavorite(product.id); }}>{favorites.includes(product.id) ? <Pin className="h-4 w-4 text-[#005931]" /> : <PinOff className="h-4 w-4 text-slate-500" />}</button><div className="absolute bottom-2 right-2 flex gap-1">{out ? <Badge variant="destructive">نفد المخزون</Badge> : <Badge className="bg-white/95 text-slate-700 hover:bg-white">متاح {stockOf(product)}</Badge>}</div></div>
                       <div className="p-3"><div className="line-clamp-2 min-h-10 text-sm font-semibold leading-5">{product.name}</div><div className="mt-2 flex items-end justify-between gap-2"><div className="font-black text-[#005931]">{money(effectivePriceOf(product))}</div><div className="flex gap-1">{(product.barcode_type === "scale" || product.is_weight_based) && <Scale className="h-4 w-4 text-blue-600" />}{product.bulk_enabled && <Box className="h-4 w-4 text-amber-600" />}</div></div>{product.bulk_enabled && !out && <Button variant="secondary" className="mt-2 h-9 w-full" onClick={event => { event.preventDefault(); event.stopPropagation(); addBulk(product); }}><Box className="ml-1 h-4 w-4" /> جملة {product.bulk_quantity} · {money(Number(product.bulk_price || 0))}</Button>}</div>
                     </div>
                   );
