@@ -19,6 +19,7 @@ export type BarcodeLabelItem = {
   price: number;
   unit?: string | null;
   barcodeType?: string | null;
+  copies?: number;
 };
 
 export const BARCODE_LABEL_SIZES: Record<BarcodeLabelSize, { width: number; height: number; label: string }> = {
@@ -96,8 +97,9 @@ export function buildBarcodeLabelsHtml(items: BarcodeLabelItem[], preferences = 
     if (!item.barcode.trim()) return [];
     let image = "";
     try { image = barcodeDataUrl(item.barcode.trim(), preferences.size); } catch { return []; }
-    return Array.from({ length: clampCopies(preferences.copies) }, (_, copyIndex) => `
-      <section class="label ${copyIndex === preferences.copies - 1 ? "" : "page-break"}">
+    const copies = clampCopies(Number(item.copies || preferences.copies));
+    return Array.from({ length: copies }, (_, copyIndex) => `
+      <section class="label ${copyIndex === copies - 1 ? "" : "page-break"}">
         ${preferences.showStoreName ? `<div class="store">${esc(siteConfig.name)}</div>` : ""}
         ${preferences.showProductName ? `<div class="name">${esc(item.name)}</div>` : ""}
         <div class="barcode"><img src="${image}" alt="${esc(item.barcode)}" /></div>
