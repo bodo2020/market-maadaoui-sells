@@ -120,9 +120,18 @@ Deno.serve(async (req: Request) => {
   });
   if (secretError || secretOk !== true) return json({ error: "UNAUTHORIZED" }, 401);
 
-  const rawAccount = Deno.env.get("FCM_SERVICE_ACCOUNT_JSON");
+  let rawAccount = Deno.env.get("FCM_SERVICE_ACCOUNT_JSON") || "";
+  let credentialSource = rawAccount ? "edge_env" : "vault";
+
   if (!rawAccount) {
-    return json({ error: "FCM_NOT_CONFIGURED", configured: false }, 503);
+    const { data: vaultAccount, error: vaultError } = await admin.rpc("get_push_provider_secret_v1", {
+      p_worker_secret: workerSecret,
+    });
+    if (!vaultError && typeof vaultAccount === "string") rawAccount = vaultAccount;
+  }
+
+  if (!rawAccount) {
+    return json({ error: "FCM_NOT_CONFIGURED", configured: false, credential_source: credentialSource }, 503);
   }
 
   let account: ServiceAccount;
@@ -259,5 +268,5 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  return json({ processed: items.length, sent, failed, retried, suppressed, configured: true });
+  return json({ processed: items.length, sent, failed, retried, suppressed, configured: true, credential_source: credentialSource });
 });

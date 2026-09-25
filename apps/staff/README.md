@@ -1,0 +1,140 @@
+# Elmadawy Staff
+
+تطبيق التشغيل الداخلي لموظفي المعداوي. نفس الـAPK يعمل كـ **Role-aware workspace**؛ الوحدات والإجراءات الظاهرة تتحدد من صلاحيات الموظف والفرع.
+
+## حدود المنتج
+
+Staff لا يحل محل POS أو Delivery أو Control Center:
+
+- POS: البيع، الدرج، إغلاق وردية الكاشير.
+- Delivery: المندوب، التتبع، المسارات وإثبات التسليم.
+- Control Center: الإدارة الكاملة والتهيئة والتقارير المتقدمة.
+- Staff: التنفيذ اليومي داخل الفرع، الإشراف السريع، وخدمات الموظف.
+
+## Staff V1 — 0.18.0
+
+### الأساس
+- تسجيل الدخول، Google Password Manager، Trusted Device.
+- الرئيسية "يومي" حسب الدور.
+- Bottom Nav ثابت 5 عناصر مع Work Hub «العمل» للوحدات التشغيلية حسب الصلاحية.
+- Task Center.
+- الحضور والانصراف والاستثناءات.
+- الإشعارات.
+- البطاقة، الإجازات، السلف وتصحيح الحضور.
+
+### Online fulfillment
+- استلام وتجهيز الطلب.
+- Barcode picking.
+- النواقص والبدائل.
+- Approval للبديل داخل Staff.
+- التسوية المالية لفروق البدائل والنواقص من خلال Payment Ledger.
+
+### Inventory workspace
+- الجرد اليومي العشوائي.
+- Blind Count + Barcode verification.
+- إعادة عد بموظف مختلف.
+- اعتماد/رفض فروق المخزون.
+- تحويلات المخزون: شحن، استلام، وفروق.
+- Low Stock / Out of Stock / Coverage Risk.
+- Spot Count قبل قرارات الشراء أو التحويل.
+
+### Expiry V2
+- مصدر الحقيقة هو `product_batches` وليس `products.expiry_date` القديم.
+- استبعاد دفعات `DAMAGED-*` القديمة من Workspace.
+- إظهار الدفعات المنتهية والقريبة من الانتهاء مع تكلفة الشراء والمورد.
+- الإهلاك وإرجاع المورد ذريان: Batch + Inventory + Ledger + Cost/Return.
+- حماية الكمية المحجوزة للطلبات Online.
+- لا يسمح بالإهلاك/الإرجاع إلا بعد Matched Inventory Count خلال آخر 4 ساعات.
+- الإهلاك يسجل Non-cash expense مشتقًا من تكلفة الشراء، ولا يسحب من الخزنة.
+- Supplier Return يخرج المخزون ويظل `pending_credit` حتى وصول Credit Note.
+- تسجيل Credit Note يتم لاحقًا بواسطة المشتريات/المالية ولا يعدل رصيد المورد تلقائيًا بدون مستند محاسبي.
+- Data-quality guard يمنع الإجراءات على `REMAINING-*` القديمة أو Duplicate batches أو تكلفة شراء صفر.
+- الصفوف غير الموثوقة تظل ظاهرة للتحقق والجرد، لكن الإهلاك/الإرجاع يظل محظورًا حتى التسوية.
+
+### الملف الوظيفي HR 360
+- Team-scoped HR 360: المدير/HR يفتح ملف الموظف من Manager Workspace حسب `hr.view` / `branch.manage_staff` والـBackend هو صاحب القرار.
+- عرض الموظف الآخر Read-only: بيانات وظيفية + الحساب والفروع + الأداء. Wallet/بطاقة الموظف وخدماته المالية تظل Self-only.
+- Super Admin فقط يمكنه PIN reset للموظف المستهدف عبر الـRPC المدقق.
+
+### الملف الوظيفي الشخصي
+- صفحة مستقلة داخل «خدماتي» على `/account/employment-file`.
+- نفس مصدر بيانات `Employee360Page` في HR؛ لا توجد نسخة بيانات منفصلة.
+- بيانات وظيفية كاملة: الرقم الوظيفي، القسم، الفريق، المسمى، Grade، المدير، نمط العمل، نوع العقد، الحالة، تاريخ التعيين/الانتهاء، وملاحظات HR.
+- الحساب والفروع: username، role، الهاتف، البريد، حالة الحساب، كل الفروع والأدوار، والفرع الوظيفي الأساسي.
+- Wallet وبطاقة الموظف: المزايا، البدل الشهري، الائتمان، المستحقات، السلف، الإجازات، رقم العضوية والباركود.
+- الأداء والحضور: الحضور الحقيقي من الجداول، الساعات، التأخير، الخروج المبكر، المهام، SLA، والجرد.
+- Performance panels تخصصية تظهر حسب النشاط الفعلي: Cashier / Inventory / Delivery / Online & Customer Service.
+- الموظف يقرأ ملفه فقط عبر نفس RPCs الآمنة الموجودة في HR.
+- لا توجد أزرار تعديل HR داخل Staff؛ تعديلات القسم/الحالة/المدير/التواريخ تظل في HR/Control Center.
+- Super Admin فقط يرى بطاقة أمان الحساب لتعيين PIN جديد عبر الـRPC المدقق الموجود أصلًا؛ هذا لا يفتح تعديل بيانات HR.
+- الملف الوظيفي والأداء Live-only ولا يتم تخزين بيانات HR الحساسة في Offline cache.
+
+### Batch Reconciliation V1
+- تبويب «تسوية الدفعات» للمنتجات المحظورة بسبب بيانات قديمة/مكررة/بدون تكلفة.
+- يتطلب `inventory.manage` + `purchases.manage` معًا أو Super Admin.
+- جرد مطابق حديث خلال 4 ساعات شرط إجباري.
+- المشرف يعيد توزيع رصيد Inventory على دفعات موثوقة برقم/تاريخ/كمية/تكلفة.
+- Supplier selector يعرض فقط id/name/code للموردين النشطين؛ بيانات الاتصال والرصيد لا تُعرض داخل Staff.
+- الدفعات الجديدة الناتجة عن Reconciliation لا تُسجل لها purchase_date وهمية؛ يبقى التاريخ Null ما لم يوجد مصدر شراء حقيقي.
+- ملاحظات الدفعة الأصلية تُحفظ داخل التسوية مع أثر التحقق.
+- مجموع الدفعات الجديدة يجب أن يساوي Inventory الحالي بالضبط.
+- Shared Inventory: أي write للصلاحية أو تسوية الدفعات يتم من فرع `inventory_source_branch_id` الفعلي فقط؛ الفرع الفرعي يعرض تنبيهًا ولا يسمح بالتصرف.
+- التسوية لا تغيّر Inventory ولا تنشئ Inventory Movement أو Expense أو Supplier Credit.
+- يحتفظ النظام بـ before/after snapshots وactor وverified count وrequest id.
+- Migration موجودة في `supabase/migrations/20260921083000_staff_batch_reconciliation_v1.sql`.
+- Migration لم تطبق على Production.
+
+### Approval & manager
+- Approval Inbox: مخزون، HR، حضور، بدائل، وتسويات مالية.
+- Manager Workspace: الفريق، الموافقات، المتأخر، الأونلاين، الجرد، الكاش وخدمة العملاء.
+- لا يوجد Productivity Score موحد؛ تظهر مؤشرات تشغيل فعلية فقط.
+
+### Shift handoff
+- POS يغلق الوردية.
+- Staff يستلم عهدة الوردية المغلقة.
+- عد فعلي + سبب أي فرق.
+- التوريد يسجل في خزنة الفرع من خلال الباك إند المالي.
+
+### Offline Recovery V1
+- Banner واضح عند انقطاع الاتصال.
+- Cache محلي لآخر Tasks / Attendance / Notifications وبعض Workspaces التشغيلية.
+- Inventory risks / transfers / expiry / supplier returns تدعم fallback للقراءة.
+- العمليات الحساسة لا تنفذ Offline؛ تنتظر عودة الاتصال بدل تكرار أو نصف تنفيذ.
+- Cache مربوط بـ user_id وليس الفرع فقط، ويتم تنظيفه عند Logout لمنع ظهور بيانات موظف سابق على نفس الجهاز.
+
+### Native Push foundation
+- Capacitor Push Notifications متوافق مع Capacitor 7.
+- تسجيل Staff device في الباك إند الحالي عبر `register_push_device_v2`.
+- Android notification channels: `general`, `orders`, `tasks`, `offers`.
+- لا يظهر Permission prompt إجباري عند فتح التطبيق؛ الموظف يفعّل الإشعارات من «خدماتي».
+- لو الإذن سبق منحه، التطبيق يعيد تسجيل الجهاز تلقائيًا.
+- الضغط على الإشعار يفتح Deep Link آمن داخل Staff فقط.
+- عند Logout يحاول التطبيق إلغاء تسجيل Push token لهذا الجهاز.
+- Firebase client config اختياري في CI؛ غيابه لا يكسر APK التجريبي.
+- الـFCM worker يستخدم Supabase Vault كمصدر موحد للـService Account مع Environment fallback.
+- حالة Production الحالية وقت التطوير: لا يوجد Staff push device مسجل، FCM provider غير مكوّن، والـworker متوقف.
+- دليل التفعيل موجود في `apps/staff/PUSH_SETUP.md`.
+
+## Backend migration
+
+Expiry actions موجودة في:
+
+`supabase/migrations/20260921003500_staff_expiry_actions_v2.sql`
+
+الـMigration **لم يتم تطبيقها على Production** أثناء تطوير هذا الفرع.
+
+## المتبقي قبل Release
+
+1. اختبار Expiry Migration على Supabase Preview/Development branch قبل Production.
+2. توفير Firebase Android `google-services.json` وFCM HTTP v1 Service Account ثم تفعيل Push حسب `PUSH_SETUP.md`.
+3. QA بأدوار حقيقية: Picker، Inventory، Cashier، Online Supervisor، Inventory Supervisor، Branch Manager، Finance.
+4. Stable Android signing secrets.
+5. APK تجريبي ثم إصلاح ملاحظات الأجهزة الفعلية.
+6. تقسيم `App.tsx` تدريجيًا إلى Features بعد تثبيت السلوك.
+
+
+### Inventory hardening QA
+- `supabase/staff_inventory_hardening.test.sql` is a self-contained `BEGIN ... ROLLBACK` integration suite.
+- Covers authorization, reconciliation idempotency/conflicts, invalid-total rollback, zero-stock cleanup, stale-count invalidation, batch/Inventory alignment, and atomic expiry disposal.
+- `supabase/STAFF_INVENTORY_PREVIEW_QA.md` contains the Preview runbook and manual Android QA matrix.
+- Production migrations remain blocked until this suite passes on a Supabase Development/Preview branch.

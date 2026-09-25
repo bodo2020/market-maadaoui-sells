@@ -13,6 +13,7 @@ import {
   NavLink,
   Route,
   Routes,
+  useLocation,
   useNavigate,
   useParams,
 } from "react-router-dom";
@@ -22,14 +23,19 @@ import { Capacitor } from "@capacitor/core";
 import {
   AlertTriangle,
   ArrowRight,
+  Banknote,
   Barcode,
   Bell,
+  BriefcaseBusiness,
   BellRing,
   Check,
   CheckCircle2,
+  CalendarDays,
   ClipboardList,
   Clock3,
+  FileText,
   Home,
+  IdCard,
   Layers3,
   Loader2,
   LogIn,
@@ -40,14 +46,26 @@ import {
   RefreshCw,
   Scale,
   ScanLine,
+  Send,
   ShieldCheck,
   Smartphone,
   UserRound,
   UsersRound,
+  XCircle,
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import { googlePasswordManager } from "./googlePasswordManager";
+import { getPersistentStaffDeviceIdentity } from "./deviceIdentity";
+import {
+  disableStaffPush,
+  enableStaffPush,
+  getStaffPushPermissionState,
+  getStoredStaffPushToken,
+  isStaffPushSupported,
+  setupStaffPush,
+} from "./staffPush";
 import * as staff from "./services/staffService";
+import EmploymentFilePage from "./EmploymentFilePage";
 import type {
   BatchPickingShadow,
   FulfillmentOrder,
@@ -58,6 +76,8 @@ import type {
   PickingSession,
   StaffBranch,
   StaffIdentity,
+  StaffSelfServiceSnapshot,
+  StaffSelfServiceRequest,
 } from "./services/staffService";
 
 type SessionState = {
@@ -76,6 +96,7 @@ function useStaffSession() {
   const resolve = useCallback(async () => {
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
+      staff.clearStaffOfflineCache();
       setState({ loading: false, identity: null, branch: null });
       return;
     }
@@ -83,6 +104,11 @@ function useStaffSession() {
       const [identity, branches] = await Promise.all([staff.getStaffIdentity(), staff.getStaffBranches()]);
       if (!identity?.active || !branches?.length) throw new Error("STAFF_ACCESS_REQUIRED");
       const branch = branches.find((row) => row.is_primary) || branches[0];
+      try {
+        await restoreKnownStaffDevice(branch.branch_id);
+      } catch {
+        // Device recovery must never block a valid staff login.
+      }
       setState({ loading: false, identity, branch });
     } catch {
       await supabase.auth.signOut();
@@ -106,7 +132,27 @@ function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [credentialBusy, setCredentialBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const fillSavedPassword = useCallback(async () => {
+    if (Capacitor.getPlatform() !== "android") return;
+    setCredentialBusy(true);
+    try {
+      const saved = await googlePasswordManager.getPassword();
+      if (saved?.username) setUsername(saved.username);
+      if (saved?.password) setPassword(saved.password);
+    } catch {
+      // No saved credential or the user dismissed the account picker.
+    } finally {
+      setCredentialBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void fillSavedPassword(); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [fillSavedPassword]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -139,6 +185,7 @@ function Login() {
         <form onSubmit={submit} autoComplete="on">
           <label htmlFor="staff-username">اسم المستخدم<input id="staff-username" name="username" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} required /></label>
           <label htmlFor="staff-password">كلمة المرور<input id="staff-password" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
+          {Capacitor.getPlatform()==="android"&&<button type="button" className="saved-credential-button" disabled={credentialBusy||busy} onClick={()=>void fillSavedPassword()}>{credentialBusy?<Loader2 className="spin"/>:<ShieldCheck/>}استخدام كلمة مرور محفوظة</button>}
           {error && <div className="error-box">{error}</div>}
           <button className="primary" disabled={busy}>{busy ? <Loader2 className="spin" /> : "تسجيل الدخول"}</button>
         </form>
@@ -170,36 +217,140 @@ function useNotificationBadge(identity: StaffIdentity, branch: StaffBranch) {
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [identity.user_id, load]);
+  useEffect(() => {
+    const refresh = () => void load();
+    window.addEventListener("staff-push-received", refresh);
+    return () => window.removeEventListener("staff-push-received", refresh);
+  }, [load]);
   return unread;
 }
 
+function useOnlineStatus() {
+  const [online,setOnline]=useState(()=>typeof navigator==="undefined"?true:navigator.onLine);
+  useEffect(()=>{
+    const onOnline=()=>setOnline(true);
+    const onOffline=()=>setOnline(false);
+    window.addEventListener("online",onOnline);
+    window.addEventListener("offline",onOffline);
+    return ()=>{window.removeEventListener("online",onOnline);window.removeEventListener("offline",onOffline);};
+  },[]);
+  return online;
+}
+
+function useStaffPushBridge(identity: StaffIdentity, branch: StaffBranch) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    let dispose: (() => void | Promise<void>) | null = null;
+    let cancelled = false;
+    void setupStaffPush({
+      onOpen: (path) => navigate(path),
+      onReceived: () => window.dispatchEvent(new Event("staff-push-received")),
+    }).then((cleanup) => {
+      if (cancelled) void cleanup();
+      else dispose = cleanup;
+    });
+    return () => {
+      cancelled = true;
+      if (dispose) void dispose();
+    };
+  }, [branch.branch_id, identity.user_id, navigate]);
+}
+
 function Shell({ identity, branch, children }: { identity: StaffIdentity; branch: StaffBranch; children: ReactNode }) {
+  useStaffPushBridge(identity, branch);
   const unread = useNotificationBadge(identity, branch);
+  const online = useOnlineStatus();
+  const location = useLocation();
+  const workActive = ["/work","/operations","/inventory","/approvals","/manager","/handoffs"]
+    .some((path)=>location.pathname===path||location.pathname.startsWith(path+"/"));
+  const navItems = [
+    { to: "/", Icon: Home, label: "الرئيسية" },
+    { to: "/tasks", Icon: ClipboardList, label: "المهام" },
+    { to: "/work", Icon: Layers3, label: "العمل" },
+    { to: "/attendance", Icon: Clock3, label: "الحضور" },
+    { to: "/account", Icon: IdCard, label: "خدماتي" },
+  ];
+
   return (
     <div className="app-shell">
       <header>
-        <div><small>{branch.branch_name}</small><strong>أهلًا، {identity.name}</strong></div>
+        <div><small>{branch.branch_name} · {branch.role_name_ar}</small><strong>أهلًا، {identity.name}</strong></div>
         <NavLink to="/notifications" className="icon-btn notification-button" aria-label="الإشعارات">
           <Bell />{unread > 0 && <b>{unread > 99 ? "99+" : unread}</b>}
         </NavLink>
       </header>
+      {!online&&<div className="offline-banner"><AlertTriangle/><div><strong>أنت بدون اتصال</strong><span>هتشوف آخر بيانات محفوظة. التنفيذ والتأكيد هيرجع لما الإنترنت يرجع.</span></div></div>}
       <main className="content">{children}</main>
-      <nav className="bottom-nav">
-        {[
-          ["/", Home, "الرئيسية"],
-          ["/tasks", ClipboardList, "المهام"],
-          ["/operations", PackageCheck, "التشغيل"],
-          ["/attendance", Clock3, "الحضور"],
-          ["/account", UserRound, "حسابي"],
-        ].map(([to, Icon, label]) => (
-          <NavLink key={to as string} to={to as string} end={to === "/"}>{<Icon size={20} />}<span>{label as string}</span></NavLink>
+      <nav className="bottom-nav" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
+        {navItems.map(({ to, Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === "/"}
+            className={({isActive})=>(isActive||(to==="/work"&&workActive))?"active":""}
+          ><Icon size={20} /><span>{label}</span></NavLink>
         ))}
       </nav>
     </div>
   );
 }
 
-function HomePage({ branch }: { identity: StaffIdentity; branch: StaffBranch }) {
+function WorkPage({ branch, identity }: { identity: StaffIdentity; branch: StaffBranch }) {
+  const canOperate = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
+  const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
+  const canApprove = branch.permissions.some((permission) =>
+    permission.includes("approve")
+    || permission.includes("review")
+    || permission === "hr.approvals.view"
+    || permission === "finance.manage"
+    || permission === "pos.manage_shifts"
+    || permission === "inventory.manage"
+    || permission === "online_orders.manage"
+  );
+  const canManager = identity.is_super_admin || branch.permissions.includes("hr.view") || branch.permissions.includes("branch.manage_staff");
+  const canHandoffs = branch.permissions.includes("finance.manage") || branch.permissions.includes("finance.view") || branch.permissions.includes("pos.manage_shifts");
+
+  const modules = [
+    ...(canOperate ? [{
+      to:"/operations", Icon:PackageCheck, title:"تجهيز الطلبات",
+      description:"استلام الطلبات، الباركود، النواقص والبدائل.",
+    }] : []),
+    ...(canInventory ? [{
+      to:"/inventory", Icon:Scale, title:"المخزون والجرد",
+      description:"الجرد، التحويلات، المخاطر، الصلاحية وإرجاعات الموردين.",
+    }] : []),
+    ...(canApprove ? [{
+      to:"/approvals", Icon:ShieldCheck, title:"الموافقات",
+      description:"طلبات تحتاج قرارك: مخزون، حضور، HR، بدائل وتسويات.",
+    }] : []),
+    ...(canManager ? [{
+      to:"/manager", Icon:UsersRound, title:"فريقي اليوم",
+      description:"المتأخر، التدخلات ومؤشرات التشغيل الفعلية للفريق.",
+    }] : []),
+    ...(canHandoffs ? [{
+      to:"/handoffs", Icon:Banknote, title:"تسليمات الوردية",
+      description:"استلام عهدة الكاشير وتوريدها للخزنة مع توثيق الفروق.",
+    }] : []),
+  ];
+
+  return <>
+    <PageTitle title="العمل" subtitle={branch.role_name_ar+" · "+branch.branch_name}/>
+    <section className="work-hub-intro">
+      <div className="work-hub-icon"><Layers3/></div>
+      <div><strong>مساحة شغلك</strong><span>الوحدات اللي تظهر هنا مرتبطة بصلاحياتك فقط.</span></div>
+    </section>
+    <div className="work-hub-grid">
+      {modules.map(({to,Icon,title,description})=><NavLink className="work-hub-card" to={to} key={to}>
+        <div className="work-hub-card-icon"><Icon/></div>
+        <div><strong>{title}</strong><p>{description}</p></div>
+        <ArrowRight/>
+      </NavLink>)}
+    </div>
+    {!modules.length&&<Empty text="مفيش وحدات تشغيل إضافية مفعلة لدورك الحالي"/>}
+  </>;
+}
+
+function HomePage({ branch, identity }: { identity: StaffIdentity; branch: StaffBranch }) {
   const [tasks, setTasks] = useState<staff.OperationsTask[]>([]);
   const [attendance, setAttendance] = useState<any>(null);
   const [busy, setBusy] = useState(true);
@@ -217,20 +368,64 @@ function HomePage({ branch }: { identity: StaffIdentity; branch: StaffBranch }) 
     }
   }, [branch.branch_id]);
   useEffect(() => { void load(); }, [load]);
+
   const overdue = tasks.filter((task) => task.is_overdue).length;
+  const mine = tasks.filter((task) => task.is_mine).length;
   const current = tasks.find((task) => task.is_mine) || tasks[0];
+  const canPrepare = branch.permissions.includes("online_orders.prepare") || branch.permissions.includes("online_orders.manage");
+  const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
+  const canApprove = branch.permissions.some((permission) =>
+    permission.includes("approve")
+    || permission.includes("review")
+    || permission === "hr.approvals.view"
+    || permission === "finance.manage"
+    || permission === "pos.manage_shifts"
+    || permission === "inventory.manage"
+    || permission === "online_orders.manage"
+  );
+  const canManager = identity.is_super_admin || branch.permissions.includes("hr.view") || branch.permissions.includes("branch.manage_staff");
+  const canHandoffs = branch.permissions.includes("finance.manage") || branch.permissions.includes("finance.view") || branch.permissions.includes("pos.manage_shifts");
 
   return (
     <>
-      <section className="hero"><small>{branch.role_name_ar}</small><h1>يومي</h1><p>{attendance?.active_session ? "أنت داخل الوردية الآن" : "ابدأ يومك وتابع أول مهمة مطلوبة"}</p></section>
-      <div className="stats"><div><strong>{tasks.length}</strong><span>مهام نشطة</span></div><div><strong>{overdue}</strong><span>متأخرة</span></div><div><strong>{attendance?.active_session ? "نشط" : "—"}</strong><span>الحضور</span></div></div>
-      <section className="section"><div className="section-head"><h2>الأولوية الآن</h2><button className="icon-btn" onClick={() => void load()}>{busy ? <Loader2 className="spin" /> : <RefreshCw />}</button></div>{current ? <TaskCard task={current} onChanged={load} /> : <Empty text="مفيش مهام محتاجة منك إجراء حاليًا" />}</section>
+      <section className="hero">
+        <small>{branch.role_name_ar} · {branch.branch_name}</small>
+        <h1>يومك يا {identity.name.split(" ")[0]}</h1>
+        <p>{attendance?.active_session ? "وردية نشطة — ركّز على أولويتك الحالية" : "ابدأ ورديتك وبعدها هتظهر لك الأولويات المطلوبة حسب دورك"}</p>
+      </section>
+
+      <div className="stats">
+        <div><strong>{mine}</strong><span>مهامي</span></div>
+        <div><strong>{overdue}</strong><span>متأخرة</span></div>
+        <div><strong>{attendance?.active_session ? "نشط" : "—"}</strong><span>الوردية</span></div>
+      </div>
+
+      <section className="section staff-home-shortcuts">
+        <div className="section-head"><h2>اختصارات شغلك</h2></div>
+        <div className="actions staff-home-actions">
+          <NavLink className="secondary" to="/tasks"><ClipboardList />المهام</NavLink>
+          {canPrepare && <NavLink className="secondary" to="/operations"><PackageCheck />تجهيز الطلبات</NavLink>}
+          {canInventory && <NavLink className="secondary" to="/inventory"><Layers3 />المخزون والجرد</NavLink>}
+          {canApprove && <NavLink className="secondary" to="/approvals"><ShieldCheck />الموافقات</NavLink>}
+          {canManager && <NavLink className="secondary" to="/manager"><UsersRound />فريقي اليوم</NavLink>}
+          {canHandoffs && <NavLink className="secondary" to="/handoffs"><Banknote />تسليمات الوردية</NavLink>}
+          <NavLink className="secondary" to="/attendance"><Clock3 />الحضور والوردية</NavLink>
+          <NavLink className="secondary" to="/account"><IdCard />خدمات الموظف</NavLink>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section-head"><h2>الأولوية الآن</h2><button className="icon-btn" onClick={() => void load()}>{busy ? <Loader2 className="spin" /> : <RefreshCw />}</button></div>
+        {current ? <TaskCard task={current} onChanged={load} /> : <Empty text="مفيش مهام محتاجة منك إجراء حاليًا" />}
+      </section>
     </>
   );
 }
 
 function TaskCard({ task, onChanged }: { task: staff.OperationsTask; onChanged: () => Promise<void> }) {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const inventoryWorkflow = staff.isInventoryTask(task) || staff.isInventoryTransferTask(task);
   const act = async (kind: "claim" | "start" | "complete") => {
     setBusy(true);
     try {
@@ -248,9 +443,13 @@ function TaskCard({ task, onChanged }: { task: staff.OperationsTask; onChanged: 
       <div className="row"><span className={`pill ${task.priority}`}>{task.priority === "urgent" ? "عاجل" : task.priority === "high" ? "عالي" : "عادي"}</span>{task.is_overdue && <span className="danger-text">متأخرة</span>}</div>
       <h3>{task.title}</h3>{task.description && <p>{task.description}</p>}<small>{task.source_kind}</small>
       <div className="actions">
-        {task.status === "open" && task.can_claim && <button className="primary" onClick={() => void act("claim")} disabled={busy}>استلام المهمة</button>}
-        {task.is_mine && task.status === "claimed" && <button className="primary" onClick={() => void act("start")} disabled={busy}><Play />بدء التنفيذ</button>}
-        {task.is_mine && task.status === "in_progress" && <button className="primary" onClick={() => void act("complete")} disabled={busy}><CheckCircle2 />تم التنفيذ</button>}
+        {inventoryWorkflow
+          ? <button className="primary" onClick={() => navigate(`/inventory?task=${task.id}`)}><Layers3 />فتح مهمة المخزون</button>
+          : <>
+            {task.status === "open" && task.can_claim && <button className="primary" onClick={() => void act("claim")} disabled={busy}>استلام المهمة</button>}
+            {task.is_mine && task.status === "claimed" && <button className="primary" onClick={() => void act("start")} disabled={busy}><Play />بدء التنفيذ</button>}
+            {task.is_mine && task.status === "in_progress" && <button className="primary" onClick={() => void act("complete")} disabled={busy}><CheckCircle2 />تم التنفيذ</button>}
+          </>}
       </div>
     </article>
   );
@@ -517,6 +716,7 @@ function PickingPage({ branch }: { branch: StaffBranch }) {
   },[branch.branch_id,orderId]);
 
   useEffect(()=>{void load();},[load]);
+
   useOrderOperationsRealtime(
     branch.branch_id,
     useCallback(()=>{void refreshSession(false);},[refreshSession]),
@@ -666,13 +866,73 @@ function readStoredDevice() {
   const token = localStorage.getItem(DEVICE_TOKEN_KEY);
   return id && token ? { id, token } : null;
 }
-function getDeviceKey() {
-  let key = localStorage.getItem(DEVICE_KEY_KEY);
-  if (!key) {
-    key = `staff-${crypto.randomUUID()}`;
-    localStorage.setItem(DEVICE_KEY_KEY, key);
+function storeTrustedDevice(id: string, token: string) {
+  localStorage.setItem(DEVICE_ID_KEY,id);
+  localStorage.setItem(DEVICE_TOKEN_KEY,token);
+}
+
+async function getDeviceIdentity() {
+  const identity=await getPersistentStaffDeviceIdentity();
+  localStorage.setItem(DEVICE_KEY_KEY,identity.deviceKey);
+  return identity;
+}
+
+type DeviceTrustState="none"|"pending"|"trusted"|"rejected";
+
+async function restoreKnownStaffDevice(branchId:string):Promise<DeviceTrustState>{
+  const identity=await getDeviceIdentity();
+  const stored=readStoredDevice();
+
+  if(stored){
+    const state=await staff.validateStaffDevice(stored.id,stored.token);
+    if(state.trusted){
+      try{
+        const bound=await staff.bindStaffDeviceFingerprint(
+          stored.id,stored.token,identity.deviceKey,identity.metadata,
+        );
+        if(!bound.requires_recovery)return "trusted";
+
+        const recovered=await staff.recoverStaffDevice(
+          branchId,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
+        );
+        if(recovered.trusted&&recovered.device_id&&recovered.device_token){
+          storeTrustedDevice(recovered.device_id,recovered.device_token);
+          return "trusted";
+        }
+        return recovered.code==="DEVICE_PENDING_APPROVAL"
+          ?"pending"
+          :recovered.code==="DEVICE_REJECTED"
+            ?"rejected"
+            :"none";
+      }catch{
+        // If migration to the persistent fingerprint fails, the validated
+        // current device token remains authoritative.
+        return "trusted";
+      }
+    }
+
+    const recovered=await staff.recoverStaffDevice(
+      branchId,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
+    );
+    if(recovered.trusted&&recovered.device_id&&recovered.device_token){
+      storeTrustedDevice(recovered.device_id,recovered.device_token);
+      return "trusted";
+    }
+    if(recovered.code==="DEVICE_PENDING_APPROVAL"||state.code==="DEVICE_PENDING_APPROVAL")return "pending";
+    if(recovered.code==="DEVICE_REJECTED"||state.code==="DEVICE_REJECTED")return "rejected";
+    return "none";
   }
-  return key;
+
+  const recovered=await staff.recoverStaffDevice(
+    branchId,identity.deviceKey,identity.deviceName,identity.platform,identity.metadata,
+  );
+  if(recovered.trusted&&recovered.device_id&&recovered.device_token){
+    storeTrustedDevice(recovered.device_id,recovered.device_token);
+    return "trusted";
+  }
+  if(recovered.code==="DEVICE_PENDING_APPROVAL")return "pending";
+  if(recovered.code==="DEVICE_REJECTED")return "rejected";
+  return "none";
 }
 function attendanceError(code: string) {
   const map: Record<string,string> = {
@@ -771,13 +1031,12 @@ function AttendancePage({ branch }: { branch: StaffBranch }) {
   const load = useCallback(async()=>{
     setBusy(true);
     try{
-      setData(await staff.getAttendance(branch.branch_id));
-      const device=readStoredDevice();
-      if(!device){setDeviceState("none");}
-      else{
-        const state=await staff.validateStaffDevice(device.id,device.token);
-        setDeviceState(state.trusted?"trusted":state.code==="DEVICE_PENDING_APPROVAL"?"pending":state.code==="DEVICE_REJECTED"?"rejected":"none");
-      }
+      const [attendance,nextDeviceState] = await Promise.all([
+        staff.getAttendance(branch.branch_id),
+        restoreKnownStaffDevice(branch.branch_id),
+      ]);
+      setData(attendance);
+      setDeviceState(nextDeviceState);
     }catch(caught){setMessage({type:"error",text:attendanceError(caught instanceof Error?caught.message:"")});}
     finally{setBusy(false);}
   },[branch.branch_id]);
@@ -790,12 +1049,14 @@ function AttendancePage({ branch }: { branch: StaffBranch }) {
     if(!pairToken.trim()||pairCode.trim().length!==6)return;
     setActing(true);setMessage(null);
     try{
-      const result=await staff.redeemStaffDevicePairing(pairToken.trim(),pairCode.trim(),getDeviceKey(),"هاتف الموظف");
+      const identity=await getDeviceIdentity();
+      const result=await staff.redeemStaffDevicePairing(
+        pairToken.trim(),pairCode.trim(),identity.deviceKey,identity.deviceName,identity.platform,
+      );
       if(result.ok){
-        localStorage.setItem(DEVICE_ID_KEY,result.device_id);
-        localStorage.setItem(DEVICE_TOKEN_KEY,result.device_token);
+        storeTrustedDevice(result.device_id,result.device_token);
         setDeviceState(result.approval_status==="approved"?"trusted":"pending");
-        setMessage({type:"ok",text:result.approval_status==="approved"?"تم اعتماد الجهاز":"تم إرسال الجهاز للموافقة من الإدارة"});
+        setMessage({type:"ok",text:result.approval_status==="approved"?"تم اعتماد الجهاز وربطه ببصمته الثابتة":"تم إرسال الجهاز للموافقة من الإدارة"});
       }
     }catch{setMessage({type:"error",text:"بيانات ربط الجهاز غير صحيحة أو انتهت صلاحيتها"});}
     finally{setActing(false);}
@@ -918,13 +1179,1106 @@ function NotificationsPage({ branch, identity }: { branch: StaffBranch; identity
   const load=useCallback(async(show=true)=>{if(show)setBusy(true);try{setData(await staff.getNotifications(branch.branch_id,filter));}finally{if(show)setBusy(false);}},[branch.branch_id,filter]);
   useEffect(()=>{void load();},[load]);
   useEffect(()=>{const channel=supabase.channel(`staff-center-${identity.user_id}`).on("postgres_changes",{event:"INSERT",schema:"public",table:"notification_realtime_signals_v2",filter:`recipient_user_id=eq.${identity.user_id}`},()=>void load(false)).subscribe();return()=>{void supabase.removeChannel(channel);};},[identity.user_id,load]);
-  const open=async(item:NotificationItem)=>{if(!item.read_at)await staff.markNotificationRead(item.id);if(item.action_url&&item.action_url.startsWith("/")){const allowed=["/tasks","/operations","/attendance","/account","/notifications"];if(allowed.some((p)=>item.action_url?.startsWith(p)))navigate(item.action_url);}await load(false);};
+  const open=async(item:NotificationItem)=>{if(!item.read_at)await staff.markNotificationRead(item.id);if(item.action_url&&item.action_url.startsWith("/")){if(item.action_url.startsWith("/inventory-transfers")||item.action_url.startsWith("/tasks?type=inventory"))navigate("/inventory");else{const allowed=["/tasks","/operations","/inventory","/attendance","/account","/notifications"];if(allowed.some((p)=>item.action_url?.startsWith(p)))navigate(item.action_url);}}await load(false);};
   return <><div className="section-head notification-title"><PageTitle title="الإشعارات" subtitle="تنبيهات ومهام تحتاج انتباهك"/><button className="mark-read" onClick={async()=>{await staff.markAllNotificationsRead(branch.branch_id);await load(false);}}><Check/>قراءة الكل</button></div><div className="notification-summary"><div><strong>{data?.summary.unread||0}</strong><span>غير مقروء</span></div><div><strong>{data?.summary.action_required||0}</strong><span>يحتاج إجراء</span></div><div><strong>{data?.summary.critical||0}</strong><span>حرج</span></div></div><div className="chips">{[["all","الكل"],["unread","غير مقروء"],["critical","حرج"],["action","إجراء"]].map(([id,label])=><button key={id} className={filter===id?"active":""} onClick={()=>setFilter(id)}>{label}</button>)}</div>{busy?<Loading/>:<div className="notification-list">{(data?.items||[]).map((item)=><button key={item.id} className={`notification-card ${!item.read_at?"unread":""} ${item.severity}`} onClick={()=>void open(item)}><div className="notification-icon">{item.requires_action?<BellRing/>:<Bell/>}</div><div><div className="row"><strong>{item.title}</strong><span className="severity">{severityLabel(item.severity)}</span></div>{item.body&&<p>{item.body}</p>}<small>{new Date(item.created_at).toLocaleString("ar-EG")}</small></div></button>)}{!data?.items.length&&<Empty text="مفيش إشعارات في القسم ده"/>}</div>}</>;
+}
+
+
+const eanLeftOdd:Record<string,string>={"0":"0001101","1":"0011001","2":"0010011","3":"0111101","4":"0100011","5":"0110001","6":"0101111","7":"0111011","8":"0110111","9":"0001011"};
+const eanLeftEven:Record<string,string>={"0":"0100111","1":"0110011","2":"0011011","3":"0100001","4":"0011101","5":"0111001","6":"0000101","7":"0010001","8":"0001001","9":"0010111"};
+const eanRight:Record<string,string>={"0":"1110010","1":"1100110","2":"1101100","3":"1000010","4":"1011100","5":"1001110","6":"1010000","7":"1000100","8":"1001000","9":"1110100"};
+const eanParity:Record<string,string>={"0":"OOOOOO","1":"OOEOEE","2":"OOEEOE","3":"OOEEEO","4":"OEOOEE","5":"OEEOOE","6":"OEEEOO","7":"OEOEOE","8":"OEOEEO","9":"OEEOEO"};
+
+function EmployeeBarcode({value}:{value:string}) {
+  if(!/^\d{13}$/.test(value))return <div className="employee-barcode-fallback">{value||"باركود غير متاح"}</div>;
+  const parity=eanParity[value[0]];
+  let bits="101";
+  for(let i=1;i<=6;i++)bits+=(parity[i-1]==="O"?eanLeftOdd:eanLeftEven)[value[i]];
+  bits+="01010";
+  for(let i=7;i<=12;i++)bits+=eanRight[value[i]];
+  bits+="101";
+  return <div className="employee-barcode" aria-label={`باركود الموظف ${value}`}>
+    <svg viewBox={`0 0 ${bits.length} 58`} role="img">{[...bits].map((bit,index)=>bit==="1"?<rect key={index} x={index} y="0" width="1" height="50"/>:null)}</svg>
+    <strong dir="ltr">{value}</strong>
+  </div>;
+}
+
+function requestTypeLabel(value:string){
+  return value==="leave"?"إجازة":value==="salary_advance"?"سلفة":value==="attendance_correction"?"تصحيح حضور":value;
+}
+function requestStatusLabel(value:string){
+  return value==="pending"?"قيد المراجعة":value==="approved"?"موافق عليه":value==="rejected"?"مرفوض":value==="cancelled"?"ملغي":value==="fulfilled"?"تم التنفيذ":value;
+}
+
+
+function inventoryTaskLabel(task: staff.OperationsTask) {
+  if (task.source_kind === "inventory_count") return "جرد";
+  if (task.source_kind === "inventory_recount") return "إعادة عد";
+  if (task.source_kind === "inventory_adjustment") return "اعتماد فرق";
+  if (task.source_kind === "inventory_transfer_dispatch") return "شحن تحويل";
+  if (task.source_kind === "inventory_transfer_receive") return "استلام تحويل";
+  if (task.source_kind === "inventory_transfer_variance") return "مراجعة فرق تحويل";
+  return "مخزون";
+}
+
+function InventoryPage({ branch, identity }: { branch: StaffBranch; identity: StaffIdentity }) {
+  const canInventory = branch.permissions.some((permission) => permission.startsWith("inventory."));
+  const canCount = branch.permissions.includes("inventory.count") || branch.permissions.includes("inventory.recount");
+  const canTransfer = branch.permissions.includes("inventory.transfer") || branch.permissions.includes("inventory.manage");
+  const canExpiry = branch.permissions.includes("inventory.manage") || branch.permissions.includes("products.manage") || branch.permissions.includes("purchases.manage");
+  const canDisposeExpiry = branch.permissions.includes("inventory.manage");
+  const canSupplierReturns = branch.permissions.includes("inventory.manage") || branch.permissions.includes("purchases.manage") || branch.permissions.includes("finance.manage");
+  const canSettleSupplierReturns = branch.permissions.includes("purchases.manage") || branch.permissions.includes("finance.manage");
+  const canReconcileBatches = identity.is_super_admin || (branch.permissions.includes("inventory.manage") && branch.permissions.includes("purchases.manage"));
+  const [tab,setTab]=useState<"tasks"|"transfers"|"risks"|"expiry"|"supplier_returns"|"batch_reconciliation">("tasks");
+  const [riskStatus,setRiskStatus]=useState<staff.InventoryRiskStatus>("low_stock");
+  const [expiryDays,setExpiryDays]=useState(30);
+  const [tasks,setTasks]=useState<staff.OperationsTask[]>([]);
+  const [transfers,setTransfers]=useState<staff.InventoryTransferWorkspace|null>(null);
+  const [risks,setRisks]=useState<staff.InventoryRiskWorkspace|null>(null);
+  const [expiry,setExpiry]=useState<staff.ExpiryWorkspace|null>(null);
+  const [supplierReturns,setSupplierReturns]=useState<staff.SupplierReturnWorkspace|null>(null);
+  const [batchReconciliation,setBatchReconciliation]=useState<staff.BatchReconciliationWorkspace|null>(null);
+  const [reconciliationSuppliers,setReconciliationSuppliers]=useState<staff.BatchReconciliationSupplierOption[]>([]);
+  const [selectedReconciliation,setSelectedReconciliation]=useState<staff.BatchReconciliationItem|null>(null);
+  const [reconciliationRequestId,setReconciliationRequestId]=useState("");
+  const [reconciliationLines,setReconciliationLines]=useState<staff.BatchReconciliationLine[]>([]);
+  const [reconciliationNote,setReconciliationNote]=useState("");
+  const [selectedExpiry,setSelectedExpiry]=useState<staff.ExpiryBatchItem|null>(null);
+  const [expiryAction,setExpiryAction]=useState<"dispose"|"supplier_return">("dispose");
+  const [expiryRequestId,setExpiryRequestId]=useState("");
+  const [expiryActionQuantity,setExpiryActionQuantity]=useState("");
+  const [expiryActionNote,setExpiryActionNote]=useState("");
+  const [selectedSupplierReturn,setSelectedSupplierReturn]=useState<staff.SupplierReturnWorkspace["items"][number]|null>(null);
+  const [supplierCreditAmount,setSupplierCreditAmount]=useState("");
+  const [supplierCreditNote,setSupplierCreditNote]=useState("");
+  const [supplierSettlementNote,setSupplierSettlementNote]=useState("");
+  const [busy,setBusy]=useState(true);
+  const [acting,setActing]=useState("");
+  const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
+  const [selectedTask,setSelectedTask]=useState<staff.OperationsTask|null>(null);
+  const [detail,setDetail]=useState<staff.InventoryAuditTaskDetail|null>(null);
+  const [barcode,setBarcode]=useState("");
+  const [actualCount,setActualCount]=useState("");
+  const [note,setNote]=useState("");
+  const [adjustmentReason,setAdjustmentReason]=useState<staff.InventoryAdjustmentReason>("unknown");
+  const [rejectionReason,setRejectionReason]=useState<staff.InventoryAdjustmentRejectionReason>("insufficient_evidence");
+  const [selectedTransfer,setSelectedTransfer]=useState<staff.InventoryTransfer|null>(null);
+  const [receipt,setReceipt]=useState<Record<string,string>>({});
+  const [transferNote,setTransferNote]=useState("");
+
+  const load=useCallback(async(showBusy=true)=>{
+    if(!canInventory){setBusy(false);return;}
+    if(showBusy)setBusy(true);
+    try{
+      if(canCount){try{await staff.ensureDailyInventoryAudit(branch.branch_id);}catch{/* scheduler/server policy remains authoritative */}}
+      const [taskRows,transferData,riskData,expiryData,supplierReturnData,reconciliationData,reconciliationSupplierData]=await Promise.all([
+        staff.listTasks(branch.branch_id,"active"),
+        canTransfer?staff.getInventoryTransferWorkspace(branch.branch_id).catch(()=>null):Promise.resolve(null),
+        staff.getInventoryRiskWorkspace(branch.branch_id,riskStatus).catch(()=>null),
+        canExpiry?staff.getExpiryWorkspace(branch.branch_id,expiryDays).catch(()=>null):Promise.resolve(null),
+        canSupplierReturns?staff.getSupplierReturnsWorkspace(branch.branch_id,"pending_credit").catch(()=>null):Promise.resolve(null),
+        canReconcileBatches?staff.getBatchReconciliationWorkspace(branch.branch_id).catch(()=>null):Promise.resolve(null),
+        canReconcileBatches?staff.getBatchReconciliationSuppliers(branch.branch_id).catch(()=>[]):Promise.resolve([]),
+      ]);
+      setTasks(taskRows.filter((task)=>staff.isInventoryTask(task)||staff.isInventoryTransferTask(task)));
+      setTransfers(transferData);
+      setRisks(riskData);
+      setExpiry(expiryData);
+      setSupplierReturns(supplierReturnData);
+      setBatchReconciliation(reconciliationData);
+      setReconciliationSuppliers(reconciliationSupplierData);
+      setMessage(null);
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل عمليات المخزون"});
+    }finally{if(showBusy)setBusy(false);}
+  },[branch.branch_id,canCount,canExpiry,canInventory,canReconcileBatches,canSupplierReturns,canTransfer,expiryDays,riskStatus]);
+
+  useEffect(()=>{void load();},[load]);
+
+  const openTask=useCallback(async(task:staff.OperationsTask)=>{
+    if(staff.isInventoryTransferTask(task)){setTab("transfers");return;}
+    setActing(task.id);setMessage(null);
+    try{
+      if(task.status==="open"&&task.can_claim)await staff.claimTask(task.id);
+      if(task.status==="open"||task.status==="claimed"){try{await staff.startTask(task.id);}catch{/* may already be started */}}
+      const next=await staff.getInventoryAuditTask(task.id);
+      setSelectedTask(task);setDetail(next);setBarcode("");setActualCount("");setNote("");
+      await load(false);
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر فتح مهمة الجرد"});
+    }finally{setActing("");}
+  },[load]);
+
+  useEffect(()=>{
+    const taskId=new URLSearchParams(window.location.search).get("task");
+    if(!taskId||!tasks.length||selectedTask)return;
+    const match=tasks.find((task)=>task.id===taskId);
+    if(match)void openTask(match);
+  },[tasks,selectedTask,openTask]);
+
+  const closeTask=()=>{setSelectedTask(null);setDetail(null);setBarcode("");setActualCount("");setNote("");};
+
+  const submitCount=async()=>{
+    if(!selectedTask||!detail||acting)return;
+    if(detail.barcode&&barcode.trim()!==detail.barcode.trim()){setMessage({type:"error",text:"امسح باركود المنتج الصحيح قبل تسجيل الكمية"});return;}
+    const qty=Number(actualCount);
+    if(!Number.isFinite(qty)||qty<0){setMessage({type:"error",text:"اكتب الكمية الفعلية التي وجدتها"});return;}
+    setActing(selectedTask.id);setMessage(null);
+    try{
+      const result=selectedTask.source_kind==="inventory_recount"
+        ?await staff.submitInventoryRecount(selectedTask.id,qty,note)
+        :await staff.submitInventoryCount(selectedTask.id,qty,note);
+      closeTask();
+      setMessage({type:"ok",text:result.result==="matched"||result.result==="matched_system"?"تم تسجيل العد والرصيد مطابق":"تم تسجيل الفرق وتحويله تلقائيًا لمسار المراجعة"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تسجيل الجرد"});}
+    finally{setActing("");}
+  };
+
+  const decideAdjustment=async(decision:"approve"|"reject")=>{
+    if(!selectedTask||!detail||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة توضح قرار المراجعة"});return;}
+    setActing(selectedTask.id);setMessage(null);
+    try{
+      if(decision==="approve")await staff.approveInventoryAdjustment(selectedTask.id,adjustmentReason,note);
+      else await staff.rejectInventoryAdjustment(selectedTask.id,rejectionReason,note);
+      closeTask();setMessage({type:"ok",text:decision==="approve"?"تم اعتماد فرق المخزون وتوثيق التسوية":"تم رفض التسوية وإرجاعها لإعادة الجرد"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر حفظ قرار المراجعة"});}
+    finally{setActing("");}
+  };
+
+  const openTransfer=(transfer:staff.InventoryTransfer)=>{
+    setSelectedTransfer(transfer);setTransferNote("");
+    setReceipt(Object.fromEntries(transfer.items.map((item)=>[item.product_id,String(item.quantity)])));
+  };
+
+  const dispatchTransfer=async()=>{
+    if(!selectedTransfer||acting)return;
+    setActing(selectedTransfer.id);setMessage(null);
+    try{
+      await staff.dispatchInventoryTransfer(selectedTransfer.id,transferNote);
+      setSelectedTransfer(null);setMessage({type:"ok",text:"تم تأكيد شحن التحويل وإنشاء مهمة الاستلام للفرع المستلم"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر شحن التحويل"});}
+    finally{setActing("");}
+  };
+
+  const receiveTransfer=async()=>{
+    if(!selectedTransfer||acting)return;
+    const items=selectedTransfer.items.map((item)=>({product_id:item.product_id,quantity:Number(receipt[item.product_id]??item.quantity)}));
+    if(items.some((item)=>!Number.isFinite(item.quantity)||item.quantity<0)){setMessage({type:"error",text:"راجع الكميات المستلمة"});return;}
+    setActing(selectedTransfer.id);setMessage(null);
+    try{
+      await staff.receiveInventoryTransfer(selectedTransfer.id,items,transferNote);
+      setSelectedTransfer(null);setMessage({type:"ok",text:"تم استلام التحويل وتحديث المخزون. أي فرق تم تحويله لمسار المراجعة"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر استلام التحويل"});}
+    finally{setActing("");}
+  };
+
+  const createRiskCheck=async(product:staff.InventoryRiskProduct)=>{
+    if(acting)return;
+    setActing(product.product_id);setMessage(null);
+    try{
+      await staff.createSpotInventoryAudit(branch.branch_id,[product.product_id]);
+      setTab("tasks");
+      setMessage({type:"ok",text:`تم إنشاء جرد سريع لـ ${product.product_name} وإسناده لموظف جرد مؤهل`});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إنشاء الجرد السريع"});}
+    finally{setActing("");}
+  };
+
+  const createExpiryCheck=async(item:staff.ExpiryBatchItem)=>{
+    if(acting)return;
+    setActing(item.batch_id);setMessage(null);
+    try{
+      await staff.createSpotInventoryAudit(branch.branch_id,[item.product_id]);
+      setTab("tasks");
+      setMessage({type:"ok",text:`تم إنشاء جرد تحقق لـ ${item.product_name} قبل أي إجراء على الدفعة ${item.batch_number}`});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إنشاء جرد التحقق"});}
+    finally{setActing("");}
+  };
+
+  const openExpiryAction=(item:staff.ExpiryBatchItem,action:"dispose"|"supplier_return")=>{
+    setSelectedExpiry(item);
+    setExpiryAction(action);
+    setExpiryRequestId(crypto.randomUUID());
+    setExpiryActionQuantity(String(item.quantity));
+    setExpiryActionNote(action==="dispose"?"إهلاك دفعة منتهية/غير صالحة بعد التحقق الفعلي":"إرجاع دفعة للمورد بعد التحقق الفعلي");
+  };
+
+  const closeExpiryAction=()=>{
+    setSelectedExpiry(null);
+    setExpiryRequestId("");
+    setExpiryActionQuantity("");
+    setExpiryActionNote("");
+  };
+
+  const submitExpiryAction=async()=>{
+    if(!selectedExpiry||acting)return;
+    const qty=Number(expiryActionQuantity);
+    if(!Number.isFinite(qty)||qty<=0||qty>selectedExpiry.quantity){setMessage({type:"error",text:"راجع كمية الإجراء؛ يجب أن تكون أكبر من صفر ولا تتجاوز كمية الدفعة"});return;}
+    if(expiryActionNote.trim().length<3){setMessage({type:"error",text:"اكتب سببًا واضحًا للإجراء"});return;}
+    setActing(selectedExpiry.batch_id);setMessage(null);
+    try{
+      const result=await staff.processExpiryBatchAction(expiryRequestId,branch.branch_id,selectedExpiry.batch_id,qty,expiryAction,expiryActionNote);
+      closeExpiryAction();
+      setMessage({
+        type:"ok",
+        text:expiryAction==="dispose"
+          ?`تم إهلاك ${qty} وتسجيل أثر تكلفة ${Number(result.value_amount||0).toLocaleString("ar-EG",{maximumFractionDigits:2})} ج.م بدون حركة نقدية`
+          :`تم إخراج ${qty} من المخزون وإنشاء إرجاع للمورد بقيمة متوقعة ${Number(result.value_amount||0).toLocaleString("ar-EG",{maximumFractionDigits:2})} ج.م`,
+      });
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تنفيذ إجراء الصلاحية"});}
+    finally{setActing("");}
+  };
+
+  const openSupplierSettlement=(item:staff.SupplierReturnWorkspace["items"][number])=>{
+    setSelectedSupplierReturn(item);
+    setSupplierCreditAmount(String(item.expected_credit_amount||0));
+    setSupplierCreditNote("");
+    setSupplierSettlementNote("");
+  };
+
+  const closeSupplierSettlement=()=>{
+    setSelectedSupplierReturn(null);
+    setSupplierCreditAmount("");
+    setSupplierCreditNote("");
+    setSupplierSettlementNote("");
+  };
+
+  const submitSupplierSettlement=async()=>{
+    if(!selectedSupplierReturn||acting)return;
+    const amount=Number(supplierCreditAmount);
+    if(!Number.isFinite(amount)||amount<0){setMessage({type:"error",text:"اكتب قيمة Credit صحيحة"});return;}
+    if(supplierCreditNote.trim().length<2){setMessage({type:"error",text:"اكتب رقم Credit Note أو مرجع اعتماد المورد"});return;}
+    setActing(selectedSupplierReturn.id);setMessage(null);
+    try{
+      await staff.settleSupplierReturn(selectedSupplierReturn.id,amount,supplierCreditNote,supplierSettlementNote);
+      closeSupplierSettlement();
+      setMessage({type:"ok",text:"تم تسجيل اعتماد المورد وإغلاق الإرجاع كـ Credited"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تسوية إرجاع المورد"});}
+    finally{setActing("");}
+  };
+
+  const openBatchReconciliation=(item:staff.BatchReconciliationItem)=>{
+    setSelectedReconciliation(item);
+    setReconciliationRequestId(crypto.randomUUID());
+    setReconciliationNote("تسوية دفعات قديمة بعد جرد فعلي مطابق");
+    setReconciliationLines(item.batches.map((line)=>({
+      ...line,
+      batch_number:line.legacy_remaining?"":line.batch_number,
+      quantity:Number(line.quantity),
+      purchase_price:Number(line.purchase_price||0),
+      note:line.legacy_remaining?[line.note,"إعادة تعريف دفعة قديمة بعد التحقق الفعلي"].filter(Boolean).join(" | "):line.note||null,
+    })));
+  };
+
+  const closeBatchReconciliation=()=>{
+    setSelectedReconciliation(null);
+    setReconciliationRequestId("");
+    setReconciliationLines([]);
+    setReconciliationNote("");
+  };
+
+  const updateReconciliationLine=(index:number,patch:Partial<staff.BatchReconciliationLine>)=>{
+    setReconciliationLines((current)=>current.map((line,i)=>i===index?{...line,...patch}:line));
+  };
+
+  const addReconciliationLine=()=>{
+    setReconciliationLines((current)=>[...current,{
+      batch_id:null,batch_number:"",expiry_date:new Date().toISOString().slice(0,10),
+      quantity:0,purchase_price:0,supplier_id:null,shelf_location:null,note:"دفعة موثقة أثناء التسوية",
+    }]);
+  };
+
+  const removeReconciliationLine=(index:number)=>{
+    setReconciliationLines((current)=>current.filter((_,i)=>i!==index));
+  };
+
+  const createReconciliationCheck=async(item:staff.BatchReconciliationItem)=>{
+    if(acting)return;
+    setActing(item.product_id);setMessage(null);
+    try{
+      await staff.createSpotInventoryAudit(branch.branch_id,[item.product_id]);
+      setTab("tasks");
+      setMessage({type:"ok",text:`تم إنشاء جرد تحقق لـ ${item.product_name}. بعد ظهور نتيجة مطابقة ارجع لتسوية الدفعات.`});
+      await load(false);
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إنشاء جرد التحقق"});
+    }finally{setActing("");}
+  };
+
+  const submitBatchReconciliation=async()=>{
+    if(!selectedReconciliation||acting)return;
+    const total=reconciliationLines.reduce((sum,line)=>sum+Number(line.quantity||0),0);
+    if(selectedReconciliation.inventory_quantity>0&&reconciliationLines.length<1){setMessage({type:"error",text:"الرصيد أكبر من صفر؛ أضف دفعة واحدة على الأقل"});return;}
+    if(Math.abs(total-selectedReconciliation.inventory_quantity)>0.001){
+      setMessage({type:"error",text:`مجموع الدفعات ${total} لازم يساوي رصيد المخزون ${selectedReconciliation.inventory_quantity}`});return;
+    }
+    if(reconciliationLines.some((line)=>!line.batch_number.trim()||!line.expiry_date||Number(line.quantity)<=0||Number(line.purchase_price)<=0)){
+      setMessage({type:"error",text:"كل دفعة لازم يكون لها رقم حقيقي وتاريخ صلاحية وكمية وتكلفة شراء صحيحة"});return;
+    }
+    if(reconciliationNote.trim().length<5){setMessage({type:"error",text:"اكتب ملاحظة واضحة لسبب التسوية"});return;}
+    setActing(selectedReconciliation.product_id);setMessage(null);
+    try{
+      await staff.reconcileProductBatches(
+        reconciliationRequestId,branch.branch_id,selectedReconciliation.product_id,reconciliationLines,reconciliationNote,
+      );
+      closeBatchReconciliation();
+      setMessage({type:"ok",text:"تمت تسوية سجل الدفعات بدون تغيير رصيد Inventory أو إنشاء حركة مالية"});
+      await load(false);
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تنفيذ تسوية الدفعات"});
+    }finally{setActing("");}
+  };
+
+  const expiryDaysLeft=(value:string)=>{
+    const today=new Date();today.setHours(12,0,0,0);
+    const target=new Date(`${value}T12:00:00`);
+    return Math.ceil((target.getTime()-today.getTime())/86400000);
+  };
+
+  if(!canInventory)return <><PageTitle title="المخزون" subtitle="الوحدة غير مفعلة لهذا الدور"/><Empty text="دورك الحالي لا يملك صلاحيات تشغيل المخزون"/></>;
+
+  const auditTasks=tasks.filter((task)=>staff.isInventoryTask(task));
+  const transferTasks=tasks.filter((task)=>staff.isInventoryTransferTask(task));
+  const mine=auditTasks.filter((task)=>task.is_mine).length;
+  const overdue=auditTasks.filter((task)=>task.is_overdue).length;
+
+  return <>
+    <PageTitle title="المخزون" subtitle="الجرد والتحويلات من نفس مهام التشغيل"/>
+    {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
+    <div className="stats"><div><strong>{mine}</strong><span>مهام جرد لي</span></div><div><strong>{overdue}</strong><span>متأخرة</span></div><div><strong>{risks?.summary.low_stock_rows||0}</strong><span>مخزون منخفض</span></div></div>
+    <div className="chips"><button className={tab==="tasks"?"active":""} onClick={()=>setTab("tasks")}>الجرد</button>{canTransfer&&<button className={tab==="transfers"?"active":""} onClick={()=>setTab("transfers")}>التحويلات</button>}<button className={tab==="risks"?"active":""} onClick={()=>setTab("risks")}>مخاطر المخزون</button>{canExpiry&&<button className={tab==="expiry"?"active":""} onClick={()=>setTab("expiry")}>الصلاحية</button>}{canSupplierReturns&&<button className={tab==="supplier_returns"?"active":""} onClick={()=>setTab("supplier_returns")}>إرجاعات الموردين</button>}{canReconcileBatches&&<button className={tab==="batch_reconciliation"?"active":""} onClick={()=>setTab("batch_reconciliation")}>تسوية الدفعات</button>}<button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
+
+    {busy?<Loading/>:tab==="tasks"?<div className="stack inventory-task-list">
+      {auditTasks.map((task)=><article className={`task-card ${task.is_overdue?"danger":""}`} key={task.id}>
+        <div className="row"><span className="pill normal">{inventoryTaskLabel(task)}</span>{task.is_overdue&&<span className="danger-text">متأخرة</span>}</div>
+        <h3>{task.title}</h3><p>{task.description||"افتح المهمة واتبع تعليمات الجرد"}</p>
+        <div className="actions"><button className="primary" disabled={acting===task.id} onClick={()=>void openTask(task)}>{acting===task.id?<Loader2 className="spin"/>:<Scale/>}فتح الجرد</button></div>
+      </article>)}
+      {!auditTasks.length&&<Empty text="مفيش مهام جرد نشطة حاليًا"/>}
+    </div>:tab==="transfers"?<div className="stack">
+      {(transfers?.transfers||[]).map((transfer)=><article className={`task-card ${transfer.has_variance?"danger":""}`} key={transfer.id}>
+        <div className="row"><strong>{transfer.transfer_number}</strong><span className="pill normal">{transfer.status==="requested"?"بانتظار الشحن":transfer.status==="dispatched"?"في الطريق":transfer.status==="received_with_variance"?"مستلم بفرق":"مستلم"}</span></div>
+        <h3>{transfer.direction==="incoming"?`من ${transfer.from_branch_name}`:`إلى ${transfer.to_branch_name}`}</h3>
+        <p>{transfer.items_count} منتج{transfer.expected_arrival_date?` · متوقع ${new Date(transfer.expected_arrival_date).toLocaleDateString("ar-EG")}`:""}</p>
+        {(transfer.can_dispatch||transfer.can_receive)&&<div className="actions"><button className="primary" onClick={()=>openTransfer(transfer)}>{transfer.can_dispatch?"تأكيد الشحن":"استلام التحويل"}</button></div>}
+      </article>)}
+      {!transfers?.transfers.length&&<Empty text="مفيش تحويلات مخزون تحتاج تنفيذ حاليًا"/>}
+    </div>:tab==="risks"?<div className="inventory-risk-workspace">
+      <div className="chips risk-filter">{([["low_stock","منخفض"],["out_of_stock","نافد"],["coverage_risk","تغطية منخفضة"]] as Array<[staff.InventoryRiskStatus,string]>).map(([id,label])=><button key={id} className={riskStatus===id?"active":""} onClick={()=>setRiskStatus(id)}>{label}</button>)}</div>
+      <div className="inventory-risk-summary"><span>منخفض <b>{risks?.summary.low_stock_rows||0}</b></span><span>نافد <b>{risks?.summary.out_of_stock_rows||0}</b></span><span>تغطية منخفضة <b>{risks?.summary.coverage_risk_rows||0}</b></span><span>جرد معلق <b>{risks?.summary.pending_audit_tasks||0}</b></span></div>
+      <div className="stack">{(risks?.products||[]).map((product)=><article className="risk-product-card" key={product.product_id}>
+        <div className="risk-product-main">{product.image_url?<img src={product.image_url} alt=""/>:<div className="risk-product-placeholder"><PackageCheck/></div>}<div><div className="row"><strong>{product.product_name}</strong><span className={`risk-state ${product.stock_status}`}>{product.stock_status==="out_of_stock"?"نافد":product.stock_status==="coverage_risk"?"تغطية منخفضة":"منخفض"}</span></div><small>{product.shelf_location?`رف ${product.shelf_location}`:"رف غير محدد"} · {product.barcode||"بدون باركود"}</small></div></div>
+        <div className="risk-stock-values"><span>فعلي <b>{product.quantity}</b></span><span>محجوز <b>{product.reserved_quantity}</b></span><span>متاح <b>{product.available_quantity}</b></span><span>الحد الأدنى <b>{product.min_stock_level}</b></span></div>
+        {risks?.permissions.can_manage_sessions&&<button className="secondary full-action" disabled={acting===product.product_id} onClick={()=>void createRiskCheck(product)}>{acting===product.product_id?<Loader2 className="spin"/>:<Scale/>}إنشاء جرد سريع قبل التصرف</button>}
+      </article>)}{!risks?.products.length&&<Empty text="مفيش منتجات في الحالة دي حاليًا"/>}</div>
+    </div>:tab==="expiry"?<div className="expiry-workspace">
+      <div className="expiry-toolbar"><div><CalendarDays/><div><strong>دفعات الصلاحية</strong><span>من product_batches للفرع فقط</span></div></div><label>الفترة<select value={expiryDays} onChange={(e)=>setExpiryDays(Number(e.target.value))}><option value={7}>7 أيام</option><option value={14}>14 يوم</option><option value={30}>30 يوم</option><option value={60}>60 يوم</option><option value={90}>90 يوم</option></select></label></div>
+      {expiry?.requires_source_branch&&<div className="expiry-data-quality-banner"><AlertTriangle/><div><strong>الفرع يستخدم مخزونًا مشتركًا</strong><span>إدارة دفعات الصلاحية والتصرف المالي تتم من فرع المخزون المصدر فقط. بدّل للفرع المصدر قبل الجرد أو الإهلاك أو الإرجاع.</span></div></div>}
+      <div className="expiry-summary"><div><strong>{expiry?.summary.expired||0}</strong><span>منتهي</span></div><div><strong>{expiry?.summary.today||0}</strong><span>ينتهي اليوم</span></div><div><strong>{expiry?.summary.action_ready_rows||0}</strong><span>جاهز للتصرف</span></div><div><strong>{Number(expiry?.summary.purchase_value_at_risk||0).toLocaleString("ar-EG",{maximumFractionDigits:2})}</strong><span>قيمة شراء معرضة</span></div></div>
+      {Boolean((expiry?.summary.zero_cost_rows||0)+(expiry?.summary.duplicate_rows||0)+(expiry?.summary.legacy_remaining_rows||0))&&<div className="expiry-data-quality-banner"><AlertTriangle/><div><strong>بيانات صلاحية تحتاج تسوية</strong><span>{expiry?.summary.zero_cost_rows||0} بدون تكلفة · {expiry?.summary.duplicate_rows||0} سجلات مكررة · {expiry?.summary.legacy_remaining_rows||0} دفعات قديمة. الإجراءات المالية متوقفة على الصفوف غير الموثوقة.</span></div></div>}
+      {Boolean((expiry?.summary.batch_mismatch_rows||0)+(expiry?.summary.audit_pending_rows||0))&&<div className="expiry-readiness-banner"><ShieldCheck/><div><strong>بوابات الأمان قبل التصرف</strong><span>{expiry?.summary.batch_mismatch_rows||0} صف يحتاج تسوية دفعات · {expiry?.summary.audit_pending_rows||0} صف يحتاج جرد تحقق حديث. الجاهز فعليًا: {expiry?.summary.action_ready_rows||0}.</span></div></div>}
+      <div className="stack expiry-list">{(expiry?.items||[]).map((item)=>{const days=expiryDaysLeft(item.expiry_date);return <article className={`expiry-card ${days<0?"expired":days<=3?"critical":days<=7?"warning":""}`} key={item.batch_id}>
+        <div className="expiry-product">{item.image_url?<img src={item.image_url} alt=""/>:<div className="risk-product-placeholder"><CalendarDays/></div>}<div><div className="row"><strong>{item.product_name}</strong><span className="expiry-status">{days<0?`منتهي من ${Math.abs(days)} يوم`:days===0?"ينتهي اليوم":`متبقي ${days} يوم`}</span></div><small>دفعة {item.batch_number} · {item.shelf_location?`رف ${item.shelf_location}`:"رف غير محدد"}</small></div></div>
+        <div className="expiry-values"><span>الكمية <b>{item.quantity}</b></span><span>تاريخ الصلاحية <b>{new Date(`${item.expiry_date}T12:00:00`).toLocaleDateString("ar-EG")}</b></span><span>سعر الشراء <b>{Number(item.purchase_price).toLocaleString("ar-EG")} ج.م</b></span></div>
+        {item.legacy_remaining_batch&&<div className="expiry-legacy-warning"><AlertTriangle/><span>دفعة `REMAINING-*` من النظام القديم؛ الإهلاك والإرجاع متوقفان لحد تسوية سجل الدفعة.</span></div>}
+        {item.duplicate_count>1&&<div className="expiry-legacy-warning"><AlertTriangle/><span>فيه {item.duplicate_count} سجلات موجبة لنفس رقم الدفعة وتاريخ الصلاحية. لازم دمج/تسوية البيانات أولًا.</span></div>}
+        {item.cost_missing&&<div className="expiry-legacy-warning"><Banknote/><span>تكلفة الشراء غير موثوقة أو صفر؛ النظام يمنع تسجيل خسارة أو Credit بقيمة غير صحيحة.</span></div>}
+        <div className={item.audit_verified?"expiry-verification ready":"expiry-verification pending"}><ShieldCheck/><span>{item.audit_verified?`تم التحقق بجرد مطابق للرصيد الحالي${item.last_verified_at?` · ${new Date(item.last_verified_at).toLocaleString("ar-EG")}`:""}`:"لا يوجد جرد تحقق صالح حاليًا أو الرصيد تغيّر بعد آخر جرد"}</span></div>
+        <div className={item.batch_inventory_aligned?"expiry-verification ready":"expiry-verification pending"}><PackageCheck/><span>{item.batch_inventory_aligned?`سجل الدفعات متطابق مع Inventory: ${item.inventory_quantity}`:`سجل الدفعات ${item.active_batch_quantity} لا يساوي Inventory ${item.inventory_quantity} — يلزم تسوية دفعات`}</span></div>
+        <div className="expiry-safety-note"><ShieldCheck/><span>{item.supplier_name?`المورد: ${item.supplier_name}. `:""}Inventory الحالي {item.inventory_quantity}. أي خصم جديد يحترم حجوزات الطلبات الأونلاين ويُسجل في Inventory Ledger.</span></div>
+        <div className="expiry-actions">
+          <button className="secondary" disabled={acting===item.batch_id||Boolean(expiry?.requires_source_branch)} onClick={()=>void createExpiryCheck(item)}>{acting===item.batch_id?<Loader2 className="spin"/>:<Scale/>}{item.audit_verified?"إعادة جرد تحقق":"جرد تحقق"}</button>
+          {canDisposeExpiry&&<button className="danger-action" disabled={acting===item.batch_id||!item.action_ready} onClick={()=>openExpiryAction(item,"dispose")}><XCircle/>{!item.safe_for_action?"تسوية البيانات أولًا":!item.batch_inventory_aligned?"تسوية الدفعات أولًا":!item.audit_verified?"جرد تحقق أولًا":"إهلاك"}</button>}
+          {canSupplierReturns&&item.can_supplier_return&&<button className="primary" disabled={acting===item.batch_id||!item.action_ready} onClick={()=>openExpiryAction(item,"supplier_return")}><Send/>{!item.safe_for_action?"تسوية البيانات أولًا":!item.batch_inventory_aligned?"تسوية الدفعات أولًا":!item.audit_verified?"جرد تحقق أولًا":"إرجاع للمورد"}</button>}
+        </div>
+      </article>})}{!expiry?.items.length&&<Empty text="مفيش دفعات منتهية أو قريبة من الانتهاء في الفترة دي"/>}</div>
+    </div>:tab==="supplier_returns"?<div className="supplier-returns-workspace">
+      <div className="supplier-return-summary"><div><FileText/><div><strong>إرجاعات بانتظار اعتماد المورد</strong><span>المخزون خرج بالفعل؛ التسوية هنا لتسجيل الـCredit Note فقط.</span></div></div><b>{supplierReturns?.items.length||0}</b></div>
+      <div className="stack supplier-return-list">{(supplierReturns?.items||[]).map((item)=><article className="supplier-return-card" key={item.id}>
+        <div className="row"><div><small>{item.supplier_name}</small><h3>إرجاع مورد</h3></div><span className="pill high">Pending Credit</span></div>
+        <div className="supplier-return-values"><span>المتوقع <b>{Number(item.expected_credit_amount).toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})} ج.م</b></span><span>التاريخ <b>{new Date(item.created_at).toLocaleDateString("ar-EG")}</b></span></div>
+        <div className="supplier-return-items">{item.items.map((line)=><div key={line.id}><span>{line.product_name} · دفعة {line.batch_number}</span><b>{line.quantity} × {Number(line.purchase_price).toLocaleString("ar-EG")} ج.م</b></div>)}</div>
+        {canSettleSupplierReturns&&<button className="primary full-action" disabled={acting===item.id} onClick={()=>openSupplierSettlement(item)}><Check/>تسجيل Credit Note</button>}
+      </article>)}{!supplierReturns?.items.length&&<Empty text="مفيش إرجاعات مورد معلقة حاليًا"/>}</div>
+    </div>:<div className="batch-reconciliation-workspace">
+      <div className="batch-reconciliation-intro"><ShieldCheck/><div><strong>تسوية دفعات المخزون</strong><span>تصحيح سجل الدفعات فقط. رصيد Inventory والحركات المالية لا يتغيروا.</span></div></div>
+      {batchReconciliation?.requires_source_branch&&<div className="expiry-data-quality-banner"><AlertTriangle/><div><strong>التسوية من فرع المخزون المصدر فقط</strong><span>الفرع الحالي يشارك Inventory من فرع آخر. بدّل لفرع المخزون المصدر قبل إنشاء جرد تحقق أو اعتماد أي توزيع دفعات.</span></div></div>}
+      <div className="stack">{(batchReconciliation?.items||[]).map((item)=><article className="batch-reconciliation-card" key={item.product_id}>
+        <div className="row"><div><small>{item.barcode||"بدون باركود"}</small><h3>{item.product_name}</h3></div><span className={item.ready_for_reconciliation?"recon-ready":"recon-blocked"}>{batchReconciliation?.requires_source_branch?"فرع المصدر مطلوب":item.ready_for_reconciliation?"جرد مطابق حديث":"محتاج جرد تحقق"}</span></div>
+        <div className="reconciliation-totals">
+          <span>Inventory <b>{item.inventory_quantity}</b></span>
+          <span>مجموع الدفعات <b>{item.batch_quantity}</b></span>
+          <span>الفرق <b>{item.quantity_gap>0?"+":""}{item.quantity_gap}</b></span>
+        </div>
+        <div className="reconciliation-issues">
+          {item.legacy_rows>0&&<span>قديم {item.legacy_rows}</span>}
+          {item.zero_cost_rows>0&&<span>بدون تكلفة {item.zero_cost_rows}</span>}
+          {item.duplicate_rows>0&&<span>مكرر {item.duplicate_rows}</span>}
+        </div>
+        <div className="reconciliation-current-batches">{item.batches.map((line,index)=><div key={line.batch_id||index}><span>{line.batch_number} · {line.expiry_date}</span><b>{line.quantity} × {Number(line.purchase_price||0).toLocaleString("ar-EG")} ج.م</b></div>)}</div>
+        <div className="actions">
+          {!item.ready_for_reconciliation&&!batchReconciliation?.requires_source_branch&&<button className="secondary" disabled={acting===item.product_id} onClick={()=>void createReconciliationCheck(item)}>{acting===item.product_id?<Loader2 className="spin"/>:<Scale/>}إنشاء جرد تحقق</button>}
+          <button className="primary" disabled={!item.ready_for_reconciliation||acting===item.product_id} onClick={()=>openBatchReconciliation(item)}><ShieldCheck/>فتح التسوية</button>
+        </div>
+      </article>)}{!batchReconciliation?.items.length&&<Empty text="مفيش منتجات محتاجة تسوية دفعات حاليًا"/>}</div>
+    </div>}
+
+    {selectedReconciliation&&<div className="inventory-modal-backdrop" onClick={closeBatchReconciliation}><section className="inventory-modal reconciliation-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>Inventory = {selectedReconciliation.inventory_quantity}</small><h2>تسوية دفعات {selectedReconciliation.product_name}</h2></div><button className="icon-btn" onClick={closeBatchReconciliation}><XCircle/></button></div>
+      <div className="reconciliation-modal-note"><ShieldCheck/><span>مجموع الكميات أدناه لازم يساوي رصيد Inventory بالضبط. التسوية لا تزيد ولا تخصم مخزون.</span></div>
+      <div className="reconciliation-lines">{reconciliationLines.map((line,index)=><div className="reconciliation-line" key={line.batch_id||`new-${index}`}>
+        <div className="row"><strong>دفعة {index+1}</strong><button className="icon-btn small" onClick={()=>removeReconciliationLine(index)} aria-label="حذف الدفعة"><XCircle/></button></div>
+        <div className="reconciliation-line-grid">
+          <label>رقم الدفعة<input value={line.batch_number} onChange={(e)=>updateReconciliationLine(index,{batch_number:e.target.value})} placeholder="BATCH-..."/></label>
+          <label>تاريخ الصلاحية<input type="date" value={line.expiry_date} onChange={(e)=>updateReconciliationLine(index,{expiry_date:e.target.value})}/></label>
+          <label>الكمية<input type="number" min="0.001" step="0.001" inputMode="decimal" value={line.quantity} onChange={(e)=>updateReconciliationLine(index,{quantity:Number(e.target.value)})}/></label>
+          <label>سعر الشراء<input type="number" min="0.01" step="0.01" inputMode="decimal" value={line.purchase_price} onChange={(e)=>updateReconciliationLine(index,{purchase_price:Number(e.target.value)})}/></label>
+          <label>المورد<select value={line.supplier_id||""} onChange={(e)=>updateReconciliationLine(index,{supplier_id:e.target.value||null,supplier_name:reconciliationSuppliers.find((item)=>item.id===e.target.value)?.name||null})}><option value="">بدون مورد</option>{reconciliationSuppliers.map((supplier)=><option key={supplier.id} value={supplier.id}>{supplier.name}{supplier.code?` · ${supplier.code}`:""}</option>)}</select></label>
+          <label>الرف<input value={line.shelf_location||""} onChange={(e)=>updateReconciliationLine(index,{shelf_location:e.target.value||null})} placeholder="اختياري"/></label>
+          <label>ملاحظة<input value={line.note||""} onChange={(e)=>updateReconciliationLine(index,{note:e.target.value||null})} placeholder="مصدر التحقق"/></label>
+        </div>
+        {line.supplier_name&&<small className="reconciliation-supplier">المورد الحالي: {line.supplier_name}</small>}
+      </div>)}</div>
+      <button className="secondary full-action" onClick={addReconciliationLine}><PackageCheck/>إضافة دفعة</button>
+      <div className="reconciliation-balance">
+        <span>المجموع الجديد <b>{reconciliationLines.reduce((sum,line)=>sum+Number(line.quantity||0),0).toLocaleString("ar-EG",{maximumFractionDigits:3})}</b></span>
+        <span>Inventory <b>{selectedReconciliation.inventory_quantity}</b></span>
+        <span>الفرق <b>{(reconciliationLines.reduce((sum,line)=>sum+Number(line.quantity||0),0)-selectedReconciliation.inventory_quantity).toLocaleString("ar-EG",{maximumFractionDigits:3})}</b></span>
+      </div>
+      <label className="inventory-field">سبب ومصدر التسوية<textarea rows={3} value={reconciliationNote} onChange={(e)=>setReconciliationNote(e.target.value)} placeholder="مثال: تمت مراجعة الموجود فعليًا وتوزيعه حسب تواريخ الصلاحية على الرف"/></label>
+      <button className="primary full-action" disabled={Boolean(acting)||Math.abs(reconciliationLines.reduce((sum,line)=>sum+Number(line.quantity||0),0)-selectedReconciliation.inventory_quantity)>0.001} onClick={()=>void submitBatchReconciliation()}>{acting?<Loader2 className="spin"/>:<Check/>}اعتماد سجل الدفعات الجديد</button>
+    </section></div>}
+
+    {selectedTask&&detail&&<div className="inventory-modal-backdrop" onClick={closeTask}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>{inventoryTaskLabel(selectedTask)}</small><h2>{detail.product_name}</h2></div><button className="icon-btn" onClick={closeTask}><XCircle/></button></div>
+      {detail.image_url&&<img className="inventory-product-image" src={detail.image_url} alt=""/>}
+      <div className="inventory-facts"><span>الرف <b>{detail.shelf_location||"—"}</b></span><span>الوحدة <b>{detail.unit_of_measure||"قطعة"}</b></span></div>
+      {detail.source_kind==="inventory_adjustment"?<>
+        <div className="inventory-review-grid"><div><span>العد الأول</span><strong>{detail.first_count??"—"}</strong></div><div><span>إعادة العد</span><strong>{detail.recount??"—"}</strong></div><div><span>الفرق المقترح</span><strong>{detail.current_adjustment_delta??"—"}</strong></div></div>
+        <label className="inventory-field">سبب التسوية<select value={adjustmentReason} onChange={(e)=>setAdjustmentReason(e.target.value as staff.InventoryAdjustmentReason)}><option value="unknown">غير معروف</option><option value="damage">تالف</option><option value="breakage">كسر</option><option value="theft">فقد / سرقة</option><option value="receiving_error">خطأ استلام</option><option value="selling_error">خطأ بيع</option><option value="previous_error">خطأ رصيد سابق</option></select></label>
+        <label className="inventory-field">ملاحظة<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideAdjustment("reject")}>رفض وإعادة جرد</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideAdjustment("approve")}>{acting?<Loader2 className="spin"/>:<Check/>}اعتماد التسوية</button></div>
+      </>:<>
+        <div className="blind-count-note"><ShieldCheck/><div><strong>Blind Count</strong><span>رصيد النظام مخفي. عدّ الموجود فعليًا فقط.</span></div></div>
+        {detail.barcode&&<label className="inventory-field">باركود المنتج<input value={barcode} onChange={(e)=>setBarcode(e.target.value)} inputMode="numeric" placeholder="امسح الباركود"/></label>}
+        <label className="inventory-field">الكمية الفعلية<input value={actualCount} onChange={(e)=>setActualCount(e.target.value)} inputMode="decimal" type="number" min="0" step="0.001" placeholder="0"/></label>
+        <label className="inventory-field">ملاحظة اختيارية<textarea rows={2} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void submitCount()}>{acting?<Loader2 className="spin"/>:<CheckCircle2/>}تسجيل نتيجة الجرد</button>
+      </>}
+    </section></div>}
+
+    {selectedTransfer&&<div className="inventory-modal-backdrop" onClick={()=>setSelectedTransfer(null)}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>{selectedTransfer.transfer_number}</small><h2>{selectedTransfer.can_dispatch?"شحن التحويل":"استلام التحويل"}</h2></div><button className="icon-btn" onClick={()=>setSelectedTransfer(null)}><XCircle/></button></div>
+      <div className="transfer-items">{selectedTransfer.items.map((item)=><div className="transfer-item" key={item.id}><div><strong>{item.product_name}</strong><small>{item.barcode||"بدون باركود"} · المشحون {item.quantity}</small></div>{selectedTransfer.can_receive&&<input type="number" min="0" step="0.001" value={receipt[item.product_id]??""} onChange={(e)=>setReceipt((current)=>({...current,[item.product_id]:e.target.value}))}/>}</div>)}</div>
+      <label className="inventory-field">ملاحظة<textarea rows={2} value={transferNote} onChange={(e)=>setTransferNote(e.target.value)} placeholder="اختياري"/></label>
+      <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void (selectedTransfer.can_dispatch?dispatchTransfer():receiveTransfer())}>{acting?<Loader2 className="spin"/>:<PackageCheck/>}{selectedTransfer.can_dispatch?"تأكيد خروج الشحنة":"تأكيد الاستلام"}</button>
+    </section></div>}
+
+    {selectedExpiry&&<div className="inventory-modal-backdrop" onClick={closeExpiryAction}><section className="inventory-modal expiry-action-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>دفعة {selectedExpiry.batch_number}</small><h2>{expiryAction==="dispose"?"إهلاك دفعة":"إرجاع للمورد"}</h2></div><button className="icon-btn" onClick={closeExpiryAction}><XCircle/></button></div>
+      <div className="approval-person"><CalendarDays/><div><strong>{selectedExpiry.product_name}</strong><span>{selectedExpiry.supplier_name?"المورد: "+selectedExpiry.supplier_name:"لا يوجد مورد مرتبط"}</span></div></div>
+      <div className="inventory-review-grid"><div><span>المتاح بالدفعة</span><strong>{selectedExpiry.quantity}</strong></div><div><span>تكلفة الوحدة</span><strong>{Number(selectedExpiry.purchase_price).toLocaleString("ar-EG")} ج.م</strong></div><div><span>{expiryAction==="dispose"?"خسارة متوقعة":"Credit متوقع"}</span><strong>{(Number(expiryActionQuantity||0)*Number(selectedExpiry.purchase_price||0)).toLocaleString("ar-EG",{maximumFractionDigits:2})}</strong></div></div>
+      <label className="inventory-field">الكمية<input type="number" min="0.001" max={selectedExpiry.quantity} step="0.001" inputMode="decimal" value={expiryActionQuantity} onChange={(e)=>setExpiryActionQuantity(e.target.value)}/></label>
+      <label className="inventory-field">سبب الإجراء<textarea rows={3} value={expiryActionNote} onChange={(e)=>setExpiryActionNote(e.target.value)}/></label>
+      <div className="handoff-warning"><ShieldCheck/><span>{expiryAction==="dispose"?"التأكيد يخصم المخزون المتاح فقط، يسجل الحركة في Inventory Ledger، ويضيف مصروفًا محاسبيًا غير نقدي بالقيمة الفعلية.":"التأكيد يخرج الكمية من المخزون المتاح وينشئ إرجاع مورد Pending Credit؛ لا يتم تعديل رصيد المورد قبل وصول Credit Note."}</span></div>
+      <button className={expiryAction==="dispose"?"danger-action full-action":"primary full-action"} disabled={Boolean(acting)} onClick={()=>void submitExpiryAction()}>{acting?<Loader2 className="spin"/>:expiryAction==="dispose"?<XCircle/>:<Send/>}{expiryAction==="dispose"?"تأكيد الإهلاك":"تأكيد الإرجاع للمورد"}</button>
+    </section></div>}
+
+    {selectedSupplierReturn&&<div className="inventory-modal-backdrop" onClick={closeSupplierSettlement}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>{selectedSupplierReturn.supplier_name}</small><h2>تسوية إرجاع المورد</h2></div><button className="icon-btn" onClick={closeSupplierSettlement}><XCircle/></button></div>
+      <div className="inventory-review-grid"><div><span>Credit المتوقع</span><strong>{Number(selectedSupplierReturn.expected_credit_amount).toFixed(2)}</strong></div><div><span>Credit المعتمد</span><strong>{Number(supplierCreditAmount||0).toFixed(2)}</strong></div><div><span>الفرق</span><strong>{(Number(supplierCreditAmount||0)-Number(selectedSupplierReturn.expected_credit_amount||0)).toFixed(2)}</strong></div></div>
+      <label className="inventory-field">قيمة Credit الفعلية<input type="number" min="0" step="0.01" inputMode="decimal" value={supplierCreditAmount} onChange={(e)=>setSupplierCreditAmount(e.target.value)}/></label>
+      <label className="inventory-field">رقم Credit Note / المرجع<input value={supplierCreditNote} onChange={(e)=>setSupplierCreditNote(e.target.value)} placeholder="مثال: CN-2026-001"/></label>
+      <label className="inventory-field">ملاحظة اختيارية<textarea rows={3} value={supplierSettlementNote} onChange={(e)=>setSupplierSettlementNote(e.target.value)}/></label>
+      <div className="handoff-warning"><FileText/><span>هذه الخطوة تثبت اعتماد المورد للمبلغ فقط. لا تنشئ حركة نقدية تلقائيًا ولا تغيّر رصيد المورد بدون مستند محاسبي لاحق.</span></div>
+      <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void submitSupplierSettlement()}>{acting?<Loader2 className="spin"/>:<Check/>}تسجيل Credit Note وإغلاق الإرجاع</button>
+    </section></div>}
+  </>;
+}
+
+
+function approvalSourceLabel(value:string){
+  if(value==="inventory_adjustment")return "فرق مخزون";
+  if(value==="attendance_exception")return "استثناء حضور";
+  if(value==="hr_request")return "طلب موظف";
+  if(value==="shift_reconciliation")return "فرق وردية";
+  if(value==="cash_handoff")return "فرق عهدة";
+  if(value==="inventory_transfer_variance")return "فرق تحويل";
+  if(value==="order_substitution")return "بديل طلب";
+  if(value==="order_substitution_financial_adjustment")return "تسوية فرق بديل";
+  if(value==="order_shortage_financial_adjustment")return "رد نقص طلب";
+  return "موافقة تشغيلية";
+}
+
+function ApprovalsPage({branch}:{branch:StaffBranch}){
+  const [scope,setScope]=useState<staff.ApprovalScope>("pending");
+  const [data,setData]=useState<staff.ApprovalCenter|null>(null);
+  const [busy,setBusy]=useState(true);
+  const [acting,setActing]=useState("");
+  const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
+  const [selected,setSelected]=useState<staff.ApprovalItem|null>(null);
+  const [inventoryDetail,setInventoryDetail]=useState<staff.InventoryAuditTaskDetail|null>(null);
+  const [hrDetail,setHrDetail]=useState<staff.HrRequestReviewDetail|null>(null);
+  const [attendanceDetail,setAttendanceDetail]=useState<staff.AttendanceExceptionReview|null>(null);
+  const [substitutionDetail,setSubstitutionDetail]=useState<staff.OrderSubstitutionApprovalDetail|null>(null);
+  const [financialDetail,setFinancialDetail]=useState<staff.OrderFinancialAdjustmentDetail|null>(null);
+  const [providerReference,setProviderReference]=useState("");
+  const [note,setNote]=useState("");
+  const [adjustmentReason,setAdjustmentReason]=useState<staff.InventoryAdjustmentReason>("unknown");
+  const [rejectionReason,setRejectionReason]=useState<staff.InventoryAdjustmentRejectionReason>("insufficient_evidence");
+
+  const load=useCallback(async(show=true)=>{
+    if(show)setBusy(true);
+    try{setData(await staff.getApprovalCenter(branch.branch_id,scope));setMessage(null);}
+    catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل الموافقات"});}
+    finally{if(show)setBusy(false);}
+  },[branch.branch_id,scope]);
+  useEffect(()=>{void load();},[load]);
+
+  const clear=()=>{setSelected(null);setInventoryDetail(null);setHrDetail(null);setAttendanceDetail(null);setSubstitutionDetail(null);setFinancialDetail(null);setProviderReference("");setNote("");};
+
+  const open=async(item:staff.ApprovalItem)=>{
+    setActing(item.id);setMessage(null);
+    try{
+      if(item.status==="open"&&item.can_claim)await staff.claimTask(item.id);
+      try{await staff.startTask(item.id);}catch{/* specialized workflow may already own the transition */}
+      setSelected(item);setNote("");
+      if(item.source_kind==="inventory_adjustment")setInventoryDetail(await staff.getInventoryAuditTask(item.id));
+      else if(item.source_kind==="hr_request")setHrDetail(await staff.getHrRequestForReview(item.id));
+      else if(item.source_kind==="attendance_exception")setAttendanceDetail(await staff.getAttendanceExceptionForReview(item.source_id));
+      else if(item.source_kind==="order_substitution")setSubstitutionDetail(await staff.getOrderSubstitutionApproval(branch.branch_id,item.source_id));
+      else if(item.source_kind==="order_substitution_financial_adjustment")setFinancialDetail(await staff.getOrderSubstitutionFinancialAdjustment(item.source_id));
+      else if(item.source_kind==="order_shortage_financial_adjustment")setFinancialDetail(await staff.getOrderShortageFinancialAdjustment(item.source_id));
+      await load(false);
+    }catch(caught){clear();setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر فتح الموافقة"});}
+    finally{setActing("");}
+  };
+
+  const decideInventory=async(decision:"approve"|"reject")=>{
+    if(!selected||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة واضحة للقرار"});return;}
+    setActing(selected.id);
+    try{
+      if(decision==="approve")await staff.approveInventoryAdjustment(selected.id,adjustmentReason,note);
+      else await staff.rejectInventoryAdjustment(selected.id,rejectionReason,note);
+      clear();setMessage({type:"ok",text:decision==="approve"?"تم اعتماد فرق المخزون":"تم رفض التسوية وإرجاعها لإعادة العد"});await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر حفظ القرار"});}
+    finally{setActing("");}
+  };
+
+  const decideHr=async(decision:"approved"|"rejected")=>{
+    if(!selected||!hrDetail||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة واضحة للقرار"});return;}
+    setActing(selected.id);
+    try{
+      await staff.decideHrRequest(selected.id,decision,note,decision==="approved"?hrDetail.request.payload:null);
+      clear();setMessage({type:"ok",text:decision==="approved"?"تم اعتماد طلب الموظف":"تم رفض طلب الموظف"});await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر حفظ القرار"});}
+    finally{setActing("");}
+  };
+
+  const decideAttendance=async(decision:"approved"|"rejected")=>{
+    if(!selected||!attendanceDetail||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة واضحة للقرار"});return;}
+    setActing(selected.id);
+    try{
+      await staff.decideAttendanceException(attendanceDetail.id,decision,note);
+      clear();setMessage({type:"ok",text:decision==="approved"?"تم اعتماد استثناء الحضور":"تم رفض استثناء الحضور"});await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر حفظ القرار"});}
+    finally{setActing("");}
+  };
+
+  const decideSubstitution=async(decision:"approve"|"reject")=>{
+    if(!selected||!substitutionDetail||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة واضحة للقرار"});return;}
+    setActing(selected.id);setMessage(null);
+    try{
+      const result=await staff.decideOrderSubstitution(substitutionDetail.id,decision,note);
+      clear();
+      const delta=Number(result.price_delta_total||0);
+      setMessage({type:"ok",text:decision==="approve"?(Math.abs(delta)>=0.01?"تم اعتماد البديل وإنشاء التسوية المالية المطلوبة":"تم اعتماد البديل بدون فرق مالي"):"تم رفض البديل وإرجاع الطلب لمسار التجهيز"});
+      await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر حفظ قرار البديل"});}
+    finally{setActing("");}
+  };
+
+  const settleFinancial=async()=>{
+    if(!selected||!financialDetail||acting)return;
+    if(providerReference.trim().length<2){setMessage({type:"error",text:"اكتب مرجع عملية التحصيل أو الرد"});return;}
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب ملاحظة واضحة للتسوية"});return;}
+    setActing(selected.id);setMessage(null);
+    try{
+      if(selected.source_kind==="order_substitution_financial_adjustment")await staff.settleOrderSubstitutionFinancialAdjustment(financialDetail.id,providerReference,note);
+      else await staff.settleOrderShortageFinancialAdjustment(financialDetail.id,providerReference,note);
+      clear();setMessage({type:"ok",text:financialDetail.direction==="charge"?"تم تسجيل تحصيل فرق الطلب":"تم تسجيل رد المبلغ وتسوية الطلب"});await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تسوية فرق الطلب"});}
+    finally{setActing("");}
+  };
+
+  const completeGeneral=async()=>{
+    if(!selected||acting)return;
+    if(note.trim().length<3){setMessage({type:"error",text:"اكتب نتيجة المراجعة"});return;}
+    setActing(selected.id);
+    try{await staff.completeTask(selected.id,note);clear();setMessage({type:"ok",text:"تم تسجيل نتيجة المراجعة"});await load(false);}
+    catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إغلاق الموافقة"});}
+    finally{setActing("");}
+  };
+
+  return <>
+    <PageTitle title="الموافقات" subtitle="Inbox واحد للمشرف والمدير حسب صلاحياته"/>
+    {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
+    <div className="approval-summary"><div><strong>{data?.summary.pending||0}</strong><span>معلقة</span></div><div><strong>{data?.summary.mine||0}</strong><span>عندي</span></div><div><strong>{data?.summary.overdue||0}</strong><span>متأخرة</span></div><div><strong>{data?.summary.critical||0}</strong><span>حرجة</span></div></div>
+    <div className="chips">{([["pending","معلقة"],["mine","عندي"],["overdue","متأخرة"],["completed","مكتملة"]] as Array<[staff.ApprovalScope,string]>).map(([id,label])=><button key={id} className={scope===id?"active":""} onClick={()=>setScope(id)}>{label}</button>)}<button onClick={()=>void load()}><RefreshCw className={busy?"spin":""}/>تحديث</button></div>
+    {busy?<Loading/>:<div className="stack approval-list">{(data?.items||[]).map((item)=><article className={`task-card ${item.is_overdue?"danger":""}`} key={item.id}><div className="row"><span className="pill normal">{approvalSourceLabel(item.source_kind)}</span>{item.priority==="urgent"&&<span className="danger-text">حرجة</span>}</div><h3>{item.title}</h3>{item.description&&<p>{item.description}</p>}<small>{new Date(item.created_at).toLocaleString("ar-EG")}{item.claimed_by_name?` · ${item.claimed_by_name}`:""}</small>{["open","claimed","in_progress","failed"].includes(item.status)&&<div className="actions"><button className="primary" disabled={acting===item.id} onClick={()=>void open(item)}>{acting===item.id?<Loader2 className="spin"/>:<ShieldCheck/>}{item.is_mine?"فتح القرار":"استلام ومراجعة"}</button></div>}</article>)}{!data?.items.length&&<Empty text="مفيش موافقات في القسم ده"/>}</div>}
+
+    {selected&&<div className="inventory-modal-backdrop" onClick={clear}><section className="inventory-modal approval-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>{approvalSourceLabel(selected.source_kind)}</small><h2>{selected.title}</h2></div><button className="icon-btn" onClick={clear}><XCircle/></button></div>
+      {selected.description&&<p className="approval-description">{selected.description}</p>}
+      {selected.source_kind==="inventory_adjustment"&&inventoryDetail?<>
+        <div className="inventory-review-grid"><div><span>رصيد النظام</span><strong>{inventoryDetail.current_system_quantity??"—"}</strong></div><div><span>إعادة العد</span><strong>{inventoryDetail.recount??"—"}</strong></div><div><span>فرق التسوية</span><strong>{inventoryDetail.current_adjustment_delta??"—"}</strong></div></div>
+        <label className="inventory-field">سبب التسوية<select value={adjustmentReason} onChange={(e)=>setAdjustmentReason(e.target.value as staff.InventoryAdjustmentReason)}><option value="unknown">غير معروف</option><option value="damage">تالف</option><option value="breakage">كسر</option><option value="theft">فقد / سرقة</option><option value="receiving_error">خطأ استلام</option><option value="selling_error">خطأ بيع</option><option value="previous_error">خطأ رصيد سابق</option></select></label>
+        <label className="inventory-field">ملاحظة<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideInventory("reject")}>رفض وإعادة عد</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideInventory("approve")}>اعتماد</button></div>
+      </>:selected.source_kind==="hr_request"&&hrDetail?<>
+        <div className="approval-person"><UserRound/><div><strong>{hrDetail.employee.name}</strong><span>{hrDetail.request.request_type==="leave"?"طلب إجازة":hrDetail.request.request_type==="salary_advance"?"طلب سلفة":"تصحيح حضور"}</span></div></div>
+        <div className="approval-request-body"><strong>السبب</strong><p>{hrDetail.request.reason}</p><pre>{JSON.stringify(hrDetail.request.payload,null,2)}</pre></div>
+        <label className="inventory-field">ملاحظة القرار<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideHr("rejected")}>رفض</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideHr("approved")}>اعتماد</button></div>
+      </>:selected.source_kind==="attendance_exception"&&attendanceDetail?<>
+        <div className="approval-person"><MapPin/><div><strong>{attendanceDetail.employee_name}</strong><span>{attendanceDetail.distance_m==null?"المسافة غير متاحة":`يبعد ${Math.round(attendanceDetail.distance_m)} متر عن الفرع`}</span></div></div>
+        {attendanceDetail.verification_photo_signed_url&&<img className="attendance-review-photo" src={attendanceDetail.verification_photo_signed_url} alt="صورة تحقق الحضور"/>}
+        <div className="approval-request-body"><strong>السبب</strong><p>{attendanceDetail.reason}</p></div>
+        <label className="inventory-field">ملاحظة القرار<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideAttendance("rejected")}>رفض</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideAttendance("approved")}>اعتماد</button></div>
+      </>:selected.source_kind==="order_substitution"&&substitutionDetail?<>
+        <div className="substitution-review-card">
+          <div className="substitution-product"><span>الأصلي</span><strong>{substitutionDetail.original_product_name}</strong><small>{Number(substitutionDetail.original_unit_price).toLocaleString("ar-EG")} ج.م</small></div>
+          <ArrowRight/>
+          <div className="substitution-product replacement">{substitutionDetail.replacement_image_url&&<img src={substitutionDetail.replacement_image_url} alt=""/>}<span>البديل المقترح</span><strong>{substitutionDetail.replacement_product_name}</strong><small>{Number(substitutionDetail.replacement_unit_price).toLocaleString("ar-EG")} ج.م × {substitutionDetail.quantity}</small></div>
+        </div>
+        <div className="approval-finance-impact"><span>فرق إجمالي الطلب</span><strong className={Number(substitutionDetail.price_delta_total)>0?"charge":Number(substitutionDetail.price_delta_total)<0?"refund":""}>{Number(substitutionDetail.price_delta_total).toLocaleString("ar-EG",{minimumFractionDigits:2})} ج.م</strong></div>
+        <label className="inventory-field">ملاحظة القرار<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)} placeholder="سبب الاعتماد أو الرفض"/></label>
+        <div className="actions"><button className="secondary" disabled={Boolean(acting)} onClick={()=>void decideSubstitution("reject")}>رفض البديل</button><button className="primary" disabled={Boolean(acting)} onClick={()=>void decideSubstitution("approve")}>اعتماد البديل</button></div>
+      </>:["order_substitution_financial_adjustment","order_shortage_financial_adjustment"].includes(selected.source_kind)&&financialDetail?<>
+        <div className="approval-request-body">
+          <strong>{selected.source_kind==="order_shortage_financial_adjustment"?financialDetail.product_name:`${financialDetail.original_product_name||""} → ${financialDetail.replacement_product_name||""}`}</strong>
+          <p>{financialDetail.direction==="charge"?"مطلوب تحصيل فرق من العميل":"مطلوب رد مبلغ للعميل"} · وسيلة الدفع {financialDetail.payment_method||"غير محددة"}</p>
+        </div>
+        <div className="inventory-review-grid"><div><span>قبل</span><strong>{Number(financialDetail.order_total_before).toFixed(2)}</strong></div><div><span>{financialDetail.direction==="charge"?"تحصيل":"رد"}</span><strong>{Number(financialDetail.amount).toFixed(2)}</strong></div><div><span>بعد</span><strong>{Number(financialDetail.target_order_total).toFixed(2)}</strong></div></div>
+        <label className="inventory-field">مرجع مزود الدفع<input value={providerReference} onChange={(e)=>setProviderReference(e.target.value)} placeholder="رقم العملية / المرجع"/></label>
+        <label className="inventory-field">ملاحظة التسوية<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)} placeholder="اكتب ما تم فعليًا"/></label>
+        <div className="handoff-warning"><ShieldCheck/><span>التأكيد يسجل التسوية في Payment Ledger ويعدل حالة الطلب حسب منطق الباك إند، وليس مجرد إغلاق Task.</span></div>
+        <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void settleFinancial()}>{acting?<Loader2 className="spin"/>:<Check/>}{financialDetail.direction==="charge"?"تأكيد التحصيل":"تأكيد رد المبلغ"}</button>
+      </>:<>
+        <div className="approval-request-body"><p>راجع التفاصيل ثم سجل نتيجة القرار.</p></div>
+        <label className="inventory-field">نتيجة المراجعة<textarea rows={3} value={note} onChange={(e)=>setNote(e.target.value)}/></label>
+        <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void completeGeneral()}>إغلاق الموافقة</button>
+      </>}
+    </section></div>}
+  </>;
+}
+
+
+function localIsoDate(daysAgo=0){
+  const date=new Date();
+  date.setDate(date.getDate()-daysAgo);
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
+
+function ManagerWorkspace({branch}:{branch:StaffBranch}){
+  const [from,setFrom]=useState(()=>localIsoDate(6));
+  const [to,setTo]=useState(()=>localIsoDate(0));
+  const [data,setData]=useState<staff.ManagerOperationsPerformance|null>(null);
+  const [approvals,setApprovals]=useState<staff.ApprovalCenter|null>(null);
+  const [tasks,setTasks]=useState<staff.OperationsTask[]>([]);
+  const [busy,setBusy]=useState(true);
+  const [error,setError]=useState("");
+
+  const load=useCallback(async()=>{
+    setBusy(true);setError("");
+    try{
+      const [performance,approvalData,taskRows]=await Promise.all([
+        staff.getManagerOperationsPerformance(branch.branch_id,from,to),
+        staff.getApprovalCenter(branch.branch_id,"pending").catch(()=>null),
+        staff.listTasks(branch.branch_id,"active"),
+      ]);
+      setData(performance);setApprovals(approvalData);setTasks(taskRows);
+    }catch(caught){
+      setData(null);setError(caught instanceof Error?caught.message:"تعذر تحميل تشغيل الفريق");
+    }finally{setBusy(false);}
+  },[branch.branch_id,from,to]);
+
+  useEffect(()=>{void load();},[load]);
+
+  const overdue=tasks.filter((task)=>task.is_overdue).length;
+  const urgent=tasks.filter((task)=>task.priority==="urgent"||task.priority==="high").length;
+  const attention=(data?.employees||[]).filter((employee)=>employee.needs_attention);
+  const inventory=data?.summary.inventory;
+  const online=data?.summary.online;
+  const cashier=data?.summary.cashier;
+
+  return <>
+    <PageTitle title="فريقي اليوم" subtitle="ملخص تشغيل الفرع والتدخلات اللي محتاجة مدير"/>
+    <section className="manager-filter-card">
+      <div><strong>{branch.branch_name}</strong><span>الفترة القصوى سنة واحدة</span></div>
+      <div className="manager-date-range">
+        <label>من<input type="date" value={from} onChange={(e)=>setFrom(e.target.value)}/></label>
+        <label>إلى<input type="date" value={to} onChange={(e)=>setTo(e.target.value)}/></label>
+        <button className="icon-btn" onClick={()=>void load()} aria-label="تحديث"><RefreshCw className={busy?"spin":""}/></button>
+      </div>
+    </section>
+    {error&&<div className="error-box">{error}</div>}
+    {busy&&!data?<Loading/>:data&&<>
+      <div className="manager-kpis">
+        <NavLink to="/approvals"><ShieldCheck/><strong>{approvals?.summary.pending||0}</strong><span>موافقات معلقة</span></NavLink>
+        <NavLink to="/tasks"><AlertTriangle/><strong>{overdue}</strong><span>مهام متأخرة</span></NavLink>
+        <div><UsersRound/><strong>{data.summary.employees}</strong><span>موظفو الفريق</span></div>
+        <div><BellRing/><strong>{urgent}</strong><span>أولوية عالية</span></div>
+      </div>
+
+      <section className="manager-section">
+        <div className="section-head"><div><h2>صحة التشغيل</h2><p>أرقام فعلية من أنشطة الفريق خلال الفترة</p></div></div>
+        <div className="manager-operations-grid">
+          <article><PackageCheck/><div><span>الأونلاين</span><strong>{online?.handled_orders||0} طلب</strong><small>{online?.cancellations||0} إلغاء</small></div></article>
+          <article><Scale/><div><span>الجرد</span><strong>{inventory?.counts_submitted||0}/{inventory?.counts_assigned||0}</strong><small>{inventory?.differences_found||0} فرق مكتشف</small></div></article>
+          <article><Banknote/><div><span>الكاشير</span><strong>{cashier?.invoices||0} فاتورة</strong><small>فرق نقدية {Number(cashier?.cash_variance||0).toLocaleString("ar-EG")} ج.م</small></div></article>
+          <article><ClipboardList/><div><span>خدمة العملاء</span><strong>{data.summary.customer_service.closed||0}/{data.summary.customer_service.assigned||0}</strong><small>{data.summary.customer_service.overdue_open||0} متابعة متأخرة</small></div></article>
+        </div>
+      </section>
+
+      <section className="manager-section">
+        <div className="section-head"><div><h2>يحتاج تدخل</h2><p>{data.summary.employees_needing_attention} موظف عليهم مؤشرات تحتاج متابعة</p></div></div>
+        <div className="manager-team-list">
+          {attention.map((employee)=><article key={employee.user_id} className="manager-employee-card">
+            <div className="manager-employee-head"><div className="avatar">{employee.name.slice(0,1)}</div><div><strong>{employee.name}</strong><span>{employee.job_title_name||employee.role}{employee.department_name?` · ${employee.department_name}`:""}</span></div><AlertTriangle/></div>
+            <div className="manager-employee-metrics">
+              <span>مهام متابعة متأخرة <b>{employee.followups_overdue_open}</b></span>
+              <span>فروق جرد <b>{employee.inventory_differences_found}</b></span>
+              <span>تعارض إعادة عد <b>{employee.inventory_recounts_conflicting}</b></span>
+              <span>فرق كاش <b>{Number(employee.cash_variance||0).toLocaleString("ar-EG")}</b></span>
+            </div>
+            <NavLink className="manager-profile-link" to={`/manager/employees/${employee.user_id}`}><IdCard/>الملف الوظيفي</NavLink>
+          </article>)}
+          {!attention.length&&<div className="manager-all-clear"><CheckCircle2/><strong>مفيش مؤشرات حرجة على الفريق في الفترة دي</strong></div>}
+        </div>
+      </section>
+
+      <section className="manager-section">
+        <div className="section-head"><div><h2>كل الفريق</h2><p>ملخص سريع بدون تقييم أو Score غامض</p></div></div>
+        <div className="manager-team-list">
+          {data.employees.map((employee)=><article key={employee.user_id} className="manager-employee-card compact">
+            <div className="manager-employee-head"><div className="avatar">{employee.name.slice(0,1)}</div><div><strong>{employee.name}</strong><span>{employee.job_title_name||employee.role}</span></div>{employee.needs_attention?<AlertTriangle/>:<CheckCircle2/>}</div>
+            <div className="manager-employee-metrics">
+              <span>جرد <b>{employee.inventory_counts_submitted}/{employee.inventory_counts_assigned}</b></span>
+              <span>أونلاين <b>{employee.online_handled_orders}</b></span>
+              <span>توصيل <b>{employee.delivery_delivered}</b></span>
+              <span>متابعات <b>{employee.followups_closed}/{employee.followups_assigned}</b></span>
+            </div>
+            <NavLink className="manager-profile-link" to={`/manager/employees/${employee.user_id}`}><IdCard/>فتح الملف الوظيفي</NavLink>
+          </article>)}
+        </div>
+      </section>
+    </>}
+  </>;
+}
+
+
+function CashHandoffPage({branch}:{branch:StaffBranch}){
+  const [data,setData]=useState<staff.CashHandoffWorkspace|null>(null);
+  const [busy,setBusy]=useState(true);
+  const [acting,setActing]=useState("");
+  const [selected,setSelected]=useState<staff.CashHandoff|null>(null);
+  const [received,setReceived]=useState("");
+  const [reason,setReason]=useState("");
+  const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
+
+  const load=useCallback(async(show=true)=>{
+    if(show)setBusy(true);
+    try{setData(await staff.getCashHandoffWorkspace(branch.branch_id));setMessage(null);}
+    catch(caught){setData(null);setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل تسليمات الوردية"});}
+    finally{if(show)setBusy(false);}
+  },[branch.branch_id]);
+
+  useEffect(()=>{void load();},[load]);
+
+  const open=(handoff:staff.CashHandoff)=>{
+    setSelected(handoff);
+    setReceived(Number(handoff.expected_amount||0).toFixed(2));
+    setReason("");
+  };
+
+  const submit=async()=>{
+    if(!selected||acting)return;
+    const amount=Number(received);
+    if(!Number.isFinite(amount)||amount<0){setMessage({type:"error",text:"اكتب المبلغ المستلم فعليًا"});return;}
+    const variance=Math.round((amount-Number(selected.expected_amount||0))*100)/100;
+    if(Math.abs(variance)>=0.01&&reason.trim().length<3){setMessage({type:"error",text:"فيه فرق في العهدة؛ اكتب سبب واضح"});return;}
+    setActing(selected.handoff_id);setMessage(null);
+    try{
+      await staff.receiveCashHandoff(selected.handoff_id,amount,reason);
+      setSelected(null);setMessage({type:"ok",text:"تم استلام العهدة وتوريدها للخزنة وتسجيل الحركة المالية"});await load(false);
+    }catch(caught){setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر استلام العهدة"});}
+    finally{setActing("");}
+  };
+
+  const variance=selected?Math.round((Number(received||0)-Number(selected.expected_amount||0))*100)/100:0;
+  return <>
+    <PageTitle title="تسليمات الوردية" subtitle="استلام عهدة الكاشير بعد إغلاق POS وتوريدها للخزنة"/>
+    {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
+    {busy?<Loading/>:data&&<>
+      <div className="handoff-safe-card"><div><small>خزنة الفرع</small><strong>{data.safe?.name||"الخزنة"}</strong></div><div><small>الرصيد الحالي</small><strong>{Number(data.safe?.balance||0).toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})} ج.م</strong></div><button className="icon-btn" onClick={()=>void load()}><RefreshCw/></button></div>
+      <section className="manager-section"><div className="section-head"><div><h2>بانتظار الاستلام</h2><p>{data.pending.length} وردية مغلقة لم يتم توريد عهدتها بعد</p></div></div>
+        <div className="handoff-list">{data.pending.map((handoff)=><article className="handoff-card" key={handoff.handoff_id}><div className="row"><div><small>{handoff.device_name}</small><h3>{handoff.cashier_name}</h3></div><span className="pill high">معلق</span></div><div className="handoff-amount"><span>المطلوب استلامه</span><strong>{Number(handoff.expected_amount).toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})} ج.م</strong></div><small>أُغلقت {new Date(handoff.closed_at).toLocaleString("ar-EG")}</small>{data.permissions.can_manage&&<button className="primary full-action" onClick={()=>open(handoff)}><Banknote/>استلام العهدة</button>}</article>)}{!data.pending.length&&<div className="manager-all-clear"><CheckCircle2/><strong>كل تسليمات الورديات متوردة للخزنة</strong></div>}</div>
+      </section>
+      <section className="manager-section"><div className="section-head"><div><h2>آخر التسليمات</h2><p>سجل مختصر للاستلامات المؤكدة</p></div></div><div className="handoff-history">{data.recent.slice(0,10).map((item)=><div key={item.handoff_id}><div><strong>{item.cashier_name}</strong><span>{new Date(item.received_at).toLocaleString("ar-EG")} · {item.received_by_name||"المسؤول"}</span></div><div><strong>{Number(item.received_amount).toLocaleString("ar-EG",{minimumFractionDigits:2})} ج.م</strong>{Math.abs(Number(item.variance_amount||0))>=0.01&&<span className="danger-text">فرق {Number(item.variance_amount).toLocaleString("ar-EG",{minimumFractionDigits:2})}</span>}</div></div>)}{!data.recent.length&&<Empty text="لسه مفيش تسليمات مكتملة"/>}</div></section>
+    </>}
+
+    {selected&&<div className="inventory-modal-backdrop" onClick={()=>setSelected(null)}><section className="inventory-modal" onClick={(event)=>event.stopPropagation()}>
+      <div className="section-head"><div><small>{selected.device_name}</small><h2>استلام عهدة {selected.cashier_name}</h2></div><button className="icon-btn" onClick={()=>setSelected(null)}><XCircle/></button></div>
+      <div className="inventory-review-grid"><div><span>المتوقع</span><strong>{Number(selected.expected_amount).toFixed(2)}</strong></div><div><span>المستلم</span><strong>{Number(received||0).toFixed(2)}</strong></div><div><span>الفرق</span><strong>{variance.toFixed(2)}</strong></div></div>
+      <label className="inventory-field">المبلغ المعدود فعليًا<input type="number" inputMode="decimal" min="0" step="0.01" value={received} onChange={(e)=>setReceived(e.target.value)}/></label>
+      {Math.abs(variance)>=0.01&&<label className="inventory-field">سبب الفرق<textarea rows={3} value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="اكتب سبب الزيادة أو العجز"/></label>}
+      <div className="handoff-warning"><ShieldCheck/><span>التأكيد ينشئ حركة مالية من درج الكاشير إلى خزنة الفرع، ولا يمكن اعتباره مجرد إغلاق شكلي.</span></div>
+      <button className="primary full-action" disabled={Boolean(acting)} onClick={()=>void submit()}>{acting?<Loader2 className="spin"/>:<Check/>}تأكيد الاستلام والتوريد</button>
+    </section></div>}
+  </>;
 }
 
 function AccountPage({ identity, branch }: { identity: StaffIdentity; branch: StaffBranch }) {
   const navigate=useNavigate();
-  return <><PageTitle title="حسابي" subtitle="هويتك وصلاحياتك في الفرع"/><section className="profile"><div className="avatar">{identity.name.slice(0,1)}</div><h2>{identity.name}</h2><p>{branch.role_name_ar} · {branch.branch_name}</p><div className="permission-list">{branch.permissions.slice(0,8).map((permission)=><span key={permission}>{permission}</span>)}</div><button className="logout" onClick={async()=>{await supabase.auth.signOut();navigate("/login",{replace:true});}}><LogOut/>تسجيل الخروج</button></section></>;
+  const [data,setData]=useState<StaffSelfServiceSnapshot|null>(null);
+  const [busy,setBusy]=useState(true);
+  const [acting,setActing]=useState(false);
+  const [view,setView]=useState<"home"|"advance"|"leave"|"attendance"|"requests">("home");
+  const [message,setMessage]=useState<{type:"ok"|"error";text:string}|null>(null);
+  const [pushStatus,setPushStatus]=useState<staff.PushDeviceStatus|null>(null);
+  const [pushPermission,setPushPermission]=useState<string>("unsupported");
+  const [pushBusy,setPushBusy]=useState(false);
+
+  const [advanceAmount,setAdvanceAmount]=useState("");
+  const [advanceMonths,setAdvanceMonths]=useState("1");
+  const [advanceReason,setAdvanceReason]=useState("");
+  const [leaveFrom,setLeaveFrom]=useState("");
+  const [leaveTo,setLeaveTo]=useState("");
+  const [leaveType,setLeaveType]=useState("annual");
+  const [leaveReason,setLeaveReason]=useState("");
+  const [attendanceDate,setAttendanceDate]=useState("");
+  const [attendanceType,setAttendanceType]=useState("time_correction");
+  const [requestedIn,setRequestedIn]=useState("");
+  const [requestedOut,setRequestedOut]=useState("");
+  const [attendanceReason,setAttendanceReason]=useState("");
+
+  const load=useCallback(async()=>{
+    setBusy(true);
+    try{
+      setData(await staff.getStaffSelfService(branch.branch_id));
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تحميل خدمات الموظف"});
+    }finally{setBusy(false);}
+  },[branch.branch_id]);
+
+  useEffect(()=>{void load();},[load]);
+
+  const loadPush=useCallback(async()=>{
+    if(!isStaffPushSupported()){
+      setPushPermission("unsupported");
+      setPushStatus(null);
+      return;
+    }
+    const [permission,status]=await Promise.all([
+      getStaffPushPermissionState(),
+      staff.getMyPushDeviceStatus().catch(()=>null),
+    ]);
+    setPushPermission(permission);
+    setPushStatus(status);
+  },[]);
+
+  useEffect(()=>{void loadPush();},[loadPush]);
+
+  const enablePush=async()=>{
+    setPushBusy(true);setMessage(null);
+    try{
+      const status=await enableStaffPush();
+      setPushStatus(status);
+      setPushPermission(await getStaffPushPermissionState());
+      setMessage({type:"ok",text:"تم تسجيل الجهاز لاستقبال إشعارات العمل"});
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر تفعيل إشعارات العمل"});
+    }finally{setPushBusy(false);}
+  };
+
+  const disablePush=async()=>{
+    setPushBusy(true);setMessage(null);
+    try{
+      await disableStaffPush();
+      setPushStatus(await staff.getMyPushDeviceStatus().catch(()=>({registered:false,device_count:0,platforms:[],providers:[]})));
+      setPushPermission(await getStaffPushPermissionState());
+      setMessage({type:"ok",text:"تم إيقاف Push على هذا الجهاز"});
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إيقاف إشعارات الجهاز"});
+    }finally{setPushBusy(false);}
+  };
+
+
+  const submitRequest=async(kind:"salary_advance"|"leave"|"attendance_correction")=>{
+    setActing(true);setMessage(null);
+    try{
+      if(kind==="salary_advance"){
+        if(Number(advanceAmount)<=0||advanceReason.trim().length<5)throw new Error("اكتب مبلغًا وسببًا واضحًا للسلفة");
+        await staff.submitMyHrRequest(branch.branch_id,kind,{
+          amount:Number(advanceAmount),
+          repayment_months:Number(advanceMonths),
+        },advanceReason.trim());
+        setAdvanceAmount("");setAdvanceMonths("1");setAdvanceReason("");
+      }else if(kind==="leave"){
+        if(!leaveFrom||!leaveTo||leaveReason.trim().length<5)throw new Error("حدد فترة الإجازة واكتب السبب");
+        await staff.submitMyHrRequest(branch.branch_id,kind,{
+          start_date:leaveFrom,end_date:leaveTo,leave_type:leaveType,partial_day:"none",
+        },leaveReason.trim());
+        setLeaveFrom("");setLeaveTo("");setLeaveReason("");
+      }else{
+        if(!attendanceDate||(!requestedIn&&!requestedOut)||attendanceReason.trim().length<5)throw new Error("أكمل بيانات تصحيح الحضور");
+        await staff.submitMyHrRequest(branch.branch_id,kind,{
+          attendance_date:attendanceDate,
+          correction_type:attendanceType,
+          requested_check_in:requestedIn||null,
+          requested_check_out:requestedOut||null,
+        },attendanceReason.trim());
+        setAttendanceDate("");setRequestedIn("");setRequestedOut("");setAttendanceReason("");
+      }
+      setMessage({type:"ok",text:"تم إرسال الطلب للمراجعة"});
+      setView("requests");
+      await load();
+    }catch(caught){
+      const raw=caught instanceof Error?caught.message:"تعذر إرسال الطلب";
+      setMessage({type:"error",text:raw.includes("HR_PENDING_REQUEST_EXISTS")?"عندك طلب من نفس النوع ما زال قيد المراجعة":raw});
+    }finally{setActing(false);}
+  };
+
+  const cancelRequest=async(item:StaffSelfServiceRequest)=>{
+    if(item.status!=="pending"||!window.confirm("إلغاء الطلب؟"))return;
+    setActing(true);setMessage(null);
+    try{
+      await staff.cancelMyHrRequest(item.id);
+      setMessage({type:"ok",text:"تم إلغاء الطلب"});
+      await load();
+    }catch(caught){
+      setMessage({type:"error",text:caught instanceof Error?caught.message:"تعذر إلغاء الطلب"});
+    }finally{setActing(false);}
+  };
+
+  if(busy&&!data)return <Loading/>;
+  const profile=data?.profile;
+  const recentRequests=data?.requests||[];
+  const pushRegistered=Boolean(pushStatus?.registered);
+  const currentDevicePushRegistered=Boolean(pushRegistered&&getStoredStaffPushToken());
+  const pushStateLabel=pushPermission==="unsupported"
+    ?"متاح في تطبيق Android فقط"
+    :currentDevicePushRegistered
+      ?"هذا الجهاز مسجل للإشعارات"
+      :pushRegistered
+        ?"يوجد جهاز آخر مسجل على حسابك، لكن هذا الجهاز غير مسجل"
+        :pushPermission==="denied"
+          ?"الإذن مرفوض من إعدادات الهاتف"
+          :pushPermission==="granted"
+            ?"الإذن موجود وهذا الجهاز يحتاج تسجيل"
+            :"الإشعارات غير مفعلة بعد";
+
+  return <>
+    <PageTitle title="خدماتي" subtitle="هويتك وطلباتك وخدمات الموارد البشرية"/>
+    {message&&<div className={message.type==="ok"?"success-box":"error-box"}>{message.text}</div>}
+
+    <section className="employee-identity-card">
+      <div className="employee-card-head">
+        <div className="avatar">{(profile?.name||identity.name).slice(0,1)}</div>
+        <div><small>{profile?.employee_code||"موظف"}</small><h2>{profile?.name||identity.name}</h2><p>{profile?.job_title?.name_ar||branch.role_name_ar} · {branch.branch_name}</p></div>
+        <IdCard/>
+      </div>
+      {data?.employee_card?.barcode&&<EmployeeBarcode value={data.employee_card.barcode}/>}
+      <div className="employee-card-meta">
+        <span>رقم العضوية <b dir="ltr">{data?.employee_card?.membership_number||"—"}</b></span>
+        {profile?.department?.name_ar&&<span>القسم <b>{profile.department.name_ar}</b></span>}
+        {profile?.manager?.name&&<span>المدير <b>{profile.manager.name}</b></span>}
+      </div>
+    </section>
+
+    <div className="self-service-stats">
+      <div><Banknote/><strong>{Number(data?.advance_summary?.outstanding_amount||0).toLocaleString("ar-EG")} ج.م</strong><span>سلف متبقية</span></div>
+      <div><CalendarDays/><strong>{Number(data?.leave_summary?.approved_days_ytd||0)}</strong><span>أيام إجازة معتمدة هذا العام</span></div>
+      <div><FileText/><strong>{recentRequests.filter((r)=>r.status==="pending").length}</strong><span>طلبات قيد المراجعة</span></div>
+    </div>
+
+    <div className="self-service-menu">
+      <button className={view==="home"?"active":""} onClick={()=>setView("home")}><IdCard/>بياناتي</button>
+      <button onClick={()=>navigate("/account/employment-file")}><BriefcaseBusiness/>الملف الوظيفي</button>
+      <button className={view==="advance"?"active":""} onClick={()=>setView("advance")}><Banknote/>طلب سلفة</button>
+      <button className={view==="leave"?"active":""} onClick={()=>setView("leave")}><CalendarDays/>طلب إجازة</button>
+      <button className={view==="attendance"?"active":""} onClick={()=>setView("attendance")}><Clock3/>تصحيح حضور</button>
+      <button className={view==="requests"?"active":""} onClick={()=>setView("requests")}><FileText/>طلباتي</button>
+    </div>
+
+    {view==="home"&&<section className="self-service-panel">
+      <button className="employment-file-entry" onClick={()=>navigate("/account/employment-file")}>
+        <BriefcaseBusiness/><div><strong>الملف الوظيفي الكامل</strong><span>بيانات HR، الفروع، الأداء والحضور والتخصصات</span></div><ArrowRight/>
+      </button>
+      <h3>بيانات العمل</h3>
+      <div className="profile-facts">
+        <div><span>الحالة</span><strong>{profile?.employment_status==="active"?"نشط":profile?.employment_status||"—"}</strong></div>
+        <div><span>نظام العمل</span><strong>{profile?.work_mode||"—"}</strong></div>
+        <div><span>نوع العقد</span><strong>{profile?.contract_type||"—"}</strong></div>
+        <div><span>تاريخ التعيين</span><strong>{profile?.hire_date?new Date(profile.hire_date).toLocaleDateString("ar-EG"):"—"}</strong></div>
+      </div>
+      <div className="staff-push-card">
+        <div className="staff-push-head"><BellRing/><div><strong>إشعارات العمل</strong><span>{pushStateLabel}</span></div><b className={currentDevicePushRegistered?"ready":pushPermission==="denied"?"blocked":"pending"}>{currentDevicePushRegistered?"مفعلة على الجهاز":pushPermission==="denied"?"مرفوضة":"غير مفعلة على الجهاز"}</b></div>
+        {pushPermission!=="unsupported"&&<div className="staff-push-meta"><span>الأجهزة المسجلة <b>{pushStatus?.device_count||0}</b></span><span>المزود <b>{pushStatus?.providers?.join(", ")||"—"}</b></span></div>}
+        {pushPermission==="unsupported"?<p>تسجيل Push Native يتم من نسخة Android فقط.</p>:currentDevicePushRegistered
+          ?<button className="secondary full-action" disabled={pushBusy} onClick={()=>void disablePush()}>{pushBusy?<Loader2 className="spin"/>:<Bell/>}إيقاف Push على هذا الجهاز</button>
+          :<button className="primary full-action" disabled={pushBusy} onClick={()=>void enablePush()}>{pushBusy?<Loader2 className="spin"/>:<BellRing/>}تفعيل إشعارات العمل</button>}
+      </div>
+      {(data?.advances?.length??0)>0&&<><h3>السلف الحالية</h3><div className="request-list">{(data?.advances??[]).slice(0,3).map((item)=><div className="request-row" key={item.id}><div><strong>{Number(item.principal_amount).toLocaleString("ar-EG")} ج.م</strong><small>متبقي {Number(item.outstanding_amount).toLocaleString("ar-EG")} ج.م · {item.repayment_months} شهر</small></div><span>{requestStatusLabel(item.status)}</span></div>)}</div></>}
+    </section>}
+
+    {view==="advance"&&<section className="self-service-panel request-form">
+      <div className="service-panel-title"><Banknote/><div><h3>طلب سلفة راتب</h3><p>الطلب يذهب للمراجعة ثم الصرف حسب سياسة الموارد البشرية.</p></div></div>
+      <label>المبلغ<input type="number" min="1" inputMode="decimal" value={advanceAmount} onChange={(e)=>setAdvanceAmount(e.target.value)} placeholder="مثال: 1000"/></label>
+      <label>عدد أشهر السداد<select value={advanceMonths} onChange={(e)=>setAdvanceMonths(e.target.value)}>{[1,2,3,4,5,6,9,12].map((n)=><option key={n} value={n}>{n} شهر</option>)}</select></label>
+      <label>سبب السلفة<textarea rows={3} value={advanceReason} onChange={(e)=>setAdvanceReason(e.target.value)} placeholder="اكتب سبب الطلب"/></label>
+      <button className="primary" disabled={acting} onClick={()=>void submitRequest("salary_advance")}>{acting?<Loader2 className="spin"/>:<Send/>}إرسال طلب السلفة</button>
+    </section>}
+
+    {view==="leave"&&<section className="self-service-panel request-form">
+      <div className="service-panel-title"><CalendarDays/><div><h3>طلب إجازة</h3><p>حدد الفترة والنوع وسيصل الطلب للمسؤول.</p></div></div>
+      <div className="form-grid"><label>من<input type="date" value={leaveFrom} onChange={(e)=>setLeaveFrom(e.target.value)}/></label><label>إلى<input type="date" value={leaveTo} onChange={(e)=>setLeaveTo(e.target.value)}/></label></div>
+      <label>نوع الإجازة<select value={leaveType} onChange={(e)=>setLeaveType(e.target.value)}><option value="annual">سنوية</option><option value="casual">عارضة</option><option value="sick">مرضية</option><option value="unpaid">بدون أجر</option><option value="other">أخرى</option></select></label>
+      <label>السبب<textarea rows={3} value={leaveReason} onChange={(e)=>setLeaveReason(e.target.value)} placeholder="سبب الإجازة"/></label>
+      <button className="primary" disabled={acting} onClick={()=>void submitRequest("leave")}>{acting?<Loader2 className="spin"/>:<Send/>}إرسال طلب الإجازة</button>
+    </section>}
+
+    {view==="attendance"&&<section className="self-service-panel request-form">
+      <div className="service-panel-title"><Clock3/><div><h3>تصحيح الحضور</h3><p>لنسيان تسجيل الدخول/الخروج أو تصحيح وقت مسجل.</p></div></div>
+      <label>التاريخ<input type="date" value={attendanceDate} onChange={(e)=>setAttendanceDate(e.target.value)}/></label>
+      <label>نوع التصحيح<select value={attendanceType} onChange={(e)=>setAttendanceType(e.target.value)}><option value="time_correction">تصحيح وقت</option><option value="missed_check_in">نسيان الحضور</option><option value="missed_check_out">نسيان الانصراف</option><option value="other">أخرى</option></select></label>
+      <div className="form-grid"><label>وقت الحضور المطلوب<input type="time" value={requestedIn} onChange={(e)=>setRequestedIn(e.target.value)}/></label><label>وقت الانصراف المطلوب<input type="time" value={requestedOut} onChange={(e)=>setRequestedOut(e.target.value)}/></label></div>
+      <label>السبب<textarea rows={3} value={attendanceReason} onChange={(e)=>setAttendanceReason(e.target.value)} placeholder="اشرح سبب التصحيح"/></label>
+      <button className="primary" disabled={acting} onClick={()=>void submitRequest("attendance_correction")}>{acting?<Loader2 className="spin"/>:<Send/>}إرسال طلب التصحيح</button>
+    </section>}
+
+    {view==="requests"&&<section className="self-service-panel">
+      <div className="section-head"><h3>طلباتي</h3><button className="icon-btn" onClick={()=>void load()}><RefreshCw/></button></div>
+      <div className="request-list">{recentRequests.map((item)=><article className="request-row request-history" key={item.id}><div><div className="row"><strong>{requestTypeLabel(item.request_type)}</strong><span className={`request-status ${item.status}`}>{requestStatusLabel(item.status)}</span></div><p>{item.reason}</p><small>{new Date(item.requested_at).toLocaleString("ar-EG")}</small>{item.decision_note&&<em>{item.decision_note}</em>}</div>{item.status==="pending"&&<button className="cancel-request" disabled={acting} onClick={()=>void cancelRequest(item)}><XCircle/>إلغاء</button>}</article>)}{!recentRequests.length&&<Empty text="لسه مفيش طلبات"/>}</div>
+    </section>}
+
+    <button className="logout self-service-logout" onClick={async()=>{try{await disableStaffPush();}catch{/* logout must not be blocked by push cleanup */}staff.clearStaffOfflineCache();await supabase.auth.signOut();navigate("/login",{replace:true});}}><LogOut/>تسجيل الخروج</button>
+  </>;
 }
 
 const PageTitle=({title,subtitle}:{title:string;subtitle:string})=><div className="page-title"><div><h1>{title}</h1><p>{subtitle}</p></div></div>;
@@ -935,7 +2289,7 @@ function AuthenticatedApp({state}:{state:ReturnType<typeof useStaffSession>}) {
   if(state.loading)return <Loading/>;
   if(!state.identity||!state.branch)return <Navigate to="/login" replace/>;
   const props={identity:state.identity,branch:state.branch};
-  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
+  return <Shell {...props}><Routes><Route path="/" element={<HomePage {...props}/>}/><Route path="/tasks" element={<TasksPage branch={state.branch}/>}/><Route path="/work" element={<WorkPage {...props}/>}/><Route path="/operations" element={<OperationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/operations/:orderId" element={<PickingPage branch={state.branch}/>}/><Route path="/inventory" element={<InventoryPage branch={state.branch} identity={state.identity}/>}/><Route path="/approvals" element={<ApprovalsPage branch={state.branch}/>}/><Route path="/manager" element={<ManagerWorkspace branch={state.branch}/>}/><Route path="/manager/employees/:employeeId" element={<EmploymentFilePage {...props}/>}/><Route path="/handoffs" element={<CashHandoffPage branch={state.branch}/>}/><Route path="/attendance" element={<AttendancePage branch={state.branch}/>}/><Route path="/notifications" element={<NotificationsPage branch={state.branch} identity={state.identity}/>}/><Route path="/account" element={<AccountPage {...props}/>}/><Route path="/account/employment-file" element={<EmploymentFilePage {...props}/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Shell>;
 }
 
 export default function App(){
