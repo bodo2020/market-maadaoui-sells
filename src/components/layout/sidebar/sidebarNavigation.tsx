@@ -8,6 +8,7 @@ import { NavigationGroup } from './types';
 export const mainNavigation: NavigationGroup = {
   title: 'التشغيل اليومي',
   items: [
+    { label: 'لوحة التشغيل', href: '/dashboard', icon: LayoutDashboard, adminOnly: true },
     { label: 'نقطة البيع', href: '/pos', icon: ShoppingCart },
     { label: 'الطلبات الإلكترونية', href: '/online-orders', icon: ShoppingBag },
     { label: 'تشغيل وتجهيز الطلبات', href: '/online-orders/operations', icon: Truck },
