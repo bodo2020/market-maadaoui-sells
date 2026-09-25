@@ -102,6 +102,7 @@ public class PosThermalPrinterPlugin extends Plugin {
         else if ("save".equals(operation)) select(call);
         else if ("print".equals(operation)) printHtml(call);
         else if ("printReceipt".equals(operation)) printReceipt(call);
+        else if ("printLabels".equals(operation)) printLabels(call);
         else if ("test".equals(operation)) testConnection(call);
         else call.reject("عملية غير معروفة");
     }
@@ -293,6 +294,88 @@ public class PosThermalPrinterPlugin extends Plugin {
         });
     }
 
+
+    @PluginMethod
+    public void printLabels(PluginCall call) {
+        if (!authorizedForSelected(call)) return;
+
+        android.content.SharedPreferences prefs = getContext().getSharedPreferences("thermal_printer", Context.MODE_PRIVATE);
+        String transport = prefs.getString("transport", "bluetooth");
+        String address = prefs.getString("address", null);
+        int usbDeviceId = prefs.getInt("usbDeviceId", -1);
+
+        if ("usb".equals(transport) && usbDeviceId < 0) { call.reject("اختار طابعة USB أولًا"); return; }
+        if (!"usb".equals(transport) && address == null) { call.reject("اختار طابعة حرارية أولًا"); return; }
+
+        Integer widthMmValue = call.getInt("widthMm");
+        Integer heightMmValue = call.getInt("heightMm");
+        Integer gapMmValue = call.getInt("gapMm");
+        JSArray labels = call.getArray("labels");
+
+        int widthMm = widthMmValue == null ? 40 : widthMmValue;
+        int heightMm = heightMmValue == null ? 25 : heightMmValue;
+        int gapMm = gapMmValue == null ? 2 : gapMmValue;
+
+        if (widthMm < 20 || widthMm > 76 || heightMm < 10 || heightMm > 120) {
+            call.reject("مقاس الاستيكر غير مدعوم على الطابعة");
+            return;
+        }
+        if (gapMm < 0 || gapMm > 10) {
+            call.reject("قيمة المسافة بين الاستيكرات غير صالحة");
+            return;
+        }
+        if (labels == null || labels.length() == 0 || labels.length() > 300) {
+            call.reject("لا توجد ملصقات صالحة للطباعة");
+            return;
+        }
+        if (testing.get() || !printing.compareAndSet(false, true)) {
+            call.reject("هناك عملية طباعة حالية؛ انتظر انتهاءها ثم حاول مرة أخرى");
+            return;
+        }
+
+        worker.execute(() -> {
+            long started = System.currentTimeMillis();
+            int totalCopies = 0;
+            int printedLabels = 0;
+            try {
+                for (int i = 0; i < labels.length(); i++) {
+                    JSONObject label = labels.optJSONObject(i);
+                    if (label == null) continue;
+                    String dataUrl = label.optString("dataUrl", "");
+                    int copies = Math.min(99, Math.max(1, label.optInt("copies", 1)));
+                    Bitmap bitmap = decodeDataUrl(dataUrl);
+                    if (bitmap == null) throw new IllegalArgumentException("تعذر تجهيز صورة الاستيكر رقم " + (i + 1));
+
+                    try {
+                        if ("usb".equals(transport)) {
+                            sendTsplLabelUsb(usbDeviceId, bitmap, widthMm, heightMm, gapMm, copies);
+                        } else {
+                            sendTsplLabelBluetooth(address, bitmap, widthMm, heightMm, gapMm, copies);
+                        }
+                    } finally {
+                        bitmap.recycle();
+                    }
+                    printedLabels += 1;
+                    totalCopies += copies;
+                }
+
+                JSObject result = new JSObject();
+                result.put("printed", printedLabels > 0);
+                result.put("labels", printedLabels);
+                result.put("totalCopies", totalCopies);
+                result.put("transport", transport);
+                result.put("mode", "tspl_bitmap");
+                result.put("totalMs", System.currentTimeMillis() - started);
+                call.resolve(result);
+            } catch (Exception error) {
+                if ("usb".equals(transport)) closePersistentUsbConnection();
+                else closePersistentConnection();
+                call.reject("تعذر طباعة استيكرات الباركود: " + error.getMessage(), error);
+            } finally {
+                printing.set(false);
+            }
+        });
+    }
 
     @PluginMethod
     public void printReceipt(PluginCall call) {
@@ -874,6 +957,93 @@ public class PosThermalPrinterPlugin extends Plugin {
         persistentOutput = persistentSocket.getOutputStream();
         persistentAddress = address;
         return persistentOutput;
+    }
+
+    private byte[] bitmapToTsplRaster(Bitmap bitmap, int targetWidth, int targetHeight) {
+        Bitmap scaled = bitmap;
+        if (bitmap.getWidth() != targetWidth || bitmap.getHeight() != targetHeight) {
+            scaled = Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, false);
+        }
+
+        int rowBytes = (targetWidth + 7) / 8;
+        byte[] raster = new byte[rowBytes * targetHeight];
+        int[] pixels = new int[targetWidth * targetHeight];
+        scaled.getPixels(pixels, 0, targetWidth, 0, 0, targetWidth, targetHeight);
+
+        for (int y = 0; y < targetHeight; y++) {
+            for (int x = 0; x < targetWidth; x++) {
+                int color = pixels[y * targetWidth + x];
+                int alpha = (color >>> 24) & 255;
+                int luminance = ((color >> 16 & 255) * 299 + (color >> 8 & 255) * 587 + (color & 255) * 114) / 1000;
+                if (alpha > 24 && luminance < 180) {
+                    raster[y * rowBytes + x / 8] |= (byte) (0x80 >> (x % 8));
+                }
+            }
+        }
+
+        if (scaled != bitmap) scaled.recycle();
+        return raster;
+    }
+
+    private byte[] ascii(String value) {
+        return value.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+    }
+
+    private void sendTsplLabelUsb(int deviceId, Bitmap bitmap, int widthMm, int heightMm, int gapMm, int copies) throws Exception {
+        int widthDots = widthMm * 8;
+        int heightDots = heightMm * 8;
+        int rowBytes = (widthDots + 7) / 8;
+        byte[] raster = bitmapToTsplRaster(bitmap, widthDots, heightDots);
+
+        try {
+            usbWrite(deviceId, ascii(
+                "SIZE " + widthMm + " mm," + heightMm + " mm\r\n" +
+                "GAP " + gapMm + " mm,0 mm\r\n" +
+                "SPEED 3\r\n" +
+                "DENSITY 8\r\n" +
+                "DIRECTION 1\r\n" +
+                "REFERENCE 0,0\r\n" +
+                "CLS\r\n" +
+                "BITMAP 0,0," + rowBytes + "," + heightDots + ",0,"
+            ), 4000);
+            usbWrite(deviceId, raster, 8000);
+            usbWrite(deviceId, ascii("\r\nPRINT 1," + copies + "\r\n"), 4000);
+        } catch (Exception error) {
+            closePersistentUsbConnection();
+            throw error;
+        }
+    }
+
+    private void sendTsplLabelBluetooth(String address, Bitmap bitmap, int widthMm, int heightMm, int gapMm, int copies) throws Exception {
+        int widthDots = widthMm * 8;
+        int heightDots = heightMm * 8;
+        int rowBytes = (widthDots + 7) / 8;
+        byte[] raster = bitmapToTsplRaster(bitmap, widthDots, heightDots);
+
+        OutputStream out = getPersistentOutput(address);
+        try {
+            out.write(ascii(
+                "SIZE " + widthMm + " mm," + heightMm + " mm\r\n" +
+                "GAP " + gapMm + " mm,0 mm\r\n" +
+                "SPEED 3\r\n" +
+                "DENSITY 8\r\n" +
+                "DIRECTION 1\r\n" +
+                "REFERENCE 0,0\r\n" +
+                "CLS\r\n" +
+                "BITMAP 0,0," + rowBytes + "," + heightDots + ",0,"
+            ));
+
+            final int chunkSize = 4096;
+            for (int offset = 0; offset < raster.length; offset += chunkSize) {
+                int length = Math.min(chunkSize, raster.length - offset);
+                out.write(raster, offset, length);
+            }
+            out.write(ascii("\r\nPRINT 1," + copies + "\r\n"));
+            out.flush();
+        } catch (Exception error) {
+            closePersistentConnection();
+            throw error;
+        }
     }
 
     private void sendBitmapUsb(int deviceId, Bitmap bitmap) throws Exception {
