@@ -231,17 +231,34 @@ export default function Barcode() {
     setCopyCounts(new Map());
   };
 
-  const printRows = (items: ProductManagementRow[], useQueueCopies = false) => {
+  const printRows = async (items: ProductManagementRow[], useQueueCopies = false) => {
     const printable = items
       .filter(row => row.barcode)
       .map(row => toLabelItem(row, useQueueCopies ? (copyCounts.get(row.row_key) || 1) : undefined));
-    if (!printable.length) return toast.error("لا توجد باركودات صالحة للطباعة في الاختيار الحالي.");
-    if (!printBarcodeLabels(printable, preferences)) return toast.error("المتصفح منع نافذة الطباعة. اسمح بالنوافذ المنبثقة للموقع.");
-    const labelCount = printable.reduce((sum, item) => sum + Number(item.copies || preferences.copies || 1), 0);
-    toast.success(`تم تجهيز ${labelCount.toLocaleString("ar-EG")} ملصق للطباعة`);
+    if (!printable.length) {
+      toast.error("لا توجد باركودات صالحة للطباعة في الاختيار الحالي.");
+      return;
+    }
+
+    try {
+      const result = await printBarcodeLabels(printable, preferences);
+      if (!result.printed) {
+        toast.error("تعذر بدء الطباعة. لو أنت على المتصفح اسمح بالنوافذ المنبثقة.");
+        return;
+      }
+      if (result.native) {
+        const timing = result.totalMs ? ` · ${Math.round(result.totalMs)} ms إرسال` : "";
+        toast.success(`تم إرسال ${result.totalLabels.toLocaleString("ar-EG")} ملصق مباشرة للطابعة${timing}`);
+      } else {
+        toast.success(`تم تجهيز ${result.totalLabels.toLocaleString("ar-EG")} ملصق لنافذة الطباعة`);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error((error as Error).message || "تعذر طباعة ملصقات الباركود.");
+    }
   };
 
-  const printQueue = () => printRows(selectedPrintable, true);
+  const printQueue = () => void printRows(selectedPrintable, true);
 
   const printAllResults = async () => {
     try {
@@ -250,7 +267,7 @@ export default function Barcode() {
       if (filter === "ready") result = result.filter(row => Boolean(row.barcode));
       if (filter === "missing") result = result.filter(row => !row.barcode);
       if (filter === "scale") result = result.filter(row => row.barcode_type === "scale");
-      printRows(result);
+      await printRows(result);
     } catch (error) {
       console.error(error);
       toast.error("تعذر تجهيز كل النتائج للطباعة.");
