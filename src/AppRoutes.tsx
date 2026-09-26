@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { UserRole } from '@/types';
 import Login from '@/pages/Login';
 import ReportsV2 from '@/pages/ReportsV2';
+import OperationsDashboard from '@/pages/OperationsDashboard';
 import ReportsSalesV2 from '@/pages/ReportsSalesV2';
 import ReportsProfitabilityV2 from '@/pages/ReportsProfitabilityV2';
 import ReportsPaymentsV2 from '@/pages/ReportsPaymentsV2';
@@ -126,7 +127,7 @@ export default function AppRoutes() {
       <Route path='/login' element={<Login />} />
       <Route path='/staff-device/activate' element={<StaffDeviceActivationPage />} />
       <Route path='/' element={<ProtectedRoute><CashierPOS /></ProtectedRoute>} />
-      <Route path='/dashboard' element={<ProtectedRoute><ReportsRedirect /></ProtectedRoute>} />
+      <Route path='/dashboard' element={<ProtectedRoute allowedRoles={marketplaceRoles}><OperationsDashboard /></ProtectedRoute>} />
       <Route path='/reports' element={<ProtectedRoute><ReportsV2 /></ProtectedRoute>} />
       <Route path='/reports/sales' element={<ProtectedRoute><ReportsSalesV2 /></ProtectedRoute>} />
       <Route path='/reports/profitability' element={<ProtectedRoute><ReportsProfitabilityV2 /></ProtectedRoute>} />
