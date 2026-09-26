@@ -2,6 +2,7 @@ import OrderLocationMap from '@/components/orders/OrderLocationMap';
 import BrandLoader from '@/components/ui/BrandLoader';
 import OnlineOrderFinalReceiptDialog from '@/components/orders/OnlineOrderFinalReceiptDialog';
 import OrderFulfillmentPanel from '@/components/orders/OrderFulfillmentPanel';
+import { CompleteWithoutDriverDialog } from '@/components/orders/CompleteWithoutDriverDialog';
 import { changeOnlineOrderStatus } from '@/services/supabase/orderOperationsService';
 import { acceptPosOnlineOrder } from '@/services/supabase/posOnlineOrdersInboxService';
 import "@/components/orders/orders-workspace.css";
@@ -52,6 +53,7 @@ export default function OrderDetails() {
   const [confirmAction,setConfirmAction] = useState<'confirm' | 'cancel' | null>(null);
   const snapshot = useQuery({queryKey:['order-delivery-snapshot',id],enabled:!!id,queryFn:() => getCheckoutSnapshot(id!)});
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
+  const [completeWithoutDriverOpen, setCompleteWithoutDriverOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const {
@@ -184,6 +186,11 @@ export default function OrderDetails() {
       <OrderFulfillmentPanel orderId={order.id} />
     ) : null}
 
+    {order.status === 'shipped' && <Card className="border-amber-200 bg-amber-50/50"><CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <div><strong>التسليم خارج تطبيق المندوب</strong><p className="text-sm text-muted-foreground">سجّل من نفّذ التسليم ومرجع تأكيد العميل. يخضع الإجراء للتحقق من حالة الدفع والتعيين.</p></div>
+      <Button variant="outline" onClick={() => setCompleteWithoutDriverOpen(true)}>تم التوصيل بدون مندوب</Button>
+    </CardContent></Card>}
+
     <div className="pos-detail-layout">
       <div className="pos-detail-content">
         <Card>
@@ -252,5 +259,6 @@ export default function OrderDetails() {
 
     <OnlineOrderFinalReceiptDialog isOpen={receiptOpen} onClose={()=>setReceiptOpen(false)} order={order} />
     <PaymentConfirmationDialog open={paymentConfirmOpen} onOpenChange={setPaymentConfirmOpen} orderId={order.id} onConfirm={fetchOrder} />
+    <CompleteWithoutDriverDialog open={completeWithoutDriverOpen} onOpenChange={setCompleteWithoutDriverOpen} orderId={order.id} onComplete={() => void fetchOrder()} />
   </div>;
 }

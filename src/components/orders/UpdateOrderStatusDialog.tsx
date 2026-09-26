@@ -35,6 +35,10 @@ export function UpdateOrderStatusDialog({
 
   const updateOrderStatus = async () => {
     if (!order || isSubmitting) return;
+    if (status === 'delivered') {
+      toast.error('استخدم مسار تسليم المندوب أو سجّل التسليم بدون مندوب مع إثبات الاستلام.');
+      return;
+    }
     
     try {
       setIsSubmitting(true);
@@ -89,7 +93,7 @@ export function UpdateOrderStatusDialog({
             </div>
             
             <RadioGroup value={status} onValueChange={(value) => setStatus(value as Order['status'])}>
-              {statusOptions.filter(item => order && allowedOrderStatuses(order.status).includes(item.value)).map((item) => (
+              {statusOptions.filter(item => item.value !== 'delivered' && order && allowedOrderStatuses(order.status).includes(item.value)).map((item) => (
                 <div key={item.value} className={`border-2 rounded-lg p-3 cursor-pointer transition-colors ${
                   status === item.value ? getStatusClass(item.value) : 'border-gray-200 hover:border-gray-300'
                 }`}>

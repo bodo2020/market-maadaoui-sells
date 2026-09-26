@@ -19,6 +19,7 @@ import { OrdersTable } from "@/components/orders/OrdersTable";
 import { CustomerProfileDialog } from "@/components/orders/CustomerProfileDialog";
 import { PaymentConfirmationDialog } from "@/components/orders/PaymentConfirmationDialog";
 import { AssignDeliveryPersonDialog } from "@/components/orders/AssignDeliveryPersonDialog";
+import { CompleteWithoutDriverDialog } from "@/components/orders/CompleteWithoutDriverDialog";
 import { useBranchStore } from "@/stores/branchStore";
 import { ReturnOrderDialog } from "@/components/orders/ReturnOrderDialog";
 import OnlineOrderInvoiceDialog from "@/components/orders/OnlineOrderInvoiceDialog";
@@ -28,9 +29,13 @@ export default function OnlineOrders() {
   const [cancelTargets, setCancelTargets] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<{
+    name: string; email?: string; phone?: string; address?: string;
+    governorate?: string; city?: string; area?: string; neighborhood?: string; order: Order;
+  } | null>(null);
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
   const [assignDeliveryOpen, setAssignDeliveryOpen] = useState(false);
+  const [completeWithoutDriverOpen, setCompleteWithoutDriverOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
   const [returnItems, setReturnItems] = useState<OrderItem[]>([]);
@@ -78,7 +83,7 @@ export default function OnlineOrders() {
         },
         async (payload) => {
           console.log('✅ New order received via realtime:', payload);
-          const newOrder = payload.new as any;
+          const newOrder = payload.new as Pick<Order, 'id' | 'total'>;
           
           // Play notification sound
           if (audioRef.current) {
@@ -124,15 +129,9 @@ export default function OnlineOrders() {
   const handleProcess = (order: Order) => {
     navigate(`/online-orders/${order.id}`);
   };
-  const handleComplete = async (order: Order) => {
-    try {
-      await changeOnlineOrderStatus(order.id, order.status, 'delivered');
-      handleOrderUpdate();
-      toast.success("تم تسليم الطلب بنجاح");
-    } catch (error) {
-      console.error('Error completing order:', error);
-      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء اكتمال الطلب");
-    }
+  const handleComplete = (order: Order) => {
+    setCurrentOrderId(order.id);
+    setCompleteWithoutDriverOpen(true);
   };
   const handlePaymentConfirm = (order: Order) => {
     setCurrentOrderId(order.id);
@@ -207,6 +206,7 @@ export default function OnlineOrders() {
             <PaymentConfirmationDialog open={paymentConfirmOpen} onOpenChange={setPaymentConfirmOpen} orderId={currentOrderId} onConfirm={handleOrderUpdate} />
             
             <AssignDeliveryPersonDialog open={assignDeliveryOpen} onOpenChange={setAssignDeliveryOpen} orderId={currentOrderId} onConfirm={handleOrderUpdate} />
+            <CompleteWithoutDriverDialog open={completeWithoutDriverOpen} onOpenChange={setCompleteWithoutDriverOpen} orderId={currentOrderId} onComplete={handleOrderUpdate} />
           </>}
 
         {returnOrderId && returnItems.length > 0 && <ReturnOrderDialog orderId={returnOrderId} items={returnItems} open={returnDialogOpen} onOpenChange={setReturnDialogOpen} onConfirm={handleOrderUpdate} />}
